@@ -72,7 +72,7 @@ A normal Swift compilation starts off with as many _frontend jobs_ as input
 files. Each invocation of the Swift frontend parses every file in the module,
 but also has a particular file marked as the _primary file._ A job is only
 responsible for compiling its primary file, and only does as much work as it
-needs to to compile that file, lazily type-checking declarations in other files
+needs to compile that file, lazily type-checking declarations in other files
 in the module.
 
 A frontend job emits diagnostics, an object file, dependency information (see

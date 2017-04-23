@@ -153,8 +153,7 @@ public:
     if (InsertPt == BB->end())
       return;
     // Set the opened archetype context from the instruction.
-    this->getOpenedArchetypes().addOpenedArchetypeOperands(
-        InsertPt->getTypeDependentOperands());
+    addOpenedArchetypeOperands(&*InsertPt);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -200,10 +199,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Opened archetypes handling
   //===--------------------------------------------------------------------===//
-  void addOpenedArchetypeOperands(SILInstruction *I) {
-    getOpenedArchetypes().addOpenedArchetypeOperands(
-        I->getTypeDependentOperands());
-  }
+  void addOpenedArchetypeOperands(SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
   // Type remapping
@@ -461,6 +457,21 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
+  ConstStringLiteralInst *
+  createConstStringLiteral(SILLocation Loc, StringRef text,
+                           ConstStringLiteralInst::Encoding encoding) {
+    return insert(ConstStringLiteralInst::create(getSILDebugLocation(Loc), text,
+                                                 encoding, F));
+  }
+
+  ConstStringLiteralInst *
+  createConstStringLiteral(SILLocation Loc, const Twine &text,
+                           ConstStringLiteralInst::Encoding encoding) {
+    SmallVector<char, 256> Out;
+    return insert(ConstStringLiteralInst::create(
+        getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
@@ -473,6 +484,14 @@ public:
            || LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
+  }
+  
+  KeyPathInst *createKeyPath(SILLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
+                             SILType Ty) {
+    return insert(KeyPathInst::create(getSILDebugLocation(Loc),
+                                      Pattern, Subs, Ty, F));
   }
 
   /// Convenience function for calling emitLoad on the type lowering for
@@ -527,6 +546,19 @@ public:
                                                  SILValue Arg) {
     return insert(new (F.getModule()) EndBorrowArgumentInst(
         getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
+  }
+
+  BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
+                                     SILAccessKind accessKind,
+                                     SILAccessEnforcement enforcement) {
+    return insert(new (F.getModule()) BeginAccessInst(
+        getSILDebugLocation(loc), address, accessKind, enforcement));
+  }
+
+  EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
+                                 bool aborted) {
+    return insert(new (F.getModule()) EndAccessInst(
+        getSILDebugLocation(loc), address, aborted));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {

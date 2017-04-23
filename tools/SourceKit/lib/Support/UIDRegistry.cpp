@@ -34,7 +34,7 @@ public:
   static void setTag(void *Ptr, void *Tag);
   static void *getTag(void *Ptr);
 };
-}
+} // end anonymous namespace
 
 static UIDRegistryImpl *getGlobalRegistry() {
   static UIDRegistryImpl *GlobalRegistry = 0;

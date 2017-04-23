@@ -35,6 +35,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TargetSelect.h"
 #include <mutex>
 
 // FIXME: Portability.
@@ -149,6 +150,11 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initialize() {
+  llvm::InitializeAllTargets();
+  llvm::InitializeAllTargetMCs();
+  llvm::InitializeAllAsmPrinters();
+  llvm::InitializeAllAsmParsers();
+
   GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
                                      SourceKit::createSwiftLangSupport);
   GlobalCtx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
@@ -810,13 +816,14 @@ handleSemanticRequest(RequestDict Req,
       return Rec(createErrorRequestInvalid("cannot specify 'key.selectorpieces' "
                                            "and 'key.argnames' at the same time"));
     }
-    Input.ArgNames.resize(ArgParts.size() + Selectors.size());
-    std::transform(ArgParts.begin(), ArgParts.end(), Input.ArgNames.begin(),
+    std::transform(ArgParts.begin(), ArgParts.end(),
+                   std::back_inserter(Input.ArgNames),
       [](const char *C) {
         StringRef Original(C);
         return Original == "_" ? StringRef() : Original;
       });
-    std::transform(Selectors.begin(), Selectors.end(), Input.ArgNames.begin(),
+    std::transform(Selectors.begin(), Selectors.end(),
+                   std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
       [Rec](const NameTranslatingInfo &Info) { reportNameInfo(Info, Rec); });
@@ -875,7 +882,7 @@ public:
 
     DependenciesStack.push_back({UIdent(), TopDict, ResponseBuilder::Array() });
   }
-  ~SKIndexingConsumer() {
+  ~SKIndexingConsumer() override {
     assert(Cancelled ||
            (EntitiesStack.size() == 1 && DependenciesStack.size() == 1));
     (void) Cancelled;
@@ -899,7 +906,7 @@ public:
 
   bool finishSourceEntity(UIdent Kind) override;
 };
-}
+} // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
                                          ArrayRef<const char *> Args,
@@ -1077,7 +1084,7 @@ public:
           ResponseBuilder::Array(),
           ResponseBuilder::Array() });
   }
-  ~SKDocConsumer() {
+  ~SKDocConsumer() override {
     assert(Cancelled || EntitiesStack.size() == 1);
     (void) Cancelled;
   }
@@ -1107,7 +1114,7 @@ public:
 
   bool handleDiagnostic(const DiagnosticEntryInfo &Info) override;
 };
-}
+} // end anonymous namespace
 
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
@@ -1201,6 +1208,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyName, Info.Name);
   if (!Info.Argument.empty())
     Elem.set(KeyKeyword, Info.Argument);
+  if (!Info.SubModuleName.empty())
+    Elem.set(KeyModuleName, Info.SubModuleName);
   if (!Info.USR.empty())
     Elem.set(KeyUSR, Info.USR);
   if (!Info.OriginalUSR.empty())
@@ -1429,6 +1438,9 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
       Entry.set(KeyActionName, Name);
     }
   }
+  if (Info.ParentNameOffset) {
+    Elem.set(KeyParentLoc, Info.ParentNameOffset.getValue());
+  }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {
     auto RelDecls = Elem.setArray(KeyRelatedDecls);
     for (auto AnnotDecl : Info.AnnotatedRelatedDeclarations) {
@@ -1551,7 +1563,7 @@ public:
 
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
-}
+} // end anonymous namespace
 
 static sourcekitd_response_t codeComplete(llvm::MemoryBuffer *InputBuf,
                                           int64_t Offset,
@@ -1922,13 +1934,13 @@ public:
 
   bool handleSourceText(StringRef Text) override;
 
-  virtual void finished() override {
+  void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
   }
 };
 
-}
+} // end anonymous namespace
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,

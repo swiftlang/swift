@@ -31,7 +31,7 @@
 namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
-  IsFragile_t Fragile;
+  IsSerialized_t Serialized;
   const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
 
@@ -39,12 +39,12 @@ public:
   friend class SILCloner<GenericCloner>;
 
   GenericCloner(SILFunction *F,
-                IsFragile_t Fragile,
+                IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
                 SubstitutionList ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
-  : TypeSubstCloner(*initCloned(F, Fragile, ReInfo, NewName), *F,
+  : TypeSubstCloner(*initCloned(F, Serialized, ReInfo, NewName), *F,
                     ParamSubs), ReInfo(ReInfo), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
@@ -53,13 +53,13 @@ public:
   /// direct) according to \p ReInfo.
   static SILFunction *
   cloneFunction(SILFunction *F,
-                IsFragile_t Fragile,
+                IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
                 SubstitutionList ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
-    GenericCloner SC(F, Fragile, ReInfo, ParamSubs,
+    GenericCloner SC(F, Serialized, ReInfo, ParamSubs,
                      NewName, Callback);
     SC.populateCloned();
     SC.cleanUp(SC.getCloned());
@@ -83,7 +83,7 @@ protected:
 
 private:
   static SILFunction *initCloned(SILFunction *Orig,
-                                 IsFragile_t Fragile,
+                                 IsSerialized_t Serialized,
                                  const ReabstractionInfo &ReInfo,
                                  StringRef NewName);
   /// Clone the body of the function into the empty function that was created

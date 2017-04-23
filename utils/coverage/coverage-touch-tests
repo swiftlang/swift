@@ -126,7 +126,7 @@ def main():
     covering_tests = set().union(*pool.map_async(
         worker,
         enumerate(relevant_changes)
-    ).get(9999999))
+    ).get(999999))
 
     logging.info('Combined covering tests:')
     for covering_test in covering_tests:

@@ -159,7 +159,6 @@ class SILDebugInfoGenerator : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "SILDebugInfoGenerator"; }
 };
 
 } // end anonymous namespace

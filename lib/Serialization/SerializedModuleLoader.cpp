@@ -131,15 +131,33 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     moduleFramework += ".framework";
     isFramework = true;
 
-    for (const auto &framepath : ctx.SearchPathOpts.FrameworkSearchPaths) {
-      currPath = framepath.Path;
+    auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
+      currPath = frameworkPath;
       llvm::sys::path::append(currPath, moduleFramework.str(),
                               "Modules", moduleFilename.str());
       auto err = openModuleFiles(currPath,
                                  archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer,
                                  scratch);
-      if (!err)
+      return !err;
+    };
+
+    for (const auto &framepath : ctx.SearchPathOpts.FrameworkSearchPaths) {
+      if (tryFrameworkImport(framepath.Path))
+        return true;
+    }
+
+    if (ctx.LangOpts.Target.isOSDarwin()) {
+      // Apple platforms have extra implicit framework search paths:
+      // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/
+      scratch = ctx.SearchPathOpts.SDKPath;
+      llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
+      if (tryFrameworkImport(scratch))
+        return true;
+
+      scratch = ctx.SearchPathOpts.SDKPath;
+      llvm::sys::path::append(scratch, "Library", "Frameworks");
+      if (tryFrameworkImport(scratch))
         return true;
     }
   }

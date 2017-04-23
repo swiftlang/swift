@@ -36,6 +36,7 @@ const char *Action::getClassName(ActionClass AC) {
     case REPLJob: return "repl";
     case LinkJob: return "link";
     case GenerateDSYMJob: return "generate-dSYM";
+    case VerifyDebugInfoJob: return "verify-debug-info";
     case GeneratePCHJob: return "generate-pch";
   }
 
@@ -63,5 +64,7 @@ void REPLJobAction::anchor() {}
 void LinkJobAction::anchor() {}
 
 void GenerateDSYMJobAction::anchor() {}
+
+void VerifyDebugInfoJobAction::anchor() {}
 
 void GeneratePCHJobAction::anchor() {}

@@ -359,6 +359,10 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::UTF16: return "utf16";
+    case StringLiteralExpr::UTF8ConstString:
+      return "utf8_const_string";
+    case StringLiteralExpr::UTF16ConstString:
+      return "utf16_const_string";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
@@ -1947,6 +1951,14 @@ public:
     printRec(E->getIndex());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+    printCommon(E, "keypath_application_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getKeyPath());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
     printCommon(E, "dynamic_subscript_expr")
       << " decl=";
@@ -2404,20 +2416,61 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+  void visitKeyPathExpr(KeyPathExpr *E) {
     printCommon(E, "keypath_expr");
-    for (unsigned i = 0, n = E->getNumComponents(); i != n; ++i) {
-      OS << "\n";
-      OS.indent(Indent + 2);
-      OS << "component=";
-      if (auto decl = E->getComponentDecl(i))
-        decl->dumpRef(OS);
-      else
-        OS << E->getComponentName(i);
-    }
-    if (auto semanticE = E->getSemanticExpr()) {
+    if (E->isObjC())
+      OS << " objc";
+    for (auto &component : E->getComponents()) {
       OS << '\n';
-      printRec(semanticE);
+      OS.indent(Indent + 2);
+      OS << "(component=";
+      switch (component.getKind()) {
+      case KeyPathExpr::Component::Kind::OptionalChain:
+        OS << "optional_chain ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::OptionalForce:
+        OS << "optional_force ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+        OS << "optional_wrap ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::Property:
+        OS << "property ";
+        component.getDeclRef().dump(OS);
+        OS << " ";
+        break;
+      
+      case KeyPathExpr::Component::Kind::Subscript:
+        OS << "subscript ";
+        component.getDeclRef().dump(OS);
+        OS << '\n';
+        component.getIndexExpr()->print(OS, Indent + 4);
+        OS.indent(Indent + 4);
+        break;
+      
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        OS << "unresolved_property ";
+        component.getUnresolvedDeclName().print(OS);
+        OS << " ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+        OS << "unresolved_subscript";
+        OS << '\n';
+        component.getIndexExpr()->print(OS, Indent + 4);
+        OS.indent(Indent + 4);
+        break;
+      }
+      OS << "type=";
+      component.getComponentType().print(OS);
+      OS << ")";
+    }
+    if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
+      OS << '\n';
+      printRec(stringLiteral);
     }
     OS << ")";
   }
@@ -3071,7 +3124,9 @@ namespace {
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
       printCommon(T, label, "protocol_composition_type");
-      for (auto proto : T->getProtocols()) {
+      if (T->hasExplicitAnyObject())
+        OS << " any_object";
+      for (auto proto : T->getMembers()) {
         printRec(proto);
       }
       OS << ")";

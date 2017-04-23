@@ -20,7 +20,7 @@ enum EMult { case X(Int64), Y(Int64) }
 @_alignment(4)
 struct CommonLayout { var x,y,z,w: Int8 }
 
-// CHECK:       @_T016type_layout_objc14TypeLayoutTestVMP = hidden global {{.*}} @create_generic_metadata_TypeLayoutTest
+// CHECK:       @_T016type_layout_objc14TypeLayoutTestVMP = internal global {{.*}} @create_generic_metadata_TypeLayoutTest
 // CHECK:       define private %swift.type* @create_generic_metadata_TypeLayoutTest
 struct TypeLayoutTest<T> {
   // -- dynamic layout, projected from metadata

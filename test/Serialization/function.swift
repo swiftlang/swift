@@ -42,7 +42,7 @@ useNested((raw, raw2), n: raw3)
 // SIL:   {{%.+}} = apply [[VARIADIC]]({{%.+}}, {{%.+}}) : $@convention(thin) (Double, @owned Array<Int>) -> ()
 variadic(x: 2.5, 4, 5)
 
-// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func9variadic2ySaySiG_Sd1xtF : $@convention(thin) (@owned Array<Int>, Double) -> ()
+// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func9variadic2ySaySiGd_Sd1xtF : $@convention(thin) (@owned Array<Int>, Double) -> ()
 variadic2(1, 2, 3, x: 5.0)
 
 // SIL:   [[SLICE:%.+]] = function_ref @_T08def_func5sliceySaySiG1x_tF : $@convention(thin) (@owned Array<Int>) -> ()

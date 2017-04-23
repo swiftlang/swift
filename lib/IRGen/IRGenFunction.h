@@ -49,6 +49,7 @@ namespace swift {
   class PatternBindingDecl;
   class SILDebugScope;
   class SILType;
+  class KeyPathInst;
   class SourceLoc;
   class StructType;
   class Substitution;
@@ -176,6 +177,10 @@ public:
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
+
+  void emitMakeBoxUniqueCall(llvm::Value *box, llvm::Value *typeMetadata,
+                             llvm::Value *alignMask, llvm::Value *&outBox,
+                             llvm::Value *&outValueAddress);
 
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 

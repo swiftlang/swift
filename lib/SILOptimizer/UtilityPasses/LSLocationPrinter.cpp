@@ -165,7 +165,7 @@ public:
 
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : Locs) {
-          Loc.print(&Fn.getModule());
+          Loc.print(llvm::outs(), &Fn.getModule());
         }
         Locs.clear();
       }
@@ -219,7 +219,7 @@ public:
         LSLocation::reduce(L, &Fn.getModule(), SLocs);
         llvm::outs() << "#" << Counter++ << II;
         for (auto &Loc : SLocs) {
-          Loc.print(&Fn.getModule());
+          Loc.print(llvm::outs(), &Fn.getModule());
         }
         L.reset();
         Locs.clear();
@@ -253,7 +253,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "Mem Location Dumper"; }
 };
 
 } // end anonymous namespace

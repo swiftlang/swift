@@ -17,7 +17,7 @@ func testGizmo(gizmo: Gizmo) {
 func testNonnullDictionary(gizmo: Gizmo) {
   // CHECK: class_method [volatile] [[SELF:%[0-9]+]] : $Gizmo, #Gizmo.doTheThing!1.foreign
   // CHECK-NOT: nilLiteral
-  // CHECK: function_ref @_T0s10DictionaryVAByxq_GSayx_q_tG17dictionaryLiteral_dtcfC
+  // CHECK: function_ref @_T0s10DictionaryVAByxq_GSayx_q_tG17dictionaryLiterald_tcfC
   gizmo.doTheThing()
 } // CHECK: } // end sil function '_T026default_arguments_imported21testNonnullDictionaryySo5GizmoC5gizmo_tF'
 

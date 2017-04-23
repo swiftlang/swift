@@ -515,24 +515,93 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
 /// Should only affect diagnostics. If you change this enum, also change
 /// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
-  DoNotDiagnose,
+  /// Has the '@cdecl' attribute.
   ExplicitlyCDecl,
+  /// Has the 'dynamic' modifier.
   ExplicitlyDynamic,
+  /// Has an explicit '@objc' attribute.
   ExplicitlyObjC,
+  /// Has an explicit '@IBOutlet' attribute.
   ExplicitlyIBOutlet,
+  /// Has an explicit '@IBAction' attribute.
   ExplicitlyIBAction,
+  /// Has an explicit '@NSManaged' attribute.
   ExplicitlyNSManaged,
+  /// Is a member of an @objc protocol.
   MemberOfObjCProtocol,
+  /// Implicitly-introduced @objc.
   ImplicitlyObjC,
+  /// Is an override of an @objc member.
   OverridesObjC,
+  /// Is a witness to an @objc protocol requirement.
   WitnessToObjC,
+  /// Has an explicit '@IBInspectable' attribute.
+  ExplicitlyIBInspectable,
+  /// Has an explicit '@GKInspectable' attribute.
+  ExplicitlyGKInspectable,
+  /// Is it a member of an @objc extension of a class.
+  MemberOfObjCExtension,
+  /// Is it a member of an @objcMembers class.
+  MemberOfObjCMembersClass,
+  /// A member of an Objective-C-defined class or subclass.
+  MemberOfObjCSubclass,
+  /// An accessor to a property.
+  Accessor,
 };
+
+/// Determine whether we should diagnose conflicts due to inferring @objc
+/// with this particular reason.
+static inline bool shouldDiagnoseObjCReason(ObjCReason reason,
+                                            ASTContext &ctx) {
+  switch(reason) {
+  case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyDynamic:
+  case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyIBOutlet:
+  case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyNSManaged:
+  case ObjCReason::MemberOfObjCProtocol:
+  case ObjCReason::OverridesObjC:
+  case ObjCReason::WitnessToObjC:
+  case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::MemberOfObjCExtension:
+    return true;
+
+  case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
+    return !ctx.LangOpts.EnableSwift3ObjCInference;
+
+  case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::Accessor:
+    return false;
+  }
+}
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
 /// complain about the correct attribute during @objc inference.
-static inline unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
-  assert(Reason != ObjCReason::DoNotDiagnose);
-  return static_cast<unsigned>(Reason) - 1;
+static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
+  switch (reason) {
+  case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyDynamic:
+  case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyIBOutlet:
+  case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyNSManaged:
+  case ObjCReason::MemberOfObjCProtocol:
+  case ObjCReason::OverridesObjC:
+  case ObjCReason::WitnessToObjC:
+  case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
+  case ObjCReason::MemberOfObjCExtension:
+    return static_cast<unsigned>(reason);
+
+  case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::Accessor:
+    llvm_unreachable("should not diagnose this @objc reason");
+  }
 }
 
 /// Flags that control protocol conformance checking.
@@ -593,6 +662,9 @@ public:
   /// partial validation of during type-checking and which will need
   /// to be finalized before we can hand off to SILGen etc.
   llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
+
+  /// The list of types whose circularity checks were delayed.
+  SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
   using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
@@ -1057,6 +1129,10 @@ public:
   ///
   /// \param t2 The second type of the constraint.
   ///
+  /// \param openArchetypes If true, archetypes are replaced with type
+  /// variables, and the result can be interpreted as whether or not the
+  /// two types can possibly equal at runtime.
+  ///
   /// \param dc The context of the conversion.
   ///
   /// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
@@ -1064,6 +1140,7 @@ public:
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
   bool typesSatisfyConstraint(Type t1, Type t2,
+                              bool openArchetypes,
                               constraints::ConstraintKind kind,
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);
@@ -1278,6 +1355,10 @@ public:
   /// Resolve the inherited protocols of a given protocol.
   void resolveInheritedProtocols(ProtocolDecl *protocol) override;
 
+  /// Validate a protocol's where clause, along with the where clauses of
+  /// its associated types.
+  void validateWhereClauses(ProtocolDecl *protocol);
+
   /// Resolve the types in the inheritance clause of the given
   /// declaration context, which will be a nominal type declaration or
   /// extension declaration.
@@ -1458,7 +1539,7 @@ public:
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr,
+  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
                                       bool requireResultType = false);
 
   /// \brief Type check whether the given type declaration includes members of
@@ -1738,6 +1819,23 @@ public:
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance through a particular declaration context using the given
+  /// type checker.
+  class LookUpConformance {
+    TypeChecker &tc;
+    DeclContext *dc;
+
+  public:
+    explicit LookUpConformance(TypeChecker &tc, DeclContext *dc)
+      : tc(tc), dc(dc) { }
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const;
+  };
+
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
 
@@ -1971,9 +2069,6 @@ public:
                           AssociatedTypeDecl *assocType) override;
   void resolveWitness(const NormalProtocolConformance *conformance,
                       ValueDecl *requirement) override;
-  ProtocolConformance *resolveInheritedConformance(
-                         const NormalProtocolConformance *conformance,
-                         ProtocolDecl *inherited) override;
 
   bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,

@@ -183,17 +183,17 @@ struct testVarDeclShortenedSyntax {
 
 // Local functions in transparent context are fragile.
 @_transparent public func foo() {
-  // CHECK-LABEL: sil shared [fragile] @_T021transparent_attribute3fooyyF3barL_yyF : $@convention(thin) () -> ()
+  // CHECK-LABEL: sil shared [serialized] @_T021transparent_attribute3fooyyF3barL_yyF : $@convention(thin) () -> ()
   func bar() {}
   bar()
 
-  // CHECK-LABEL: sil shared [fragile] @_T021transparent_attribute3fooyyFyycfU_ : $@convention(thin) () -> () {
+  // CHECK-LABEL: sil shared [serialized] @_T021transparent_attribute3fooyyFyycfU_ : $@convention(thin) () -> () {
   let f: () -> () = {}
   f()
 
-  // CHECK-LABEL: sil shared [fragile] @_T021transparent_attribute3fooyyF3zimL_yyF : $@convention(thin) () -> () {
+  // CHECK-LABEL: sil shared [serialized] @_T021transparent_attribute3fooyyF3zimL_yyF : $@convention(thin) () -> () {
   func zim() {
-    // CHECK-LABEL: sil shared [fragile] @_T021transparent_attribute3fooyyF3zimL_yyF4zangL_yyF : $@convention(thin) () -> () {
+    // CHECK-LABEL: sil shared [serialized] @_T021transparent_attribute3fooyyF3zimL_yyF4zangL_yyF : $@convention(thin) () -> () {
     func zang() {
     }
     zang()
@@ -206,7 +206,7 @@ struct testVarDeclShortenedSyntax {
 // CHECK-LABEL: sil @_T021transparent_attribute25referencedFromTransparentyyF : $@convention(thin) () -> () {
 @_versioned func referencedFromTransparent() {}
 
-// CHECK-LABEL: sil [transparent] [fragile] @_T021transparent_attribute23referencesVersionedFuncyycyF : $@convention(thin) () -> @owned @callee_owned () -> () {
+// CHECK-LABEL: sil [transparent] [serialized] @_T021transparent_attribute23referencesVersionedFuncyycyF : $@convention(thin) () -> @owned @callee_owned () -> () {
 @_transparent public func referencesVersionedFunc() -> () -> () {
   return referencedFromTransparent
 }

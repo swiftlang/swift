@@ -25,10 +25,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -43,7 +45,6 @@ class Decl;
 class ClassDecl;
 class GenericFunctionType;
 class TrailingWhereClause;
-struct TypeLoc;
 
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
@@ -197,8 +198,12 @@ protected:
 
     /// Whether the name is implicit, produced as the result of caching.
     unsigned ImplicitName : 1;
+
+    /// Whether the @objc was inferred using Swift 3's deprecated inference
+    /// rules.
+    unsigned Swift3Inferred : 1;
   };
-  enum { NumObjCAttrBits = NumDeclAttrBits + 2 };
+  enum { NumObjCAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
   class AccessibilityAttrBitFields {
@@ -716,6 +721,7 @@ class ObjCAttr final : public DeclAttribute,
   {
     ObjCAttrBits.HasTrailingLocationInfo = false;
     ObjCAttrBits.ImplicitName = implicitName;
+    ObjCAttrBits.Swift3Inferred = false;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -821,6 +827,18 @@ public:
 
     NameData = name.getOpaqueValue();
     ObjCAttrBits.ImplicitName = implicit;
+  }
+
+  /// Determine whether this attribute was inferred based on Swift 3's
+  /// deprecated @objc inference rules.
+  bool isSwift3Inferred() const {
+    return ObjCAttrBits.Swift3Inferred;
+  }
+
+  /// Set whether this attribute was inferred based on Swift 3's deprecated
+  /// @objc inference rules.
+  void setSwift3Inferred(bool inferred = true) {
+    ObjCAttrBits.Swift3Inferred = inferred;
   }
 
   /// Clear the name of this entity.
@@ -1107,6 +1125,36 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Specialize;
+  }
+};
+
+/// The @_implements attribute, which treats a decl as the implementation for
+/// some named protocol requirement (but otherwise not-visible by that name).
+class ImplementsAttr : public DeclAttribute {
+
+  TypeLoc ProtocolType;
+  DeclName MemberName;
+  DeclNameLoc MemberNameLoc;
+
+public:
+  ImplementsAttr(SourceLoc atLoc, SourceRange Range,
+                 TypeLoc ProtocolType,
+                 DeclName MemberName,
+                 DeclNameLoc MemberNameLoc);
+
+  static ImplementsAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                SourceRange Range,
+                                TypeLoc ProtocolType,
+                                DeclName MemberName,
+                                DeclNameLoc MemberNameLoc);
+
+  TypeLoc getProtocolType() const;
+  TypeLoc &getProtocolType();
+  DeclName getMemberName() const { return MemberName; }
+  DeclNameLoc getMemberNameLoc() const { return MemberNameLoc; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Implements;
   }
 };
 

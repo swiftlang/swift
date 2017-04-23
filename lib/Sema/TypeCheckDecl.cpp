@@ -24,6 +24,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -241,9 +242,40 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
   ITC.satisfy(requestTypeCheckRawType(enumDecl));
 }
 
+void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
+  ProtocolRequirementTypeResolver resolver(protocol);
+  TypeResolutionOptions options;
+
+  if (auto whereClause = protocol->getTrailingWhereClause()) {
+    DeclContext *lookupDC = protocol;
+    for (auto &req : whereClause->getRequirements()) {
+      // FIXME: handle error?
+      (void)validateRequirement(whereClause->getWhereLoc(), req,
+                                lookupDC, options, &resolver);
+    }
+  }
+
+  for (auto member : protocol->getMembers()) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (auto whereClause = assocType->getTrailingWhereClause()) {
+        DeclContext *lookupDC = assocType->getDeclContext();
+
+        for (auto &req : whereClause->getRequirements()) {
+          if (!validateRequirement(whereClause->getWhereLoc(), req,
+                                   lookupDC, options, &resolver))
+            // FIXME handle error?
+            continue;
+        }
+      }
+    }
+  }
+}
+
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
   IterativeTypeChecker ITC(*this);
   ITC.satisfy(requestInheritedProtocols(protocol));
+
+  validateWhereClauses(protocol);
 }
 
 void TypeChecker::resolveInheritanceClause(
@@ -411,10 +443,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // If this is a protocol or protocol composition type, record the
     // protocols.
     if (inheritedTy->isExistentialType()) {
-      SmallVector<ProtocolDecl *, 4> protocols;
-      inheritedTy->isExistentialType(protocols);
-
-      allProtocols.insert(protocols.begin(), protocols.end());
+      auto layout = inheritedTy->getExistentialLayout();
+      for (auto proto : layout.getProtocols()) {
+        auto *protoDecl = proto->getDecl();
+        allProtocols.insert(protoDecl);
+      }
       continue;
     }
     
@@ -953,10 +986,10 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
-      // If the conflicting declarations have non-overlapping availability and
-      // - one throws and the other does not,
-      // - or they are initializers with different failability
-      // let them go.
+      // If the conflicting declarations have non-overlapping availability and,
+      // we allow the redeclaration to proceed if...
+      //
+      // - they are initializers with different failability,
       bool isAcceptableVersionBasedChange = false;
       {
         const auto *currentInit = dyn_cast<ConstructorDecl>(current);
@@ -967,6 +1000,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           isAcceptableVersionBasedChange = true;
         }
       }
+      // - one throws and the other does not,
       {
         const auto *currentAFD = dyn_cast<AbstractFunctionDecl>(current);
         const auto *otherAFD = dyn_cast<AbstractFunctionDecl>(other);
@@ -975,6 +1009,19 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           isAcceptableVersionBasedChange = true;
         }
       }
+      // - or they are computed properties of different types,
+      {
+        const auto *currentVD = dyn_cast<VarDecl>(current);
+        const auto *otherVD = dyn_cast<VarDecl>(other);
+        if (currentVD && otherVD &&
+            !currentVD->hasStorage() &&
+            !otherVD->hasStorage() &&
+            !currentVD->getInterfaceType()->isEqual(
+              otherVD->getInterfaceType())) {
+          isAcceptableVersionBasedChange = true;
+        }
+      }
+
       if (isAcceptableVersionBasedChange) {
         class AvailabilityRange {
           Optional<clang::VersionTuple> introduced;
@@ -1167,7 +1214,8 @@ static void configureImplicitSelf(TypeChecker &tc,
   auto selfDecl = func->getImplicitSelfDecl();
 
   // Compute the type of self.
-  Type selfIfaceTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true);
+  Type selfIfaceTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
+                                                    /*wantDynamicSelf*/true);
   assert(selfDecl && selfIfaceTy && "Not a method");
 
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
@@ -2270,6 +2318,23 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
+/// Whether this declaration is a member of a class extension marked @objc.
+static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
+  auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ext) return false;
+
+  return ext->getAsClassOrClassExtensionContext() &&
+    ext->getAttrs().hasAttribute<ObjCAttr>();
+}
+
+/// Whether this declaration is a member of a class with the `@objcMembers`
+/// attribute.
+static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
+  auto classDecl = VD->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) return false;
+
+  return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
+}
 /// Figure out if a declaration should be exported to Objective-C.
 static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                              const ValueDecl *VD,
@@ -2281,42 +2346,106 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   bool isMemberOfObjCProtocol =
       protocolContext && protocolContext->isObjC();
 
+  // Local function to determine whether we can implicitly infer @objc.
+  auto canInferImplicitObjC = [&] {
+    if (VD->isInvalid())
+      return false;
+    if (VD->isOperator())
+      return false;
+
+    // Implicitly generated declarations are not @objc, except for constructors.
+    if (!allowImplicit && VD->isImplicit())
+      return false;
+
+    if (VD->getFormalAccess() <= Accessibility::FilePrivate)
+      return false;
+
+    return true;
+  };
+
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
     return ObjCReason::ExplicitlyObjC;
-  // dynamic, @IBOutlet, @IBAction, and @NSManaged imply @objc.
-  else if (VD->getAttrs().hasAttribute<DynamicAttr>())
-    return ObjCReason::ExplicitlyDynamic;
-  else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
+  // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
+  //
+  // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
+  // (where they warn on failure) and loudly in Swift 4 (error on failure).
+  if (VD->getAttrs().hasAttribute<IBOutletAttr>())
     return ObjCReason::ExplicitlyIBOutlet;
-  else if (VD->getAttrs().hasAttribute<IBActionAttr>())
+  if (VD->getAttrs().hasAttribute<IBActionAttr>())
     return ObjCReason::ExplicitlyIBAction;
-  else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+  if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
+    return ObjCReason::ExplicitlyIBInspectable;
+  if (VD->getAttrs().hasAttribute<GKInspectableAttr>())
+    return ObjCReason::ExplicitlyGKInspectable;
+  if (VD->getAttrs().hasAttribute<NSManagedAttr>())
     return ObjCReason::ExplicitlyNSManaged;
   // A member of an @objc protocol is implicitly @objc.
-  else if (isMemberOfObjCProtocol)
+  if (isMemberOfObjCProtocol)
     return ObjCReason::MemberOfObjCProtocol;
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
-  else if (VD->getAttrs().hasAttribute<NonObjCAttr>())
+  if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
+      (isa<ExtensionDecl>(VD->getDeclContext()) &&
+       cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
+        .hasAttribute<NonObjCAttr>()))
     return None;
+  if (isMemberOfObjCClassExtension(VD))
+    return ObjCReason::MemberOfObjCExtension;
+  if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
+    return ObjCReason::MemberOfObjCMembersClass;
   // An override of an @objc declaration is implicitly @objc.
-  else if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
+  if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason::OverridesObjC;
   // A witness to an @objc protocol requirement is implicitly @objc.
-  else if (VD->getDeclContext()->getAsClassOrClassExtensionContext() &&
-           !TC.findWitnessedObjCRequirements(
-             VD,
-             /*anySingleRequirement=*/true).empty())
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      !TC.findWitnessedObjCRequirements(VD,
+                                        /*anySingleRequirement=*/true).empty())
     return ObjCReason::WitnessToObjC;
-  else if (VD->isInvalid())
+
+  // Infer '@objc' for 'dynamic' members.
+  if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
+    // For implicit 'dynamic', just infer '@objc' implicitly.
+    if (attr->isImplicit())
+      return ObjCReason::ImplicitlyObjC;
+
+    bool isAccessor =
+      isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->isGetterOrSetter();
+
+    // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
+    if (TC.Context.LangOpts.EnableSwift3ObjCInference) {
+      // If we've been asked to warn about deprecated @objc inference, do so
+      // now.
+      if (TC.Context.LangOpts.WarnSwift3ObjCInference && !isAccessor) {
+        TC.diagnose(VD, diag::objc_inference_swift3_dynamic)
+          .highlight(attr->getLocation())
+          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
+                      "@objc ");
+      }
+
+      return ObjCReason::ExplicitlyDynamic;
+    }
+
+    // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
+    // anyway for better recovery.
+    TC.diagnose(VD, diag::dynamic_requires_objc,
+                VD->getDescriptiveKind(), VD->getFullName())
+      .highlight(attr->getRange())
+      .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
+                   "@objc ");
+
+    return ObjCReason::ImplicitlyObjC;
+  }
+
+  // If we aren't provided Swift 3's @objc inference rules, we're done.
+  if (!TC.Context.LangOpts.EnableSwift3ObjCInference)
     return None;
-  else if (VD->isOperator())
-    return None;
-  // Implicitly generated declarations are not @objc, except for constructors.
-  else if (!allowImplicit && VD->isImplicit())
-    return None;
-  else if (VD->getFormalAccess() <= Accessibility::FilePrivate)
+
+  // Infer '@objc' for valid, non-implicit, non-operator, members of classes
+  // (and extensions thereof) whose class hierarchies originate in Objective-C,
+  // e.g., which derive from NSObject, so long as the members have internal
+  // access or greater.
+  if (!canInferImplicitObjC())
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,
@@ -2328,8 +2457,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     if (classDecl->isForeign())
       return None;
 
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
-      return ObjCReason::DoNotDiagnose;
+    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
+      return VD->isImplicit() ? ObjCReason::ImplicitlyObjC
+                              : ObjCReason::MemberOfObjCSubclass;
+    }
   }
 
   return None;
@@ -2606,7 +2737,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    if (*isObjC == ObjCReason::DoNotDiagnose)
+    if (!shouldDiagnoseObjCReason(*isObjC, TC.Context))
       isObjC = ObjCReason::ImplicitlyObjC;
 
     TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
@@ -2706,6 +2837,29 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     if (auto sourceFile = method->getParentSourceFile()) {
       sourceFile->ObjCMethods[method->getObjCSelector()].push_back(method);
     }
+  }
+
+  // Special handling for Swift 3 @objc inference rules that are no longer
+  // present in later versions of Swift.
+  if (*isObjC == ObjCReason::MemberOfObjCSubclass) {
+    // If we've been asked to unconditionally warn about these deprecated
+    // @objc inference rules, do so now. However, we don't warn about
+    // accessors---just the main storage declarations.
+    if (TC.Context.LangOpts.WarnSwift3ObjCInference &&
+        !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
+      TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
+      TC.diagnose(D, diag::objc_inference_swift3_addobjc)
+        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@objc ");
+      TC.diagnose(D, diag::objc_inference_swift3_addnonobjc)
+        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@nonobjc ");
+    }
+
+    // Mark the attribute as having used Swift 3 inference, or create an
+    // implicit @objc for that purpose.
+    auto attr = D->getAttrs().getAttribute<ObjCAttr>();
+    attr->setSwift3Inferred();
   }
 }
 
@@ -2997,7 +3151,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   auto dc = decl->getDeclContext();
   auto behaviorSelf = conformance->getType();
-  auto behaviorInterfaceSelf = conformance->getInterfaceType();
+  auto behaviorInterfaceSelf =
+    conformance->getDeclContext()->mapTypeOutOfContext(behaviorSelf);
   auto behaviorProto = conformance->getProtocol();
   auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
@@ -3032,10 +3187,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     auto inherited = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
                                            ConformanceCheckFlags::Used,
                                            blameLoc);
-    if (inherited && inherited->isConcrete()) {
-      conformance->setInheritedConformance(refinedProto,
-                                           inherited->getConcrete());
-    } else {
+    if (!inherited || !inherited->isConcrete()) {
       // Add some notes that the conformance is behavior-driven.
       TC.diagnose(behavior->getLoc(),
                   diag::self_conformance_required_by_property_behavior,
@@ -3102,7 +3254,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       // FIXME: Maybe we should synthesize an implicit TypeAliasDecl? We
       // really don't want the behavior conformances to show up in the
       // enclosing namespace though.
-      conformance->setTypeWitness(assocTy, valueSub, /*typeDecl*/ nullptr);
+      conformance->setTypeWitness(assocTy, propTy, /*typeDecl*/ nullptr);
     }
   next_requirement:;
   }
@@ -3942,8 +4094,10 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType())
+    if (SD->hasInterfaceType() || SD->isBeingValidated())
       return;
+
+    SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
     assert(dc->isTypeContext() &&
@@ -3987,6 +4141,8 @@ public:
       if (!SD->getGenericSignatureOfContext())
         TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    SD->setIsBeingValidated(false);
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
@@ -4405,33 +4561,7 @@ public:
 
     if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
-
-      ProtocolRequirementTypeResolver resolver(PD);
-      TypeResolutionOptions options;
-
-      if (auto whereClause = PD->getTrailingWhereClause()) {
-        DeclContext *lookupDC = PD;
-        for (auto &req : whereClause->getRequirements()) {
-          // FIXME: handle error?
-          (void)TC.validateRequirement(whereClause->getWhereLoc(), req,
-                                       lookupDC, options, &resolver);
-        }
-      }
-
-      for (auto member : PD->getMembers()) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-          if (auto whereClause = assocType->getTrailingWhereClause()) {
-            DeclContext *lookupDC = assocType->getDeclContext();
-
-            for (auto &req : whereClause->getRequirements()) {
-              if (!TC.validateRequirement(whereClause->getWhereLoc(), req,
-                                          lookupDC, options, &resolver))
-                // FIXME handle error?
-                continue;
-            }
-          }
-        }
-      }
+      TC.validateWhereClauses(PD);
     }
 
     if (IsSecondPass) {
@@ -4963,10 +5093,8 @@ public:
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(
           FD->getDeclContext());
       if (protocolContext && FD->isAccessor()) {
-        // Don't complain about accessors in protocols.  We will emit a
-        // diagnostic about the property itself.
         if (isObjC)
-          isObjC = ObjCReason::DoNotDiagnose;
+          isObjC = ObjCReason::Accessor;
       }
 
       if (FD->isGetterOrSetter()) {
@@ -4982,8 +5110,26 @@ public:
 
         if (storage->getAttrs().hasAttribute<NonObjCAttr>())
           isObjC = None;
-        else if (!isObjC && storage->isObjC())
-          isObjC = ObjCReason::DoNotDiagnose;
+        else if (storage->isObjC()) {
+          if (!isObjC) {
+            // Make this accessor @objc because its property is @objc.
+            isObjC = ObjCReason::Accessor;
+          } else {
+            // If @objc on the storage declaration was inferred using a
+            // deprecated rule, but this accessor is @objc in its own right,
+            // complain.
+            auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>();
+            if (storageObjCAttr->isSwift3Inferred() &&
+                shouldDiagnoseObjCReason(*isObjC, TC.Context)) {
+              TC.diagnose(storage, diag::accessor_swift3_objc_inference,
+                          storage->getDescriptiveKind(), storage->getFullName(),
+                          isa<SubscriptDecl>(storage), FD->isSetter())
+                .fixItInsert(storage->getAttributeInsertionLoc(
+                                                      /*forModifier=*/false),
+                             "@objc ");
+            }
+          }
+        }
 
         // If the storage is dynamic, propagate to this accessor.
         if (isObjC && storage->isDynamic() && !FD->isDynamic())
@@ -5108,7 +5254,7 @@ public:
                               bool treatIUOResultAsError) {
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
-        parentMember, member, parentMember->getInterfaceType(), &TC);
+        parentMember, member, parentMember->getInterfaceType());
     const auto *parentTy = plainParentTy->castTo<FunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
       parentTy = parentTy->getResult()->castTo<FunctionType>();
@@ -5404,7 +5550,9 @@ public:
     if (decl->isInvalid() || decl->getOverriddenDecl())
       return false;
 
-    auto owningTy = decl->getDeclContext()->getDeclaredInterfaceType();
+    auto *dc = decl->getDeclContext();
+
+    auto owningTy = dc->getDeclaredInterfaceType();
     if (!owningTy)
       return false;
 
@@ -5503,7 +5651,7 @@ public:
         lookupOptions -= NameLookupFlags::ProtocolMembers;
         lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-        members = TC.lookupMember(decl->getDeclContext(), superclass,
+        members = TC.lookupMember(dc, superclass,
                                   name, lookupOptions);
       }
 
@@ -5516,7 +5664,7 @@ public:
         if (member->getKind() != decl->getKind())
           continue;
 
-        if (!member->getDeclContext()->getAsClassOrClassExtensionContext())
+        if (!dc->getAsClassOrClassExtensionContext())
           continue;
 
         auto parentDecl = cast<ValueDecl>(member);
@@ -5552,7 +5700,7 @@ public:
 
         // Check whether the types are identical.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
-            parentDecl, decl, parentDecl->getInterfaceType(), &TC);
+            parentDecl, decl, parentDecl->getInterfaceType());
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           // For methods, strip off the 'Self' type.
@@ -5574,7 +5722,17 @@ public:
             continue;
         }
 
-        if (declTy->isEqual(parentDeclTy)) {
+        // Canonicalize with respect to the override's generic signature, if any.
+        auto *genericSig = decl->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+        auto *module = dc->getParentModule();
+
+        auto canDeclTy =
+          declTy->getCanonicalType(genericSig, *module);
+        auto canParentDeclTy =
+          parentDeclTy->getCanonicalType(genericSig, *module);
+
+        if (canDeclTy == canParentDeclTy) {
           matches.push_back({parentDecl, true, parentDeclTy});
           hadExactMatch = true;
           continue;
@@ -5685,8 +5843,7 @@ public:
       // defining module.  This is not required for constructors, which are
       // never really "overridden" in the intended sense here, because of
       // course derived classes will change how the class is initialized.
-      Accessibility matchAccess =
-          matchDecl->getFormalAccess(decl->getDeclContext());
+      Accessibility matchAccess = matchDecl->getFormalAccess(dc);
       if (matchAccess < Accessibility::Open &&
           matchDecl->getModuleContext() != decl->getModuleContext() &&
           !isa<ConstructorDecl>(decl)) {
@@ -5694,7 +5851,7 @@ public:
                     decl->getDescriptiveKind());
 
       } else if (matchAccess == Accessibility::Open &&
-                 classDecl->getFormalAccess(decl->getDeclContext()) ==
+                 classDecl->getFormalAccess(dc) ==
                    Accessibility::Open &&
                  decl->getFormalAccess() != Accessibility::Open &&
                  !decl->isFinal()) {
@@ -5709,9 +5866,9 @@ public:
 
       } else {
         auto matchAccessScope =
-          matchDecl->getFormalAccessScope(decl->getDeclContext());
+          matchDecl->getFormalAccessScope(dc);
         auto classAccessScope =
-          classDecl->getFormalAccessScope(decl->getDeclContext());
+          classDecl->getFormalAccessScope(dc);
         auto requiredAccessScope =
           matchAccessScope.intersectWith(classAccessScope);
 
@@ -5719,15 +5876,16 @@ public:
         bool shouldDiagnose = false;
         bool shouldDiagnoseSetter = false;
         if (!isa<ConstructorDecl>(decl)) {
-          auto DC = requiredAccessScope->getDeclContext();
-          shouldDiagnose = !decl->isAccessibleFrom(DC);
+          auto scopeDC = requiredAccessScope->getDeclContext();
+          shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
-          if (!shouldDiagnose && matchDecl->isSettable(decl->getDeclContext())){
+          if (!shouldDiagnose && matchDecl->isSettable(dc)){
             auto matchASD = cast<AbstractStorageDecl>(matchDecl);
-            if (matchASD->isSetterAccessibleFrom(decl->getDeclContext())) {
+            if (matchASD->isSetterAccessibleFrom(dc)) {
               const auto *ASD = cast<AbstractStorageDecl>(decl);
               shouldDiagnoseSetter =
-                  ASD->isSettable(DC) && !ASD->isSetterAccessibleFrom(DC);
+                  ASD->isSettable(scopeDC) &&
+                  !ASD->isSetterAccessibleFrom(scopeDC);
             }
           }
         }
@@ -5813,7 +5971,7 @@ public:
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();
         auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
-            matchDecl, decl, matchDecl->getInterfaceType(), &TC);
+            matchDecl, decl, matchDecl->getInterfaceType());
         
         if (!propertyTy->canOverride(parentPropertyTy,
                                      OverrideMatchMode::Strict,
@@ -5906,7 +6064,6 @@ public:
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
-    UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(ObjCBridged)
     UNINTERESTING_ATTR(Optional)
     UNINTERESTING_ATTR(Override)
@@ -5940,6 +6097,9 @@ public:
 
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
+
+    UNINTERESTING_ATTR(ObjCMembers)
+    UNINTERESTING_ATTR(Implements)
 
 #undef UNINTERESTING_ATTR
 
@@ -5989,10 +6149,45 @@ public:
     }
 
     void visitDynamicAttr(DynamicAttr *attr) {
-      if (!Override->getAttrs().hasAttribute<DynamicAttr>())
+      if (!Override->isDynamic())
         // Dynamic is inherited.
         Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
+    }
+
+    void visitObjCAttr(ObjCAttr *attr) {
+      // Checking for overrides of declarations that are implicitly @objc
+      // and occur in class extensions, because overriding will no longer be
+      // possible under the Swift 4 rules.
+
+      // We only care about the storage declaration.
+      if (auto func = dyn_cast<FuncDecl>(Override)) {
+        if (func->isAccessor()) return;
+      }
+
+      // If @objc was explicit or handles elsewhere, nothing to do.
+      if (!attr->isSwift3Inferred()) return;
+
+      // When warning about all deprecated @objc inference rules,
+      // we only need to do this check if we have implicit 'dynamic'.
+      if (TC.Context.LangOpts.WarnSwift3ObjCInference) {
+        if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>())
+          if (!dynamicAttr->isImplicit()) return;
+      }
+
+      // The overridden declaration needs to be in an extension.
+      if (!isa<ExtensionDecl>(Base->getDeclContext())) return;
+
+      // Complain.
+      TC.diagnose(Override, diag::override_swift3_objc_inference,
+                  Override->getDescriptiveKind(),
+                  Override->getFullName(),
+                  Base->getDeclContext()
+                    ->getAsNominalTypeOrNominalTypeExtensionContext()
+                    ->getName());
+      TC.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
+        .fixItInsert(Base->getAttributeInsertionLoc(false),
+                     "@objc ");
     }
   };
 
@@ -6804,144 +6999,6 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
   return None;
 }
 
-using NominalDeclSet = llvm::SmallPtrSetImpl<NominalTypeDecl *>;
-static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
-                                     Type baseType, bool isGenericArg = false);
-
-static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
-                                       Type baseType,
-                                       bool isGenericArg = false);
-
-// dispatch arbitrary declaration to relevant circularity checks.
-static bool checkNominalDeclCircularity(Decl *decl, NominalDeclSet &known,
-                                        Type baseType,
-                                        bool isGenericArg = false) {
-  if (auto s = dyn_cast<StructDecl>(decl)) {
-    if (checkStructDeclCircularity(s, known, baseType, isGenericArg)) {
-      return true;
-    }
-  } else if (auto e = dyn_cast<EnumDecl>(decl)) {
-    if (checkEnumDeclCircularity(e, known, baseType, isGenericArg)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-
-// break down type that "contains" other types and check them each.
-static bool deconstructTypeForDeclCircularity(Type type,
-                                              NominalDeclSet &known) {
-
-  if (auto tuple = type->getAs<TupleType>()) {
-    // check each element in tuple
-    for (auto Elt: tuple->getElements()) {
-      if (deconstructTypeForDeclCircularity(Elt.getType(), known)) {
-        return true;
-      }
-    }
-  }
-
-  if (auto decl = type->getAnyNominal()) {
-    // Found a circularity! Stop checking from here on out.
-    if (known.count(decl)) {
-      return true;
-    }
-
-    bool isGenericArg = type->getAs<BoundGenericType>() != nullptr;
-    if (checkNominalDeclCircularity(decl, known, type, isGenericArg)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-
-static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
-                                       Type baseType, bool isGenericArg) {
-
-  // if we are checking a generic argument, don't make it a starting point
-  // of a circularity.
-  if (!isGenericArg) {
-    known.insert(S);
-  }
-
-  for (auto field: S->getStoredProperties()) {
-    if (auto vd = dyn_cast<VarDecl>(field)) {
-      // skip uninteresting fields.
-      if (vd->isStatic() || !vd->hasStorage() || !vd->hasType()) {
-        continue;
-      }
-
-      auto vdt = baseType->getTypeOfMember(S->getModuleContext(), vd, nullptr);
-
-      if (deconstructTypeForDeclCircularity(vdt, known)) {
-        return true;
-      }
-    }
-  }
-
-  // we didn't find any circularity, clean up.
-  if (!isGenericArg) {
-    known.erase(S);
-  }
-  return false;
-}
-
-static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
-                                     Type baseType, bool isGenericArg) {
-  // enums marked as 'indirect' are safe
-  if (E->isIndirect())
-    return false;
-
-  // if we are checking a generic argument, don't make it a starting point
-  // of a circularity.
-  if (!isGenericArg)
-    known.insert(E);
-
-  for (auto elt: E->getAllElements()) {
-    // FIXME: Strange that this can happen, it means we're potentially
-    // not diagnosing circularity when we should be.
-    if (!elt->hasInterfaceType())
-      continue;
-
-    // skip uninteresting fields.
-    if (!elt->getArgumentInterfaceType() || elt->isIndirect())
-      continue;
-
-    auto eltType = baseType->getTypeOfMember(E->getModuleContext(), elt,
-      elt->getArgumentInterfaceType());
-
-    if (deconstructTypeForDeclCircularity(eltType, known))
-      return true;
-  }
-
-  // we didn't find any circularity, clean up.
-  if (!isGenericArg)
-    known.erase(E);
-
-  return false;
-}
-
-void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
-  llvm::SmallPtrSet<NominalTypeDecl *, 16> known;
-  auto baseType = decl->getDeclaredInterfaceType();
-
-  if (checkNominalDeclCircularity(decl, known, baseType)) {
-    if (isa<StructDecl>(decl)) {
-      diagnose(decl->getLoc(),
-               diag::unsupported_recursive_type,
-               decl->getDeclaredInterfaceType());
-    } else if (isa<EnumDecl>(decl)) {
-      diagnose(decl->getLoc(),
-               diag::recursive_enum_not_indirect,
-               decl->getDeclaredInterfaceType())
-        .fixItInsert(decl->getStartLoc(), "indirect ");
-    }
-  }
-}
-
 void TypeChecker::validateDecl(ValueDecl *D) {
   // Generic parameters are validated as part of their context.
   if (isa<GenericTypeParamDecl>(D))
@@ -7082,8 +7139,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, D);
 
-    // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
+      // Mark a class as @objc. This must happen before checking its members.
       Optional<ObjCReason> isObjC = shouldMarkClassAsObjC(*this, CD);
       markAsObjC(*this, CD, isObjC);
 
@@ -7093,6 +7150,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
            CD->getSuperclass()->getClassOrBoundGenericClass()
              ->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
+
+      // Inherit @objcMembers.
+      if (auto superclass = CD->getSuperclassDecl()) {
+        if (superclass->getAttrs().hasAttribute<ObjCMembersAttr>() &&
+            !CD->getAttrs().hasAttribute<ObjCMembersAttr>()) {
+          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*IsImplicit=*/true));
+        }
+      }
     }
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
@@ -7224,6 +7289,24 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           isObjC = None;
 
         markAsObjC(*this, VD, isObjC);
+
+        // Under the Swift 3 inference rules, if we have @IBInspectable or
+        // @GKInspectable but did not infer @objc, warn that the attribute is
+        if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
+          if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+            diagnose(attr->getLocation(),
+                     diag::attribute_meaningless_when_nonobjc,
+                     attr->getAttrName())
+              .fixItRemove(attr->getRange());
+          }
+
+          if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+            diagnose(attr->getLocation(),
+                     diag::attribute_meaningless_when_nonobjc,
+                     attr->getAttrName())
+              .fixItRemove(attr->getRange());
+          }
+        }
 
         // Infer 'dynamic' before touching accessors.
         inferDynamic(Context, VD);
@@ -7493,8 +7576,12 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
+
     builder.inferRequirements(*ext->getModuleContext(),
-                              TypeLoc::withoutLoc(extInterfaceType));
+                              TypeLoc::withoutLoc(extInterfaceType),
+                              source);
   };
 
   // Validate the generic type signature.
@@ -8227,6 +8314,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     if (isa<ClassDecl>(D) ||
         isa<ProtocolDecl>(D)) {
       /* ok */
+    } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+      if (!Ext->getAsClassOrClassExtensionContext())
+        error = diag::objc_extension_not_class;
     } else if (auto ED = dyn_cast<EnumDecl>(D)) {
       if (ED->isGenericContext())
         error = diag::objc_enum_generic;
@@ -8324,7 +8414,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   if (auto nonObjcAttr = Attrs.getAttribute<NonObjCAttr>()) {
-    // Only methods, properties, subscripts and constructors can be NonObjC.
+    // Only extensions of classes; methods, properties, subscripts
+    // and constructors can be NonObjC.
     // The last three are handled automatically by generic attribute
     // validation -- for the first one, we have to check FuncDecls
     // ourselves.
@@ -8336,6 +8427,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
          !checkObjCDeclContext(func) ||
          (func->isAccessor() && !func->isGetterOrSetter()))) {
       error = diag::invalid_nonobjc_decl;
+    }
+
+    if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+      if (!ext->getAsClassOrClassExtensionContext())
+        error = diag::invalid_nonobjc_extension;
     }
 
     if (error) {

@@ -122,8 +122,6 @@ namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
   ~EmitDFDiagnostics() override {}
 
-  StringRef getName() override { return "Emit Dataflow Diagnostics"; }
-
   /// The entry point to the transformation.
   void run() override {
     SILModule &M = getFunction()->getModule();

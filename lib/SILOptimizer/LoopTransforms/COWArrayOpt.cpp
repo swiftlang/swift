@@ -489,6 +489,8 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
     return false;
   }
 
@@ -825,6 +827,8 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
     return true;
   }
 
@@ -1598,7 +1602,6 @@ class COWArrayOptPass : public SILFunctionTransform {
       }
   }
 
-  StringRef getName() override { return "SIL COW Array Optimization"; }
 };
 } // end anonymous namespace
 
@@ -2342,7 +2345,6 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
 } // end anonymous namespace
 

@@ -24,7 +24,7 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK-LABEL: sil hidden  @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : $T):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
@@ -69,14 +69,14 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 }
 // CHECK: } // end sil function '_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF'
 
-// CHECK: sil shared [thunk] @[[THUNK1]] :
+// CHECK: sil shared [serializable] [thunk] @[[THUNK1]] :
 // CHECK: bb0([[SELF:%.*]] : $Self):
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
 // CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>([[SELF]])
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
 
-// CHECK: sil shared [thunk] @[[THUNK1_THUNK]]
+// CHECK: sil shared [serializable] [thunk] @[[THUNK1_THUNK]]
 // CHECK: bb0([[SELF:%.*]] : $Self):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:   [[FN:%.*]] = witness_method $Self, #NSRuncing.runce!1.foreign
@@ -85,19 +85,19 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK:   return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK1_THUNK]]'
 
-// CHECK: sil shared [thunk] @[[THUNK2]] :
+// CHECK: sil shared [serializable] [thunk] @[[THUNK2]] :
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:_T014objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
 // CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK2]]'
 
-// CHECK: sil shared [thunk] @[[THUNK2_THUNK]] :
+// CHECK: sil shared [serializable] [thunk] @[[THUNK2_THUNK]] :
 // CHECK:      [[FN:%.*]] = witness_method $Self, #NSRuncing.mince!1.foreign
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK2_THUNK]]'
 
-// CHECK-LABEL: sil hidden  @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : $NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[BORROWED_THIS_1:%.*]] = begin_borrow [[THIS]]
@@ -137,7 +137,7 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
 }
 // CHECK : } // end sil function '_T014objc_protocols0A23_protocol_partial_applyyAA9NSRuncing_pF'
 
-// CHECK-LABEL: sil hidden  @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign

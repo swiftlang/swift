@@ -202,3 +202,14 @@ func f(a : r25271859<(Float, Int)>) {
   }
 }
 
+// LValue to rvalue conversions.
+
+func takesRValue(_: (Int, (Int, Int))) {}
+func takesAny(_: Any) {}
+
+var x = 0
+var y = 0
+
+let _ = (x, (y, 0))
+takesRValue((x, (y, 0)))
+takesAny((x, (y, 0)))

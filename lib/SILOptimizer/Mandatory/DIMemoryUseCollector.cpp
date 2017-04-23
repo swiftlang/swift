@@ -18,6 +18,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringExtras.h"
+
+#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
+#error "Included ownership header?!"
+#endif
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -632,6 +637,17 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Instructions that compute a subelement are handled by a helper.
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
       collectTupleElementUses(TEAI, BaseEltNo);
+      continue;
+    }
+
+    // Look through begin_access.
+    if (isa<BeginAccessInst>(User)) {
+      collectUses(User, BaseEltNo);
+      continue;
+    }
+
+    // Ignore end_access.
+    if (isa<EndAccessInst>(User)) {
       continue;
     }
     

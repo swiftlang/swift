@@ -51,7 +51,8 @@ class WorkspaceTestCase(unittest.TestCase):
 class ComputeBuildSubdirTestCase(unittest.TestCase):
 
     def create_basic_args(self, generator, variant, assertions,
-                          enable_asan=False):
+                          enable_asan=False, enable_ubsan=False,
+                          enable_tsan=False):
         return argparse.Namespace(
             cmake_generator=generator,
             cmark_build_variant=variant,
@@ -63,13 +64,27 @@ class ComputeBuildSubdirTestCase(unittest.TestCase):
             llvm_assertions=assertions,
             swift_assertions=assertions,
             swift_stdlib_assertions=assertions,
-            enable_asan=enable_asan)
+            enable_asan=enable_asan,
+            enable_ubsan=enable_ubsan,
+            enable_tsan=enable_tsan)
 
     def test_Ninja_ReleaseAssert_asan(self):  # noqa (N802 function name should be lowercase)
         args = self.create_basic_args(
             "Ninja", variant="Release", assertions=True, enable_asan=True)
         self.assertEqual(compute_build_subdir(args),
                          "Ninja-ReleaseAssert+asan")
+
+    def test_Ninja_ReleaseAssert_ubsan(self):  # noqa (N802 function name should be lowercase)
+        args = self.create_basic_args(
+            "Ninja", variant="Release", assertions=True, enable_ubsan=True)
+        self.assertEqual(compute_build_subdir(args),
+                         "Ninja-ReleaseAssert+ubsan")
+
+    def test_Ninja_ReleaseAssert_tsan(self):  # noqa (N802 function name should be lowercase)
+        args = self.create_basic_args(
+            "Ninja", variant="Release", assertions=True, enable_tsan=True)
+        self.assertEqual(compute_build_subdir(args),
+                         "Ninja-ReleaseAssert+tsan")
 
     def test_Ninja_ReleaseAssert(self):  # noqa (N802 function name should be lowercase)
         # build-script -R
@@ -141,7 +156,9 @@ class ComputeBuildSubdirTestCase(unittest.TestCase):
         def generate():
             for c in productions:
                 args = argparse.Namespace(cmake_generator="Ninja",
-                                          enable_asan=False)
+                                          enable_asan=False,
+                                          enable_ubsan=False,
+                                          enable_tsan=False)
                 for key, val in zip(keys, c):
                     setattr(args, key, val)
                 yield compute_build_subdir(args)

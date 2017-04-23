@@ -11,26 +11,26 @@
 // RUN: %swiftc_driver -driver-print-jobs -target i386-apple-watchos2.0 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix watchOS_SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-x86_64 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv6-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -driver-print-jobs -target armv6-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-armv6 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-armv7 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -driver-print-jobs -target thumbv7-unknown-linux-gnueabihf -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-thumbv7 %s < %t.linux.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-none-linux-androideabi -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7 %s < %t.android.txt
 // RUN: %FileCheck -check-prefix ANDROID-armv7-NEGATIVE %s < %t.android.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
 // RUN: %FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Fsystem car -F cdr -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
@@ -39,14 +39,6 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.10   %s > %t.simple-macosx10.10.txt
 // RUN: %FileCheck %s < %t.simple-macosx10.10.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
-
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0        %s > %t.simple-ios8.txt
-// RUN: %FileCheck -check-prefix IOS_ARCLITE %s < %t.simple-ios8.txt
-
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.11   %s | %FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios9.0        %s | %FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-tvos9.0        %s | %FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target armv7k-apple-watchos2.0    %s | %FileCheck -check-prefix NO_ARCLITE %s
 
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: touch %t/a.o
@@ -58,12 +50,6 @@
 
 // There are more RUN lines further down in the file.
 
-// REQUIRES: CODEGENERATOR=X86
-
-// FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux/freebsd
-// rdar://problem/19692770
-// XFAIL: freebsd, linux
-
 // CHECK: swift
 // CHECK: -o [[OBJECTFILE:.*]]
 
@@ -73,7 +59,6 @@
 // CHECK-DAG: -rpath [[STDLIB_PATH]]
 // CHECK-DAG: -lSystem
 // CHECK-DAG: -arch x86_64
-// CHECK-DAG: -force_load {{[^ ]+/lib/arc/libarclite_macosx.a}} -framework CoreFoundation
 // CHECK: -o {{[^ ]+}}
 
 
@@ -128,7 +113,7 @@
 // LINUX-x86_64-DAG: -lswiftCore
 // LINUX-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-x86_64-DAG: -F foo
+// LINUX-x86_64-DAG: -F foo -iframework car -F cdr
 // LINUX-x86_64-DAG: -framework bar
 // LINUX-x86_64-DAG: -L baz
 // LINUX-x86_64-DAG: -lboo
@@ -144,7 +129,7 @@
 // LINUX-armv6-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-armv6-DAG: -target armv6-unknown-linux-gnueabihf
 // LINUX-armv6-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-armv6-DAG: -F foo
+// LINUX-armv6-DAG: -F foo -iframework car -F cdr
 // LINUX-armv6-DAG: -framework bar
 // LINUX-armv6-DAG: -L baz
 // LINUX-armv6-DAG: -lboo
@@ -160,7 +145,7 @@
 // LINUX-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-armv7-DAG: -target armv7-unknown-linux-gnueabihf
 // LINUX-armv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-armv7-DAG: -F foo
+// LINUX-armv7-DAG: -F foo -iframework car -F cdr
 // LINUX-armv7-DAG: -framework bar
 // LINUX-armv7-DAG: -L baz
 // LINUX-armv7-DAG: -lboo
@@ -176,7 +161,7 @@
 // LINUX-thumbv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // LINUX-thumbv7-DAG: -target thumbv7-unknown-linux-gnueabihf
 // LINUX-thumbv7-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// LINUX-thumbv7-DAG: -F foo
+// LINUX-thumbv7-DAG: -F foo -iframework car -F cdr
 // LINUX-thumbv7-DAG: -framework bar
 // LINUX-thumbv7-DAG: -L baz
 // LINUX-thumbv7-DAG: -lboo
@@ -191,7 +176,7 @@
 // ANDROID-armv7-DAG: -lswiftCore
 // ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // ANDROID-armv7-DAG: -target armv7-none-linux-androideabi
-// ANDROID-armv7-DAG: -F foo
+// ANDROID-armv7-DAG: -F foo -iframework car -F cdr
 // ANDROID-armv7-DAG: -framework bar
 // ANDROID-armv7-DAG: -L baz
 // ANDROID-armv7-DAG: -lboo
@@ -207,7 +192,7 @@
 // CYGWIN-x86_64-DAG: -lswiftCore
 // CYGWIN-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift]]
 // CYGWIN-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH]]
-// CYGWIN-x86_64-DAG: -F foo
+// CYGWIN-x86_64-DAG: -F foo -iframework car -F cdr
 // CYGWIN-x86_64-DAG: -framework bar
 // CYGWIN-x86_64-DAG: -L baz
 // CYGWIN-x86_64-DAG: -lboo
@@ -220,7 +205,7 @@
 // COMPLEX-DAG: -lfoo
 // COMPLEX-DAG: -framework bar
 // COMPLEX-DAG: -L baz
-// COMPLEX-DAG: -F garply
+// COMPLEX-DAG: -F garply -F car -F cdr
 // COMPLEX-DAG: -undefined dynamic_lookup
 // COMPLEX-DAG: -macosx_version_min 10.9.1
 // COMPLEX: -o sdk.out
@@ -231,19 +216,9 @@
 // DEBUG-NEXT: bin/ld{{"? }}
 // DEBUG: -add_ast_path {{.*}}/{{[^/]+}}.swiftmodule
 // DEBUG: -o linker
-// DEBUG-NEXT: bin/dsymutil
+// DEBUG-NEXT: {{^|bin/}}dsymutil
 // DEBUG: linker
 // DEBUG: -o linker.dSYM
-
-
-
-// IOS_ARCLITE: bin/ld{{"? }}
-// IOS_ARCLITE: -force_load {{[^ ]+/lib/arc/libarclite_iphonesimulator.a}}
-// IOS_ARCLITE: -o {{[^ ]+}}
-
-// NO_ARCLITE: bin/ld{{"? }}
-// NO_ARCLITE-NOT: arclite
-// NO_ARCLITE: -o {{[^ ]+}}
 
 
 // COMPILE_AND_LINK: bin/swift
@@ -268,7 +243,7 @@
 // INFERRED_NAME: bin/swift
 // INFERRED_NAME: -module-name LINKER
 // INFERRED_NAME: bin/ld{{"? }}
-// INFERRED_NAME: -o libLINKER.dylib
+// INFERRED_NAME: -o libLINKER.{{dylib|so}}
 
 
 // Test ld detection. We use hard links to make sure
@@ -279,7 +254,7 @@
 // RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: chmod +x %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
-// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc %s -### | %FileCheck -check-prefix=RELATIVE-LINKER %s
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=RELATIVE-LINKER %s
 
 // RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/swift
 // RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/ld

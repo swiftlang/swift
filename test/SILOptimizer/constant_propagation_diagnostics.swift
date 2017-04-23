@@ -2,6 +2,7 @@
 
 // <rdar://problem/18213320> enum with raw values that are too big are not diagnosed
 enum EnumWithTooLargeElements : UInt8 {
+  case negativeOne = -1     // expected-error 2 {{negative integer '-1' overflows when stored into unsigned type 'UInt8'}}
   case one = 1
   case two = 2
   case three

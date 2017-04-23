@@ -52,7 +52,7 @@ protocol InternalProtocol {
 
 // Witness table for conformance with resilient associated type
 
-// CHECK: @_T019protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP = {{(protected )?}}constant [2 x i8*] [
+// CHECK: @_T019protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP = {{(protected )?}}hidden constant [2 x i8*] [
 // CHECK-SAME:   i8* bitcast (%swift.type* ()* @_T019protocol_resilience23ResilientConformingTypeVMa to i8*),
 // CHECK-SAME:   i8* bitcast (i8** ()* @_T019protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa to i8*)
 // CHECK-SAME: ]
@@ -383,6 +383,6 @@ bb0(%0 : $*ConformsWithResilientAssoc):
 
 // Fragile conformance -- no runtime calls needed
 
-// CHECK-LABEL: define{{( protected)?}} i8** @_T019protocol_resilience16ConformingStructVAA17ResilientProtocolAAWa()
+// CHECK-LABEL: define{{( protected)?}} hidden i8** @_T019protocol_resilience16ConformingStructVAA17ResilientProtocolAAWa()
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8** getelementptr inbounds ([8 x i8*], [8 x i8*]* @_T019protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP, i32 0, i32 0)

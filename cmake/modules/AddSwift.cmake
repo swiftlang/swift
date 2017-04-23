@@ -99,7 +99,7 @@ function(_add_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  # MSVC and clang-cl dont't understand -target.
+  # MSVC and clang-cl don't understand -target.
   if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
   endif()
@@ -263,6 +263,10 @@ function(_add_variant_c_compile_flags)
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
+  endif()
+
+  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+    list(APPEND result "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -1432,6 +1436,11 @@ function(add_swift_library name)
     endif()
 
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+      if(NOT SWIFT_SDK_${sdk}_ARCHITECTURES)
+        # SWIFT_SDK_${sdk}_ARCHITECTURES is empty, so just continue
+        continue()
+      endif()
+
       set(THIN_INPUT_TARGETS)
 
       # For each architecture supported by this SDK
@@ -1544,6 +1553,11 @@ function(add_swift_library name)
           endif()
         endif()
 
+        # Add PrivateFrameworks, rdar://28466433
+        if(SWIFTLIB_IS_SDK_OVERLAY)
+          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
+        endif()
+
         # Add this library variant.
         _add_swift_library_single(
           ${VARIANT_NAME}
@@ -1630,6 +1644,7 @@ function(add_swift_library name)
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           set(codesign_arg CODESIGN)
         endif()
+        precondition(THIN_INPUT_TARGETS)
         _add_swift_lipo_target(
             SDK ${sdk}
             TARGET ${lipo_target}

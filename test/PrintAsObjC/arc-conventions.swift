@@ -15,7 +15,7 @@
 import Foundation
 
 public class Test: NSObject {
-  public func initAllTheThings() -> AnyObject {
+  @objc public func initAllTheThings() -> AnyObject {
     print("method called")
     return "initialized" as NSString
   }

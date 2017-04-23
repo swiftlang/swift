@@ -44,19 +44,18 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _bridgeToObjectiveC witness.
-  auto witness = conformance->getWitness(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement, nullptr);
   assert(witness);
 
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq) return None;
 
-  Type objcType =
-      conformance->getTypeWitness(objcTypeReq, nullptr).getReplacement();
+  Type objcType = conformance->getTypeWitness(objcTypeReq, nullptr);
   assert(objcType);
 
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness.getDecl());
+  SILDeclRef witnessConstant(witness);
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
@@ -66,10 +65,10 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
 
   // FIXME: Figure out the right SubstitutionMap stuff if the witness
   // has generic parameters of its own.
-  assert(!cast<FuncDecl>(witness.getDecl())->isGeneric() &&
+  assert(!cast<FuncDecl>(witness)->isGeneric() &&
          "Generic witnesses not supported");
 
-  auto *dc = cast<FuncDecl>(witness.getDecl())->getDeclContext();
+  auto *dc = cast<FuncDecl>(witness)->getDeclContext();
   auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
@@ -119,11 +118,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitness(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement, nullptr);
   assert(witness);
 
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness.getDecl());
+  SILDeclRef witnessConstant(witness);
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
@@ -396,7 +395,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
                                                  invokeTy,
                                                  fnTy,
                                                  blockTy,
-                                                 F.isFragile());
+                                                 F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -485,9 +484,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
   // Fall back to dynamic Any-to-id bridging.
   // The destination type should be AnyObject in this case.
-  assert(loweredBridgedTy->isEqual(
-           SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-             ->getDeclaredType()));
+  assert(loweredBridgedTy->isEqual(SGF.getASTContext().getAnyObjectType()));
 
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
@@ -664,7 +661,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                                  thunkTy,
                                                  blockTy,
                                                  funcTy,
-                                                 F.isFragile());
+                                                 F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -758,10 +755,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
   // id-to-Any bridging.
   if (loweredNativeTy->isAny()) {
-    assert(loweredBridgedTy->isEqual(
-      SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType())
-      && "Any should bridge to AnyObject");
+    assert(loweredBridgedTy->isEqual(SGF.getASTContext().getAnyObjectType())
+           && "Any should bridge to AnyObject");
 
     // TODO: Ever need to handle +0 values here?
     assert(v.hasCleanup());
@@ -1029,6 +1024,29 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   if (substConv.hasIndirectSILResults()) {
     args.push_back(
         emitTemporaryAllocation(loc, substConv.getSingleSILResultType()));
+  }
+
+  // If the '@objc' was inferred due to deprecated rules,
+  // emit a Builtin.swift3ImplicitObjCEntrypoint().
+  //
+  // However, don't do so for 'dynamic' members, which must use Objective-C
+  // dispatch and therefore create many false positives.
+  if (thunk.hasDecl()) {
+    auto decl = thunk.getDecl();
+
+    // For an accessor, look at the storage declaration's attributes.
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      if (func->isAccessor())
+        decl = func->getAccessorStorageDecl();
+    }
+
+    if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
+      if (attr->isSwift3Inferred() &&
+          !decl->getAttrs().hasAttribute<DynamicAttr>()) {
+        B.createBuiltin(loc, getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
+            getModule().Types.getEmptyTupleType(), { }, { });
+      }
+    }
   }
 
   // Now, enter a cleanup used for bridging the arguments. Note that if we

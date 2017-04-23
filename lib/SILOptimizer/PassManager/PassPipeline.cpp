@@ -71,12 +71,22 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
   P.addOwnershipModelEliminator();
 }
 
-static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
+static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
+                                    const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
+  if (Options.EnableMandatorySemanticARCOpts) {
+    P.addSemanticARCOpts();
+  }
+  P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
+  P.addOwnershipModelEliminator();
+  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
+
+  P.addAccessEnforcementSelection();
+  P.addAccessMarkerElimination();
 
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
@@ -104,11 +114,8 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
     return P;
   }
 
-  // Lower all ownership instructions right after SILGen for now.
-  addOwnershipModelEliminatorPipeline(P);
-
   // Otherwise run the rest of diagnostics.
-  addMandatoryOptPipeline(P);
+  addMandatoryOptPipeline(P, Options);
 
   if (SILViewGuaranteedCFG) {
     addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
@@ -212,6 +219,14 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+  P.addSimplifyCFG();
+  P.addSILCombine();
+
+  // Mainly for Array.append(contentsOf) optimization.
+  P.addArrayElementPropagation();
+  
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).
@@ -519,7 +534,7 @@ void SILPassPipelinePlan::addPasses(ArrayRef<PassKind> PassKinds) {
     // updated.
     switch (K) {
 // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION)                                            \
+#define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID: {                                                         \
     add##ID();                                                                 \
     break;                                                                     \
@@ -560,7 +575,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
                os << "        \"" << Pipeline.Name << "\"";
                for (PassKind Kind : getPipelinePasses(Pipeline)) {
                  os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << PassKindName(Kind) << ']';
+                    << PassKindTag(Kind) << ']';
                }
              },
              [&] { os << "\n    ],\n"; });

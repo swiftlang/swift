@@ -40,6 +40,6 @@ bb0:
   return %28 : $()
 }
 
-sil [fragile] [_semantics "array.init"] @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
+sil [serialized] [_semantics "array.init"] @array_init : $@convention(thin) (@thin ArrayOf<Foo>.Type) -> @owned ArrayOf<Foo>
 
-sil [fragile] [_semantics "array.get_count"] @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt
+sil [serialized] [_semantics "array.get_count"] @array_get_count : $@convention(method) (@owned ArrayOf<Foo>) -> MyInt

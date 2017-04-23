@@ -309,7 +309,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   assert(noOptResultTy);
 
   // Create a temporary for the output optional.
-  auto &resultTL = F.getTypeLowering(resultTy);
+  auto &resultTL = getTypeLowering(resultTy);
 
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
@@ -329,7 +329,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
         // possible.
-        if (F.getTypeLowering(input.getType()).isAddressOnly() &&
+        if (getTypeLowering(input.getType()).isAddressOnly() &&
             silConv.useLoweredAddresses()) {
           auto *someDecl = B.getASTContext().getOptionalSomeDecl();
           input = B.createUncheckedTakeEnumDataAddr(
@@ -340,14 +340,14 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue some = B.createOptionalSome(loc, result).forward(*this);
-          return scope.exit(loc, some);
+          return scope.exitAndBranch(loc, some);
         }
 
         RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
         ArgumentSource resultValueRV(loc, std::move(R));
         emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                     finalResult.getValue(), resultTL);
-        return scope.exit(loc);
+        return scope.exitAndBranch(loc);
       });
 
   SEBuilder.addCase(
@@ -356,11 +356,11 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
-          return scope.exit(loc, none);
+          return scope.exitAndBranch(loc, none);
         }
 
         emitInjectOptionalNothingInto(loc, finalResult.getValue(), resultTL);
-        return scope.exit(loc);
+        return scope.exitAndBranch(loc);
       });
 
   std::move(SEBuilder).emit();
@@ -462,7 +462,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
     auto nsErrorType = nsErrorDecl->getDeclaredType()->getCanonicalType();
-    if (nsErrorType->isExactSuperclassOf(concreteFormalType, nullptr)) {
+    if (nsErrorType->isExactSuperclassOf(concreteFormalType)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
         nsError = B.createUpcast(loc, nsError, getLoweredType(nsErrorType));
@@ -483,10 +483,12 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
       if (storedNSErrorConformance->isConcrete()) {
-        if (auto witnessVar = storedNSErrorConformance->getConcrete()
-                                          ->getWitness(nsErrorVar, nullptr)) {
-          nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
-          nsErrorVarSubstitutions = witnessVar.getSubstitutions();
+        if (auto normal = dyn_cast<NormalProtocolConformance>(
+                                    storedNSErrorConformance->getConcrete())) {
+          if (auto witnessVar = normal->getWitness(nsErrorVar, nullptr)) {
+            nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
+            nsErrorVarSubstitutions = witnessVar.getSubstitutions();
+          }
         }
       }
 
@@ -641,9 +643,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // its upper bound.
     auto anyObjectProto = getASTContext()
       .getProtocol(KnownProtocolKind::AnyObject);
-    auto anyObjectTy = anyObjectProto
-      ? anyObjectProto->getDeclaredType()->getCanonicalType()
-      : CanType();
+    auto anyObjectTy = getASTContext().getAnyObjectType();
     auto eraseToAnyObject =
     [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
@@ -695,7 +695,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                             *this));
           ManagedValue mv = F(SGFContext(init.get()));
           if (!mv.isInContext()) {
-            mv.forwardInto(*this, loc, init->getAddress());
+            init->copyOrInitValueInto(*this, loc, mv, /*init*/ true);
             init->finishInitialization(*this);
           }
         });
@@ -888,14 +888,12 @@ ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
     return entry.Value;
   }
 
-  // If the context wants us to initialize a buffer, copy there instead
+  // If the context has an initialization a buffer, copy there instead
   // of making a temporary allocation.
   if (auto I = C.getEmitInto()) {
-    if (SILValue address = I->getAddressForInPlaceInitialization()) {
-      entry.Value.copyInto(*this, address, loc);
-      I->finishInitialization(*this);
-      return ManagedValue::forInContext();
-    }
+    I->copyOrInitValueInto(*this, loc, entry.Value, /*init*/ false);
+    I->finishInitialization(*this);
+    return ManagedValue::forInContext();
   }
 
   // Otherwise, copy the value into a temporary.

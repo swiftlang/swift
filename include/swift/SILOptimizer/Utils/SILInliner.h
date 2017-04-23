@@ -51,7 +51,7 @@ public:
              CloneCollector::CallbackType Callback = nullptr)
       : TypeSubstCloner<SILInliner>(To, From, ApplySubs,
                                     OpenedArchetypesTracker, true),
-        IKind(IKind), CalleeEntryBB(nullptr), CallSiteScope(nullptr),
+        IKind(IKind), CalleeEntryBB(nullptr),
         Callback(Callback) {
   }
 
@@ -114,7 +114,7 @@ private:
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
   Optional<SILLocation> Loc;
-  const SILDebugScope *CallSiteScope;
+  const SILDebugScope *CallSiteScope = nullptr;
   SILFunction *CalleeFunction;
   llvm::SmallDenseMap<const SILDebugScope *,
                       const SILDebugScope *> InlinedScopeCache;

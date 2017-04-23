@@ -1,4 +1,5 @@
 [flake8]
+ignore = W291
 filename = *.py,
            ./utils/80+-check,
            ./utils/backtrace-check,
@@ -18,8 +19,7 @@ filename = *.py,
            ./utils/line-directive,
            ./utils/swift_build_support/tests/mock-distcc,
            ./docs/scripts/ns-html2rst,
-           .utils/PathSanitizingFileCheck,
-           ./utils/python-lint,
+           ./utils/PathSanitizingFileCheck,
            ./utils/recursive-lipo,
            ./utils/round-trip-syntax-test,
            ./utils/rth,
@@ -28,4 +28,4 @@ filename = *.py,
            ./utils/submit-benchmark-results,
            ./utils/update-checkout,
            ./utils/viewcfg,
-           ./utils/symbolicate-linux-fatal
+           ./utils/symbolicate-linux-fatal,

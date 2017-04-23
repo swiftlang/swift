@@ -152,10 +152,10 @@ namespace {
         ValueDecl *witness = nullptr;
         auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-          witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
+          witness = concrete->getTypeWitnessAndDecl(assocType, &TC)
             .second;
         } else if (found->isProtocolRequirement()) {
-          witness = concrete->getWitness(found, &TC).getDecl();
+          witness = concrete->getWitnessDecl(found, &TC);
         }
 
         // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
@@ -414,8 +414,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       // Use the type witness.
       auto concrete = conformance->getConcrete();
-      Type memberType =
-        concrete->getTypeWitness(assocType, this).getReplacement();
+      Type memberType = concrete->getTypeWitness(assocType, this);
       assert(memberType && "Missing type witness?");
 
       // If we haven't seen this type result yet, add it to the result set.

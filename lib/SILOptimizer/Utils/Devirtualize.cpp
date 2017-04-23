@@ -536,7 +536,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     return false;
   }
 
-  if (AI.getFunction()->isFragile()) {
+  if (AI.getFunction()->isSerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
     if (!F->hasValidLinkageForFragileRef())
@@ -846,8 +846,9 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
-                                           ProtocolConformanceRef C) {
+static DevirtualizationResult
+devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
+                          ProtocolConformanceRef C) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI.getModule();
@@ -893,20 +894,38 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   auto ResultSILType = substConv.getSILResultType();
   ApplySite SAI;
 
-  if (auto *A = dyn_cast<ApplyInst>(AI))
-    SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
-                              ResultSILType, NewSubs, Arguments,
-                              A->isNonThrowing());
+  SILValue ResultValue;
+  if (auto *A = dyn_cast<ApplyInst>(AI)) {
+    auto *NewAI =
+        Builder.createApply(Loc, FRI, SubstCalleeSILType, ResultSILType,
+                            NewSubs, Arguments, A->isNonThrowing());
+    // Check if any casting is required for the return value.
+    ResultValue = castValueToABICompatibleType(&Builder, Loc, NewAI,
+                                               NewAI->getType(), AI.getType());
+    SAI = ApplySite::isa(NewAI);
+  }
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
                                  NewSubs, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
-  if (auto *PAI = dyn_cast<PartialApplyInst>(AI))
-    SAI = Builder.createPartialApply(Loc, FRI, SubstCalleeSILType,
-                                     NewSubs, Arguments, PAI->getType());
+  if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
+    auto PartialApplyConvention = PAI->getType()
+                                      .getSwiftRValueType()
+                                      ->getAs<SILFunctionType>()
+                                      ->getCalleeConvention();
+    auto PAIResultType = SILBuilder::getPartialApplyResultType(
+        SubstCalleeSILType, Arguments.size(), Module, {},
+        PartialApplyConvention);
+    auto *NewPAI = Builder.createPartialApply(
+        Loc, FRI, SubstCalleeSILType, NewSubs, Arguments, PAIResultType);
+    // Check if any casting is required for the return value.
+    ResultValue = castValueToABICompatibleType(
+        &Builder, Loc, NewPAI, NewPAI->getType(), PAI->getType());
+    SAI = ApplySite::isa(NewPAI);
+  }
 
   NumWitnessDevirt++;
-  return SAI;
+  return std::make_pair(ResultValue, SAI);
 }
 
 static bool canDevirtualizeWitnessMethod(ApplySite AI) {
@@ -922,7 +941,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite AI) {
   if (!F)
     return false;
 
-  if (AI.getFunction()->isFragile()) {
+  if (AI.getFunction()->isSerialized()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
     if (!F->hasValidLinkageForFragileRef())
@@ -948,8 +967,7 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
     AI.getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                 WMI->getMember());
 
-  auto Result = devirtualizeWitnessMethod(AI, F, WMI->getConformance());
-  return std::make_pair(Result.getInstruction(), Result);
+  return devirtualizeWitnessMethod(AI, F, WMI->getConformance());
 }
 
 //===----------------------------------------------------------------------===//

@@ -244,7 +244,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     NodePointer totalInput = nullptr;
     if (inputs.size() > 1) {
-      auto tuple = Dem.createNode(Node::Kind::NonVariadicTuple);
+      auto tuple = Dem.createNode(Node::Kind::Tuple);
       for (auto &input : inputs)
         tuple->addChild(input, Dem);
       totalInput = tuple;
@@ -280,7 +280,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Tuple: {
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
     const char *labels = tuple->Labels;
-    auto tupleNode = Dem.createNode(Node::Kind::NonVariadicTuple);
+    auto tupleNode = Dem.createNode(Node::Kind::Tuple);
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
       auto elt = Dem.createNode(Node::Kind::TupleElement);
 

@@ -18,8 +18,8 @@
 
 #include "swift/ABI/Class.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/AttrKind.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
@@ -27,14 +27,15 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/IR/CallSite.h"
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
@@ -48,7 +49,6 @@
 #include "IRGenModule.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
-#include "Linking.h"
 #include "MemberAccessStrategy.h"
 
 
@@ -63,20 +63,25 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
   return theClass;
 }
 
-/// What reference counting mechanism does a class have?
-ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
-                                                      ClassDecl *theClass) {
+/// What reference counting mechanism does a class-like type have?
+ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
+                                                     CanType type) {
   // If ObjC interop is disabled, we have a Swift refcount.
   if (!IGM.ObjCInterop)
     return ReferenceCounting::Native;
 
-  // NOTE: if you change this, change Type::usesNativeReferenceCounting.
-  // If the root class is implemented in swift, then we have a swift
-  // refcount; otherwise, we have an ObjC refcount.
-  if (getRootClass(theClass)->hasKnownSwiftImplementation())
+  if (type->usesNativeReferenceCounting(ResilienceExpansion::Maximal))
     return ReferenceCounting::Native;
 
-  return ReferenceCounting::ObjC;
+  // Class-constrained archetypes and existentials that don't use
+  // native reference counting and yet have a superclass must be
+  // using ObjC reference counting.
+  auto superclass = type->getSuperclass();
+  if (superclass)
+    return ReferenceCounting::ObjC;
+
+  // Otherwise, it could be either one.
+  return ReferenceCounting::Unknown;
 }
 
 /// What isa encoding mechanism does a type have?
@@ -226,7 +231,7 @@ namespace {
       }
 
       if (theClass->hasSuperclass()) {
-        SILType superclassType = classType.getSuperclass(nullptr);
+        SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 
@@ -435,6 +440,37 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
 }
+
+llvm::Constant *
+irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
+                                                       SILType baseType,
+                                                       VarDecl *field) {
+  auto fieldType = baseType.getFieldType(field, IGM.getSILModule());
+  // If the field is empty, its address doesn't matter.
+  auto &fieldTI = IGM.getTypeInfo(fieldType);
+  if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
+    return llvm::ConstantInt::get(IGM.SizeTy, 0);
+  }
+
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
+  unsigned fieldIndex = classLayout.getFieldIndex(field);
+
+  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  case FieldAccess::ConstantDirect: {
+    auto &element = baseClassTI.getElements(IGM, baseType)[fieldIndex];
+    return llvm::ConstantInt::get(IGM.SizeTy,
+                                  element.getByteOffset().getValue());
+  }
+  case FieldAccess::NonConstantDirect:
+  case FieldAccess::ConstantIndirect:
+  case FieldAccess::NonConstantIndirect:
+    return nullptr;
+  }
+}
+
+
 
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
@@ -2087,7 +2123,7 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
-  ReferenceCounting refcount = ::getReferenceCountingForClass(IGM, D);
+  ReferenceCounting refcount = ::getReferenceCountingForType(IGM, type);
   
   SpareBitVector spareBits;
   

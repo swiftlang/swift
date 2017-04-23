@@ -388,12 +388,6 @@ private:
         DEMANGLE_CHILD_OR_RETURN(witnessTable, Type);
         return witnessTable;
       }
-      if (Mangled.nextIf('o')) {
-        auto witnessTableOffset =
-            Factory.createNode(Node::Kind::WitnessTableOffset);
-        DEMANGLE_CHILD_OR_RETURN(witnessTableOffset, Entity);
-        return witnessTableOffset;
-      }
       if (Mangled.nextIf('v')) {
         auto fieldOffset = Factory.createNode(Node::Kind::FieldOffset);
         DEMANGLE_CHILD_AS_NODE_OR_RETURN(fieldOffset, Directness);
@@ -1654,13 +1648,12 @@ private:
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
-    NodePointer tuple = Factory.createNode(
-        isV == IsVariadic::yes ? Node::Kind::VariadicTuple
-                               : Node::Kind::NonVariadicTuple);
+    NodePointer tuple = Factory.createNode(Node::Kind::Tuple);
+    NodePointer elt = nullptr;
     while (!Mangled.nextIf('_')) {
       if (!Mangled)
         return nullptr;
-      NodePointer elt = Factory.createNode(Node::Kind::TupleElement);
+      elt = Factory.createNode(Node::Kind::TupleElement);
 
       if (isStartOfIdentifier(Mangled.peek())) {
         NodePointer label = demangleIdentifier(Node::Kind::TupleElementName);
@@ -1675,6 +1668,12 @@ private:
       elt->addChild(type, Factory);
 
       tuple->addChild(elt, Factory);
+    }
+    if (isV == IsVariadic::yes && elt) {
+      elt->reverseChildren();
+      NodePointer marker = Factory.createNode(Node::Kind::VariadicMarker);
+      elt->addChild(marker, Factory);
+      elt->reverseChildren();
     }
     return tuple;
   }

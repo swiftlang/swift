@@ -28,4 +28,4 @@ MakeItNotAGlobal()
 
 // Make sure our vtable/witness tables are properly deserialized.
 // CHECK: sil_vtable Y {
-// CHECK: sil_witness_table public_external [fragile] Y: P module Swift {
+// CHECK: sil_witness_table public_external [serialized] Y: P module Swift {

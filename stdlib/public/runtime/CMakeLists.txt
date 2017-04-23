@@ -45,6 +45,7 @@ set(swift_runtime_sources
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp
+    Exclusivity.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp

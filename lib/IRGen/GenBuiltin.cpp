@@ -697,12 +697,20 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(V);
   }
 
-  if (Builtin.ID == BuiltinValueKind::Once) {
+  if (Builtin.ID == BuiltinValueKind::Once
+      || Builtin.ID == BuiltinValueKind::OnceWithContext) {
     // The input type is statically (Builtin.RawPointer, @convention(thin) () -> ()).
     llvm::Value *PredPtr = args.claimNext();
     // Cast the predicate to a OnceTy pointer.
     PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGF.IGM.OnceTy->getPointerTo());
     llvm::Value *FnCode = args.claimNext();
+    // Get the context if any.
+    llvm::Value *Context;
+    if (Builtin.ID == BuiltinValueKind::OnceWithContext) {
+      Context = args.claimNext();
+    } else {
+      Context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    }
     
     // If we know the platform runtime's "done" value, emit the check inline.
     llvm::BasicBlock *doneBB = nullptr;
@@ -723,7 +731,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     
     // Emit the runtime "once" call.
     auto call
-      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode});
+      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode, Context});
     call->setCallingConv(IGF.IGM.DefaultCC);
     
     // If we emitted the "done" check inline, join the branches.
@@ -849,6 +857,25 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     IGF.emitTSanInoutAccessCall(address);
     return;
   }
+
+  if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
+    llvm::Value *args[2];
+    auto argIter = IGF.CurFn->arg_begin();
+
+    // self
+    args[0] = &*argIter++;
+    if (args[0]->getType() != IGF.IGM.ObjCPtrTy)
+      args[0] = IGF.Builder.CreateBitCast(args[0], IGF.IGM.ObjCPtrTy);
+
+    // _cmd
+    args[1] = &*argIter;
+    if (args[1]->getType() != IGF.IGM.ObjCSELTy)
+      args[1] = IGF.Builder.CreateBitCast(args[1], IGF.IGM.ObjCSELTy);
+
+    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(), args);
+    return;
+  }
+
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

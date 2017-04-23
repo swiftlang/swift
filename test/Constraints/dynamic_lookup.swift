@@ -235,7 +235,7 @@ _ = anyDict["test"]!.bar() // expected-error {{value of type 'Any' has no member
 // looked-up dynamically through AnyObject are treated as conforming
 // to the protocols they are supposed to conform to.
 class NSObjDerived1 : NSObject {
-  var everything: [Any] = []
+  @objc var everything: [Any] = []
 }
 
 class NSObjDerived2 : NSObject {

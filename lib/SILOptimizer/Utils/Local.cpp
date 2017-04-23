@@ -407,30 +407,19 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
 }
 
 SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
-  switch (L) {
-  case SILLinkage::Public:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
-  case SILLinkage::Hidden:
-  case SILLinkage::HiddenExternal:
-    // Specializations of public or hidden symbols can be shared by all TUs
-    // that specialize the definition.
-    // Treat stdlib_binary_only specially. We don't serialize the body of
-    // stdlib_binary_only functions so we can't mark them as Shared (making
-    // their visibility in the dylib hidden).
-    return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
-                                                     : SILLinkage::Shared;
-
-  case SILLinkage::Private:
-  case SILLinkage::PrivateExternal:
-    // Specializations of private symbols should remain so.
-    // TODO: maybe PrivateExternals should get SharedExternal (these are private
-    // functions from the stdlib which are specialized in another module).
+  if (hasPrivateVisibility(L) &&
+      !F->isSerialized()) {
+    // Specializations of private symbols should remain so, unless
+    // they were serialized, which can only happen when specializing
+    // definitions from a standard library built with -sil-serialize-all.
     return SILLinkage::Private;
   }
 
-  llvm_unreachable("Unhandled SILLinkage in switch.");
+  // Treat stdlib_binary_only specially. We don't serialize the body of
+  // stdlib_binary_only functions so we can't mark them as Shared (making
+  // their visibility in the dylib hidden).
+  return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
+                                                   : SILLinkage::Shared;
 }
 
 /// Remove all instructions in the body of \p BB in safe manner by using
@@ -510,7 +499,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
         // A is a superclass of B, then it can be done by means
         // of a simple upcast.
         if (mt2.getInstanceType()->isExactSuperclassOf(
-              mt1.getInstanceType(), nullptr)) {
+              mt1.getInstanceType())) {
           return B->createUpcast(Loc, Value, DestTy);
         }
  
@@ -687,8 +676,10 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (AI->getNumOperands() != 3 || !Fn->hasSemanticsAttr("string.concat"))
+  if (AI->getNumArguments() != 3 || !Fn->hasSemanticsAttr("string.concat"))
     return false;
+
+  assert(Fn->getRepresentation() == SILFunctionTypeRepresentation::Method);
 
   // Left and right operands of a string concatenation operation.
   AILeft = dyn_cast<ApplyInst>(AI->getOperand(1));
@@ -729,6 +720,11 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
         (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
          AIRightOperandsNum == 5)))
     return false;
+
+  assert(FRILeftFun->getRepresentation() ==
+         SILFunctionTypeRepresentation::Method);
+  assert(FRIRightFun->getRepresentation() ==
+         SILFunctionTypeRepresentation::Method);
 
   SLILeft = dyn_cast<StringLiteralInst>(AILeft->getOperand(1));
   SLIRight = dyn_cast<StringLiteralInst>(AIRight->getOperand(1));
@@ -887,6 +883,8 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongReleaseInst:
+  case ValueKind::CopyValueInst:
+  case ValueKind::DestroyValueInst:
   case ValueKind::RetainValueInst:
   case ValueKind::ReleaseValueInst:
   case ValueKind::DebugValueInst:
@@ -916,6 +914,12 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
 
   // Otherwise, we need to destroy the argument.
   if (Arg->getType().isObject()) {
+    // If we have qualified ownership, we should just emit a destroy value.
+    if (Arg->getFunction()->hasQualifiedOwnership()) {
+      Callbacks.CreatedNewInst(Builder.createDestroyValue(Loc, Arg));
+      return;
+    }
+
     if (Arg->getType().hasReferenceSemantics()) {
       auto U = Builder.emitStrongRelease(Loc, Arg);
       if (U.isNull())
@@ -1078,7 +1082,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
     bool LiveInSucc = false;
     bool DeadInSucc = false;
     for (const SILSuccessor &Succ : BB->getSuccessors()) {
-      if (LiveBlocks.count(Succ)) {
+      if (isAliveAtBeginOfBlock(Succ)) {
         LiveInSucc = true;
       } else {
         DeadInSucc = true;
@@ -1101,7 +1105,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // The value is not live in some of the successor blocks.
       LiveOutBlocks.insert(BB);
       for (const SILSuccessor &Succ : BB->getSuccessors()) {
-        if (!LiveBlocks.count(Succ)) {
+        if (!isAliveAtBeginOfBlock(Succ)) {
           // It's an "exit" edge from the lifetime region.
           FrontierBlocks.insert(Succ);
         }
@@ -1163,7 +1167,7 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
     // live at the end of BB and therefore Inst is definitely in the lifetime
     // region (Note that we don't check in upward direction against the value's
     // definition).
-    if (LiveBlocks.count(Succ))
+    if (isAliveAtBeginOfBlock(Succ))
       return true;
   }
   // The value is live in the block but not at the end of the block. Check if
@@ -1526,7 +1530,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   if (!BridgedFunc)
     return nullptr;
 
-  if (Inst->getFunction()->isFragile() &&
+  if (Inst->getFunction()->isSerialized() &&
       !BridgedFunc->hasValidLinkageForFragileRef())
     return nullptr;
 

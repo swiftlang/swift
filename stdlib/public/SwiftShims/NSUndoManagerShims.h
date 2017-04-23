@@ -1,4 +1,4 @@
-//===--- NSUndoManagerShims.h - Foundation declarations for NSUndoManager overlay ------===//
+//===--- NSUndoManagerShims.h - Foundation decl. for NSUndoManager overlay ===//
 //
 // This source file is part of the Swift.org open source project
 //

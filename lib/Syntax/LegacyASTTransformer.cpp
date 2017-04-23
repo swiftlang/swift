@@ -62,7 +62,7 @@ namespace {
 
     std::vector<RC<TokenSyntax>> TokensInRange;
 
-    while(Start < End.base()) {
+    while (Start < End.base()) {
       TokensInRange.push_back(Start->first);
       ++Start;
     }
@@ -1185,6 +1185,13 @@ RC<SyntaxData> LegacyASTTransformer::visitConditionalCheckedCastExpr(
   return getUnknownExpr(E);
 }
 
+RC<SyntaxData> LegacyASTTransformer::visitKeyPathApplicationExpr(
+    KeyPathApplicationExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
 RC<SyntaxData>
 LegacyASTTransformer::visitIsExpr(IsExpr *E,
                                   const SyntaxData *Parent,
@@ -1258,9 +1265,9 @@ LegacyASTTransformer::visitObjCSelectorExpr(ObjCSelectorExpr *E,
 }
 
 RC<SyntaxData>
-LegacyASTTransformer::visitObjCKeyPathExpr(ObjCKeyPathExpr *E,
-                                           const SyntaxData *Parent,
-                                           const CursorIndex IndexInParent) {
+LegacyASTTransformer::visitKeyPathExpr(KeyPathExpr *E,
+                                       const SyntaxData *Parent,
+                                       const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
 }
 

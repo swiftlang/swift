@@ -62,6 +62,6 @@ public class PublicSub: Base {
 // CHECK-NEXT:  method #Fooable.foo!1: {{.*}} : @_T04main7FooImplVAA7FooableA2aDP3fooyyFTW
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_witness_table [fragile] PublicFooImpl: Fooable module main {
+// CHECK-LABEL: sil_witness_table [serialized] PublicFooImpl: Fooable module main {
 // CHECK-NEXT:  method #Fooable.foo!1: {{.*}} : @_T04main13PublicFooImplVAA7FooableA2aDP3fooyyFTW
 // CHECK-NEXT: }

@@ -33,6 +33,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
@@ -58,10 +59,10 @@
 #include "GenOpaque.h"
 #include "GenPoly.h"
 #include "GenType.h"
+#include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "MetadataPath.h"
 #include "NecessaryBindings.h"
 #include "ProtocolInfo.h"
@@ -97,9 +98,6 @@ public:
   PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
 
   ArrayRef<MetadataSource> getSources() const { return Sources; }
-
-  using RequirementCallback =
-    llvm::function_ref<void(GenericRequirement requirement)>;
 
   void enumerateRequirements(const RequirementCallback &callback);
 
@@ -199,17 +197,18 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
   });
 }
 
-void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
-  if (!Generics) return;
+void
+irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
+                                          const RequirementCallback &callback) {
+  if (!signature) return;
 
   // Get all of the type metadata.
-  for (auto gp : Generics.getGenericParams()) {
-    if (Generics->getCanonicalTypeInContext(gp, M) == gp)
-      callback({gp, nullptr});
+  for (auto gp : signature->getSubstitutableParams()) {
+    callback({CanType(gp), nullptr});
   }
 
   // Get the protocol conformances.
-  for (auto &reqt : Generics->getRequirements()) {
+  for (auto &reqt : signature->getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -229,6 +228,11 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
     }
     llvm_unreachable("bad requirement kind");
   }
+}
+
+void
+PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
+  return enumerateGenericSignatureRequirements(Generics, callback);
 }
 
 void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
@@ -838,12 +842,13 @@ static bool isDependentConformance(IRGenModule &IGM,
   if (isResilientConformance(conformance))
     return true;
 
-  // Check whether any of the inherited protocols are dependent.
-  for (auto &entry : conformance->getInheritedConformances()) {
-    if (isDependentConformance(IGM, entry.second->getRootNormalConformance(),
-                               expansion)) {
+  // Check whether any of the inherited conformances are dependent.
+  for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+    if (isDependentConformance(IGM,
+                               conformance->getInheritedConformance(inherited)
+                                 ->getRootNormalConformance(),
+                               expansion))
       return true;
-    }
   }
 
   // If the conforming type isn't dependent, the below check is never true.
@@ -852,10 +857,10 @@ static bool isDependentConformance(IRGenModule &IGM,
 
   // Check whether any of the associated types are dependent.
   if (conformance->forEachTypeWitness(nullptr,
-        [&](AssociatedTypeDecl *requirement, const Substitution &sub,
+        [&](AssociatedTypeDecl *requirement, Type type,
             TypeDecl *explicitDecl) -> bool {
           // RESILIENCE: this could be an opaque conformance
-          return sub.getReplacement()->hasArchetype();
+          return type->hasArchetype();
        })) {
     return true;
   }
@@ -1124,12 +1129,11 @@ public:
 
       SILEntries = SILEntries.slice(1);
 
-      const Substitution &sub =
-        Conformance.getTypeWitness(requirement, nullptr);
+      CanType associate =
+        Conformance.getTypeWitness(requirement, nullptr)->getCanonicalType();
 
       // This type will be expressed in terms of the archetypes
       // of the conforming context.
-      CanType associate = sub.getReplacement()->getCanonicalType();
       assert(!associate->hasTypeParameter());
 
       llvm::Constant *metadataAccessFunction =
@@ -2439,7 +2443,6 @@ void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
 NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          CanSILFunctionType substType,
                                           const SubstitutionMap &subs) {
   NecessaryBindings bindings;
 

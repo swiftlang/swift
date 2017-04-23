@@ -49,6 +49,17 @@ static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   llvm_unreachable("bad string encoding");
 }
 
+static unsigned
+toStableConstStringEncoding(ConstStringLiteralInst::Encoding encoding) {
+  switch (encoding) {
+  case ConstStringLiteralInst::Encoding::UTF8:
+    return SIL_UTF8;
+  case ConstStringLiteralInst::Encoding::UTF16:
+    return SIL_UTF16;
+  }
+  llvm_unreachable("bad string encoding");
+}
+
 static unsigned toStableSILLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return SIL_LINKAGE_PUBLIC;
@@ -222,7 +233,7 @@ namespace {
 
     /// Helper function to determine if given the current state of the
     /// deserialization if the function body for F should be deserialized.
-    bool shouldEmitFunctionBody(const SILFunction *F);
+    bool shouldEmitFunctionBody(const SILFunction *F, bool isReference = true);
 
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
@@ -236,7 +247,7 @@ namespace {
 void SILSerializer::addMandatorySILFunction(const SILFunction *F,
                                             bool emitDeclarationsForOnoneSupport) {
   // If this function is not fragile, don't do anything.
-  if (!shouldEmitFunctionBody(F))
+  if (!shouldEmitFunctionBody(F, /* isReference */ false))
     return;
 
   auto iter = FuncsToEmit.find(F);
@@ -270,13 +281,10 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
     return;
   }
 
-  // If we referenced a non-fragile shared function from a fragile
-  // function, serialize it too. In practice, it will either be a
-  // thunk, or an optimizer specialization. In both cases, we don't
-  // have enough information at the time we emit the function to
-  // know if it should be marked fragile or not.
   if (F->getLinkage() == SILLinkage::Shared && !DeclOnly) {
-    assert(F->isThunk() == IsReabstractionThunk || F->hasForeignBody());
+    assert(F->isSerialized() == IsSerializable ||
+           F->hasForeignBody());
+
     FuncsToEmit[F] = false;
     Worklist.push_back(F);
     return;
@@ -363,7 +371,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
-      (unsigned)F.isTransparent(), (unsigned)F.isFragile(),
+      (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(), FnID,
@@ -1162,6 +1170,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                     S.addIdentifierRef(Ctx.getIdentifier(Str)));
     break;
   }
+  case ValueKind::ConstStringLiteralInst: {
+    auto SLI = cast<ConstStringLiteralInst>(&SI);
+    StringRef Str = SLI->getValue();
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    unsigned encoding = toStableConstStringEncoding(SLI->getEncoding());
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    (unsigned)SI.getKind(), encoding, 0, 0,
+                                    S.addIdentifierRef(Ctx.getIdentifier(Str)));
+    break;
+  }
   case ValueKind::FloatLiteralInst:
   case ValueKind::IntegerLiteralInst: {
     // Use SILOneOperandLayout to specify the type and the literal.
@@ -1358,6 +1376,35 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
 
+  case ValueKind::BeginAccessInst: {
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    auto *BAI = cast<BeginAccessInst>(&SI);
+    unsigned attr =
+         unsigned(BAI->getAccessKind())
+       + (unsigned(BAI->getEnforcement()) << 3);
+    SILValue operand = BAI->getOperand();
+
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
+        S.addTypeRef(operand->getType().getSwiftRValueType()),
+        (unsigned)operand->getType().getCategory(),
+        addValueRef(operand));
+    break;
+  }
+
+  case ValueKind::EndAccessInst: {
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    auto *EAI = cast<EndAccessInst>(&SI);
+    unsigned attr = unsigned(EAI->isAborting());
+    SILValue operand = EAI->getOperand();
+
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
+        S.addTypeRef(operand->getType().getSwiftRValueType()),
+        (unsigned)operand->getType().getCategory(),
+        addValueRef(operand));
+    break;
+  }
   case ValueKind::AssignInst:
   case ValueKind::CopyAddrInst:
   case ValueKind::StoreInst:
@@ -1737,6 +1784,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
+  case ValueKind::KeyPathInst:
     llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.
@@ -1820,7 +1868,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
-                                 (unsigned)g.isFragile(),
+                                 g.isSerialized() ? 1 : 0,
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  TyID, dID);
@@ -1855,7 +1903,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
-    unsigned(wt.isFragile()));
+    wt.isSerialized() == IsSerialized ? 1 : 0);
 
   S.writeConformance(wt.getConformance(), SILAbbrCodes);
 
@@ -1946,17 +1994,28 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
 }
 
 /// Helper function for whether to emit a function body.
-bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F) {
+bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
+                                           bool isReference) {
+
+  // If F is a declaration, it has no body to emit...
+  // The declaration will be serialized anyways if it is referenced anywhere.
+  if (F->isExternalDeclaration())
+    return false;
+
+  // Never serialize any function definitions available externally, unless
+  // it is a referenced shared function (see the explanation in
+  // SILSerializer::writeSILFunction).
+  // TODO: Special handling for resilient mode.
+  if (F->isAvailableExternally() &&
+      !(isReference && hasSharedVisibility(F->getLinkage())))
+    return false;
+
   // If we are asked to serialize everything, go ahead and do it.
   if (ShouldSerializeAll)
     return true;
 
-  // If F is a declaration, it has no body to emit...
-  if (F->isExternalDeclaration())
-    return false;
-
-  // If F is transparent, we should always emit its body.
-  if (F->isFragile())
+  // If F is serialized, we should always emit its body.
+  if (F->isSerialized() == IsSerialized)
     return true;
 
   return false;
@@ -2026,7 +2085,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if ((ShouldSerializeAll || wt.isFragile()) &&
+    if ((ShouldSerializeAll || wt.isSerialized()) &&
         wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }

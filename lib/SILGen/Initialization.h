@@ -24,10 +24,12 @@
 
 namespace swift {
 namespace Lowering {
-  class SILGenFunction;
 
+class SILGenFunction;
 class Initialization;
 using InitializationPtr = std::unique_ptr<Initialization>;
+class TemporaryInitialization;
+using TemporaryInitializationPtr = std::unique_ptr<TemporaryInitialization>;
   
 /// An abstract class for consuming a value.  This is used for initializing
 /// variables, although that is not the only way it is used.
@@ -45,9 +47,9 @@ using InitializationPtr = std::unique_ptr<Initialization>;
 ///
 /// This interface supports four ways to receive the initializing value:
 ///
-///   - If getAddressForInPlaceInitialization() returns non-null, the
-///     initializing value may be created directly in that location.
-///     It is legal to call getAddressForInPlaceInitialization()
+///   - If canPerformInPlaceInitialization() return true,
+///     getAddressForInPlaceInitialization may be called.
+///     It is not legal to call getAddressForInPlaceInitialization
 ///     multiple times.
 ///
 ///   - If canSplitIntoTupleElements() returns true, getTupleElements may
@@ -75,29 +77,26 @@ public:
   Initialization() {}
   virtual ~Initialization() {}
 
-  /// Return true if this initialization is a simple address in memory.
-  virtual bool isSingleBuffer() const {
+  /// Return true if this initialization supports in-place initialization.
+  ///
+  /// This method must return consistently both before and after
+  /// initialization begins.
+  virtual bool canPerformInPlaceInitialization() const {
     return false;
   }
 
-   /// If this initialization represents a single contiguous buffer, return the
-  /// SILValue of that buffer's address. If not, returns an invalid SILValue.
-  virtual SILValue getAddressOrNull() const = 0;
-  
-  /// Returns the address of the single contiguous buffer represented by this
-  /// initialization. Once the address has been stored to,
-  /// finishInitialization must be called.
-  SILValue getAddress() const {
-    SILValue address = getAddressOrNull();
-    assert(address && "initialization does not represent a single buffer");
-    return address;
+  /// A hack that should be removed relating to the initialization of
+  /// global values.
+  virtual bool isInPlaceInitializationOfGlobal() const {
+    llvm_unreachable("didn't implement isInPlaceInitializationOfGlobal");
   }
   
-  
-  /// If this initialization has an address we can directly emit into, return
-  /// it.  Otherwise, return a null SILValue.
-  virtual SILValue getAddressForInPlaceInitialization() const {
-    return SILValue();
+  /// Begin an in-place initialization, given that
+  /// canPerformInPlaceInitialization() returned true.
+  virtual SILValue
+  getAddressForInPlaceInitialization(SILGenFunction &SGF, SILLocation loc) {
+    llvm_unreachable("Must implement if getAddressForInPlaceInitialization "
+                     "returns true");
   }
   
   /// Return true if we can get the addresses of elements with the
@@ -163,14 +162,15 @@ class SingleBufferInitialization : public Initialization {
 public:
   SingleBufferInitialization() {}
   
-  bool isSingleBuffer() const override {
+  bool canPerformInPlaceInitialization() const override {
     return true;
   }
 
-  // SingleBufferInitializations always have an address.
-  SILValue getAddressForInPlaceInitialization() const override {
-    return getAddress();
-  }
+  // SingleBufferInitializations must always implement this method.
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override = 0;
+
+  bool isInPlaceInitializationOfGlobal() const override = 0;
   
   bool canSplitIntoTupleElements() const override {
     return true;
@@ -182,7 +182,8 @@ public:
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override {
-    copyOrInitValueIntoSingleBuffer(SGF, loc, value, isInit, getAddress());
+    auto address = getAddressForInPlaceInitialization(SGF, loc);
+    copyOrInitValueIntoSingleBuffer(SGF, loc, value, isInit, address);
   }
 
   /// Overriders must call this.
@@ -207,13 +208,19 @@ class KnownAddressInitialization : public SingleBufferInitialization {
   /// The physical address of the global.
   SILValue address;
   
-  virtual void anchor() const;
 public:
   KnownAddressInitialization(SILValue address) : address(address) {}
   
-  SILValue getAddressOrNull() const override {
+  SILValue getAddress() const {
     return address;
   }
+
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
+    return address;
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override;
 
   void finishUninitialized(SILGenFunction &SGF) override {}
 };
@@ -232,13 +239,16 @@ public:
     TemporaryInitialization::finishInitialization(SGF);
   }
 
-  SILValue getAddressOrNull() const override {
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
     return Addr;
   }
 
   SILValue getAddress() const {
     return Addr;
   }
+
+  bool isInPlaceInitializationOfGlobal() const override;
 
   /// Returns the cleanup corresponding to the value of the temporary.
   CleanupHandle getInitializedCleanup() const { return Cleanup; }
@@ -258,14 +268,7 @@ public:
   SmallVector<InitializationPtr, 4> SubInitializations;
     
   TupleInitialization() {}
-    
-  SILValue getAddressOrNull() const override {
-    if (SubInitializations.size() == 1)
-      return SubInitializations[0]->getAddressOrNull();
-    else
-      return SILValue();
-  }
-    
+
   bool canSplitIntoTupleElements() const override {
     return true;
   }

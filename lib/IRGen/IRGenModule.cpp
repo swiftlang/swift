@@ -21,6 +21,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
 #include "clang/AST/ASTContext.h"
@@ -48,7 +49,6 @@
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
-#include "Linking.h"
 
 #include <initializer_list>
 
@@ -117,11 +117,6 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                 LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
   return ClangCodeGen;
-}
-
-/// A helper for determining if the triple uses the DLL storage
-static bool useDllStorage(const llvm::Triple &Triple) {
-  return Triple.isOSBinFormatCOFF() && !Triple.isOSCygMing();
 }
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
@@ -261,8 +256,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   FullBoxMetadataPtrTy = FullBoxMetadataStructTy->getPointerTo(DefaultAS);
 
-
-  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, Int32Ty, Int32Ty };
+  llvm::Type *refCountedElts[] = {TypeMetadataPtrTy, Int32Ty, Int32Ty};
   RefCountedStructTy->setBody(refCountedElts);
 
   PtrSize = Size(DataLayout.getPointerSize(DefaultAS));
@@ -356,7 +350,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                               openedErrorTriple,
                                               /*packed*/ false);
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
-  
+
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
   DereferenceableID = LLVMContext.getMDKindID("dereferenceable");

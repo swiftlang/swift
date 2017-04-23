@@ -346,9 +346,7 @@ Expr *SemaAnnotator::walkToExprPost(Expr *E) {
 }
 
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
-  if (isDone())
-    return false;
-  return true;
+  return !isDone();
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {

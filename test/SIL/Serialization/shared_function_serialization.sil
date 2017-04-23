@@ -4,9 +4,9 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -I %t -linker -inline %s -o - | %FileCheck %s
 
 // CHECK: sil private @top_level_code
-// CHECK: sil public_external [fragile] @_T0s1XVABycfC{{.*}}
-// CHECK: sil public_external [fragile] @_T0s17the_thing_it_doesys1XV1x_tF{{.*}}
-// CHECK: sil shared_external [fragile] [noinline] @_T0s9the_thingyx1t_tlFs1XV_Tgq5{{.*}}
+// CHECK: sil public_external [serialized] @_T0s1XVABycfC{{.*}}
+// CHECK: sil public_external [serialized] @_T0s17the_thing_it_doesys1XV1x_tF{{.*}}
+// CHECK: sil shared_external [serializable] [noinline] @_T0s9the_thingyx1t_tlFs1XV_Tgq5{{.*}}
 
 sil_stage canonical
 

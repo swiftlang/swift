@@ -232,6 +232,9 @@ namespace irgen {
                                       CanSILFunctionType methodType,
                                       bool useSuperVTable);
 
+  /// Get the offset of the given class method within the class's vtables.
+  unsigned getVirtualMethodIndex(IRGenModule &IGM, SILDeclRef method);
+  
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol
@@ -290,9 +293,8 @@ namespace irgen {
   bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
 
   /// Determine how the given type metadata should be accessed.
-  MetadataAccessStrategy getTypeMetadataAccessStrategy(IRGenModule &IGM,
-                                                       CanType type);
-  
+  MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
+
   /// Return the address of a function that will return type metadata 
   /// for the given non-dependent type.
   llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,

@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
@@ -1656,7 +1657,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   } else {
 #ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     assert(!isOutOfLine &&
-           "Should only see inline represenations of existentials");
+           "Should only see inline representations of existentials");
 #else
     // swift_dynamicCast took or destroyed the value as per the original request
     // We may still have an opaque existential container to deallocate.
@@ -2195,6 +2196,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                                           const Metadata *srcType,
                                           const Metadata *targetType,
                                           DynamicCastFlags flags) {
+  // These flag combinations are not handled here.
+  assert(!(flags & DynamicCastFlags::Unconditional));
+  assert(!(flags & DynamicCastFlags::DestroyOnFailure));
+
   // Swift type should be AnyObject or a class type.
   if (!srcType->isAnyClass()) {
     auto existential = dyn_cast<ExistentialTypeMetadata>(srcType);
@@ -2234,7 +2239,8 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   
   // Maybe we can cast the boxed value to our destination type somehow.
   auto innerFlags = flags - DynamicCastFlags::TakeOnSuccess
-                          - DynamicCastFlags::DestroyOnFailure;
+                          - DynamicCastFlags::DestroyOnFailure
+                          - DynamicCastFlags::Unconditional;
   if (swift_dynamicCast(dest, const_cast<OpaqueValue*>(boxedValue),
                         boxedType, targetType, innerFlags)) {
     // Release the box if we need to.
@@ -2525,10 +2531,19 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
     return unwrapResult.success;
 
 #if SWIFT_OBJC_INTEROP
-  // A class or AnyObject reference may point at a boxed _SwiftValue.
-  if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
-                                    targetType, flags)) {
-    return true;
+  // A class or AnyObject reference may point to a _SwiftValue box.
+  {
+    auto innerFlags = flags - DynamicCastFlags::Unconditional
+                            - DynamicCastFlags::DestroyOnFailure;
+    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
+                                      targetType, innerFlags)) {
+      // TakeOnSuccess was handled inside tryDynamicCastBoxedSwiftValue().
+      return true;
+    } else {
+      // Couldn't cast boxed value to targetType.
+      // Fall through and try to cast the _SwiftValue box itself to targetType.
+      // (for example, casting _SwiftValue to NSObject will be successful)
+    }
   }
 #endif
 

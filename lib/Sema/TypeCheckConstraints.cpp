@@ -23,6 +23,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -2420,11 +2421,69 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return hadError;
 }
 
+static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
+                                               Type t) {
+  llvm::DenseMap<SubstitutableType *, TypeVariableType *> types;
+
+  return t.subst(
+    [&](SubstitutableType *origType) -> Type {
+      auto found = types.find(origType);
+      if (found != types.end())
+        return found->second;
+
+      if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
+        if (archetypeType->getParent())
+          return Type();
+
+        auto locator = cs.getConstraintLocator(nullptr);
+        auto replacement = cs.createTypeVariable(locator, 0);
+
+        if (auto superclass = archetypeType->getSuperclass()) {
+          cs.addConstraint(ConstraintKind::Subtype, replacement,
+                           superclass, locator);
+        }
+        for (auto proto : archetypeType->getConformsTo()) {
+          cs.addConstraint(ConstraintKind::ConformsTo, replacement,
+                           proto->getDeclaredType(), locator);
+        }
+        types[origType] = replacement;
+        return replacement;
+      }
+
+      // FIXME: Remove this case
+      assert(cast<GenericTypeParamType>(origType));
+      auto locator = cs.getConstraintLocator(nullptr);
+      auto replacement = cs.createTypeVariable(locator, 0);
+      types[origType] = replacement;
+      return replacement;
+    },
+    [&](CanType origType, Type substType, ProtocolType *conformedProtocol)
+      -> Optional<ProtocolConformanceRef> {
+      return ProtocolConformanceRef(conformedProtocol->getDecl());
+    });
+}
+
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
+                                         bool openArchetypes,
                                          ConstraintKind kind, DeclContext *dc,
                                          bool *unwrappedIUO) {
+  assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
+         "Unexpected type variable in constraint satisfaction testing");
+
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  if (openArchetypes) {
+    type1 = replaceArchetypesWithTypeVariables(cs, type1);
+    type2 = replaceArchetypesWithTypeVariables(cs, type2);
+  }
+
   cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
+
+  if (openArchetypes) {
+    assert(!unwrappedIUO && "FIXME");
+    SmallVector<Solution, 4> solutions;
+    return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
+  }
+
   if (auto solution = cs.solveSingle()) {
     if (unwrappedIUO)
       *unwrappedIUO = solution->getFixedScore().Data[SK_ForceUnchecked] > 0;
@@ -2436,26 +2495,34 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Subtype, dc);
+  return typesSatisfyConstraint(type1, type2,
+                                /*openArchetypes=*/false,
+                                ConstraintKind::Subtype, dc);
 }
 
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc,
                                   bool *unwrappedIUO) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc,
+  return typesSatisfyConstraint(type1, type2,
+                                /*openArchetypes=*/false,
+                                ConstraintKind::Conversion, dc,
                                 unwrappedIUO);
 }
 
 bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
                                             DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc) ||
-    isObjCBridgedTo(type1, type2, dc);
+  return (typesSatisfyConstraint(type1, type2,
+                                 /*openArchetypes=*/false,
+                                 ConstraintKind::Conversion, dc) ||
+          isObjCBridgedTo(type1, type2, dc));
 }
 
 bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
                                   bool *unwrappedIUO) {
   return (Context.LangOpts.EnableObjCInterop &&
-   typesSatisfyConstraint(type1, type2, ConstraintKind::BridgingConversion,
-                          dc, unwrappedIUO));
+          typesSatisfyConstraint(type1, type2,
+                                 /*openArchetypes=*/false,
+                                 ConstraintKind::BridgingConversion,
+                                 dc, unwrappedIUO));
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
@@ -2466,24 +2533,23 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  auto locator = cs.getConstraintLocator(nullptr);
-
-  // Add all of the requirements of the archetype to the given type.
-  // FIXME: Short-circuit if any of the constraints fails.
-  if (archetype->requiresClass() && !type->mayHaveSuperclass())
+  if (archetype->requiresClass() &&
+      !type->mayHaveSuperclass() &&
+      !type->isObjCExistentialType())
     return false;
 
   if (auto superclass = archetype->getSuperclass()) {
-    cs.addConstraint(ConstraintKind::Subtype, type, superclass, locator);
-  }
-  for (auto proto : archetype->getConformsTo()) {
-    cs.addConstraint(ConstraintKind::ConformsTo, type,
-                     proto->getDeclaredType(), locator);
+    if (!superclass->isExactSuperclassOf(type))
+      return false;
   }
 
-  // Solve the system.
-  return cs.solveSingle().hasValue();
+  for (auto proto : archetype->getConformsTo()) {
+    if (!dc->getParentModule()->lookupConformance(
+          type, proto, this))
+      return false;
+  }
+
+  return true;
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
@@ -2663,6 +2729,11 @@ void Solution::dump(raw_ostream &out) const {
       out << "base type " << choice.getBaseType()->getString() << "\n";
       break;
 
+    case OverloadChoiceKind::KeyPathApplication:
+      out << "key path application root "
+          << choice.getBaseType()->getString() << "\n";
+      break;
+
     case OverloadChoiceKind::TupleIndex:
       out << "tuple " << choice.getBaseType()->getString() << " index "
         << choice.getTupleIndex() << "\n";
@@ -2694,7 +2765,7 @@ void Solution::dump(raw_ostream &out) const {
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
-                   opened.first.print(out);
+                   opened.first->print(out);
                    out << " -> ";
                    opened.second->print(out);
                  },
@@ -2826,6 +2897,11 @@ void ConstraintSystem::print(raw_ostream &out) {
         out << "base type " << choice.getBaseType()->getString() << "\n";
         break;
 
+      case OverloadChoiceKind::KeyPathApplication:
+        out << "key path application root "
+            << choice.getBaseType()->getString() << "\n";
+        break;
+
       case OverloadChoiceKind::TupleIndex:
         out << "tuple " << choice.getBaseType()->getString() << " index "
             << choice.getTupleIndex() << "\n";
@@ -2852,7 +2928,7 @@ void ConstraintSystem::print(raw_ostream &out) {
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
-                   opened.first.print(out);
+                   opened.first->print(out);
                    out << " -> ";
                    opened.second->print(out);
                  },
@@ -2940,11 +3016,18 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // Determine whether we should suppress diagnostics.
   bool suppressDiagnostics = (contextKind == CheckedCastContextKind::None);
 
+  bool optionalToOptionalCast = false;
+
   // Local function to indicate failure.
   auto failed = [&] {
     if (suppressDiagnostics) {
       return CheckedCastKind::Unresolved;
     }
+
+    // Explicit optional-to-optional casts always succeed because a nil
+    // value of any optional type can be cast to any other optional type.
+    if (optionalToOptionalCast)
+      return CheckedCastKind::ValueCast;
 
     diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
       .highlight(diagFromRange)
@@ -2972,6 +3055,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
     toType = toValueType;
     fromType = fromValueType;
+    optionalToOptionalCast = true;
   }
   
   // On the other hand, casts can decrease optionality monadically.
@@ -3319,10 +3403,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();
-  SmallVector<ProtocolDecl*, 2> toProtocols;
-  bool toExistential = toType->isExistentialType(toProtocols);
-  SmallVector<ProtocolDecl*, 2> fromProtocols;
-  bool fromExistential = fromType->isExistentialType(fromProtocols);
+  bool toExistential = toType->isExistentialType();
+  bool fromExistential = fromType->isExistentialType();
   
   // If we're doing a metatype cast, it can only be existential if we're
   // casting to/from the existential metatype. 'T.self as P.Protocol'
@@ -3333,23 +3415,104 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     toExistential &= toExistentialMetatype;
     fromExistential &= fromExistentialMetatype;
   }
-  
+
   // Casts to or from generic types can't be statically constrained in most
   // cases, because there may be protocol conformances we don't statically
   // know about.
-  //
-  // TODO: There are cases we could statically warn about, such as casting
-  // from a non-class to a class-constrained archetype or existential.
-  if (toExistential || fromExistential || fromArchetype || toArchetype)
-    return CheckedCastKind::ValueCast;
+  if (toExistential || fromExistential || fromArchetype || toArchetype) {
+    // Cast to and from AnyObject always succeed.
+    if (toType->isAnyObject() || fromType->isAnyObject())
+      return CheckedCastKind::ValueCast;
+
+    bool toRequiresClass;
+    if (toType->isExistentialType())
+      toRequiresClass = toType->getExistentialLayout().requiresClass;
+    else
+      toRequiresClass = toType->mayHaveSuperclass();
+
+    bool fromRequiresClass;
+    if (fromType->isExistentialType())
+      fromRequiresClass = fromType->getExistentialLayout().requiresClass;
+    else
+      fromRequiresClass = fromType->mayHaveSuperclass();
+
+    // If neither type is class-constrained, anything goes.
+    if (!fromRequiresClass && !toRequiresClass)
+        return CheckedCastKind::ValueCast;
+
+    if (!fromRequiresClass && toRequiresClass) {
+      // If source type is abstract, anything goes.
+      if (fromExistential || fromArchetype)
+        return CheckedCastKind::ValueCast;
+
+      // Otherwise, we're casting a concrete non-class type to a
+      // class-constrained archetype or existential, which will
+      // probably fail, but we'll try more casts below.
+    }
+
+    if (fromRequiresClass && !toRequiresClass) {
+      // If destination type is abstract, anything goes.
+      if (toExistential || toArchetype)
+        return CheckedCastKind::ValueCast;
+
+      // Otherwise, we're casting a class-constrained archetype
+      // or existential to a non-class concrete type, which
+      // will probably fail, but we'll try more casts below.
+    }
+
+    if (fromRequiresClass && toRequiresClass) {
+      // Ok, we are casting between class-like things. Let's see if we have
+      // explicit superclass bounds.
+      Type toSuperclass;
+      if (toType->getClassOrBoundGenericClass())
+        toSuperclass = toType;
+      else
+        toSuperclass = toType->getSuperclass();
+
+      Type fromSuperclass;
+      if (fromType->getClassOrBoundGenericClass())
+        fromSuperclass = fromType;
+      else
+        fromSuperclass = fromType->getSuperclass();
+
+      // Unless both types have a superclass bound, we have no further
+      // information.
+      if (!toSuperclass || !fromSuperclass)
+        return CheckedCastKind::ValueCast;
+
+      // Compare superclass bounds.
+      if (typesSatisfyConstraint(toSuperclass, fromSuperclass,
+                                 /*openArchetypes=*/true,
+                                 ConstraintKind::Subtype, dc))
+        return CheckedCastKind::ValueCast;
+
+      // An upcast is also OK.
+      if (typesSatisfyConstraint(fromSuperclass, toSuperclass,
+                                 /*openArchetypes=*/true,
+                                 ConstraintKind::Subtype, dc))
+        return CheckedCastKind::ValueCast;
+    }
+  }
 
   if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;
   }
 
-  // If the destination type is a subtype of the source type, we have
+  // If the destination type can be a supertype of the source type, we are
+  // performing what looks like an upcast except it rebinds generic
+  // parameters.
+  if (!metatypeCast &&
+      typesSatisfyConstraint(fromType, toType,
+                             /*openArchetypes=*/true,
+                             ConstraintKind::Subtype, dc)) {
+    return CheckedCastKind::ValueCast;
+  }
+
+  // If the destination type can be a subtype of the source type, we have
   // a downcast.
-  if (isSubtypeOf(toType, fromType, dc)) {
+  if (typesSatisfyConstraint(toType, fromType,
+                             /*openArchetypes=*/true,
+                             ConstraintKind::Subtype, dc)) {
     return CheckedCastKind::ValueCast;
   }
   

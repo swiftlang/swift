@@ -339,6 +339,12 @@ namespace {
         && LHS_->getValue().equals(RHS->getValue());
     }
 
+    bool visitConstStringLiteralInst(const ConstStringLiteralInst *RHS) {
+      auto LHS_ = cast<ConstStringLiteralInst>(LHS);
+      return LHS_->getEncoding() == RHS->getEncoding() &&
+             LHS_->getValue().equals(RHS->getValue());
+    }
+
     bool visitStructInst(const StructInst *RHS) {
       // We have already checked the operands. Make sure that the StructDecls
       // match up.
@@ -369,9 +375,7 @@ namespace {
 
     bool visitRefTailAddrInst(RefTailAddrInst *RHS) {
       auto *X = cast<RefTailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
@@ -447,9 +451,7 @@ namespace {
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
       auto *X = cast<TailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitCondFailInst(CondFailInst *RHS) {
@@ -992,6 +994,9 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 /// additional handling. It is important to know this information when
 /// you perform such optimizations like e.g. jump-threading.
 bool SILInstruction::isTriviallyDuplicatable() const {
+  if (isa<ThrowInst>(this))
+    return false;
+
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
   }

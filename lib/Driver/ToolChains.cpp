@@ -37,8 +37,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-/// The name of the Swift migrator binary.
-static const char * const SWIFT_UPDATE_NAME = "swift-update";
 /// The limit for passing a list of files on the command line.
 static const size_t TOO_MANY_FILES = 128;
 
@@ -94,7 +92,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::UpdateCode:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -139,6 +136,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
+  inputArgs.AddLastArg(arguments, options::OPT_value_recursion_threshold);
+  inputArgs.AddLastArg(arguments, options::OPT_warn_swift3_objc_inference);
   inputArgs.AddLastArg(arguments, options::OPT_suppress_warnings);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
@@ -146,6 +145,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
+  inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -182,10 +183,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    II.ExecutableName = SWIFT_UPDATE_NAME;
-  else
-    Arguments.push_back("-frontend");
+  Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
@@ -227,6 +225,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
       break;
+    case types::TY_TBD:
+      FrontendModeOption = "-emit-tbd";
+      break;
+    case types::TY_Remapping:
+      FrontendModeOption = "-update-code";
+      break;
     case types::TY_Nothing:
       // We were told to output nothing, so get the last mode option and use that.
       if (const Arg *A = context.Args.getLastArg(options::OPT_modes_Group))
@@ -245,7 +249,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ObjCHeader:
     case types::TY_Image:
     case types::TY_SwiftDeps:
-    case types::TY_Remapping:
+    case types::TY_ModuleTrace:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -255,11 +259,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
-  case OutputInfo::Mode::UpdateCode:
-    // Make sure that adding '-update-code' will permit accepting all arguments
-    // '-c' accepts.
-    FrontendModeOption = "-c";
-    break;
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
@@ -268,8 +267,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add input arguments.
   switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::UpdateCode: {
+  case OutputInfo::Mode::StandardCompile: {
     assert(context.InputActions.size() == 1 &&
            "The Swift frontend expects exactly one input (the primary file)!");
 
@@ -295,6 +293,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           FoundPrimaryInput = true;
         }
         Arguments.push_back(inputPair.second->getValue());
+
+        // Forward migrator flags.
+        if (auto DataPath = context.Args.getLastArg(options::
+                                                    OPT_api_diff_data_file)) {
+          Arguments.push_back("-api-diff-data-file");
+          Arguments.push_back(DataPath->getValue());
+        }
       }
     }
     break;
@@ -382,6 +387,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (!ReferenceDependenciesPath.empty()) {
     Arguments.push_back("-emit-reference-dependencies-path");
     Arguments.push_back(ReferenceDependenciesPath.c_str());
+  }
+
+  const std::string &LoadedModuleTracePath =
+      context.Output.getAdditionalOutputForType(types::TY_ModuleTrace);
+  if (!LoadedModuleTracePath.empty()) {
+    Arguments.push_back("-emit-loaded-module-trace-path");
+    Arguments.push_back(LoadedModuleTracePath.c_str());
   }
 
   const std::string &FixitsPath =
@@ -495,6 +507,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
       break;
 
     case types::TY_ImportedModules:
+    case types::TY_TBD:
     case types::TY_SwiftModuleFile:
     case types::TY_RawSIL:
     case types::TY_RawSIB:
@@ -513,6 +526,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case types::TY_Image:
     case types::TY_SwiftDeps:
     case types::TY_Remapping:
+    case types::TY_ModuleTrace:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -521,7 +535,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
-  case OutputInfo::Mode::UpdateCode:
     llvm_unreachable("invalid mode for backend job");
   }
 
@@ -552,7 +565,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
-  case OutputInfo::Mode::UpdateCode:
     llvm_unreachable("invalid mode for backend job");
   }
 
@@ -600,10 +612,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    II.ExecutableName = SWIFT_UPDATE_NAME;
-  else
-    Arguments.push_back("-frontend");
+  Arguments.push_back("-frontend");
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.
@@ -748,6 +757,26 @@ ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   return {"dsymutil", Arguments};
+}
+
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const VerifyDebugInfoJobAction &job,
+                               const JobContext &context) const {
+  assert(context.Inputs.size() == 1);
+  assert(context.InputActions.empty());
+
+  // This mirrors the clang driver's --verify-debug-info option.
+  ArgStringList Arguments;
+  Arguments.push_back("--verify");
+  Arguments.push_back("--debug-info");
+  Arguments.push_back("--eh-frame");
+  Arguments.push_back("--quiet");
+
+  StringRef inputPath =
+      context.Inputs.front()->getOutput().getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(inputPath));
+
+  return {"dwarfdump", Arguments};
 }
 
 ToolChain::InvocationInfo
@@ -1123,7 +1152,11 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-  context.Args.AddAllArgs(Arguments, options::OPT_F, options::OPT_Fsystem);
+  for (const Arg *arg : context.Args.filtered(options::OPT_F,
+                                              options::OPT_Fsystem)) {
+    Arguments.push_back("-F");
+    Arguments.push_back(arg->getValue());
+  }
 
   if (context.Args.hasArg(options::OPT_enable_app_extension)) {
     // Keep this string fixed in case the option used by the
@@ -1445,7 +1478,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-  context.Args.AddAllArgs(Arguments, options::OPT_F, options::OPT_Fsystem);
+  for (const Arg *arg : context.Args.filtered(options::OPT_F,
+                                              options::OPT_Fsystem)) {
+    if (arg->getOption().matches(options::OPT_Fsystem))
+      Arguments.push_back("-iframework");
+    else
+      Arguments.push_back(context.Args.MakeArgString(arg->getSpelling()));
+    Arguments.push_back(arg->getValue());
+  }
 
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("--sysroot");

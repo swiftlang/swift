@@ -202,37 +202,37 @@ public func foo(_ x: Double) {
 }
 // CHECK: } // end sil function '_T010cf_members3foo{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1VABSd5value_tcfCTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1VABSd5value_tcfCTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V9translateABSd7radians_tFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V9translateABSd7radians_tFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V5scaleABSdFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V5scaleABSdFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V12staticMethods5Int32VyFZTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V12staticMethods5Int32VyFZTO
 // CHECK:       bb0([[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V13selfComesLastySd1x_tFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V13selfComesLastySd1x_tFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil shared [thunk] @_T0SC7Struct1V14selfComesThirdys5Int32V1a_Sf1bSd1xtFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0SC7Struct1V14selfComesThirdys5Int32V1a_Sf1bSd1xtFTO
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])

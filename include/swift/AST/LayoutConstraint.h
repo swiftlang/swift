@@ -222,7 +222,7 @@ class LayoutConstraintInfo : public llvm::FoldingSetNode {
                      AllocationArena arena, unsigned alignment = 8);
   void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 
-  // Representation of the non-parametrized layouts.
+  // Representation of the non-parameterized layouts.
   static LayoutConstraintInfo UnknownLayoutConstraintInfo;
   static LayoutConstraintInfo RefCountedObjectConstraintInfo;
   static LayoutConstraintInfo NativeRefCountedObjectConstraintInfo;
@@ -260,7 +260,7 @@ class LayoutConstraint {
   LayoutConstraintInfo *operator->() const { return Ptr; }
 
   /// Merge these two constraints and return a more specific one
-  /// or fail if they’re incompatible and return an unknown constraint.
+  /// or fail if they're incompatible and return an unknown constraint.
   LayoutConstraint merge(LayoutConstraint Other);
 
   explicit operator bool() const { return Ptr != 0; }

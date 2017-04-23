@@ -19,4 +19,4 @@ func foo() {
   }
 }
 
-// CHECK: sil shared @_T017capture_typealias3fooyyFBi64_ycfU_ : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: sil private @_T017capture_typealias3fooyyFBi64_ycfU_ : $@convention(thin) () -> Builtin.Int64 {

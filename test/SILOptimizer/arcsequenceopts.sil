@@ -87,12 +87,12 @@ public protocol Error {
   var _code: Builtin.Int32 { get }
 }
 
-sil [fragile] @use : $@convention(thin) (Builtin.NativeObject) -> ()
-sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [serialized] @use : $@convention(thin) (Builtin.NativeObject) -> ()
+sil [serialized] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
-sil [fragile] @owned_return : $@convention(thin) () -> (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>)
+sil [serialized] @owned_return : $@convention(thin) () -> (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>)
 
-sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+sil [serialized] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
 
 /////////////////
 // Basic Tests //
@@ -2025,14 +2025,14 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK: bb1
 // CHECK: strong_release
 // CHECK: bb2
 // CHECK: strong_release
-sil [fragile] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+sil [serialized] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
@@ -2047,7 +2047,7 @@ bb2(%3 : $Error):
   throw %3 : $Error
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -2055,7 +2055,7 @@ bb2(%3 : $Error):
 // CHECK: strong_release
 // CHECK: bb2(
 // CHECK: strong_release
-sil [fragile] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+sil [serialized] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()

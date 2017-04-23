@@ -325,6 +325,15 @@ protected:
   };
   enum { NumAnyMetatypeTypeBits = NumTypeBaseBits + 2 };
   static_assert(NumAnyMetatypeTypeBits <= 32, "fits in an unsigned");
+
+  struct ProtocolCompositionTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    /// Whether we have an explicitly-stated class constraint not
+    /// implied by any of our members.
+    unsigned HasExplicitAnyObject : 1;
+  };
+  enum { NumProtocolCompositionTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumProtocolCompositionTypeBits <= 32, "fits in an unsigned");
   
   union {
     TypeBaseBitfields TypeBaseBits;
@@ -334,6 +343,7 @@ protected:
     ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
+    ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
   };
 
 protected:
@@ -364,6 +374,10 @@ public:
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
   CanType getCanonicalType();
+
+  /// getCanonicalType - Stronger canonicalization which folds away equivalent
+  /// associated types, or type parameters that have been made concrete.
+  CanType getCanonicalType(GenericSignature *sig, ModuleDecl &mod);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -572,26 +586,8 @@ public:
   /// bound.
   bool isClassExistentialType();
 
-  /// isExistentialType - Determines whether this type is an existential type,
-  /// whose real (runtime) type is unknown but which is known to conform to
-  /// some set of protocols. Protocol and protocol-conformance types are
-  /// existential types.
-  ///
-  /// \param Protocols If the type is an existential type, this vector is
-  /// populated with the set of protocols
-  bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols);
-
-  /// isAnyExistentialType - Determines whether this type is any kind of
-  /// existential type: a protocol type, a protocol composition type, or
-  /// an existential metatype.
-  ///
-  /// \param protocols If the type is an existential type, this vector is
-  /// populated with the set of protocols.
-  bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols);
-
-  /// Given that this type is any kind of existential type, produce
-  /// its list of protocols.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
 
   /// Determines the element type of a known *UnsafeMutablePointer
   /// variant, or returns null if the type is not a pointer.
@@ -660,18 +656,13 @@ public:
 
   /// \brief Retrieve the superclass of this type.
   ///
-  /// \param resolver The resolver for lazy type checking, or null if the
-  ///                 AST is already type-checked.
-  ///
   /// \returns The superclass of this type, or a null type if it has no
   ///          superclass.
-  Type getSuperclass(LazyResolver *resolver);
+  Type getSuperclass();
   
   /// \brief True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
-  /// \param resolver The resolver for lazy type checking, or null if the
-  ///                 AST is already type-checked.
   ///
   /// \returns True if this type is \c ty or a superclass of \c ty.
   ///
@@ -682,7 +673,7 @@ public:
   /// will return false. `isBindableToSuperclassOf` should be used
   /// for queries that care whether a generic class type can be substituted into
   /// a type's subclass.
-  bool isExactSuperclassOf(Type ty, LazyResolver *resolver);
+  bool isExactSuperclassOf(Type ty);
 
   /// \brief Get the substituted base class type, starting from a base class
   /// declaration and a substituted derived class type.
@@ -695,29 +686,21 @@ public:
   ///
   /// Calling `C<String, NSObject>`->getSuperclassForDecl(`A`) will return
   /// `A<Int, NSObject>`.
-  Type getSuperclassForDecl(const ClassDecl *classDecl, LazyResolver *resolver);
+  Type getSuperclassForDecl(const ClassDecl *classDecl);
 
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///
   /// \param ty       The potential subclass.
-  /// \param resolver The resolver for lazy type checking, or null if the
-  ///                 AST is already type-checked.
   ///
   /// \returns True if this type is \c ty, a superclass of \c ty, or an
   ///          archetype-parameterized type that can be bound to a superclass
   ///          of \c ty.
-  bool isBindableToSuperclassOf(Type ty, LazyResolver *resolver);
+  bool isBindableToSuperclassOf(Type ty);
 
   /// True if this type contains archetypes that could be substituted with
   /// concrete types to form the argument type.
-  bool isBindableTo(Type ty, LazyResolver *resolver);
-
-  /// \brief Retrieve the layout constraint of this type.
-  ///
-  /// \returns The layout constraint of this type, or a null layout constraint
-  ///          if it has no layout constraint.
-  LayoutConstraint getLayoutConstraint();
+  bool isBindableTo(Type ty);
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
@@ -926,8 +909,7 @@ public:
   /// 'self' argument type as appropriate.
   Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                       const ValueDecl *derivedDecl,
-                                      Type memberType,
-                                      LazyResolver *resolver);
+                                      Type memberType);
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
@@ -2084,11 +2066,6 @@ public:
     return get(T, repr, T->getASTContext());
   }
 
-  /// Return the canonicalized list of protocols.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
-    getInstanceType()->getAnyExistentialTypeProtocols(protos);
-  }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ExistentialMetatype;
@@ -2107,9 +2084,6 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   static CanExistentialMetatypeType get(CanType type,
                                         MetatypeRepresentation repr) {
     return CanExistentialMetatypeType(ExistentialMetatypeType::get(type, repr));
-  }
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    getInstanceType().getAnyExistentialTypeProtocols(protocols);
   }
 END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   
@@ -3619,12 +3593,8 @@ public:
   }
 
   /// True if only classes may conform to the protocol.
-  bool requiresClass() const;
+  bool requiresClass();
 
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
-    protos.push_back(getDecl());
-  }
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Protocol;
@@ -3661,9 +3631,6 @@ private:
                RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
-    getPointer()->getAnyExistentialTypeProtocols(protos);
-  }
 END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 
 /// ProtocolCompositionType - A type that composes some number of protocols
@@ -3683,27 +3650,46 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// protocol, then the canonical type is that protocol type. Otherwise, it is
 /// a composition of the protocols in that list.
 class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
-  ArrayRef<Type> Protocols;
+  ArrayRef<Type> Members;
   
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
-  /// given set of protocols.
-  static Type get(const ASTContext &C, ArrayRef<Type> Protocols);
+  /// given set of members.
+  static Type get(const ASTContext &C, ArrayRef<Type> Members,
+                  bool HasExplicitAnyObject);
   
-  /// \brief Retrieve the set of protocols composed to create this type.
-  ArrayRef<Type> getProtocols() const { return Protocols; }
-
-  /// \brief Return the protocols of this type in canonical order.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos);
+  /// \brief Retrieve the set of members composed to create this type.
+  ///
+  /// For non-canonical types, this can contain classes, protocols and
+  /// protocol compositions in any order. There can be at most one unique
+  /// class constraint, either stated directly or as recursive member.
+  ///
+  /// In canonical types, this list will contain the superclass first if
+  /// any, followed by zero or more protocols in a canonical sorted order,
+  /// minimized to remove duplicates or protocols implied by inheritance.
+  ///
+  /// Note that the list of members is not sufficient to uniquely identify
+  /// a protocol composition type; you also have to look at
+  /// hasExplicitAnyObject().
+  ArrayRef<Type> getMembers() const { return Members; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Protocols);
+    Profile(ID, Members, hasExplicitAnyObject());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<Type> Members,
+                      bool HasExplicitAnyObject);
 
-  /// True if one or more of the protocols is class.
-  bool requiresClass() const;
-  
+  /// True if the composition requires the concrete conforming type to
+  /// be a class, either via a directly-stated superclass constraint or
+  /// one of its member protocols being class-constrained.
+  bool requiresClass();
+
+  /// True if the class requirement is stated directly via '& AnyObject'.
+  bool hasExplicitAnyObject() {
+    return ProtocolCompositionTypeBits.HasExplicitAnyObject;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ProtocolComposition;
@@ -3711,23 +3697,19 @@ public:
   
 private:
   static ProtocolCompositionType *build(const ASTContext &C,
-                                        ArrayRef<Type> Protocols);
+                                        ArrayRef<Type> Members,
+                                        bool HasExplicitAnyObject);
 
-  ProtocolCompositionType(const ASTContext *Ctx, ArrayRef<Type> Protocols)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
-               RecursiveTypeProperties()),
-      Protocols(Protocols) { }
+  ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> members,
+                          bool hasExplicitAnyObject,
+                          RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
+               properties),
+      Members(members) {
+    ProtocolCompositionTypeBits.HasExplicitAnyObject = hasExplicitAnyObject;
+  }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
-  /// In the canonical representation, these are all ProtocolTypes.
-  CanTypeArrayRef getProtocols() const {
-    return CanTypeArrayRef(getPointer()->getProtocols());
-  }
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
-    for (CanType proto : getProtocols()) {
-      cast<ProtocolType>(proto).getAnyExistentialTypeProtocols(protos);
-    }
-  }
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
 /// LValueType - An l-value is a handle to a physical object.  The
@@ -4578,16 +4560,6 @@ inline CanType CanType::getNominalParent() const {
   } else {
     return cast<BoundGenericType>(*this).getParent();
   }
-}
-
-inline bool TypeBase::mayHaveSuperclass() {
-  if (getClassOrBoundGenericClass())
-    return true;
-
-  if (auto archetype = getAs<ArchetypeType>())
-    return (bool)archetype->requiresClass();
-
-  return is<DynamicSelfType>();
 }
 
 inline TupleTypeElt::TupleTypeElt(Type ty, Identifier name, bool isVariadic,

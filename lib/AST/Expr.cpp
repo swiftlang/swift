@@ -268,6 +268,22 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
       if (!GetType(E->getBase())->isLValueType()) return;
       visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
     }
+    void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E,
+                                     AccessKind accessKind) {
+      if (!GetType(E->getBase())->isLValueType()) return;
+      auto kpDecl = E->getKeyPath()->getType()->castTo<BoundGenericType>()
+        ->getDecl();
+      AccessKind baseAccess;
+      // A ReferenceWritableKeyPath only reads its base.
+      if (kpDecl ==
+            E->getType()->getASTContext().getReferenceWritableKeyPathDecl())
+        baseAccess = AccessKind::Read;
+      else
+        // Assuming a writable keypath projects a part of the base.
+        baseAccess = getPartialAccessKind(accessKind);
+      
+      visit(E->getBase(), baseAccess);
+    }
 
     static AccessKind getPartialAccessKind(AccessKind accessKind) {
       return (accessKind == AccessKind::Read
@@ -321,6 +337,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     LEAF_LVALUE_EXPR(DynamicLookup)
     LEAF_LVALUE_EXPR(OpaqueValue)
     LEAF_LVALUE_EXPR(EditorPlaceholder)
+    LEAF_LVALUE_EXPR(Error)
 
     COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
@@ -329,7 +346,6 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     COMPLETE_PHYSICAL_LVALUE_EXPR(Identity, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(TupleElement, getBase())
 
-    NON_LVALUE_EXPR(Error)
     NON_LVALUE_EXPR(Literal)
     NON_LVALUE_EXPR(SuperRef)
     NON_LVALUE_EXPR(Type)
@@ -349,7 +365,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(Assign)
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
-    NON_LVALUE_EXPR(ObjCKeyPath)
+    NON_LVALUE_EXPR(KeyPath)
     NON_LVALUE_EXPR(EnumIsCase)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
@@ -432,6 +448,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
     return ConcreteDeclRef();
   }
 
+  NO_REFERENCE(KeyPathApplication);
   NO_REFERENCE(TupleElement);
   NO_REFERENCE(CaptureList);
   NO_REFERENCE(Closure);
@@ -493,7 +510,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(UnresolvedPattern);
   NO_REFERENCE(EditorPlaceholder);
   NO_REFERENCE(ObjCSelector);
-  NO_REFERENCE(ObjCKeyPath);
+  NO_REFERENCE(KeyPath);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -652,7 +669,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
-  case ExprKind::ObjCKeyPath:
+  case ExprKind::KeyPath:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -700,6 +717,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Array:
   case ExprKind::Dictionary:
   case ExprKind::Subscript:
+  case ExprKind::KeyPathApplication:
   case ExprKind::TupleElement:
     return true;
 
@@ -1321,6 +1339,7 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
    
   MemberRefExprBits.Semantics = (unsigned) semantics;
   MemberRefExprBits.IsSuper = false;
+  assert(Member);
 }
 
 Type OverloadSetRefExpr::getBaseType() const {
@@ -1790,7 +1809,7 @@ RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
 
 OtherConstructorDeclRefExpr *
 RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
-  // Dig out the OtherConstructorRefExpr. Note that this is the reverse
+  // Dig out the OtherConstructorDeclRefExpr. Note that this is the reverse
   // of what we do in pre-checking.
   Expr *candidate = getSubExpr();
   while (true) {
@@ -1986,42 +2005,77 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<ArchetypeType>();
 }
 
-ObjCKeyPathExpr::ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
-                         ArrayRef<Identifier> names,
-                         ArrayRef<SourceLoc> nameLocs,
-                         SourceLoc rParenLoc)
-  : Expr(ExprKind::ObjCKeyPath, /*Implicit=*/nameLocs.empty()),
-    KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc)
+KeyPathExpr::KeyPathExpr(ASTContext &C,
+                         SourceLoc keywordLoc, SourceLoc lParenLoc,
+                         TypeRepr *root,
+                         ArrayRef<Component> components,
+                         SourceLoc rParenLoc,
+                         bool isObjC,
+                         bool isImplicit)
+  : Expr(ExprKind::KeyPath, isImplicit),
+    KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc),
+    RootType(root),
+    Components(C.AllocateUninitialized<Component>(components.size()))
 {
-  // Copy components (which are all names).
-  ObjCKeyPathExprBits.NumComponents = names.size();
-  for (auto idx : indices(names))
-    getComponentsMutable()[idx] = names[idx];
+  // Copy components into the AST context.
+  std::uninitialized_copy(components.begin(), components.end(),
+                          Components.begin());
+  
+  KeyPathExprBits.IsObjC = isObjC;
+}
 
-  assert(nameLocs.empty() || nameLocs.size() == names.size());
-  ObjCKeyPathExprBits.HaveSourceLocations = !nameLocs.empty();
-  if (ObjCKeyPathExprBits.HaveSourceLocations) {
-    memcpy(getNameLocsMutable().data(), nameLocs.data(),
-           nameLocs.size() * sizeof(SourceLoc));
+void
+KeyPathExpr::resolveComponents(ASTContext &C,
+                          ArrayRef<KeyPathExpr::Component> resolvedComponents) {
+  // Reallocate the components array if it needs to be.
+  if (Components.size() < resolvedComponents.size()) {
+    Components = C.Allocate<Component>(resolvedComponents.size());
+    for (unsigned i : indices(Components)) {
+      ::new ((void*)&Components[i]) Component{};
+    }
   }
+  
+  for (unsigned i : indices(resolvedComponents)) {
+    Components[i] = resolvedComponents[i];
+  }
+  Components = Components.slice(0, resolvedComponents.size());
 }
 
-Identifier ObjCKeyPathExpr::getComponentName(unsigned i) const {
-  if (auto decl = getComponentDecl(i))
-    return decl->getFullName().getBaseName();
-
-  return getComponents()[i].get<Identifier>();
+KeyPathExpr::Component
+KeyPathExpr::Component::forSubscript(ASTContext &ctx,
+                                     ConcreteDeclRef subscript,
+                                     SourceLoc lSquareLoc,
+                                     ArrayRef<Expr *> indexArgs,
+                                     ArrayRef<Identifier> indexArgLabels,
+                                     ArrayRef<SourceLoc> indexArgLabelLocs,
+                                     SourceLoc rSquareLoc,
+                                     Expr *trailingClosure,
+                                     Type elementType) {
+  SmallVector<Identifier, 4> indexArgLabelsScratch;
+  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
+  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
+                                   indexArgLabelLocs, rSquareLoc,
+                                   trailingClosure, /*implicit*/ false,
+                                   indexArgLabelsScratch,
+                                   indexArgLabelLocsScratch);
+  return forSubscriptWithPrebuiltIndexExpr(subscript, index, elementType,
+                                           lSquareLoc);
 }
 
-ObjCKeyPathExpr *ObjCKeyPathExpr::create(ASTContext &ctx,
-                                 SourceLoc keywordLoc, SourceLoc lParenLoc,
-                                 ArrayRef<Identifier> names,
-                                 ArrayRef<SourceLoc> nameLocs,
-                                 SourceLoc rParenLoc) {
-  unsigned size = sizeof(ObjCKeyPathExpr)
-    + names.size() * sizeof(Identifier)
-    + nameLocs.size() * sizeof(SourceLoc);
-  void *mem = ctx.Allocate(size, alignof(ObjCKeyPathExpr));
-  return new (mem) ObjCKeyPathExpr(keywordLoc, lParenLoc, names, nameLocs,
-                                   rParenLoc);
+KeyPathExpr::Component
+KeyPathExpr::Component::forUnresolvedSubscript(ASTContext &ctx,
+                                         SourceLoc lSquareLoc,
+                                         ArrayRef<Expr *> indexArgs,
+                                         ArrayRef<Identifier> indexArgLabels,
+                                         ArrayRef<SourceLoc> indexArgLabelLocs,
+                                         SourceLoc rSquareLoc,
+                                         Expr *trailingClosure) {
+  SmallVector<Identifier, 4> indexArgLabelsScratch;
+  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
+  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
+                                   indexArgLabelLocs, rSquareLoc,
+                                   trailingClosure, /*implicit*/ false,
+                                   indexArgLabelsScratch,
+                                   indexArgLabelLocsScratch);
+  return forUnresolvedSubscriptWithPrebuiltIndexExpr(index, lSquareLoc);
 }

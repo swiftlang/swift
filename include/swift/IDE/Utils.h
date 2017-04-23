@@ -306,7 +306,7 @@ public:
   unsigned commonPartsCount(DeclNameViewer &Other) const;
 };
 
-/// This provide a utility for writing to an underlying string buffer mulitiple
+/// This provide a utility for writing to an underlying string buffer multiple
 /// string pieces and retrieve them later when the underlying buffer is stable.
 class DelayedStringRetriever : public raw_ostream {
     SmallVectorImpl<char> &OS;
@@ -341,7 +341,62 @@ public:
       auto P = StartEnds[I];
       return StringRef(OS.begin() + P.first, P.second - P.first);
     }
-  };
+};
+
+enum class RegionType {
+  Unmatched,
+  Mismatch,
+  ActiveCode,
+  InactiveCode,
+  String,
+  Selector,
+  Comment,
+};
+
+enum class NoteRegionKind {
+  BaseName,
+};
+
+struct NoteRegion {
+  NoteRegionKind Kind;
+  unsigned Offset;
+  unsigned Length;
+};
+
+struct Replacement {
+  CharSourceRange Range;
+  StringRef Text;
+  ArrayRef<NoteRegion> RegionsWorthNote;
+};
+
+class SourceEditConsumer {
+public:
+  virtual void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) = 0;
+  virtual ~SourceEditConsumer() = default;
+  void accept(SourceManager &SM, CharSourceRange Range, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
+  void accept(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
+  void insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
+  void accept(SourceManager &SM, Replacement Replacement) { accept(SM, RegionType::ActiveCode, {Replacement}); }
+};
+
+class SourceEditJsonConsumer : public SourceEditConsumer {
+  struct Implementation;
+  Implementation &Impl;
+public:
+  SourceEditJsonConsumer(llvm::raw_ostream &OS);
+  ~SourceEditJsonConsumer();
+  void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
+};
+
+class SourceEditOutputConsumer : public SourceEditConsumer {
+  struct Implementation;
+  Implementation &Impl;
+
+public:
+  SourceEditOutputConsumer(SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS);
+  ~SourceEditOutputConsumer();
+  void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
+};
 } // namespace ide
 } // namespace swift
 

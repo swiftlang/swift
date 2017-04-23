@@ -42,7 +42,8 @@ void SILWitnessTable::addWitnessTable() {
 }
 
 SILWitnessTable *
-SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
+SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
+                        IsSerialized_t Serialized,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
   assert(Conformance && "Cannot create a witness table for a null "
@@ -53,7 +54,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage, bool IsFragile,
 
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
-  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, IsFragile,
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Serialized,
                                            Name.str(), Conformance, entries);
 
   wt->addWitnessTable();
@@ -84,18 +85,18 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage,
-                                 bool IsFragile, StringRef N,
+                                 IsSerialized_t Serialized, StringRef N,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
   : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-    IsDeclaration(true) {
-  convertToDefinition(entries, IsFragile);
+    IsDeclaration(true), Serialized(false) {
+  convertToDefinition(entries, Serialized);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  NormalProtocolConformance *Conformance)
   : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-    IsDeclaration(true), IsFragile(false)
+    IsDeclaration(true), Serialized(false)
 {}
 
 SILWitnessTable::~SILWitnessTable() {
@@ -120,11 +121,16 @@ SILWitnessTable::~SILWitnessTable() {
   }
 }
 
+IsSerialized_t SILWitnessTable::isSerialized() const {
+  return Serialized ? IsSerialized : IsNotSerialized;
+}
+
 void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries,
-                                          bool isFragile) {
+                                          IsSerialized_t isSerialized) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;
-  IsFragile = isFragile;
+  assert(isSerialized != IsSerializable);
+  Serialized = (isSerialized == IsSerialized);
 
   Entries = Mod.allocateCopy(entries);
 

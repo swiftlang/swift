@@ -432,7 +432,8 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   return id;
 }
 
-DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
+DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
+                              bool allowTypeAliasXRef) {
   if (!D)
     return 0;
 
@@ -446,6 +447,10 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
           isa<PrecedenceGroupDecl>(D)) &&
          "cannot cross-reference this decl");
+
+  assert((allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
+          D->getModuleContext() == M) &&
+         "cannot cross-reference typealiases directly (use the NameAliasType)");
 
   id = { ++LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
@@ -657,6 +662,8 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_PARAM);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::LAYOUT_REQUIREMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -709,10 +716,14 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     llvm::raw_svector_ostream versionString(versionStringBuf);
     versionString << Version::getCurrentLanguageVersion();
     size_t shortVersionStringLength = versionString.tell();
-    versionString << '/' << version::getSwiftFullVersion(
-      M->getASTContext().LangOpts.EffectiveLanguageVersion);
+    versionString << '('
+                  << M->getASTContext().LangOpts.EffectiveLanguageVersion;
+    size_t compatibilityVersionStringLength =
+        versionString.tell() - shortVersionStringLength - 1;
+    versionString << ")/" << version::getSwiftFullVersion();
     Metadata.emit(ScratchRecord,
                   VERSION_MAJOR, VERSION_MINOR, shortVersionStringLength,
+                  compatibilityVersionStringLength,
                   versionString.str());
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
@@ -772,7 +783,7 @@ void Serializer::writeDocHeader() {
     auto& LangOpts = M->getASTContext().LangOpts;
     Metadata.emit(ScratchRecord,
                   VERSION_MAJOR, VERSION_MINOR,
-                  /*short version string length*/0,
+                  /*short version string length*/0, /*compatibility length*/0,
                   version::getSwiftFullVersion(
                     LangOpts.EffectiveLanguageVersion));
 
@@ -1116,8 +1127,35 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
         size = layout->getTrivialSizeInBits();
         alignment = layout->getAlignment();
       }
+      LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
+      switch (layout->getKind()) {
+      case LayoutConstraintKind::NativeRefCountedObject:
+        rawKind = LayoutRequirementKind::NativeRefCountedObject;
+        break;
+      case LayoutConstraintKind::RefCountedObject:
+        rawKind = LayoutRequirementKind::RefCountedObject;
+        break;
+      case LayoutConstraintKind::Trivial:
+        rawKind = LayoutRequirementKind::Trivial;
+        break;
+      case LayoutConstraintKind::TrivialOfExactSize:
+        rawKind = LayoutRequirementKind::TrivialOfExactSize;
+        break;
+      case LayoutConstraintKind::TrivialOfAtMostSize:
+        rawKind = LayoutRequirementKind::TrivialOfAtMostSize;
+        break;
+      case LayoutConstraintKind::Class:
+        rawKind = LayoutRequirementKind::Class;
+        break;
+      case LayoutConstraintKind::NativeClass:
+        rawKind = LayoutRequirementKind::NativeClass;
+        break;
+      case LayoutConstraintKind::UnknownLayout:
+        rawKind = LayoutRequirementKind::UnknownLayout;
+        break;
+      }
       LayoutRequirementLayout::emitRecord(
-          Out, ScratchRecord, layoutReqAbbrCode, (unsigned)layout->getKind(),
+          Out, ScratchRecord, layoutReqAbbrCode, rawKind,
           addTypeRef(req.getFirstType()), size, alignment);
     }
   }
@@ -1256,16 +1294,6 @@ void Serializer::writeNormalConformance(
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
 
-  // Collect the set of protocols inherited by this conformance.
-  SmallVector<ProtocolDecl *, 8> inheritedProtos;
-  for (auto inheritedMapping : conformance->getInheritedConformances()) {
-    inheritedProtos.push_back(inheritedMapping.first);
-  }
-
-  // Sort the protocols so that we get a deterministic ordering.
-  llvm::array_pod_sort(inheritedProtos.begin(), inheritedProtos.end(),
-                       ProtocolType::compareProtocols);
-
   conformance->forEachValueWitness(nullptr,
     [&](ValueDecl *req, Witness witness) {
       data.push_back(addDeclRef(req));
@@ -1300,16 +1328,15 @@ void Serializer::writeNormalConformance(
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness,
-                                      TypeDecl *typeDecl) {
+                                      Type type, TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
-    data.push_back(addDeclRef(typeDecl));
-    // The substitution record is serialized later.
+    data.push_back(addTypeRef(type));
+    data.push_back(addDeclRef(typeDecl, /*forceSerialization*/false,
+                              /*allowTypeAliasXRef*/true));
     ++numTypeWitnesses;
     return false;
   });
 
-  unsigned numInheritedConformances = inheritedProtos.size();
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
@@ -1317,19 +1344,12 @@ void Serializer::writeNormalConformance(
                                               addDeclRef(protocol), ownerID,
                                               numValueWitnesses,
                                               numTypeWitnesses,
-                                              numInheritedConformances,
                                               data);
 
   // Write requirement signature conformances.
   for (auto reqConformance : conformance->getSignatureConformances())
     writeConformance(reqConformance, DeclTypeAbbrCodes);
   
-  // Write inherited conformances.
-  for (auto inheritedProto : inheritedProtos) {
-    writeConformance(conformance->getInheritedConformance(inheritedProto),
-                     DeclTypeAbbrCodes);
-  }
-
   conformance->forEachValueWitness(nullptr,
                                    [&](ValueDecl *req, Witness witness) {
    // Bail out early for simple witnesses.
@@ -1356,14 +1376,6 @@ void Serializer::writeNormalConformance(
                       witness.requiresSubstitution()
                         ? witness.getSyntheticEnvironment()
                         : nullptr);
-  });
-
-  conformance->forEachTypeWitness(/*resolver=*/nullptr,
-                                  [&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness,
-                                      TypeDecl *typeDecl) {
-    writeSubstitutions(witness, DeclTypeAbbrCodes);
-    return false;
   });
 }
 
@@ -1415,7 +1427,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
-    if (genericEnv)
+    if (genericEnv && type->hasArchetype())
       type = genericEnv->mapTypeOutOfContext(type);
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
@@ -1433,7 +1445,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
       = abbrCodes[InheritedProtocolConformanceLayout::Code];
 
     auto type = conf->getType();
-    if (genericEnv)
+    if (genericEnv && type->hasArchetype())
       type = genericEnv->mapTypeOutOfContext(type);
 
     InheritedProtocolConformanceLayout::emitRecord(
@@ -1472,7 +1484,7 @@ Serializer::writeSubstitutions(SubstitutionList substitutions,
 
   for (auto &sub : substitutions) {
     auto replacementType = sub.getReplacement();
-    if (genericEnv) {
+    if (genericEnv && replacementType->hasArchetype()) {
       replacementType =
         genericEnv->mapTypeOutOfContext(replacementType);
     }
@@ -1935,6 +1947,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
   case DAK_Count:
+  case DAK_Implements:
     llvm_unreachable("cannot serialize attribute");
     return;
 
@@ -2075,7 +2088,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     }
     auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
     ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   theAttr->isImplicit(), 
+                                   theAttr->isImplicit(),
+                                   theAttr->isSwift3Inferred(),
                                    theAttr->isNameImplicit(), numArgs, pieces);
     return;
   }
@@ -2545,7 +2559,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addIdentifierRef(typeAlias->getName()),
                                 contextID,
                                 addTypeRef(underlying),
-                                addTypeRef(typeAlias->getInterfaceType()),
+                                /*no longer used*/TypeID(),
                                 typeAlias->isImplicit(),
                                 addGenericEnvironmentRef(
                                              typeAlias->getGenericEnvironment()),
@@ -3110,7 +3124,10 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias));
+                                    addDeclRef(typeAlias,
+                                               /*forceSerialization*/false,
+                                               /*allowTypeAliasXRef*/true),
+                                    TypeID());
     break;
   }
   case TypeKind::NameAlias: {
@@ -3119,7 +3136,10 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias));
+                                    addDeclRef(typeAlias,
+                                               /*forceSerialization*/false,
+                                               /*allowTypeAliasXRef*/true),
+                                    addTypeRef(ty->getCanonicalType()));
     break;
   }
 
@@ -3411,11 +3431,12 @@ void Serializer::writeType(Type ty) {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
     SmallVector<TypeID, 4> protocols;
-    for (auto proto : composition->getProtocols())
+    for (auto proto : composition->getMembers())
       protocols.push_back(addTypeRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              composition->hasExplicitAnyObject(),
                                               protocols);
     break;
   }
@@ -3549,6 +3570,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
+  registerDeclTypeAbbr<LayoutRequirementLayout>();
   registerDeclTypeAbbr<GenericEnvironmentLayout>();
   registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
 
@@ -4145,13 +4167,15 @@ namespace {
       auto keyLength = key.getString(scratch).size();
       assert(keyLength <= std::numeric_limits<uint16_t>::max() &&
              "selector too long");
-      size_t entrySize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
-      uint16_t dataLength = entrySize * data.size();
-      assert(dataLength / entrySize == data.size() && "too many methods");
+      uint32_t dataLength = 0;
+      for (const auto &entry : data) {
+        dataLength += sizeof(uint32_t) + 1 + sizeof(uint32_t);
+        dataLength += std::get<0>(entry).size();
+      }
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -4167,10 +4191,11 @@ namespace {
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       endian::Writer<little> writer(out);
-      for (auto entry : data) {
-        writer.write<uint32_t>(std::get<0>(entry));
+      for (const auto &entry : data) {
+        writer.write<uint32_t>(std::get<0>(entry).size());
         writer.write<uint8_t>(std::get<1>(entry));
         writer.write<uint32_t>(std::get<2>(entry));
+        out.write(std::get<0>(entry).c_str(), std::get<0>(entry).size());
       }
     }
   };
@@ -4260,12 +4285,17 @@ static void collectInterestingNestedDeclarations(
     if (!isLocal) {
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if (func->isObjC()) {
-          TypeID owningTypeID
-            = S.addTypeRef(func->getDeclContext()->getDeclaredInterfaceType());
-          objcMethods[func->getObjCSelector()].push_back(
-            std::make_tuple(owningTypeID,
-                            func->isObjCInstanceMethod(),
-                            S.addDeclRef(func)));
+          if (auto owningClass =
+                func->getDeclContext()->getAsClassOrClassExtensionContext()) {
+            Mangle::ASTMangler mangler;
+            std::string ownerName = mangler.mangleNominalType(owningClass);
+            assert(!ownerName.empty() && "Mangled type came back empty!");
+
+            objcMethods[func->getObjCSelector()].push_back(
+              std::make_tuple(ownerName,
+                              func->isObjCInstanceMethod(),
+                              S.addDeclRef(func)));
+          }
         }
       }
     }
@@ -4525,7 +4555,7 @@ void swift::serialize(ModuleOrSourceFile DC,
 
   bool hadError = withOutputFile(getContext(DC), options.OutputPath,
                                  [&](raw_ostream &out) {
-    SharedTimer timer("Serialization (swiftmodule)");
+    SharedTimer timer("Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
   });
   if (hadError)
@@ -4534,7 +4564,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
-      SharedTimer timer("Serialization (swiftdoc)");
+      SharedTimer timer("Serialization, swiftdoc");
       Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
                                    getContext(DC));
     });

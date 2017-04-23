@@ -30,18 +30,23 @@ class SwitchCaseFullExpr {
   SILGenFunction &SGF;
   Scope scope;
   CleanupLocation loc;
-  SILBasicBlock &contBlock;
+  NullablePtr<SILBasicBlock> contBlock;
 
 public:
-  explicit SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
-                              SILBasicBlock *contBlock = nullptr);
+  SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc);
+  SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
+                     SILBasicBlock *contBlock);
 
   ~SwitchCaseFullExpr() = default;
 
   SwitchCaseFullExpr(const SwitchCaseFullExpr &) = delete;
   SwitchCaseFullExpr &operator=(const SwitchCaseFullExpr &) = delete;
 
-  void exit(SILLocation loc, ArrayRef<SILValue> result = {});
+  /// Pop the scope and branch to the cont block.
+  void exitAndBranch(SILLocation loc, ArrayRef<SILValue> result = {});
+
+  /// Pop the scope and do not branch to the cont block.
+  void exit();
 };
 
 } // namespace Lowering

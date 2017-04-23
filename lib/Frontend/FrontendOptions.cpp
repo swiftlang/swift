@@ -34,6 +34,7 @@ bool FrontendOptions::actionHasOutput() const {
   case EmitSIBGen:
   case EmitSIB:
   case EmitModuleOnly:
+  case UpdateCode:
     return true;
   case Immediate:
   case REPL:
@@ -43,6 +44,7 @@ bool FrontendOptions::actionHasOutput() const {
   case EmitBC:
   case EmitObject:
   case EmitImportedModules:
+  case EmitTBD:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -65,6 +67,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case EmitSIBGen:
   case EmitSIB:
   case EmitModuleOnly:
+  case UpdateCode:
     return false;
   case Immediate:
   case REPL:
@@ -74,6 +77,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case EmitBC:
   case EmitObject:
   case EmitImportedModules:
+  case EmitTBD:
     return false;
   }
   llvm_unreachable("Unknown ActionType");

@@ -99,6 +99,7 @@ KNOWN_SETTINGS=(
     installable-package         ""               "the path to the archive of the installation directory"
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
+    skip-reconfigure            ""               "set to skip reconfigure"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
     skip-build-cmark            ""               "set to skip building CommonMark"
@@ -172,11 +173,6 @@ KNOWN_SETTINGS=(
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
-    compiler-vendor             "none"           "compiler vendor name [none,apple]"
-    clang-user-visible-version  "4.0.0"          "user-visible version of the embedded Clang and LLVM compilers"
-    swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
-    swift-compiler-version      ""               "string that indicates a compiler version for Swift"
-    clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
     darwin-crash-reporter-client ""              "whether to enable CrashReporter integration"
     darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
@@ -253,7 +249,7 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
-    swift-runtime-enable-cow-existentials "0"    "Enable the copy-on-write existential implementation"
+    swift-runtime-enable-cow-existentials "1"    "Enable the copy-on-write existential implementation"
 )
 
 # Centralized access point for traced command invocation.
@@ -941,6 +937,10 @@ fi
 # FIXME: We currently do not support cross-compiling swift with compiler-rt.
 if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
     SKIP_BUILD_COMPILER_RT=1
+fi
+
+if [[ "${SKIP_RECONFIGURE}" ]]; then
+    RECONFIGURE=""
 fi
 
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths

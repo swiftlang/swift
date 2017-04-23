@@ -55,6 +55,7 @@ UIdent sourcekitd::KeyEnableDiagnostics("key.enablediagnostics");
 UIdent sourcekitd::KeySyntacticOnly("key.syntactic_only");
 UIdent sourcekitd::KeyLength("key.length");
 UIdent sourcekitd::KeyActionable("key.actionable");
+UIdent sourcekitd::KeyParentLoc("key.parent_loc");
 UIdent sourcekitd::KeyKind("key.kind");
 UIdent sourcekitd::KeyAccessibility("key.accessibility");
 UIdent sourcekitd::KeySetterAccessibility("key.setter_accessibility");
@@ -329,7 +330,7 @@ public:
   VariantPrinter(raw_ostream &OS, unsigned Indent = 0, bool PrintAsJSON = false)
     : RequestResponsePrinterBase(OS, Indent, PrintAsJSON) { }
 };
-}
+} // end anonymous namespace
 
 void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
   for (unsigned i = 0, e = Str.size(); i != e; ++i) {

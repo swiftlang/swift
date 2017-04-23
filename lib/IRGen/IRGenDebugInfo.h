@@ -61,14 +61,24 @@ class IRGenDebugInfo {
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
 
-  // Various caches.
-  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
+  /// Used for caching SILDebugScopes without inline information.
+  typedef std::pair<const void *, void *> LocalScopeHash;
+  struct LocalScope : public LocalScopeHash {
+    LocalScope(const SILDebugScope *DS)
+        : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
+                          DS->Parent.getOpaqueValue()}) {}
+  };
+
+  /// Various caches.
+  /// @{
+  llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
+  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
   llvm::DenseMap<llvm::StringRef, llvm::TrackingMDNodeRef> DIFileCache;
+  llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
-  std::vector<std::pair<const SILDebugScope *, llvm::TrackingMDNodeRef>>
-      LastInlineChain;
+  /// @}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
   std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
@@ -158,10 +168,10 @@ public:
   /// \param Fn The IR representation of the function.
   /// \param Rep The calling convention of the function.
   /// \param Ty The signature of the function.
-  llvm::DISubprogram *emitFunction(const SILDebugScope *DS,
-                                   llvm::Function *Fn,
+  llvm::DISubprogram *emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                    SILFunctionTypeRepresentation Rep,
-                                   SILType Ty, DeclContext *DeclCtx = nullptr);
+                                   SILType Ty, DeclContext *DeclCtx = nullptr,
+                                   GenericEnvironment *GE = nullptr);
 
   /// Emit debug info for a given SIL function.
   llvm::DISubprogram *emitFunction(SILFunction &SILFn, llvm::Function *Fn);
@@ -207,7 +217,17 @@ public:
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
 
+  /// Decode (and cache) a SourceLoc.
+  SILLocation::DebugLoc decodeSourceLoc(SourceLoc SL);
 private:
+  /// Decode (and cache) a SILLocation.
+  SILLocation::DebugLoc decodeDebugLoc(SILLocation Loc);
+  /// Return the debug location from a SILLocation.
+  SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc);
+  /// Return the start of the location's source range.
+  SILLocation::DebugLoc getStartLocation(Optional<SILLocation> OptLoc);
+
+
   StringRef BumpAllocatedString(const char *Data, size_t Length);
   StringRef BumpAllocatedString(std::string S);
   StringRef BumpAllocatedString(StringRef S);
@@ -257,19 +277,20 @@ private:
   StringRef getMangledName(DebugTypeInfo DbgTy);
   /// Create the array of function parameters for a function type.
   llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy,
-                                            DeclContext *DeclCtx);
+                                            DeclContext *DeclCtx,
+                                            GenericEnvironment *GE);
   /// Create the array of function parameters for FnTy. SIL Version.
-  llvm::DITypeRefArray createParameterTypes(SILType SILTy,
-                                            DeclContext *DeclCtx);
+  llvm::DITypeRefArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx,
+                                            GenericEnvironment *GE);
   /// Create a single parameter type and push it.
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
-                           SILType CanTy, DeclContext *DeclCtx);
+                           SILType CanTy, DeclContext *DeclCtx,
+                           GenericEnvironment *GE);
   /// Return an array with the DITypes for each of a tuple's elements.
-  llvm::DINodeArray getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope,
-                                     llvm::DIFile *File,
-                                     llvm::DINode::DIFlags Flags,
-                                     DeclContext *DeclContext,
-                                     unsigned &SizeInBits);
+  llvm::DINodeArray
+  getTupleElements(TupleType *TupleTy, llvm::DIScope *Scope, llvm::DIFile *File,
+                   llvm::DINode::DIFlags Flags, DeclContext *DeclContext,
+                   GenericEnvironment *GE, unsigned &SizeInBits);
   llvm::DIFile *getFile(llvm::DIScope *Scope);
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M);
   /// Return a cached module for an access path or create a new one.

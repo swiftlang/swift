@@ -93,6 +93,10 @@ LLVM_ATTRIBUTE_NORETURN
 extern void
 fatalError(uint32_t flags, const char *format, ...);
 
+/// swift::warning() emits a warning from the runtime.
+extern void
+warning(uint32_t flags, const char *format, ...);
+
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
 LLVM_ATTRIBUTE_NORETURN

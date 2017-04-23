@@ -19,8 +19,8 @@ func test0(c c: C) {
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box ${ var A }
-// CHECK-NEXT: [[PBA:%.*]] = project_box [[A1]]
-// CHECK:      [[A:%.*]] = mark_uninitialized [var] [[PBA]]
+// CHECK:      [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
+// CHECK-NEXT: [[PBA:%.*]] = project_box [[MARKED_A1]]
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box ${ var @sil_weak Optional<C> }, var, name "x"
@@ -37,7 +37,7 @@ func test0(c c: C) {
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
 
 //   Drill to a.x
-// CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[A]] : $*A, #A.x
+// CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[PBA]] : $*A, #A.x
 
 //   Store to a.x.
 // CHECK-NEXT: store_weak [[OPTVAL]] to [[A_X]] : $*@sil_weak Optional<C>
@@ -45,8 +45,8 @@ func test0(c c: C) {
 }
 
 // <rdar://problem/16871284> silgen crashes on weak capture
-// CHECK: weak.(testClosureOverWeak () -> ()).(closure #1)
-// CHECK-LABEL: sil shared @_T04weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@owned { var @sil_weak Optional<C> }) -> Int {
+// CHECK: closure #1 () -> Swift.Int in weak.testClosureOverWeak() -> ()
+// CHECK-LABEL: sil private @_T04weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@owned { var @sil_weak Optional<C> }) -> Int {
 // CHECK: bb0(%0 : ${ var @sil_weak Optional<C> }):
 // CHECK-NEXT:  %1 = project_box %0
 // CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1

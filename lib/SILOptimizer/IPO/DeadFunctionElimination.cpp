@@ -756,7 +756,8 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
         for (SILInstruction &I : BB) {
           if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
             SILFunction *RefF = FRI->getReferencedFunction();
-            if (RefF->isTransparent() && RefF->isFragile())
+            // FIXME: Bad usage of transparent
+            if (RefF->isTransparent() && RefF->isSerialized())
               ensureAlive(RefF);
           }
         }
@@ -843,7 +844,6 @@ class SILDeadFuncElimination : public SILModuleTransform {
     deadFunctionElimination.eliminateFunctions(this);
   }
   
-  StringRef getName() override { return "Dead Function Elimination"; }
 };
 
 class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
@@ -861,9 +861,6 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
     EFDFE.eliminateFunctions(this);
  }
 
-  StringRef getName() override {
-    return "External Function Definitions Elimination";
-  }
 };
 
 } // end anonymous namespace

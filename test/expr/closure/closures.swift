@@ -338,3 +338,18 @@ func r25993258a() {
 func r25993258b() {
   r25993258_helper { _ in () }
 }
+
+// We have to map the captured var type into the right generic environment.
+class GenericClass<T> {}
+
+func lvalueCapture<T>(c: GenericClass<T>) {
+  var cc = c
+  weak var wc = c
+
+  func innerGeneric<U>(_: U) {
+    _ = cc
+    _ = wc
+
+    cc = wc!
+  }
+}

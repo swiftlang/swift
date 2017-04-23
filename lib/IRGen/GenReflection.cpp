@@ -19,20 +19,21 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
 #include "GenClass.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "IRGenModule.h"
-#include "Linking.h"
-#include "LoadableTypeInfo.h"
 #include "IRGenMangler.h"
+#include "IRGenModule.h"
+#include "LoadableTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -252,7 +253,7 @@ protected:
 
       auto init = B.finishAndCreateFuture();
 
-      var = info.createVariable(IGM, init.getType(), Alignment(4));
+      var = createVariable(IGM, info, init.getType(), Alignment(4));
       var->setConstant(true);
       init.installInGlobal(var);
 
@@ -282,7 +283,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     // If the conforming type is generic, we just want to emit the
     // unbound generic type here.
-    auto *Nominal = Conformance->getInterfaceType()->getAnyNominal();
+    auto *Nominal = Conformance->getType()->getAnyNominal();
     assert(Nominal && "Structural conformance?");
 
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
@@ -333,9 +334,7 @@ class SuperclassMetadataBuilder : public ReflectionMetadataBuilder {
     auto *M = IGM.getSILModule().getSwiftModule();
 
     addTypeRef(M, Class->getDeclaredType()->getCanonicalType());
-
-    auto anyObjectDecl = IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
-    addTypeRef(M, anyObjectDecl->getDeclaredType()->getCanonicalType());
+    addTypeRef(M, IGM.Context.getAnyObjectType());
 
     B.addInt32(1);
     B.addInt32(AssociatedTypeRecordSize);
@@ -389,7 +388,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto kind = FieldDescriptorKind::Struct;
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
-      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+      auto type = CD->getDeclaredType()->getCanonicalType();
+      auto RC = getReferenceCountingForType(IGM, type);
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else
@@ -723,8 +723,7 @@ public:
         SwiftType = SwiftType.transform([&](Type t) -> Type {
           if (auto *archetype = t->getAs<ArchetypeType>()) {
             assert(archetype->requiresClass() && "don't know what to do");
-            return IGM.Context.getProtocol(KnownProtocolKind::AnyObject)
-                ->getDeclaredType();
+            return IGM.Context.getAnyObjectType();
           }
           return t;
         })->getCanonicalType();
@@ -889,11 +888,11 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
   SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
   auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
-                                const Substitution &Sub,
+                                Type Replacement,
                                 const TypeDecl *TD) -> bool {
 
     auto Subst = Conformance->getDeclContext()->mapTypeOutOfContext(
-        Sub.getReplacement());
+        Replacement);
 
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),
@@ -932,7 +931,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(thinFunction);
 
     CanType anyMetatype = CanExistentialMetatypeType::get(
-      ProtocolCompositionType::get(Context, {})->getCanonicalType());
+      Context.TheAnyType);
     BuiltinTypes.insert(anyMetatype);
   }
 
@@ -971,7 +970,7 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   // superclass as a special associated type named 'super' on the
   // 'AnyObject' protocol.
   if (auto Superclass = Decl->getDeclaredInterfaceType()
-                            ->getSuperclass(nullptr)) {
+                            ->getSuperclass()) {
     SuperclassMetadataBuilder builder(*this, cast<ClassDecl>(Decl),
                                       Superclass->getCanonicalType());
     builder.emit();

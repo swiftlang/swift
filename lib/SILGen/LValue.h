@@ -100,6 +100,7 @@ public:
     OpenedExistentialKind,      // opened opaque existential
     AddressorKind,              // var/subscript addressor
     ValueKind,                  // random base pointer as an lvalue
+    KeyPathApplicationKind,     // applying a key path
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
@@ -343,6 +344,7 @@ public:
                          CanType substFormalType);
 
   static LValue forAddress(ManagedValue address,
+                           Optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
 
@@ -454,6 +456,13 @@ public:
   AbstractionPattern getOrigFormalType() const {
     return getTypeData().OrigFormalType;
   }
+
+  /// Returns true when the other access definitely does not begin a formal
+  /// access that would conflict with this the accesses begun by this
+  /// LValue. This is a best-effort attempt; it may return false in cases
+  /// where the two LValues do not conflict.
+  bool isObviouslyNonConflicting(const LValue &other, AccessKind selfAccess,
+                                 AccessKind otherAccess);
 
   void dump() const;
   void print(raw_ostream &OS) const;

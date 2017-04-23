@@ -22,6 +22,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -586,6 +587,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       }
     }
 
+    // FIXME: This will go away soon.
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (archetype->requiresClass())
         return ProtocolConformanceRef(protocol);
@@ -605,35 +607,38 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    type->getAnyExistentialTypeProtocols(protocols);
-
-    // Due to an IRGen limitation, witness tables cannot be passed from an
-    // existential to an archetype parameter, so for now we restrict this to
-    // @objc protocols.
-    for (auto proto : protocols) {
-      if (!proto->isObjC() &&
-          !proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-        return None;
-    }
-
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf() ||
         !protocol->existentialTypeSupported(resolver))
       return None;
 
-    // Special-case AnyObject, which may not be in the list of conformances.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (type->isClassExistentialType())
-        return ProtocolConformanceRef(protocol);
+    auto layout = type->getExistentialLayout();
 
+    // Due to an IRGen limitation, witness tables cannot be passed from an
+    // existential to an archetype parameter, so for now we restrict this to
+    // @objc protocols.
+    if (!layout.isObjC())
       return None;
+
+    // Special-case AnyObject, which may not be in the list of conformances.
+    //
+    // FIXME: This is going away soon.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject))
+      return ProtocolConformanceRef(protocol);
+
+    // If the existential is class-constrained, the class might conform
+    // concretely.
+    if (layout.superclass) {
+      if (auto result = lookupConformance(layout.superclass, protocol,
+                                          resolver))
+        return result;
     }
 
-    // Look for this protocol within the existential's list of conformances.
-    for (auto proto : protocols) {
-      if (proto == protocol || proto->inheritsFrom(protocol))
+    // Otherwise, the existential might conform abstractly.
+    for (auto proto : layout.getProtocols()) {
+      auto *protoDecl = proto->getDecl();
+      if (protoDecl == protocol || protoDecl->inheritsFrom(protocol))
         return ProtocolConformanceRef(protocol);
     }
 
@@ -676,9 +681,9 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       = rootConformance->getType()->getClassOrBoundGenericClass();
 
     // Map up to our superclass's type.
-    Type superclassTy = type->getSuperclass(resolver);
+    Type superclassTy = type->getSuperclass();
     while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass(resolver);
+      superclassTy = superclassTy->getSuperclass();
 
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol,

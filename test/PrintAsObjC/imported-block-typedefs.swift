@@ -29,22 +29,22 @@ import ObjectiveC
   // - (void)noescapeParam3:(SWIFT_NOESCAPE BlockWithNoescapeParam _Nonnull)input;
   // - (void)noescapeParam4:(SWIFT_NOESCAPE BlockReturningBlockWithEscapingParam _Nonnull)input;
   // - (void)noescapeParam5:(SWIFT_NOESCAPE BlockReturningBlockWithNoescapeParam _Nonnull)input;
-  func noescapeParam1(_ input: PlainBlock) {}
-  func noescapeParam2(_ input: BlockWithEscapingParam) {}
-  func noescapeParam3(_ input: BlockWithNoescapeParam) {}
-  func noescapeParam4(_ input: BlockReturningBlockWithEscapingParam) {}
-  func noescapeParam5(_ input: BlockReturningBlockWithNoescapeParam) {}
+  @objc func noescapeParam1(_ input: PlainBlock) {}
+  @objc func noescapeParam2(_ input: BlockWithEscapingParam) {}
+  @objc func noescapeParam3(_ input: BlockWithNoescapeParam) {}
+  @objc func noescapeParam4(_ input: BlockReturningBlockWithEscapingParam) {}
+  @objc func noescapeParam5(_ input: BlockReturningBlockWithNoescapeParam) {}
   
   // CHECK-NEXT: - (void)escapingParam1:(PlainBlock _Nonnull)input;
   // CHECK-NEXT: - (void)escapingParam2:(BlockWithEscapingParam _Nonnull)input;
   // CHECK-NEXT: - (void)escapingParam3:(BlockWithNoescapeParam _Nonnull)input;
   // CHECK-NEXT: - (void)escapingParam4:(BlockReturningBlockWithEscapingParam _Nonnull)input;
   // CHECK-NEXT: - (void)escapingParam5:(BlockReturningBlockWithNoescapeParam _Nonnull)input;
-  func escapingParam1(_ input: @escaping PlainBlock) {}
-  func escapingParam2(_ input: @escaping BlockWithEscapingParam) {}
-  func escapingParam3(_ input: @escaping BlockWithNoescapeParam) {}
-  func escapingParam4(_ input: @escaping BlockReturningBlockWithEscapingParam) {}
-  func escapingParam5(_ input: @escaping BlockReturningBlockWithNoescapeParam) {}
+  @objc func escapingParam1(_ input: @escaping PlainBlock) {}
+  @objc func escapingParam2(_ input: @escaping BlockWithEscapingParam) {}
+  @objc func escapingParam3(_ input: @escaping BlockWithNoescapeParam) {}
+  @objc func escapingParam4(_ input: @escaping BlockReturningBlockWithEscapingParam) {}
+  @objc func escapingParam5(_ input: @escaping BlockReturningBlockWithNoescapeParam) {}
   
   // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE void (^ _Nonnull)(void)))resultHasNoescapeParam1 SWIFT_WARN_UNUSED_RESULT;
   // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE void (^ _Nonnull)(PlainBlock _Nullable)))resultHasNoescapeParam2 SWIFT_WARN_UNUSED_RESULT;
@@ -57,22 +57,22 @@ import ObjectiveC
   //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithNoescapeParam _Nonnull))resultHasNoescapeParam3 SWIFT_WARN_UNUSED_RESULT;
   //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockReturningBlockWithEscapingParam _Nonnull))resultHasNoescapeParam4 SWIFT_WARN_UNUSED_RESULT;
   //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockReturningBlockWithNoescapeParam _Nonnull))resultHasNoescapeParam5 SWIFT_WARN_UNUSED_RESULT;
-  func resultHasNoescapeParam1() -> (PlainBlock) -> () { fatalError() }
-  func resultHasNoescapeParam2() -> (BlockWithEscapingParam) -> () { fatalError() }
-  func resultHasNoescapeParam3() -> (BlockWithNoescapeParam) -> () { fatalError() }
-  func resultHasNoescapeParam4() -> (BlockReturningBlockWithEscapingParam) -> () { fatalError() }
-  func resultHasNoescapeParam5() -> (BlockReturningBlockWithNoescapeParam) -> () { fatalError() }
+  @objc func resultHasNoescapeParam1() -> (PlainBlock) -> () { fatalError() }
+  @objc func resultHasNoescapeParam2() -> (BlockWithEscapingParam) -> () { fatalError() }
+  @objc func resultHasNoescapeParam3() -> (BlockWithNoescapeParam) -> () { fatalError() }
+  @objc func resultHasNoescapeParam4() -> (BlockReturningBlockWithEscapingParam) -> () { fatalError() }
+  @objc func resultHasNoescapeParam5() -> (BlockReturningBlockWithNoescapeParam) -> () { fatalError() }
   
   // CHECK-NEXT: - (void (^ _Nonnull)(PlainBlock _Nonnull))resultHasEscapingParam1 SWIFT_WARN_UNUSED_RESULT;
   // CHECK-NEXT: - (void (^ _Nonnull)(BlockWithEscapingParam _Nonnull))resultHasEscapingParam2 SWIFT_WARN_UNUSED_RESULT;
   // CHECK-NEXT: - (void (^ _Nonnull)(BlockWithNoescapeParam _Nonnull))resultHasEscapingParam3 SWIFT_WARN_UNUSED_RESULT;
   // CHECK-NEXT: - (void (^ _Nonnull)(BlockReturningBlockWithEscapingParam _Nonnull))resultHasEscapingParam4 SWIFT_WARN_UNUSED_RESULT;
   // CHECK-NEXT: - (void (^ _Nonnull)(BlockReturningBlockWithNoescapeParam _Nonnull))resultHasEscapingParam5 SWIFT_WARN_UNUSED_RESULT;
-  func resultHasEscapingParam1() -> (@escaping PlainBlock) -> () { fatalError() }
-  func resultHasEscapingParam2() -> (@escaping BlockWithEscapingParam) -> () { fatalError() }
-  func resultHasEscapingParam3() -> (@escaping BlockWithNoescapeParam) -> () { fatalError() }
-  func resultHasEscapingParam4() -> (@escaping BlockReturningBlockWithEscapingParam) -> () { fatalError() }
-  func resultHasEscapingParam5() -> (@escaping BlockReturningBlockWithNoescapeParam) -> () { fatalError() }
+  @objc func resultHasEscapingParam1() -> (@escaping PlainBlock) -> () { fatalError() }
+  @objc func resultHasEscapingParam2() -> (@escaping BlockWithEscapingParam) -> () { fatalError() }
+  @objc func resultHasEscapingParam3() -> (@escaping BlockWithNoescapeParam) -> () { fatalError() }
+  @objc func resultHasEscapingParam4() -> (@escaping BlockReturningBlockWithEscapingParam) -> () { fatalError() }
+  @objc func resultHasEscapingParam5() -> (@escaping BlockReturningBlockWithNoescapeParam) -> () { fatalError() }
 
 }
 // CHECK-NEXT: init

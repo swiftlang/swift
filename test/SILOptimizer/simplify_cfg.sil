@@ -2707,3 +2707,66 @@ bb6:
   return %6 : $()
 }
 
+enum TestEnum {
+  case int64(Builtin.Int64)
+  case string (Base)
+  case none
+}
+
+enum MyError : Error {
+ case a
+ case b
+ case c(TestEnum)
+}
+
+enum MyError2 : Error {
+ case o(Optional<MyError>)
+}
+
+sil @foo : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
+sil @foo2 : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
+
+sil @dont_thread_throw_block : $@convention(thin) (@guaranteed TestEnum) -> (Builtin.Int8, @error Error) {
+bb0(%0 : $TestEnum):
+  switch_enum %0 : $TestEnum, case #TestEnum.int64!enumelt.1: bb1,  default bb4
+
+bb1(%5 : $Builtin.Int64):
+  %7 = function_ref @foo : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
+  %9 = apply %7(%5) : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
+  br bb6(%9 : $Builtin.Int8)
+
+bb2(%11 : $Builtin.Int32):
+  %13 = function_ref @foo2 : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
+  %15 = apply %13(%11) : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
+  br bb6(%15 : $Builtin.Int8)
+
+bb4:
+  %60 = debug_value %0 : $TestEnum
+  %22 = alloc_existential_box $Error, $MyError2
+  %23 = project_existential_box $MyError2 in %22 : $Error
+  switch_enum %0 : $TestEnum, case #TestEnum.none!enumelt: bbnone, case #TestEnum.int64!enumelt.1: bb7, case #TestEnum.string!enumelt.1: bb10
+
+bbnone:
+  %tn = enum $TestEnum, #TestEnum.none!enumelt
+  %en = enum $MyError, #MyError.c!enumelt.1, %tn : $TestEnum
+br bb5(%en : $MyError)
+
+bb7(%50 : $Builtin.Int64):
+  %t = enum $TestEnum, #TestEnum.int64!enumelt.1, %50 : $Builtin.Int64
+  %e1 = enum $MyError, #MyError.c!enumelt.1, %t : $TestEnum
+  br bb5(%e1 : $MyError)
+
+bb10(%53 : $Base):
+  %t4 = enum $TestEnum, #TestEnum.string!enumelt.1, %53 : $Base
+  %e4 = enum $MyError, #MyError.c!enumelt.1, %t4 : $TestEnum
+  br bb5(%e4 : $MyError)
+
+bb5(%e : $MyError):
+  %89 = enum $Optional<MyError>, #Optional.some!enumelt.1, %e : $MyError
+  %e5 = enum $MyError2, #MyError2.o!enumelt.1, %89 : $Optional<MyError>
+  store %e5 to %23 : $*MyError2
+  throw %22 : $Error
+
+bb6(%44 : $Builtin.Int8):
+  return %44 : $Builtin.Int8
+}

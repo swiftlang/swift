@@ -27,8 +27,6 @@ open class d {
 // CHECK-DAG: @_T09dllexport2ciAA1cCv = dllexport global %T9dllexport1cC* null, align 4
 // CHECK-DAG: @_T09dllexport1pMp = dllexport constant %swift.protocol
 // CHECK-DAG: @_T09dllexport1cCMn = dllexport constant
-// CHECK-DAG: @_T09dllexport1cCML = dllexport global %swift.type* null, align 4
-// CHECK-DAG: @_T09dllexport1dCML = dllexport global %swift.type* null, align 4
 // CHECK-DAG: @_T09dllexport1cCN = dllexport alias %swift.type
 // CHECK-DAG: @_T09dllexport1dCN = dllexport alias %swift.type, bitcast ({{.*}})
 // CHECK-DAG-OPT: @_T09dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLyyF = dllexport alias void (), void ()* @_swift_dead_method_stub

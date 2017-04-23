@@ -665,9 +665,18 @@ SILCloner<ImplClass>::visitStringLiteralInst(StringLiteralInst *Inst) {
                                                  Inst->getEncoding()));
 }
 
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitConstStringLiteralInst(
+    ConstStringLiteralInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createConstStringLiteral(
+                    getOpLocation(Inst->getLoc()), Inst->getValue(),
+                    Inst->getEncoding()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
                                               getOpValue(Inst->getOperand()),
@@ -724,6 +733,25 @@ void SILCloner<ImplClass>::visitEndBorrowArgumentInst(
   doPostProcess(
       Inst, getBuilder().createEndBorrowArgument(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitBeginAccessInst(BeginAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createBeginAccess(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getOperand()),
+                                           Inst->getAccessKind(),
+                                           Inst->getEnforcement()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndAccessInst(EndAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createEndAccess(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand()),
+                                         Inst->isAborting()));
 }
 
 template <typename ImplClass>
@@ -1466,7 +1494,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
     if (Ty != newLookupType) {
-      assert(Ty->isExactSuperclassOf(newLookupType, nullptr) &&
+      assert(Ty->isExactSuperclassOf(newLookupType) &&
              "Should only create upcasts for sub class.");
 
       // We use the super class as the new look up type.
@@ -2222,6 +2250,16 @@ void SILCloner<ImplClass>::visitObjCProtocolInst(ObjCProtocolInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createObjCProtocol(
                           getOpLocation(Inst->getLoc()), Inst->getProtocol(),
+                          getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createKeyPath(
+                          getOpLocation(Inst->getLoc()),
+                          Inst->getPattern(),
+                          getOpSubstitutions(Inst->getSubstitutions()),
                           getOpType(Inst->getType())));
 }
 

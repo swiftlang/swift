@@ -610,9 +610,6 @@ class LetPropertiesOptPass : public SILModuleTransform
     LetPropertiesOpt(getModule()).run(this);
   }
 
-  StringRef getName() override {
-    return "SIL Let Properties Optimization";
-  }
 };
 } // end anonymous namespace
 

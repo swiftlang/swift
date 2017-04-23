@@ -157,7 +157,7 @@ extension SCNGeometryElement {
   /// Creates an instance from `indices` for a `primitiveType`
   /// that has a constant number of indices per primitive
   /// - Precondition: the `primitiveType` must be `.triangles`, `.triangleStrip`, `.line` or `.point`
-  public convenience init<IndexType : Integer>(
+  public convenience init<IndexType : FixedWidthInteger>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
   ) {
     precondition(primitiveType == .triangles || primitiveType == .triangleStrip || primitiveType == .line || primitiveType == .point, "Expected constant number of indices per primitive")
@@ -187,12 +187,15 @@ extension SCNGeometryElement {
 @available(iOS, introduced: 8.0)
 @available(OSX, introduced: 10.8)
 extension SCNGeometrySource {
+  @nonobjc
   public convenience init(vertices: [SCNVector3]) {
     self.init(vertices: UnsafePointer(vertices), count: vertices.count)
   }
+  @nonobjc
   public convenience init(normals: [SCNVector3]) {
     self.init(normals: UnsafePointer(normals), count: normals.count)
   }
+  @nonobjc
   public convenience init(textureCoordinates: [CGPoint]) {
     self.init(textureCoordinates: UnsafePointer(textureCoordinates), count: textureCoordinates.count)
   }

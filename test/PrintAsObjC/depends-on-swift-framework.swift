@@ -25,7 +25,7 @@ import OtherModule
 // CHECK-LABEL: @interface Test
 public class Test: NSObject {
   // CHECK: - (void)testSimpleTypealias:(id <Fungible> _Nonnull)_;
-  func testSimpleTypealias(_: AliasForFungible) {}
+  @objc func testSimpleTypealias(_: AliasForFungible) {}
   // CHECK: - (void)testGenericTypealias:(FungibleContainer<id <Fungible>> * _Nonnull)_;
-  func testGenericTypealias(_: FungibleContainer<AliasForFungible>) {}
+  @objc func testGenericTypealias(_: FungibleContainer<AliasForFungible>) {}
 } // CHECK: @end

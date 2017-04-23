@@ -30,12 +30,18 @@ protected:
   CanGenericSignature CurGenericSignature;
   ModuleDecl *Mod = nullptr;
   const DeclContext *DeclCtx = nullptr;
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
   bool OptimizeProtocolNames = true;
 
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
+
+  /// If enabled, entities that ought to have names but don't get a placeholder.
+  ///
+  /// If disabled, it is an error to try to mangle such an entity.
+  bool AllowNamelessEntities = false;
 
 public:
   enum class SymbolKind {
@@ -107,9 +113,13 @@ public:
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
-
-  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
   
+  std::string mangleKeyPathGetterThunkHelper(const VarDecl *property);
+  std::string mangleKeyPathSetterThunkHelper(const VarDecl *property);
+
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
+                                    GenericEnvironment *GE);
+
   std::string mangleDeclType(const ValueDecl *decl);
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
@@ -120,7 +130,7 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
-  std::string mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix);
+  std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         AddressorKind addressorKind,
@@ -134,8 +144,6 @@ protected:
   void appendType(Type type);
   
   void appendDeclName(const ValueDecl *decl);
-
-  void appendProtocolList(ArrayRef<Type> Protocols, bool &First);
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         bool &isAssocTypeAtDepth);
@@ -167,13 +175,13 @@ protected:
 
   void appendProtocolName(const ProtocolDecl *protocol);
 
-  void appendNominalType(const NominalTypeDecl *decl);
+  void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunctionType(AnyFunctionType *fn);
+  void appendFunctionType(AnyFunctionType *fn, bool forceSingleParam);
 
-  void appendFunctionSignature(AnyFunctionType *fn);
+  void appendFunctionSignature(AnyFunctionType *fn, bool forceSingleParam);
 
-  void appendParams(Type ParamsTy);
+  void appendParams(Type ParamsTy, bool forceSingleParam);
 
   void appendTypeList(Type listTy);
 
@@ -205,9 +213,9 @@ protected:
                                  ArrayRef<Requirement> &requirements,
                                  SmallVectorImpl<Requirement> &requirementsBuf);
 
-  void appendDeclType(const ValueDecl *decl);
+  void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 
-  bool tryAppendStandardSubstitution(const NominalTypeDecl *type);
+  bool tryAppendStandardSubstitution(const GenericTypeDecl *type);
 
   void appendConstructorEntity(const ConstructorDecl *ctor, bool isAllocating);
   

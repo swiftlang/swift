@@ -20,6 +20,8 @@ namespace swift {
   static const char SERIALIZED_MODULE_DOC_EXTENSION[] = "swiftdoc";
   /// The extension for PCH files.
   static const char PCH_EXTENSION[] = "pch";
+  /// The extension for replacement map files.
+  static const char REMAP_EXTENSION[] = "remap";
   /// The extension for SIL files.
   static const char SIL_EXTENSION[] = "sil";
   /// The extension for SIB files.

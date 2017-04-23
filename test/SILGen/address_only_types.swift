@@ -151,7 +151,7 @@ func address_only_materialize() -> Int {
   // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo!1
   // CHECK: [[RET:%[0-9]+]] = apply [[FOO_METHOD]]<[[OPENED]]>([[TEMP_PROJ]])
-  // CHECK: destroy_addr [[TEMP_PROJ]]
+  // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
   // CHECK: return [[RET]]
 }

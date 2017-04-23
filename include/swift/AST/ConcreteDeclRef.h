@@ -93,8 +93,12 @@ public:
   /// given declaration. This array will be copied into the ASTContext by the
   /// constructor.
   ConcreteDeclRef(ASTContext &ctx, ValueDecl *decl,
-                  SubstitutionList substitutions)
-    : Data(SpecializedDeclRef::create(ctx, decl, substitutions)) { }
+                  SubstitutionList substitutions) {
+    if (substitutions.empty())
+      Data = decl;
+    else
+      Data = SpecializedDeclRef::create(ctx, decl, substitutions);
+  }
 
   /// Determine whether this declaration reference refers to anything.
   explicit operator bool() const { return !Data.isNull(); }
@@ -109,7 +113,7 @@ public:
 
   /// Retrieve a reference to the declaration this one overrides.
   ConcreteDeclRef
-  getOverriddenDecl(ASTContext &ctx, LazyResolver *resolver) const;
+  getOverriddenDecl(ASTContext &ctx) const;
 
   /// Determine whether this reference specializes the declaration to which
   /// it refers.

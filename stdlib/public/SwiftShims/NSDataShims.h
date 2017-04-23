@@ -1,4 +1,4 @@
-//===--- NSDataShims.h - Foundation declarations for Data overlay ------===//
+//===--- NSDataShims.h - Foundation declarations for Data overlay ---------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -113,3 +113,7 @@
 // RUN: %swiftc_driver -incremental -output-file-map %S/Inputs/empty-ofm.json %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM_ENTRY %s
 // INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ("swift-dependencies" under "")
 // INCREMENTAL_WITHOUT_OFM_ENTRY: swift -frontend
+
+// RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s
+// EXCLUSIVITY_CHECKED: swift
+// EXCLUSIVITY_CHECKED: -enforce-exclusivity=checked

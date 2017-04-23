@@ -20,8 +20,8 @@ using namespace swift::sema;
 using namespace swift::syntax;
 
 void
-Semantics::recordSyntaxMapping(syntax::RC<syntax::SyntaxData> FromNode,
-                                   ASTNode ToNode) {
+Semantics::recordSyntaxMapping(RC<syntax::SyntaxData> FromNode,
+                               ASTNode ToNode) {
   if (FromNode->getKind() == SyntaxKind::Unknown) {
     return;
   }

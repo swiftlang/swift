@@ -72,7 +72,7 @@ points for this library:
    Swift Programming Language book as much as possible, so people know what to
    look for.
 1. Accommodate "bad syntax" - humans are imperfect and source code is constantly
-   in a state of flux in an editor. Unforunately, we still live in a
+   in a state of flux in an editor. Unfortunately, we still live in a
    character-centric world - the library shouldn't fall over on bad syntax just
    because someone is in the middle of typing `struct`.
 
@@ -383,7 +383,7 @@ column number, etc. `RawSyntax` are more like the integer 1 - a single
 theoretical entity that exists, but manifesting everywhere it occurs identically
 in Swift source code.
 
-Beyond this, `SyntaxData` nodes have *no signficant public API*.
+Beyond this, `SyntaxData` nodes have *no significant public API*.
 
 - `SyntaxData` are immutable.
    However, they may mutate themselves in order to implement lazy instantiation

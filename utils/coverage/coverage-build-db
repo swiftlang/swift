@@ -52,10 +52,11 @@ def parse_coverage_log(filepath):
             new_section = [section[0]]
             i = 1
             if len(section) > 2:
-                while i < len(section)-1:
-                    while i < len(section)-1 and section[i][0] in ['0', None]:
+                while i < len(section) - 1:
+                    while i < len(section) - 1 and \
+                            section[i][0] in ['0', None]:
                         i += 1
-                    if i == len(section)-1:
+                    if i == len(section) - 1:
                         if section[i][0] not in ['0', None]:
                             istart = int(section[i][1])
                             iend = istart
@@ -63,9 +64,9 @@ def parse_coverage_log(filepath):
                         break
                     istart = int(section[i][1])
                     iend = istart  # single line interval starting
-                    while i < len(section)-1 and \
-                            int(section[i+1][1]) == iend + 1 and \
-                            section[i+1][0] not in ['0', None]:
+                    while i < len(section) - 1 and \
+                            int(section[i + 1][1]) == iend + 1 and \
+                            section[i + 1][0] not in ['0', None]:
                         iend += 1
                         i += 1
                     new_section.append((istart, iend))

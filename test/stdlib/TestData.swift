@@ -627,11 +627,15 @@ class TestData : TestDataSuper {
         data.append(subdata2)
 
         var numChunks = 0
+        var offsets = [Int]()
         data.enumerateBytes() { buffer, offset, stop in
             numChunks += 1
+            offsets.append(offset)
         }
 
         expectEqual(2, numChunks, "composing two dispatch_data should enumerate as structural data as 2 chunks")
+        expectEqual(0, offsets[0], "composing two dispatch_data should enumerate as structural data with the first offset as the location of the region")
+        expectEqual(dataToEncode.count, offsets[1], "composing two dispatch_data should enumerate as structural data with the first offset as the location of the region")
     }
 
     func test_basicReadWrite() {
@@ -944,6 +948,62 @@ class TestData : TestDataSuper {
             }
         }
     }
+
+    func test_rangeZoo() {
+        let r1 = Range(0..<1)
+        let r2 = CountableRange(0..<1)
+        let r3 = ClosedRange(0..<1)
+        let r4 = CountableClosedRange(0..<1)
+
+        let data = Data(bytes: [8, 1, 2, 3, 4])
+        let slice1: Data = data[r1]
+        let slice2: Data = data[r2]
+        let slice3: Data = data[r3]
+        let slice4: Data = data[r4]
+        expectEqual(slice1[0], 8)
+        expectEqual(slice2[0], 8)
+        expectEqual(slice3[0], 8)
+        expectEqual(slice4[0], 8)
+    }
+
+    func test_sliceAppending() {
+        // https://bugs.swift.org/browse/SR-4473
+        var fooData = Data()
+        let barData = Data([0, 1, 2, 3, 4, 5])
+        let slice = barData.suffix(from: 3)
+        fooData.append(slice)
+        expectEqual(fooData[0], 0x03)
+        expectEqual(fooData[1], 0x04)
+        expectEqual(fooData[2], 0x05)
+    }
+    
+    func test_replaceSubrange() {
+        // https://bugs.swift.org/browse/SR-4462
+        let data = Data(bytes: [0x01, 0x02])
+        var dataII = Data(base64Encoded: data.base64EncodedString())!
+        dataII.replaceSubrange(0..<1, with: Data())
+        expectEqual(dataII[0], 0x02)
+    }
+    
+    func test_sliceWithUnsafeBytes() {
+        let base = Data([0, 1, 2, 3, 4, 5])
+        let slice = base[2..<4]
+        let segment = slice.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) -> [UInt8] in
+            return [ptr.pointee, ptr.advanced(by: 1).pointee]
+        }
+        expectEqual(segment, [UInt8(2), UInt8(3)])
+    }
+
+    func test_sliceIteration() {
+        let base = Data([0, 1, 2, 3, 4, 5])
+        let slice = base[2..<4]
+        var found = [UInt8]()
+        for byte in slice {
+            found.append(byte)
+        }
+        expectEqual(found[0], 2)
+        expectEqual(found[1], 3)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -989,6 +1049,11 @@ DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashabl
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
+DataTests.test("test_rangeZoo") { TestData().test_rangeZoo() }
+DataTests.test("test_sliceAppending") { TestData().test_sliceAppending() }
+DataTests.test("test_replaceSubrange") { TestData().test_replaceSubrange() }
+DataTests.test("test_sliceWithUnsafeBytes") { TestData().test_sliceWithUnsafeBytes() }
+DataTests.test("test_sliceIteration") { TestData().test_sliceIteration() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

@@ -207,6 +207,18 @@ array.get_capacity() -> Int
   Read the array capacity from the storage descriptor. The semantics
   are identical to ``get_count`` except for the meaning of the return value.
 
+array.append_element(newElement: Element)
+
+  Appends a single element to the array. No elements are read.
+  The operation is itself guarded by ``make_mutable``.
+  In contrast to other semantics operations, this operation is allowed to be
+  inlined in the early stages of the compiler.
+
+array.append_contentsOf(contentsOf newElements: S)
+
+  Appends all elements from S, which is a Sequence. No elements are read.
+  The operation is itself guarded by ``make_mutable``.
+
 array.make_mutable()
 
   This operation guards mutating operations that don't already imply

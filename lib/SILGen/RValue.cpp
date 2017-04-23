@@ -365,13 +365,12 @@ static void copyOrInitValuesInto(Initialization *init,
   
   bool implodeTuple = false;
 
-  if (auto Address = init->getAddressOrNull()) {
-    if (isa<GlobalAddrInst>(Address) &&
-        SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
-      // Implode tuples in initialization of globals if they are
-      // of trivial types.
-      implodeTuple = true;
-    }
+  if (init->canPerformInPlaceInitialization() &&
+      init->isInPlaceInitializationOfGlobal() &&
+      SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
+    // Implode tuples in initialization of globals if they are
+    // of trivial types.
+    implodeTuple = true;
   }
   
   // If we can satisfy the tuple type by breaking up the aggregate

@@ -103,23 +103,14 @@ bb0:
   return %tuple : $()
 }
 
+// CHECK-LABEL: define {{.*}} @testOtherGlobal
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
+  // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+    alloc_global @otherGlobal
 
-  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
-  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-  // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
-  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
-  // CHECK: [[allocateBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*
-  // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[allocateBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
-  alloc_global @otherGlobal
-
-  // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
-  // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
-  // CHECK: [[projectBuffer:%.*]] = bitcast i8* [[WITNESS]] to %swift.opaque* ([[BUFFER]]*, %swift.type*)*
-  // CHECK: [[VALUE:%.*]] = call %swift.opaque* [[projectBuffer]]([[BUFFER]]* @otherGlobal, %swift.type* [[METADATA]])
+  // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
   %addr = global_addr @otherGlobal : $*Size
 
   %tuple = tuple ()
@@ -127,3 +118,54 @@ bb0:
   // CHECK: ret void
   return %tuple : $()
 }
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_allocate_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK: entry:
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 18
+// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
+// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
+// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   br i1 [[ISINLINE]], label %done, label %outline.allocateValueInBuffer
+//
+// CHECK: outline.allocateValueInBuffer:
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
+// CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
+// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
+// CHECK:   [[PTR:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
+// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
+// CHECK:   store i8* [[PTR]], i8** [[ADDR]]
+// CHECK:   [[OUTLINEADDR:%.*]] = bitcast i8* [[PTR]] to %swift.opaque*
+// CHECK:   br label %done
+//
+// CHECK: done:
+// CHECK:   [[PHI:%.*]] = phi %swift.opaque* [ %1, %entry ], [ [[OUTLINEADDR]], %outline.allocateValueInBuffer ]
+// CHECK:   ret %swift.opaque* [[PHI]]
+
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_project_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 18
+// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
+// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
+// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   br i1 [[ISINLINE]], label %done, label %outline.projectValueInBuffer
+//
+// CHECK: outline.projectValueInBuffer:
+// CHECK:   [[CAST:%.*]] = bitcast %swift.opaque* %1 to %swift.opaque**
+// CHECK:   [[PTR_TO_BUFFER:%.*]] = load %swift.opaque*, %swift.opaque** [[CAST]]
+// CHECK:   br label %done
+//
+// CHECK: done:
+// CHECK:   [[PHI:%.*]] = phi %swift.opaque* [ %1, %entry ], [ [[PTR_TO_BUFFER]], %outline.projectValueInBuffer ]
+// CHECK:   ret %swift.opaque* [[PHI]]

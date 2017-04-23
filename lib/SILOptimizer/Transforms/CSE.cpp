@@ -822,10 +822,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
         case ArrayCallKind::kGetCapacity:
         case ArrayCallKind::kCheckIndex:
         case ArrayCallKind::kCheckSubscript:
-          if (SemCall.hasGuaranteedSelf()) {
-            return true;
-          }
-          return false;
+          return SemCall.hasGuaranteedSelf();
         default:
           return false;
       }
@@ -1156,10 +1153,6 @@ class SILCSE : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override {
-    return RunsOnHighLevelSil ? "High-level CSE" : "CSE";
-  }
-  
 public:
   SILCSE(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 };

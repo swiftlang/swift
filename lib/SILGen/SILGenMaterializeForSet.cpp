@@ -359,7 +359,7 @@ public:
          emitter.WitnessStorage->hasAddressors()))
       emitter.TheAccessSemantics = AccessSemantics::DirectToStorage;
     else if (emitter.WitnessStorage->hasClangNode() ||
-             emitter.WitnessStorage->getAttrs().hasAttribute<NSManagedAttr>())
+             emitter.WitnessStorage->isDynamic())
       emitter.TheAccessSemantics = AccessSemantics::Ordinary;
     else
       emitter.TheAccessSemantics = AccessSemantics::DirectToAccessor;
@@ -388,7 +388,8 @@ public:
   void emit(SILGenFunction &gen);
 
   SILValue emitUsingStorage(SILGenFunction &gen, SILLocation loc,
-                            ManagedValue self, RValue &&indices);
+                            ManagedValue self, RValue &&indices,
+                            SILValue callbackBuffer, SILFunction *&callback);
 
   SILValue emitUsingAddressor(SILGenFunction &gen, SILLocation loc,
                               ManagedValue self, RValue &&indices,
@@ -433,12 +434,13 @@ public:
       else {
         if (!self.isLValue())
           self = ManagedValue::forLValue(self.getValue());
-        return LValue::forAddress(self, selfPattern, SubstSelfType);
+        return LValue::forAddress(self, None, selfPattern, SubstSelfType);
       }
     }
 
     CanType witnessSelfType =
-      Witness->computeInterfaceSelfType()->getCanonicalType();
+      Witness->computeInterfaceSelfType()->getCanonicalType(
+        GenericSig, *SGM.M.getSwiftModule());
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
     witnessSelfType = witnessSelfType->getInOutObjectType()
       ->getCanonicalType();
@@ -558,7 +560,8 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
     llvm_unreachable("materializeForSet should never engage in behavior init");
   
   case AccessStrategy::Storage:
-    address = emitUsingStorage(gen, loc, self, std::move(indicesRV));
+    address = emitUsingStorage(gen, loc, self, std::move(indicesRV),
+                               callbackBuffer, callbackFn);
     break;
 
   case AccessStrategy::Addressor:
@@ -646,7 +649,9 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
                              ArrayRef<ManagedValue> sourceIndices) {
   auto witnessSubscript = cast<SubscriptDecl>(WitnessStorage);
   CanType witnessIndicesType =
-    witnessSubscript->getIndicesInterfaceType()->getCanonicalType();
+    witnessSubscript->getIndicesInterfaceType()
+      ->getCanonicalType(GenericSig,
+                         *SGM.M.getSwiftModule());
   CanType substIndicesType =
     getSubstWitnessInterfaceType(witnessIndicesType);
 
@@ -679,9 +684,8 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   auto callback =
     SGM.M.createFunction(Linkage, CallbackName, callbackType,
                          genericEnv, SILLocation(Witness),
-                         IsBare, F.isTransparent(), F.isFragile(),
-                         IsNotThunk,
-                         /*classVisibility=*/SILFunction::NotRelevant,
+                         IsBare, F.isTransparent(), F.isSerialized(),
+                         IsNotThunk, SubclassScope::NotApplicable,
                          /*inlineStrategy=*/InlineDefault,
                          /*EK=*/EffectsKind::Unspecified,
                          /*InsertBefore=*/&F);
@@ -727,11 +731,22 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 SILValue MaterializeForSetEmitter::emitUsingStorage(SILGenFunction &gen,
                                                     SILLocation loc,
                                                     ManagedValue self,
-                                                    RValue &&indices) {
+                                                    RValue &&indices,
+                                                    SILValue callbackBuffer,
+                                                    SILFunction *&callback) {
   LValue lvalue = buildLValue(gen, loc, self, std::move(indices),
                               AccessKind::ReadWrite);
+
+  SmallVector<SILValue, 4> valuesToEndAccessOf;
+  gen.ValuesToEndAccessForMaterializeForSet = &valuesToEndAccessOf;
+
   ManagedValue address =
     gen.emitAddressOfLValue(loc, std::move(lvalue), AccessKind::ReadWrite);
+
+  if (!valuesToEndAccessOf.empty()) {
+    // FIXME: build callback to end access.
+  }
+
   return address.getUnmanagedValue();
 }
 

@@ -89,5 +89,5 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "A tool to format Swift code\n");
 
-  return doFormat({"/Users/david/test.swift"});
+  return doFormat({"/does/not/exist/test.swift"});
 }

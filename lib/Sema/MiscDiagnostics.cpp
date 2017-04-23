@@ -726,7 +726,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   
       // Casting to the same type or a superclass is a no-op.
       if (toTy->isEqual(fromTy) ||
-          toTy->isExactSuperclassOf(fromTy, &TC)) {
+          toTy->isExactSuperclassOf(fromTy)) {
         auto d = TC.diagnose(DRE->getLoc(), diag::bitcasting_is_no_op,
                              fromTy, toTy);
         if (subExpr) {
@@ -757,7 +757,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
       
       // Unchecked casting to a subclass is better done by unsafeDowncast.
-      if (fromTy->isBindableToSuperclassOf(toTy, &TC)) {
+      if (fromTy->isBindableToSuperclassOf(toTy)) {
         TC.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
                     fromTy, toTy)
           .fixItReplace(DRE->getNameLoc().getBaseNameLoc(),
@@ -1286,7 +1286,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = isStore;
 
             // But silence the warning if the base was explicitly qualified.
-            if (dyn_cast_or_null<DotSyntaxBaseIgnoredExpr>(Parent.getAsExpr()))
+            auto parentAsExpr = Parent.getAsExpr();
+            if (parentAsExpr && isa<DotSyntaxBaseIgnoredExpr>(parentAsExpr))
               shouldDiagnose = false;
 
             if (shouldDiagnose) {
@@ -1738,9 +1739,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     // bridging---that doesn't count.
     Type bridged;
     if (normalizedBaseTy->isAny()) {
-      const ProtocolDecl *anyObjectProto =
-          ctx.getProtocol(KnownProtocolKind::AnyObject);
-      bridged = anyObjectProto->getDeclaredType();
+      bridged = ctx.getAnyObjectType();
     } else {
       bridged = ctx.getBridgedToObjC(DC, normalizedBaseTy);
     }
@@ -1989,7 +1988,8 @@ public:
         unsigned defaultFlags = 0;
         // If this VarDecl is nested inside of a CaptureListExpr, remember that
         // fact for better diagnostics.
-        if (dyn_cast_or_null<CaptureListExpr>(Parent.getAsExpr()))
+        auto parentAsExpr = Parent.getAsExpr();
+        if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
           defaultFlags = RK_CaptureList;
         VarDecls[vd] |= defaultFlags;
       }

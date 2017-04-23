@@ -497,3 +497,19 @@ sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @calle
   %pa = partial_apply %fn<Int> (%0) : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
   return %pa : $@callee_owned () -> @owned GenericEnum2<Int>
 }
+
+struct SwiftStruct {}
+
+sil @fun : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
+
+// CHECK-LABEL: define{{.*}} swiftcc { i8*, %swift.refcounted* } @partial_apply_thin_type(%T13partial_apply10SwiftClassC*)
+// CHECK: [[CONTEXT:%.*]] = bitcast %T13partial_apply10SwiftClassC* %0 to %swift.refcounted*
+// CHECK: [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @_T03funTA to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
+// CHECK:  ret { i8*, %swift.refcounted* } [[CLOSURE]]
+
+sil @partial_apply_thin_type : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> @callee_owned () -> () {
+entry(%0: $@thin SwiftStruct.Type, %1: $SwiftClass):
+  %fun = function_ref @fun : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
+  %closure = partial_apply %fun (%0, %1) : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
+  return %closure : $@callee_owned () -> ()
+}

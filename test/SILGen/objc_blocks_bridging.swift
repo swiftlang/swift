@@ -133,7 +133,7 @@ class Test: NSObject {
   func blockTakesBlock() -> ((Int) -> Int) -> Int {}
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0S2iIxyd_SiIxxd_S2iIyByd_SiIyByd_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIxyd_SiIxxd_S2iIyByd_SiIyByd_TR
 // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[ORIG_BLOCK:%.*]] :
 // CHECK:         [[CLOSURE:%.*]] = partial_apply {{%.*}}([[BLOCK_COPY]])
 // CHECK:         [[RESULT:%.*]] = apply {{%.*}}([[CLOSURE]])
@@ -142,14 +142,14 @@ class Test: NSObject {
 func clearDraggingItemImageComponentsProvider(_ x: NSDraggingItem) {
   x.imageComponentsProvider = {}
 }
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0SayypGIxo_So7NSArrayCSgIyBa_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SayypGIxo_So7NSArrayCSgIyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @_T0Sa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[CONVERTED]]
 // CHECK:         return [[OPTIONAL]]
 
 // CHECK-LABEL: sil hidden @{{.*}}bridgeNonnullBlockResult{{.*}}
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0SSIxo_So8NSStringCSgIyBa_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SSIxo_So8NSStringCSgIyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:         [[BRIDGED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
@@ -180,6 +180,6 @@ struct GenericStruct<T> {
   }
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0Ix_Ixx_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned @callee_owned () -> ()) -> (), @convention(block) () -> ()) -> ()
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0IyB_Ix_TR : $@convention(thin) (@owned @convention(block) () -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ix_Ixx_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned @callee_owned () -> ()) -> (), @convention(block) () -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0IyB_Ix_TR : $@convention(thin) (@owned @convention(block) () -> ()) -> ()
 

@@ -511,13 +511,13 @@ protocol P {
 }
 
 extension P {
-  func foo() { print("P.foo()")
-  func bar() { print("P.bar()")
+  func foo() { print("P.foo()") }
+  func bar() { print("P.bar()") }
 }
 
 struct X : P {
-  func foo() { print("X.foo()")
-  func bar() { print("X.bar()")
+  func foo() { print("X.foo()") }
+  func bar() { print("X.bar()") }
 }
 
 let x = X()

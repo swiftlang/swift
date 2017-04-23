@@ -1,4 +1,4 @@
-//===--- SILVTableVisitor.h - Class vtable visitor -------------*- C++ -*-===//
+//===--- SILVTableVisitor.h - Class vtable visitor --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

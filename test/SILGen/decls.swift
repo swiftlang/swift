@@ -31,20 +31,20 @@ func MRV() -> (Int, Float, (), Double) {}
 // CHECK-LABEL: sil hidden @_T05decls14tuple_patternsyyF
 func tuple_patterns() {
   var (a, b) : (Int, Float)
-  // CHECK: [[AADDR1:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBA:%.*]] = project_box [[AADDR1]]
-  // CHECK: [[AADDR:%[0-9]+]] = mark_uninitialized [var] [[PBA]]
-  // CHECK: [[BADDR1:%[0-9]+]] = alloc_box ${ var Float }
-  // CHECK: [[PBB:%.*]] = project_box [[BADDR1]]
-  // CHECK: [[BADDR:%[0-9]+]] = mark_uninitialized [var] [[PBB]]
+  // CHECK: [[ABOX:%[0-9]+]] = alloc_box ${ var Int }
+  // CHECK: [[AADDR:%[0-9]+]] = mark_uninitialized [var] [[ABOX]]
+  // CHECK: [[PBA:%.*]] = project_box [[AADDR]]
+  // CHECK: [[BBOX:%[0-9]+]] = alloc_box ${ var Float }
+  // CHECK: [[BADDR:%[0-9]+]] = mark_uninitialized [var] [[BBOX]]
+  // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
 
   var (c, d) = (a, b)
   // CHECK: [[CADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBC:%.*]] = project_box [[CADDR]]
   // CHECK: [[DADDR:%[0-9]+]] = alloc_box ${ var Float }
   // CHECK: [[PBD:%.*]] = project_box [[DADDR]]
-  // CHECK: copy_addr [[AADDR]] to [initialization] [[PBC]]
-  // CHECK: copy_addr [[BADDR]] to [initialization] [[PBD]]
+  // CHECK: copy_addr [[PBA]] to [initialization] [[PBC]]
+  // CHECK: copy_addr [[PBB]] to [initialization] [[PBD]]
 
   // CHECK: [[EADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBE:%.*]] = project_box [[EADDR]]
@@ -65,8 +65,8 @@ func tuple_patterns() {
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
   // CHECK-NOT: alloc_box ${ var Float }
-  // CHECK: copy_addr [[AADDR]] to [initialization] [[PBI]]
-  // CHECK: [[B:%[0-9]+]] = load [trivial] [[BADDR]]
+  // CHECK: copy_addr [[PBA]] to [initialization] [[PBI]]
+  // CHECK: [[B:%[0-9]+]] = load [trivial] [[PBB]]
   // CHECK-NOT: store [[B]]
   var (i,_) = (a, b)
 

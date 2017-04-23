@@ -85,6 +85,7 @@ public:
   IGNORED_ATTR(Versioned)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
+  IGNORED_ATTR(Implements)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -186,7 +187,8 @@ public:
     // 'final' only makes sense in the context of a class declaration.
     // Reject it on global functions, protocols, structs, enums, etc.
     if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (D->getDeclContext()->getAsProtocolExtensionContext())
+      if (TC.Context.isSwiftVersion3() && 
+          D->getDeclContext()->getAsProtocolExtensionContext())
         TC.diagnose(attr->getLocation(), 
           diag::protocol_extension_cannot_be_final)
           .fixItRemove(attr->getRange());
@@ -234,6 +236,7 @@ public:
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
   bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
   void visitSILStoredAttr(SILStoredAttr *attr);
+  void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
 
@@ -293,6 +296,10 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and final.
   if (D->getAttrs().hasAttribute<FinalAttr>())
     return diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
+
+  // Members cannot be both dynamic and @nonobjc.
+  if (D->getAttrs().hasAttribute<NonObjCAttr>())
+    return diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
 }
 
 
@@ -629,6 +636,10 @@ void AttributeEarlyChecker::visitSetterAccessibilityAttr(
   }
 }
 
+void AttributeEarlyChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
+  if (!isa<ClassDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::objcmembers_attribute_nonclass);
+}
 
 void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   // Don't perform early attribute validation more than once.
@@ -745,6 +756,7 @@ public:
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
+    IGNORED_ATTR(ObjCMembers)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -785,6 +797,7 @@ public:
   void visitInlineableAttr(InlineableAttr *attr);
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
+  void visitImplementsAttr(ImplementsAttr *attr);
 };
 } // end anonymous namespace
 
@@ -832,7 +845,7 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
-  Type CurriedTy = FD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+  Type CurriedTy = FD->getMethodInterfaceType();
   Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
   if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
     TC.diagnose(D, diag::invalid_ibaction_result, ResultTy);
@@ -1617,7 +1630,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Form a new generic signature based on the old one.
   GenericSignatureBuilder Builder(D->getASTContext(),
-                           LookUpConformanceInModule(DC->getParentModule()));
+                                  TypeChecker::LookUpConformance(TC, DC));
 
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);
@@ -1776,7 +1789,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Add the requirements to the builder.
   for (auto &req : resolvedRequirements)
-    Builder.addRequirement(&req);
+    Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
   Builder.finalize(attr->getLocation(), genericSig->getGenericParams(),
@@ -1869,6 +1882,52 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
         attr->setInvalid();
       }
     }
+  }
+}
+
+void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
+  TypeLoc &ProtoTypeLoc = attr->getProtocolType();
+  TypeResolutionOptions options;
+  options |= TR_AllowUnboundGenerics;
+
+  DeclContext *DC = D->getDeclContext();
+  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),
+                          DC, options);
+  ProtoTypeLoc.setType(T);
+
+  // Definite error-types were already diagnosed in resolveType.
+  if (!T || T->hasError())
+    return;
+
+  // Check that we got a ProtocolType.
+  if (auto PT = T->getAs<ProtocolType>()) {
+    ProtocolDecl *PD = PT->getDecl();
+
+    // Check that the ProtocolType has the specified member.
+    LookupResult R = TC.lookupMember(PD->getDeclContext(),
+                                     PT, attr->getMemberName());
+    if (!R) {
+      TC.diagnose(attr->getLocation(),
+                  diag::implements_attr_protocol_lacks_member,
+                  PD->getBaseName(), attr->getMemberName())
+        .highlight(attr->getMemberNameLoc().getSourceRange());
+    }
+
+    // Check that the decl we're decorating is a member of a type that actually
+    // conforms to the specified protocol.
+    NominalTypeDecl *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!NTD->lookupConformance(DC->getParentModule(), PD, conformances)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::implements_attr_protocol_not_conformed_to,
+                  NTD->getFullName(), PD->getFullName())
+        .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
+    }
+
+  } else {
+    TC.diagnose(attr->getLocation(),
+                diag::implements_attr_non_protocol_type)
+      .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
   }
 }
 

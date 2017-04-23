@@ -43,6 +43,8 @@ namespace swift {
   class ClassDecl;
   class SILFunctionType;
   enum class SILLinkage : unsigned char;
+  enum IsSerialized_t : unsigned char;
+  enum class SubclassScope : unsigned char;
   class SILModule;
   class SILLocation;
   class AnyFunctionRef;
@@ -263,7 +265,7 @@ struct SILDeclRef {
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function should have its body serialized.
-  bool isFragile() const;
+  IsSerialized_t isSerialized() const;
   /// \brief True if the function has noinline attribute.
   bool isNoinline() const;
   /// \brief True if the function has __always inline attribute.
@@ -364,6 +366,12 @@ struct SILDeclRef {
   static bool isClangGenerated(ClangNode node);
 
   bool isImplicit() const;
+
+  /// Return the scope in which the parent class of a method (i.e. class
+  /// containing this declaration) can be subclassed, returning NotApplicable if
+  /// this is not a method, there is no such class, or the class cannot be
+  /// subclassed.
+  SubclassScope getSubclassScope() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

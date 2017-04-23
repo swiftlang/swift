@@ -201,7 +201,7 @@ public:
 
   FullApplySite getApplyInst() const { return AI; }
 
-  IsFragile_t isFragile() const;
+  IsSerialized_t isSerialized() const;
 
   std::string createName() const;
 
@@ -389,16 +389,16 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // AI from parent?
 }
 
-IsFragile_t CallSiteDescriptor::isFragile() const {
-  if (getClosure()->getFunction()->isFragile() &&
-      getApplyCallee()->isFragile())
-    return IsFragile;
-  return IsNotFragile;
+IsSerialized_t CallSiteDescriptor::isSerialized() const {
+  if (getClosure()->getFunction()->isSerialized() &&
+      getApplyCallee()->isSerialized())
+    return IsSerializable;
+  return IsNotSerialized;
 }
 
 std::string CallSiteDescriptor::createName() const {
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, isFragile(),
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, isSerialized(),
                                                               getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
@@ -546,8 +546,8 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       getSpecializedLinkage(ClosureUser, ClosureUser->getLinkage()),
       ClonedName, ClonedTy,
       ClosureUser->getGenericEnvironment(), ClosureUser->getLocation(),
-      IsBare, ClosureUser->isTransparent(), CallSiteDesc.isFragile(),
-      ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
+      IsBare, ClosureUser->isTransparent(), CallSiteDesc.isSerialized(),
+      ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
   if (ClosureUser->hasUnqualifiedOwnership()) {
@@ -677,7 +677,6 @@ public:
 
   void run() override;
 
-  StringRef getName() override { return "Closure Specialization"; }
 };
 
 void SILClosureSpecializerTransform::run() {
@@ -768,7 +767,7 @@ void SILClosureSpecializerTransform::gatherCallSites(
         // Don't specialize non-fragile callees if the caller is fragile;
         // the specialized callee will have shared linkage, and thus cannot
         // be referenced from the fragile caller.
-        if (Caller->isFragile() &&
+        if (Caller->isSerialized() &&
             !ApplyCallee->hasValidLinkageForFragileInline())
           continue;
 

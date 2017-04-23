@@ -162,10 +162,6 @@ class Remangler {
   class EntityContext {
     bool AsContext = false;
   public:
-    bool isAsContext() const {
-      return AsContext;
-    }
-
     class ManglingContextRAII {
       EntityContext &Ctx;
       bool SavedValue;
@@ -253,6 +249,9 @@ class Remangler {
     mangleChildNodes(Proto);
   }
 
+  void mangleProtocolList(Node *protocols, Node *superclass,
+                          bool hasExplicitAnyObject);
+
   bool trySubstitution(Node *node, SubstitutionEntry &entry,
                        bool treatAsIdentifier = false);
   void addSubstitution(const SubstitutionEntry &entry);
@@ -272,7 +271,7 @@ class Remangler {
   }
 
   void mangleAnyNominalType(Node *node);
-  void mangleNominalType(Node *node, char TypeOp);
+  void mangleAnyGenericType(Node *node, char TypeOp);
   void mangleGenericArgs(Node *node, char &Separator);
 
 #define NODE(ID)                                                        \
@@ -414,7 +413,7 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
   return {(int)Chain.size(), node};
 }
 
-void Remangler::mangleNominalType(Node *node, char TypeOp) {
+void Remangler::mangleAnyGenericType(Node *node, char TypeOp) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
   mangleChildNodes(node);
@@ -437,9 +436,9 @@ void Remangler::mangleAnyNominalType(Node *node) {
     return;
   }
   switch (node->getKind()) {
-    case Node::Kind::Structure: return mangleNominalType(node, 'V');
-    case Node::Kind::Enum: return mangleNominalType(node, 'O');
-    case Node::Kind::Class: return mangleNominalType(node, 'C');
+    case Node::Kind::Structure: return mangleAnyGenericType(node, 'V');
+    case Node::Kind::Enum: return mangleAnyGenericType(node, 'O');
+    case Node::Kind::Class: return mangleAnyGenericType(node, 'C');
     default:
       unreachable("bad nominal type kind");
   }
@@ -485,7 +484,7 @@ void Remangler::mangleAllocator(Node *node) {
 
 void Remangler::mangleArgumentTuple(Node *node) {
   Node *Child = skipType(getSingleChild(node));
-  if (Child->getKind() == Node::Kind::NonVariadicTuple &&
+  if (Child->getKind() == Node::Kind::Tuple &&
       Child->getNumChildren() == 0) {
     Buffer << 'y';
     return;
@@ -1327,7 +1326,7 @@ void Remangler::mangleNonObjCAttribute(Node *node) {
   Buffer << "TO";
 }
 
-void Remangler::mangleNonVariadicTuple(Node *node) {
+void Remangler::mangleTuple(Node *node) {
   mangleTypeList(node);
   Buffer << 't';
 }
@@ -1381,7 +1380,7 @@ void Remangler::manglePrivateDeclName(Node *node) {
 }
 
 void Remangler::mangleProtocol(Node *node) {
-  mangleNominalType(node, 'P');
+  mangleAnyGenericType(node, 'P');
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
@@ -1405,15 +1404,38 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
-void Remangler::mangleProtocolList(Node *node) {
-  node = getSingleChild(node, Node::Kind::TypeList);
+void Remangler::mangleProtocolList(Node *node, Node *superclass,
+                                   bool hasExplicitAnyObject) {
+  auto *protocols = getSingleChild(node, Node::Kind::TypeList);
   bool FirstElem = true;
-  for (NodePointer Child : *node) {
+  for (NodePointer Child : *protocols) {
     manglePureProtocol(Child);
     mangleListSeparator(FirstElem);
   }
   mangleEndOfList(FirstElem);
+  if (superclass) {
+    mangleType(superclass);
+    Buffer << "Xc";
+    return;
+  } else if (hasExplicitAnyObject) {
+    Buffer << "Xl";
+    return;
+  }
   Buffer << 'p';
+}
+
+void Remangler::mangleProtocolList(Node *node) {
+  mangleProtocolList(node, nullptr, false);
+}
+
+void Remangler::mangleProtocolListWithClass(Node *node) {
+  mangleProtocolList(node->getChild(0),
+                     node->getChild(1),
+                     false);
+}
+
+void Remangler::mangleProtocolListWithAnyObject(Node *node) {
+  mangleProtocolList(node->getChild(0), nullptr, true);
 }
 
 void Remangler::mangleProtocolWitness(Node *node) {
@@ -1457,6 +1479,16 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
     mangleChildNodes(node);
   }
   Buffer << "TR";
+}
+
+void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TK";
+}
+
+void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tk";
 }
 
 void Remangler::mangleReturnType(Node *node) {
@@ -1518,8 +1550,7 @@ void Remangler::mangleType(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node) {
-  mangleChildNodes(node);
-  Buffer << 'a';
+  mangleAnyGenericType(node, 'a');
 }
 
 void Remangler::mangleTypeList(Node *node) {
@@ -1599,11 +1630,6 @@ void Remangler::mangleVariable(Node *node) {
   Buffer << 'v';
 }
 
-void Remangler::mangleVariadicTuple(Node *node) {
-  mangleTypeList(node);
-  Buffer << "dt";
-}
-
 void Remangler::mangleVTableAttribute(Node *node) {
   unreachable("Old-fashioned vtable thunk in new mangling format");
 }
@@ -1621,11 +1647,6 @@ void Remangler::mangleWeak(Node *node) {
 void Remangler::mangleWillSet(Node *node) {
   mangleChildNodes(node);
   Buffer << "fw";
-}
-
-void Remangler::mangleWitnessTableOffset(Node *node) {
-  mangleChildNodes(node);
-  Buffer << "Wo";
 }
 
 void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {
@@ -1793,6 +1814,10 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       NodePointer result = Factory.createNode(Node::Kind::Extension);
       result->addChild(node->getFirstChild(), Factory);
       result->addChild(getUnspecialized(parent, Factory), Factory);
+      if (node->getNumChildren() == 3) {
+        // Add the generic signature of the extension.
+        result->addChild(node->getChild(2), Factory);
+      }
       return result;
     }
     default:

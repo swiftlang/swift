@@ -4,6 +4,7 @@ set(sources
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
+  KeyPath.h
   LibcShims.h
   RefCount.h
   RuntimeShims.h
@@ -22,6 +23,8 @@ set(sources
   XPCOverlayShims.h
 
   CoreFoundationOverlayShims.h
+  CFCharacterSetShims.h
+  CFHashingShims.h
 
   FoundationOverlayShims.h
   FoundationShimSupport.h

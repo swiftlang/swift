@@ -412,25 +412,25 @@ entry:
   return undef : $()
 }
 
-sil [fragile] @fragile_function : $@convention(thin) () -> () {
+sil [serialized] @fragile_function : $@convention(thin) () -> () {
 entry:
   return undef : $()
 }
 
-// CHECK-LABEL: sil [fragile] @fragile_calls_resilient : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [serialized] @fragile_calls_resilient : $@convention(thin) () -> () {
 // CHECK: function_ref @resilient_function
 // CHECK: return
-sil [fragile] @fragile_calls_resilient : $@convention(thin) () -> () {
+sil [serialized] @fragile_calls_resilient : $@convention(thin) () -> () {
 entry:
   %f = function_ref @resilient_function : $@convention(thin) () -> ()
   %z = apply %f() : $@convention(thin) () -> ()
   return %z : $()
 }
 
-// CHECK-LABEL: sil [fragile] @fragile_calls_fragile : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [serialized] @fragile_calls_fragile : $@convention(thin) () -> () {
 // CHECK-NOT: function_ref @resilient_function
 // CHECK: return
-sil [fragile] @fragile_calls_fragile : $@convention(thin) () -> () {
+sil [serialized] @fragile_calls_fragile : $@convention(thin) () -> () {
 entry:
   %f = function_ref @fragile_function : $@convention(thin) () -> ()
   %z = apply %f() : $@convention(thin) () -> ()

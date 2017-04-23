@@ -1,0 +1,9 @@
+[
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@barGlobalVariable",
+    "OldPrintedName": "barGlobalVariable",
+    "NewPrintedName": "memberVariable",
+    "NewTypeName": "bar"
+  }
+]

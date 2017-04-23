@@ -108,6 +108,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(BeginBorrowInst, SILInstruction, begin_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(EndBorrowArgumentInst, SILInstruction, end_borrow_argument, MayHaveSideEffects, DoesNotRelease)
+  INST(BeginAccessInst, SILInstruction, begin_access, MayHaveSideEffects, DoesNotRelease)
+  INST(EndAccessInst, SILInstruction, end_access, MayHaveSideEffects, DoesNotRelease)
   INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
@@ -183,7 +185,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(IntegerLiteralInst, LiteralInst, integer_literal, None, DoesNotRelease)
     INST(FloatLiteralInst, LiteralInst, float_literal, None, DoesNotRelease)
     INST(StringLiteralInst, LiteralInst, string_literal, None, DoesNotRelease)
-    VALUE_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
+    INST(ConstStringLiteralInst, LiteralInst, const_string_literal, None, DoesNotRelease)
+    VALUE_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_VALUE(MethodInst, SILInstruction)
@@ -200,7 +203,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Metatypes
   INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
-  INST(ValueMetatypeInst, SILInstruction, value_metatype, None, DoesNotRelease)
+  INST(ValueMetatypeInst, SILInstruction, value_metatype, MayRead, DoesNotRelease)
   INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, MayRead, DoesNotRelease)
   INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
 
@@ -242,6 +245,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)
   INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
+
+  // Key paths
+  INST(KeyPathInst, SILInstruction, keypath, None, DoesNotRelease)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)

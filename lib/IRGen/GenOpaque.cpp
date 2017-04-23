@@ -23,12 +23,12 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "swift/IRGen/ValueWitness.h"
 
 #include "FixedTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "ProtocolInfo.h"
-#include "ValueWitness.h"
 
 #include "GenOpaque.h"
 

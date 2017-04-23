@@ -3461,7 +3461,6 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
-  StringRef getName() override { return "Simplify CFG"; }
 };
 } // end anonymous namespace
 
@@ -3500,7 +3499,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "Split Critical Edges"; }
 };
 
 // Used to test SimplifyCFG::simplifyArgs with sil-opt.
@@ -3516,7 +3514,6 @@ public:
     }
   }
   
-  StringRef getName() override { return "Simplify Block Args"; }
 };
 
 // Used to test splitBBArguments with sil-opt
@@ -3530,7 +3527,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "SROA BB Arguments"; }
 };
 
 // Used to test tryMoveCondFailToPreds with sil-opt
@@ -3546,7 +3542,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "Move Cond Fail To Preds"; }
 };
 
 } // end anonymous namespace

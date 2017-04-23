@@ -144,3 +144,15 @@ ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &SGF,
     return ManagedValue::forUnmanaged(getValue());
   return SGF.emitFormalEvaluationManagedBeginBorrow(loc, getValue());
 }
+
+void ManagedValue::print(raw_ostream &os) const {
+  if (SILValue v = getValue()) {
+    v->print(os);
+  }
+}
+
+void ManagedValue::dump() const {
+#ifndef NDEBUG
+  print(llvm::dbgs());
+#endif
+}

@@ -334,3 +334,12 @@ func f23202128() {
   UP(pipe)    // ok
   UP(&pipe)   // expected-error {{'&' is not allowed passing array value as 'UnsafePointer<Int32>' argument}} {{6-7=}}
 }
+
+func takesRawBuffer(_ b: UnsafeRawBufferPointer) {}
+
+// <rdar://problem/29586888> UnsafeRawBufferPointer range subscript is inconsistent with Collection.
+func f29586888(b: UnsafeRawBufferPointer) {
+  takesRawBuffer(b[1..<2]) // expected-error {{'subscript' is unavailable: use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.}}
+  let slice = b[1..<2]
+  takesRawBuffer(slice) // expected-error {{cannot convert value of type 'RandomAccessSlice<UnsafeRawBufferPointer>' to expected argument type 'UnsafeRawBufferPointer'}}
+}

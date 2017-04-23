@@ -578,10 +578,8 @@ class ExecutionContext(object):
                 elif '\n' in text:
                     i = text.find('\n')
                     self.result_text.append(text[:i + 1])
-                    self.last_file_line = (
-                        self.last_file_line[0], self.last_file_line[1] + 1)
                     # and try again
-                    self.append_text(text[i + 1:], file, line)
+                    self.append_text(text[i + 1:], file, line + 1)
                     return
 
         self.result_text.append(text)
@@ -751,12 +749,22 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     local bindings.
 
     >>> from tempfile import NamedTemporaryFile
-    >>> f = NamedTemporaryFile()
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
+    >>> f = NamedTemporaryFile(delete=False)
     >>> f.write(
-    ... '''---
+    ... r'''---
     ... % for i in range(int(x)):
     ... a pox on ${i} for epoxy
     ... % end
+    ... ${120 +
+    ...
+    ...    3}
+    ... abc
+    ... ${"w\nx\nX\ny"}
+    ... z
     ... ''')
     >>> f.flush()
     >>> result = expand(
@@ -770,7 +778,18 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     a pox on 0 for epoxy
     //#sourceLocation(file: "dummy.file", line: 3)
     a pox on 1 for epoxy
-
+    //#sourceLocation(file: "dummy.file", line: 5)
+    123
+    //#sourceLocation(file: "dummy.file", line: 8)
+    abc
+    w
+    x
+    X
+    y
+    //#sourceLocation(file: "dummy.file", line: 10)
+    z
+    >>> f.close()
+    >>> os.remove(f.name)
     """
     with open(filename) as f:
         t = parse_template(filename, f.read())
@@ -781,6 +800,7 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
                 t, line_directive=line_directive, **local_bindings)
         finally:
             os.chdir(d)
+
 
 def parse_template(filename, text=None):
     r"""Return an AST corresponding to the given template file.
@@ -1037,7 +1057,9 @@ def execute_template(
 
     Keyword arguments become local variable bindings in the execution context
 
-    >>> ast = parse_template('/dummy.file', text=
+    >>> root_directory = os.path.abspath('/')
+    >>> file_name = root_directory + 'dummy.file'
+    >>> ast = parse_template(file_name, text=
     ... '''Nothing
     ... % if x:
     ... %    for i in range(3):
@@ -1047,7 +1069,7 @@ def execute_template(
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
     >>> out = execute_template(ast, line_directive='//#sourceLocation', x=1)
-    >>> out = out.replace(os.path.abspath(os.sep) + 'dummy.file', "DUMMY-FILE")
+    >>> out = out.replace(file_name, "DUMMY-FILE")
     >>> print(out, end="")
     //#sourceLocation(file: "DUMMY-FILE", line: 1)
     Nothing
@@ -1058,7 +1080,7 @@ def execute_template(
     //#sourceLocation(file: "DUMMY-FILE", line: 4)
     2
 
-    >>> ast = parse_template('/dummy.file', text=
+    >>> ast = parse_template(file_name, text=
     ... '''Nothing
     ... % a = []
     ... % for x in range(3):
@@ -1067,7 +1089,7 @@ def execute_template(
     ... ${a}
     ... ''')
     >>> out = execute_template(ast, line_directive='//#sourceLocation', x=1)
-    >>> out = out.replace(os.path.abspath(os.sep) + 'dummy.file', "DUMMY-FILE")
+    >>> out = out.replace(file_name, "DUMMY-FILE")
     >>> print(out, end="")
     //#sourceLocation(file: "DUMMY-FILE", line: 1)
     Nothing
@@ -1081,6 +1103,16 @@ def execute_template(
 
 
 def main():
+    """
+    Lint this file.
+    >>> import sys
+    >>> gyb_path = os.path.realpath(__file__).replace('.pyc', '.py')
+    >>> sys.path.append(os.path.dirname(gyb_path))
+    >>> import python_lint
+    >>> python_lint.lint([gyb_path], verbose=False)
+    0
+    """
+
     import argparse
     import sys
 

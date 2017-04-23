@@ -791,8 +791,6 @@ namespace {
     void run() override {
       performNoReturnFunctionProcessing(getModule(), this);
     }
-    
-    StringRef getName() override { return "NoReturnFolding"; }
   };
 } // end anonymous namespace
 
@@ -806,8 +804,6 @@ namespace {
     void run() override {
       performSILDiagnoseUnreachable(getModule(), this);
     }
-
-    StringRef getName() override { return "Diagnose Unreachable"; }
   };
 } // end anonymous namespace
 
