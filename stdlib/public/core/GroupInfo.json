@@ -96,6 +96,9 @@
     "CTypes.swift",
     "MemoryLayout.swift"
   ],
+  "KeyPaths": [
+    "KeyPath.swift"
+  ],
   "Reflection": [
     "Dump.swift",
     "Mirror.swift",

@@ -216,6 +216,9 @@ namespace swift {
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
     bool WarnSwift3ObjCInference = false;
+    
+    /// Enable keypaths.
+    bool EnableExperimentalKeyPaths = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

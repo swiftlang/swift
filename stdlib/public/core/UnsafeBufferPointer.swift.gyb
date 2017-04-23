@@ -68,8 +68,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias Iterator =
-    IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
+  public typealias Iterator = UnsafeBufferPointerIterator<Element>
 
   /// The index of the first element in a nonempty buffer.
   ///
@@ -181,6 +180,28 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   @_inlineable
   public var indices: Indices {
     return startIndex..<endIndex
+  }
+
+  /// Copies `self` into the supplied buffer.
+  ///
+  /// - Precondition: The memory in `self` is uninitialized. The buffer must
+  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  ///
+  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+  ///   initialized.
+  public func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    guard !isEmpty else { return (makeIterator(),buffer.startIndex) }
+
+    guard count <= buffer.count, let ptr = buffer.baseAddress else {
+      fatalError("Insufficient space allocated to copy buffer contents")      
+    }
+  
+    ptr.initialize(from: baseAddress!, count: self.count)
+    var it: Iterator = self.makeIterator()
+    it._position = it._end
+    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))        
   }
 
   /// Accesses the element at the specified position.

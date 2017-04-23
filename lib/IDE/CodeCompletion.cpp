@@ -1382,7 +1382,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto CheckKind = CompletionTypeCheckKind::Normal;
     if (Kind == CompletionKind::KeyPathExpr ||
         Kind == CompletionKind::KeyPathExprDot)
-      CheckKind = CompletionTypeCheckKind::ObjCKeyPath;
+      CheckKind = CompletionTypeCheckKind::KeyPath;
 
     // If we've already successfully type-checked the expression for some
     // reason, just return the type.
@@ -1433,7 +1433,7 @@ public:
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
-  void completeExprKeyPath(ObjCKeyPathExpr *KPE, bool HasDot) override;
+  void completeExprKeyPath(KeyPathExpr *KPE, bool HasDot) override;
 
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
@@ -4509,7 +4509,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeExprKeyPath(ObjCKeyPathExpr *KPE,
+void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       bool HasDot) {
   Kind = HasDot ? CompletionKind::KeyPathExprDot : CompletionKind::KeyPathExpr;
   ParsedExpr = KPE;

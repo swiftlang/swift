@@ -148,6 +148,8 @@ var qualifiedName = NSRuncingMode.mince
 var topLevelCaseName = RuncingMince // expected-error{{}}
 #endif
 
+let _: EnumViaAttribute = .first
+
 // NS_OPTIONS
 var withMince: NSRuncingOptions = .enableMince
 var withQuince: NSRuncingOptions = .enableQuince
@@ -193,6 +195,7 @@ let audioComponentFlags2: FakeAudioComponentFlags = [.loadOutOfProcess]
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
 
 let optionsWithSwiftName: NSOptionsAlsoGetSwiftName = .Case
+let optionsViaAttribute: OptionsViaAttribute = [.first, .second]
 
 // <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
 #if !IRGEN

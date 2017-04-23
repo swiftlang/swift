@@ -432,7 +432,8 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   return id;
 }
 
-DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
+DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
+                              bool allowTypeAliasXRef) {
   if (!D)
     return 0;
 
@@ -446,6 +447,10 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
           isa<PrecedenceGroupDecl>(D)) &&
          "cannot cross-reference this decl");
+
+  assert((allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
+          D->getModuleContext() == M) &&
+         "cannot cross-reference typealiases directly (use the NameAliasType)");
 
   id = { ++LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
@@ -1326,7 +1331,8 @@ void Serializer::writeNormalConformance(
                                       Type type, TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
     data.push_back(addTypeRef(type));
-    data.push_back(addDeclRef(typeDecl));
+    data.push_back(addDeclRef(typeDecl, /*forceSerialization*/false,
+                              /*allowTypeAliasXRef*/true));
     ++numTypeWitnesses;
     return false;
   });
@@ -3118,7 +3124,10 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias));
+                                    addDeclRef(typeAlias,
+                                               /*forceSerialization*/false,
+                                               /*allowTypeAliasXRef*/true),
+                                    TypeID());
     break;
   }
   case TypeKind::NameAlias: {
@@ -3127,7 +3136,10 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias));
+                                    addDeclRef(typeAlias,
+                                               /*forceSerialization*/false,
+                                               /*allowTypeAliasXRef*/true),
+                                    addTypeRef(ty->getCanonicalType()));
     break;
   }
 

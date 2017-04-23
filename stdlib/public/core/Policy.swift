@@ -390,7 +390,9 @@ public typealias AnyClass = AnyObject.Type
 ///
 /// - SeeAlso: `OptionSet`
 @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
-public protocol BitwiseOperations {
+typealias BitwiseOperations = _BitwiseOperations
+
+public protocol _BitwiseOperations {
   /// Returns the intersection of bits set in the two arguments.
   ///
   /// The bitwise AND operator (`&`) returns a value that has each bit set to
@@ -495,7 +497,7 @@ public protocol BitwiseOperations {
 /// - Parameters:
 ///   - lhs: A value to update with the union of bits set in the two arguments.
 ///   - rhs: Another value.
-public func |= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
+public func |= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs | rhs
 }
 
@@ -506,7 +508,7 @@ public func |= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to update with the intersections of bits set in the two
 ///     arguments.
 ///   - rhs: Another value.
-public func &= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
+public func &= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs & rhs
 }
 
@@ -517,7 +519,7 @@ public func &= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to update with the bits that are set in exactly one of the
 ///     two arguments.
 ///   - rhs: Another value.
-public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
+public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs ^ rhs
 }
 

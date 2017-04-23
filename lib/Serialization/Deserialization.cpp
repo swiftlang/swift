@@ -1437,42 +1437,11 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     if (!isType)
       pathTrace.addType(filterTy);
 
-    bool retrying = false;
-    retry:
-
     baseModule->lookupQualified(ModuleType::get(baseModule), name,
                                 NL_QualifiedDefault | NL_KnownNoDependency,
                                 /*typeResolver=*/nullptr, values);
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
                  None, values);
-
-    // HACK HACK HACK: Omit-needless-words hack to try to cope with
-    // the "NS" prefix being added/removed. No "real" compiler mode
-    // has to go through this path, but it's an option we toggle for
-    // testing.
-    if (values.empty() && !retrying &&
-        (baseModule->getName().str() == "ObjectiveC" ||
-         baseModule->getName().str() == "Foundation")) {
-      if (name.str().startswith("NS")) {
-        if (name.str().size() > 2 && name.str() != "NSCocoaError") {
-          auto known = getKnownFoundationEntity(name.str());
-          if (!known) {
-            name = getContext().getIdentifier(name.str().substr(2));
-            retrying = true;
-            goto retry;
-          }
-        }
-      } else {
-        SmallString<16> buffer;
-        buffer += "NS";
-        buffer += name.str();
-        // FIXME: Try uppercasing for non-types.
-        name = getContext().getIdentifier(buffer);
-        retrying = true;
-        goto retry;
-      }
-    }
-
     break;
   }
 
@@ -3851,11 +3820,23 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   switch (recordID) {
   case decls_block::NAME_ALIAS_TYPE: {
     DeclID underlyingID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID);
+    TypeID canonicalTypeID;
+    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                 canonicalTypeID);
     auto alias = dyn_cast_or_null<TypeAliasDecl>(getDecl(underlyingID));
     if (!alias) {
       error();
       return nullptr;
+    }
+
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      if (Type expectedType = getType(canonicalTypeID)) {
+        if (!alias->getDeclaredInterfaceType()->isEqual(expectedType)) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType;
+          break;
+        }
+      }
     }
 
     typeOrOffset = alias->getDeclaredInterfaceType();
@@ -4425,7 +4406,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::UnboundGenericTypeLayout::readRecord(scratch,
                                                       genericID, parentID);
 
-    auto genericDecl = cast<NominalTypeDecl>(getDecl(genericID));
+    auto genericDecl = cast<GenericTypeDecl>(getDecl(genericID));
     typeOrOffset = UnboundGenericType::get(genericDecl, getType(parentID), ctx);
     break;
   }
@@ -4615,6 +4596,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
     auto second = getType(*rawIDIter++);
     auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    if (isa<TypeAliasDecl>(third) &&
+        third->getModuleContext() != getAssociatedModule() &&
+        !third->getDeclaredInterfaceType()->isEqual(second)) {
+      // Conservatively drop references to typealiases in other modules
+      // that may have changed. This may also drop references to typealiases
+      // that /haven't/ changed but just happen to have generics in them, but
+      // in practice having a declaration here isn't actually required by the
+      // rest of the compiler.
+      third = nullptr;
+    }
     typeWitnesses[first] = std::make_pair(second, third);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");

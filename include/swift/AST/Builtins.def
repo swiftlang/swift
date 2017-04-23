@@ -463,6 +463,8 @@ BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
+/// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
+BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
 
 /// unreachable has type () -> Never
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)

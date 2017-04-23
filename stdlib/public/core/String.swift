@@ -353,17 +353,6 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   }
 }
 
-extension String : ExpressibleByUnicodeScalarLiteral {
-  /// Creates an instance initialized to the given Unicode scalar value.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal that contains a single
-  /// Unicode scalar value.
-  public init(unicodeScalarLiteral value: String) {
-    self = value
-  }
-}
-
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @_inlineable
   @effects(readonly)
@@ -377,18 +366,6 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
       input: UnsafeBufferPointer(
         start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
         count: Int(utf8CodeUnitCount)))
-  }
-}
-
-extension String : ExpressibleByExtendedGraphemeClusterLiteral {
-  /// Creates an instance initialized to the given extended grapheme cluster
-  /// literal.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal containing a single
-  /// extended grapheme cluster.
-  public init(extendedGraphemeClusterLiteral value: String) {
-    self = value
   }
 }
 

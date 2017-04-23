@@ -742,7 +742,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType, genericSig,
                             QueryTypeSubstitutionMap{subs},
-                            LookUpConformanceInModule{dc->getParentModule()},
+                            LookUpConformance(*this, dc),
                             unsatisfiedDependency);
 
     switch (result) {
@@ -757,7 +757,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformanceInModule(dc->getParentModule()),
+                                LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
 
   if (isa<NominalTypeDecl>(decl)) {

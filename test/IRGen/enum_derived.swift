@@ -27,8 +27,8 @@ enum E {
 
 // CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @_T012enum_derived1EO9hashValueSifg(i8)
 // CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @_T012enum_derived1EO9hashValueSifg(i8)
-// CHECK: %1 = zext i8 %0 to i{{.*}}
-// CHECK: ret i{{.*}} %1
+// CHECK: [[R:%.*]] = zext i8 %0 to i{{.*}}
+// CHECK: ret i{{.*}} [[R]]
 
 // Derived conformances from extensions
 // The actual enums are in Inputs/def_enum.swift

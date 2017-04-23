@@ -1539,7 +1539,7 @@ public:
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr,
+  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
                                       bool requireResultType = false);
 
   /// \brief Type check whether the given type declaration includes members of
@@ -1818,6 +1818,23 @@ public:
   conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
+
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance through a particular declaration context using the given
+  /// type checker.
+  class LookUpConformance {
+    TypeChecker &tc;
+    DeclContext *dc;
+
+  public:
+    explicit LookUpConformance(TypeChecker &tc, DeclContext *dc)
+      : tc(tc), dc(dc) { }
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const;
+  };
 
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);

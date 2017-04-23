@@ -153,8 +153,7 @@ public:
     if (InsertPt == BB->end())
       return;
     // Set the opened archetype context from the instruction.
-    this->getOpenedArchetypes().addOpenedArchetypeOperands(
-        InsertPt->getTypeDependentOperands());
+    addOpenedArchetypeOperands(&*InsertPt);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -200,10 +199,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Opened archetypes handling
   //===--------------------------------------------------------------------===//
-  void addOpenedArchetypeOperands(SILInstruction *I) {
-    getOpenedArchetypes().addOpenedArchetypeOperands(
-        I->getTypeDependentOperands());
-  }
+  void addOpenedArchetypeOperands(SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
   // Type remapping
@@ -488,6 +484,14 @@ public:
            || LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
+  }
+  
+  KeyPathInst *createKeyPath(SILLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
+                             SILType Ty) {
+    return insert(KeyPathInst::create(getSILDebugLocation(Loc),
+                                      Pattern, Subs, Ty, F));
   }
 
   /// Convenience function for calling emitLoad on the type lowering for

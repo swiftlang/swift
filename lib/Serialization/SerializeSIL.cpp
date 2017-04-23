@@ -1784,6 +1784,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
+  case ValueKind::KeyPathInst:
     llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.
