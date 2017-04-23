@@ -1940,6 +1940,11 @@ public:
                             NameLookupOptions options
                               = defaultMemberLookupOptions);
 
+  /// \brief Check whether the given declaration can be written as a
+  /// member of the given base type.
+  bool isUnsupportedMemberTypeAccess(Type type,
+                                     TypeDecl *typeDecl);
+
   /// \brief Look up a member type within the given type.
   ///
   /// This routine looks for member types with the given name within the

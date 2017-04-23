@@ -308,6 +308,46 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
+bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
+  auto memberType = typeDecl->getDeclaredInterfaceType();
+
+  // We don't allow lookups of a non-generic typealias of an unbound
+  // generic type, because we have no way to model such a type in the
+  // AST.
+  //
+  // For generic typealiases, the typealias itself has an unbound
+  // generic form whose parent type can be another unbound generic
+  // type.
+  //
+  // FIXME: Could lift this restriction once we have sugared
+  // "member types".
+  if (type->is<UnboundGenericType>() &&
+      isa<TypeAliasDecl>(typeDecl) &&
+      cast<TypeAliasDecl>(typeDecl)->getGenericParams() == nullptr &&
+      memberType->hasTypeParameter()) {
+    return true;
+  }
+
+  if (type->is<UnboundGenericType>() &&
+      isa<AssociatedTypeDecl>(typeDecl)) {
+    return true;
+  }
+
+  // We don't allow lookups of an associated type or typealias of an
+  // existential type, because we have no way to represent such types.
+  if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (type->isExistentialType() &&
+        (isa<TypeAliasDecl>(typeDecl) ||
+         isa<AssociatedTypeDecl>(typeDecl))) {
+      if (memberType->hasTypeParameter()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
                                                Type type, Identifier name,
                                                NameLookupOptions options) {
@@ -338,29 +378,21 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
       continue;
 
-    // If we're looking up a member of a protocol, we must take special care.
+    auto memberType = typeDecl->getDeclaredInterfaceType();
+
+    if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
+      // Add the type to the result set, so that we can diagnose the
+      // reference instead of just saying the member does not exist.
+      if (types.insert(memberType->getCanonicalType()).second)
+        result.Results.push_back({typeDecl, memberType});
+
+      continue;
+    }
+
+    // If we're looking up an associated type of a concrete type,
+    // record it later for conformance checking; we might find a more
+    // direct typealias with the same name later.
     if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-      auto memberType = typeDecl->getDeclaredInterfaceType();
-
-      // We don't allow lookups of an associated type or typealias of an
-      // existential type, because we have no way to represent such types.
-      //
-      // This is diagnosed further on down in resolveNestedIdentTypeComponent().
-      if (type->isExistentialType() &&
-          (isa<TypeAliasDecl>(typeDecl) ||
-           isa<AssociatedTypeDecl>(typeDecl))) {
-        if (memberType->hasTypeParameter()) {
-          // If we haven't seen this type result yet, add it to the result set.
-          if (types.insert(memberType->getCanonicalType()).second)
-            result.Results.push_back({typeDecl, memberType});
-
-          continue;
-        }
-      }
-
-      // If we're looking up an associated type of a concrete type,
-      // record it later for conformance checking; we might find a more
-      // direct typealias with the same name later.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter()) {
@@ -381,8 +413,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                              typeDecl, type);
+    memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                         typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)

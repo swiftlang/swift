@@ -1449,19 +1449,21 @@ static Type resolveNestedIdentTypeComponent(
     member = memberTypes.back().first;
   }
 
-  if (parentTy->isExistentialType() && isa<AssociatedTypeDecl>(member)) {
-    if (diagnoseErrors)
-      TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
-                  comp->getIdentifier());
-
-    return ErrorType::get(TC.Context);
-  }
-
-  if (parentTy->isExistentialType() && isa<TypeAliasDecl>(member) &&
-      memberType->hasTypeParameter()) {
-    if (diagnoseErrors)
-      TC.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
-                  comp->getIdentifier());
+  // Diagnose invalid cases.
+  if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
+    if (diagnoseErrors) {
+      if (parentTy->is<UnboundGenericType>())
+        diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
+      else if (parentTy->isExistentialType() &&
+               isa<AssociatedTypeDecl>(member)) {
+        TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
+                    comp->getIdentifier());
+      } else if (parentTy->isExistentialType() &&
+                 isa<TypeAliasDecl>(member)) {
+        TC.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
+                    comp->getIdentifier());
+      }
+    }
 
     return ErrorType::get(TC.Context);
   }
@@ -3167,7 +3169,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   }
 
   auto memberType = member->getDeclaredInterfaceType();
-  if (!baseTy)
+  if (!baseTy || !memberType->hasTypeParameter())
     return memberType;
 
   auto subs = baseTy->getContextSubstitutionMap(
