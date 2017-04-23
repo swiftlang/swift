@@ -1355,7 +1355,7 @@ static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *end = Bytes.end(), *start = end;
 
-  // Work back from the end to find whitespace to strip
+  // Work back from the end to find whitespace to strip.
   while (start > Bytes.begin() && isWhitespace(start[-1])) {
     switch (*--start) {
     case '\n':
@@ -1408,7 +1408,7 @@ void Lexer::lexStringLiteral() {
   bool wasWhitespace = false, allWhitespace = true, wasAllWhitespace = true;
   unsigned Modifiers = 0;
 
-  // Is this the start of a multiline string litersl?
+  // Is this the start of a multiline string literal?
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
     Modifiers |= StringLiteralMultiline;
     CurPtr += 2;
@@ -1689,9 +1689,12 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     IndentStripped = Bytes;
     size_t pos = 0;
     while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
-      bool removeNewLine = (pos == 0 && (Modifiers & StringLiteralFirstSegment)) ||
-            ((Modifiers & StringLiteralLastSegment) &&
-             pos + ToReplace.size() == IndentStripped.size());
+      bool removeNewLine =
+        // Strip empty line at beginning.
+        (pos == 0 && (Modifiers & StringLiteralFirstSegment)) ||
+        // Strip trailing line ending.
+        ((Modifiers & StringLiteralLastSegment) &&
+         pos + ToReplace.size() == IndentStripped.size());
       IndentStripped.replace(pos, ToReplace.size(), removeNewLine ? "" : "\n");
       pos++;
     }

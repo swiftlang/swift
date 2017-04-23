@@ -14,41 +14,103 @@ func delimit(_ str: String) -> String {
 
 // CHECK: -1-
 print("-1-")
-// CHECK-NEXT: {{^}}<Six
-// CHECK-NEXT: {{^}}""Zeta"">
+// CHECK-NEXT: {{^}}<One
+// CHECK-NEXT: {{^}}""Alpha"">
 print(delimit("""
-    Six
-    ""Zeta""
+    One
+    ""Alpha""
     """
 ))
 
 // CHECK: -2-
 print("-2-")
-// CHECK-NEXT: {{^}}<  Eight
-// CHECK-NEXT: {{^}}Iota>
+// CHECK-NEXT: {{^}}<  Two
+// CHECK-NEXT: {{^}}Beta>
 print(delimit("""
-    Eight
-  Iota
+    Two
+  Beta
   """
 ))
 
 // CHECK: -3-
 print("-3-")
-// CHECK-NEXT: {{^}}<  Nine
-// CHECK-NEXT: {{^}}  Kappa>
+// CHECK-NEXT: {{^}}<  Three
+// CHECK-NEXT: {{^}}  Gamma>
 print(delimit("""
-    Nine
-    Kappa
+    Three
+    Gamma
   """
 ))
 
 // CHECK: -4-
 print("-4-")
-// CHECK-NEXT: {{^}}<    Ten
-// CHECK-NEXT: {{^}}    Lambda>
+// CHECK-NEXT: {{^}}<    Four
+// CHECK-NEXT: {{^}}    Delta>
 print(delimit("""
-    Ten
-    Lambda
+    Four
+    Delta
+"""))
+
+// CHECK: -5-
+print("-5-")
+// CHECK-NEXT: {{^}}<Five
+// CHECK-NEXT: {{^}}
+// CHECK-NEXT: {{^}}
+// CHECK-NEXT: {{^}}Epsilon>
+print(delimit("""
+    Five\n
+
+    Epsilon
+    """))
+
+// CHECK: -6-
+print("-6-")
+// CHECK-NEXT: {{^}}<Six
+// CHECK-NEXT: {{^}}Zeta
+// CHECK-NEXT: {{^}}>
+print(delimit("""
+    Six
+    Zeta
+
+    """))
+
+// CHECK: -7-
+print("-7-")
+// CHECK-NEXT: {{^}}<Seven
+// CHECK-NEXT: {{^}}Eta
+// CHECK-NEXT: {{^}}>
+print(delimit("""
+    Seven
+    Eta\n
+    """))
+
+// CHECK: -8-
+print("-8-")
+// CHECK-NEXT: {{^}}<"""
+// CHECK-NEXT: {{^}}"""
+// CHECK-NEXT: {{^}}"""
+// CHECK-NEXT: {{^}}Iota>
+print(delimit("""
+    \"""
+    "\""
+    ""\"
+    Iota
+    """))
+
+// CHECK: -9-
+print("-9-")
+// CHECK-NEXT: {{^}}< Nine
+// CHECK-NEXT: {{^}}Kappa>
+print(delimit("""
+     \("Nine")
+    Kappa
+    """))
+
+// CHECK: -10-
+print("-10-")
+// CHECK-NEXT: {{^}}<\>
+print(delimit("""
+\\
 """))
 
 // ===---------- Done --------===
