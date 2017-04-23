@@ -388,3 +388,19 @@ func pets<T>(fur: T) -> Claws<Kitten>.Fangs<T> {
 func test() {
   let _: Claws<Kitten>.Fangs<Puppy> = pets(fur: Puppy())
 }
+
+// https://bugs.swift.org/browse/SR-4379
+extension OuterGeneric.MidNonGeneric {
+  func doStuff() -> OuterGeneric {
+    return OuterGeneric()
+  }
+
+  func doMoreStuff() -> OuterGeneric.MidNonGeneric {
+    return OuterGeneric.MidNonGeneric()
+  }
+
+  func doMoreStuffWrong() -> Self {
+    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'OuterGeneric.MidNonGeneric'?}}
+
+  }
+}

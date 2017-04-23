@@ -287,11 +287,11 @@ ERROR(extension_type_expected,none,
 
 // TypeAlias
 ERROR(expected_equal_in_typealias,PointsToFirstBadToken,
-      "expected '=' in typealias declaration", ())
+      "expected '=' in type alias declaration", ())
 ERROR(expected_type_in_typealias,PointsToFirstBadToken,
-      "expected type in typealias declaration", ())
+      "expected type in type alias declaration", ())
 ERROR(expected_type_in_associatedtype,PointsToFirstBadToken,
-      "expected type in associatedtype declaration", ())
+      "expected type in associated type declaration", ())
 ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
       "associated types may not have a generic parameter list", ())
 
@@ -859,7 +859,7 @@ ERROR(expected_rbrace_in_brace_stmt,none,
 
 /// Associatedtype Statement
 ERROR(typealias_inside_protocol_without_type,none,
-      "typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement", ())
+      "type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement", ())
 ERROR(associatedtype_outside_protocol,none,
       "associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement", ())
 

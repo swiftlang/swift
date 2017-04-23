@@ -53,14 +53,14 @@ func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> =
 
 // Incompatible concrete typealias types are flagged as such
 protocol P3 {
-    typealias T = Int // expected-error{{typealias 'T' requires types 'Q3.T' (aka 'Float') and 'Int' to be the same}}
+    typealias T = Int // expected-error{{type alias 'T' requires types 'Q3.T' (aka 'Float') and 'Int' to be the same}}
 }
 protocol Q3: P3 {
     typealias T = Float
 }
 
 protocol P3_1 {
-    typealias T = Float // expected-error{{typealias 'T' requires types 'P3.T' (aka 'Int') and 'Float' to be the same}}
+    typealias T = Float // expected-error{{type alias 'T' requires types 'P3.T' (aka 'Int') and 'Float' to be the same}}
 }
 protocol Q3_1: P3, P3_1 {}
 
