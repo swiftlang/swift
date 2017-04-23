@@ -42,8 +42,19 @@ public:
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
-    TC.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
-      .fixItRemove(attr->getRangeWithAt());
+    assert(!D->hasClangNode() && "Clang imported propagated a bogus attribute");
+    if (!D->hasClangNode()) {
+      SourceLoc loc = attr->getLocation();
+      assert(loc.isValid() && "Diagnosing attribute with invalid location");
+      if (loc.isInvalid()) {
+        loc = D->getLoc();
+      }
+      if (loc.isValid()) {
+        TC.diagnose(loc, std::forward<ArgTypes>(Args)...)
+          .fixItRemove(attr->getRangeWithAt());
+      }
+    }
+
     attr->setInvalid();
   }
 
