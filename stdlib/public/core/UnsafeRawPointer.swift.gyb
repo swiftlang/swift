@@ -52,7 +52,7 @@
 ///
 %if mutable:
 /// You can use methods like `initializeMemory(as:from:)` and
-/// `moveInitializeMemory(as:from:count)` to bind raw memory to a type and
+/// `moveInitializeMemory(as:from:count:)` to bind raw memory to a type and
 /// initialize it with a value or series of values. To bind uninitialized
 /// memory to a type without initializing it, use the `bindMemory(to:count:)`
 /// method. These methods all return typed pointers for further typed access
