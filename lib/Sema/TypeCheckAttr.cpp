@@ -306,10 +306,8 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
   const FuncDecl *FD = cast<FuncDecl>(D);
-  if (!FD->getDeclContext()->getAsClassOrClassExtensionContext() ||
-      FD->isStatic() || FD->isAccessor())
+  if (!FD->isPotentialIBActionTarget())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
-
 }
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
