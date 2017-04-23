@@ -409,6 +409,15 @@ extension String {
 }
 
 extension String {
+  // This is needed because of the issue described in SR-4660 which causes
+  // source compatibility issues when String becomes a collection
+  @_tranparent
+  public func max<T : Comparable>(_ x: T, _ y: T) -> T {
+    return Swift.max(x,y)
+  }
+}
+
+extension String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a seqeunce of strings")
   public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
     where S.Iterator.Element == String {
