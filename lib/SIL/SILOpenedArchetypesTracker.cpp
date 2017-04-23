@@ -39,11 +39,10 @@ bool SILOpenedArchetypesTracker::hasUnresolvedOpenedArchetypeDefinitions() {
   return false;
 }
 
-bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
-  bool Registered = false;
+void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
   // Nothing else to be done if the type does not contain an opened archetype.
   if (!Ty || !Ty->hasOpenedExistential())
-    return Registered;
+    return;
 
   // Find all opened existentials used by this type and check if their
   // definitions are known.
@@ -65,39 +64,33 @@ bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
     // archetype can be constructed.
     addOpenedArchetypeDef(archetypeTy, Placeholder);
   });
-  return Registered;
 }
 
 // Register archetypes opened by a given instruction.
 // Can be used to incrementally populate the mapping, e.g.
 // if it is done when performing a scan of all instructions
 // inside a function.
-bool SILOpenedArchetypesTracker::registerOpenedArchetypes(
+void SILOpenedArchetypesTracker::registerOpenedArchetypes(
     const SILInstruction *I) {
   assert((!I->getParent() || I->getFunction() == &F) &&
          "Instruction does not belong to a proper SILFunction");
   auto Archetype = getOpenedArchetypeOf(I);
-  if (!Archetype)
-    return false;
-  addOpenedArchetypeDef(Archetype, I);
-  return true;
+  if (Archetype)
+    addOpenedArchetypeDef(Archetype, I);
 }
 
 // Register opened archetypes whose definitions are referenced by
 // the typedef operands of this instruction.
-bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
+void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
     const SILInstruction *I) {
   assert((!I->getParent() || I->getFunction() == &F) &&
          "Instruction does not belong to a proper SILFunction");
-  bool Registered = false;
   for (auto &Op : I->getTypeDependentOperands()) {
     auto OpenedArchetypeDef = Op.get();
     if (auto *DefInst = dyn_cast<SILInstruction>(OpenedArchetypeDef)) {
       addOpenedArchetypeDef(getOpenedArchetypeOf(DefInst), OpenedArchetypeDef);
-      Registered = true;
     }
   }
-  return Registered;
 }
 
 // Unregister archetypes opened by a given instruction.

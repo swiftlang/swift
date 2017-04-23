@@ -153,7 +153,8 @@ public:
     if (InsertPt == BB->end())
       return;
     // Set the opened archetype context from the instruction.
-    addOpenedArchetypeOperands(&*InsertPt);
+    this->getOpenedArchetypes().addOpenedArchetypeOperands(
+        InsertPt->getTypeDependentOperands());
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -199,7 +200,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Opened archetypes handling
   //===--------------------------------------------------------------------===//
-  void addOpenedArchetypeOperands(SILInstruction *I);
+  void addOpenedArchetypeOperands(SILInstruction *I) {
+    getOpenedArchetypes().addOpenedArchetypeOperands(
+        I->getTypeDependentOperands());
+  }
 
   //===--------------------------------------------------------------------===//
   // Type remapping
