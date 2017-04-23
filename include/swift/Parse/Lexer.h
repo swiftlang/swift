@@ -403,7 +403,8 @@ public:
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
-                                           unsigned Modifiers = 0, const std::string &ToReplace = "");
+                                           unsigned Modifiers = 0,
+                                           const std::string &ToReplace = "");
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
@@ -512,7 +513,7 @@ private:
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker();
 
-  // new for multiline string literals
+  /// New for multiline string literals
   void validateIndents(const Token &Str);
 };
   

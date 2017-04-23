@@ -47,6 +47,7 @@ enum StringLiteralModifiers : unsigned {
 
   // pseudo option not in Token.h
   StringLiteralFirstSegment = 1<<1,
+  StringLiteralLastSegment = 1<<2
 };
 
 //===----------------------------------------------------------------------===//
@@ -1179,7 +1180,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     return ~1U;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
-    if (Modifiers & StringLiteralMultiline) // ... unless they are mutli-line
+    if (Modifiers & StringLiteralMultiline) // ... unless they are mutliline
       return CurPtr[-1];
     if (EmitDiagnostics)
       diagnose(CurPtr-1, diag::lex_unterminated_string);
@@ -1207,14 +1208,14 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '"': ++CurPtr; return '"';
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
-  case '\n':
-    LLVM_FALLTHROUGH;
+
+  // Escaped newline (SE-0173?)
   case '\r':
-    if (Modifiers & StringLiteralMultiline)
-      return *CurPtr++;
-    if (EmitDiagnostics)
-      diagnose(CurPtr, diag::lex_invalid_escape);
-    return ~1U;
+    if (CurPtr[1] == '\n')
+      ++CurPtr;
+    LLVM_FALLTHROUGH;
+  case '\n':
+    return *CurPtr++;
 
   case 'u': {  //  \u HEX HEX HEX HEX
     ++CurPtr;
@@ -1340,7 +1341,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
   }
 }
 
-/// extract content of string literal from inside quotes
+/// Extract content of string literal from inside quotes
 static StringRef getStringLiteralContent(const Token &Str) {
   StringRef Bytes = Str.getText();
   Bytes = Bytes.drop_front().drop_back();
@@ -1353,29 +1354,31 @@ static StringRef getStringLiteralContent(const Token &Str) {
   return Bytes;
 }
 
-/// determine contents of literal to be normalised - either
+/// Determine contents of literal to be normalized - either
 /// to strip indenting or normalise line endings to a single \n
 static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *end = Bytes.end(), *start = end;
 
-  // work back from the end to find whitespace to strip
+  // Work back from the end to find whitespace to strip
   while (start > Bytes.begin() && isWhitespace(start[-1])) {
-    if (*--start == '\n' || *start == '\r') {
-      if (start[-1] == '\r')
-        start--;
-      // return it to be replaced including line sep
-      return std::string(start, end - start);
+    switch (*--start) {
+      case '\n':
+        if (start[-1] == '\r')
+          --start;
+        LLVM_FALLTHROUGH;
+      case '\r':
+        return std::string(start, end-start);
     }
   }
 
-  // are there windows line endings in the source, if so return it to be replaced
-  const char *windowsLinesep = strnstr(Bytes.begin(), "\r\n", Bytes.end()-Bytes.begin());
-  return windowsLinesep != nullptr ? "\r\n" : "\n";
+  // Are there non UNIX line endings in the source, if so return it to be replaced
+  return Bytes.find("\r\n") != StringRef::npos ? "\r\n"
+    : Bytes.find("\r") != StringRef::npos ? "\r" : "\n";
 }
 
 /// validateIndents:
-/// check contents of string literal has consistent indentation
+/// Check contents of string literal has consistent indentation
 /// for removal and contains equivalent line endings (beginnings)
 void Lexer::validateIndents(const Token &Str) {
   std::string ToReplace = getTrailingIndentOrWindowsLineEnding(Str);
@@ -1384,33 +1387,38 @@ void Lexer::validateIndents(const Token &Str) {
 
   StringRef Bytes = getStringLiteralContent(Str);
   const char *BytesPtr = Bytes.begin();
-  while ((BytesPtr = (const char *)memchr(BytesPtr, '\n', Bytes.end()-BytesPtr)) != nullptr) {
-    const char *NextPtr = BytesPtr + 1;
-    if (*NextPtr != '\n' && *NextPtr != '\r') {
-      if (BytesPtr[-1] == '\r')
-        BytesPtr--;
-      if (StringRef(BytesPtr, ToReplace.size()) != ToReplace)
-        diagnose(NextPtr, diag::lex_ambiguous_string_indent);
+  size_t pos = 0;
+  while ((pos = Bytes.find('\n', pos)) != StringRef::npos) {
+    size_t nextpos = pos + 1;
+    if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
+      if (BytesPtr[pos-1] == '\r')
+        pos--;
+      if (StringRef(BytesPtr + pos, ToReplace.size()) != ToReplace)
+        diagnose(BytesPtr + nextpos, diag::lex_ambiguous_string_indent);
     }
-    BytesPtr = NextPtr;
+    pos = nextpos;
   }
 }
 
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
+///   string_literal ::= ["]["]["].*["]["]["] - new multiline
 void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
 
-  bool wasErroneous = false, wasWhitespace = false, allWhitespace = true;
+  bool wasErroneous = false;
+  bool wasWhitespace = false, allWhitespace = true, wasAllWhitespace = true;
   unsigned Modifiers = 0;
 
-  // is this the start of a multiline string litersl
+  // Is this the start of a multiline string litersl?
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
     Modifiers |= StringLiteralMultiline;
     CurPtr += 2;
+    if (*CurPtr != '\n' && *CurPtr != '\r')
+      diagnose(CurPtr, diag::lex_illegal_multiline_string_start);
   }
 
   while (true) {
@@ -1436,15 +1444,20 @@ void Lexer::lexStringLiteral() {
         diagnose(TokStart, diag::lex_unterminated_string);
         return formToken(tok::unknown, TokStart);
       }
-      // warning for trailing whitespace
+      // Warning for trailing whitespace
       else if (wasWhitespace && !allWhitespace)
         diagnose(CurPtr, diag::lex_trailing_multiline_whitespace)
           .fixItReplaceChars(getSourceLoc(CurPtr), getSourceLoc(CurPtr), "\\n\\");
+      wasAllWhitespace = allWhitespace = true;
       wasWhitespace = false;
-      allWhitespace = true;
+    }
+    else if (*CurPtr == '\\' && (CurPtr[1] == '\r' || CurPtr[1] == '\n')) {
+      wasAllWhitespace = allWhitespace = true;
+      wasWhitespace = false;
     }
     else {
       wasWhitespace = *CurPtr == ' ' || *CurPtr == '\t';
+      wasAllWhitespace = allWhitespace;
       if (!wasWhitespace)
         allWhitespace = false;
     }
@@ -1496,6 +1509,8 @@ void Lexer::lexStringLiteral() {
       // is this the end of a multiline string literal
       if (Modifiers & StringLiteralMultiline) {
         if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr + 2) != '"') {
+          if (!wasAllWhitespace)
+            diagnose(CurPtr, diag::lex_illegal_multiline_string_end);
           CurPtr += 2;
           formToken(tok::string_literal, TokStart, Modifiers);
           validateIndents(NextToken);
@@ -1674,13 +1689,11 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
                                          unsigned Modifiers, const std::string &ToReplace) {
 
-  // The next section of code is somewhat overcooked.
-  // It is a global replace of the string returned by
-  // getTrailingIndentOrWindowsLineEnding(token) which:
-  // Strips any indent that corresponds to the indent
-  // of the multi-line string terminating line and
-  // normalises line endings in the source to \n.
-  // It also removes any intial empty line.
+  // The next section of code is somewhat overcooked. It is a global replace of
+  // the string returned by getTrailingIndentOrWindowsLineEnding(token) which:
+  // Strips any indent that corresponds to the indent of the multiline string
+  // terminating line and normalises line endings in the source to \n. It also
+  // removes any intial (and final) empty line.
 
   std::string IndentStripped;
 
@@ -1688,10 +1701,9 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     IndentStripped = Bytes;
     size_t pos = 0;
     while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
-      bool removeInitialNewLine = pos == 0 && (Modifiers & StringLiteralFirstSegment);
-      IndentStripped.replace(pos, ToReplace.size(), removeInitialNewLine ? "" : "\n");
-      if ((removeInitialNewLine || !(Modifiers & StringLiteralFirstSegment)) && ToReplace == "\n")
-        break;
+      bool removeNewLine = (pos == 0 && (Modifiers & StringLiteralFirstSegment)) ||
+            ((Modifiers & StringLiteralLastSegment) && pos + ToReplace.size() == IndentStripped.size());
+      IndentStripped.replace(pos, ToReplace.size(), removeNewLine ? "" : "\n");
       pos++;
     }
     Bytes = IndentStripped;
@@ -1724,11 +1736,11 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '"': TempString.push_back('"'); continue;
     case '\'': TempString.push_back('\''); continue;
     case '\\': TempString.push_back('\\'); continue;
-      
-    // multiline with escaped newline, gobble it
+
+    // Multiline with escaped newline, skip it
     case '\r':
       if (*BytesPtr == '\n')
-        BytesPtr++;
+        ++BytesPtr;
       continue;
     case '\n':
       continue;
@@ -1821,6 +1833,7 @@ void Lexer::getStringLiteralSegments(
     SegmentStartPtr = BytesPtr = End;
   }
 
+  Modifiers |= StringLiteralLastSegment;
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr, Modifiers, ToReplace));
