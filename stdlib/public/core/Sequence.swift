@@ -380,7 +380,7 @@ public protocol Sequence {
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
-  /// In this example, `filter` is used to include only names shorter than
+  /// In this example, `filter(_:)` is used to include only names shorter than
   /// five characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
@@ -391,7 +391,7 @@ public protocol Sequence {
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
-  /// - Returns: An array of the elements that `includeElement` allowed.
+  /// - Returns: An array of the elements that `isIncluded` allowed.
   func filter(
     _ isIncluded: (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element]
@@ -862,7 +862,7 @@ extension Sequence {
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
-  /// In this example, `filter` is used to include only names shorter than
+  /// In this example, `filter(_:)` is used to include only names shorter than
   /// five characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
@@ -873,7 +873,7 @@ extension Sequence {
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
-  /// - Returns: An array of the elements that `includeElement` allowed.
+  /// - Returns: An array of the elements that `isIncluded` allowed.
   @_inlineable
   public func filter(
     _ isIncluded: (Iterator.Element) throws -> Bool
