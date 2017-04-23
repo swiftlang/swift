@@ -361,3 +361,30 @@ struct OuterWithConstraint<T : HasAssocType> {
 extension OuterWithConstraint.InnerWithConstraint {
   func foo<V>(v: V) where T.FirstAssocType == U.SecondAssocType {}
 }
+
+// Name lookup within a 'where' clause should find generic parameters
+// of the outer type.
+extension OuterGeneric.MidGeneric where D == Int, F == String {
+  func doStuff() -> (D, F) {
+    return (100, "hello")
+  }
+}
+
+// https://bugs.swift.org/browse/SR-4672
+protocol ExpressibleByCatLiteral {}
+protocol ExpressibleByDogLiteral {}
+
+struct Kitten : ExpressibleByCatLiteral {}
+struct Puppy : ExpressibleByDogLiteral {}
+
+struct Claws<A: ExpressibleByCatLiteral> {
+  struct Fangs<B: ExpressibleByDogLiteral> { }
+}
+
+func pets<T>(fur: T) -> Claws<Kitten>.Fangs<T> {
+  return Claws<Kitten>.Fangs<T>()
+}
+
+func test() {
+  let _: Claws<Kitten>.Fangs<Puppy> = pets(fur: Puppy())
+}

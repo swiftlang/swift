@@ -1023,6 +1023,99 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   return ErrorType::get(tc.Context);
 }
 
+static Type
+resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
+                                  ComponentIdentTypeRepr *comp,
+                                  TypeResolutionOptions options,
+                                  bool diagnoseErrors,
+                                  GenericTypeResolver *resolver,
+                                  UnsatisfiedDependency *unsatisfiedDependency);
+
+static Type
+resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
+                                 ComponentIdentTypeRepr *comp,
+                                 TypeResolutionOptions options,
+                                 bool diagnoseErrors,
+                                 GenericTypeResolver *resolver,
+                                 UnsatisfiedDependency *unsatisfiedDependency) {
+  if (!DC->isInnermostContextGeneric())
+    return Type();
+
+  auto *genericParams = DC->getGenericParamsOfContext();
+
+  if (!isa<ExtensionDecl>(DC)) {
+    auto matchingParam =
+      std::find_if(genericParams->begin(), genericParams->end(),
+                   [comp](const GenericTypeParamDecl *param) {
+                     return param->getFullName().matchesRef(comp->getIdentifier());
+                   });
+
+    if (matchingParam == genericParams->end())
+      return Type();
+
+    comp->setValue(*matchingParam);
+    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                             diagnoseErrors, resolver,
+                                             unsatisfiedDependency);
+  }
+
+  // If we are inside an extension of a nested type, we have to visit
+  // all outer parameter lists. Otherwise, we will visit them when
+  // name lookup goes ahead and checks the outer DeclContext.
+  for (auto *outerParams = genericParams;
+       outerParams != nullptr;
+       outerParams = outerParams->getOuterParameters()) {
+    auto matchingParam =
+      std::find_if(outerParams->begin(), outerParams->end(),
+                   [comp](const GenericTypeParamDecl *param) {
+                     return param->getFullName().matchesRef(comp->getIdentifier());
+                   });
+
+    if (matchingParam != outerParams->end()) {
+      comp->setValue(*matchingParam);
+      return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                               diagnoseErrors, resolver,
+                                               unsatisfiedDependency);
+    }
+  }
+
+  // If the lookup occurs from within a trailing 'where' clause of
+  // a constrained extension, also look for associated types.
+  if (genericParams->hasTrailingWhereClause() &&
+      comp->getIdLoc().isValid() &&
+      TC.Context.SourceMgr.rangeContainsTokenLoc(
+        genericParams->getTrailingWhereClauseSourceRange(),
+          comp->getIdLoc())) {
+    // We need to be able to perform qualified lookup into the given
+    // declaration context.
+    if (unsatisfiedDependency &&
+        (*unsatisfiedDependency)(
+          requestQualifiedLookupInDeclContext({ DC, comp->getIdentifier(),
+                comp->getIdLoc() })))
+      return Type();
+
+    auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+    SmallVector<ValueDecl *, 4> decls;
+    if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
+                            comp->getIdentifier(),
+                            NL_QualifiedDefault|NL_ProtocolMembers,
+                            &TC,
+                            decls)) {
+      for (const auto decl : decls) {
+        // FIXME: Better ambiguity handling.
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+          comp->setValue(assocType);
+          return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                                   diagnoseErrors, resolver,
+                                                   unsatisfiedDependency);
+        }
+      }
+    }
+  }
+
+  return Type();
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 ///
@@ -1070,59 +1163,11 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // For lookups within the generic signature, look at the generic
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TR_GenericSignature)) {
-    GenericParamList *genericParams = nullptr;
-
-    if (DC->isInnermostContextGeneric())
-      genericParams = DC->getGenericParamsOfContext();
-
-    if (genericParams) {
-      auto matchingParam =
-          std::find_if(genericParams->begin(), genericParams->end(),
-                       [comp](const GenericTypeParamDecl *param) {
-        return param->getFullName().matchesRef(comp->getIdentifier());
-      });
-
-      if (matchingParam != genericParams->end()) {
-        comp->setValue(*matchingParam);
-        return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                 diagnoseErrors, resolver,
-                                                 unsatisfiedDependency);
-      }
-    }
-
-    // If the lookup occurs from within a trailing 'where' clause of
-    // a constrained extension, also look for associated types.
-    if (genericParams && genericParams->hasTrailingWhereClause() &&
-        isa<ExtensionDecl>(DC) && comp->getIdLoc().isValid() &&
-        TC.Context.SourceMgr.rangeContainsTokenLoc(
-          genericParams->getTrailingWhereClauseSourceRange(),
-          comp->getIdLoc())) {
-      // We need to be able to perform qualified lookup into the given
-      // declaration context.
-      if (unsatisfiedDependency &&
-          (*unsatisfiedDependency)(
-            requestQualifiedLookupInDeclContext({ DC, comp->getIdentifier(),
-                                                  comp->getIdLoc() })))
-        return nullptr;
-
-      auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-      SmallVector<ValueDecl *, 4> decls;
-      if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
-                              comp->getIdentifier(),
-                              NL_QualifiedDefault|NL_ProtocolMembers,
-                              &TC,
-                              decls)) {
-        for (const auto decl : decls) {
-          // FIXME: Better ambiguity handling.
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-            comp->setValue(assocType);
-            return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                     diagnoseErrors, resolver,
-                                                     unsatisfiedDependency);
-          }
-        }
-      }
-    }
+    Type type = resolveGenericSignatureComponent(
+      TC, DC, comp, options, diagnoseErrors, resolver,
+      unsatisfiedDependency);
+    if (type)
+      return type;
 
     if (!DC->isCascadingContextForLookup(/*excludeFunctions*/false))
       options |= TR_KnownNonCascadingDependency;
@@ -1138,7 +1183,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         requestUnqualifiedLookupInDeclContext({ lookupDC, 
                                                 comp->getIdentifier(),
                                                 comp->getIdLoc() })))
-    return nullptr;
+    return Type();
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TR_KnownNonCascadingDependency))
