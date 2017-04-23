@@ -114,13 +114,11 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     _abstract()
   }
   
-  // FIXME: This should return Self, but that breaks the closure specializer.
-  // rdar://problem/31725007
   public // @testable
   static func _create(
     capacityInBytes bytes: Int,
     initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
-  ) -> AnyKeyPath {
+  ) -> Self {
     _sanityCheck(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,

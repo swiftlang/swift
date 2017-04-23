@@ -771,6 +771,15 @@ void SILClosureSpecializerTransform::gatherCallSites(
             !ApplyCallee->hasValidLinkageForFragileInline())
           continue;
 
+        // If the callee uses a dynamic Self, we cannot specialize it,
+        // since the resulting specialization might longer has 'self' as the
+        // last parameter.
+        //
+        // We could fix this by inserting new arguments more carefully, or
+        // changing how we model dynamic Self altogether.
+        if (mayBindDynamicSelf(ApplyCallee))
+          return;
+
         // Ok, we know that we can perform the optimization but not whether or
         // not the optimization is profitable. Find the index of the argument
         // corresponding to our partial apply.

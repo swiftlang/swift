@@ -103,14 +103,22 @@ ProtocolConformanceRef::subst(Type origType,
   auto substType = origType.subst(subs, conformances,
                                   SubstFlags::UseErrorType);
 
-  if (substType->isOpenedExistential())
-    return *this;
-
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
   if (isConcrete())
     return ProtocolConformanceRef(
       getConcrete()->subst(substType, subs, conformances));
+
+  // Opened existentials trivially conform and do not need to go through
+  // substitution map lookup.
+  if (substType->isOpenedExistential())
+    return *this;
+
+  // If the substituted type is an existential, we have a self-conforming
+  // existential being substituted in place of itself. There's no
+  // conformance information in this case, so just return.
+  if (substType->isObjCExistentialType())
+    return *this;
 
   auto *proto = getRequirement();
 
@@ -154,9 +162,7 @@ ProtocolConformanceRef::subst(Type origType,
     return ProtocolConformanceRef(lookupResults.front());
   }
 
-  // FIXME: Rip this out once ConformanceAccessPaths are plumbed through
-  auto *M = proto->getParentModule();
-  return *M->lookupConformance(substType, proto, nullptr);
+  llvm_unreachable("Invalid conformance substitution");
 }
 
 Type
@@ -788,11 +794,16 @@ ProtocolConformance *
 ProtocolConformance::subst(Type substType,
                            TypeSubstitutionFn subs,
                            LookupConformanceFn conformances) const {
+  // ModuleDecl::lookupConformance() strips off dynamic Self, so
+  // we should do the same here.
+  if (auto selfType = substType->getAs<DynamicSelfType>())
+    substType = selfType->getSelfType();
+
   if (getType()->isEqual(substType))
     return const_cast<ProtocolConformance *>(this);
   
   switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
     if (substType->isSpecialized()) {
       assert(getType()->isSpecialized()
              && "substitution mapped non-specialized to specialized?!");
@@ -831,10 +842,11 @@ ProtocolConformance::subst(Type substType,
                                    const_cast<ProtocolConformance *>(this),
                                    subMap);
     }
+
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
     return const_cast<ProtocolConformance *>(this);
-      
+  }
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance

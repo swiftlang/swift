@@ -124,9 +124,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!genericSig->conformsToProtocol(type, proto, mod))
     return None;
 
-  auto canonType = genericSig->getCanonicalTypeInContext(type, mod);
   auto accessPath =
-    genericSig->getConformanceAccessPath(canonType, proto, mod);
+    genericSig->getConformanceAccessPath(type, proto, mod);
 
   // Fall through because we cannot yet evaluate an access path.
   Optional<ProtocolConformanceRef> conformance;
@@ -143,8 +142,21 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     // If we've hit an abstract conformance, everything from here on out is
     // abstract.
     // FIXME: This may not always be true, but it holds for now.
-    if (conformance->isAbstract())
+    if (conformance->isAbstract()) {
+      // FIXME: Rip this out once we can get a concrete conformance from
+      // an archetype.
+      auto *M = proto->getParentModule();
+      auto substType = type.subst(*this);
+      if (substType &&
+          !substType->is<ArchetypeType>() &&
+          !substType->isTypeParameter() &&
+          !substType->isExistentialType()) {
+        auto lazyResolver = M->getASTContext().getLazyResolver();
+        return *M->lookupConformance(substType, proto, lazyResolver);
+      }
+
       return ProtocolConformanceRef(proto);
+    }
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.
@@ -153,7 +165,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // If we haven't set the signature conformances yet, force the issue now.
     if (normal->getSignatureConformances().empty()) {
-      auto lazyResolver = canonType->getASTContext().getLazyResolver();
+      auto lazyResolver = type->getASTContext().getLazyResolver();
       lazyResolver->resolveTypeWitness(normal, nullptr);
 
       // Error case: the conformance is broken, so we cannot handle this
