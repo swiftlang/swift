@@ -1210,14 +1210,6 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
 
-  // Escaped newline (SE-0173?)
-  case '\r':
-    if (CurPtr[1] == '\n')
-      ++CurPtr;
-    LLVM_FALLTHROUGH;
-  case '\n':
-    return *CurPtr++;
-
   case 'u': {  //  \u HEX HEX HEX HEX
     ++CurPtr;
     if (*CurPtr != '{') {
