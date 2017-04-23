@@ -4825,6 +4825,11 @@ public:
     if (!typeRepr)
       return false;
 
+    // 'Self' on a free function is not dynamic 'Self'.
+    if (!func->getDeclContext()->getAsClassOrClassExtensionContext() &&
+        !isa<ProtocolDecl>(func->getDeclContext()))
+      return false;
+
     // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
     // property. We could implement it as such in the future.
     if (func->isAccessor())
@@ -4867,45 +4872,6 @@ public:
     // Check whether it is 'Self'.
     if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
       return false;
-
-    // 'Self' in protocol extensions is not dynamic 'Self'.
-    DeclContext *dc = func->getDeclContext();
-    for (auto parentDC = dc; !parentDC->isModuleScopeContext();
-         parentDC = parentDC->getParent()) {
-      if (parentDC->getAsProtocolExtensionContext()) {
-        return false;
-      }
-    }
-
-    // Dynamic 'Self' is only permitted on methods.
-    if (!dc->isTypeContext()) {
-      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
-                  dc->isLocalContext());
-      simpleRepr->setInvalid();
-      return true;
-    }
-
-    // 'Self' is only a dynamic self on class methods and
-    // protocol requirements.
-    auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->hasError())
-      return false;
-
-    auto nominal = declaredType->getAnyNominal();
-    if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
-      int which;
-      if (isa<StructDecl>(nominal))
-        which = 0;
-      else if (isa<EnumDecl>(nominal))
-        which = 1;
-      else
-        llvm_unreachable("Unknown nominal type");
-      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
-                  which, nominal->getName())
-        .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
-      simpleRepr->setInvalid();
-      return true;
-    }
 
     // Note that the function has a dynamic Self return type and set
     // the return type component to the dynamic self type.

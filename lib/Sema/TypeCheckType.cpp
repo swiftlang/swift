@@ -481,8 +481,19 @@ Type TypeChecker::resolveTypeInContext(
       for (auto parentDC = fromDC;
            !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParent()) {
-        if (parentDC->getAsNominalTypeOrNominalTypeExtensionContext() == nominalType)
+        auto *parentNominal =
+          parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+        if (parentNominal == nominalType)
           return resolver->resolveTypeOfContext(parentDC);
+        if (isa<ExtensionDecl>(parentDC)) {
+          auto *extendedType = parentNominal;
+          while (extendedType != nullptr) {
+            if (extendedType == nominalType)
+              return resolver->resolveTypeOfDecl(extendedType);
+            extendedType = extendedType->getParent()
+              ->getAsNominalTypeOrNominalTypeExtensionContext();
+          }
+        }
       }
     }
   }
@@ -839,6 +850,37 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   return type;
 }
 
+static std::string getDeclNameFromContext(DeclContext *dc,
+                                          NominalTypeDecl *nominal) {
+  // We don't allow an unqualified reference to a type inside an
+  // extension if the type is itself nested inside another type,
+  // eg:
+  //
+  // extension A.B { ... B ... }
+  //
+  // Instead, you must write 'A.B'. Calculate the right name to use
+  // for fixits.
+  if (!isa<ExtensionDecl>(dc)) {
+    SmallVector<Identifier, 2> idents;
+    auto *parentNominal = nominal;
+    while (parentNominal != nullptr) {
+      idents.push_back(parentNominal->getName());
+      parentNominal = parentNominal->getDeclContext()
+        ->getAsNominalTypeOrNominalTypeExtensionContext();
+    }
+    std::reverse(idents.begin(), idents.end());
+    std::string result;
+    for (auto ident : idents) {
+      if (!result.empty())
+        result += ".";
+      result += ident.str();
+    }
+    return result;
+  } else {
+    return nominal->getName().str();
+  }
+}
+
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -859,26 +901,35 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 UnsatisfiedDependency *unsatisfiedDependency) {
   // Unqualified lookup case.
   if (parentType.isNull()) {
-    // Attempt to refer to 'Self' within a non-protocol nominal
-    // type. Fix this by replacing 'Self' with the nominal type name.
-    DeclContext *nominalDC = nullptr;
-    NominalTypeDecl *nominal = nullptr;
     if (comp->getIdentifier() == tc.Context.Id_Self &&
-        !isa<GenericIdentTypeRepr>(comp) &&
-        (nominalDC = dc->getInnermostTypeContext()) &&
-        (nominal = nominalDC->getAsNominalTypeOrNominalTypeExtensionContext())) {
-      // Retrieve the nominal type and resolve it within this context.
-      assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-      auto type = resolver->resolveTypeOfContext(dc->getInnermostTypeContext());
-      if (type->hasError())
-        return type;
+        !isa<GenericIdentTypeRepr>(comp)) {
+      DeclContext *nominalDC = nullptr;
+      NominalTypeDecl *nominal = nullptr;
+      if ((nominalDC = dc->getInnermostTypeContext()) &&
+          (nominal = nominalDC->getAsNominalTypeOrNominalTypeExtensionContext())) {
+        // Attempt to refer to 'Self' within a non-protocol nominal
+        // type. Fix this by replacing 'Self' with the nominal type name.
 
-      // Produce a Fix-It replacing 'Self' with the nominal type name.
-      tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getName())
-        .fixItReplace(comp->getIdLoc(), nominal->getName().str());
-      comp->overwriteIdentifier(nominal->getName());
-      comp->setValue(nominal);
-      return type;
+        // Retrieve the nominal type and resolve it within this context.
+        assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+        auto type = resolver->resolveTypeOfContext(dc->getInnermostTypeContext());
+        if (type->hasError())
+          return type;
+
+        // Produce a Fix-It replacing 'Self' with the nominal type name.
+        auto name = getDeclNameFromContext(dc, nominal);
+        tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
+          .fixItReplace(comp->getIdLoc(), name);
+        comp->overwriteIdentifier(nominal->getName());
+        comp->setValue(nominal);
+        return type;
+      } else {
+        // Attempt to refer to 'Self' from a free function.
+        tc.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
+                    dc->getParent()->isLocalContext());
+
+        return ErrorType::get(tc.Context);
+      }
     }
 
 

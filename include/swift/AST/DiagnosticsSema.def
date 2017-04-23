@@ -1959,10 +1959,10 @@ ERROR(no_equal_overload_for_int,none,
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
-ERROR(dynamic_self_struct_enum,none,
-      "%select{struct|enum}0 method cannot return 'Self'; "
-      "did you mean to use the %select{struct|enum}0 type %1?",
-      (int, Identifier))
+
+ERROR(self_in_nominal,none,
+      "'Self' is only available in a protocol or as the result of a "
+      "method in a class; did you mean '%0'?", (StringRef))
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,none,
@@ -2912,9 +2912,6 @@ ERROR(array_literal_intrinsics_not_found,none,
       "Array<T>", ())
 ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(self_in_nominal,none,
-      "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean %0?", (Identifier))
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
