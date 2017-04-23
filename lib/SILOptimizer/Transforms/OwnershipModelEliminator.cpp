@@ -39,13 +39,8 @@ namespace {
 struct OwnershipModelEliminatorVisitor
     : SILInstructionVisitor<OwnershipModelEliminatorVisitor, bool> {
   SILBuilder &B;
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
-  OwnershipModelEliminatorVisitor(SILBuilder &B)
-      : B(B), OpenedArchetypesTracker(B.getFunction()) {
-    B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
-
+  OwnershipModelEliminatorVisitor(SILBuilder &B) : B(B) {}
   void beforeVisit(ValueBase *V) {
     auto *I = cast<SILInstruction>(V);
     B.setInsertionPoint(I);
