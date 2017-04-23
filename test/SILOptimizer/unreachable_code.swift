@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
@@ -350,7 +350,7 @@ func testGuard(_ a : Int) {
   }
 }
 
-public func testFailingCast(_ s:String) -> Int {
+func testFailingCast(_ s:String) -> Int {
    // There should be no notes or warnings about a call to a noreturn function, because we do not expose
    // how casts are lowered.
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
@@ -419,14 +419,30 @@ while true {
 
 
 // SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
-public struct SR1010<T> {
+struct SR1010<T> {
   var a : T
 }
 
 extension SR1010 {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
-  public init(_ base: Int) {
+  init(_ base: Int) {
     fatalError("unavailable function can't be called")
   }
 }
 
+// More spurious 'will never be executed' warnings
+struct FailingStruct {
+  init?(x: ()) {
+    fatalError("gotcha")
+  }
+}
+
+class FailingClass {
+  init?(x: ()) {
+    fatalError("gotcha")
+  }
+
+  convenience init?(y: ()) {
+    fatalError("gotcha")
+  }
+}
