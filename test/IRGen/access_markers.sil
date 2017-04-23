@@ -1,0 +1,79 @@
+// RUN: %target-swift-frontend -enforce-exclusivity=checked -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+
+import Builtin
+import Swift
+
+class A {
+  @sil_stored var property: Int { get set }
+  deinit
+  init()
+}
+
+// CHECK-DAG: [[C:%T14access_markers1AC]] = type
+// CHECK-DAG: [[INT:%TSi]] = type <{ [[SIZE:i(32|64)]] }>
+
+sil_vtable A {}
+
+// CHECK-LABEL: define {{.*}}void @testPaired(
+sil @testPaired : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  // CHECK:      [[SCRATCH1:%.*]] = alloca [[BUFFER:.* x i8.]], align
+  // CHECK:      [[SCRATCH2:%.*]] = alloca [[BUFFER]], align
+
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], [[C]]* %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.start(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH1]], [[SIZE]] 1)
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH1]])
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.end(i64 {{.*}}, i8* [[T0]])
+  %4 = end_access %3 : $*Int
+
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.start(i64 {{.*}}, i8* [[T0]])
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH2]], [[SIZE]] 0)
+  %5 = begin_access [read] [dynamic] %2 : $*Int
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH2]])
+  // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.end(i64 {{.*}}, i8* [[T0]])
+  %6 = end_access %5 : $*Int
+
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: define {{.*}}void @testUnpaired(
+sil @testUnpaired : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  // CHECK:      [[SCRATCH:%.*]] = alloca [[BUFFER:.* x i8.]], align
+  %1 = alloc_stack $Builtin.UnsafeValueBuffer
+
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], [[C]]* %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 1)
+  %3 = begin_unpaired_access [modify] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
+  %4 = end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 0)
+  %5 = begin_unpaired_access [read] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
+  %6 = end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  dealloc_stack %1 : $*Builtin.UnsafeValueBuffer
+
+  %20 = tuple ()
+  return %20 : $()
+}

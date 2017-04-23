@@ -565,6 +565,22 @@ public:
         getSILDebugLocation(loc), address, aborted));
   }
 
+  BeginUnpairedAccessInst *
+  createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
+                            SILAccessKind accessKind,
+                            SILAccessEnforcement enforcement) {
+    return insert(new (F.getModule()) BeginUnpairedAccessInst(
+        getSILDebugLocation(loc), address, buffer, accessKind, enforcement));
+  }
+
+  EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
+                                                 SILValue buffer,
+                                              SILAccessEnforcement enforcement,
+                                                 bool aborted) {
+    return insert(new (F.getModule()) EndUnpairedAccessInst(
+        getSILDebugLocation(loc), buffer, enforcement, aborted));
+  }
+
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));

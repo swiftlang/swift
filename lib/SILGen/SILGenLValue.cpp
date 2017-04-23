@@ -421,10 +421,13 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
   // Hack for materializeForSet emission, where we can't safely
   // push a begin/end access.
   if (!SGF.InWritebackScope) {
-    assert(SGF.ValuesToEndAccessForMaterializeForSet);
+    auto unpairedAccesses = SGF.UnpairedAccessesForMaterializeForSet;
+    assert(unpairedAccesses &&
+           "tried to enter access scope without a writeback scope!");
     if (enforcement == SILAccessEnforcement::Dynamic) {
-      // FIXME: begin access.
-      SGF.ValuesToEndAccessForMaterializeForSet->push_back(addr);
+      SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
+                                      silAccessKind, enforcement);
+      unpairedAccesses->NumAccesses++;
     }
     return addr;
   }

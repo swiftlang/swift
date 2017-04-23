@@ -2241,7 +2241,6 @@ StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
 
 /// Begins an access scope. Must be paired with an end_access instruction
 /// along every path.
-/// 
 class BeginAccessInst
     : public UnaryInstructionBase<ValueKind::BeginAccessInst> {
   friend class SILBuilder;
@@ -2335,6 +2334,109 @@ struct BeginAccessInst::UseToEndAccess {
 inline auto BeginAccessInst::getEndAccesses() const -> EndAccessRange {
   return EndAccessRange(getUses(), UseToEndAccess());
 }
+
+/// Begins an access without requiring a paired end_access.
+/// Dynamically, an end_unpaired_access does still need to be called, though.
+///
+/// This should only be used in materializeForSet, and eventually it should
+/// be removed entirely.
+class BeginUnpairedAccessInst : public SILInstruction {
+  friend class SILBuilder;
+
+  FixedOperandList<2> Operands;
+
+  SILAccessKind AccessKind;
+  SILAccessEnforcement Enforcement;
+
+  BeginUnpairedAccessInst(SILDebugLocation loc, SILValue addr, SILValue buffer,
+                          SILAccessKind accessKind,
+                          SILAccessEnforcement enforcement)
+    : SILInstruction(ValueKind::BeginUnpairedAccessInst,
+                     loc, addr->getType()),
+      Operands(this, addr, buffer),
+      AccessKind(accessKind), Enforcement(enforcement) {
+  }
+
+public:
+  SILAccessKind getAccessKind() const {
+    return AccessKind;
+  }
+  void setAccessKind(SILAccessKind kind) {
+    AccessKind = kind;
+  }
+
+  SILAccessEnforcement getEnforcement() const {
+    return Enforcement;
+  }
+  void setEnforcement(SILAccessEnforcement enforcement) {
+    Enforcement = enforcement;
+  }
+
+  SILValue getSource() const {
+    return Operands[0].get();
+  }
+
+  SILValue getBuffer() const {
+    return Operands[1].get();
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return {};
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return {};
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BeginUnpairedAccessInst;
+  }
+};
+
+/// Ends an unpaired access.
+class EndUnpairedAccessInst
+    : public UnaryInstructionBase<ValueKind::EndUnpairedAccessInst> {
+  friend class SILBuilder;
+
+  SILAccessEnforcement Enforcement;
+  bool Aborting;
+
+private:
+  EndUnpairedAccessInst(SILDebugLocation loc, SILValue buffer,
+                        SILAccessEnforcement enforcement,
+                        bool aborting = false)
+    : UnaryInstructionBase(loc, buffer), Enforcement(enforcement),
+      Aborting(aborting) {
+  }
+
+public:
+  /// An aborted access is one that did not perform the expected
+  /// transition described by the begin_access instruction before it
+  /// reached this end_access.
+  ///
+  /// Only AccessKind::Init and AccessKind::Deinit accesses can be
+  /// aborted.
+  bool isAborting() const {
+    return Aborting;
+  }
+  void setAborting(bool aborting) {
+    Aborting = aborting;
+  }
+
+  SILAccessEnforcement getEnforcement() const {
+    return Enforcement;
+  }
+  void setEnforcement(SILAccessEnforcement enforcement) {
+    Enforcement = enforcement;
+  }
+
+  SILValue getBuffer() const {
+    return getOperand();
+  }
+};
 
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in

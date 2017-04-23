@@ -218,8 +218,8 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
 
-static InlineCost getEnforcementCost(BeginAccessInst &I) {
-  switch (I.getEnforcement()) {
+static InlineCost getEnforcementCost(SILAccessEnforcement enforcement) {
+  switch (enforcement) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("evaluating cost of access with unknown enforcement?");
   case SILAccessEnforcement::Dynamic:
@@ -291,9 +291,16 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
     // Access instructions are free unless we're dynamically enforcing them.
     case ValueKind::BeginAccessInst:
-      return getEnforcementCost(cast<BeginAccessInst>(I));
+      return getEnforcementCost(cast<BeginAccessInst>(I).getEnforcement());
     case ValueKind::EndAccessInst:
-      return getEnforcementCost(*cast<EndAccessInst>(I).getBeginAccess());
+      return getEnforcementCost(cast<EndAccessInst>(I).getBeginAccess()
+                                                     ->getEnforcement());
+    case ValueKind::BeginUnpairedAccessInst:
+      return getEnforcementCost(cast<BeginUnpairedAccessInst>(I)
+                                  .getEnforcement());
+    case ValueKind::EndUnpairedAccessInst:
+      return getEnforcementCost(cast<EndUnpairedAccessInst>(I)
+                                  .getEnforcement());
 
     // TODO: These are free if the metatype is for a Swift class.
     case ValueKind::ThickToObjCMetatypeInst:
