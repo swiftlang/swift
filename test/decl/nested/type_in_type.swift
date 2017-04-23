@@ -361,3 +361,11 @@ struct OuterWithConstraint<T : HasAssocType> {
 extension OuterWithConstraint.InnerWithConstraint {
   func foo<V>(v: V) where T.FirstAssocType == U.SecondAssocType {}
 }
+
+// Name lookup within a 'where' clause should find generic parameters
+// of the outer type.
+extension OuterGeneric.MidGeneric where D == Int, F == String {
+  func doStuff() -> (D, F) {
+    return (100, "hello")
+  }
+}
