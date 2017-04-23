@@ -286,7 +286,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
       // Inject the self value into an optional if the constructor is failable.
       if (ctor->getFailability() != OTK_None) {
-        selfValue = B.createEnum(ctor, selfValue,
+        selfValue = B.createEnum(cleanupLoc, selfValue,
                                  getASTContext().getOptionalSomeDecl(),
                                  getLoweredLoadableType(resultType));
       }
@@ -306,7 +306,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // If this is a failable initializer, project out the payload.
       case OTK_Optional:
       case OTK_ImplicitlyUnwrappedOptional:
-        returnAddress = B.createInitEnumDataAddr(ctor, completeReturnAddress,
+        returnAddress = B.createInitEnumDataAddr(cleanupLoc,
+                                                 completeReturnAddress,
                                        getASTContext().getOptionalSomeDecl(),
                                                  selfLV->getType());
         break;
@@ -320,7 +321,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // Inject the enum tag if the result is optional because of failability.
       if (ctor->getFailability() != OTK_None) {
         // Inject the 'Some' tag.
-        B.createInjectEnumAddr(ctor, completeReturnAddress,
+        B.createInjectEnumAddr(cleanupLoc, completeReturnAddress,
                                getASTContext().getOptionalSomeDecl());
       }
     }
