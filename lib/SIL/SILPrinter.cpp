@@ -1642,6 +1642,17 @@ public:
     *this << (EAI->isAborting() ? "[abort] " : "")
           << getIDAndType(EAI->getOperand());
   }
+  void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *BAI) {
+    *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
+          << getSILAccessEnforcementName(BAI->getEnforcement())
+          << "] " << getIDAndType(BAI->getSource()) << ", "
+          << getIDAndType(BAI->getBuffer());
+  }
+  void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
+    *this << (EAI->isAborting() ? "[abort] " : "")
+          << '[' << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+          << getIDAndType(EAI->getOperand());
+  }
 
   void visitCondFailInst(CondFailInst *FI) {
     *this << getIDAndType(FI->getOperand());

@@ -144,6 +144,7 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
     assert(!I->hasValue() && "Expected an instruction without a result");      \
     llvm_unreachable("Instruction without a result can not have ownership");   \
   }
+NO_RESULT_OWNERSHIP_INST(BeginUnpairedAccess)
 NO_RESULT_OWNERSHIP_INST(DeallocStack)
 NO_RESULT_OWNERSHIP_INST(DeallocRef)
 NO_RESULT_OWNERSHIP_INST(DeallocPartialRef)
@@ -153,6 +154,7 @@ NO_RESULT_OWNERSHIP_INST(DeallocExistentialBox)
 NO_RESULT_OWNERSHIP_INST(EndAccess)
 NO_RESULT_OWNERSHIP_INST(EndBorrow)
 NO_RESULT_OWNERSHIP_INST(EndBorrowArgument)
+NO_RESULT_OWNERSHIP_INST(EndUnpairedAccess)
 NO_RESULT_OWNERSHIP_INST(Store)
 NO_RESULT_OWNERSHIP_INST(StoreWeak)
 NO_RESULT_OWNERSHIP_INST(StoreUnowned)

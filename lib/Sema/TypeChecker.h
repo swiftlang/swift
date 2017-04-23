@@ -488,6 +488,9 @@ enum TypeResolutionFlags : unsigned {
   /// clause on something other than an enum (i.e. V, but not U or W, in class
   /// T: U.V<W>)
   TR_NonEnumInheritanceClauseOuterLayer = 0x2000000,
+
+  /// Whether we are checking the underlying type of a typealias.
+  TR_TypeAliasUnderlyingType = 0x4000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -1936,6 +1939,11 @@ public:
   LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
                             NameLookupOptions options
                               = defaultMemberLookupOptions);
+
+  /// \brief Check whether the given declaration can be written as a
+  /// member of the given base type.
+  bool isUnsupportedMemberTypeAccess(Type type,
+                                     TypeDecl *typeDecl);
 
   /// \brief Look up a member type within the given type.
   ///

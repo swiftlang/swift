@@ -166,6 +166,22 @@ public:
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
 
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireAddressType(SILType type, const Twine &valueDescription,
+                      const char *typeName) {
+    _require(type.isAddress(), valueDescription + " must be an address");
+    auto result = type.getAs<T>();
+    _require(bool(result), valueDescription + " must have type " + typeName);
+    return result;
+  }
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireAddressType(SILValue value, const Twine &valueDescription,
+                     const char *typeName) {
+    return _requireAddressType<T>(value->getType(), valueDescription, typeName);
+  }
+#define requireAddressType(type, value, valueDescription) \
+  _requireAddressType<type>(value, valueDescription, #type)
+
   template <class T>
   typename CanTypeWrapperTraits<T>::type
   _forbidObjectType(SILType type, const Twine &valueDescription,
@@ -1259,16 +1275,6 @@ public:
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
 
-    require(isa<GlobalAddrInst>(op) ||
-            isa<AllocStackInst>(op) ||
-            isa<ProjectBoxInst>(op) ||
-            isa<RefElementAddrInst>(op) ||
-            isa<PointerToAddressInst>(op) ||
-            isa<SILFunctionArgument>(op) ||
-            isa<BeginAccessInst>(op) ||
-            isa<MarkUninitializedInst>(op),
-            "begin_access operand must be a root address derivation");
-
     // Any kind of access marker can be used in the raw stage if either kind
     // of enforcement is enabled globally.
     // After the raw stage, only dynamic access markers can be used, and
@@ -1323,6 +1329,22 @@ public:
               BAI->getAccessKind() == SILAccessKind::Deinit,
               "aborting access must apply to init or deinit");
     }
+  }
+
+  void checkBeginUnpairedAccessInst(BeginUnpairedAccessInst *I) {
+    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+            "unpaired access can never use unknown enforcement");
+    require(I->getSource()->getType().isAddress(),
+            "address operand must have address type");
+    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+                       "scratch buffer operand");
+  }
+
+  void checkEndUnpairedAccessInst(EndUnpairedAccessInst *I) {
+    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+            "unpaired access can never use unknown enforcement");
+    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+                       "scratch buffer operand");
   }
 
   void checkStoreInst(StoreInst *SI) {

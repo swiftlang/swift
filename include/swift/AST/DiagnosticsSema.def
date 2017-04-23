@@ -1297,7 +1297,7 @@ ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(extension_protocol_via_typealias,none,
       "protocol %0 in the module being compiled cannot be extended via a "
-      "typealias", (Type))
+      "type alias", (Type))
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
@@ -1556,7 +1556,7 @@ ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 ERROR(typealias_outside_of_protocol,none,
-      "typealias %0 can only be used with a concrete type or "
+      "type alias %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 
 ERROR(circular_protocol_def,none,
@@ -1609,7 +1609,7 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 ERROR(protocol_typealias_conflict, none,
-      "typealias %0 requires types %1 and %2 to be the same",
+      "type alias %0 requires types %1 and %2 to be the same",
       (Identifier, Type, Type))
 WARNING(redundant_conformance_constraint,none,
         "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
@@ -1959,10 +1959,10 @@ ERROR(no_equal_overload_for_int,none,
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
-ERROR(dynamic_self_struct_enum,none,
-      "%select{struct|enum}0 method cannot return 'Self'; "
-      "did you mean to use the %select{struct|enum}0 type %1?",
-      (int, Identifier))
+
+ERROR(self_in_nominal,none,
+      "'Self' is only available in a protocol or as the result of a "
+      "method in a class; did you mean '%0'?", (StringRef))
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,none,
@@ -2912,9 +2912,6 @@ ERROR(array_literal_intrinsics_not_found,none,
       "Array<T>", ())
 ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(self_in_nominal,none,
-      "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean %0?", (Identifier))
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
