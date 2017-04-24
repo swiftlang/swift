@@ -163,6 +163,12 @@ CharacterTests.test("CR-LF") {
   let str_rev = "\r\nytrewq"
   expectEqual(str.characters.count, str_rev.characters.count)
   expectEqualSequence(str.characters.reversed(), str_rev.characters)
+
+  // Mixed form
+  let strUTF16 = "a\u{03B2}c\r\nd\u{03B5}f"
+  let strUTF16_rev = "f\u{03B5}d\r\nc\u{03B2}a"
+  expectEqual(strUTF16.characters.count, strUTF16_rev.characters.count)
+  expectEqualSequence(strUTF16.characters.reversed(), strUTF16_rev.characters)
 }
 
 /// Test that a given `String` can be transformed into a `Character` and back
