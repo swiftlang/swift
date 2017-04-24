@@ -56,6 +56,14 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
       Text = (llvm::Twine(MD->newTypeName) + "." + MD->newPrintedName).str();
       return true;
     }
+
+    // Simple rename.
+    if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
+      if (CI->NodeKind == SDKNodeKind::Var && CI->isRename()) {
+        Text = CI->getNewName();
+        return true;
+      }
+    }
     return false;
   }
 

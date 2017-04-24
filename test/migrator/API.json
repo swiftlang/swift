@@ -5,5 +5,16 @@
     "OldPrintedName": "barGlobalVariable",
     "NewPrintedName": "memberVariable",
     "NewTypeName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SA@SomeItemSet@FI@theSimpleOldName",
+    "LeftComment": "theSimpleOldName",
+    "RightUsr": "",
+    "RightComment": "theSimpleNewName",
+    "ModuleName": "SomeModule"
   }
 ]
