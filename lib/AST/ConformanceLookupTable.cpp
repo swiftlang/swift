@@ -809,8 +809,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
                                                           protocol,
-                                                          resolver)
-                                  .getPointer();
+                                                          resolver);
 
     // Form the inherited conformance.
     conformance = ctx.getInheritedConformance(
