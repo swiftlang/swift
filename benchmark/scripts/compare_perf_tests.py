@@ -141,8 +141,6 @@ def main():
 
     new_tests = set(new_results.keys())
     old_tests = set(old_results.keys())
-    # added_tests = new_tests.difference(old_tests)
-    # removed_tests = old_tests.difference(new_tests)
     comparable_tests = new_tests.intersection(old_tests)
 
     for key in comparable_tests:
