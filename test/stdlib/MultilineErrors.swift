@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s 2> %t.warnings.txt
+// RUN: %target-build-swift %s 2> %t.warnings.txt || echo -n
 // RUN: %FileCheck -check-prefix=CHECK-ERRORS %s < %t.warnings.txt
 
 import Swift
@@ -44,4 +44,20 @@ print(delimit("""
     Fourteen
   	Pi
     """
+))
+
+// CHECK: -15-
+print("-15-")
+// CHECK-ERRORS: error: invalid start of multi-line string literal
+print(delimit("""Fourteen
+    Pi
+    """
+))
+
+// CHECK: -16-
+print("-16-")
+// CHECK-ERRORS: error: invalid end of multi-line string literal
+print(delimit("""
+    Fourteen
+    Pi"""
 ))
