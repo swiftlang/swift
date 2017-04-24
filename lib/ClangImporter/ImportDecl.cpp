@@ -3703,9 +3703,12 @@ namespace {
       }
 
       // Handle attributes.
-      if (decl->hasAttr<clang::IBActionAttr>())
+      if (decl->hasAttr<clang::IBActionAttr>() &&
+          isa<FuncDecl>(result) &&
+          cast<FuncDecl>(result)->isPotentialIBActionTarget()) {
         result->getAttrs().add(
             new (Impl.SwiftContext) IBActionAttr(/*IsImplicit=*/false));
+      }
 
       // Check whether there's some special method to import.
       if (!forceClassMethod) {

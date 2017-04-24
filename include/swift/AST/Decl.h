@@ -5308,6 +5308,10 @@ public:
 
   /// True if the function is a defer body.
   bool isDeferBody() const;
+
+  /// Perform basic checking to determine whether the @IBAction attribute can
+  /// be applied to this function.
+  bool isPotentialIBActionTarget() const;
 };
   
 /// \brief This represents a 'case' declaration in an 'enum', which may declare
