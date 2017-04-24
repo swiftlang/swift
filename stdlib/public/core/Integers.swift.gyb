@@ -2348,11 +2348,8 @@ ${operatorComment('&' + x.operator, True)}
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent only nonnegative values.
-public protocol UnsignedInteger : BinaryInteger {
-  /// A type that can represent the absolute value of any possible value of the
-  /// conforming type.
-  associatedtype Magnitude : BinaryInteger
-}
+public protocol UnsignedInteger : BinaryInteger
+  where Magnitude : BinaryInteger { }
 
 extension UnsignedInteger {
   /// The magnitude of this value.
@@ -2458,11 +2455,8 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent both positive and negative values.
-public protocol SignedInteger : BinaryInteger, SignedNumeric {
-  /// A type that can represent the absolute value of any possible value of the
-  /// conforming type.
-  associatedtype Magnitude : BinaryInteger
-
+public protocol SignedInteger : BinaryInteger, SignedNumeric
+    where Magnitude : BinaryInteger {
   // These requirements are for the source code compatibility with Swift 3
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
