@@ -387,8 +387,8 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
       subs = subs.slice(1);
 
       auto canTy = depTy->getCanonicalType();
-      if (isa<SubstitutableType>(canTy))
-        result.addSubstitution(cast<SubstitutableType>(canTy),
+      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
+        result.addSubstitution(paramTy,
                                sub.getReplacement());
       assert(reqts.size() == sub.getConformances().size());
       for (auto conformance : sub.getConformances())
@@ -415,8 +415,8 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     // Compute the replacement type.
     Type currentReplacement = depTy.subst(subs, lookupConformance,
                                           SubstFlags::UseErrorType);
-    if (auto substTy = dyn_cast<SubstitutableType>(canTy))
-      subMap.addSubstitution(substTy, currentReplacement);
+    if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
+      subMap.addSubstitution(paramTy, currentReplacement);
 
     // Collect the conformances.
     for (auto req: reqs) {
