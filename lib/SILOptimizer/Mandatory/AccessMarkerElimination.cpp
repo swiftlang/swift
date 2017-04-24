@@ -35,8 +35,6 @@ struct AccessMarkerElimination : SILModuleTransform {
     // Don't bother doing anything unless some kind of exclusivity
     // enforcement is enabled.
     auto &M = *getModule();
-    if (!M.getOptions().isAnyExclusivityEnforcementEnabled())
-      return;
 
     bool removedAny = false;
 

@@ -135,9 +135,7 @@ static bool shouldUseUnsafeEnforcement(VarDecl *var) {
 
 Optional<SILAccessEnforcement>
 SILGenFunction::getStaticEnforcement(VarDecl *var) {
-  if (getOptions().EnforceExclusivityStatic)
-    return SILAccessEnforcement::Static;
-  return None;
+  return SILAccessEnforcement::Static;
 }
 
 Optional<SILAccessEnforcement>
@@ -152,10 +150,7 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
 
 Optional<SILAccessEnforcement>
 SILGenFunction::getUnknownEnforcement(VarDecl *var) {
-  if (getOptions().EnforceExclusivityStatic ||
-      getOptions().EnforceExclusivityDynamic)
-    return SILAccessEnforcement::Unknown;
-  return None;
+  return SILAccessEnforcement::Unknown;
 }
 
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
@@ -2895,7 +2890,6 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
   // because it causes the formal accesses to the source and destination to
   // overlap.
   bool peepholeConflict =
-      getOptions().isAnyExclusivityEnforcementEnabled() &&
       !src.isObviouslyNonConflicting(dest, AccessKind::Read, AccessKind::Write);
 
   if (peepholeConflict || !src.isPhysical() || !dest.isPhysical()) {

@@ -68,8 +68,10 @@ struct Box<T> {
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = init_enum_data_addr [[RESULT]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: copy_addr %1 to [initialization] %14 : $*T
 // CHECK-NEXT: inject_enum_addr [[RESULT]] : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK-NEXT: [[T_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*Box<T>, #Box.t
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*Box<T>
+// CHECK-NEXT: [[T_ADDR:%.*]] = struct_element_addr [[WRITE]] : $*Box<T>, #Box.t
 // CHECK-NEXT: copy_addr [take] [[RESULT]] to [[T_ADDR:%.*]] : $*Optional<T>
+// CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: dealloc_stack [[RESULT]] : $*Optional<T>
 // CHECK-NEXT: copy_addr [[SELF_ADDR]] to [initialization] %0 : $*Box<T>
 // CHECK-NEXT: destroy_addr %1 : $*T

@@ -138,7 +138,8 @@ func inoutToPointer() {
   // CHECK: [[PB:%.*]] = project_box [[INT]]
   takesMutablePointer(&int)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[PB]]
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_MUTABLE]]
@@ -159,7 +160,8 @@ func inoutToPointer() {
 
   takesMutableRawPointer(&int)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[PB]]
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutableRawPointer>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_MUTABLE]]
@@ -188,7 +190,8 @@ func classInoutToPointer() {
   // CHECK: [[PB:%.*]] = project_box [[VAR]]
   takesPlusOnePointer(&c)
   // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_T018pointer_conversion19takesPlusOnePointer{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[PB]]
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
   // CHECK: [[CONVERT:%.*]] = function_ref @_T0s30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_PLUS_ONE]]

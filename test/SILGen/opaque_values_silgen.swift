@@ -185,7 +185,8 @@ public func s020_______callVarArg() {
 // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $T):
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[CPY:%.*]] = copy_value [[BORROWED_ARG1]] : $T
-// CHECK:   assign [[CPY]] to [[ARG0]] : $*T
+// CHECK:   [[READ:%.*]] = begin_access [modify] [unknown] [[ARG0]] : $*T
+// CHECK:   assign [[CPY]] to [[READ]] : $*T
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   destroy_value [[ARG1]] : $T
 // CHECK:   return %{{.*}} : $()
@@ -528,7 +529,8 @@ func s230______condFromAny(_ x: Any) {
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:   [[LOAD_BOX:%.*]] = load [copy] [[PROJ_BOX]]
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*Error
+// CHECK:   [[LOAD_BOX:%.*]] = load [copy] [[READ]]
 // CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $Error to $*@opened({{.*}}) Error
 // CHECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
 // CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
@@ -735,10 +737,12 @@ func s340_______captureBox() {
 // CHECK:   [[APPLY_FOR_BRANCH:%.*]] = apply %{{.*}}([[ARG]]) : $@convention(method) (Bool) -> Builtin.Int1
 // CHECK:   cond_br [[APPLY_FOR_BRANCH]], bb2, bb1
 // CHECK: bb1:
-// CHECK:   [[RETVAL1:%.*]] = load [copy] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[RETVAL1:%.*]] = load [copy] [[READ]] : $*EmptyP
 // CHECK:   br bb3([[RETVAL1]] : $EmptyP)
 // CHECK: bb2:
-// CHECK:   [[RETVAL2:%.*]] = load [copy] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[RETVAL2:%.*]] = load [copy] [[READ]] : $*EmptyP
 // CHECK:   br bb3([[RETVAL2]] : $EmptyP)
 // CHECK: bb3([[RETVAL:%.*]] : $EmptyP):
 // CHECK:   destroy_value [[ALLOC_OF_BOX]]
@@ -1052,11 +1056,12 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 // ---
 // CHECK-LABEL: sil @_T0s10DictionaryV20opaque_values_silgenE22inoutAccessOfSubscriptyq_3key_tF : $@convention(method) <Key, Value where Key : Hashable> (@in Value, @inout Dictionary<Key, Value>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Value, [[ARG1:%.*]] : $*Dictionary<Key, Value>):
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*Dictionary<Key, Value>
 // CHECK:   [[OPTIONAL_ALLOC:%.*]] = alloc_stack $Optional<Value>
 // CHECK:   switch_enum_addr [[OPTIONAL_ALLOC]] : $*Optional<Value>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb2:
 // CHECK:   [[OPTIONAL_LOAD:%.*]] = load [take] [[OPTIONAL_ALLOC]] : $*Optional<Value>
-// CHECK:   apply {{.*}}<Key, Value>([[OPTIONAL_LOAD]], {{.*}}, [[ARG1]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:   apply {{.*}}<Key, Value>([[OPTIONAL_LOAD]], {{.*}}, [[WRITE]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T0s10DictionaryV20opaque_values_silgenE22inoutAccessOfSubscriptyq_3key_tF'
 
