@@ -57,7 +57,9 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Class:
     case NodeKind::Enum:
-    case NodeKind::Structure: {
+    case NodeKind::Structure:
+    case NodeKind::TypeAlias: // This can show up for imported Clang decls.
+    {
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
       if (!decodeMangledNominalType(Node, typeDecl, parent))

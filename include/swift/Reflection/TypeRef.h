@@ -224,6 +224,7 @@ public:
   bool isStruct() const;
   bool isEnum() const;
   bool isClass() const;
+  bool isAlias() const;
 
   const TypeRef *getParent() const {
     return Parent;

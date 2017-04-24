@@ -35,6 +35,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
@@ -5802,12 +5803,13 @@ static void diagnosePotentialWitness(TypeChecker &tc,
 
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
+  // For anything imported from Clang, lazily check conformances.
+  if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    return;
+
   // Determine the accessibility of this conformance.
   Accessibility defaultAccessibility;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    // For anything with a Clang node, lazily check conformances.
-    if (ext->hasClangNode()) return;
-
     Type extendedTy = ext->getExtendedType();
     if (!extendedTy)
       return;
@@ -5816,11 +5818,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       return;
     defaultAccessibility = nominal->getFormalAccess();
   } else {
-    // For anything with a Clang node, lazily check conformances.
-    auto nominal = cast<NominalTypeDecl>(dc);
-    if (nominal->hasClangNode()) return;
-
-    defaultAccessibility = nominal->getFormalAccess();
+    defaultAccessibility = cast<NominalTypeDecl>(dc)->getFormalAccess();
   }
 
   ReferencedNameTracker *tracker = nullptr;

@@ -14,7 +14,7 @@
 // CHECK:         key.kind: source.lang.swift.decl.struct,
 // CHECK-NEXT:    key.name: "MyError",
 // CHECK-NEXT:    key.usr: "s:SC7MyErrorV",
-// CHECK-NEXT:    This is my cool error code.
+// CHECK-NOT:     This is my cool error code.
 
 // CHECK:             key.kind: source.lang.swift.decl.enum,
 // CHECK-NEXT:        key.name: "Code",
@@ -28,5 +28,5 @@
 
 // CHECK:             key.kind: source.lang.swift.decl.var.static,
 // CHECK-NEXT:        key.name: "errFirst",
-// CHECK-NEXT:        key.usr: "s:SC7MyErrorV8errFirstAB4CodeOvZ",
+// CHECK-NEXT:        key.usr: "s:SC7MyErrorV8errFirstSo0aB4CodeVvZ",
 // CHECK-NEXT:        This is first error.

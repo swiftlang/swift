@@ -63,7 +63,7 @@ print("ObjC quick look objects:")
 // CHECK-LABEL: ObjC enums:
 print("ObjC enums:")
 
-// CHECK-NEXT: We cannot reflect ComparisonResult yet
+// CHECK-NEXT: We cannot reflect NSComparisonResult yet
 print("We cannot reflect \(ComparisonResult.orderedAscending) yet")
 
 // Don't crash when introspecting framework types such as NSURL.

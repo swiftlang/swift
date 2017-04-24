@@ -33,6 +33,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -1739,7 +1740,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     if (ClassDecl *clas = dyn_cast<ClassDecl>(Nominal)) {
       if (clas->isForeign())
         getAddrOfForeignTypeMetadataCandidate(conformingType);
-    } else if (Nominal->hasClangNode()) {
+    } else if (isa<ClangModuleUnit>(Nominal->getModuleScopeContext())) {
       getAddrOfForeignTypeMetadataCandidate(conformingType);
     }
   }
