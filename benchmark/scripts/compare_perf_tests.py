@@ -30,6 +30,7 @@ class PerformanceTestResult:
         self.mean = int(csv_row[5])     # Mean (average) runtime (ms)
         self.sd = int(csv_row[6])       # Standard Deviation (ms)
         self.median = int(csv_row[7])   # Median runtime (ms)
+        self.max_rss = int(csv_row[8])  # Maximum Resident Set Size (B)
 
 
 class ResultComparison:
@@ -46,16 +47,16 @@ class ResultComparison:
         self.delta = round(((ratio - 1) * 100), 2)  # FIXME no need to round
 
         self.is_dubious = (  # FIXME this is legacy
-            "(?)" if ((old.min < new.min and new.min < old.max) or
+            '(?)' if ((old.min < new.min and new.min < old.max) or
                       (new.min < old.min and old.min < new.max))
-            else "")
+            else '')
 
     # Tuple of values formatted for display in results table:
     # (name, old value, new value, delta [%], speedup ratio)
     def values(self):
         return (self.name, str(self.old.min), str(self.new.min),
-                "{0:+.1f}%".format(self.delta),
-                "{0:.2f}x {1}".format(self.ratio, self.is_dubious))
+                '{0:+.1f}%'.format(self.delta),
+                '{0:.2f}x {1}'.format(self.ratio, self.is_dubious))
 
 
 class TestComparator:
@@ -146,8 +147,9 @@ class ReportFormatter:
 
     def __column_widths(self, header):
         changed = self.comparator.decreased + self.comparator.increased
-        comparisons = (changed if self.changes_only else
-                       changed + self.comparator.unchanged)
+        comparisons = changed + self.comparator.unchanged  # FIXME legacy
+        # comparisons = (changed if self.changes_only else
+        #                changed + self.comparator.unchanged)
         values = map(lambda c: c.values(), comparisons)
 
         def col_widths(contents):
@@ -157,7 +159,7 @@ class ReportFormatter:
             return tuple(map(max, zip(maximum, col_widths(contents))))
 
         widths = reduce(max_widths, values, col_widths(header))
-        widths = widths[:-1] + (2,)  # FIXME legacy formatting
+        widths = widths[:-2] + (6, 2)  # FIXME legacy formatting
         return widths
 
     def __formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
@@ -197,7 +199,8 @@ class ReportFormatter:
         return ''.join([
             results('Regression', self.comparator.decreased, True, True),
             results('Improvement', self.comparator.increased, True),
-            results('No Changes', self.comparator.unchanged),
+            ('' if self.changes_only else
+             results('No Changes', self.comparator.unchanged))
         ])
 
     HTML = """
@@ -241,8 +244,8 @@ class ReportFormatter:
                 name, old, new, delta, speedup_color, speedup)
 
         def header(title):
-            return row("<strong>{0}:</strong>".format(title),
-                       "", "", "", "", "black")
+            return row('<strong>{0}:</strong>'.format(title),
+                       '', '', '', '', 'black')
 
         def results(title, comp_list, speedup_color):
             rows = [
@@ -253,7 +256,7 @@ class ReportFormatter:
                     header(title) + ''.join(rows))
 
         return self.HTML.format(self.HTML_TABLE.format(
-            "TEST", self.old_branch, self.new_branch, "DELTA", "SPEEDUP",
+            'TEST', self.old_branch, self.new_branch, 'DELTA', 'SPEEDUP',
             ''.join([
                 results('Regression', self.comparator.decreased, 'red'),
                 results('Improvement', self.comparator.increased, 'green'),
@@ -264,7 +267,7 @@ class ReportFormatter:
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Compare Performance tests.")
+    parser = argparse.ArgumentParser(description='Compare Performance tests.')
     parser.add_argument('--old-file',
                         help='Baseline performance test suite (csv file)',
                         required=True)
@@ -279,11 +282,11 @@ def main():
     parser.add_argument('--changes-only',
                         help='Output only affected tests', action='store_true')
     parser.add_argument('--new-branch',
-                        help='Name of the new branch', default="NEW_MIN")
+                        help='Name of the new branch', default='NEW_MIN')
     parser.add_argument('--old-branch',
-                        help='Name of the old branch', default="OLD_MIN")
+                        help='Name of the old branch', default='OLD_MIN')
     parser.add_argument('--delta-threshold',
-                        help='Delta threshold. Default 0.05.', default="0.05")
+                        help='Delta threshold. Default 0.05.', default='0.05')
 
     args = parser.parse_args()
     comparator = TestComparator(args.old_file, args.new_file,
@@ -292,23 +295,23 @@ def main():
                                 args.changes_only)
 
     if args.format:
-        if args.format.lower() != "markdown":
+        if args.format.lower() != 'markdown':
             print(formatter.git())
         else:
             print(formatter.markdown())
 
     if args.format:
-        if args.format.lower() == "html":
+        if args.format.lower() == 'html':
             if args.output:
                 write_to_file(args.output, formatter.html())
             else:
-                print("Error: missing --output flag.")
+                print('Error: missing --output flag.')
                 sys.exit(1)
-        elif args.format.lower() == "markdown":
+        elif args.format.lower() == 'markdown':
             if args.output:
                 write_to_file(args.output, formatter.markdown())
-        elif args.format.lower() != "git":
-            print("{0} is unknown format.".format(args.format))
+        elif args.format.lower() != 'git':
+            print('{0} is unknown format.'.format(args.format))
             sys.exit(1)
 
 
@@ -316,10 +319,10 @@ def write_to_file(file_name, data):
     """
     Write data to given file
     """
-    file = open(file_name, "w")
+    file = open(file_name, 'w')
     file.write(data)
     file.close
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())
