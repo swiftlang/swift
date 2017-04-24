@@ -254,6 +254,7 @@ struct APIDiffItemStore {
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
   ArrayRef<APIDiffItem*> getAllDiffItems() const;
+  void printIncomingUsr(bool print = true);
 
   /// Add a path of a JSON file dumped from swift-api-digester that contains
   /// API changes we care about. Calling this can be heavy since the procedure
