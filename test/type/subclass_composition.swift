@@ -71,6 +71,16 @@ func basicDiagnostics(
   // Valid typealias case
   _: OtherAndP2 & P3) {}
 
+// A composition containing only a single class is actually identical to
+// the class type itself.
+struct Box<T : Base<Int>> {}
+
+func takesBox(_: Box<Base<Int>>) {}
+
+func passesBox(_ b: Box<Base<Int> & Base<Int>>) {
+  takesBox(b)
+}
+
 // Test that subtyping behaves as you would expect.
 func basicSubtyping(
   base: Base<Int>,
