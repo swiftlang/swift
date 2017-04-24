@@ -55,7 +55,7 @@ public func testDevirt<T>(_ c: CC<T>) -> T? {
 
 // Check that the instance method Derived<T>.foo can be devirtualized, because Derived.foo is an internal function,
 // Derived has no subclasses and it is a WMO compilation.
-// CHECK-LABEL: sil hidden [noinline] @_T022devirt_unbound_generic5test2yAA7DerivedCyxGlF{{.*}}
+// CHECK-LABEL: sil shared [noinline] @_T022devirt_unbound_generic5test2yAA7DerivedCyxGlF{{.*}}
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply
@@ -72,7 +72,7 @@ public func doTest2<T>(_ t:T) {
 
 // Check that the class method Derived<T>.boo can be devirtualized, because Derived.boo is an internal function,
 // Derived has no subclasses and it is a WMO compilation.
-// CHECK: sil hidden [noinline] @_T022devirt_unbound_generic5test3yAA7DerivedCyxGlF{{.*}}
+// CHECK: sil shared [noinline] @_T022devirt_unbound_generic5test3yAA7DerivedCyxGlF{{.*}}
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply

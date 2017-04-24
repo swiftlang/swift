@@ -1701,19 +1701,19 @@ bb0(%0 : $*T):
   return %r : $()
 }
 
-// CHECK-LABEL: sil @_T036exploded_release_to_guaranteed_paramTf4gX_n
+// CHECK-LABEL: sil shared @_T036exploded_release_to_guaranteed_paramTf4gX_n
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):
 // CHECK-NOT: strong_release
 // CHECK: return
 
-// CHECK-LABEL: sil @_T025single_owned_return_valueTf4n_g : $@convention(thin) (@owned boo) -> boo
+// CHECK-LABEL: sil shared @_T025single_owned_return_valueTf4n_g : $@convention(thin) (@owned boo) -> boo
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
 // CHECK-NOT: retain_value
 // CHECK: return
 
 // There should not be a single retain in this function.
 //
-// CHECK-LABEL: sil @_T045single_owned_return_value_with_self_recursionTf4n_g : $@convention(thin) (@owned boo) -> boo
+// CHECK-LABEL: sil shared @_T045single_owned_return_value_with_self_recursionTf4n_g : $@convention(thin) (@owned boo) -> boo
 // CHECK: bb0
 // CHECK-NOT: retain_value
 // CHECK: return
@@ -1776,26 +1776,26 @@ bb0(%0 : $*T):
 // CHECK:  return
 
 // Check that an owned-to-guaranteed has happened.
-// CHECK-LABEL: sil hidden [noinline] @_T027generic_owned_to_guaranteedTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
-// CHECK-NOT: release_value 
+// CHECK-LABEL: sil shared [noinline] @_T027generic_owned_to_guaranteedTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
+// CHECK-NOT: release_value
 // CHECK-NOT: strong_release 
 // CHECK-NOT: destroy_addr 
 // CHECK: end sil function '_T027generic_owned_to_guaranteedTf4g_n'
 
 // Check that an owned-to-guaranteed has happened.
-// CHECK-LABEL: sil @_T034generic_owned_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
-// Call the specialized function. It should have a guaranteed param now. 
+// CHECK-LABEL: sil shared @_T034generic_owned_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
+// Call the specialized function. It should have a guaranteed param now.
 // CHECK: function_ref @_T027generic_owned_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
 // CHECK: apply
 // CHECK: end sil function '_T034generic_owned_to_guaranteed_callerTf4g_n'
 
 // Check that a in-to-guaranteed has happened.
-// CHECK-LABEL: sil hidden [noinline] @_T024generic_in_to_guaranteedTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
+// CHECK-LABEL: sil shared [noinline] @_T024generic_in_to_guaranteedTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
 // CHECK-NOT: destroy_addr
 // CHECK: end sil function '_T024generic_in_to_guaranteedTf4g_n'
 
 // Check that a in-to-guaranteed has happened.
-// CHECK-LABEL: sil @_T031generic_in_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
+// CHECK-LABEL: sil shared @_T031generic_in_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
 // Call the specialized function. It should have a guaranteed param now. 
 // CHECK: function_ref @_T024generic_in_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
 // CHECK: apply
