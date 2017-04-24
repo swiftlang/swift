@@ -1981,9 +1981,7 @@ done:
   for (auto i = emittedInoutArgs.begin(), e = emittedInoutArgs.end();
          i != e; ++i) {
     for (auto j = emittedInoutArgs.begin(); j != i; ++j) {
-      // TODO: This uses exact SILValue equivalence to detect aliases,
-      // we could do something stronger here to catch other obvious cases.
-      if (i->first != j->first) continue;
+      if (!RValue::areObviouslySameValue(i->first, j->first)) continue;
 
       SGF.SGM.diagnose(i->second, diag::inout_argument_alias)
         .highlight(i->second.getSourceRange());
