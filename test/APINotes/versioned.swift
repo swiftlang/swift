@@ -13,9 +13,13 @@
 // RUN: not %target-swift-frontend -typecheck -F %S/Inputs/custom-frameworks -swift-version 4 %s 2>&1 | %FileCheck -check-prefix=CHECK-DIAGS -check-prefix=CHECK-DIAGS-4 %s
 // RUN: not %target-swift-frontend -typecheck -F %S/Inputs/custom-frameworks -swift-version 3 %s 2>&1 | %FileCheck -check-prefix=CHECK-DIAGS -check-prefix=CHECK-DIAGS-3 %s
 
+// RUN: %target-swift-frontend -emit-silgen -F %S/Inputs/custom-frameworks -swift-version 3 %s -DSILGEN 2>&1 | %FileCheck -check-prefix=CHECK-SILGEN -check-prefix=CHECK-SILGEN-3 %s
+// RUN: %target-swift-frontend -emit-silgen -F %S/Inputs/custom-frameworks -swift-version 4 %s -DSILGEN 2>&1 | %FileCheck -check-prefix=CHECK-SILGEN -check-prefix=CHECK-SILGEN-4 %s
+
 import APINotesFrameworkTest
 
-func testRenamedTopLevel() {
+#if !SILGEN
+func testRenamedTopLevelDiags() {
   var value = 0.0
 
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
@@ -53,8 +57,7 @@ func testRenamedTopLevel() {
 
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   _ = VeryImportantCStruct()
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: 'VeryImportantCStruct' has been renamed to 'ImportantCStruct'
-  // CHECK-DIAGS-3: note: 'VeryImportantCStruct' was introduced in Swift 4
+  // CHECK-DIAGS-3-NOTE: versioned.swift:[[@LINE-1]]:
 
   // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE+1]]:
   _ = InnerInSwift4()
@@ -63,5 +66,18 @@ func testRenamedTopLevel() {
 
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   _ = Outer.Inner()
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:13: error: 'Inner' has been renamed to 'InnerInSwift4'
+  // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE-1]]:
 }
+#endif
+
+#if !swift(>=4)
+func useSwift3Name(_: ImportantCStruct) {}
+// CHECK-SILGEN-3: sil hidden @_T09versioned13useSwift3NameySo20VeryImportantCStructVF
+
+func useNewlyNested(_: InnerInSwift4) {}
+// CHECK-SILGEN-3: sil hidden @_T09versioned14useNewlyNestedySo5OuterV5InnerVF
+#endif
+
+func useSwift4Name(_: VeryImportantCStruct) {}
+// CHECK-SILGEN: sil hidden @_T09versioned13useSwift4NameySo20VeryImportantCStructVF
+
