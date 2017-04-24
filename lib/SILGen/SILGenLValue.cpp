@@ -78,6 +78,28 @@ static void pushWriteback(SILGenFunction &SGF,
   cleanup.Depth = context.stable_begin();
 }
 
+void ExclusiveBorrowFormalAccess::diagnoseConflict(
+                                    const ExclusiveBorrowFormalAccess &rhs,
+                                    SILGenFunction &SGF) const {
+  // If the two writebacks we're comparing are of different kinds (e.g.
+  // ownership conversion vs a computed property) then they aren't the
+  // same and thus cannot conflict.
+  if (component->getKind() != rhs.component->getKind())
+    return;
+
+  // If the lvalues don't have the same base value (possibly null), then
+  // they aren't the same.  Note that this is the primary source of false
+  // negative for this diagnostic.
+  SILValue lhsBaseValue = base.getValue(), rhsBaseValue = rhs.base.getValue();
+  if (lhsBaseValue != rhsBaseValue &&
+      (!lhsBaseValue || !rhsBaseValue ||
+       !RValue::areObviouslySameValue(lhsBaseValue, rhsBaseValue))) {
+    return;
+  }
+
+  component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc, SGF);
+}
+
 //===----------------------------------------------------------------------===//
 
 static CanType getSubstFormalRValueType(Expr *expr) {

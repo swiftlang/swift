@@ -7,12 +7,16 @@ func takesTwoInouts<T>(_ p1: inout T, _ p2: inout T) { }
 func simpleInoutDiagnostic() {
   var i = 7
 
+  // expected-error@+4{{inout arguments are not allowed to alias each other}}
+  // expected-note@+3{{previous aliasing argument}}
   // expected-warning@+2{{simultaneous accesses to var 'i'; modification requires exclusive access}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&i, &i)
 }
 
 func inoutOnInoutParameter(p: inout Int) {
+  // expected-error@+4{{inout arguments are not allowed to alias each other}}
+  // expected-note@+3{{previous aliasing argument}}
   // expected-warning@+2{{simultaneous accesses to parameter 'p'; modification requires exclusive access}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&p, &p)
@@ -34,6 +38,8 @@ struct StructWithMutatingMethodThatTakesSelfInout {
   mutating func mutate(_ other: inout SomeClass) { }
 
   mutating func callMutatingMethodThatTakesSelfInout() {
+    // expected-error@+4{{inout arguments are not allowed to alias each other}}
+    // expected-note@+3{{previous aliasing argument}}
     // expected-warning@+2{{simultaneous accesses to parameter 'self'; modification requires exclusive access}}
     // expected-note@+1{{conflicting access is here}}
     mutate(&self)
@@ -74,6 +80,8 @@ class ClassWithFinalStoredProp {
 
 func violationWithGenericType<T>(_ p: T) {
   var local = p
+  // expected-error@+4{{inout arguments are not allowed to alias each other}}
+  // expected-note@+3{{previous aliasing argument}}
   // expected-warning@+2{{simultaneous accesses to var 'local'; modification requires exclusive access}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&local, &local)
