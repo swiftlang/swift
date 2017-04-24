@@ -2443,6 +2443,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
   ObjCKind = 0;
+  HasMissingDesignatedInitializers = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2451,6 +2452,13 @@ DestructorDecl *ClassDecl::getDestructor() {
   assert(!results.empty() && "Class without destructor?");
   assert(results.size() == 1 && "More than one destructor?");
   return cast<DestructorDecl>(results.front());
+}
+
+bool ClassDecl::hasMissingDesignatedInitializers() const {
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  (void)mutableThis->lookupDirect(getASTContext().Id_init,
+                                  /*ignoreNewExtensions*/true);
+  return HasMissingDesignatedInitializers;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
@@ -2476,6 +2484,14 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   ClassDecl *superclassDecl;
   if (!getSuperclass() ||
       !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
+    ClassDeclBits.InheritsSuperclassInits
+      = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
+    return false;
+  }
+
+  // If the superclass has known-missing designated initializers, inheriting
+  // is unsafe.
+  if (superclassDecl->hasMissingDesignatedInitializers()) {
     ClassDeclBits.InheritsSuperclassInits
       = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
     return false;
