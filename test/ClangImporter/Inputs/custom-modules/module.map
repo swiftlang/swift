@@ -138,6 +138,10 @@ module TypeAndValue {
   export *
 }
 
+module UnimportableMembers {
+  header "UnimportableMembers.h"
+}
+
 module UsesSubmodule {
   header "UsesSubmodule.h"
   export *
