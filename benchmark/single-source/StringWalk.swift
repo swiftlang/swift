@@ -22,6 +22,10 @@ import TestsUtils
 
 var count: Int = 0
 
+//
+// Helper functionality
+//
+
 @inline(never) func countScalars(_ s: String.UnicodeScalarView) {
   for _ in s {
     count += 1
@@ -47,11 +51,22 @@ var count: Int = 0
   }
 }
 
+//
+// Workloads
+//
 let asciiString =
   "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
 let winter = "🏂☃❅❆❄︎⛄️❄️"
 let utf16String =
   winter + "the quick brown fox" + String(winter.characters.reversed())
+
+// A workload that's mostly Latin characters, with occasional emoji
+// interspersed. Common for tweets.
+let tweetString = "Worst thing about working on String is that it breaks *everything*. Asserts, debuggers, and *especially* printf-style debugging 😭"
+
+//
+// Benchmarks
+//
 
 // Pre-commit benchmark: simple scalar walk
 @inline(never)
@@ -93,6 +108,20 @@ public func run_StringWalkUnicodeCharacters(_ N: Int) {
 }
 
 @inline(never)
+public func run_StringWalkMixedScalars(_ N: Int) {
+  for _ in 1...scalarsMultiplier*N {
+    countScalars(tweetString.unicodeScalars)
+  }
+}
+
+@inline(never)
+public func run_StringWalkMixedCharacters(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    countCharacters(tweetString.characters)
+  }
+}
+
+@inline(never)
 public func run_StringWalkASCIIScalarsBackwards(_ N: Int) {
   for _ in 1...scalarsMultiplier*N {
     countScalars_rev(asciiString.unicodeScalars.reversed())
@@ -117,5 +146,19 @@ public func run_StringWalkUnicodeScalarsBackwards(_ N: Int) {
 public func run_StringWalkUnicodeCharactersBackwards(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
     countCharacters_rev(utf16String.characters.reversed())
+  }
+}
+
+@inline(never)
+public func run_StringWalkMixedScalarsBackwards(_ N: Int) {
+  for _ in 1...scalarsMultiplier*N {
+    countScalars_rev(tweetString.unicodeScalars.reversed())
+  }
+}
+
+@inline(never)
+public func run_StringWalkMixedCharactersBackwards(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    countCharacters_rev(tweetString.characters.reversed())
   }
 }

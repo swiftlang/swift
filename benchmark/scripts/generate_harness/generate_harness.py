@@ -150,10 +150,14 @@ string_tests = [
     "StringWalkASCIICharacters",
     "StringWalkUnicodeScalars",
     "StringWalkUnicodeCharacters",
+    "StringWalkMixedScalars",
+    "StringWalkMixedCharacters",
     "StringWalkASCIIScalarsBackwards",
     "StringWalkASCIICharactersBackwards",
     "StringWalkUnicodeScalarsBackwards",
     "StringWalkUnicodeCharactersBackwards",
+    "StringWalkMixedScalarsBackwards",
+    "StringWalkMixedCharactersBackwards",
 ]
 
 ignored_run_funcs = other_tests + string_tests
