@@ -33,12 +33,12 @@ extension FixedWidthInteger {
   @discardableResult
   // @_transparent
   public mutating func replaceUWord(_ n: Int, with newBits: UInt) -> Bool {
-    let flippedBits = word(at: n) ^ newBits
+    let flippedBits = _word(at: n) ^ newBits
     self ^= Self(_truncatingBits: flippedBits) << (${word_bits} * n)
-    if word(at: n) != newBits {
+    if _word(at: n) != newBits {
       _log("###### overflow replacing word \(n) with \(newBits.hex)")
     }
-    return word(at: n) == newBits
+    return _word(at: n) == newBits
   }
 
   /// a hex representation of every bit in the number
@@ -54,7 +54,7 @@ extension FixedWidthInteger {
       if nibbles % 4 == 0 && nibbles != 0 {
         result.insert("_", at: result.startIndex)
       }
-      let lowUWord = x.word(at: 0)
+      let lowUWord = x._word(at: 0)
       result.insert(
         hexDigits[Int(lowUWord._value) & 0xF],
         at: result.startIndex
@@ -495,16 +495,17 @@ tests.test("Basics") {
 
 tests.test("word") {
   let x = UDWord(Int.max)
-  expectEqual(Int.max._lowUWord, x.word(at: 0))
-  expectEqual(0, x.word(at: 1))
+  expectEqual(Int.max._lowUWord, x._word(at: 0))
+  expectEqual(0, x._word(at: 1))
 
   let y = DWord(Int.min)
-  expectEqual(Int.min._lowUWord, y.word(at: 0))
-  expectEqual(~0, y.word(at: 1))
+  expectEqual(Int.min._lowUWord, y._word(at: 0))
+  expectEqual(~0, y._word(at: 1))
 
   let z = UInt(~Int.min) + 1
-  expectEqual(Int.min._lowUWord, z.word(at: 0))
-  expectEqual(0, z.word(at: 1))
+  expectEqual(Int.min._lowUWord, z._word(at: 0))
+  expectEqual(0, z._word(at: 1))
+}
 }
 
 tests.test("multipliedFullWidth/UInt8") {
