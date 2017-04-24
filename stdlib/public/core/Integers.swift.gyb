@@ -2172,6 +2172,7 @@ extension FixedWidthInteger {
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
 
+  @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
 }
