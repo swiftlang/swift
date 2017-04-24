@@ -976,6 +976,28 @@ class PrintAST : public ASTVisitor<PrintAST> {
     TL.getType().print(Printer, Options);
   }
 
+  void printContextIfNeeded(const Decl *decl) {
+    if (IndentLevel > 0)
+      return;
+
+    switch (Options.ShouldQualifyNestedDeclarations) {
+    case PrintOptions::QualifyNestedDeclarations::Never:
+      return;
+    case PrintOptions::QualifyNestedDeclarations::TypesOnly:
+      if (!isa<TypeDecl>(decl))
+        return;
+      break;
+    case PrintOptions::QualifyNestedDeclarations::Always:
+      break;
+    }
+
+    auto *container = dyn_cast<NominalTypeDecl>(decl->getDeclContext());
+    if (!container)
+      return;
+    printType(container->getDeclaredInterfaceType());
+    Printer << ".";
+  }
+
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
 
@@ -2404,6 +2426,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << tok::kw_typealias << " ";
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2474,6 +2497,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_enum << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2501,6 +2525,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_struct << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2528,6 +2553,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_class << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2557,6 +2583,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_protocol << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2628,6 +2655,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << (decl->isLet() ? tok::kw_let : tok::kw_var) << " ";
   }
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2932,6 +2960,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
         Printer << tok::kw_func << " ";
       }
+      printContextIfNeeded(decl);
       recordDeclLoc(decl,
         [&]{ // Name
           if (!decl->hasName())
@@ -3054,6 +3083,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
+  printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
@@ -3087,6 +3117,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       Printer << "/*not inherited*/ ";
   }
 
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
@@ -3135,6 +3166,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer << "deinit";

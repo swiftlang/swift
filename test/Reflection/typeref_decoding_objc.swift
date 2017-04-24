@@ -10,34 +10,34 @@
 // CHECK: =======
 // CHECK: TypesToReflect.OC
 // CHECK: -----------------
-// CHECK: nsObject: __ObjC.NSObject
-// CHECK: (class __ObjC.NSObject)
+// CHECK: nsObject: __C.NSObject
+// CHECK: (class __C.NSObject)
 
-// CHECK: nsString: __ObjC.NSString
-// CHECK: (class __ObjC.NSString)
+// CHECK: nsString: __C.NSString
+// CHECK: (class __C.NSString)
 
-// CHECK: cfString: __ObjC.CFString
-// CHECK: (class __ObjC.CFString)
+// CHECK: cfString: __C.CFString
+// CHECK: (class __C.CFString)
 
 // CHECK: aBlock: @convention(block) () -> ()
 // CHECK: (function convention=block
 // CHECK:   (tuple))
 
-// CHECK: ocnss: TypesToReflect.GenericOC<__ObjC.NSString>
+// CHECK: ocnss: TypesToReflect.GenericOC<__C.NSString>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
-// CHECK:   (class __ObjC.NSString))
+// CHECK:   (class __C.NSString))
 
-// CHECK: occfs: TypesToReflect.GenericOC<__ObjC.CFString>
+// CHECK: occfs: TypesToReflect.GenericOC<__C.CFString>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
-// CHECK:   (class __ObjC.CFString))
+// CHECK:   (class __C.CFString))
 
 // CHECK: TypesToReflect.GenericOC
 // CHECK: ------------------------
 
 // CHECK: TypesToReflect.HasObjCClasses
 // CHECK: -----------------------------
-// CHECK: url: __ObjC.NSURL
-// CHECK: (class __ObjC.NSURL)
+// CHECK: url: __C.NSURL
+// CHECK: (class __C.NSURL)
 
 // CHECK: integer: Swift.Int
 // CHECK: (struct Swift.Int)
@@ -48,12 +48,12 @@
 // CHECK: TypesToReflect.OP
 // CHECK: -----------------
 
-// CHECK: __ObjC.Bundle
-// CHECK: ---------------
-// CHECK: __ObjC.NSURL
+// CHECK: __C.Bundle
+// CHECK: ----------
+// CHECK: __C.NSURL
+// CHECK: ---------
+// CHECK: __C.NSCoding
 // CHECK: ------------
-// CHECK: __ObjC.NSCoding
-// CHECK: ---------------
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
@@ -77,6 +77,6 @@
 // CHECK-NEXT: ====================
 
 // CHECK:      - Capture types:
-// CHECK-NEXT: (class __ObjC.Bundle)
-// CHECK-NEXT: (protocol __ObjC.NSCoding)
+// CHECK-NEXT: (class __C.Bundle)
+// CHECK-NEXT: (protocol __C.NSCoding)
 // CHECK-NEXT: - Metadata sources:

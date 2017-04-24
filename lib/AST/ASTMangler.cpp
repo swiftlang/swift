@@ -1036,28 +1036,21 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
-  auto clangDecl = decl->getClangDecl();
-
-  // Classes and protocols implemented in Objective-C have a special context
+  // Declarations provided provided by a C module have a special context
   // mangling.
   //   known-context ::= 'So'
-  if (isa<ClassDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCInterfaceDecl>(clangDecl) ||
-           isa<clang::TypedefDecl>(clangDecl));
-    return appendOperator("So");
-  }
-  
-  if (isa<ProtocolDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCProtocolDecl>(clangDecl));
-    return appendOperator("So");
-  }
-
-  // Declarations provided by a C module have a special context mangling.
+  //
+  // Also handle top-level imported declarations that don't have corresponding
+  // Clang decls. Check getKind() directly to avoid a layering dependency.
   //   known-context ::= 'SC'
-  // Do a dance to avoid a layering dependency.
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
-    if (file->getKind() == FileUnitKind::ClangModule)
+    if (file->getKind() == FileUnitKind::ClangModule) {
+      // FIXME: Import-as-member Clang decls should appear under 'So' as well,
+      // rather than under their current parent.
+      if (decl->getClangDecl())
+        return appendOperator("So");
       return appendOperator("SC");
+    }
   }
 
   // Just mangle the decl's DC.
@@ -1255,7 +1248,7 @@ void ASTMangler::appendModule(const ModuleDecl *module) {
   StringRef ModName = module->getName().str();
   if (ModName == MANGLING_MODULE_OBJC)
     return appendOperator("So");
-  if (ModName == MANGLING_MODULE_C)
+  if (ModName == MANGLING_MODULE_CLANG_IMPORTER)
     return appendOperator("SC");
 
   appendIdentifier(ModName);

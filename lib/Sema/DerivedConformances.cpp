@@ -17,6 +17,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
@@ -148,7 +149,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
   // normally.
-  if (parentDecl->hasClangNode())
+  if (isa<ClangModuleUnit>(parentDC->getModuleScopeContext()))
     tc.Context.addExternalDecl(getterDecl);
 
   return getterDecl;
