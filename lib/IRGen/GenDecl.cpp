@@ -2145,7 +2145,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     }
   } else {
     // Metadata for Clang types should be uniqued like foreign classes.
-    if (nom->hasClangNode()) {
+    if (isa<ClangModuleUnit>(nom->getModuleScopeContext())) {
       typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
       defaultTy = IGM.TypeMetadataStructTy;
@@ -2664,9 +2664,8 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
               "foreign candidate");
     defaultVarTy = TypeMetadataStructTy;
     adjustmentIndex = 0;
-  } else if (concreteType->getAnyNominal()) {
-    auto nom = concreteType->getNominalOrBoundGenericNominal();
-    assert((!nom || !nom->hasClangNode())
+  } else if (auto nom = concreteType->getAnyNominal()) {
+    assert(!isa<ClangModuleUnit>(nom->getModuleScopeContext())
            && "metadata for foreign type should be emitted as "
               "foreign candidate");
     (void)nom;
