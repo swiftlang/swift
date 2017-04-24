@@ -128,6 +128,7 @@ normalize_boolean_spelling(LLVM_ENABLE_ASSERTIONS)
 normalize_boolean_spelling(SWIFT_STDLIB_ASSERTIONS)
 normalize_boolean_spelling(SWIFT_AST_VERIFIER)
 normalize_boolean_spelling(SWIFT_ASAN_BUILD)
+normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
