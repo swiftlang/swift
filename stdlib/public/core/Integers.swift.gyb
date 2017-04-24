@@ -1476,6 +1476,12 @@ public protocol BinaryInteger :
   ///   n-th word of this value.
   func _word(at n: Int) -> UInt
 
+  // FIXME(integers): add doc comments
+  // FIXME: Should be `Words : Collection where Words.Iterator.Element == UInt`
+  // See <rdar://problem/31798916> for why it isn't.
+  associatedtype Words
+  var words: Words { get }
+
   /// The number of bits in the current binary representation of this value.
   ///
   /// This property is a constant for instances of fixed-width integer
@@ -1918,6 +1924,18 @@ extension BinaryInteger {
 }
 #endif
 
+extension BinaryInteger {
+  // FIXME(integers): inefficient. Should get rid of _word(at:) and
+  // countRepresentedWords, and make `words` the basic operation.
+  public var words: [UInt] {
+    var result = [UInt]()
+    result.reserveCapacity(countRepresentedWords)
+    for i in 0..<self.countRepresentedWords {
+      result.append(_word(at: i))
+    }
+    return result
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//

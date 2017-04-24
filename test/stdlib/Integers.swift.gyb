@@ -506,6 +506,16 @@ tests.test("word") {
   expectEqual(Int.min._lowUWord, z._word(at: 0))
   expectEqual(0, z._word(at: 1))
 }
+
+tests.test("words") {
+  expectEqualSequence([UInt.max], (-1 as Int).words)
+  expectEqualSequence([UInt.max], (-1 as Int8).words)
+  expectEqualSequence([UInt.max], (-1 as Int16).words)
+  expectEqualSequence([UInt.max], (-1 as Int32).words)
+  expectEqualSequence([UInt.max], (-1 as Int64).words)
+
+  expectEqualSequence([1], 1.words)
+  expectEqualSequence([0], 0.words)
 }
 
 tests.test("multipliedFullWidth/UInt8") {
