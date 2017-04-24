@@ -90,6 +90,7 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
+  void printHelp(bool ShowHidden) const;
 };
 
 }

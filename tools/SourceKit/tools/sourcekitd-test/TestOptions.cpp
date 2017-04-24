@@ -146,6 +146,12 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
+    case OPT_help: {
+      printHelp(false);
+      return true;
+      break;
+    }
+
     case OPT_offset:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Offset)) {
         llvm::errs() << "error: expected integer for 'offset'\n";
@@ -279,7 +285,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
-                   << InputArg->getAsString(ParsedArgs) << '\n';
+                   << InputArg->getAsString(ParsedArgs) << '\n'
+                   << "Use -h or -help for assistance" << '\n';
       return true;
     }
   }
@@ -291,4 +298,17 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
   }
 
   return false;
+}
+
+void TestOptions::printHelp(bool ShowHidden) const {
+
+  // Based off of swift/lib/Driver/Driver.cpp, at Driver::printHelp
+  //FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
+  // Maybe not for modes such as Interactive, Batch, AutolinkExtract, etc,
+  // as in Driver.cpp. But could be useful for extra info, like HelpHidden.
+
+  TestOptTable Table;
+
+  Table.PrintHelp(llvm::outs(), "sourcekitd-test", "SourceKit Testing Tool",
+                      ShowHidden);
 }
