@@ -620,10 +620,12 @@ static void verifySubstitutionList(SubstitutionList Subs, StringRef Name) {
         for (auto Sub : Subs) {
           Sub.getReplacement()->dump();
         });
+#ifndef NDEBUG
   for (auto Sub : Subs) {
     assert(!Sub.getReplacement()->hasError() &&
            "There should be no error types in substitutions");
   }
+#endif
 }
 
 /// This is a fast path for full specializations.
@@ -1115,6 +1117,7 @@ void FunctionSignaturePartialSpecializer::
     // Create an equivalent generic parameter.
     auto SubstGenericParam = createGenericParam();
     auto SubstGenericParamCanTy = SubstGenericParam->getCanonicalType();
+    (void)SubstGenericParamCanTy;
 
     CallerInterfaceToSpecializedInterfaceMapping
         [CallerGenericParam->getCanonicalType()
@@ -1972,6 +1975,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   CanSILFunctionType SubstType = ReInfo.getSubstitutedType();
   auto specConv = SpecializedFunc->getConventions();
+  (void)specConv;
   SILFunctionConventions substConv(SubstType, M);
 
   assert(specConv.useLoweredAddresses());

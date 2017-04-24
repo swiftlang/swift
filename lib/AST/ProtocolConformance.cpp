@@ -436,6 +436,7 @@ static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
   if (!knownKind) return false;
 
   auto &ctx = nominal->getASTContext();
+  (void)ctx;
 
   // Local function to handle resolution via lookup directly into the nominal
   // type.
