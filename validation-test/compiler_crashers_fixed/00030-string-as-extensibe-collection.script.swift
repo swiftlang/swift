@@ -6,7 +6,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: %target-swift-frontend %s -emit-ir
-
+// XFAIL: *
+// TODO: Decide if this test should just be deleted, now String _is_ an RRC
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 
 extension String : RangeReplaceableCollection {}
