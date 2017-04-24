@@ -125,6 +125,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   assert(optTL.isLoadable() && "Address-only optionals cannot use this");
   SILType optType = optTL.getLoweredType();
   CanType formalOptType = optType.getSwiftRValueType();
+  (void)formalOptType;
 
   assert(formalOptType.getAnyOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
