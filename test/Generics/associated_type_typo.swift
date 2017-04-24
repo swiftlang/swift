@@ -60,10 +60,10 @@ func typoFunc3<T : P1>(x: TypoType, y: (T.Assoc) -> ()) { // expected-error{{use
 typealias Element_<S: Sequence> = S.Iterator.Element
 
 public protocol _Indexable1 {
-  associatedtype Slice
+  associatedtype Slice // expected-note{{declared here}}
 }
 public protocol Indexable : _Indexable1 {
-  associatedtype Slice : _Indexable1
+  associatedtype Slice : _Indexable1 // expected-warning{{redeclaration of associated type 'Slice'}}
 }
 
 protocol Pattern {
