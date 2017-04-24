@@ -4,6 +4,7 @@
 
 import Bar
 
-func foo(_ b: BarForwardDeclaredClass) -> Int32 {
+func foo(_ b: BarForwardDeclaredClass, _ s: SomeItemSet) -> Int32 {
+  let _ = s.theSimpleOldName
   return barGlobalVariable
 }

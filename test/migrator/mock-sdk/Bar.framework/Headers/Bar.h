@@ -18,6 +18,7 @@ enum BarForwardDeclaredEnum {
 
 typedef struct {
   int count;
+  int theSimpleOldName;
 } SomeItemSet;
 
 typedef SomeItemSet SomeEnvironment;

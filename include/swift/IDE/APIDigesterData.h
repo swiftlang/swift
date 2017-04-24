@@ -91,6 +91,8 @@ public:
   static void undef(llvm::raw_ostream &os);
   void streamDef(llvm::raw_ostream &S) const override;
   StringRef getKey() const override { return LeftUsr; }
+  bool isRename() const { return DiffKind == NodeAnnotation::Rename; }
+  StringRef getNewName() const { assert(isRename()); return RightComment; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
   }
