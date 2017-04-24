@@ -40,7 +40,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_14 | %FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_15 | %FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_16 | %FileCheck %s -check-prefix=NO_OPERATORS
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_17 | %FileCheck %s -check-prefix=NO_OPERATORS
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_17 | %FileCheck %s -check-prefix=VOID_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_18 | %FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_19 | %FileCheck %s -check-prefix=EMPTYCLASS_INFIX
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_20 | %FileCheck %s -check-prefix=NO_OPERATORS
@@ -244,6 +244,7 @@ func testInfix11() {
   S2#^INFIX_11^#
 }
 // NO_OPERATORS-NOT: Decl[InfixOperatorFunction]
+
 func testInfix12() {
   P#^INFIX_12^#
 }
@@ -259,9 +260,20 @@ func testInfix15<T: P where T.T == S2>() {
 func testInfix16<T: P where T.T == S2>() {
   T.foo#^INFIX_16^#
 }
+
 func testInfix17(x: Void) {
   x#^INFIX_17^#
 }
+
+// VOID_OPERATORS: Begin completions
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#()#}[#Bool#]; name=!= ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#()#}[#Bool#]; name=== ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  <= {#()#}[#Bool#]; name=<= ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  >= {#()#}[#Bool#]; name=>= ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#()#}[#Bool#]; name=< ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  > {#()#}[#Bool#]; name=> ()
+// VOID_OPERATORS: End completions
+
 func testInfix18(x: (S2, S2) {
   x#^INFIX_18^#
 }
