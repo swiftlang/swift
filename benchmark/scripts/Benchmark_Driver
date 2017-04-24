@@ -123,12 +123,10 @@ def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     tests = subprocess.check_output([driver_path, '--list']).split()[2:]
     if args.filter:
-        prefix = args.filter
-        tests = filter(lambda name: name.startswith(prefix), tests)
-    elif args.benchmark:
-        benchmarks = set(args.benchmark)
-        tests = sorted(list(set(tests).intersection(benchmarks)))
-    return tests
+        return filter(lambda name: name.startswith(args.filter), tests)
+    if not args.benchmark:
+        return tests
+    return sorted(list(set(tests).intersection(set(args.benchmark))))
 
 
 def get_current_git_branch(git_repo_path):
