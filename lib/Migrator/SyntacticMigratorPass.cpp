@@ -68,6 +68,7 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
     if (Opts.APIDigesterDataStorePath.empty())
       return;
     DiffStore.addStorePath(Opts.APIDigesterDataStorePath);
+    DiffStore.printIncomingUsr(Opts.DumpUsr);
     walk(SF);
   }
 

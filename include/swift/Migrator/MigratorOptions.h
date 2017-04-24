@@ -28,6 +28,9 @@ struct MigratorOptions {
   /// compiler and applies them. This is generally for debugging.
   bool EnableMigratorFixits = true;
 
+  /// Whether to print each USR we query the api change data store about.
+  bool DumpUsr = false;
+
   /// If non-empty, print the last MigrationState's output text to the given
   /// file path.
   std::string EmitMigratedFilePath = "";

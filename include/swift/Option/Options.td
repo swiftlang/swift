@@ -434,6 +434,9 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
   HelpText<"API migration data is from <path>">,
   MetaVarName<"<path>">;
 
+def dump_usr: Flag<["-"], "dump-usr">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Dump USR for each declaration reference">;
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
