@@ -9,8 +9,8 @@ func delimit(_ str: String) -> String {
     return "<\(str)>"
 }
 
-// CHECK: -11-
-print("-11-")
+// CHECK: -1-
+print("-1-")
 // CHECK-ERRORS: error: invalid mix of multi-line string literal indentation
 print(delimit("""
     Eleven
@@ -18,8 +18,8 @@ print(delimit("""
     """
 ))
 
-// CHECK: -12-
-print("-12-")
+// CHECK: -2-
+print("-2-")
 // Note: The next few tests use physical tab characters, not spaces.
 // CHECK-ERRORS: error: invalid mix of multi-line string literal indentation
 print(delimit("""
@@ -28,8 +28,8 @@ print(delimit("""
 	"""
 ))
 
-// CHECK: -13-
-print("-13-")
+// CHECK: -3-
+print("-3-")
 // CHECK-ERRORS: error: invalid mix of multi-line string literal indentation
 print(delimit("""
   Thirteen
@@ -37,8 +37,8 @@ print(delimit("""
   """
 ))
 
-// CHECK: -14-
-print("-14-")
+// CHECK: -4-
+print("-4-")
 // CHECK-ERRORS: error: invalid mix of multi-line string literal indentation
 print(delimit("""
     Fourteen
@@ -46,16 +46,16 @@ print(delimit("""
     """
 ))
 
-// CHECK: -15-
-print("-15-")
+// CHECK: -5-
+print("-5-")
 // CHECK-ERRORS: error: invalid start of multi-line string literal
 print(delimit("""Fourteen
     Pi
     """
 ))
 
-// CHECK: -16-
-print("-16-")
+// CHECK: -6-
+print("-6-")
 // CHECK-ERRORS: error: invalid end of multi-line string literal
 print(delimit("""
     Fourteen

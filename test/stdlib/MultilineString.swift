@@ -1,9 +1,6 @@
 // RUN: %target-run-stdlib-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-// RUN: %target-build-swift %s 2> %t.warnings.txt
-// RUN: %FileCheck -check-prefix=CHECK-WARNINGS %s < %t.warnings.txt
-
 import Swift
 
 // ===---------- Multiline --------===
@@ -112,6 +109,15 @@ print("-10-")
 print(delimit("""
 \\
 """))
+
+// CHECK: -11-
+print("-11-")
+// CHECK-NEXT: {{^}}<
+// CHECK-NEXT: {{^}}ABC>
+print(delimit("""
+
+  ABC
+  """))
 
 // ===---------- Done --------===
 // CHECK-NEXT: Done.

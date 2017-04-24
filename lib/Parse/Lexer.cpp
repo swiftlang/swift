@@ -1338,46 +1338,43 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 /// Extract content of string literal from inside quotes.
 static StringRef getStringLiteralContent(const Token &Str) {
   StringRef Bytes = Str.getText();
-  Bytes = Bytes.drop_front().drop_back();
 
-  if (Str.getStringModifiers() & StringLiteralMultiline) {
+  if (Str.getStringModifiers() & StringLiteralMultiline)
+    Bytes = Bytes.drop_front(3).drop_back(3);
+  else
     Bytes = Bytes.drop_front().drop_back();
-    Bytes = Bytes.drop_front().drop_back();
-  }
 
   return Bytes;
 }
 
-/// getTrailingIndentOrWindowsLineEnding:
-/// Determine contents of literal to be normalized, either
-/// to strip indenting or normalize line endings to a single \n.
-static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
+/// getTrailingIndent:
+/// Determine contents of literal to be indent stripped.
+static std::string getTrailingIndent(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *end = Bytes.end(), *start = end;
 
   // Work back from the end to find whitespace to strip.
-  while (start > Bytes.begin() && isWhitespace(start[-1])) {
+  while (start > Bytes.begin()) {
     switch (*--start) {
+    case ' ':
+    case '\t':
+      continue;
     case '\n':
-      if (start[-1] == '\r')
-        --start;
-      LLVM_FALLTHROUGH;
     case '\r':
-      return std::string(start, end-start);
+      return std::string(start+1, end-(start+1));
+    default:
+      return "";
     }
   }
 
-  // Are there non UNIX line endings? If so, they should be replaced.
-  return Bytes.find("\r\n") != StringRef::npos ? "\r\n"
-    : Bytes.find("\r") != StringRef::npos ? "\r" : "\n";
+  return "";
 }
 
 /// validateIndents:
-/// Check that contents of string literal have consistent indentation
-/// for removal and contain equivalent line endings (beginnings).
+/// Check that contents of string literal have consistent indentation.
 void Lexer::validateIndents(const Token &Str) {
-  std::string ToReplace = getTrailingIndentOrWindowsLineEnding(Str);
-  if (ToReplace.empty())
+  std::string ToStrip = getTrailingIndent(Str);
+  if (ToStrip.empty())
     return;
 
   StringRef Bytes = getStringLiteralContent(Str);
@@ -1386,9 +1383,7 @@ void Lexer::validateIndents(const Token &Str) {
   while ((pos = Bytes.find('\n', pos)) != StringRef::npos) {
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
-      if (BytesPtr[pos-1] == '\r')
-        pos--;
-      if (StringRef(BytesPtr + pos, ToReplace.size()) != ToReplace)
+      if (Bytes.substr(nextpos, ToStrip.size()) != ToStrip)
         diagnose(BytesPtr + nextpos, diag::lex_ambiguous_string_indent);
     }
     pos = nextpos;
@@ -1675,31 +1670,7 @@ void Lexer::tryLexEditorPlaceholder() {
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
                                          unsigned Modifiers,
-                                         const std::string &ToReplace) {
-
-  // The next section of code is somewhat overcooked. It is a global replace of
-  // the string returned by getTrailingIndentOrWindowsLineEnding(token) which
-  // strips any indent that corresponds to the indent of the multiline string
-  // terminating line and normalizes line endings in the source to \n. It also
-  // removes any intial (and final) empty line.
-
-  std::string IndentStripped;
-
-  if ((Modifiers & StringLiteralMultiline) && !ToReplace.empty()) {
-    IndentStripped = Bytes;
-    size_t pos = 0;
-    while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
-      bool removeNewLine =
-        // Strip empty line at beginning.
-        (pos == 0 && (Modifiers & StringLiteralFirstSegment)) ||
-        // Strip trailing line ending.
-        ((Modifiers & StringLiteralLastSegment) &&
-         pos + ToReplace.size() == IndentStripped.size());
-      IndentStripped.replace(pos, ToReplace.size(), removeNewLine ? "" : "\n");
-      pos++;
-    }
-    Bytes = IndentStripped;
-  }
+                                         const std::string &ToStrip) {
 
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
@@ -1708,6 +1679,22 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   const char *BytesPtr = Bytes.begin();
   while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
+
+    // Multiline string line ending normalization and indent stripping.
+    if (CurChar == '\r' || CurChar == '\n') {
+      bool stripNewline = (Modifiers & StringLiteralFirstSegment) &&
+        BytesPtr - 1 == Bytes.begin();
+      if (CurChar == '\r' && *BytesPtr == '\n')
+        BytesPtr++;
+      if (ToStrip.length() && StringRef(BytesPtr, ToStrip.length()) == ToStrip)
+        BytesPtr += ToStrip.length();
+      if ((Modifiers & StringLiteralLastSegment) && BytesPtr == Bytes.end())
+        stripNewline = true;
+      if (!stripNewline)
+        TempString.push_back('\n');
+      continue;
+    }
+
     if (CurChar != '\\') {
       TempString.push_back(CurChar);
       continue;
@@ -1755,7 +1742,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped
   // forms (in a valid string).
-  if (TempString.size() == Bytes.size() && ToReplace.empty()) {
+  if (TempString.size() == Bytes.size()) {
     TempString.clear();
     return Bytes;
   }
@@ -1772,10 +1759,10 @@ void Lexer::getStringLiteralSegments(
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
-  std::string ToReplace = "";
+  std::string ToStrip = "";
   unsigned Modifiers = Str.getStringModifiers() | StringLiteralFirstSegment;
   if (Modifiers & StringLiteralMultiline)
-      ToReplace = getTrailingIndentOrWindowsLineEnding(Str);
+      ToStrip = getTrailingIndent(Str);
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1797,7 +1784,7 @@ void Lexer::getStringLiteralSegments(
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                   BytesPtr-SegmentStartPtr-2,
-                                  Modifiers, ToReplace));
+                                  Modifiers, ToStrip));
     Modifiers &= ~StringLiteralFirstSegment;
 
     // Find the closing ')'.
@@ -1820,7 +1807,7 @@ void Lexer::getStringLiteralSegments(
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
-                                Modifiers|StringLiteralLastSegment, ToReplace));
+                                Modifiers | StringLiteralLastSegment, ToStrip));
 }
 
 

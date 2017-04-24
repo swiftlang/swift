@@ -376,17 +376,17 @@ public:
     SourceLoc Loc;
     unsigned Length;
     unsigned Modifiers;
-    std::string ToReplace;
+    std::string ToStrip;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
                                     unsigned Modifiers,
-                                    const std::string &ToReplace) {
+                                    const std::string &ToStrip) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
       Result.Modifiers = Modifiers;
-      Result.ToReplace = ToReplace;
+      Result.ToStrip = ToStrip;
       return Result;
     }
     
@@ -405,12 +405,12 @@ public:
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
                                            unsigned Modifiers = 0,
-                                           const std::string &ToReplace = "");
+                                           const std::string &ToStrip = "");
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer, Segment.Modifiers, Segment.ToReplace);
+        Buffer, Segment.Modifiers, Segment.ToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
