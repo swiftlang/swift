@@ -1178,36 +1178,6 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  /// Creates a new collection by concatenating the elements of two collections.
-  ///
-  /// The two arguments must have the same `Element` type. For example, you can
-  /// concatenate the elements of two integer arrays.
-  ///
-  ///     let lowerNumbers = [1, 2, 3, 4]
-  ///     let higherNumbers: ContiguousArray = [5, 6, 7, 8, 9, 10]
-  ///     let allNumbers = lowerNumbers + higherNumbers
-  ///     print(allNumbers)
-  ///     // Prints "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
-  ///
-  /// The resulting collection has the type of the argument on the left-hand
-  /// side. In the example above, `moreNumbers` has the same type as `numbers`,
-  /// which is `[Int]`.
-  ///
-  /// - Parameters:
-  ///   - lhs: A range-replaceable collection.
-  ///   - rhs: Another range-replaceable collection.
-  @_inlineable
-  public static func +<
-    RRC2 : RangeReplaceableCollection
-  >(lhs: Self, rhs: RRC2) -> Self
-    where Iterator.Element == RRC2.Iterator.Element {
-
-    var lhs = lhs
-    // FIXME: what if lhs is a reference type?  This will mutate it.
-    lhs.append(contentsOf: rhs)
-    return lhs
-  }
-
   @_inlineable
   public static func + (lhs: Self, rhs: Self) -> Self {
     var lhs = lhs
