@@ -6898,7 +6898,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   }
   if (!Result && version == CurrentVersion) {
     // If we couldn't import this Objective-C entity, determine
-    // whether it was a required member of a protocol.
+    // whether it was a required member of a protocol, or a designated
+    // initializer of a class.
     bool hasMissingRequiredMember = false;
     if (auto clangProto
           = dyn_cast<clang::ObjCProtocolDecl>(ClangDecl->getDeclContext())) {
@@ -6917,6 +6918,21 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
         if (auto proto = cast_or_null<ProtocolDecl>(
                 importDecl(clangProto, CurrentVersion))) {
           proto->setHasMissingRequirements(true);
+        }
+      }
+    }
+    if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
+      if (!SwiftContext.LangOpts.isSwiftVersion3() &&
+          method->isDesignatedInitializerForTheInterface()) {
+        const clang::ObjCInterfaceDecl *theClass = method->getClassInterface();
+        assert(theClass && "cannot be a protocol method here");
+        // Only allow this to affect declarations in the same top-level module
+        // as the original class.
+        if (getClangModuleForDecl(theClass) == getClangModuleForDecl(method)) {
+          if (auto swiftClass = cast_or_null<ClassDecl>(
+                  importDecl(theClass, CurrentVersion))) {
+            swiftClass->setHasMissingDesignatedInitializers();
+          }
         }
       }
     }

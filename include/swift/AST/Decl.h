@@ -3186,9 +3186,6 @@ class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
 
-  /// Whether the class has @objc ancestry.
-  unsigned ObjCKind : 3;
-
   /// Create the Objective-C member lookup table.
   void createObjCMethodLookup();
 
@@ -3197,6 +3194,11 @@ class ClassDecl : public NominalTypeDecl {
     /// superclass was computed yet or not.
     llvm::PointerIntPair<Type, 1, bool> Superclass;
   } LazySemanticInfo;
+
+  /// Whether the class has @objc ancestry.
+  unsigned ObjCKind : 3;
+
+  unsigned HasMissingDesignatedInitializers : 1;
 
   friend class IterativeTypeChecker;
 
@@ -3280,6 +3282,17 @@ public:
   /// \see getForeignClassKind
   bool isForeign() const {
     return getForeignClassKind() != ForeignKind::Normal;
+  }
+
+  /// Returns true if the class has designated initializers that are not listed
+  /// in its members.
+  ///
+  /// This can occur, for example, if the class is an Objective-C class with
+  /// initializers that cannot be represented in Swift.
+  bool hasMissingDesignatedInitializers() const;
+
+  void setHasMissingDesignatedInitializers(bool newValue = true) {
+    HasMissingDesignatedInitializers = newValue;
   }
 
   /// Find a method of a class that overrides a given method.
