@@ -388,7 +388,7 @@ public:
       // If we've checked types already, do some extra verification.
       if (!SF || SF->ASTStage >= SourceFile::TypeChecked) {
         verifyCheckedAlways(node);
-        if (!HadError)
+        if (!HadError && shouldVerifyChecked(node))
           verifyChecked(node);
       }
 
@@ -404,6 +404,12 @@ public:
     bool shouldVerify(Stmt *S) { return true; }
     bool shouldVerify(Pattern *S) { return true; }
     bool shouldVerify(Decl *S) { return true; }
+
+    // Default cases for whether we should verify a checked subtree.
+    bool shouldVerifyChecked(Expr *E) { return !E->getType().isNull(); }
+    bool shouldVerifyChecked(Stmt *S) { return true; }
+    bool shouldVerifyChecked(Pattern *S) { return S->hasType(); }
+    bool shouldVerifyChecked(Decl *S) { return true; }
 
     // Default cases for cleaning up as we exit a node.
     void cleanup(Expr *E) { }
@@ -782,6 +788,10 @@ public:
       verifyCheckedAlwaysBase(D);
     }
 
+    bool shouldVerifyChecked(ThrowStmt *S) {
+      return shouldVerifyChecked(S->getSubExpr());
+    }
+
     void verifyChecked(ThrowStmt *S) {
       checkSameType(S->getSubExpr()->getType(),
                     checkExceptionTypeExists("throw expression"),
@@ -789,11 +799,19 @@ public:
       verifyCheckedBase(S);
     }
 
+    bool shouldVerifyChecked(CatchStmt *S) {
+      return shouldVerifyChecked(S->getErrorPattern());
+    }
+
     void verifyChecked(CatchStmt *S) {
       checkSameType(S->getErrorPattern()->getType(),
                     checkExceptionTypeExists("catch statement"),
                     "catch pattern");
       verifyCheckedBase(S);
+    }
+
+    bool shouldVerifyChecked(ReturnStmt *S) {
+      return !S->hasResult() || shouldVerifyChecked(S->getResult());
     }
 
     void verifyChecked(ReturnStmt *S) {
@@ -849,15 +867,19 @@ public:
       case StmtConditionElement::CK_Availability: break;
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
-        checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
-                      "condition type");
+        if (shouldVerifyChecked(E))
+          checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
+                        "condition type");
         break;
       }
 
       case StmtConditionElement::CK_PatternBinding:
-        checkSameType(elt.getPattern()->getType(),
-                      elt.getInitializer()->getType(),
-                      "conditional binding type");
+        if (shouldVerifyChecked(elt.getPattern()) &&
+            shouldVerifyChecked(elt.getInitializer())) {
+          checkSameType(elt.getPattern()->getType(),
+                    elt.getInitializer()->getType(),
+                    "conditional binding type");
+        }
         break;
       }
     }
