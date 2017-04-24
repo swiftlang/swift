@@ -41,6 +41,7 @@ namespace swift {
 class GenericSignature;
 class GenericEnvironment;
 class SubstitutableType;
+typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 
 template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
@@ -55,7 +56,7 @@ class SubstitutionMap {
   GenericSignature *genericSig;
 
   // FIXME: Switch to a more efficient representation.
-  llvm::DenseMap<SubstitutableType *, Type> subMap;
+  llvm::DenseMap<GenericTypeParamType *, Type> subMap;
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
 
@@ -165,7 +166,7 @@ private:
   // instead, use GenericSignature::getSubstitutionMap() or
   // GenericEnvironment::getSubstitutionMap().
 
-  void addSubstitution(CanSubstitutableType type, Type replacement);
+  void addSubstitution(CanGenericTypeParamType type, Type replacement);
   void addConformance(CanType type, ProtocolConformanceRef conformance);
 };
 
