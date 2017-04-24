@@ -2445,9 +2445,16 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
   }
 
-  const Metadata *getSuperclassConstraint() const {
-    // FIXME
-    return nullptr;
+  const TargetMetadata<Runtime> *getSuperclassConstraint() const {
+    if (!Flags.hasSuperclassConstraint())
+      return nullptr;
+
+    // Get a pointer to tail-allocated storage for this metadata record.
+    auto Pointer = reinterpret_cast<
+      ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this + 1);
+
+    // The superclass immediately follows the list of protocol descriptors.
+    return Pointer[Protocols.NumProtocols];
   }
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
