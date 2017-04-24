@@ -76,7 +76,9 @@ addSubstitution(CanSubstitutableType type, Type replacement) {
 }
 
 Optional<ProtocolConformanceRef>
-SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
+SubstitutionMap::lookupConformance(CanType origType, ProtocolDecl *proto) const {
+  CanType type = origType;
+
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   GenericEnvironment *genericEnv = nullptr;
@@ -146,7 +148,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       // FIXME: Rip this out once we can get a concrete conformance from
       // an archetype.
       auto *M = proto->getParentModule();
-      auto substType = type.subst(*this);
+      auto substType = origType.subst(*this);
       if (substType &&
           !substType->is<ArchetypeType>() &&
           !substType->isTypeParameter() &&
