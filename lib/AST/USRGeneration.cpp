@@ -46,14 +46,27 @@ bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
 }
 
 static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
-                                  raw_ostream &OS) {
+                                 const ExtensionDecl *ExtContextD,
+                                 raw_ostream &OS) {
   if (!D)
     return true;
 
+  // The Swift module name that the decl originated from. If the decl is
+  // originating from ObjC code (ObjC module or the bridging header) then this
+  // will be empty.
+  StringRef ModuleName;
+  if (!D->hasClangNode())
+    ModuleName = D->getModuleContext()->getNameStr();
+
   if (isa<ClassDecl>(D)) {
-    clang::index::generateUSRForObjCClass(ObjCName, OS);
+    StringRef extContextName;
+    if (ExtContextD) {
+      extContextName = ExtContextD->getModuleContext()->getNameStr();
+    }
+    clang::index::generateUSRForObjCClass(ObjCName, OS,
+                                          ModuleName, extContextName);
   } else if (isa<ProtocolDecl>(D)) {
-    clang::index::generateUSRForObjCProtocol(ObjCName, OS);
+    clang::index::generateUSRForObjCProtocol(ObjCName, OS, ModuleName);
   } else if (isa<VarDecl>(D)) {
     clang::index::generateUSRForObjCProperty(ObjCName, D->isStatic(), OS);
   } else if (isa<ConstructorDecl>(D)) {
@@ -63,11 +76,23 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
   } else if (isa<AbstractFunctionDecl>(D)) {
     clang::index::generateUSRForObjCMethod(ObjCName, D->isInstanceMember(), OS);
   } else if (isa<EnumDecl>(D)) {
-    OS << "@E@" << ObjCName; // FIXME: expose clang API to handle enum names
+    clang::index::generateUSRForGlobalEnum(ObjCName, OS, ModuleName);
   } else if (isa<EnumElementDecl>(D)) {
-    OS << "@" << ObjCName;
+    clang::index::generateUSRForEnumConstant(ObjCName, OS);
   } else {
     llvm_unreachable("Unexpected value decl");
+  }
+  return false;
+}
+
+static bool printObjCUSRContext(const Decl *D, raw_ostream &OS) {
+  OS << clang::index::getUSRSpacePrefix();
+  auto *DC = D->getDeclContext();
+  if (auto *Parent = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    auto *extContextD = dyn_cast<ExtensionDecl>(DC);
+    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
+    if (printObjCUSRFragment(Parent, ObjCName.first.str(), extContextD, OS))
+      return true;
   }
   return false;
 }
@@ -75,6 +100,9 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
 static bool printObjCUSRForAccessor(const AbstractStorageDecl *ASD,
                                     AccessorKind Kind,
                                     raw_ostream &OS) {
+  if (printObjCUSRContext(ASD, OS))
+    return true;
+
   ObjCSelector Selector;
   switch (Kind) {
     case swift::AccessorKind::IsGetter:
@@ -94,23 +122,19 @@ static bool printObjCUSRForAccessor(const AbstractStorageDecl *ASD,
 }
 
 static bool printObjCUSR(const ValueDecl *D, raw_ostream &OS) {
-  OS << clang::index::getUSRSpacePrefix();
-
-  if (auto *Parent = D->getDeclContext()->
-        getAsNominalTypeOrNominalTypeExtensionContext()) {
-    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
-    if (printObjCUSRFragment(Parent, ObjCName.first.str(), OS))
-      return true;
-  }
+  if (printObjCUSRContext(D, OS))
+    return true;
+  auto *extContextD = dyn_cast<ExtensionDecl>(D->getDeclContext());
 
   auto ObjCName = objc_translation::getObjCNameForSwiftDecl(D);
 
   if (!ObjCName.first.empty())
-    return printObjCUSRFragment(D, ObjCName.first.str(), OS);
+    return printObjCUSRFragment(D, ObjCName.first.str(), extContextD, OS);
 
   assert(ObjCName.second);
   llvm::SmallString<128> Buf;
-  return printObjCUSRFragment(D, ObjCName.second.getString(Buf), OS);
+  return printObjCUSRFragment(D, ObjCName.second.getString(Buf),
+                              extContextD, OS);
 }
 
 static bool shouldUseObjCUSR(const Decl *D) {
