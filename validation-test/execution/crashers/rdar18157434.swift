@@ -17,5 +17,12 @@ struct X<T> {
   var a: S
 }
 
-X<()>()
+func generic<T>(_: T) {}
 
+// We don't want the metadata allocation to be optimized away
+@_semantics("optimize.sil.never")
+func main() {
+  generic(X<()>())
+}
+
+main()
