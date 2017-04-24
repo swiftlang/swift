@@ -148,6 +148,7 @@ extension String {
 /// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
+
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
@@ -170,6 +171,14 @@ extension String.CharacterView : BidirectionalCollection {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index, in c: String.CharacterView) {
       self._base = _base
+      
+      let core = c._core
+
+      if _fastPath(core.isASCII) {
+        self._countUTF16 = 1
+        return
+      }
+      
       self._countUTF16 = c._measureExtendedGraphemeClusterForward(from: _base)
     }
 
@@ -283,6 +292,7 @@ extension String.CharacterView : BidirectionalCollection {
     }
     
     let startIndexUTF16 = start._position
+
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()

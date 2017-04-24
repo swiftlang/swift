@@ -62,6 +62,14 @@ extension String {
   public func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
+    
+    if let p = _core.asciiBuffer {      
+      return try p.baseAddress!.withMemoryRebound(
+              to: Int8.self, capacity: _core.count) {
+                try body($0)
+      }
+    }
+    
     return try self.utf8CString.withUnsafeBufferPointer {
       try body($0.baseAddress!)
     }
