@@ -349,38 +349,6 @@ GenericEnvironment::getForwardingSubstitutions() const {
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 
-SubstitutionMap GenericEnvironment::
-getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result(const_cast<GenericEnvironment *>(this));
-
-  getGenericSignature()->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
-      // Map the interface type to a context type.
-      auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                   MakeAbstractConformanceForGenericType());
-
-      auto sub = subs.front();
-      subs = subs.slice(1);
-
-      // Record the replacement type and its conformances.
-      if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
-        result.addSubstitution(CanArchetypeType(archetype), sub.getReplacement());
-        assert(reqts.size() == sub.getConformances().size());
-        for (auto conformance : sub.getConformances())
-          result.addConformance(CanType(archetype), conformance);
-        return false;
-      }
-
-      assert(contextTy->hasError());
-      return false;
-    });
-
-  assert(subs.empty() && "did not use all substitutions?!");
-
-  result.verify();
-  return result;
-}
-
 SubstitutionMap
 GenericEnvironment::
 getSubstitutionMap(TypeSubstitutionFn subs,
@@ -389,6 +357,7 @@ getSubstitutionMap(TypeSubstitutionFn subs,
 
   getGenericSignature()->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
+      auto canTy = depTy->getCanonicalType();
 
       // Map the interface type to a context type.
       auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
@@ -397,20 +366,19 @@ getSubstitutionMap(TypeSubstitutionFn subs,
       // Compute the replacement type.
       Type currentReplacement = contextTy.subst(subs, lookupConformance,
                                                 SubstFlags::UseErrorType);
-      if (auto archetypeTy = contextTy->getAs<ArchetypeType>()) {
-        subMap.addSubstitution(CanArchetypeType(archetypeTy),
-                               currentReplacement);
 
-        // Collect the conformances.
-        for (auto req: reqs) {
-          assert(req.getKind() == RequirementKind::Conformance);
-          auto protoType = req.getSecondType()->castTo<ProtocolType>();
-          auto conformance = lookupConformance(CanArchetypeType(archetypeTy),
-                                               currentReplacement,
-                                               protoType);
-          if (conformance)
-            subMap.addConformance(CanArchetypeType(archetypeTy), *conformance);
-        }
+      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
+        subMap.addSubstitution(paramTy, currentReplacement);
+
+      // Collect the conformances.
+      for (auto req: reqs) {
+        assert(req.getKind() == RequirementKind::Conformance);
+        auto protoType = req.getSecondType()->castTo<ProtocolType>();
+        auto conformance = lookupConformance(canTy,
+                                             currentReplacement,
+                                             protoType);
+        if (conformance)
+          subMap.addConformance(canTy, *conformance);
       }
 
       return false;

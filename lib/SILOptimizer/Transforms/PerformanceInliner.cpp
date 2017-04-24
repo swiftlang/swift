@@ -194,7 +194,8 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (HasNoOpenedExistentials)
     return false;
 
-  auto SubsMap = Callee->getGenericEnvironment()->getSubstitutionMap(Subs);
+  auto SubsMap = Callee->getLoweredFunctionType()
+    ->getGenericSignature()->getSubstitutionMap(Subs);
 
   for (auto &BB : *Callee) {
     for (auto &I : BB) {
@@ -355,7 +356,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   SubstitutionMap CalleeSubstMap;
   if (IsGeneric) {
-    CalleeSubstMap = Callee->getGenericEnvironment()
+    CalleeSubstMap = Callee->getLoweredFunctionType()
+      ->getGenericSignature()
       ->getSubstitutionMap(AI.getSubstitutions());
   }
 
