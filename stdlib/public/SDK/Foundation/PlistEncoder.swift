@@ -47,23 +47,31 @@ open class PropertyListEncoder {
     ///
     /// - parameter value: The value to encode.
     /// - returns: A new `Data` value containing the encoded property list data.
-    /// - throws: `CocoaError.coderInvalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
+    /// - throws: `EncodingError.invalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
     open func encode<Value : Encodable>(_ value: Value) throws -> Data {
         let encoder = _PlistEncoder(options: self.options)
         try value.encode(to: encoder)
 
         guard encoder.storage.count > 0 else {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) did not encode any values.")
+            throw EncodingError.invalidValue(value,
+                                             EncodingError.Context(codingPath: [],
+                                                                   debugDescription: "Top-level \(Value.self) did not encode any values."))
         }
 
         let topLevel = encoder.storage.popContainer()
         if topLevel is NSNumber {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) encoded as number property list fragment.")
+            throw EncodingError.invalidValue(value,
+                                             EncodingError.Context(codingPath: [],
+                                                                   debugDescription: "Top-level \(Value.self) encoded as number property list fragment."))
         } else if topLevel is NSString {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) encoded as string property list fragment.")
+            throw EncodingError.invalidValue(value,
+                                             EncodingError.Context(codingPath: [],
+                                                                   debugDescription: "Top-level \(Value.self) encoded as string property list fragment."))
         } else if topLevel is NSDate {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) encoded as date property list fragment.")
+            throw EncodingError.invalidValue(value,
+                                             EncodingError.Context(codingPath: [],
+                                                                   debugDescription: "Top-level \(Value.self) encoded as date property list fragment."))
         }
 
         return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
@@ -235,7 +243,6 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     mutating func encode(_ value: String?, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
     mutating func encode(_ value: Float?, forKey key: Key)  throws { self.container[key.stringValue] = self.encoder.box(value) }
     mutating func encode(_ value: Double?, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
-    mutating func encode(_ value: Data?, forKey key: Key)   throws { self.container[key.stringValue] = self.encoder.box(value) }
 
     mutating func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
         try self.encoder.with(pushedKey: key) {
@@ -302,7 +309,6 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     mutating func encode(_ value: Float?)  throws { self.container.add(self.encoder.box(value)) }
     mutating func encode(_ value: Double?) throws { self.container.add(self.encoder.box(value)) }
     mutating func encode(_ value: String?) throws { self.container.add(self.encoder.box(value)) }
-    mutating func encode(_ value: Data?)   throws { self.container.add(self.encoder.box(value)) }
 
     mutating func encode<T : Encodable>(_ value: T?) throws {
         try self.encoder.with(pushedKey: nil) {
@@ -421,11 +427,6 @@ extension _PlistEncoder : SingleValueEncodingContainer {
         assertCanEncodeSingleValue()
         self.storage.push(container: box(value))
     }
-
-    func encode(_ value: Data) throws {
-        assertCanEncodeSingleValue()
-        self.storage.push(container: box(value))
-    }
 }
 
 // MARK: - Concrete Value Representations
@@ -454,9 +455,12 @@ extension _PlistEncoder {
             return _plistNullNSString
         }
 
-        // PropertyListSerialization handles Dates directly.
         if T.self == Date.self {
+            // PropertyListSerialization handles Date directly.
             return NSDate(timeIntervalSinceReferenceDate: (value as! Date).timeIntervalSinceReferenceDate)
+        } else if T.self == Data.self {
+            // PropertyListSerialization handles Data directly.
+            return NSData(data: (value as! Data))
         }
 
         // The value should request a container from the _PlistEncoder.
@@ -563,7 +567,7 @@ open class PropertyListDecoder {
     /// - parameter type: The type of the value to decode.
     /// - parameter data: The data to decode from.
     /// - returns: A value of the requested type.
-    /// - throws: `CocoaError.coderReadCorrupt` if values requested from the payload are corrupted, or if the given data is not a valid property list.
+    /// - throws: `DecodingError.dataCorrupted` if values requested from the payload are corrupted, or if the given data is not a valid property list.
     /// - throws: An error if any value throws an error during decoding.
     open func decode<T : Decodable>(_ type: T.Type, from data: Data) throws -> T {
         var format: PropertyListSerialization.PropertyListFormat = .binary
@@ -576,7 +580,7 @@ open class PropertyListDecoder {
     /// - parameter data: The data to decode from.
     /// - parameter format: The parsed property list format.
     /// - returns: A value of the requested type along with the detected format of the property list.
-    /// - throws: `CocoaError.coderReadCorrupt` if values requested from the payload are corrupted, or if the given data is not a valid property list.
+    /// - throws: `DecodingError.dataCorrupted` if values requested from the payload are corrupted, or if the given data is not a valid property list.
     /// - throws: An error if any value throws an error during decoding.
     open func decode<T : Decodable>(_ type: T.Type, from data: Data, format: inout PropertyListSerialization.PropertyListFormat) throws -> T {
         let topLevel = try PropertyListSerialization.propertyList(from: data, options: [], format: &format)
@@ -630,11 +634,13 @@ fileprivate class _PlistDecoder : Decoder {
 
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
         guard !(self.storage.topContainer is NSNull) else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+            throw DecodingError.valueNotFound(KeyedDecodingContainer<Key>.self,
+                                              DecodingError.Context(codingPath: self.codingPath,
+                                                      debugDescription: "Cannot get keyed decoding container -- found null value instead."))
         }
 
         guard let container = self.storage.topContainer as? [String : Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: self.storage.topContainer)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: self.storage.topContainer)
         }
 
         let wrapper = _PlistKeyedDecodingContainer<Key>(referencing: self, wrapping: container)
@@ -643,11 +649,13 @@ fileprivate class _PlistDecoder : Decoder {
 
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
         guard !(self.storage.topContainer is NSNull) else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get unkeyed decoding container -- found null value instead.")
+            throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                              DecodingError.Context(codingPath: self.codingPath,
+                                                      debugDescription: "Cannot get unkeyed decoding container -- found null value instead."))
         }
 
         guard let container = self.storage.topContainer as? [Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: self.storage.topContainer)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: self.storage.topContainer)
         }
 
         let wrapper = _PlistUnkeyedDecodingContainer(referencing: self, wrapping: container)
@@ -656,15 +664,21 @@ fileprivate class _PlistDecoder : Decoder {
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
         guard !(self.storage.topContainer is NSNull) else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get single value decoding container -- found null value instead.")
+            throw DecodingError.valueNotFound(SingleValueDecodingContainer.self,
+                                              DecodingError.Context(codingPath: self.codingPath,
+                                                      debugDescription: "Cannot get single value decoding container -- found null value instead."))
         }
 
         guard !(self.storage.topContainer is [String : Any]) else {
-            throw CocoaError.coderTypeMismatch(at: self.codingPath, reason: "Expected single value but keyed container instead.")
+            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self,
+                                             DecodingError.Context(codingPath: self.codingPath,
+                                                     debugDescription: "Cannot get single value decoding container -- found keyed container instead."))
         }
 
         guard !(self.storage.topContainer is [Any]) else {
-            throw CocoaError.coderTypeMismatch(at: self.codingPath, reason: "Expected single value but unkeyed container instead.")
+            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self,
+                                             DecodingError.Context(codingPath: self.codingPath,
+                                                     debugDescription: "Cannot get single value decoding container -- found unkeyed container instead."))
         }
 
         return self
@@ -840,11 +854,13 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
         return try self.decoder.with(pushedKey: key) {
             guard let value = self.container[key.stringValue] else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- no value found for key \"\(key.stringValue)\"")
+                throw DecodingError.valueNotFound(KeyedDecodingContainer<NestedKey>.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get nested keyed container -- no value found for key \"\(key.stringValue)\""))
             }
 
             guard let container = value as? [String : Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
 
             let wrapper = _PlistKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
@@ -855,11 +871,13 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         return try self.decoder.with(pushedKey: key) {
             guard let value = self.container[key.stringValue] else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- no value found for key \"\(key.stringValue)\"")
+                throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get nested unkeyed container -- no value found for key \"\(key.stringValue)\""))
             }
 
             guard let container = value as? [Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
 
             return _PlistUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
@@ -869,7 +887,9 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     func _superDecoder(forKey key: CodingKey) throws -> Decoder {
         return try self.decoder.with(pushedKey: key) {
             guard let value = self.container[key.stringValue] else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\"")
+                throw DecodingError.valueNotFound(Decoder.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\""))
             }
 
             return _PlistDecoder(referencing: value, options: self.decoder.options)
@@ -1097,16 +1117,20 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         return try self.decoder.with(pushedKey: nil) {
             guard !self.isAtEnd else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- unkeyed container is at end.")
+                throw DecodingError.valueNotFound(KeyedDecodingContainer<NestedKey>.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get nested keyed container -- unkeyed container is at end."))
             }
 
             let value = self.container[self.currentIndex]
             guard !(value is NSNull) else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+                throw DecodingError.valueNotFound(KeyedDecodingContainer<NestedKey>.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get keyed decoding container -- found null value instead."))
             }
 
             guard let container = value as? [String : Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
 
             self.currentIndex += 1
@@ -1118,16 +1142,20 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         return try self.decoder.with(pushedKey: nil) {
             guard !self.isAtEnd else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- unkeyed container is at end.")
+                throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get nested unkeyed container -- unkeyed container is at end."))
             }
 
             let value = self.container[self.currentIndex]
             guard !(value is NSNull) else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+                throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get keyed decoding container -- found null value instead."))
             }
 
             guard let container = value as? [Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
 
             self.currentIndex += 1
@@ -1138,12 +1166,15 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     mutating func superDecoder() throws -> Decoder {
         return try self.decoder.with(pushedKey: nil) {
             guard !self.isAtEnd else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- unkeyed container is at end.")
+                throw DecodingError.valueNotFound(Decoder.self, DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get superDecoder() -- unkeyed container is at end."))
             }
 
             let value = self.container[self.currentIndex]
             guard !(value is NSNull) else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- found null value instead.")
+                throw DecodingError.valueNotFound(Decoder.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                          debugDescription: "Cannot get superDecoder() -- found null value instead."))
             }
 
             self.currentIndex += 1
@@ -1196,7 +1227,7 @@ extension _PlistDecoder {
 
         }
 
-        throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
     fileprivate func unbox(_ value: Any?, as type: Int.Type) throws -> Int? {
@@ -1204,12 +1235,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int = number.intValue
         guard NSNumber(value: int) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return int
@@ -1220,12 +1251,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int8 = number.int8Value
         guard NSNumber(value: int8) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return int8
@@ -1236,12 +1267,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int16 = number.int16Value
         guard NSNumber(value: int16) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return int16
@@ -1252,12 +1283,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int32 = number.int32Value
         guard NSNumber(value: int32) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return int32
@@ -1268,12 +1299,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int64 = number.int64Value
         guard NSNumber(value: int64) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return int64
@@ -1284,12 +1315,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint = number.uintValue
         guard NSNumber(value: uint) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return uint
@@ -1300,12 +1331,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint8 = number.uint8Value
         guard NSNumber(value: uint8) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return uint8
@@ -1316,12 +1347,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint16 = number.uint16Value
         guard NSNumber(value: uint16) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return uint16
@@ -1332,12 +1363,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint32 = number.uint32Value
         guard NSNumber(value: uint32) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return uint32
@@ -1348,12 +1379,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint64 = number.uint64Value
         guard NSNumber(value: uint64) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return uint64
@@ -1364,12 +1395,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let float = number.floatValue
         guard NSNumber(value: float) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return float
@@ -1380,12 +1411,12 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let double = number.doubleValue
         guard NSNumber(value: double) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed property list number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed property list number <\(number)> does not fit in \(type)."))
         }
 
         return double
@@ -1395,21 +1426,10 @@ extension _PlistDecoder {
         guard let value = value else { return nil }
 
         guard let string = value as? String else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         return string == _plistNull ? nil : string
-    }
-
-    func unbox(_ value: Any?, as type: Data.Type) throws -> Data? {
-        guard let value = value else { return nil }
-        if let string = value as? String, string == _plistNull { return nil }
-
-        guard let data = value as? Data else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
-        }
-
-        return data
     }
 
     func unbox(_ value: Any?, as type: Date.Type) throws -> Date? {
@@ -1417,10 +1437,21 @@ extension _PlistDecoder {
         if let string = value as? String, string == _plistNull { return nil }
 
         guard let date = value as? Date else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         return date
+    }
+
+    func unbox(_ value: Any?, as type: Data.Type) throws -> Data? {
+        guard let value = value else { return nil }
+        if let string = value as? String, string == _plistNull { return nil }
+
+        guard let data = value as? Data else {
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        }
+
+        return data
     }
 
     func unbox<T : Decodable>(_ value: Any?, as type: T.Type) throws -> T? {
@@ -1430,6 +1461,8 @@ extension _PlistDecoder {
         let decoded: T
         if T.self == Date.self {
             decoded = (try self.unbox(value, as: Date.self) as! T)
+        } else if T.self == Data.self {
+            decoded = (try self.unbox(value, as: Data.self) as! T)
         } else {
             self.storage.push(container: value)
             decoded = try T(from: self)
@@ -1447,42 +1480,3 @@ extension _PlistDecoder {
 // Since plists do not support null values by default, we will encode them as "$null".
 fileprivate let _plistNull = "$null"
 fileprivate let _plistNullNSString = NSString(string: _plistNull)
-
-//===----------------------------------------------------------------------===//
-// CocoaError Extensions
-//===----------------------------------------------------------------------===//
-
-extension CocoaError {
-    /// Returns an error whose domain is `NSCocoaErrorDomain` and error is `Cocoa.coderTypeMismatch` describing a type mismatch.
-    ///
-    /// - parameter context: The context in which the error occurred.
-    /// - parameter expectation: The type expected to be encountered.
-    /// - parameter reality: The value that was encountered instead of the expected type.
-    /// - returns: An error appropriate for throwing.
-    fileprivate static func typeMismatch(at path: [CodingKey?], expectation: Any.Type, reality: Any) -> Error {
-        let message = "Expected to decode \(expectation) but found \(_typeDescription(of: reality)) instead."
-        return CocoaError.coderTypeMismatch(at: path, reason: message)
-    }
-
-    /// Returns a description of the type of `value` appropriate for an error message.
-    ///
-    /// - parameter value: The value whose type to describe.
-    /// - returns: A string describing `value`.
-    /// - precondition: `value` is one of the types below.
-    fileprivate static func _typeDescription(of value: Any) -> String {
-        if value is NSNumber /* FIXME: If swift-corelibs-foundation isn't updated to use NSNumber, this check will be necessary: || value is Int || value is Double */ {
-            return "a number"
-        } else if let value = value as? String {
-            return value == _plistNull ? "a null value" : "a string/data"
-        } else if value is Date {
-            return "a date"
-        } else if value is [Any] {
-            return "an array"
-        } else if value is [String : Any] {
-            return "a dictionary"
-        } else {
-            // This should never happen -- we somehow have a non-plist type here.
-            preconditionFailure("Invalid storage type \(type(of: value)).")
-        }
-    }
-}

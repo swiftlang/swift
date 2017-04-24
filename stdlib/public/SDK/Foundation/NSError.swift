@@ -849,10 +849,6 @@ extension CocoaError.Code {
   public static var coderInvalidValue: CocoaError.Code {
     return CocoaError.Code(rawValue: 4866)
   }
-
-  public static var coderTypeMismatch: CocoaError.Code {
-    return CocoaError.Code(rawValue: 4867)
-  }
 }
 
 extension CocoaError.Code {
@@ -1303,10 +1299,6 @@ extension CocoaError {
 
   public static var coderInvalidValue: CocoaError.Code {
     return CocoaError.Code(rawValue: 4866)
-  }
-
-  public static var coderTypeMismatch: CocoaError.Code {
-    return CocoaError.Code(rawValue: 4867)
   }
 }
 

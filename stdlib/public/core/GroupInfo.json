@@ -158,6 +158,7 @@
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift"
+    "Hashable.swift",
+    "Codable.swift"
   ]
 }

@@ -113,23 +113,23 @@ open class JSONEncoder {
     ///
     /// - parameter value: The value to encode.
     /// - returns: A new `Data` value containing the encoded JSON data.
-    /// - throws: `CocoaError.coderInvalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
+    /// - throws: `EncodingError.invalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
     open func encode<T : Encodable>(_ value: T) throws -> Data {
         let encoder = _JSONEncoder(options: self.options)
         try value.encode(to: encoder)
 
         guard encoder.storage.count > 0 else {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) did not encode any values.")
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
         }
 
         let topLevel = encoder.storage.popContainer()
         if topLevel is NSNull {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) encoded as null JSON fragment.")
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as null JSON fragment."))
         } else if topLevel is NSNumber {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) encoded as number JSON fragment.")
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as number JSON fragment."))
         } else if topLevel is NSString {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) encoded as string JSON fragment.")
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as string JSON fragment."))
         }
 
         return try JSONSerialization.data(withJSONObject: topLevel, options: outputFormatting == .prettyPrinted ? .prettyPrinted : [])
@@ -314,13 +314,6 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
         }
     }
 
-    mutating func encode(_ value: Data?, forKey key: Key) throws {
-        // Since the Data strategy may request a container through a closure, the coding path needs to contain this key.
-        try self.encoder.with(pushedKey: key) {
-            self.container[key.stringValue] = try self.encoder.box(value)
-        }
-    }
-
     mutating func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
         try self.encoder.with(pushedKey: key) {
             self.container[key.stringValue] = try self.encoder.box(value)
@@ -394,13 +387,6 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
 
     mutating func encode(_ value: Double?) throws {
         // Since the double may be invalid and throw, the coding path needs to contain this key.
-        try self.encoder.with(pushedKey: nil) {
-            self.container.add(try self.encoder.box(value))
-        }
-    }
-
-    mutating func encode(_ value: Data?) throws {
-        // Since the Data strategy may request a container through a closure, the coding path needs to contain this key.
         try self.encoder.with(pushedKey: nil) {
             self.container.add(try self.encoder.box(value))
         }
@@ -523,11 +509,6 @@ extension _JSONEncoder : SingleValueEncodingContainer {
         assertCanEncodeSingleValue()
         try self.storage.push(container: box(value))
     }
-
-    func encode(_ value: Data) throws {
-        assertCanEncodeSingleValue()
-        try self.storage.push(container: box(value))
-    }
 }
 
 // MARK: - Concrete Value Representations
@@ -556,7 +537,7 @@ extension _JSONEncoder {
             guard case let .convertToString(positiveInfinity: posInfString,
                                             negativeInfinity: negInfString,
                                             nan: nanString) = self.options.nonConformingFloatEncodingStrategy else {
-                throw CocoaError.invalidFloatingPointValue(float, at: codingPath)
+                throw EncodingError._invalidFloatingPointValue(float, at: codingPath)
             }
 
             if float == Float.infinity {
@@ -580,7 +561,7 @@ extension _JSONEncoder {
             guard case let .convertToString(positiveInfinity: posInfString,
                                             negativeInfinity: negInfString,
                                             nan: nanString) = self.options.nonConformingFloatEncodingStrategy else {
-                throw CocoaError.invalidFloatingPointValue(double, at: codingPath)
+                throw EncodingError._invalidFloatingPointValue(double, at: codingPath)
             }
 
             if double == Double.infinity {
@@ -593,30 +574,6 @@ extension _JSONEncoder {
         }
 
         return NSNumber(value: double)
-    }
-
-
-    fileprivate func box(_ data: Data?) throws -> NSObject {
-        guard let data = data else {
-            return NSNull()
-        }
-
-        switch self.options.dataEncodingStrategy {
-        case .base64Encode:
-            return NSString(string: data.base64EncodedString())
-
-        case .custom(let closure):
-            let depth = self.storage.count
-            try closure(data, self)
-
-            guard self.storage.count > depth else {
-                // The closure didn't encode anything. Return the default keyed container.
-                return NSDictionary()
-            }
-
-            // We can pop because the closure encoded something.
-            return self.storage.popContainer()
-        }
     }
 
     fileprivate func box(_ date: Date?) throws -> NSObject {
@@ -660,14 +617,40 @@ extension _JSONEncoder {
         }
     }
 
+    fileprivate func box(_ data: Data?) throws -> NSObject {
+        guard let data = data else {
+            return NSNull()
+        }
+
+        switch self.options.dataEncodingStrategy {
+        case .base64Encode:
+            return NSString(string: data.base64EncodedString())
+
+        case .custom(let closure):
+            let depth = self.storage.count
+            try closure(data, self)
+
+            guard self.storage.count > depth else {
+                // The closure didn't encode anything. Return the default keyed container.
+                return NSDictionary()
+            }
+
+            // We can pop because the closure encoded something.
+            return self.storage.popContainer()
+        }
+    }
+
     fileprivate func box<T : Encodable>(_ value: T?) throws -> NSObject {
         guard let value = value else {
             return NSNull()
         }
 
-        // Respect Date encoding strategy
         if T.self == Date.self {
+            // Respect Date encoding strategy
             return try self.box((value as! Date))
+        } else if T.self == Data.self {
+            // Respect Data encoding strategy
+            return try self.box((value as! Data))
         }
 
         // The value should request a container from the _JSONEncoder.
@@ -829,7 +812,7 @@ open class JSONDecoder {
     /// - parameter type: The type of the value to decode.
     /// - parameter data: The data to decode from.
     /// - returns: A value of the requested type.
-    /// - throws: `CocoaError.coderReadCorrupt` if values requested from the payload are corrupted, or if the given data is not valid JSON.
+    /// - throws: `DecodingError.dataCorrupted` if values requested from the payload are corrupted, or if the given data is not valid JSON.
     /// - throws: An error if any value throws an error during decoding.
     open func decode<T : Decodable>(_ type: T.Type, from data: Data) throws -> T {
         let topLevel = try JSONSerialization.jsonObject(with: data)
@@ -883,11 +866,13 @@ fileprivate class _JSONDecoder : Decoder {
 
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
         guard !(self.storage.topContainer is NSNull) else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+            throw DecodingError.valueNotFound(KeyedDecodingContainer<Key>.self,
+                                              DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Cannot get keyed decoding container -- found null value instead."))
         }
 
         guard let container = self.storage.topContainer as? [String : Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: self.storage.topContainer)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: self.storage.topContainer)
         }
 
         let wrapper = _JSONKeyedDecodingContainer<Key>(referencing: self, wrapping: container)
@@ -896,11 +881,13 @@ fileprivate class _JSONDecoder : Decoder {
 
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
         guard !(self.storage.topContainer is NSNull) else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get unkeyed decoding container -- found null value instead.")
+            throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                              DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Cannot get unkeyed decoding container -- found null value instead."))
         }
 
         guard let container = self.storage.topContainer as? [Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: self.storage.topContainer)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: self.storage.topContainer)
         }
 
         let wrapper = _JSONUnkeyedDecodingContainer(referencing: self, wrapping: container)
@@ -909,15 +896,21 @@ fileprivate class _JSONDecoder : Decoder {
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
         guard !(self.storage.topContainer is NSNull) else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get single value decoding container -- found null value instead.")
+            throw DecodingError.valueNotFound(SingleValueDecodingContainer.self,
+                                              DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Cannot get single value decoding container -- found null value instead."))
         }
 
         guard !(self.storage.topContainer is [String : Any]) else {
-            throw CocoaError.coderTypeMismatch(at: self.codingPath, reason: "Expected single value but keyed container instead.")
+            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self,
+                                             DecodingError.Context(codingPath: self.codingPath,
+                                                                   debugDescription: "Cannot get single value decoding container -- found keyed container instead."))
         }
 
         guard !(self.storage.topContainer is [Any]) else {
-            throw CocoaError.coderTypeMismatch(at: self.codingPath, reason: "Expected single value but unkeyed container instead.")
+            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self,
+                                             DecodingError.Context(codingPath: self.codingPath,
+                                                                   debugDescription: "Cannot get single value decoding container -- found unkeyed container instead."))
         }
 
         return self
@@ -1093,11 +1086,13 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
         return try self.decoder.with(pushedKey: key) {
             guard let value = self.container[key.stringValue] else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- no value found for key \"\(key.stringValue)\"")
+                throw DecodingError.keyNotFound(key,
+                                                DecodingError.Context(codingPath: self.codingPath,
+                                                                      debugDescription: "Cannot get \(KeyedDecodingContainer<NestedKey>.self) -- no value found for key \"\(key.stringValue)\""))
             }
 
             guard let container = value as? [String : Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
 
             let wrapper = _JSONKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
@@ -1108,11 +1103,13 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         return try self.decoder.with(pushedKey: key) {
             guard let value = self.container[key.stringValue] else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- no value found for key \"\(key.stringValue)\"")
+                throw DecodingError.keyNotFound(key,
+                                                DecodingError.Context(codingPath: self.codingPath,
+                                                                      debugDescription: "Cannot get UnkeyedDecodingContainer -- no value found for key \"\(key.stringValue)\""))
             }
 
             guard let container = value as? [Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
 
             return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
@@ -1122,7 +1119,9 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     func _superDecoder(forKey key: CodingKey) throws -> Decoder {
         return try self.decoder.with(pushedKey: key) {
             guard let value = self.container[key.stringValue] else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\"")
+                throw DecodingError.keyNotFound(key,
+                                                DecodingError.Context(codingPath: self.codingPath,
+                                                                      debugDescription: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\""))
             }
 
             return _JSONDecoder(referencing: value, options: self.decoder.options)
@@ -1350,16 +1349,20 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         return try self.decoder.with(pushedKey: nil) {
             guard !self.isAtEnd else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- unkeyed container is at end.")
+                throw DecodingError.valueNotFound(KeyedDecodingContainer<NestedKey>.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get nested keyed container -- unkeyed container is at end."))
             }
 
             let value = self.container[self.currentIndex]
             guard !(value is NSNull) else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+                throw DecodingError.valueNotFound(KeyedDecodingContainer<NestedKey>.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get keyed decoding container -- found null value instead."))
             }
 
             guard let container = value as? [String : Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
 
             self.currentIndex += 1
@@ -1371,16 +1374,20 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         return try self.decoder.with(pushedKey: nil) {
             guard !self.isAtEnd else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- unkeyed container is at end.")
+                throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get nested keyed container -- unkeyed container is at end."))
             }
 
             let value = self.container[self.currentIndex]
             guard !(value is NSNull) else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+                throw DecodingError.valueNotFound(UnkeyedDecodingContainer.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get keyed decoding container -- found null value instead."))
             }
 
             guard let container = value as? [Any] else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
 
             self.currentIndex += 1
@@ -1391,12 +1398,16 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     mutating func superDecoder() throws -> Decoder {
         return try self.decoder.with(pushedKey: nil) {
             guard !self.isAtEnd else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- unkeyed container is at end.")
+                throw DecodingError.valueNotFound(Decoder.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get superDecoder() -- unkeyed container is at end."))
             }
 
             let value = self.container[self.currentIndex]
             guard !(value is NSNull) else {
-                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- found null value instead.")
+                throw DecodingError.valueNotFound(Decoder.self,
+                                                  DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Cannot get superDecoder() -- found null value instead."))
             }
 
             self.currentIndex += 1
@@ -1449,7 +1460,7 @@ extension _JSONDecoder {
 
         }
 
-        throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
     fileprivate func unbox(_ value: Any?, as type: Int.Type) throws -> Int? {
@@ -1457,12 +1468,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int = number.intValue
         guard NSNumber(value: int) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return int
@@ -1473,12 +1484,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int8 = number.int8Value
         guard NSNumber(value: int8) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return int8
@@ -1489,12 +1500,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int16 = number.int16Value
         guard NSNumber(value: int16) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return int16
@@ -1505,12 +1516,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int32 = number.int32Value
         guard NSNumber(value: int32) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return int32
@@ -1521,12 +1532,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let int64 = number.int64Value
         guard NSNumber(value: int64) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return int64
@@ -1537,12 +1548,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint = number.uintValue
         guard NSNumber(value: uint) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return uint
@@ -1553,12 +1564,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint8 = number.uint8Value
         guard NSNumber(value: uint8) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return uint8
@@ -1569,12 +1580,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint16 = number.uint16Value
         guard NSNumber(value: uint16) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return uint16
@@ -1585,12 +1596,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint32 = number.uint32Value
         guard NSNumber(value: uint32) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return uint32
@@ -1601,12 +1612,12 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let number = value as? NSNumber else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         let uint64 = number.uint64Value
         guard NSNumber(value: uint64) == number else {
-            throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number <\(number)> does not fit in \(type).")
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number <\(number)> does not fit in \(type)."))
         }
 
         return uint64
@@ -1625,7 +1636,7 @@ extension _JSONDecoder {
             // * If it was a Double or Decimal, you will get back the nearest approximation if it will fit
             let double = number.doubleValue
             guard abs(double) <= Double(Float.greatestFiniteMagnitude) else {
-                throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Parsed JSON number \(number) does not fit in \(type).")
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Parsed JSON number \(number) does not fit in \(type)."))
             }
 
             return Float(double)
@@ -1656,7 +1667,7 @@ extension _JSONDecoder {
             }
         }
 
-        throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
     func unbox(_ value: Any?, as type: Double.Type) throws -> Double? {
@@ -1692,7 +1703,7 @@ extension _JSONDecoder {
             }
         }
 
-        throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
     func unbox(_ value: Any?, as type: String.Type) throws -> String? {
@@ -1700,34 +1711,10 @@ extension _JSONDecoder {
         guard !(value is NSNull) else { return nil }
 
         guard let string = value as? String else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
 
         return string
-    }
-
-    func unbox(_ value: Any?, as type: Data.Type) throws -> Data? {
-        guard let value = value else { return nil }
-        guard !(value is NSNull) else { return nil }
-
-        switch self.options.dataDecodingStrategy {
-        case .base64Decode:
-            guard let string = value as? String else {
-                throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
-            }
-
-            guard let data = Data(base64Encoded: string) else {
-                throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Encountered Data is not valid Base64.")
-            }
-
-            return data
-
-        case .custom(let closure):
-            self.storage.push(container: value)
-            let data = try closure(self)
-            self.storage.popContainer()
-            return data
-        }
     }
 
     func unbox(_ value: Any?, as type: Date.Type) throws -> Date? {
@@ -1753,7 +1740,7 @@ extension _JSONDecoder {
             if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
                 let string = try self.unbox(value, as: String.self)!
                 guard let date = _iso8601Formatter.date(from: string) else {
-                    throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Expected date string to be ISO8601-formatted.")
+                    throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Expected date string to be ISO8601-formatted."))
                 }
 
                 return date
@@ -1764,7 +1751,7 @@ extension _JSONDecoder {
         case .formatted(let formatter):
             let string = try self.unbox(value, as: String.self)!
             guard let date = formatter.date(from: string) else {
-                throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Date string does not match format expected by formatter.")
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Date string does not match format expected by formatter."))
             }
 
             return date
@@ -1777,6 +1764,30 @@ extension _JSONDecoder {
         }
     }
 
+    func unbox(_ value: Any?, as type: Data.Type) throws -> Data? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
+        switch self.options.dataDecodingStrategy {
+        case .base64Decode:
+            guard let string = value as? String else {
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            }
+
+            guard let data = Data(base64Encoded: string) else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Encountered Data is not valid Base64."))
+            }
+
+            return data
+
+        case .custom(let closure):
+            self.storage.push(container: value)
+            let data = try closure(self)
+            self.storage.popContainer()
+            return data
+        }
+    }
+
     func unbox<T : Decodable>(_ value: Any?, as type: T.Type) throws -> T? {
         guard let value = value else { return nil }
         guard !(value is NSNull) else { return nil }
@@ -1784,6 +1795,8 @@ extension _JSONDecoder {
         let decoded: T
         if T.self == Date.self {
             decoded = (try self.unbox(value, as: Date.self) as! T)
+        } else if T.self == Data.self {
+            decoded = (try self.unbox(value, as: Data.self) as! T)
         } else {
             self.storage.push(container: value)
             decoded = try T(from: self)
@@ -1807,16 +1820,17 @@ fileprivate var _iso8601Formatter: ISO8601DateFormatter = {
 }()
 
 //===----------------------------------------------------------------------===//
-// CocoaError Extensions
+// Error Utilities
 //===----------------------------------------------------------------------===//
 
-extension CocoaError {
-    /// Returns an error whose domain is `NSCocoaErrorDomain` and error is `CocoaError.coderInvalidValue`.
+fileprivate extension EncodingError {
+    /// Returns a `.invalidValue` error describing the given invalid floating-point value.
+    ///
     ///
     /// - parameter value: The value that was invalid to encode.
-    /// - parameter context: The context the value was attempted to be encoded in.
-    /// - returns: An `Error` with the appropriate localized description, context, and debug description.
-    fileprivate static func invalidFloatingPointValue<T : FloatingPoint>(_ value: T, at path: [CodingKey?]) -> Error {
+    /// - parameter path: The path of `CodingKey`s taken to encode this value.
+    /// - returns: An `EncodingError` with the appropriate path and debug description.
+    fileprivate static func _invalidFloatingPointValue<T : FloatingPoint>(_ value: T, at codingPath: [CodingKey?]) -> EncodingError {
         let valueDescription: String
         if value == T.infinity {
             valueDescription = "\(T.self).infinity"
@@ -1826,40 +1840,7 @@ extension CocoaError {
             valueDescription = "\(T.self).nan"
         }
 
-        let message = "Unable to encode \(valueDescription) directly in JSON. Use JSONEncoder.NonConformingFloatEncodingStrategy.convertToString to encode the value instead."
-        return CocoaError.coderInvalidValue(at: path, reason: message)
-    }
-
-    /// Returns an error whose domain is `NSCocoaErrorDomain` and error is `Cocoa.coderTypeMismatch` describing a type mismatch.
-    ///
-    /// - parameter context: The context in which the error occurred.
-    /// - parameter expectation: The type expected to be encountered.
-    /// - parameter reality: The value that was encountered instead of the expected type.
-    /// - returns: An error appropriate for throwing.
-    fileprivate static func typeMismatch(at path: [CodingKey?], expectation: Any.Type, reality: Any) -> Error {
-        let message = "Expected to decode \(expectation) but found \(_typeDescription(of: reality)) instead."
-        return CocoaError.coderTypeMismatch(at: path, reason: message)
-    }
-
-    /// Returns a description of the type of `value` appropriate for an error message.
-    ///
-    /// - parameter value: The value whose type to describe.
-    /// - returns: A string describing `value`.
-    /// - precondition: `value` is one of the types below.
-    fileprivate static func _typeDescription(of value: Any) -> String {
-        if value is NSNull {
-            return "a null value"
-        } else if value is NSNumber /* FIXME: If swift-corelibs-foundation isn't updated to use NSNumber, this check will be necessary: || value is Int || value is Double */ {
-            return "a number"
-        } else if value is String {
-            return "a string/data"
-        } else if value is [Any] {
-            return "an array"
-        } else if value is [String : Any] {
-            return "a dictionary"
-        } else {
-            // This should never happen -- we somehow have a non-JSON type here.
-            preconditionFailure("Invalid storage type \(type(of: value)).")
-        }
+        let debugDescription = "Unable to encode \(valueDescription) directly in JSON. Use JSONEncoder.NonConformingFloatEncodingStrategy.convertToString to specify how the value should be encoded."
+        return .invalidValue(value, EncodingError.Context(codingPath: codingPath, debugDescription: debugDescription))
     }
 }
