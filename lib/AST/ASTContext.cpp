@@ -739,14 +739,11 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Find all of the declarations with this name in the appropriate module.
   SmallVector<ValueDecl *, 1> results;
 
-  // _BridgedNSError, _BridgedStoredNSError, _ErrorCodeProtocol, CodingKey,
-  // Encodable, and Decodable are all in the Foundation module.
+  // _BridgedNSError, _BridgedStoredNSError, and _ErrorCodeProtocol are all in
+  // the Foundation module.
   if (kind == KnownProtocolKind::BridgedNSError ||
       kind == KnownProtocolKind::BridgedStoredNSError ||
-      kind == KnownProtocolKind::ErrorCodeProtocol ||
-      kind == KnownProtocolKind::CodingKey ||
-      kind == KnownProtocolKind::Encodable ||
-      kind == KnownProtocolKind::Decodable) {
+      kind == KnownProtocolKind::ErrorCodeProtocol) {
     ModuleDecl *foundation =
         const_cast<ASTContext *>(this)->getLoadedModule(Id_Foundation);
     if (!foundation)

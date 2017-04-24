@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements explicit derivation of the Foundation CodingKey
-// protocol for an enum.
+// This file implements explicit derivation of the CodingKey protocol for an
+// enum.
 //
 //===----------------------------------------------------------------------===//
 

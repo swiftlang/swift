@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements explicit derivation of the Foundation Codable protocol
-// for a struct or class.
+// This file implements explicit derivation of the Encodable and Decodable
+// protocols for a struct or class.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -62,42 +62,6 @@ static bool superclassIsDecodable(ClassDecl *type) {
     auto &C = type->getASTContext();
     return inheritsConformanceTo(type,
                                  C.getProtocol(KnownProtocolKind::Decodable));
-}
-
-/// Looks up a type declaration with the given name in the Foundation module.
-///
-/// Asserts that the Foundation module is loaded, that the given name does not
-/// refer to more than one type, and that the entity with the given name refers
-/// to a type instead of a different type of declaration.
-///
-/// \param C The AST context to perform the lookup in.
-///
-/// \param name The name of the type declaration to look up.
-static TypeDecl *lookupFoundationTypeDecl(ASTContext &C, Identifier name) {
-  auto *foundationModule = C.getLoadedModule(C.Id_Foundation);
-  assert(foundationModule && "Foundation module must be loaded.");
-
-  SmallVector<ValueDecl *, 1> results;
-  foundationModule->lookupMember(results, cast<DeclContext>(foundationModule),
-                                 DeclName(name), Identifier());
-  assert(results.size() == 1 && "Ambiguous/missing type.");
-
-  auto *typeDecl = dyn_cast<TypeDecl>(results[0]);
-  assert(typeDecl && "Found non-type decl.");
-  return typeDecl;
-}
-
-/// Looks up a type with the given name in the Foundation module.
-///
-/// Asserts that the Foundation module is loaded, that the given name does not
-/// refer to more than one type, and that the entity with the given name refers
-/// to a type instead of a different type of declaration.
-///
-/// \param C The AST context to perform the lookup in.
-///
-/// \param name The name of the type to look up.
-static Type lookupFoundationType(ASTContext &C, Identifier name) {
-  return lookupFoundationTypeDecl(C, name)->getDeclaredInterfaceType();
 }
 
 /// Validates that all the variables declared in the given list of declarations
@@ -359,18 +323,14 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
 ///
 /// \param DC The \c DeclContext to create the decl in.
 ///
-/// \param containerBase The name of the generic type to bind the key type in.
+/// \param keyedContainerDecl The generic type to bind the key type in.
 ///
 /// \param keyType The key type to bind to the container type.
 ///
 /// \param isLet Whether to declare the variable as immutable.
 static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
-                                     Identifier containerBase, Type keyType,
-                                     bool isLet) {
-  // Look up Keyed*Container
-  auto *keyedContainerDecl =
-      cast<NominalTypeDecl>(lookupFoundationTypeDecl(C, containerBase));
-
+                                     NominalTypeDecl *keyedContainerDecl,
+                                     Type keyType, bool isLet) {
   // Bind Keyed*Container to Keyed*Container<KeyType>
   Type boundType[1] = {keyType};
   auto containerType = BoundGenericType::get(keyedContainerDecl, Type(),
@@ -474,7 +434,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // let container : KeyedEncodingContainer<CodingKeys>
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
-                                             C.Id_KeyedEncodingContainer,
+                                             C.getKeyedEncodingContainerDecl(),
                                              codingKeysType, /*isLet=*/false);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -616,7 +576,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   // Create from the inside out:
 
   // (to: Encoder)
-  auto encoderType = lookupFoundationType(C, C.Id_Encoder);
+  auto encoderType = C.getEncoderDecl()->getDeclaredInterfaceType();
   auto inputTypeElt = TupleTypeElt(encoderType, C.Id_to);
   auto inputType = TupleType::get(ArrayRef<TupleTypeElt>(inputTypeElt), C);
 
@@ -726,7 +686,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
   // let container : KeyedDecodingContainer<CodingKeys>
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
-                                             C.Id_KeyedEncodingContainer,
+                                             C.getKeyedDecodingContainerDecl(),
                                              codingKeysType, /*isLet=*/true);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -885,7 +845,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   // Compute from the inside out:
 
   // (from: Decoder)
-  auto decoderType = lookupFoundationType(C, C.Id_Decoder);
+  auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto inputTypeElt = TupleTypeElt(decoderType, C.Id_from);
   auto inputType = TupleType::get(ArrayRef<TupleTypeElt>(inputTypeElt), C);
 
