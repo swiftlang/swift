@@ -398,8 +398,13 @@ void SubstitutionMap::verify() const {
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out) const {
+  auto *genericSig = getGenericSignature();
+  if (genericSig == nullptr) {
+    out << "Empty substitution map\n";
+    return;
+  }
   out << "Generic signature: ";
-  getGenericSignature()->print(out);
+  genericSig->print(out);
   out << "\n";
   out << "Substitutions:\n";
   for (const auto &sub : subMap) {
