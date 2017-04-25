@@ -1036,7 +1036,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
-  // Declarations provided provided by a C module have a special context
+  // Declarations provided by a C module have a special context
   // mangling.
   //   known-context ::= 'So'
   //

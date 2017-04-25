@@ -138,7 +138,7 @@ public:
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
-  /// determined. Otherwise returns null. For diagonostic purposes.
+  /// determined. Otherwise returns null. For diagnostic purposes.
   const ValueDecl *getStorageDecl() const {
     switch(Kind) {
     case AccessedStorageKind::GlobalVar:

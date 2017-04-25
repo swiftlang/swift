@@ -160,7 +160,7 @@ sil_vtable C {}
 // CHECK-64-SAME: i32 -2147483620,
 //              -- 0x8000_0010 - instantiable in-line, size 16
 // CHECK-32-SAME: i32 -2147483636,
-// -- 0x3c00_0000 - computed, settable, nmutating, identified by property offset, no args
+// -- 0x3c00_0000 - computed, settable, nonmutating, identified by property offset, no args
 // CHECK-SAME: i32 1006632960,
 // CHECK-SAME: [[WORD]]
 // CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_get,

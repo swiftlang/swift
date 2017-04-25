@@ -4994,7 +4994,7 @@ class EndLifetimeInst
 
 /// An unsafe conversion in between ownership kinds.
 ///
-/// This is used today in destructors where due to objective-c legacy
+/// This is used today in destructors where due to Objective-C legacy
 /// constraints, we need to be able to convert a guaranteed parameter to an owned
 /// parameter.
 class UncheckedOwnershipConversionInst
