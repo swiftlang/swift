@@ -87,6 +87,13 @@ _ = """
   """
 // CHECK: "\nABC"
 
+// contains tabs
+_ = """
+	Twelve
+	Nu
+	"""
+// CHECK: "Twelve\nNu"
+
 _ = """
 
   ABC
