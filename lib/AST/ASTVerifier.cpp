@@ -1711,22 +1711,6 @@ public:
       verifyCheckedBase(E);
     }
     
-    void verifyChecked(LValueToPointerExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying LValueToPointerExpr", E);
-
-      if (!E->getSubExpr()->getType()->is<LValueType>()) {
-        Out << "LValueToPointerExpr subexpression must be an lvalue\n";
-        abort();
-      }
-      if (!E->getType()->isEqual(
-                             E->getType()->getASTContext().TheRawPointerType)) {
-        Out << "LValueToPointerExpr result type must be RawPointer\n";
-        abort();
-      }
-      
-      verifyCheckedBase(E);
-    }
-    
     void verifyChecked(DynamicTypeExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 
