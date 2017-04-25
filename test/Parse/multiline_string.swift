@@ -64,6 +64,20 @@ _ = """
 // CHECK: "\nKappa"
 
 _ = """
+	first
+	 second
+	third
+	"""
+// CHECK: "first\n second\nthird"
+
+_ = """
+ first
+ 	second
+ third
+ """
+// CHECK: "first\n\tsecond\nthird"
+
+_ = """
 \\
 """
 // CHECK: "\\"
