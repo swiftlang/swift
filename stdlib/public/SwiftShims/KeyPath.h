@@ -20,7 +20,8 @@
 #include "SwiftStdint.h"
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+namespace swift {
+extern "C" {
 #endif
 
 // Bitfields for the key path buffer header.
@@ -87,7 +88,8 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedUnresolvedIDF
 
 
 #ifdef __cplusplus
-}} // namespace swift } extern "C" }
+} // extern "C"
+} // namespace swift
 #endif
 
 #endif // __SWIFT_SHIMS_KEYPATH_H__
