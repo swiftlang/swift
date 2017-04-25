@@ -1,7 +1,7 @@
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | %FileCheck %s -check-prefix=BAD_MEMBERS_1
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | %FileCheck %s -check-prefix=BAD_MEMBERS_2
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | %FileCheck %s -check-prefix=WITH_GLOBAL
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_28991372 | %FileCheck %s -check-prefix=RDAR_28991372
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | %FileCheck %s -check-prefix=BAD_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | %FileCheck %s -check-prefix=BAD_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | %FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_28991372 | %FileCheck %s -check-prefix=RDAR_28991372
 
 class BadMembers1 {
   var prop: Int {
@@ -37,7 +37,7 @@ func badMembers2(_ a: BadMembers2) {
 
 func globalFunc() {}
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | %FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | %FileCheck %s -check-prefix=WITH_GLOBAL
 class C {
   let x : Int { #^LET_COMPUTED^# }
 }
@@ -49,7 +49,7 @@ class C {
 ({ x in 2+x })(#^CLOSURE_CALLED_IN_PLACE_1^#
 
 // rdar://19634354
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_19634354
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_19634354
 while true {
   func f() {
     a#^RDAR_19634354^#
@@ -57,7 +57,7 @@ while true {
 }
 
 // rdar://problem/21197042
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
 struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
@@ -69,13 +69,13 @@ struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
 }
 
 // rdar://problem/21796881
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_21796881
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21796881
 extension ExpressibleByNilLiteral {
    var nil: Self { #^RDAR_21796881^# }
 }
 
 // rdar://problem/21436558
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_21436558
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21436558
 private protocol RoundRobin : Sendable, Receivable {
   typealias _NEXT
 }
@@ -86,7 +86,7 @@ private protocol RoundRobin : Sendable, Receivable {
 #endif
 
 // rdar://problem/21435993
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_21435993
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21435993
 class C<T> {
   func test() {
     do {} catch { #^RDAR_21435993^# }
@@ -95,7 +95,7 @@ class C<T> {
 }
 
 // rdar://problem/21149908
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_21149908
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21149908
 @objc func handleTap(_ recognizer: UIGestureRecognizer) {
   if recognizer.state == .Ended {
     let _ : () = self.suggestion.cata(#^RDAR_21149908^#{ _ in
@@ -107,7 +107,7 @@ class C<T> {
 }
 
 // rdar://problem/22036358
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22036358
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22036358
 public extension AnyIterator {
   public extension AnySequence {
     public func take(_ n: Int) -> AnySequence<Element> {
@@ -119,7 +119,7 @@ public extension AnyIterator {
 }
 
 // rdar://problem/22012123
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22012123
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22012123
 protocol Fooable {
   protocol FooableZingable : Fooable {
     #^RDAR_22012123^#
@@ -127,7 +127,7 @@ protocol Fooable {
 }
 
 // rdar://problem/22688199
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | %FileCheck %s -check-prefix=FLIP_CURRIED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | %FileCheck %s -check-prefix=FLIP_CURRIED
 func curried(_ a: Int)(_ b1: Int, _ b2: Int) { }
 func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
@@ -135,20 +135,20 @@ func rdar22688199() {
 }
 // FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#Int#}, {#Int#})[#(Int) -> ()#]
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22836263
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
 func rdar22836263() {
   let x: [Int]
   nosuchfunc(x[0].#^RDAR_22836263^#)
 }
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22835966
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22835966
 func rdar22835966() {
   class Inner {
     var prop = #^RDAR_22835966^#
   }
 }
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=INVALID_TYPE_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=INVALID_TYPE_INIT
 struct Foo {
   let a: Anosuchtype
   let b: Bnosuchtype
@@ -161,13 +161,13 @@ func rdar22834017() {
 // FIXME: We could provide a useful completion here. rdar://problem/22846558
 // INVALID_TYPE_INIT-NOT: Begin completions
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {
   return IndexingIterator(#^RDAR_23173692^#)
 }
 // RDAR_23173692: Begin completions
 
-// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=RDAR_22769393 | %FileCheck %s -check-prefix=RDAR_22769393
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22769393 | %FileCheck %s -check-prefix=RDAR_22769393
 public enum PropertyListItem {
   case PLString(String)
   case PLDict([String:PropertyListItem])
