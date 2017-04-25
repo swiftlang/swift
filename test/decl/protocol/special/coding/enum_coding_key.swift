@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Enums with no raw type conforming to CodingKey should get implicit derived
 // conformance of methods.
 enum NoRawTypeKey : CodingKey {

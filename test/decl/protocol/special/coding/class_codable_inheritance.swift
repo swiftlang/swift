@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 class SimpleClass : Codable {
   var x: Int = 1
   var y: Double = .pi

@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Simple classes where Codable conformance is added in extensions should still
 // derive conformance.
 class SimpleClass {

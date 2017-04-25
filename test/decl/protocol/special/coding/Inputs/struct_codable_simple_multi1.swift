@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Simple structs with all Codable properties should get derived conformance to
 // Codable.
 struct SimpleStruct : Codable {

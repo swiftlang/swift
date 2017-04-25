@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Classes with computed members should get synthesized conformance to Codable,
 // but their lazy and computed members should be skipped as part of the
 // synthesis.

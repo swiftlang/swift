@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
-
-import Foundation
 
 // Cannot create an enum with a raw value but no cases.
 enum EmptyEnum : CodingKey {}

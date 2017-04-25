@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Enums where CodingKey conformance is added in extensions should still derive
 // conformance.
 enum NoRawTypeKey {

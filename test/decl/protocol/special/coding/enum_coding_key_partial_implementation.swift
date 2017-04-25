@@ -1,9 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Enums which conform to CodingKey and which should derive conformance should
 // get all synthesized methods that they do not implement themselves.
 enum NoRawTypeKey1 : CodingKey {

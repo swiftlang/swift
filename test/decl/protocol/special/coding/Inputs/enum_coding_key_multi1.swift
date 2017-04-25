@@ -1,7 +1,3 @@
-// REQUIRES: objc_interop
-
-import Foundation
-
 enum NoRawTypeKey : CodingKey {
     case a, b, c
 }

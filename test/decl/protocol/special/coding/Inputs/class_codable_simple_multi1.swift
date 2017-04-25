@@ -1,7 +1,3 @@
-// REQUIRES: objc_interop
-
-import Foundation
-
 // Simple classes with all Codable properties should get derived conformance to
 // Codable.
 class SimpleClass : Codable {
