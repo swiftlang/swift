@@ -309,9 +309,10 @@ extension String.CharacterView : BidirectionalCollection {
 
     // Perform a quick single-code-unit grapheme check
     if _core._baseAddress != nil {
+      let pos = start._position - _coreOffset
       if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core._nthContiguous(startIndexUTF16),
-        _core._nthContiguous(startIndexUTF16+1)
+        _core._nthContiguous(pos),
+        _core._nthContiguous(pos+1)
       ) {
         return 1
       }
@@ -389,9 +390,10 @@ extension String.CharacterView : BidirectionalCollection {
 
     // Perform a quick single-code-unit grapheme check
     if _core._baseAddress != nil {
+      let pos = end._position - _coreOffset - 1
       if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core._nthContiguous(endIndexUTF16-2),
-        _core._nthContiguous(endIndexUTF16-1)
+        _core._nthContiguous(pos-1),
+        _core._nthContiguous(pos)
       ) {
         return 1
       }
