@@ -1735,10 +1735,43 @@ public:
                             CanType baseFormalType, VarDecl *var,
                             AccessKind accessKind, AccessSemantics semantics);
 
+  struct PointerAccessInfo {
+    CanType PointerType;
+    PointerTypeKind PointerKind;
+    swift::AccessKind AccessKind;
+  };
+
+  PointerAccessInfo getPointerAccessInfo(Type pointerType);
   ManagedValue emitLValueToPointer(SILLocation loc, LValue &&lvalue,
-                                   CanType pointerType, PointerTypeKind ptrKind,
-                                   AccessKind accessKind);
-  
+                                   PointerAccessInfo accessInfo);
+
+  struct ArrayAccessInfo {
+    Type PointerType;
+    Type ArrayType;
+    swift::AccessKind AccessKind;
+  };
+  ArrayAccessInfo getArrayAccessInfo(Type pointerType, Type arrayType);
+  ManagedValue emitArrayToPointer(SILLocation loc, LValue &&lvalue,
+                                  ArrayAccessInfo accessInfo);
+
+  class ForceTryEmission {
+    SILGenFunction &SGF;
+    Expr *Loc;
+    JumpDest OldThrowDest;
+
+  public:
+    ForceTryEmission(SILGenFunction &SGF, Expr *loc);
+
+    ForceTryEmission(const ForceTryEmission &) = delete;
+    ForceTryEmission &operator=(const ForceTryEmission &) = delete;
+
+    void finish();
+
+    ~ForceTryEmission() {
+      if (Loc) finish();
+    }
+  };
+
   /// Return forwarding substitutions for the archetypes in the current
   /// function.
   SubstitutionList getForwardingSubstitutions();
