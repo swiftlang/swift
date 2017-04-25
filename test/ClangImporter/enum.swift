@@ -11,6 +11,7 @@
 
 import Foundation
 import user_objc
+import enums_using_attributes
 
 // NS_ENUM
 var mince = NSRuncingMode.mince
@@ -148,6 +149,9 @@ var qualifiedName = NSRuncingMode.mince
 var topLevelCaseName = RuncingMince // expected-error{{}}
 #endif
 
+let _: EnumViaAttribute = .first
+let _: CFEnumWithAttr = .first
+
 // NS_OPTIONS
 var withMince: NSRuncingOptions = .enableMince
 var withQuince: NSRuncingOptions = .enableQuince
@@ -193,6 +197,8 @@ let audioComponentFlags2: FakeAudioComponentFlags = [.loadOutOfProcess]
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
 
 let optionsWithSwiftName: NSOptionsAlsoGetSwiftName = .Case
+let optionsViaAttribute: OptionsViaAttribute = [.first, .second]
+let optionsViaAttribute2: CFOptionsWithAttr = [.first]
 
 // <rdar://problem/25168818> Don't import None members in NS_OPTIONS types
 #if !IRGEN
@@ -208,3 +214,10 @@ _ = EmptySet3.None
 // Just use this type, making sure that its case alias doesn't cause problems.
 // rdar://problem/30401506
 _ = EnumWithAwkwardDeprecations.normalCase1
+
+#if !IRGEN
+let _: UnknownEnumThanksToAPINotes = .first // expected-error {{has no member 'first'}}
+let _: UnknownOptionsThanksToAPINotes = .first // expected-error {{has no member 'first'}}
+#endif
+let _ = UnknownEnumThanksToAPINotesFirst
+let _ = UnknownOptionsThanksToAPINotesFirst

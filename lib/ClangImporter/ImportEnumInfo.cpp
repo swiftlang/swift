@@ -50,9 +50,32 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
     nsErrorDomain = ctx.AllocateCopy(domainAttr->getErrorDomain()->getName());
     return;
   }
+  if (decl->hasAttr<clang::FlagEnumAttr>()) {
+    kind = EnumKind::Options;
+    return;
+  }
+  if (decl->hasAttr<clang::EnumExtensibilityAttr>()) {
+    // FIXME: Distinguish between open and closed enums.
+    kind = EnumKind::Enum;
+    return;
+  }
+
+  // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
+  // then we don't need to check the macros.
+  for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {
+    if (!attr->getVersion().empty())
+      continue;
+    if (isa<clang::FlagEnumAttr>(attr->getAttrToAdd()) ||
+        isa<clang::EnumExtensibilityAttr>(attr->getAttrToAdd())) {
+      kind = EnumKind::Unknown;
+      return;
+    }
+  }
 
   // Was the enum declared using *_ENUM or *_OPTIONS?
-  // FIXME: Use Clang attributes instead of groveling the macro expansion loc.
+  // FIXME: Stop using these once flag_enum and enum_extensibility
+  // have been adopted everywhere, or at least relegate them to Swift 3 mode
+  // only.
   auto loc = decl->getLocStart();
   if (loc.isMacroID()) {
     StringRef MacroName = pp.getImmediateMacroName(loc);
