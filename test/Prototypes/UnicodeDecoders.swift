@@ -189,10 +189,6 @@ extension Unicode.UTF8 : UnicodeEncoding {
 
   public struct ReverseDecoder {
     public init() { _buffer = 0; _bitsInBuffer = 0 }
-    public init(_ other: ForwardDecoder) {
-      _bitsInBuffer = other._bitsInBuffer
-      _buffer = other._buffer.byteSwapped &>> (32 - _bitsInBuffer)
-    }
     var _buffer: UInt32
     var _bitsInBuffer: UInt8
   }
@@ -296,8 +292,6 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   
   public // @testable
   func _validateBuffer() -> (valid: Bool, length: UInt8) {
-    // This seems like it should be equivalent, but it isn't.  Figure out why.
-    // return Unicode.UTF8.ReverseDecoder(self)._validateBuffer()
     if _buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ ... ... ... CU0 ].
       return (true, 1)
     }
