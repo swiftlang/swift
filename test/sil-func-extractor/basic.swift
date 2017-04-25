@@ -44,7 +44,9 @@
 // EXTRACT-INIT-LABEL:   sil hidden @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
 // EXTRACT-INIT-NEXT:      ref_element_addr
+// EXTRACT-INIT-NEXT:      begin_access [modify] [dynamic]
 // EXTRACT-INIT-NEXT:      store
+// EXTRACT-INIT-NEXT:      end_access
 // EXTRACT-INIT-NEXT:      return
 
 
@@ -55,7 +57,9 @@
 // EXTRACT-NOW-LABEL:   sil hidden @_T05basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
 // EXTRACT-NOW:           ref_element_addr
+// EXTRACT-NOW-NEXT:      begin_access [read] [dynamic]
 // EXTRACT-NOW-NEXT:      load
+// EXTRACT-NOW-NEXT:      end_access
 // EXTRACT-NOW-NEXT:      return
 
 struct X {

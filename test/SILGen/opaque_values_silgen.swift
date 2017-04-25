@@ -441,7 +441,8 @@ var foo_var : Foo = s180_______return_foo()
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s190___return_foo_varAA3Foo_pyF : $@convention(thin) () -> @out Foo {
 // CHECK: bb0:
 // CHECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*Foo
-// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[GLOBAL]] : $*Foo
+// CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*Foo
+// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[READ]] : $*Foo
 // CHECK:   return [[LOAD_GLOBAL]] : $Foo
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s190___return_foo_varAA3Foo_pyF'
 func s190___return_foo_var() -> Foo {
@@ -453,7 +454,8 @@ func s190___return_foo_var() -> Foo {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s200______use_foo_varyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*Foo
-// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[GLOBAL]] : $*Foo
+// CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*Foo
+// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[READ]] : $*Foo
 // CHECK:   [[OPEN_VAR:%.*]] = open_existential_opaque [[LOAD_GLOBAL]] : $Foo
 // CHECK:   [[WITNESS:%.*]] = witness_method $@opened
 // CHECK:   apply [[WITNESS]]
@@ -864,7 +866,8 @@ func s400______maybeCloneP(c: Clonable) {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s410__globalRvalueGetS2iF : $@convention(thin) (Int) -> Int {
 // CHECK: bb0([[ARG:%.*]] : $Int):
 // CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @_T020opaque_values_silgen16subscriptableGetAA013SubscriptableE0_pv : $*SubscriptableGet
-// CHECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[GLOBAL_ADDR]] : $*SubscriptableGet to $*@opened
+// CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*SubscriptableGet
+// CHECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGet to $*@opened
 // CHECK:   [[GET_OPAQUE:%.*]] = load [copy] [[OPEN_ARG]] : $*@opened
 // CHECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}) SubscriptableGet>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SubscriptableGet> (Int, @in_guaranteed τ_0_0) -> Int
 // CHECK:   destroy_value [[GET_OPAQUE]]
@@ -879,7 +882,8 @@ func s410__globalRvalueGet(_ i : Int) -> Int {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s420__globalLvalueGetS2iF : $@convention(thin) (Int) -> Int {
 // CHECK: bb0([[ARG:%.*]] : $Int):
 // CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @_T020opaque_values_silgen19subscriptableGetSetAA013SubscriptableeF0_pv : $*SubscriptableGetSet
-// CHECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[GLOBAL_ADDR]] : $*SubscriptableGetSet to $*@opened
+// CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*SubscriptableGetSet
+// CHECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGetSet to $*@opened
 // CHECK:   [[GET_OPAQUE:%.*]] = load [copy] [[OPEN_ARG]] : $*@opened
 // CHECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}) SubscriptableGetSet>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SubscriptableGetSet> (Int, @in_guaranteed τ_0_0) -> Int
 // CHECK:   destroy_value [[GET_OPAQUE]]

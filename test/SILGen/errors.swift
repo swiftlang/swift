@@ -184,7 +184,9 @@ class HasThrowingInit {
 // CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
 // CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[BORROWED_T0]] : $HasThrowingInit
-// CHECK-NEXT: assign %0 to [[T1]] : $*Int
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[T1]] : $*Int
+// CHECK-NEXT: assign %0 to [[WRITE]] : $*Int
+// CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
@@ -507,7 +509,9 @@ class BaseThrowingInit : HasThrowingInit {
 //   Initialize subField.
 // CHECK:      [[T0:%.*]] = load_borrow [[PB]]
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $BaseThrowingInit, #BaseThrowingInit.subField
-// CHECK-NEXT: assign %1 to [[T1]]
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[T1]] : $*Int
+// CHECK-NEXT: assign %1 to [[WRITE]]
+// CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: end_borrow [[T0]] from [[PB]]
 //   Super delegation.
 // CHECK-NEXT: [[T0:%.*]] = load [take] [[PB]]

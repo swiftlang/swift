@@ -11,6 +11,8 @@ class Story {
   }
 
   func test() {
+    // expected-warning@+2 {{simultaneous accesses to var 'finalStored', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-note@+1 {{conflicting access is here}}
     swap(&self.finalStored[0], &self.finalStored[1])
     swap(&self.overridableStored[0], &self.overridableStored[1])
     swap(&self.computed[0], &self.computed[1]) // expected-error{{invalid aliasing}} expected-note{{concurrent writeback}}

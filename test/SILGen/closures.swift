@@ -334,7 +334,8 @@ class SelfCapturedInInit : Base {
   // CHECK:   [[COPIED_SELF:%.*]] = load [copy] [[PB_SELF_BOX]]
   // CHECK:   [[FOO_VALUE:%.*]] = partial_apply {{%.*}}([[COPIED_SELF]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
   // CHECK:   [[FOO_LOCATION:%.*]] = ref_element_addr [[BORROWED_SELF]]
-  // CHECK:   assign [[FOO_VALUE]] to [[FOO_LOCATION]]
+  // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[FOO_LOCATION]] : $*@callee_owned () -> @owned SelfCapturedInInit
+  // CHECK:   assign [[FOO_VALUE]] to [[ACCESS]]
   override init() {
     super.init()
     foo = { self }
@@ -384,7 +385,8 @@ func closeOverLetLValue() {
 // CHECK:   [[LOADED_CLASS:%.*]] = load [copy] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
 // CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[BORROWED_LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
-// CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[INT_IN_CLASS_ADDR]] : $*Int
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[INT_IN_CLASS_ADDR]] : $*Int
+// CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[LOADED_CLASS]]
 // CHECK:   destroy_value [[LOADED_CLASS]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty

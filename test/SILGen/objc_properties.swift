@@ -39,7 +39,9 @@ class A {
   init(other : A, x : Int) {
     // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
     // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $A, #A.prop
-    // CHECK: assign %1 to [[SELF_A]]
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[SELF_A]] : $*Int
+    // CHECK: assign %1 to [[WRITE]]
+    // CHECK: end_access [[WRITE]] : $*Int
     // CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
     prop = x
 
