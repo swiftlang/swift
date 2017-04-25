@@ -335,9 +335,25 @@ func metatypeSubtyping(
   let _: Derived.Type = derivedAndAnyObject
   let _: BaseAndP2<Int>.Type = baseIntAndP2AndAnyObject
 
+  let _ = baseIntAndP2 as Base<Int>.Type
+  let _ = baseIntAndP2AndAnyObject as Base<Int>.Type
+  let _ = derivedAndAnyObject as Derived.Type
+  let _ = baseIntAndP2AndAnyObject as BaseAndP2<Int>.Type
+
+  let _ = baseIntAndP2 as? Base<Int>.Type // expected-warning {{always succeeds}}
+  let _ = baseIntAndP2AndAnyObject as? Base<Int>.Type // expected-warning {{always succeeds}}
+  let _ = derivedAndAnyObject as? Derived.Type // expected-warning {{always succeeds}}
+  let _ = baseIntAndP2AndAnyObject as? BaseAndP2<Int>.Type // expected-warning {{always succeeds}}
+
   // Upcast
   let _: BaseAndP2<Int>.Type = derived
   let _: BaseAndP2<Int>.Type = derivedAndAnyObject
+
+  let _ = derived as BaseAndP2<Int>.Type
+  let _ = derivedAndAnyObject as BaseAndP2<Int>.Type
+
+  let _ = derived as? BaseAndP2<Int>.Type // expected-warning {{always succeeds}}
+  let _ = derivedAndAnyObject as? BaseAndP2<Int>.Type // expected-warning {{always succeeds}}
 
   // Erasing superclass constraint
   let _: P2.Type = baseIntAndP2
@@ -345,6 +361,18 @@ func metatypeSubtyping(
   let _: P2.Type = derivedAndAnyObject
   let _: (P2 & AnyObject).Type = derived
   let _: (P2 & AnyObject).Type = derivedAndAnyObject
+
+  let _ = baseIntAndP2 as P2.Type
+  let _ = derived as P2.Type
+  let _ = derivedAndAnyObject as P2.Type
+  let _ = derived as (P2 & AnyObject).Type
+  let _ = derivedAndAnyObject as (P2 & AnyObject).Type
+
+  let _ = baseIntAndP2 as? P2.Type // expected-warning {{always succeeds}}
+  let _ = derived as? P2.Type // expected-warning {{always succeeds}}
+  let _ = derivedAndAnyObject as? P2.Type // expected-warning {{always succeeds}}
+  let _ = derived as? (P2 & AnyObject).Type // expected-warning {{always succeeds}}
+  let _ = derivedAndAnyObject as? (P2 & AnyObject).Type // expected-warning {{always succeeds}}
 
   // Initializers
   let _: Base<Int> & P2 = baseIntAndP2.init(classInit: ())
