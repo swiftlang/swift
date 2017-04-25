@@ -10,21 +10,13 @@ set(sourcekitdInProc_args
 )
 
 if (SOURCEKIT_INSTALLING_INPROC)
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    add_sourcekit_framework(sourcekitdInProc
-      ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
-      ${sourcekitdInProc_args}
-      MODULEMAP module.modulemap
-      INSTALL_IN_COMPONENT sourcekit-inproc
-    )
-    set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY LINK_FLAGS " -fapplication-extension")
-  else()
-    add_sourcekit_library(sourcekitdInProc
-      ${sourcekitdInProc_args}
-      INSTALL_IN_COMPONENT sourcekit-inproc
-      SHARED
-    )
-  endif()
+  add_sourcekit_framework(sourcekitdInProc
+    ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
+    ${sourcekitdInProc_args}
+    MODULEMAP module.modulemap
+    INSTALL_IN_COMPONENT sourcekit-inproc
+  )
+  set_property(TARGET sourcekitdInProc APPEND_STRING PROPERTY LINK_FLAGS " -fapplication-extension")
 else()
   add_sourcekit_library(sourcekitdInProc
     ${sourcekitdInProc_args}
