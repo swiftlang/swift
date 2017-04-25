@@ -12,6 +12,7 @@
 
 #include "swift/AST/USRGeneration.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"
@@ -27,6 +28,7 @@
 
 using namespace swift;
 using namespace swift::migrator;
+using namespace swift::ide;
 using namespace swift::ide::api;
 
 struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
@@ -46,6 +48,26 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
       return {};
     // FIXME: overrides and conformances.
     return DiffStore.getDiffItems(Buffer.str());
+  }
+
+  DeclNameViewer getFuncRename(ValueDecl *VD, bool &IgnoreBase) {
+    for (auto *Item : getRelatedDiffItems(VD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        if (CI->isRename()) {
+          IgnoreBase = true;
+          switch(CI->NodeKind) {
+          case SDKNodeKind::Function:
+            IgnoreBase = false;
+            LLVM_FALLTHROUGH;
+          case SDKNodeKind::Constructor:
+            return DeclNameViewer(CI->getNewName());
+          default:
+            return DeclNameViewer();
+          }
+        }
+      }
+    }
+    return DeclNameViewer();
   }
 
   bool isSimpleReplacement(APIDiffItem *Item, std::string &Text) {
@@ -88,6 +110,72 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
       if (isSimpleReplacement(Item, RepText)) {
         Editor.replace(Range, RepText);
         return true;
+      }
+    }
+    return true;
+  }
+
+  struct ReferenceCollector : public SourceEntityWalker {
+    ValueDecl *Target;
+    CharSourceRange Result;
+    ReferenceCollector(ValueDecl* Target) : Target(Target) {}
+    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                            Type T, ReferenceMetaData Data) override {
+      if (D == Target) {
+        Result = Range;
+        return false;
+      }
+      return true;
+    }
+  };
+
+  void handleFuncRename(ValueDecl *FD, Expr* FuncRefContainer, Expr *Arg) {
+    bool IgnoreBase = false;
+    if (auto View = getFuncRename(FD, IgnoreBase)) {
+      if(!IgnoreBase) {
+        ReferenceCollector Walker(FD);
+        Walker.walk(FuncRefContainer);
+        Editor.replace(Walker.Result, View.base());
+      }
+      unsigned Idx = 0;
+      for (auto LR :getCallArgLabelRanges(SM, Arg,
+                                          LabelRangeEndAt::LabelNameOnly)) {
+        if (Idx < View.argSize()) {
+          auto Label = View.args()[Idx++];
+
+          // FIXME: We update only when args are consistently valid.
+          if (Label != "_" && LR.getByteLength())
+            Editor.replace(LR, Label);
+        }
+      }
+    }
+  }
+
+  bool walkToExprPre(Expr *E) override {
+    if (auto *CE = dyn_cast<CallExpr>(E)) {
+      auto Fn = CE->getFn();
+      auto Args = CE->getArg();
+      switch (Fn->getKind()) {
+      case ExprKind::DeclRef: {
+        if (auto FD = Fn->getReferencedDecl().getDecl())
+          handleFuncRename(FD, Fn, Args);
+        break;
+      }
+      case ExprKind::DotSyntaxCall: {
+        auto DSC = cast<DotSyntaxCallExpr>(Fn);
+        if (auto FD = DSC->getFn()->getReferencedDecl().getDecl())
+          handleFuncRename(FD, DSC->getFn(), Args);
+        break;
+      }
+      case ExprKind::ConstructorRefCall: {
+        auto CCE = cast<ConstructorRefCallExpr>(Fn);
+        if (auto FD = CCE->getFn()->getReferencedDecl().getDecl())
+          handleFuncRename(FD, CCE->getFn(), Args);
+        break;
+      }
+      default:
+        break;
       }
     }
     return true;

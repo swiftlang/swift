@@ -403,7 +403,7 @@ public:
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getDiffItems(StringRef Key) const {
   if (Impl.PrintUsr)
-    llvm::outs() << Key;
+    llvm::outs() << Key << "\n";
   return Impl.Data[Key];
 }
 
