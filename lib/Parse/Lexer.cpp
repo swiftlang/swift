@@ -1372,7 +1372,7 @@ static StringRef getMultilineTrailingIndent(const Token &Str) {
 }
 
 /// validateMultilineIndents:
-/// Diagnosw contents of string literal that have inconsistent indentation.
+/// Diagnose contents of string literal that have inconsistent indentation.
 void Lexer::validateMultilineIndents(const Token &Str) {
   StringRef Indent = getMultilineTrailingIndent(Str);
   if (Indent.empty())
