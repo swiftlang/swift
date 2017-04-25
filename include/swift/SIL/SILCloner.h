@@ -384,6 +384,10 @@ SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
                                   SILInstruction *Cloned) {
   assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
          "cloned function dropped debug scope");
+  // Remove any previous mappings for the Orig instruction.
+  // If this is not done and there is a mapping for Orig in the map already,
+  // then this new mapping will be silently ignored.
+  InstructionMap.erase(Orig);
   InstructionMap.insert(std::make_pair(Orig, Cloned));
 }
 
