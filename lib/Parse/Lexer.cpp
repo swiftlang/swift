@@ -1658,7 +1658,6 @@ void Lexer::tryLexEditorPlaceholder() {
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
-                                         bool MultilineString,
                                          bool IsFirstSegment,
                                          bool IsLastSegment,
                                          unsigned IndentToStrip) {
@@ -1774,8 +1773,7 @@ void Lexer::getStringLiteralSegments(
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                   BytesPtr-SegmentStartPtr-2,
-                                  MultilineString, IsFirstSegment, false,
-                                  IndentToStrip));
+                                  IsFirstSegment, false, IndentToStrip));
     IsFirstSegment = false;
 
     // Find the closing ')'.
@@ -1798,8 +1796,7 @@ void Lexer::getStringLiteralSegments(
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
-                                MultilineString, IsFirstSegment, true,
-                                IndentToStrip));
+                                IsFirstSegment, true, IndentToStrip));
 }
 
 

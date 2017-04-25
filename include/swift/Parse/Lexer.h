@@ -375,17 +375,15 @@ public:
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
     unsigned Length, IndentToStrip;
-    bool MultilineString, IsFirstSegment, IsLastSegment;
+    bool IsFirstSegment, IsLastSegment;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
-                                    bool MultilineString,
                                     bool IsFirstSegment, bool IsLastSegment,
                                     unsigned IndentToStrip) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
-      Result.MultilineString = MultilineString;
       Result.IsFirstSegment = IsFirstSegment;
       Result.IsLastSegment = IsLastSegment;
       Result.IndentToStrip = IndentToStrip;
@@ -406,7 +404,6 @@ public:
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
-                                           bool MultilineString = false,
                                            bool IsFirstSegment = false,
                                            bool IsLastSegment = false,
                                            unsigned IndentToStrip = 0);
@@ -414,8 +411,8 @@ public:
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer, Segment.MultilineString, Segment.IsFirstSegment,
-        Segment.IsLastSegment, Segment.IndentToStrip);
+        Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
+        Segment.IndentToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
