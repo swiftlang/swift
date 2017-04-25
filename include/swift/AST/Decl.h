@@ -436,8 +436,11 @@ class alignas(1 << DeclAlignInBits) Decl {
   class TypeAliasDeclBitfields {
     friend class TypeAliasDecl;
     unsigned : NumGenericTypeDeclBits;
+
+    /// Whether the typealias forwards perfectly to its underlying type.
+    unsigned IsCompatibilityAlias : 1;
   };
-  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits };
+  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
 
   class NominalTypeDeclBitFields {
@@ -2440,6 +2443,14 @@ public:
 
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
+
+  bool isCompatibilityAlias() const {
+    return TypeAliasDeclBits.IsCompatibilityAlias;
+  }
+
+  void markAsCompatibilityAlias(bool newValue = true) {
+    TypeAliasDeclBits.IsCompatibilityAlias = newValue;
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;

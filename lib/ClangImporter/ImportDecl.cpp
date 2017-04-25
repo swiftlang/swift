@@ -2063,8 +2063,12 @@ namespace {
     void markAsVariant(Decl *decl, ImportedName correctSwiftName) {
       // Types always import using the latest version. Make sure all names up
       // to that version are considered available.
-      if (isa<TypeDecl>(decl) && getVersion() >= getActiveSwiftVersion())
-        return;
+      if (isa<TypeDecl>(decl)) {
+        cast<TypeAliasDecl>(decl)->markAsCompatibilityAlias();
+
+        if (getVersion() >= getActiveSwiftVersion())
+          return;
+      }
 
       // TODO: some versions should be deprecated instead of unavailable
 
