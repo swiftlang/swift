@@ -397,6 +397,9 @@ public:
   ~SourceEditOutputConsumer();
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
+
+// Get the ranges of argument labels from an Arg, either tuple or paren.
+std::vector<CharSourceRange> getCallArgLabelRanges(SourceManager &SM, Expr *Arg);
 } // namespace ide
 } // namespace swift
 
