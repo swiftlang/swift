@@ -31,12 +31,41 @@ using namespace swift;
 namespace {
 
 struct AccessMarkerElimination : SILModuleTransform {
+  void replaceBeginAccessUsers(BeginAccessInst *beginAccess) {
+
+    // Handle all the uses:
+    while (!beginAccess->use_empty()) {
+      Operand *op = *beginAccess->use_begin();
+
+      // Delete any associated end_access instructions.
+      if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
+        assert(endAccess->use_empty() && "found use of end_access");
+        endAccess->eraseFromParent();
+
+        // Forward all other uses to the original address.
+      } else {
+        op->set(beginAccess->getSource());
+      }
+    }
+  }
+
   void run() override {
     // Don't bother doing anything unless some kind of exclusivity
     // enforcement is enabled.
     auto &M = *getModule();
 
+    auto preserveAccess = [&M](SILAccessEnforcement enforcement) {
+      // Leave dynamic accesses in place, but delete all others.
+      return enforcement == SILAccessEnforcement::Dynamic
+             && M.getOptions().EnforceExclusivityDynamic;
+    };
+
     bool removedAny = false;
+
+    auto eraseInst = [&removedAny](SILInstruction *inst) {
+      removedAny = true;
+      return inst->getParent()->erase(inst);
+    };
 
     for (auto &F : M) {
       // Iterating in reverse eliminates more begin_access users before they
@@ -48,32 +77,37 @@ struct AccessMarkerElimination : SILModuleTransform {
 
           if (auto beginAccess = dyn_cast<BeginAccessInst>(inst)) {
             // Leave dynamic accesses in place, but delete all others.
-            if (beginAccess->getEnforcement() == SILAccessEnforcement::Dynamic
-                && M.getOptions().EnforceExclusivityDynamic)
+            if (preserveAccess(beginAccess->getEnforcement()))
               continue;
 
-            // Handle all the uses:
-            while (!beginAccess->use_empty()) {
-              Operand *op = *beginAccess->use_begin();
-
-              // Delete any associated end_access instructions.
-              if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
-                assert(endAccess->use_empty() && "found use of end_access");
-                endAccess->eraseFromParent();
-
-              // Forward all other uses to the original address.
-              } else {
-                op->set(beginAccess->getSource());
-              }
-            }
-
-            II = BB.erase(beginAccess);
-            removedAny = true;
+            replaceBeginAccessUsers(beginAccess);
+            II = eraseInst(beginAccess);
             continue;
           }
 
           // end_access instructions will be handled when we process the
           // begin_access.
+
+          // begin_unpaired_access instructions will be directly removed and
+          // simply replaced with their operand.
+          if (auto BUA = dyn_cast<BeginUnpairedAccessInst>(inst)) {
+            if (preserveAccess(BUA->getEnforcement()))
+              continue;
+
+            BUA->replaceAllUsesWith(BUA->getSource());
+            II = eraseInst(BUA);
+            continue;
+          }
+          // end_unpaired_access instructions will be directly removed and
+          // simply replaced with their operand.
+          if (auto EUA = dyn_cast<EndUnpairedAccessInst>(inst)) {
+            if (preserveAccess(EUA->getEnforcement()))
+              continue;
+
+            assert(EUA->use_empty() && "use of end_unpaired_access");
+            II = eraseInst(EUA);
+            continue;
+          }
         }
       }
 
