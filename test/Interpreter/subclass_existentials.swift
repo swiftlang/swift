@@ -444,25 +444,23 @@ SubclassExistentialsTestSuite.test("Failing scalar downcast to subclass existent
   }
 }
 
-// FIXME
-
 SubclassExistentialsTestSuite.test("Failing dynamic downcast to subclass existential") {
   do {
     let baseInt: Base<Int> = Base<Int>(x: 123, y: 321)
 
-    //expectNil(cast(baseInt, to: ((Base<Int>) & P).self))
+    expectNil(cast(baseInt, to: ((Base<Int>) & P).self))
   }
 
   do {
     let r: R = Base<Int>(x: 123, y: 321)
 
-    //expectNil(cast(r, to: ((Base<Int>) & P).self))
+    expectNil(cast(r, to: ((Base<Int>) & P).self))
   }
 
   do {
     let conformsToP = ConformsToP(protocolInit: ())
 
-    //expectNil(cast(conformsToP, to: ((Base<Int>) & P).self))
+    expectNil(cast(conformsToP, to: ((Base<Int>) & P).self))
   }
 }
 
