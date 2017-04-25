@@ -900,4 +900,16 @@ public func testCondCastSwiftToCFSetInt() -> CFSet? {
   return setOpt
 }
 
+public class NSObjectSubclass : NSObject { }
 
+var anyHashable: AnyHashable = 0
+
+// CHECK-LABEL: _T021bridged_casts_folding29testUncondCastSwiftToSubclassAA08NSObjectI0CyF
+// CHECK: [[GLOBAL:%[0-9]+]] = global_addr @_T021bridged_casts_folding11anyHashables03AnyE0Vv
+// CHECK: function_ref @_T0s11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
+// CHECK-NEXT: apply
+// CHECK-NEXT: unconditional_checked_cast {{%.*}} : $NSObject to $NSObjectSubclass
+@inline(never)
+public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {
+  return anyHashable as! NSObjectSubclass
+}
