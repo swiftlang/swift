@@ -665,9 +665,9 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
-    // If the parameter was a tuple, try to look through the various
-    // tuple operations.
-    if (auto paramTupleType = paramType->getAs<TupleType>()) {
+    // If the parameter was structurally a tuple, try to look through the
+    // various tuple operations.
+    if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
         return classifyTupleRethrowsArgument(tuple, paramTupleType);
       } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
@@ -675,8 +675,7 @@ private:
       }
 
       int scalarElt = paramTupleType->getElementForScalarInit();
-      if (scalarElt < 0 ||
-          !paramTupleType->getElementType(scalarElt)->isEqual(arg->getType())) {
+      if (scalarElt < 0) {
         // Otherwise, we're passing an opaque tuple expression, and we
         // should treat it as contributing to 'rethrows' if the original
         // parameter type included a throwing function type.
