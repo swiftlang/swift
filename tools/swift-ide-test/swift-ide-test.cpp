@@ -1428,108 +1428,16 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     return EXIT_SUCCESS;
   }
 
-  // If we were given a mangled name, do a very simple form of LLDB's logic to
-  // look up a type based on that name.
-  Demangle::Context DCtx;
-  Demangle::NodePointer node = DCtx.demangleSymbolAsNode(MangledNameToFind);
-  using NodeKind = Demangle::Node::Kind;
-
-  if (!node) {
-    llvm::errs() << "Unable to demangle name.\n";
-    return EXIT_FAILURE;
-  }
-  node = node->getFirstChild();
-
-  // FIXME: Look up things other than types.
-  if (node->getKind() != NodeKind::TypeMangling) {
-    llvm::errs() << "Name does not refer to a type.\n";
-    return EXIT_FAILURE;
-  }
-  node = node->getFirstChild();
-  assert(node->getKind() == NodeKind::Type);
-  node = node->getFirstChild();
-
-  switch (node->getKind()) {
-  case NodeKind::Class:
-  case NodeKind::Enum:
-  case NodeKind::Protocol:
-  case NodeKind::Structure:
-  case NodeKind::TypeAlias:
-    break;
-  default:
-    llvm::errs() << "Name does not refer to a nominal type or typealias.\n";
+  // If we were given a mangled name, only print that declaration.
+  std::string error;
+  const Decl *D = ide::getDeclFromMangledSymbolName(CI.getASTContext(),
+                                                    MangledNameToFind, error);
+  if (!D) {
+    llvm::errs() << "Unable to find decl for symbol: " << error << "\n";
     return EXIT_FAILURE;
   }
 
-  ASTContext &ctx = CI.getASTContext();
-
-  SmallVector<std::pair<DeclName, Identifier>, 4> identifiers;
-  do {
-    auto nameNode = node->getChild(1);
-    switch (nameNode->getKind()) {
-    case NodeKind::Identifier:
-      identifiers.push_back({ ctx.getIdentifier(nameNode->getText()),
-                              Identifier() });
-      break;
-    case NodeKind::PrivateDeclName:
-      identifiers.push_back({
-        ctx.getIdentifier(nameNode->getChild(1)->getText()),
-        ctx.getIdentifier(nameNode->getChild(0)->getText())
-      });
-      break;
-    default:
-      llvm::errs() << "Unsupported name kind.\n";
-      return EXIT_FAILURE;
-    }
-
-    node = node->getChild(0);
-
-    switch (node->getKind()) {
-    case NodeKind::Module:
-      // Will break out of loop below.
-      break;
-    case NodeKind::Class:
-    case NodeKind::Enum:
-    case NodeKind::Protocol:
-    case NodeKind::Structure:
-      break;
-    default:
-      llvm::errs() << "Name does not refer to a nominal type.\n";
-      return EXIT_FAILURE;
-    }
-  } while (node->getKind() != NodeKind::Module);
-
-  ModuleDecl *M = getModuleByFullName(ctx, node->getText());
-  SmallVector<ValueDecl *, 4> results;
-  M->lookupMember(results, M, identifiers.back().first,
-                  identifiers.back().second);
-
-  if (results.empty()) {
-    llvm::errs() << "No matching declarations found for "
-      << MangledNameToFind << ".\n";
-    return EXIT_FAILURE;
-  }
-
-  // Progressively perform lookup into matching containers.
-  for (auto member : reversed(llvm::makeArrayRef(identifiers).drop_back())) {
-    decltype(results) prevResults;
-    std::swap(results, prevResults);
-
-    for (auto container : prevResults) {
-      M->lookupMember(results, cast<NominalTypeDecl>(container),
-                      member.first, member.second);
-    }
-
-    if (results.empty()) {
-      llvm::errs() << "No matching declarations found for "
-        << MangledNameToFind << ".\n";
-      return EXIT_FAILURE;
-    }
-  }
-
-  for (auto *VD : results)
-    VD->print(llvm::outs(), Options);
-
+  D->print(llvm::outs(), Options);
   return EXIT_SUCCESS;
 }
 
