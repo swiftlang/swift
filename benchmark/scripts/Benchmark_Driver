@@ -124,9 +124,9 @@ def get_tests(driver_path, args):
     tests = subprocess.check_output([driver_path, '--list']).split()[2:]
     if args.filter:
         return filter(lambda name: name.startswith(args.filter), tests)
-    if not args.benchmark:
+    if not args.benchmarks:
         return tests
-    return sorted(list(set(tests).intersection(set(args.benchmark))))
+    return sorted(list(set(tests).intersection(set(args.benchmarks))))
 
 
 def get_current_git_branch(git_repo_path):
@@ -360,7 +360,7 @@ def main():
     parent_parser = argparse.ArgumentParser(add_help=False)
     benchmarks_group = parent_parser.add_mutually_exclusive_group()
     benchmarks_group.add_argument(
-        'benchmark',
+        'benchmarks',
         default=[],
         help='benchmark to run (default: all)', nargs='*', metavar="BENCHMARK")
     benchmarks_group.add_argument(
