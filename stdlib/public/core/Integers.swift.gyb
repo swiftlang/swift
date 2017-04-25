@@ -1479,7 +1479,7 @@ public protocol BinaryInteger :
   // FIXME(integers): add doc comments
   // FIXME: Should be `Words : Collection where Words.Iterator.Element == UInt`
   // See <rdar://problem/31798916> for why it isn't.
-  associatedtype Words
+  associatedtype Words : Sequence
   var words: Words { get }
 
   /// The number of bits in the current binary representation of this value.
