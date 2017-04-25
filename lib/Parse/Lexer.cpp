@@ -1269,6 +1269,10 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         }
         // Otherwise it's an ordinary character; treat it normally.
       } else {
+        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
+          Diags->diagnose(Lexer::getSourceLoc(CurPtr-1),
+                          diag::lex_multiline_inside_interpolation);
+        }
         OpenDelimiters.push_back(CurPtr[-1]);
       }
       continue;

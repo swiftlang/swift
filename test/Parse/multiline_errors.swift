@@ -52,5 +52,7 @@ _ = """ """ // expected-error@-0{{invalid start of multi-line string literal}}
 
 _ = "\("""
   not valid
-  """)" // expected-error@-2{{Unterminated string literal}}
- // expected-error@-1{{invalid start of multi-line string literal}}
+  """)" // expected-error@-2{{mult-iline string literals are not allowed inside an interpolation}}
+// expected-error@-3{{unterminated string literal}}
+// expected-error@-2{{invalid start of multi-line string literal}}
+// expected-error@-3{{unterminated string literal}}
