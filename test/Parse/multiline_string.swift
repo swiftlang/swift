@@ -8,28 +8,24 @@ _ = """
     One
     ""Alpha""
     """
-
 // CHECK: "One\n\"\"Alpha\"\""
 
 _ = """
     Two
   Beta
   """
-
 // CHECK: "  Two\nBeta"
 
 _ = """
     Three
     Gamma
   """
-
 // CHECK: "  Three\n  Gamma"
 
 _ = """
     Four
     Delta
 """
-
 // CHECK: "    Four\n    Delta"
 
 _ = """
@@ -37,7 +33,6 @@ _ = """
 
     Epsilon
     """
-
 // CHECK: "Five\n\n\nEpsilon"
 
 
@@ -46,14 +41,12 @@ _ = """
     Zeta
 
     """
-
 // CHECK: "Six\nZeta\n"
 
 _ = """
     Seven
     Eta\n
     """
-
 // CHECK: "Seven\nEta\n"
 
 _ = """
@@ -62,27 +55,23 @@ _ = """
     ""\"
     Iota
     """
-
 // CHECK: "\"\"\"\n\"\"\"\n\"\"\"\nIota"
 
 _ = """
      \("Nine")
     Kappa
     """
-
 // CHECK: "\nKappa"
 
 _ = """
 \\
 """
-
 // CHECK: "\\"
 
 _ = """
 
   ABC
   """
-
 // CHECK: "\nABC"
 
 
@@ -90,20 +79,38 @@ _ = """
 
 ABC
 """
-
 // CHECK: "\nABC"
 
 _ = """
   
   ABC
   """
-
-
 // CHECK: "\nABC"
 
 _ = """
 
   ABC
   """
-
 // CHECK: "\nABC"
+
+_ = """
+
+    ABC
+
+    """
+// CHECK: "\nABC\n"
+
+_ = """
+
+
+    """
+// CHECK: "\n"
+
+_ = """
+
+    """
+// CHECK: ""
+
+_ = """
+    """
+// CHECK: ""

@@ -43,9 +43,10 @@ using clang::isWhitespace;
 
 /// Number of bits must tally with Token.h.
 enum StringLiteralModifiers : unsigned {
+  // Currently only one: multiline string but could be more e.g. regex escaping.
   StringLiteralMultiline = 1<<0,
 
-  // Pseudo options not in Token.h.
+  // Pseudo-options not in Token.h.
   // Only passed around as unsigned
   StringLiteralFirstSegment = 1<<1,
   StringLiteralLastSegment = 1<<2
@@ -1349,19 +1350,19 @@ static StringRef getStringLiteralContent(const Token &Str) {
 
 /// getTrailingIndent:
 /// Determine contents of literal to be indent stripped.
-static std::string getTrailingIndent(const Token &Str) {
+static StringRef getMultilineTrailingIndent(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
-  const char *end = Bytes.end(), *start = end;
+  const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
 
   // Work back from the end to find whitespace to strip.
-  while (start > Bytes.begin()) {
+  while (start > begin) {
     switch (*--start) {
     case ' ':
     case '\t':
       continue;
     case '\n':
     case '\r':
-      return std::string(start+1, end-(start+1));
+      return StringRef(start+1, end-(start+1));
     default:
       return "";
     }
@@ -1370,11 +1371,11 @@ static std::string getTrailingIndent(const Token &Str) {
   return "";
 }
 
-/// validateIndents:
-/// Check that contents of string literal have consistent indentation.
-void Lexer::validateIndents(const Token &Str) {
-  std::string ToStrip = getTrailingIndent(Str);
-  if (ToStrip.empty())
+/// validateMultilineIndents:
+/// Diagnosw contents of string literal that have inconsistent indentation.
+void Lexer::validateMultilineIndents(const Token &Str) {
+  StringRef Indent = getMultilineTrailingIndent(Str);
+  if (Indent.empty())
     return;
 
   StringRef Bytes = getStringLiteralContent(Str);
@@ -1383,7 +1384,7 @@ void Lexer::validateIndents(const Token &Str) {
   while ((pos = Bytes.find('\n', pos)) != StringRef::npos) {
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
-      if (Bytes.substr(nextpos, ToStrip.size()) != ToStrip)
+      if (Bytes.substr(nextpos, Indent.size()) != Indent)
         diagnose(BytesPtr + nextpos, diag::lex_ambiguous_string_indent);
     }
     pos = nextpos;
@@ -1393,7 +1394,7 @@ void Lexer::validateIndents(const Token &Str) {
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
-void Lexer::lexStringLiteral() {
+void Lexer::lexStringLiteral(unsigned Modifiers) {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
   // NOTE: We only allow single-quote string literals so we can emit useful
@@ -1401,7 +1402,6 @@ void Lexer::lexStringLiteral() {
 
   bool wasErroneous = false;
   bool wasWhitespace = false, allWhitespace = true, wasAllWhitespace = true;
-  unsigned Modifiers = 0;
 
   // Is this the start of a multiline string literal?
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
@@ -1495,7 +1495,7 @@ void Lexer::lexStringLiteral() {
             diagnose(CurPtr, diag::lex_illegal_multiline_string_end);
           CurPtr += 2;
           formToken(tok::string_literal, TokStart, Modifiers);
-          validateIndents(NextToken);
+          validateMultilineIndents(NextToken);
           return;
         }
         else
@@ -1670,7 +1670,7 @@ void Lexer::tryLexEditorPlaceholder() {
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
                                          unsigned Modifiers,
-                                         const std::string &ToStrip) {
+                                         unsigned IdentToStrip) {
 
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
@@ -1686,8 +1686,8 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
         BytesPtr - 1 == Bytes.begin();
       if (CurChar == '\r' && *BytesPtr == '\n')
         BytesPtr++;
-      if (ToStrip.length() && StringRef(BytesPtr, ToStrip.length()) == ToStrip)
-        BytesPtr += ToStrip.length();
+      if (*BytesPtr != '\r' && *BytesPtr != '\n')
+        BytesPtr += IdentToStrip;
       if ((Modifiers & StringLiteralLastSegment) && BytesPtr == Bytes.end())
         stripNewline = true;
       if (!stripNewline)
@@ -1754,15 +1754,15 @@ void Lexer::getStringLiteralSegments(
               SmallVectorImpl<StringSegment> &Segments,
               DiagnosticEngine *Diags) {
   assert(Str.is(tok::string_literal));
-  // Get the bytes behind the string literal, dropping the double quotes.
+  // Get the bytes behind the string literal, dropping any double quotes.
   StringRef Bytes = getStringLiteralContent(Str);
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
-  std::string ToStrip = "";
+  unsigned IdentToStrip = 0;
   unsigned Modifiers = Str.getStringModifiers() | StringLiteralFirstSegment;
   if (Modifiers & StringLiteralMultiline)
-      ToStrip = getTrailingIndent(Str);
+      IdentToStrip = getMultilineTrailingIndent(Str).size();
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1784,7 +1784,7 @@ void Lexer::getStringLiteralSegments(
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                   BytesPtr-SegmentStartPtr-2,
-                                  Modifiers, ToStrip));
+                                  Modifiers, IdentToStrip));
     Modifiers &= ~StringLiteralFirstSegment;
 
     // Find the closing ')'.
@@ -1807,7 +1807,8 @@ void Lexer::getStringLiteralSegments(
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
-                                Modifiers | StringLiteralLastSegment, ToStrip));
+                                Modifiers|StringLiteralLastSegment,
+                                IdentToStrip));
 }
 
 

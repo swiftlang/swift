@@ -31,3 +31,8 @@ _ = """Fourteen
 _ = """
     Fourteen
     Pi""" // expected-error@-0{{invalid end of multi-line string literal}}
+
+_ = """""" // expected-error@-0{{invalid start of multi-line string literal}}
+
+_ = """
+// expected-error@-1{{Unterminated string literal}}

@@ -374,19 +374,17 @@ public:
     enum : char { Literal, Expr } Kind;
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
-    unsigned Length;
-    unsigned Modifiers;
-    std::string ToStrip;
+    unsigned Length, Modifiers, IdentToStrip;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
                                     unsigned Modifiers,
-                                    const std::string &ToStrip) {
+                                    unsigned IdentToStrip) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
       Result.Modifiers = Modifiers;
-      Result.ToStrip = ToStrip;
+      Result.IdentToStrip = IdentToStrip;
       return Result;
     }
     
@@ -395,6 +393,8 @@ public:
       Result.Kind = Expr;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.Modifiers = 0;
+      Result.IdentToStrip = 0;
       return Result;
     }
   };
@@ -405,12 +405,12 @@ public:
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
                                            unsigned Modifiers = 0,
-                                           const std::string &ToStrip = "");
+                                           unsigned IdentToStrip = 0);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer, Segment.Modifiers, Segment.ToStrip);
+        Buffer, Segment.Modifiers, Segment.IdentToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -505,7 +505,7 @@ private:
   unsigned lexCharacter(const char *&CurPtr,
                         char StopQuote, bool EmitDiagnostics,
                         unsigned Modifiers = 0);
-  void lexStringLiteral();
+  void lexStringLiteral(unsigned Modifiers = 0);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
@@ -515,8 +515,8 @@ private:
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker();
 
-  /// Multiline string literals.
-  void validateIndents(const Token &Str);
+  /// Check multiline string literal is indented correctly.
+  void validateMultilineIndents(const Token &Str);
 };
   
 } // end namespace swift
