@@ -374,17 +374,17 @@ public:
     enum : char { Literal, Expr } Kind;
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
-    unsigned Length, Modifiers, IdentToStrip;
+    unsigned Length, Modifiers, IndentToStrip;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
                                     unsigned Modifiers,
-                                    unsigned IdentToStrip) {
+                                    unsigned IndentToStrip) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
       Result.Modifiers = Modifiers;
-      Result.IdentToStrip = IdentToStrip;
+      Result.IndentToStrip = IndentToStrip;
       return Result;
     }
     
@@ -394,7 +394,7 @@ public:
       Result.Loc = Loc;
       Result.Length = Length;
       Result.Modifiers = 0;
-      Result.IdentToStrip = 0;
+      Result.IndentToStrip = 0;
       return Result;
     }
   };
@@ -405,12 +405,12 @@ public:
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
                                            unsigned Modifiers = 0,
-                                           unsigned IdentToStrip = 0);
+                                           unsigned IndentToStrip = 0);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer, Segment.Modifiers, Segment.IdentToStrip);
+        Buffer, Segment.Modifiers, Segment.IndentToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments

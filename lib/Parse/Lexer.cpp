@@ -1348,8 +1348,8 @@ static StringRef getStringLiteralContent(const Token &Str) {
   return Bytes;
 }
 
-/// getTrailingIndent:
-/// Determine contents of literal to be indent stripped.
+/// getMultilineTrailingIndent:
+/// Determine trailing indent to be used for multiline literal indent stripping.
 static StringRef getMultilineTrailingIndent(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
@@ -1670,7 +1670,7 @@ void Lexer::tryLexEditorPlaceholder() {
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
                                          unsigned Modifiers,
-                                         unsigned IdentToStrip) {
+                                         unsigned IndentToStrip) {
 
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
@@ -1687,7 +1687,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       if (CurChar == '\r' && *BytesPtr == '\n')
         BytesPtr++;
       if (*BytesPtr != '\r' && *BytesPtr != '\n')
-        BytesPtr += IdentToStrip;
+        BytesPtr += IndentToStrip;
       if ((Modifiers & StringLiteralLastSegment) && BytesPtr == Bytes.end())
         stripNewline = true;
       if (!stripNewline)
@@ -1759,10 +1759,10 @@ void Lexer::getStringLiteralSegments(
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
-  unsigned IdentToStrip = 0;
+  unsigned IndentToStrip = 0;
   unsigned Modifiers = Str.getStringModifiers() | StringLiteralFirstSegment;
   if (Modifiers & StringLiteralMultiline)
-      IdentToStrip = getMultilineTrailingIndent(Str).size();
+      IndentToStrip = getMultilineTrailingIndent(Str).size();
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1784,7 +1784,7 @@ void Lexer::getStringLiteralSegments(
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                   BytesPtr-SegmentStartPtr-2,
-                                  Modifiers, IdentToStrip));
+                                  Modifiers, IndentToStrip));
     Modifiers &= ~StringLiteralFirstSegment;
 
     // Find the closing ')'.
@@ -1808,7 +1808,7 @@ void Lexer::getStringLiteralSegments(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
                                 Modifiers|StringLiteralLastSegment,
-                                IdentToStrip));
+                                IndentToStrip));
 }
 
 
