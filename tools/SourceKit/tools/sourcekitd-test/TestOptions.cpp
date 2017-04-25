@@ -149,7 +149,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_help: {
       printHelp(false);
       return true;
-      break;
     }
 
     case OPT_offset:
