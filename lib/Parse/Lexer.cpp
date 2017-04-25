@@ -1343,7 +1343,8 @@ static StringRef getStringLiteralContent(const Token &Str) {
 
 /// getMultilineTrailingIndent:
 /// Determine trailing indent to be used for multiline literal indent stripping.
-static StringRef getMultilineTrailingIndent(const Token &Str) {
+static StringRef getMultilineTrailingIndent(const Token &Str,
+                                            DiagnosticEngine *Diags) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
 
@@ -1357,6 +1358,9 @@ static StringRef getMultilineTrailingIndent(const Token &Str) {
     case '\r':
       return StringRef(start+1, end-(start+1));
     default:
+      if (Diags)
+        Diags->diagnose(getSourceLoc(start),
+                        diag::lex_illegal_multiline_string_end);
       return "";
     }
   }
@@ -1367,7 +1371,7 @@ static StringRef getMultilineTrailingIndent(const Token &Str) {
 /// validateMultilineIndents:
 /// Diagnose contents of string literal that have inconsistent indentation.
 void Lexer::validateMultilineIndents(const Token &Str) {
-  StringRef Indent = getMultilineTrailingIndent(Str);
+  StringRef Indent = getMultilineTrailingIndent(Str, Diags);
   if (Indent.empty())
     return;
 
@@ -1394,7 +1398,6 @@ void Lexer::lexStringLiteral() {
   // diagnostics about changing them to double quotes.
 
   bool wasErroneous = false, MultilineString = false;
-  bool wasWhitespace = false, allWhitespace = true, wasAllWhitespace = true;
 
   // Is this the start of a multiline string literal?
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
@@ -1422,19 +1425,10 @@ void Lexer::lexStringLiteral() {
     }
 
     // String literals cannot have \n or \r in them (unless multiline).
-    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
-      if (!MultilineString || CurPtr == BufferEnd) {
-        diagnose(TokStart, diag::lex_unterminated_string);
-        return formToken(tok::unknown, TokStart);
-      }
-      wasAllWhitespace = allWhitespace = true;
-      wasWhitespace = false;
-    }
-    else {
-      wasWhitespace = *CurPtr == ' ' || *CurPtr == '\t';
-      wasAllWhitespace = allWhitespace;
-      if (!wasWhitespace)
-        allWhitespace = false;
+    if (((*CurPtr == '\r' || *CurPtr == '\n') && !MultilineString)
+        || CurPtr == BufferEnd) {
+      diagnose(TokStart, diag::lex_unterminated_string);
+      return formToken(tok::unknown, TokStart);
     }
 
     unsigned CharValue = lexCharacter(CurPtr, *TokStart, true, MultilineString);
@@ -1484,8 +1478,6 @@ void Lexer::lexStringLiteral() {
       // Is this the end of a multiline string literal?
       if (MultilineString) {
         if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr + 2) != '"') {
-          if (!wasAllWhitespace)
-            diagnose(CurPtr-1, diag::lex_illegal_multiline_string_end);
           CurPtr += 2;
           formToken(tok::string_literal, TokStart, MultilineString);
           validateMultilineIndents(NextToken);
@@ -1755,7 +1747,7 @@ void Lexer::getStringLiteralSegments(
   bool MultilineString = Str.IsMultilineString(), IsFirstSegment = true;
   unsigned IndentToStrip = 0;
   if (MultilineString)
-      IndentToStrip = getMultilineTrailingIndent(Str).size();
+      IndentToStrip = getMultilineTrailingIndent(Str, /*Diags=*/nullptr).size();
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
