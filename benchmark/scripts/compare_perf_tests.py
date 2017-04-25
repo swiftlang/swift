@@ -150,7 +150,7 @@ def main():
                 new_max_results[row[TESTNAME]] = int(row[MAX])
 
     ratio_total = 0
-    for key in new_results.keys():
+    for key in set(new_results.keys()).intersection(old_results.keys()):
             ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
             ratio_list[key] = round(ratio, 2)
             ratio_total *= ratio
@@ -168,7 +168,8 @@ def main():
     (complete_perf_list,
      increased_perf_list,
      decreased_perf_list,
-     normal_perf_list) = sort_ratio_list(ratio_list, args.changes_only)
+     normal_perf_list) = sort_ratio_list(
+        ratio_list, delta_list, args.changes_only)
 
     """
     Create markdown formatted table
@@ -276,7 +277,7 @@ def convert_to_html(ratio_list, old_results, new_results, delta_list,
     (complete_perf_list,
      increased_perf_list,
      decreased_perf_list,
-     normal_perf_list) = sort_ratio_list(ratio_list, changes_only)
+     normal_perf_list) = sort_ratio_list(ratio_list, delta_list, changes_only)
 
     html_rows = ""
     for key in complete_perf_list:
@@ -321,7 +322,7 @@ def write_to_file(file_name, data):
     file.close
 
 
-def sort_ratio_list(ratio_list, changes_only=False):
+def sort_ratio_list(ratio_list, delta_list, changes_only=False):
     """
     Return 3 sorted list improvement, regression and normal.
     """
@@ -330,7 +331,7 @@ def sort_ratio_list(ratio_list, changes_only=False):
     sorted_normal_perf_list = []
     normal_perf_list = {}
 
-    for key, v in sorted(ratio_list.items(), key=lambda x: x[1]):
+    for key, v in sorted(delta_list.items(), key=lambda x: x[1], reverse=True):
         if ratio_list[key] < RATIO_MIN:
             decreased_perf_list.append(key)
         elif ratio_list[key] > RATIO_MAX:
@@ -348,6 +349,7 @@ def sort_ratio_list(ratio_list, changes_only=False):
         complete_perf_list = (decreased_perf_list + increased_perf_list +
                               sorted_normal_perf_list)
 
+    increased_perf_list.reverse()
     return (complete_perf_list, increased_perf_list,
             decreased_perf_list, sorted_normal_perf_list)
 
