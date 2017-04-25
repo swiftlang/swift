@@ -580,9 +580,9 @@ extension ExpressibleByStringLiteral
 ///     }
 public protocol ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
-  associatedtype Element
+  associatedtype ArrayLiteralElement
   /// Creates an instance initialized with the given elements.
-  init(arrayLiteral elements: Element...)
+  init(arrayLiteral elements: ArrayLiteralElement...)
 }
 
 /// A type that can be initialized using a dictionary literal.
