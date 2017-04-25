@@ -52,11 +52,11 @@ protected:
   }
 
 public:
-#ifndef NDEBUG
   virtual ~SwitchBuilder() {
+#ifndef NDEBUG
     assert(CasesToAdd == 0 && "Did not add enough cases");
-  }
 #endif
+  }
 
   // Create a SwitchBuilder instance for a switch that will have the given
   // number of cases.
