@@ -395,6 +395,9 @@ public:
       Result.Kind = Expr;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.IsFirstSegment = false;
+      Result.IsLastSegment = false;
+      Result.IndentToStrip = 0;
       return Result;
     }
   };
