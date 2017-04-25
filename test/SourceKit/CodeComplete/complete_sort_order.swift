@@ -7,7 +7,7 @@ func test() {
 
 }
 
-// XFAIL: broken_std_regex, linux
+// XFAIL: broken_std_regex
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0 -pos=7:1 %s -- %s > %t.orig
 // RUN: %FileCheck -check-prefix=NAME %s < %t.orig
 // Make sure the order is as below, foo(Int) should come before foo(String).
