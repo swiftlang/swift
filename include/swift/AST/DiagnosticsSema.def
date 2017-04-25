@@ -1962,6 +1962,12 @@ ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
+ERROR(broken_coding_key_requirement,none,
+      "CodingKey protocol is broken: unexpected requirement", ())
+ERROR(broken_encodable_requirement,none,
+      "Encodable protocol is broken: unexpected requirement", ())
+ERROR(broken_decodable_requirement,none,
+      "Decodable protocol is broken: unexpected requirement", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
