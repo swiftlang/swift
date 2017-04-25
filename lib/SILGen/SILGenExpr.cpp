@@ -436,7 +436,6 @@ namespace {
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
-    RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
     RValue visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
                                           SGFContext C);
     RValue visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *E,
@@ -3350,28 +3349,6 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   if (result.isInContext())
     return RValue();
   return RValue(SGF, E, result);
-}
-
-RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
-                                               SGFContext C) {
-  LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::ReadWrite);
-  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(),
-                                             std::move(lv),
-                                             AccessKind::ReadWrite)
-    .getUnmanagedValue();
-  // TODO: Reabstract the lvalue to match the abstraction level expected by
-  // the inout address conversion's InOutType. For now, just report cases where
-  // we would need a reabstraction as unsupported.
-  SILType abstractedTy
-    = SGF.getLoweredType(AbstractionPattern(E->getAbstractionPatternType()),
-                         E->getSubExpr()->getType()->getLValueOrInOutObjectType());
-  if (address->getType().getObjectType() != abstractedTy)
-    SGF.SGM.diagnose(E, diag::not_implemented,
-                     "abstraction difference in inout conversion");
-  
-  SILValue ptr = SGF.B.createAddressToPointer(E, address,
-                              SILType::getRawPointerType(SGF.getASTContext()));
-  return RValue(SGF, E, ManagedValue::forUnmanaged(ptr));
 }
 
 RValue RValueEmitter::visitClassMetatypeToObjectExpr(
