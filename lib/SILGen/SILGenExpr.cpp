@@ -1117,16 +1117,22 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
   return ManagedValue(buffer, enterDestroyCleanup(buffer));
 }
 
-RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
+SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
+                                                   Expr *loc)
+    : SGF(SGF), Loc(loc), OldThrowDest(SGF.ThrowDest) {
+  assert(loc && "cannot pass a null location");
+
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-  llvm::SaveAndRestore<JumpDest> throwDest{
-      SGF.ThrowDest,
-      JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
-               CleanupLocation::get(E))};
+  SGF.ThrowDest = JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
+                           CleanupLocation::get(loc));
+}
 
-  // Visit the sub-expression.
-  RValue result = visit(E->getSubExpr(), C);
+void SILGenFunction::ForceTryEmission::finish() {
+  assert(Loc && "emission already finished");
+
+  auto catchBB = SGF.ThrowDest.getBlock();
+  SGF.ThrowDest = OldThrowDest;
 
   // If there are no uses of the catch block, just drop it.
   if (catchBB->pred_empty()) {
@@ -1138,12 +1144,20 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
     ASTContext &ctx = SGF.getASTContext();
     auto error = catchBB->createPHIArgument(SILType::getExceptionType(ctx),
                                             ValueOwnershipKind::Owned);
-    SGF.B.createBuiltin(E, ctx.getIdentifier("unexpectedError"),
+    SGF.B.createBuiltin(Loc, ctx.getIdentifier("unexpectedError"),
                         SGF.SGM.Types.getEmptyTupleType(), {}, {error});
-    SGF.B.createUnreachable(E);
+    SGF.B.createUnreachable(Loc);
   }
 
-  return result;
+  // Prevent double-finishing and make the destructor a no-op.
+  Loc = nullptr;
+}
+
+RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
+  SILGenFunction::ForceTryEmission emission(SGF, E);
+
+  // Visit the sub-expression.
+  return visit(E->getSubExpr(), C);
 }
 
 RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
@@ -4110,13 +4124,10 @@ public:
 };
 } // end anonymous namespace
 
-RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
-                                              SGFContext C) {
-  // If we're converting on the behalf of an
-  // AutoreleasingUnsafeMutablePointer, convert the lvalue to
-  // unowned(unsafe), so we can point at +0 storage.
+SILGenFunction::PointerAccessInfo
+SILGenFunction::getPointerAccessInfo(Type type) {
   PointerTypeKind pointerKind;
-  Type elt = E->getType()->getAnyPointerElementType(pointerKind);
+  Type elt = type->getAnyPointerElementType(pointerKind);
   assert(elt && "not a pointer");
   (void)elt;
 
@@ -4124,23 +4135,27 @@ RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
     ((pointerKind == PTK_UnsafePointer || pointerKind == PTK_UnsafeRawPointer)
        ? AccessKind::Read : AccessKind::ReadWrite);
 
-  // Get the original lvalue.
-  LValue lv = SGF.emitLValue(cast<InOutExpr>(E->getSubExpr())->getSubExpr(),
-                             accessKind);
+  return { type->getCanonicalType(), pointerKind, accessKind };
+}
 
-  auto ptr = SGF.emitLValueToPointer(E, std::move(lv),
-                                     E->getType()->getCanonicalType(),
-                                     pointerKind, accessKind);
+RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E,
+                                              SGFContext C) {
+  // If we're converting on the behalf of an
+  // AutoreleasingUnsafeMutablePointer, convert the lvalue to
+  // unowned(unsafe), so we can point at +0 storage.
+  auto accessInfo = SGF.getPointerAccessInfo(E->getType());
+
+  // Get the original lvalue.
+  LValue lv = SGF.emitLValue(E->getSubExpr(), accessInfo.AccessKind);
+
+  auto ptr = SGF.emitLValueToPointer(E, std::move(lv), accessInfo);
   return RValue(SGF, E, ptr);
 }
 
 /// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
 /// autoreleasing-unsafe-mutable.
-ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
-                                                 LValue &&lv,
-                                                 CanType pointerType,
-                                                 PointerTypeKind pointerKind,
-                                                 AccessKind accessKind) {
+ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
+                                                PointerAccessInfo pointerInfo) {
   // The incoming lvalue should be at the abstraction level of T in
   // Unsafe*Pointer<T>. Reabstract it if necessary.
   auto opaqueTy = AbstractionPattern::getOpaque();
@@ -4149,7 +4164,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
         != loweredTy.getSwiftRValueType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
-  switch (pointerKind) {
+  switch (pointerInfo.PointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
   case PTK_UnsafeMutableRawPointer:
@@ -4175,6 +4190,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
   }
 
   // Get the lvalue address as a raw pointer.
+  auto accessKind = pointerInfo.AccessKind;
   SILValue address =
     emitAddressOfLValue(loc, std::move(lv), accessKind).getUnmanagedValue();
   address = B.createAddressToPointer(loc, address,
@@ -4188,6 +4204,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
   FuncDecl *converter =
     getASTContext().getConvertInOutToPointerArgument(nullptr);
 
+  auto pointerType = pointerInfo.PointerType;
   auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                                        getPointerProtocol());
   return emitApplyOfLibraryIntrinsic(loc, converter, subMap,
@@ -4195,34 +4212,31 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
                                      SGFContext())
            .getAsSingleValue(*this, loc);
 }
-RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
-                                              SGFContext C) {
-  FormalEvaluationScope writeback(SGF);
 
-  auto &Ctx = SGF.getASTContext();
+static ManagedValue emitArrayToPointer(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       ManagedValue array,
+                                SILGenFunction::ArrayAccessInfo accessInfo) {
+  auto &ctx = SGF.getASTContext();
+
   FuncDecl *converter;
-  ManagedValue orig;
+  if (accessInfo.AccessKind == AccessKind::Read) {
+    converter = ctx.getConvertConstArrayToPointerArgument(nullptr);
+    if (array.isLValue())
+      array = SGF.B.createLoadCopy(loc, array);
 
-  // Convert the array mutably if it's being passed inout.
-  auto subExpr = E->getSubExpr();
-  if (subExpr->getType()->is<InOutType>()) {
-    converter = Ctx.getConvertMutableArrayToPointerArgument(nullptr);
-    orig = SGF.emitAddressOfLValue(subExpr,
-                               SGF.emitLValue(subExpr, AccessKind::ReadWrite),
-                                   AccessKind::ReadWrite);
   } else {
-    converter = Ctx.getConvertConstArrayToPointerArgument(nullptr);
-    orig = SGF.emitRValueAsSingleValue(subExpr);
+    converter = ctx.getConvertMutableArrayToPointerArgument(nullptr);
+    assert(array.isLValue());
   }
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   auto *M = SGF.SGM.M.getSwiftModule();
-  auto firstSubMap = subExpr->getType()->getInOutObjectType()
-    ->getContextSubstitutionMap(
-      M, Ctx.getArrayDecl());
-  auto secondSubMap = E->getType()
-    ->getContextSubstitutionMap(
-      M, SGF.getPointerProtocol());
+  auto firstSubMap =
+    accessInfo.ArrayType->getContextSubstitutionMap(M, ctx.getArrayDecl());
+  auto secondSubMap =
+    accessInfo.PointerType->getContextSubstitutionMap(M,
+                                                      SGF.getPointerProtocol());
 
   auto *genericSig = converter->getGenericSignature();
   auto subMap =
@@ -4233,13 +4247,49 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                              genericSig);
 
   SmallVector<ManagedValue, 2> resultScalars;
-  SGF.emitApplyOfLibraryIntrinsic(E, converter, subMap, orig, SGFContext())
+  SGF.emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())
     .getAll(resultScalars);
   assert(resultScalars.size() == 2);
-  
+
   // The owner's already in its own cleanup.  Return the pointer.
-  return RValue(SGF, E, resultScalars[1]);
+  return resultScalars[1];
 }
+
+RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
+                                              SGFContext C) {
+  FormalEvaluationScope writeback(SGF);
+
+  auto subExpr = E->getSubExpr();
+  auto accessInfo = SGF.getArrayAccessInfo(E->getType(),
+                                     subExpr->getType()->getInOutObjectType());
+
+  // Convert the array mutably if it's being passed inout.
+  ManagedValue array;
+  if (accessInfo.AccessKind != AccessKind::Read) {
+    array = SGF.emitAddressOfLValue(subExpr,
+                                SGF.emitLValue(subExpr, AccessKind::ReadWrite),
+                                    AccessKind::ReadWrite);
+  } else {
+    array = SGF.emitRValueAsSingleValue(subExpr);
+  }
+
+  auto pointer = ::emitArrayToPointer(SGF, E, array, accessInfo);
+  return RValue(SGF, E, pointer);
+}
+
+SILGenFunction::ArrayAccessInfo
+SILGenFunction::getArrayAccessInfo(Type pointerType, Type arrayType) {
+  auto pointerAccessInfo = getPointerAccessInfo(pointerType);
+  return { pointerType, arrayType, pointerAccessInfo.AccessKind };
+}
+
+ManagedValue SILGenFunction::emitArrayToPointer(SILLocation loc, LValue &&lv,
+                                                ArrayAccessInfo accessInfo) {
+  auto array =
+    emitAddressOfLValue(loc, std::move(lv), accessInfo.AccessKind);
+  return ::emitArrayToPointer(*this, loc, array, accessInfo);
+}
+
 RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
                                                SGFContext C) {
   auto &Ctx = SGF.getASTContext();

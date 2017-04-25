@@ -5,8 +5,12 @@
 
 import Foundation
 
+func sideEffect1() -> Int { return 1 }
+func sideEffect2() -> Int { return 2 }
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>) {}
 func takesConstPointer(_ x: UnsafePointer<Int>) {}
+func takesMutablePointer(_ x: UnsafeMutablePointer<Int>, and: Int) {}
+func takesConstPointer(_ x: UnsafePointer<Int>, and: Int) {}
 func takesMutableVoidPointer(_ x: UnsafeMutableRawPointer) {}
 func takesConstVoidPointer(_ x: UnsafeRawPointer) {}
 func takesMutableRawPointer(_ x: UnsafeMutableRawPointer) {}
@@ -232,4 +236,34 @@ func functionInoutToPointer() {
   // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_owned (@in ()) -> @out ()
   // CHECK: address_to_pointer [[REABSTRACT_BUF]]
   takesMutableVoidPointer(&f)
+}
+
+// rdar://problem/31781386
+// CHECK-LABEL: sil hidden @_T018pointer_conversion20inoutPointerOrderingyyF
+func inoutPointerOrdering() {
+  // CHECK: [[ARRAY_BOX:%.*]] = alloc_box ${ var Array<Int> }
+  // CHECK: [[ARRAY:%.*]] = project_box [[ARRAY_BOX]] :
+  // CHECK: store {{.*}} to [init] [[ARRAY]]
+  var array = [Int]()
+
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_T018pointer_conversion19takesMutablePointerySpySiG_Si3andtF
+  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
+  // CHECK: [[SIDE2:%.*]] = function_ref @_T018pointer_conversion11sideEffect2SiyF
+  // CHECK: [[RESULT2:%.*]] = apply [[SIDE2]]()
+  // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[ARRAY]] : $*Array<Int>
+  // CHECK: apply [[TAKES_MUTABLE]]({{.*}}, [[RESULT2]])
+  // CHECK: strong_unpin
+  // CHECK: end_access [[ACCESS]]
+  takesMutablePointer(&array[sideEffect1()], and: sideEffect2())
+
+  // CHECK: [[TAKES_CONST:%.*]] = function_ref @_T018pointer_conversion17takesConstPointerySPySiG_Si3andtF
+  // CHECK: [[SIDE1:%.*]] = function_ref @_T018pointer_conversion11sideEffect1SiyF
+  // CHECK: [[RESULT1:%.*]] = apply [[SIDE1]]()
+  // CHECK: [[SIDE2:%.*]] = function_ref @_T018pointer_conversion11sideEffect2SiyF
+  // CHECK: [[RESULT2:%.*]] = apply [[SIDE2]]()
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[ARRAY]] : $*Array<Int>
+  // CHECK: apply [[TAKES_CONST]]({{.*}}, [[RESULT2]])
+  // CHECK: end_access [[ACCESS]]
+  takesConstPointer(&array[sideEffect1()], and: sideEffect2())
 }
