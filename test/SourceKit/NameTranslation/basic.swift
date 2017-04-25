@@ -32,7 +32,10 @@ func foo2 (_ a : FooClassDerived) {
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21:withBB: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK8 %s
 // RUN: %sourcekitd-test -req=translate -objc-name fooProperty11 -pos=16:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK9 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21:withBB:withC: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
-// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKFEWER1 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21:: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING1 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector :withBB: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING2 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector :: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING3 %s
 
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK10 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithfloat2: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK12 %s
@@ -57,3 +60,8 @@ func foo2 (_ a : FooClassDerived) {
 // CHECK12: init(float2:)
 // CHECK13: init(_:)
 // CHECK14: init
+
+// CHECKFEWER1: fooInstanceFunc21(_:withB:)
+// CHECKMISSING1: fooInstanceFunc21(_:withB:)
+// CHECKMISSING2: fooInstanceFunc2(_:withBB:)
+// CHECKMISSING3: fooInstanceFunc2(_:withB:)
