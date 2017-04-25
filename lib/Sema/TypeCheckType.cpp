@@ -3072,8 +3072,17 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   if (auto fixed = fixCompositionWithPostfix(TC, repr))
     return resolveType(fixed, options);
 
+  // Note that the superclass type will appear as part of one of the
+  // types in 'Members', so it's not used when constructing the
+  // fully-realized type below -- but we just record it to make sure
+  // there is only one superclass.
   Type SuperclassType;
-  SmallVector<Type, 4> ProtocolTypes;
+  SmallVector<Type, 4> Members;
+
+  // Whether we saw at least one protocol. A protocol composition
+  // must either be empty (in which case it is Any or AnyObject),
+  // or if it has a superclass constraint, have at least one protocol.
+  bool HasProtocol = false;
 
   auto checkSuperclass = [&](SourceLoc loc, Type t) -> bool {
     if (SuperclassType && !SuperclassType->isEqual(t)) {
@@ -3096,16 +3105,19 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       if (checkSuperclass(tyR->getStartLoc(), ty))
         continue;
 
-      ProtocolTypes.push_back(ty);
+      Members.push_back(ty);
       continue;
     }
 
     if (ty->isExistentialType()) {
-      if (auto superclassTy = ty->getSuperclass())
-        if (checkSuperclass(tyR->getStartLoc(), superclassTy))
+      auto layout = ty->getExistentialLayout();
+      if (layout.superclass)
+        if (checkSuperclass(tyR->getStartLoc(), layout.superclass))
           continue;
+      if (!layout.getProtocols().empty())
+        HasProtocol = true;
 
-      ProtocolTypes.push_back(ty);
+      Members.push_back(ty);
       continue;
     }
 
@@ -3114,9 +3126,15 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                 ty);
   }
 
+  // Avoid confusing diagnostics ('MyClass' not convertible to 'MyClass',
+  // etc) by collapsing a composition consisting of a single class down
+  // to the class itself.
+  if (SuperclassType && !HasProtocol)
+    return SuperclassType;
+
   // In user-written types, AnyObject constraints always refer to the
   // AnyObject type in the standard library.
-  return ProtocolCompositionType::get(Context, ProtocolTypes,
+  return ProtocolCompositionType::get(Context, Members,
                                       /*HasExplicitAnyObject=*/false);
 }
 
