@@ -18,6 +18,7 @@ from __future__ import print_function
 import argparse
 import csv
 import sys
+from math import sqrt
 
 
 class PerformanceTestResult:
@@ -28,16 +29,56 @@ class PerformanceTestResult:
         self.min = int(csv_row[3])      # Minimum runtime (ms)
         self.max = int(csv_row[4])      # Maximum runtime (ms)
         self.mean = int(csv_row[5])     # Mean (average) runtime (ms)
-        self.sd = int(csv_row[6])       # Standard Deviation (ms)
+        sd = int(csv_row[6])            # Standard Deviation (ms)
+        # For computing running variance
+        self.S_runtime = (0 if self.samples < 2 else
+                          (sd * sd) * (self.samples - 1))
         self.median = int(csv_row[7])   # Median runtime (ms)
         self.max_rss = int(csv_row[8])  # Maximum Resident Set Size (B)
+        # TODO if we really want to compute mean MAX_RSS: self.S_memory
+
+    @property
+    def sd(self):  # Standard Deviation (ms)
+        return (0 if self.samples < 2 else
+                sqrt(self.S_runtime / (self.samples - 1)))
+
+    @property
+    def cv(self):  # Coeficient of Variation (%)
+        return self.sd / self.mean
+
+    # Compute running variance, B. P. Welford's method
+    # See Knuth TAOCP vol 2, 3rd edition, page 232, or
+    # https://www.johndcook.com/blog/standard_deviation/
+    # M is mean, Standard Deviation is defined as sqrt(S/k-1)
+    @staticmethod
+    def running_mean_variance((k, M_, S_), x):
+        k = float(k + 1)
+        M = M_ + (x - M_) / k
+        S = S_ + (x - M_) * (x - M)
+        return (k, M, S)
+
+    def merge(self, r):
+        self.min = min(self.min, r.min)
+        self.max = max(self.max, r.max)
+        # self.median = None # unclear what to do here
+
+        def push(x):
+            state = (self.samples, self.mean, self.S_runtime)
+            state = self.running_mean_variance(state, x)
+            (self.samples, self.mean, self.S_runtime) = state
+
+        # Merging test results with up to 3 samples is exact
+        # TODO investigate how to best handle merge of higher sample counts
+        values = [r.min, r.max, r.median, r.mean][:min(r.samples, 4)]
+        map(push, values)
 
     header = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
+
     # Tuple of values formatted for display in results table:
     # (name, min value, max value, mean value, max_rss)
     def values(self):
         return (self.name, str(self.min), str(self.max),
-                str(self.mean),str(self.max_rss))
+                str(self.mean), str(self.max_rss))
 
 
 class ResultComparison:
@@ -55,10 +96,11 @@ class ResultComparison:
 
         self.is_dubious = (  # FIXME this is legacy
             ' (?)' if ((old.min < new.min and new.min < old.max) or
-                      (new.min < old.min and old.min < new.max))
+                       (new.min < old.min and old.min < new.max))
             else '')
 
     header = ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
+
     # Tuple of values formatted for display in results table:
     # (name, old value, new value, delta [%], speedup ratio)
     def values(self):
@@ -75,10 +117,14 @@ class TestComparator:
                         return len(row) > 8
             tests = map(PerformanceTestResult,
                         filter(skip_totals, csv.reader(open(filename))))
-            # FIXME merge test with same name  into single results
-            # Support for merged(appended) outputs from Benchmark_Driver
-            names = map(lambda t: t.name, tests)
-            return dict(zip(names, tests))
+
+            def add_or_merge(names, r):
+                if r.name not in names:
+                    names[r.name] = r
+                else:
+                    names[r.name].merge(r)
+                return names
+            return reduce(add_or_merge, tests, dict())
 
         old_results = load_from_CSV(old_file)
         new_results = load_from_CSV(new_file)
@@ -154,7 +200,8 @@ class ReportFormatter:
 
         values = map(lambda c: c.values(), comparisons)
         widths = map(lambda columns: map(len, columns),
-            [PerformanceTestResult.header, ResultComparison.header] + values)
+                     [PerformanceTestResult.header, ResultComparison.header] +
+                     values)
 
         def max_widths(maximum, widths):
             return tuple(map(max, zip(maximum, widths)))
