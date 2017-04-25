@@ -1,3 +1,5 @@
+// REQUIRES: objc_interop
+
 // RUN: mkdir -p %t
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -module-name cross_language -import-objc-header %S/Inputs/cross_language_bridge_head.h -D SWIFT_CODE -print-indexed-symbols -source-filename %s > %t.idx.out
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -module-name cross_language -import-objc-header %S/Inputs/cross_language_bridge_head.h -D SWIFT_CODE -emit-objc-header-path %t/objc_header.h
