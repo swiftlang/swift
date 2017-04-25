@@ -65,7 +65,9 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
   // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x
-  // CHECK-NEXT:   assign [[XOBJ]] to [[X]] : $*X
+  // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*X
+  // CHECK-NEXT:   assign [[XOBJ]] to [[WRITE]] : $*X
+  // CHECK-NEXT:   end_access [[WRITE]] : $*X
   // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 

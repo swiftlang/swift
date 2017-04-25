@@ -74,7 +74,8 @@ class CC {
   // CHECK:    [[PB:%.*]] = project_box [[FOO]]
   // CHECK:    [[BORROWED_UNINIT_SELF:%.*]] = begin_borrow [[UNINIT_SELF]]
   // CHECK:    [[X:%.*]] = ref_element_addr [[BORROWED_UNINIT_SELF]] : $CC, #CC.x
-  // CHECK:    [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>
+  // CHECK:    [[READ:%.*]] = begin_access [read] [dynamic] [[X]] : $*@sil_weak Optional<CC>
+  // CHECK:    [[VALUE:%.*]] = load_weak [[READ]] : $*@sil_weak Optional<CC>
   // CHECK:    store [[VALUE]] to [init] [[PB]] : $*Optional<CC>
   // CHECK:    end_borrow [[BORROWED_UNINIT_SELF]] from [[UNINIT_SELF]]
   // CHECK:    destroy_value [[FOO]]

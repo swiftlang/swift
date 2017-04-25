@@ -745,7 +745,9 @@ class FailableBaseClass {
 // CHECK:       bb0(%0 : $FailableBaseClass):
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    store [[CANARY]] to [[MEMBER_ADDR]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*Canary
 // CHECK-NEXT:    br bb1
 // CHECK:       bb1:
 // CHECK-NEXT:    strong_release %0
@@ -876,7 +878,9 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:         store %0 to [[SELF_BOX]]
 // CHECK:         [[CANARY:%.*]] = apply
 // CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
-// CHECK-NEXT:    store [[CANARY]] to [[MEMBER_ADDR]]
+// CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [dynamic] [[MEMBER_ADDR]] : $*Canary
+// CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
+// CHECK-NEXT:    end_access [[WRITE]] : $*Canary
 // CHECK-NEXT:    [[BASE_SELF:%.*]] = upcast %0
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17FailableBaseClassCACSgyt28failBeforeFullInitialization_tcfc
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
