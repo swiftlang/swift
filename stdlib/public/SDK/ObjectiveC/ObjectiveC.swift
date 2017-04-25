@@ -142,11 +142,7 @@ extension Selector : Equatable, Hashable {
 extension Selector : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    let name = sel_getName(self)
-    if name == nil {
-      return "<NULL>"
-    }
-    return String(cString: name!)
+    return String(_sel: self)
   }
 }
 
