@@ -142,7 +142,7 @@ extension _UTF8Decoder {
       let codeUnit = _buffer & 0xff
       _buffer &>>= 8
       _bitsInBuffer = _bitsInBuffer &- 8
-      return .valid(UInt32(codeUnit), length: 1)
+      return .valid(codeUnit, length: 1)
     }
     // Buffering mode.
     // Fill buffer back to 4 bytes (or as many as are left in the iterator).
@@ -204,7 +204,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   public static func scalar(buffer: UInt32, length: Int) -> UnicodeScalar {
     switch length {
     case 1:
-      return UnicodeScalar(_unchecked: buffer & 0x7f)
+      return UnicodeScalar(_unchecked: buffer & 0xff)
     case 2:
       var value = buffer       & 0b0______________________11_1111
       value    |= buffer &>> 2 & 0b0______________0111__1100_0000
@@ -296,6 +296,8 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   
   public // @testable
   func _validateBuffer() -> (valid: Bool, length: UInt8) {
+    // This seems like it should be equivalent, but it isn't.  Figure out why.
+    // return Unicode.UTF8.ReverseDecoder(self)._validateBuffer()
     if _buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ ... ... ... CU0 ].
       return (true, 1)
     }
@@ -356,7 +358,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public static func scalar(buffer: UInt32, length: Int) -> UnicodeScalar {
     switch length {
     case 1:
-      return UnicodeScalar(_unchecked: buffer & 0x7f)
+      return UnicodeScalar(_unchecked: buffer & 0xff)
     case 2:
       var value = (buffer & 0b0_______________________11_1111__0000_0000) &>> 8
       value    |= (buffer & 0b0________________________________0001_1111) &<< 6
