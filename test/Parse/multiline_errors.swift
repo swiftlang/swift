@@ -50,5 +50,7 @@ _ = """""" // expected-error@-0{{invalid start of multi-line string literal}}
 _ = """ """ // expected-error@-0{{invalid start of multi-line string literal}}
 // newline currently required after opening """
 
-_ = """
-// expected-error@-1{{Unterminated string literal}}
+_ = "\("""
+  not valid
+  """)" // expected-error@-2{{Unterminated string literal}}
+ // expected-error@-1{{invalid start of multi-line string literal}}
