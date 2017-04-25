@@ -145,25 +145,39 @@ protected:
     SILValue CalleeVal = Inst->getCallee();
     SILBuilderWithPostProcess<TypeSubstCloner, 4> Builder(this, Inst);
     Builder.setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
+    SmallVector<Substitution, 16> TempSubstList;
     if (!Inlining) {
       FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
       if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+        auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
+        auto GenSig = LoweredFnTy->getGenericSignature();
+        if (GenSig) {
+          GenSig->getSubstitutions(
+              Inst->getFunction()
+                  ->getLoweredFunctionType()
+                  ->getGenericSignature()
+                  ->getSubstitutionMap(Inst->getSubstitutions()),
+              TempSubstList);
+        }
+        for (auto &Sub : TempSubstList) {
+          Sub = asImpl().getOpSubstitution(Sub);
+        }
+        SubstitutionList Subs = TempSubstList;
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                         &Builder.getFunction());
         Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
                                    getOpType(Inst->getSubstCalleeSILType()),
-                                   SubstitutionList(),
+                                   Subs,
                                    Args,
                                    getOpType(Inst->getType()));
         return;
       }
     }
 
-    SmallVector<Substitution, 16> TempSubstList;
     for (auto &Sub : Inst->getSubstitutions()) {
       TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
-    
+
     Builder.createPartialApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
