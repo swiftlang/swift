@@ -318,7 +318,7 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
     }
   }
 
-  // At the same time (x>>n) > Int.max and  Int.max < (x>>n) is false.
+  // At the same time (x>>n) > Int.max and Int.max < (x>>n) is false.
   if (match(BI,
             m_CombineOr(
                 // Int.max < x

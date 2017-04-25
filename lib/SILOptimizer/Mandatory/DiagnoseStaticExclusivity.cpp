@@ -95,7 +95,7 @@ private:
 ///
 /// The key invariant that this class must maintain is that if it says
 /// two storage locations are the same then they must be the same at run time.
-/// It is  allowed to err on the other side: it may imprecisely fail to
+/// It is allowed to err on the other side: it may imprecisely fail to
 /// recognize that two storage locations that represent the same run-time
 /// location are in fact the same.
 class AccessedStorage {
