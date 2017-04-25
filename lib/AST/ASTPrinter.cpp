@@ -976,6 +976,28 @@ class PrintAST : public ASTVisitor<PrintAST> {
     TL.getType().print(Printer, Options);
   }
 
+  void printContextIfNeeded(const Decl *decl) {
+    if (IndentLevel > 0)
+      return;
+
+    switch (Options.ShouldQualifyNestedDeclarations) {
+    case PrintOptions::QualifyNestedDeclarations::Never:
+      return;
+    case PrintOptions::QualifyNestedDeclarations::TypesOnly:
+      if (!isa<TypeDecl>(decl))
+        return;
+      break;
+    case PrintOptions::QualifyNestedDeclarations::Always:
+      break;
+    }
+
+    auto *container = dyn_cast<NominalTypeDecl>(decl->getDeclContext());
+    if (!container)
+      return;
+    printType(container->getDeclaredInterfaceType());
+    Printer << ".";
+  }
+
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
 
@@ -1239,23 +1261,38 @@ void PrintAST::printPattern(const Pattern *pattern) {
 }
 
 /// If we can't find the depth of a type, return ErrorDepth.
-const unsigned ErrorDepth = ~0U;
+static const unsigned ErrorDepth = ~0U;
 /// A helper function to return the depth of a type.
 static unsigned getDepthOfType(Type ty) {
-  if (auto paramTy = ty->getAs<GenericTypeParamType>())
-    return paramTy->getDepth();
+  unsigned depth = ErrorDepth;
+  
+  auto combineDepth = [&depth](unsigned newDepth) -> bool {
+    // If there is no current depth (depth == ErrorDepth), then assign to
+    // newDepth; otherwise, choose the deeper of the current and new depth.
+    
+    // Since ErrorDepth == ~0U, ErrorDepth + 1 == 0, which is smaller than any
+    // valid depth + 1.
+    depth = std::max(depth+1U, newDepth+1U) - 1U;
+    return false;
+  };
+  
+  ty.findIf([combineDepth](Type t) -> bool {
+    if (auto paramTy = t->getAs<GenericTypeParamType>())
+      return combineDepth(paramTy->getDepth());
 
-  if (auto depMemTy = dyn_cast<DependentMemberType>(ty->getCanonicalType())) {
-    CanType rootTy;
-    do {
-      rootTy = depMemTy.getBase();
-    } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
-    if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
-      return rootParamTy->getDepth();
-    return ErrorDepth;
-  }
+    if (auto depMemTy = dyn_cast<DependentMemberType>(t->getCanonicalType())) {
+      CanType rootTy;
+      do {
+        rootTy = depMemTy.getBase();
+      } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
+      if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
+        return combineDepth(rootParamTy->getDepth());
+    }
 
-  return ErrorDepth;
+    return false;
+  });
+  
+  return depth;
 }
 
 namespace {
@@ -1406,9 +1443,9 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::Conformance:
   case RequirementKind::Layout:
-  case RequirementKind::Superclass:
     return getDepthOfType(req.getFirstType());
 
+  case RequirementKind::Superclass:
   case RequirementKind::SameType: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
@@ -2389,6 +2426,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << tok::kw_typealias << " ";
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2459,6 +2497,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_enum << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2486,6 +2525,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_struct << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2513,6 +2553,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_class << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2542,6 +2583,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_protocol << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2613,6 +2655,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << (decl->isLet() ? tok::kw_let : tok::kw_var) << " ";
   }
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2917,6 +2960,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
         Printer << tok::kw_func << " ";
       }
+      printContextIfNeeded(decl);
       recordDeclLoc(decl,
         [&]{ // Name
           if (!decl->hasName())
@@ -3039,6 +3083,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
+  printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
@@ -3072,6 +3117,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       Printer << "/*not inherited*/ ";
   }
 
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
@@ -3120,6 +3166,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer << "deinit";

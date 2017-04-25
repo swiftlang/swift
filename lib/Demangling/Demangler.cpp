@@ -505,7 +505,7 @@ NodePointer Demangler::demangleStandardSubstitution() {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
-      return createNode(Node::Kind::Module, MANGLING_MODULE_C);
+      return createNode(Node::Kind::Module, MANGLING_MODULE_CLANG_IMPORTER);
     case 'g': {
       NodePointer OptionalTy =
         createType(createWithChildren(Node::Kind::BoundGenericEnum,
@@ -1260,6 +1260,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case'f':
       return demangleFunctionSpecialization();
+    case 'K':
+    case 'k': {
+      auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
+                               : Node::Kind::KeyPathSetterThunkHelper;
+      auto decl = popNode();
+      return createWithChild(nodeKind, decl);
+    }
     default:
       return nullptr;
   }

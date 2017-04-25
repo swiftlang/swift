@@ -1937,7 +1937,128 @@ static CanType claimNextParamClause(CanAnyFunctionType &type) {
   return result;
 }
 
-using InOutArgument = std::pair<LValue, SILLocation>;
+class InOutArgument {
+public:
+  enum KindTy {
+    /// This is a true inout argument.
+    InOut,
+
+    /// This is a borrowed direct argument.
+    BorrowDirect,
+
+    /// This is a borrowed indirect argument.
+    BorrowIndirect,
+
+    /// The l-value needs to be converted to a pointer type.
+    LValueToPointer,
+
+    /// An array l-value needs to be converted to a pointer type.
+    ArrayToPointer,
+  };
+
+private:
+  KindTy Kind;
+  LValue LV;
+  SILLocation Loc;
+  Expr *OriginalExpr;
+  union {
+    SILGenFunction::PointerAccessInfo PointerInfo;
+    SILGenFunction::ArrayAccessInfo ArrayInfo;
+  };
+
+public:
+  InOutArgument(KindTy kind, LValue &&lv, SILLocation loc)
+    : Kind(kind), LV(std::move(lv)), Loc(loc) {}
+  InOutArgument(SILGenFunction::PointerAccessInfo pointerInfo,
+                LValue &&lv, SILLocation loc, Expr *originalExpr)
+    : Kind(LValueToPointer), LV(std::move(lv)), Loc(loc),
+      OriginalExpr(originalExpr) {
+    PointerInfo = pointerInfo;
+  }
+  InOutArgument(SILGenFunction::ArrayAccessInfo arrayInfo,
+                LValue &&lv, SILLocation loc, Expr *originalExpr)
+    : Kind(ArrayToPointer), LV(std::move(lv)), Loc(loc),
+      OriginalExpr(originalExpr) {
+    ArrayInfo = arrayInfo;
+  }
+
+  bool isSimpleInOut() const { return Kind == InOut; }
+  SILLocation getLocation() const { return Loc; }
+
+  ManagedValue emit(SILGenFunction &SGF) {
+    switch (Kind) {
+    case InOut:
+      return emitInOut(SGF);
+    case BorrowDirect:
+      return emitBorrowDirect(SGF);
+    case BorrowIndirect:
+      return emitBorrowIndirect(SGF);
+    case LValueToPointer:
+      return emitLValueToPointer(SGF);
+    case ArrayToPointer:
+      return emitArrayToPointer(SGF);
+    }
+    llvm_unreachable("bad kind");
+  }
+
+private:
+  ManagedValue emitInOut(SILGenFunction &SGF) {
+    return emitAddress(SGF, AccessKind::ReadWrite);
+  }
+
+  ManagedValue emitBorrowIndirect(SILGenFunction &SGF) {
+    return emitAddress(SGF, AccessKind::Read);
+  }
+
+  ManagedValue emitBorrowDirect(SILGenFunction &SGF) {
+    ManagedValue address = emitAddress(SGF, AccessKind::Read);
+    return SGF.B.createLoadBorrow(Loc, address);
+  }
+
+  ManagedValue emitLValueToPointer(SILGenFunction &SGF) {
+    auto value = SGF.emitLValueToPointer(Loc, std::move(LV), PointerInfo);
+    return finishOriginalExpr(SGF, value, OriginalExpr);
+  }
+
+  ManagedValue emitArrayToPointer(SILGenFunction &SGF) {
+    auto value = SGF.emitArrayToPointer(Loc, std::move(LV), ArrayInfo);
+    return finishOriginalExpr(SGF, value, OriginalExpr);
+  }
+
+  ManagedValue emitAddress(SILGenFunction &SGF, AccessKind accessKind) {
+    auto tsanKind =
+      (accessKind == AccessKind::Read ? TSanKind::None : TSanKind::InoutAccess);
+    return SGF.emitAddressOfLValue(Loc, std::move(LV), accessKind, tsanKind);
+  }
+
+  ManagedValue finishOriginalExpr(SILGenFunction &SGF, ManagedValue innerValue,
+                                  Expr *expr) {
+    // This needs to handle all of the recursive cases from
+    // ArgEmission::maybeEmitAsAccess.
+
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Handle injections into optionals.
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr)) {
+      auto value = finishOriginalExpr(SGF, innerValue, inject->getSubExpr());
+      auto &optionalTL = SGF.getTypeLowering(expr->getType());
+      return SGF.emitInjectOptional(inject, optionalTL, SGFContext(),
+                                    [&](SGFContext ctx) { return value; });
+    }
+
+    // Handle try!.
+    if (auto forceTry = dyn_cast<ForceTryExpr>(expr)) {
+      // Handle throws from the accessor?  But what if the writeback throws?
+      SILGenFunction::ForceTryEmission emission(SGF, forceTry);
+      return finishOriginalExpr(SGF, innerValue, forceTry->getSubExpr());
+    }
+
+    // Done with the recursive cases.  Make sure we handled everything.
+    assert(isa<InOutToPointerExpr>(expr) ||
+           isa<ArrayToPointerExpr>(expr));
+    return innerValue;
+  }
+};
 
 /// Begin all the formal accesses for a set of inout arguments.
 static void beginInOutFormalAccesses(SILGenFunction &SGF,
@@ -1957,13 +2078,12 @@ static void beginInOutFormalAccesses(SILGenFunction &SGF,
     for (ManagedValue &siteArg : siteArgs) {
       if (siteArg) continue;
 
-      LValue &inoutArg = inoutNext->first;
-      SILLocation loc = inoutNext->second;
-      ManagedValue address = SGF.emitAddressOfLValue(loc, std::move(inoutArg),
-                                                     AccessKind::ReadWrite,
-                                                     TSanKind::InoutAccess);
-      siteArg = address;
-      emittedInoutArgs.push_back({address.getValue(), loc});
+      auto value = inoutNext->emit(SGF);
+      siteArg = value;
+      if (inoutNext->isSimpleInOut()) {
+        emittedInoutArgs.push_back({value.getValue(),
+                                    inoutNext->getLocation()});
+      }
 
       if (++inoutNext == inoutArgs.end())
         goto done;
@@ -1981,9 +2101,7 @@ done:
   for (auto i = emittedInoutArgs.begin(), e = emittedInoutArgs.end();
          i != e; ++i) {
     for (auto j = emittedInoutArgs.begin(); j != i; ++j) {
-      // TODO: This uses exact SILValue equivalence to detect aliases,
-      // we could do something stronger here to catch other obvious cases.
-      if (i->first != j->first) continue;
+      if (!RValue::areObviouslySameValue(i->first, j->first)) continue;
 
       SGF.SGM.diagnose(i->second, diag::inout_argument_alias)
         .highlight(i->second.getSourceRange());
@@ -2369,9 +2487,7 @@ private:
       Args.push_back(ManagedValue::forInContext());
       return;
     } else if (SGF.silConv.isSILIndirect(param)) {
-      auto value = emitIndirect(std::move(arg), loweredSubstArgType,
-                                origParamType, param);
-      Args.push_back(value);
+      emitIndirect(std::move(arg), loweredSubstArgType, origParamType, param);
       return;
     }
 
@@ -2460,31 +2576,30 @@ private:
 
   void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
 
-  ManagedValue emitIndirect(ArgumentSource &&arg,
-                            SILType loweredSubstArgType,
-                            AbstractionPattern origParamType,
-                            SILParameterInfo param) {
+  void emitIndirect(ArgumentSource &&arg,
+                    SILType loweredSubstArgType,
+                    AbstractionPattern origParamType,
+                    SILParameterInfo param) {
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+    ManagedValue result;
 
     // If no abstraction is required, try to honor the emission contexts.
     if (!contexts.RequiresReabstraction) {
       auto loc = arg.getLocation();
-      ManagedValue result =
-        std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
+      result = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
 
-      // If it's already in memory, great.
-      if (result.getType().isAddress()) {
-        return result;
-
-      // Otherwise, put it there.
-      } else {
-        return emitMaterializeIntoTemporary(SGF, loc, result);
+      // If it's not already in memory, put it there.
+      if (!result.getType().isAddress()) {
+        result = emitMaterializeIntoTemporary(SGF, loc, result);
       }
-    }
 
     // Otherwise, simultaneously emit and reabstract.
-    return std::move(arg).materialize(SGF, origParamType,
-                                      SGF.getSILType(param));
+    } else {
+      result = std::move(arg).materialize(SGF, origParamType,
+                                          SGF.getSILType(param));
+    }
+
+    Args.push_back(result);
   }
 
   void emitIndirectInto(ArgumentSource &&arg,
@@ -2537,7 +2652,7 @@ private:
 
     // Leave an empty space in the ManagedValue sequence and
     // remember that we had an inout argument.
-    InOutArguments.push_back({std::move(lv), loc});
+    InOutArguments.emplace_back(InOutArgument::InOut, std::move(lv), loc);
     Args.push_back(ManagedValue());
     return;
   }
@@ -2558,6 +2673,17 @@ private:
             std::move(arg), loweredSubstArgType, origParamType, param);
         break;
       }
+
+    // Peephole certain argument emissions.
+    } else if (arg.isExpr()) {
+      auto expr = std::move(arg).asKnownExpr();
+
+      // Try the peepholes.
+      if (maybeEmitAsAccess(expr, expr))
+        return;
+
+      // Otherwise, just use the default logic.
+      value = SGF.emitRValueAsSingleValue(expr, contexts.ForEmission);
     } else {
       value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
     }
@@ -2580,7 +2706,56 @@ private:
 
     Args.push_back(value);
   }
-  
+
+  bool maybeEmitAsAccess(Expr *expr, Expr *originalExpr) {
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Delay accessing inout-to-pointer arguments until the call.
+    if (auto inoutToPointer = dyn_cast<InOutToPointerExpr>(expr)) {
+      auto info = SGF.getPointerAccessInfo(inoutToPointer->getType());
+      LValue lv = SGF.emitLValue(inoutToPointer->getSubExpr(), info.AccessKind);
+      InOutArguments.emplace_back(info, std::move(lv), inoutToPointer,
+                                  originalExpr);
+      Args.push_back(ManagedValue());
+      return true;
+    }
+
+    // Delay accessing array-to-pointer arguments until the call.
+    if (auto arrayToPointer = dyn_cast<ArrayToPointerExpr>(expr)) {
+      auto arrayExpr = arrayToPointer->getSubExpr();
+      if (auto inoutType = arrayExpr->getType()->getAs<InOutType>()) {
+        auto info = SGF.getArrayAccessInfo(arrayToPointer->getType(),
+                                           inoutType->getObjectType());
+        LValue lv = SGF.emitLValue(arrayExpr, info.AccessKind);
+        InOutArguments.emplace_back(info, std::move(lv), arrayToPointer,
+                                    originalExpr);
+        Args.push_back(ManagedValue());
+        return true;
+      }
+
+      // TODO: if the array comes from a storage reference, borrow it.
+      return false;
+    }
+
+    // Any recursive cases we handle here need to be handled in
+    // InOutArgument::finishOriginalExpr.
+
+    // Handle injections into optionals.
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr)) {
+      return maybeEmitAsAccess(inject->getSubExpr(), originalExpr);
+    }
+
+    // Handle try! expressions.
+    if (auto forceTry = dyn_cast<ForceTryExpr>(expr)) {
+      // Any expressions in the l-value must be routed appropriately.
+      SILGenFunction::ForceTryEmission emission(SGF, forceTry);
+
+      return maybeEmitAsAccess(forceTry->getSubExpr(), originalExpr);
+    }
+
+    return false;
+  }
+
   ManagedValue emitSubstToOrigArgument(ArgumentSource &&arg,
                                        SILType loweredSubstArgType,
                                        AbstractionPattern origParamType,

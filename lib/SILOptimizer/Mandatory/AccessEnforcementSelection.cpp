@@ -382,7 +382,12 @@ struct AccessEnforcementSelection : SILFunctionTransform {
     // dependent BeginAccess).
     //
     // Running before diagnostic constant propagation requires handling 'undef'.
-    assert(isa<AllocStackInst>(address) || isa<SILUndef>(address));
+    //
+    // FIXME: This assert will eventually be important, but for now it's safe to
+    // disable until this problem is resolved:
+    //   <rdar://problem/31797132> [Exclusivity] lldb asserts in
+    //   AccessEnforcementSelector
+    // assert(isa<AllocStackInst>(address) || isa<SILUndef>(address));
     setStaticEnforcement(access);
   }
 

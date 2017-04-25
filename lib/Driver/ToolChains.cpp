@@ -300,6 +300,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           Arguments.push_back("-api-diff-data-file");
           Arguments.push_back(DataPath->getValue());
         }
+        if (context.Args.hasArg(options::OPT_dump_usr)) {
+          Arguments.push_back("-dump-usr");
+        }
       }
     }
     break;

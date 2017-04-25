@@ -1290,7 +1290,7 @@ void Remangler::mangleModule(Node *node) {
     Buffer << 's';
   } else if (node->getText() == MANGLING_MODULE_OBJC) {
     Buffer << "So";
-  } else if (node->getText() == MANGLING_MODULE_C) {
+  } else if (node->getText() == MANGLING_MODULE_CLANG_IMPORTER) {
     Buffer << "SC";
   } else {
     mangleIdentifier(node);
@@ -1479,6 +1479,16 @@ void Remangler::mangleReabstractionThunkHelper(Node *node) {
     mangleChildNodes(node);
   }
   Buffer << "TR";
+}
+
+void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TK";
+}
+
+void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tk";
 }
 
 void Remangler::mangleReturnType(Node *node) {

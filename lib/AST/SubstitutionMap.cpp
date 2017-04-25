@@ -58,7 +58,19 @@ bool SubstitutionMap::hasDynamicSelf() const {
 }
 
 Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
-  auto known = subMap.find(type);
+  // If we have an archetype, map out of the context so we can compute a
+  // conformance access path.
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    if (archetype->isOpenedExistential() ||
+        archetype->getParent() != nullptr)
+      return Type();
+
+    auto *genericEnv = archetype->getGenericEnvironment();
+    type = cast<GenericTypeParamType>(
+      genericEnv->mapTypeOutOfContext(archetype)->getCanonicalType());
+  }
+
+  auto known = subMap.find(cast<GenericTypeParamType>(type));
   if (known != subMap.end() && known->second)
     return known->second;
 
@@ -67,9 +79,9 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 }
 
 void SubstitutionMap::
-addSubstitution(CanSubstitutableType type, Type replacement) {
-  assert(!(type->isTypeParameter() && !getGenericSignature()) &&
-         "type parameter substitution map without generic signature");
+addSubstitution(CanGenericTypeParamType type, Type replacement) {
+  assert(getGenericSignature() &&
+         "cannot add entries to empty substitution map");
   auto result = subMap.insert(std::make_pair(type, replacement));
   assert(result.second || result.first->second->isEqual(replacement));
   (void) result;
@@ -79,9 +91,8 @@ Optional<ProtocolConformanceRef>
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
-  GenericEnvironment *genericEnv = nullptr;
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    genericEnv = archetype->getGenericEnvironment();
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    auto *genericEnv = archetype->getGenericEnvironment();
     type = genericEnv->mapTypeOutOfContext(type)->getCanonicalType();
   }
 
@@ -93,11 +104,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
     [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
-      // We're working relative to a generic environment, map into that
-      // context before looking into the conformance map.
-      if (genericEnv)
-        type = genericEnv->mapTypeIntoContext(type);
-
       auto known = conformanceMap.find(type->getCanonicalType().getPointer());
       if (known == conformanceMap.end())
         return None;
@@ -124,9 +130,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!genericSig->conformsToProtocol(type, proto, mod))
     return None;
 
-  auto canonType = genericSig->getCanonicalTypeInContext(type, mod);
   auto accessPath =
-    genericSig->getConformanceAccessPath(canonType, proto, mod);
+    genericSig->getConformanceAccessPath(type, proto, mod);
 
   // Fall through because we cannot yet evaluate an access path.
   Optional<ProtocolConformanceRef> conformance;
@@ -143,8 +148,21 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     // If we've hit an abstract conformance, everything from here on out is
     // abstract.
     // FIXME: This may not always be true, but it holds for now.
-    if (conformance->isAbstract())
+    if (conformance->isAbstract()) {
+      // FIXME: Rip this out once we can get a concrete conformance from
+      // an archetype.
+      auto *M = proto->getParentModule();
+      auto substType = type.subst(*this);
+      if (substType &&
+          !substType->is<ArchetypeType>() &&
+          !substType->isTypeParameter() &&
+          !substType->isExistentialType()) {
+        auto lazyResolver = M->getASTContext().getLazyResolver();
+        return *M->lookupConformance(substType, proto, lazyResolver);
+      }
+
       return ProtocolConformanceRef(proto);
+    }
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.
@@ -153,7 +171,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // If we haven't set the signature conformances yet, force the issue now.
     if (normal->getSignatureConformances().empty()) {
-      auto lazyResolver = canonType->getASTContext().getLazyResolver();
+      auto lazyResolver = type->getASTContext().getLazyResolver();
       lazyResolver->resolveTypeWitness(normal, nullptr);
 
       // Error case: the conformance is broken, so we cannot handle this
@@ -171,6 +189,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
 void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
+  assert(!isa<ArchetypeType>(type));
   conformanceMap[type.getPointer()].push_back(conformance);
 }
 
@@ -384,8 +403,13 @@ void SubstitutionMap::verify() const {
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out) const {
+  auto *genericSig = getGenericSignature();
+  if (genericSig == nullptr) {
+    out << "Empty substitution map\n";
+    return;
+  }
   out << "Generic signature: ";
-  getGenericSignature()->print(out);
+  genericSig->print(out);
   out << "\n";
   out << "Substitutions:\n";
   for (const auto &sub : subMap) {

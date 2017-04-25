@@ -1642,6 +1642,17 @@ public:
     *this << (EAI->isAborting() ? "[abort] " : "")
           << getIDAndType(EAI->getOperand());
   }
+  void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *BAI) {
+    *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
+          << getSILAccessEnforcementName(BAI->getEnforcement())
+          << "] " << getIDAndType(BAI->getSource()) << ", "
+          << getIDAndType(BAI->getBuffer());
+  }
+  void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
+    *this << (EAI->isAborting() ? "[abort] " : "")
+          << '[' << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+          << getIDAndType(EAI->getOperand());
+  }
 
   void visitCondFailInst(CondFailInst *FI) {
     *this << getIDAndType(FI->getOperand());
@@ -1769,6 +1780,83 @@ public:
     printBranchArgs(CBI->getTrueArgs());
     *this << ", " << Ctx.getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
+  }
+  
+  void visitKeyPathInst(KeyPathInst *KPI) {
+    *this << KPI->getType() << ", ";
+    
+    auto pattern = KPI->getPattern();
+    
+    if (pattern->getGenericSignature()) {
+      pattern->getGenericSignature()->print(PrintState.OS);
+      *this << ' ';
+    }
+    
+    *this << "(";
+    
+    if (!pattern->getObjCString().empty())
+      *this << "objc \"" << pattern->getObjCString() << "\"; ";
+    
+    *this << "root $" << KPI->getPattern()->getRootType();
+    
+    for (auto &component : pattern->getComponents()) {
+      *this << "; ";
+      
+      switch (auto kind = component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto prop = component.getStoredPropertyDecl();
+        *this << "stored_property #";
+        printValueDecl(prop, PrintState.OS);
+        *this << " : $" << component.getComponentType();
+        break;
+      }
+      case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::SettableProperty: {
+        *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
+                    ? "gettable_property $" : "settable_property $")
+              << component.getComponentType() << ", "
+              << " id ";
+        auto id = component.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          *this << declRef << " : "
+                << declRef.getDecl()->getInterfaceType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Function: {
+          id.getFunction()->printName(PrintState.OS);
+          *this << " : " << id.getFunction()->getLoweredType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property: {
+          *this << "##";
+          printValueDecl(id.getProperty(), PrintState.OS);
+          break;
+        }
+        }
+        *this << ", getter ";
+        component.getComputedPropertyGetter()->printName(PrintState.OS);
+        *this << " : "
+              << component.getComputedPropertyGetter()->getLoweredType();
+        if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+          *this << ", setter ";
+          component.getComputedPropertySetter()->printName(PrintState.OS);
+          *this << " : "
+                << component.getComputedPropertySetter()->getLoweredType();
+        }
+        assert(component.getComputedPropertyIndices().empty()
+               && "todo");
+        break;
+      }
+      }
+    }
+    
+    *this << ')';
+    if (!KPI->getSubstitutions().empty()) {
+      *this << ' ';
+      printSubstitutions(KPI->getSubstitutions());
+    }
   }
 };
 } // end anonymous namespace

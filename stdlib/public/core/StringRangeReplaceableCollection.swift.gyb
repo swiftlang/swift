@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// `String` does not conform to `RangeReplaceableCollection`, but provides a
-// similar API.
-
-extension String {
+extension String : RangeReplaceableCollection, BidirectionalCollection {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 
@@ -23,6 +20,31 @@ extension String {
   /// In Swift, *reachability* refers to the ability to produce one value from
   /// the other through zero or more applications of `index(after:)`.
   public typealias IndexDistance = CharacterView.IndexDistance
+
+  /// Creates a string representing the given character repeated the specified
+  /// number of times.
+  ///
+  /// For example, use this initializer to create a string with ten `"0"`
+  /// characters in a row.
+  ///
+  ///     let zeroes = String("0" as Character, count: 10)
+  ///     print(zeroes)
+  ///     // Prints "0000000000"
+  public init(repeating repeatedValue: Character, count: Int) {
+    self.init(repeating: String(repeatedValue), count: count)
+  }
+
+  // Now that String conforms to Collection, we need to disambiguate between:
+  // - init<T>(_ value: T) where T : LosslessStringConvertible
+  // - init<S>(_ characters: S) where S : Sequence, S.Iterator.Element == Character
+  // Cannot simply do init(_: String) as that would itself be ambiguous with
+  // init?(_ description: String)
+  public init<
+    T : LosslessStringConvertible & Sequence
+  >(_ other: T)
+  where T.Iterator.Element == Character {
+    self = other.description
+  }
 
   /// The position of the first character in a nonempty string.
   ///
@@ -383,6 +405,36 @@ extension String {
     withMutableCharacters {
       (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
     }
+  }
+}
+
+extension String {
+  // This is needed because of the issue described in SR-4660 which causes
+  // source compatibility issues when String becomes a collection
+  @_transparent
+  public func max<T : Comparable>(_ x: T, _ y: T) -> T {
+    return Swift.max(x,y)
+  }
+
+  // This is needed because of the issue described in SR-4660 which causes
+  // source compatibility issues when String becomes a collection
+  @_transparent
+  public func min<T : Comparable>(_ x: T, _ y: T) -> T {
+    return Swift.min(x,y)
+  }
+}
+
+extension String {
+  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a seqeunce of strings")
+  public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
+    where S.Iterator.Element == String {
+      fatalError()
+  }
+
+  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a seqeunce of strings")
+  public static func + <S : Sequence>(lhs: String, rhs: S) -> Never
+    where S.Iterator.Element == String {
+      fatalError()
   }
 }
 

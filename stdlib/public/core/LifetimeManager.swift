@@ -10,8 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Evaluate `f()` and return its result, ensuring that `x` is not
-/// destroyed before f returns.
+/// Evaluates a closure while ensuring that the given instance is not destroyed
+/// before the closure returns.
+///
+/// - Parameters:
+///   - x: An instance to preserve until the execution of `body` is completed.
+///   - body: A closure to execute that depends on the lifetime of `x` being
+///     extended.
+/// - Returns: The return value of `body`, if any.
 @_inlineable
 public func withExtendedLifetime<T, Result>(
   _ x: T, _ body: () throws -> Result
@@ -20,8 +26,14 @@ public func withExtendedLifetime<T, Result>(
   return try body()
 }
 
-/// Evaluate `f(x)` and return its result, ensuring that `x` is not
-/// destroyed before f returns.
+/// Evaluates a closure while ensuring that the given instance is not destroyed
+/// before the closure returns.
+///
+/// - Parameters:
+///   - x: An instance to preserve until the execution of `body` is completed.
+///   - body: A closure to execute that depends on the lifetime of `x` being
+///     extended.
+/// - Returns: The return value of `body`, if any.
 @_inlineable
 public func withExtendedLifetime<T, Result>(
   _ x: T, _ body: (T) throws -> Result

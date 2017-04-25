@@ -150,7 +150,7 @@ def main():
                 new_max_results[row[TESTNAME]] = int(row[MAX])
 
     ratio_total = 0
-    for key in new_results.keys():
+    for key in set(new_results.keys()).intersection(old_results.keys()):
             ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
             ratio_list[key] = round(ratio, 2)
             ratio_total *= ratio
@@ -168,7 +168,8 @@ def main():
     (complete_perf_list,
      increased_perf_list,
      decreased_perf_list,
-     normal_perf_list) = sort_ratio_list(ratio_list, args.changes_only)
+     normal_perf_list) = sort_ratio_list(
+        ratio_list, delta_list, args.changes_only)
 
     """
     Create markdown formatted table
@@ -176,13 +177,13 @@ def main():
     test_name_width = max_width(ratio_list, title='TEST', key_len=True)
     new_time_width = max_width(new_results, title=new_branch)
     old_time_width = max_width(old_results, title=old_branch)
-    delta_width = max_width(delta_list, title='DELTA (%)')
+    delta_width = max_width(delta_list, title='DELTA')
 
     markdown_table_header = "\n" + MARKDOWN_ROW.format(
         "TEST".ljust(test_name_width),
         old_branch.ljust(old_time_width),
         new_branch.ljust(new_time_width),
-        "DELTA (%)".ljust(delta_width),
+        "DELTA".ljust(delta_width),
         "SPEEDUP".ljust(2))
     markdown_table_header += MARKDOWN_ROW.format(
         HEADER_SPLIT.ljust(test_name_width),
@@ -276,7 +277,7 @@ def convert_to_html(ratio_list, old_results, new_results, delta_list,
     (complete_perf_list,
      increased_perf_list,
      decreased_perf_list,
-     normal_perf_list) = sort_ratio_list(ratio_list, changes_only)
+     normal_perf_list) = sort_ratio_list(ratio_list, delta_list, changes_only)
 
     html_rows = ""
     for key in complete_perf_list:
@@ -307,7 +308,7 @@ def convert_to_html(ratio_list, old_results, new_results, delta_list,
                                                            unknown_list[key]))
 
     html_table = HTML_TABLE.format("TEST", old_branch, new_branch,
-                                   "DELTA (%)", "SPEEDUP", html_rows)
+                                   "DELTA", "SPEEDUP", html_rows)
     html_data = HTML.format(html_table)
     return html_data
 
@@ -321,7 +322,7 @@ def write_to_file(file_name, data):
     file.close
 
 
-def sort_ratio_list(ratio_list, changes_only=False):
+def sort_ratio_list(ratio_list, delta_list, changes_only=False):
     """
     Return 3 sorted list improvement, regression and normal.
     """
@@ -330,7 +331,7 @@ def sort_ratio_list(ratio_list, changes_only=False):
     sorted_normal_perf_list = []
     normal_perf_list = {}
 
-    for key, v in sorted(ratio_list.items(), key=lambda x: x[1]):
+    for key, v in sorted(delta_list.items(), key=lambda x: x[1], reverse=True):
         if ratio_list[key] < RATIO_MIN:
             decreased_perf_list.append(key)
         elif ratio_list[key] > RATIO_MAX:
@@ -348,6 +349,7 @@ def sort_ratio_list(ratio_list, changes_only=False):
         complete_perf_list = (decreased_perf_list + increased_perf_list +
                               sorted_normal_perf_list)
 
+    increased_perf_list.reverse()
     return (complete_perf_list, increased_perf_list,
             decreased_perf_list, sorted_normal_perf_list)
 

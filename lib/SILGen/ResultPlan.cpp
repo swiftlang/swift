@@ -347,9 +347,11 @@ public:
 
   Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
+    SILGenFunction::PointerAccessInfo pointerInfo = {
+      unwrappedPtrType, ptrKind, AccessKind::ReadWrite
+    };
     auto pointerValue =
-        SGF.emitLValueToPointer(loc, std::move(lvalue), unwrappedPtrType,
-                                ptrKind, AccessKind::ReadWrite);
+        SGF.emitLValueToPointer(loc, std::move(lvalue), pointerInfo);
 
     // Wrap up in an Optional if called for.
     if (optKind != OTK_None) {

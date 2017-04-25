@@ -1436,6 +1436,11 @@ function(add_swift_library name)
     endif()
 
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+      if(NOT SWIFT_SDK_${sdk}_ARCHITECTURES)
+        # SWIFT_SDK_${sdk}_ARCHITECTURES is empty, so just continue
+        continue()
+      endif()
+
       set(THIN_INPUT_TARGETS)
 
       # For each architecture supported by this SDK
@@ -1639,6 +1644,7 @@ function(add_swift_library name)
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           set(codesign_arg CODESIGN)
         endif()
+        precondition(THIN_INPUT_TARGETS)
         _add_swift_lipo_target(
             SDK ${sdk}
             TARGET ${lipo_target}

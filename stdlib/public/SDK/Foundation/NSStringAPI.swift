@@ -616,7 +616,7 @@ extension String {
     return _withOptionalOutParameter(leftover) {
       self._ns.getBytes(
         &buffer,
-        maxLength: min(buffer.count, maxBufferCount),
+        maxLength: Swift.min(buffer.count, maxBufferCount),
         usedLength: usedBufferCount,
         encoding: encoding.rawValue,
         options: options,
@@ -636,7 +636,8 @@ extension String {
   public func getCString(
     _ buffer: inout [CChar], maxLength: Int, encoding: Encoding
   ) -> Bool {
-    return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength),
+    return _ns.getCString(&buffer,
+                          maxLength: Swift.min(buffer.count, maxLength),
                           encoding: encoding.rawValue)
   }
 
@@ -652,7 +653,7 @@ extension String {
   public func getFileSystemRepresentation(
     _ buffer: inout [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
-      &buffer, maxLength: min(buffer.count, maxLength))
+      &buffer, maxLength: Swift.min(buffer.count, maxLength))
   }
 
   // - (void)

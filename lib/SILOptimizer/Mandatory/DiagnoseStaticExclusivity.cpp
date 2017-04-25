@@ -29,6 +29,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -135,6 +136,29 @@ public:
     assert(Kind == AccessedStorageKind::ClassProperty);
     return ObjProj;
   }
+
+  /// Returns the ValueDecl for the underlying storage, if it can be
+  /// determined. Otherwise returns null. For diagonostic purposes.
+  const ValueDecl *getStorageDecl() const {
+    switch(Kind) {
+    case AccessedStorageKind::GlobalVar:
+      return getGlobal()->getDecl();
+    case AccessedStorageKind::Value:
+      if (auto *Box = dyn_cast<AllocBoxInst>(getValue())) {
+        return Box->getLoc().getAsASTNode<VarDecl>();
+      }
+      if (auto *Arg = dyn_cast<SILFunctionArgument>(getValue())) {
+        return Arg->getDecl();
+      }
+      break;
+    case AccessedStorageKind::ClassProperty: {
+      const ObjectProjection &OP = getObjectProjection();
+      const Projection &P = OP.getProjection();
+      return P.getVarDecl(OP.getObject()->getType());
+    }
+    }
+    return nullptr;
+  }
 };
 
 /// Models the in-progress accesses for a single storage location.
@@ -218,6 +242,7 @@ using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
 /// A pair of 'begin_access' instructions that conflict.
 struct ConflictingAccess {
+  AccessedStorage Storage;
   const BeginAccessInst *FirstAccess;
   const BeginAccessInst *SecondAccess;
 };
@@ -334,7 +359,8 @@ isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
 /// Emits a diagnostic if beginning an access with the given in-progress
 /// accesses violates the law of exclusivity. Returns true when a
 /// diagnostic was emitted.
-static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
+static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
+                                         const BeginAccessInst *PriorAccess,
                                          const BeginAccessInst *NewAccess,
                                          ASTContext &Ctx) {
 
@@ -342,17 +368,35 @@ static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
   assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
            NewAccess->getAccessKind() == SILAccessKind::Read));
 
-  ExclusiveOrShared_t NewRequires = getRequiredAccess(NewAccess);
   ExclusiveOrShared_t PriorRequires = getRequiredAccess(PriorAccess);
 
-  diagnose(Ctx, NewAccess->getLoc().getSourceLoc(),
-           diag::exclusivity_access_required,
-           static_cast<unsigned>(NewAccess->getAccessKind()),
-           static_cast<unsigned>(NewRequires));
-  diagnose(Ctx, PriorAccess->getLoc().getSourceLoc(),
-           diag::exclusivity_conflicting_access,
-           static_cast<unsigned>(PriorAccess->getAccessKind()),
-           static_cast<unsigned>(PriorRequires));
+  // Diagnose on the first access that requires exclusivity.
+  const BeginAccessInst *AccessForMainDiagnostic = PriorAccess;
+  const BeginAccessInst *AccessForNote = NewAccess;
+  if (PriorRequires != ExclusiveOrShared_t::ExclusiveAccess) {
+    AccessForMainDiagnostic = NewAccess;
+    AccessForNote = PriorAccess;
+  }
+
+  SourceRange rangeForMain =
+    AccessForMainDiagnostic->getLoc().getSourceRange();
+
+  if (const ValueDecl *VD = Storage.getStorageDecl()) {
+    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
+             diag::exclusivity_access_required,
+             VD->getDescriptiveKind(),
+             VD->getName(),
+             static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
+        .highlight(rangeForMain);
+  } else {
+    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
+             diag::exclusivity_access_required_unknown_decl,
+             static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
+        .highlight(rangeForMain);
+  }
+  diagnose(Ctx, AccessForNote->getLoc().getSourceLoc(),
+           diag::exclusivity_conflicting_access)
+      .highlight(AccessForNote->getLoc().getSourceRange());
 }
 
 /// Make a best effort to find the underlying object for the purpose
@@ -508,11 +552,12 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
       // Ending onr decrements the count.
       if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
         SILAccessKind Kind = BAI->getAccessKind();
-        AccessInfo &Info = Accesses[findAccessedStorage(BAI->getSource())];
+        const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
+        AccessInfo &Info = Accesses[Storage];
         if (Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict()) {
           const BeginAccessInst *Conflict = Info.getFirstAccess();
           assert(Conflict && "Must already have had access to conflict!");
-          ConflictingAccesses.push_back({ Conflict, BAI });
+          ConflictingAccesses.push_back({ Storage, Conflict, BAI });
         }
 
         Info.beginAccess(BAI);
@@ -554,7 +599,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
                                                CallsToSuppress))
       continue;
 
-    diagnoseExclusivityViolation(PriorAccess, NewAccess, Fn.getASTContext());
+    diagnoseExclusivityViolation(Violation.Storage, PriorAccess, NewAccess,
+                                 Fn.getASTContext());
   }
 }
 

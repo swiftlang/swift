@@ -338,12 +338,15 @@ func archetype_member_ref<T : Runcible>(_ x: T) {
   var x = x
   x.free_method()
   // CHECK: witness_method $T, #Runcible.free_method!1
+  // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[X:%.*]]
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[X:%.*]] to [initialization] [[TEMP]]
+  // CHECK-NEXT: copy_addr [[READ]] to [initialization] [[TEMP]]
+  // CHECK-NEXT: end_access [[READ]]
   // CHECK-NEXT: apply
   // CHECK-NEXT: destroy_addr [[TEMP]]
   var u = x.associated_method()
   // CHECK: witness_method $T, #Runcible.associated_method!1
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
   // CHECK-NEXT: apply
   T.static_method()
   // CHECK: witness_method $T, #Runcible.static_method!1
@@ -435,11 +438,13 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
 
   int(x.0)
-  // CHECK: tuple_element_addr [[PB]] : {{.*}}, 0
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+  // CHECK: tuple_element_addr [[READ]] : {{.*}}, 0
   // CHECK: apply
 
   float(x.1)
-  // CHECK: tuple_element_addr [[PB]] : {{.*}}, 1
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+  // CHECK: tuple_element_addr [[READ]] : {{.*}}, 1
   // CHECK: apply
 
   int(tuple().0)
@@ -480,21 +485,26 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
     : b
     ? y
     : z
-  // CHECK:   [[A:%[0-9]+]] = load [trivial] [[PBA]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBA]]
+  // CHECK:   [[A:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
-  // CHECK:   [[XVAL:%[0-9]+]] = load [trivial] [[PBX]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
+  // CHECK:   [[XVAL:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[XVAL]] : $Int)
   // CHECK: [[ELSE_A]]:
-  // CHECK:   [[B:%[0-9]+]] = load [trivial] [[PBB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBB]]
+  // CHECK:   [[B:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
-  // CHECK:   [[YVAL:%[0-9]+]] = load [trivial] [[PBY]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]
+  // CHECK:   [[YVAL:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[YVAL]] : $Int)
   // CHECK: [[ELSE_B]]:
-  // CHECK:   [[ZVAL:%[0-9]+]] = load [trivial] [[PBZ]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBZ]]
+  // CHECK:   [[ZVAL:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
   // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)

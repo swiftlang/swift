@@ -121,6 +121,12 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 __swift_uint64_t swift::_swift_stdlib_HashingDetail_fixedSeedOverride = 0;
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_instantiateInertHeapObject(void *address,
+                                              const HeapMetadata *metadata) {
+  ::new (address) HeapObject{metadata};
+}
+
 namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any
   // LLVM libs into the runtime, so define this here.

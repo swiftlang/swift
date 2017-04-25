@@ -59,6 +59,11 @@ CommonDiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind,
                  RightUsr(RightUsr), LeftComment(LeftComment),
                  RightComment(RightComment), ModuleName(ModuleName) {
   assert(!ChildIndex.empty() && "Child index is empty.");
+  llvm::SmallVector<StringRef, 4> Pieces;
+  ChildIndex.split(Pieces, ":");
+  std::transform(Pieces.begin(), Pieces.end(),
+                 std::back_inserter(ChildIndexPieces),
+                 [](StringRef Piece) { return std::stoi(Piece); });
 }
 
 StringRef swift::ide::api::CommonDiffItem::head() {
@@ -366,6 +371,7 @@ private:
   llvm::BumpPtrAllocator Allocator;
 public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
+  bool PrintUsr;
   std::vector<APIDiffItem*> AllItems;
   void addStorePath(StringRef FileName) {
     llvm::MemoryBuffer *pMemBuffer = nullptr;
@@ -395,7 +401,11 @@ public:
 };
 
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
-getDiffItems(StringRef Key) const { return Impl.Data[Key]; }
+getDiffItems(StringRef Key) const {
+  if (Impl.PrintUsr)
+    llvm::outs() << Key << "\n";
+  return Impl.Data[Key];
+}
 
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getAllDiffItems() const { return Impl.AllItems; }
@@ -407,4 +417,8 @@ swift::ide::api::APIDiffItemStore::~APIDiffItemStore() { delete &Impl; }
 
 void swift::ide::api::APIDiffItemStore::addStorePath(StringRef Path) {
   Impl.addStorePath(Path);
+}
+
+void swift::ide::api::APIDiffItemStore::printIncomingUsr(bool print) {
+  Impl.PrintUsr = print;
 }

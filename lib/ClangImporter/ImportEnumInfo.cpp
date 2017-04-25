@@ -60,6 +60,18 @@ void EnumInfo::classifyEnum(ASTContext &ctx, const clang::EnumDecl *decl,
     return;
   }
 
+  // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
+  // then we don't need to check the macros.
+  for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {
+    if (!attr->getVersion().empty())
+      continue;
+    if (isa<clang::FlagEnumAttr>(attr->getAttrToAdd()) ||
+        isa<clang::EnumExtensibilityAttr>(attr->getAttrToAdd())) {
+      kind = EnumKind::Unknown;
+      return;
+    }
+  }
+
   // Was the enum declared using *_ENUM or *_OPTIONS?
   // FIXME: Stop using these once flag_enum and enum_extensibility
   // have been adopted everywhere, or at least relegate them to Swift 3 mode

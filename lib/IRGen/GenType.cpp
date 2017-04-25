@@ -1531,8 +1531,9 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
   assert(type.getNominalOrBoundGenericNominal());
 
   // We share type infos for different instantiations of a generic type
-  // when the archetypes have the same exemplars.  Mangling the archetypes
-  // in this case can be very misleading, so we just mangle the base name.
+  // when the archetypes have the same exemplars.  We cannot mangle
+  // archetypes, and the mangling does not have to be unique, so we just
+  // mangle the unbound generic form of the type.
   if (type->hasArchetype())
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();

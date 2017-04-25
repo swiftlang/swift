@@ -4,13 +4,13 @@
 
 typealias TestDiagPointsToEndOfLine =
 
-// CHECK: error: expected type in typealias declaration
+// CHECK: error: expected type in type alias declaration
 // CHECK-NEXT: {{^}}typealias TestDiagPointsToEndOfLine ={{$}}
 // CHECK-NEXT: {{^}}                                     ^{{$}}
 
 typealias TestDiagPointsToBadToken = =
 
-// CHECK: error: expected type in typealias declaration
+// CHECK: error: expected type in type alias declaration
 // CHECK-NEXT: {{^}}typealias TestDiagPointsToBadToken = ={{$}}
 // CHECK-NEXT: {{^}}                                     ^{{$}}
 

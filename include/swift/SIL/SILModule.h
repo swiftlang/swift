@@ -36,6 +36,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
@@ -48,6 +49,7 @@ namespace swift {
   class AnyFunctionType;
   class ASTContext;
   class FuncDecl;
+  class KeyPathPattern;
   class SILUndef;
   class SourceFile;
   class SerializedSILLoader;
@@ -99,18 +101,19 @@ public:
   using LinkingMode = SILOptions::LinkingMode;
 
 private:
-  friend class SILBasicBlock;
-  friend class SILCoverageMap;
-  friend class SILDefaultWitnessTable;
-  friend class SILFunction;
-  friend class SILGlobalVariable;
-  friend class SILLayout;
-  friend class SILType;
-  friend class SILVTable;
-  friend class SILUndef;
-  friend class SILWitnessTable;
-  friend class Lowering::SILGenModule;
-  friend class Lowering::TypeConverter;
+  friend KeyPathPattern;
+  friend SILBasicBlock;
+  friend SILCoverageMap;
+  friend SILDefaultWitnessTable;
+  friend SILFunction;
+  friend SILGlobalVariable;
+  friend SILLayout;
+  friend SILType;
+  friend SILVTable;
+  friend SILUndef;
+  friend SILWitnessTable;
+  friend Lowering::SILGenModule;
+  friend Lowering::TypeConverter;
   class SerializationCallback;
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
@@ -221,6 +224,9 @@ private:
   /// Method which returns the SerializedSILLoader, creating the loader if it
   /// has not been created yet.
   SerializedSILLoader *getSILLoader();
+
+  /// Folding set for key path patterns.
+  llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
 
 public:
   ~SILModule();

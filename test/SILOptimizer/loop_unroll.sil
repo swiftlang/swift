@@ -71,6 +71,78 @@ bb3:
  return %8 : $()
 }
 
+// CHECK-LABEL: sil @loop_unroll_3
+// CHECK: bb0:
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK: bb2:
+// CHECK:  br bb4
+// CHECK: bb3:
+// CHECK:  return
+// CHECK: bb4
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  br bb3
+
+sil @loop_unroll_3 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_sge_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK-LABEL: sil @loop_unroll_4
+// CHECK: bb0:
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK: bb2:
+// CHECK:  br bb4
+// CHECK: bb3:
+// CHECK:  return
+// CHECK: bb4
+// CHECK:  = builtin "sadd_with_overflow_Int64
+// CHECK:  br bb3
+
+sil @loop_unroll_4 : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 0
+ %1 = integer_literal $Builtin.Int64, 1
+ %2 = integer_literal $Builtin.Int64, 1
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Int64)
+
+bb1(%4 : $Builtin.Int64):
+  %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = builtin "cmp_sgt_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Int64)
+
+bb3:
+ %8 = tuple()
+ return %8 : $()
+}
+
 class B {}
 
 // CHECK-LABEL: sil @unroll_with_stack_allocation

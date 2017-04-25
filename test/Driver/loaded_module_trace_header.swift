@@ -1,4 +1,4 @@
-// RUN: env SWIFT_LOADED_MODULE_TRACE_PATH=%t %target-build-swift -module-name loaded_module_trace_header %s -o- -import-objc-header %S/Inputs/loaded_module_trace_header.h > /dev/null
+// RUN: env SWIFT_LOADED_MODULE_TRACE_FILE=%t %target-build-swift -module-name loaded_module_trace_header %s -o- -import-objc-header %S/Inputs/loaded_module_trace_header.h > /dev/null
 // RUN: %FileCheck %s < %t
 
 // REQUIRES: objc_interop
@@ -12,7 +12,6 @@
 // CHECK: "{{[^"]*}}/Darwin.swiftmodule"
 // CHECK: "{{[^"]*}}/Foundation.swiftmodule"
 // CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/IOKit.swiftmodule"
 // CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }

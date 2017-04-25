@@ -1489,6 +1489,25 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createEndAccess(Loc, op, aborted);
     break;
   }
+  case ValueKind::BeginUnpairedAccessInst: {
+    SILValue source = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    SILValue buffer = getLocalValue(
+        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    auto accessKind = SILAccessKind(Attr & 0x7);
+    auto enforcement = SILAccessEnforcement(Attr >> 3);
+    ResultVal = Builder.createBeginUnpairedAccess(Loc, source, buffer,
+                                                  accessKind, enforcement);
+    break;
+  }
+  case ValueKind::EndUnpairedAccessInst: {
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    bool aborted = Attr & 0x1;
+    auto enforcement = SILAccessEnforcement(Attr >> 1);
+    ResultVal = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted);
+    break;
+  }
   case ValueKind::StoreUnownedInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
@@ -2051,6 +2070,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
+  case ValueKind::KeyPathInst:
     llvm_unreachable("todo");
   }
 

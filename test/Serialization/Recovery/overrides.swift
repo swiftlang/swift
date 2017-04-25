@@ -5,7 +5,59 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery | %FileCheck -check-prefix CHECK-RECOVERY %s
 
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery -D TEST -verify
+
 // REQUIRES: objc_interop
+
+#if TEST
+import Lib
+
+func testInitializers() {
+  _ = D1_DesignatedInitDisappears()
+  _ = D1_DesignatedInitDisappears(value: 0) // expected-error {{incorrect argument label in call}}
+  _ = D1_DesignatedInitDisappears(convenience: 0)
+
+  _ = D2_OnlyDesignatedInitDisappears(value: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
+  _ = D2_OnlyDesignatedInitDisappears(convenience: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
+
+  _ = D3_ConvenienceInitDisappears()
+  _ = D3_ConvenienceInitDisappears(value: 0) // expected-error {{incorrect argument label in call}}
+  _ = D3_ConvenienceInitDisappears(convenience: 0)
+
+  _ = D4_UnknownInitDisappears()
+  _ = D4_UnknownInitDisappears(value: 0) // expected-error {{argument passed to call that takes no arguments}}
+
+  // FIXME: Why does 'init()' show up in the generated interface if it can't be
+  // called?
+  _ = D5_OnlyUnknownInitDisappears() // expected-error {{cannot be constructed because it has no accessible initializers}}
+  _ = D5_OnlyUnknownInitDisappears(value: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
+}
+
+func testSubclassInitializers() {
+  class DesignatedInitDisappearsSub : D1_DesignatedInitDisappears {}
+  _ = DesignatedInitDisappearsSub()
+  _ = DesignatedInitDisappearsSub(value: 0) // expected-error {{argument passed to call that takes no arguments}}
+  _ = DesignatedInitDisappearsSub(convenience: 0) // expected-error {{argument passed to call that takes no arguments}}
+
+  class OnlyDesignatedInitDisappearsSub : D2_OnlyDesignatedInitDisappears {}
+  _ = OnlyDesignatedInitDisappearsSub(value: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
+  _ = OnlyDesignatedInitDisappearsSub(convenience: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
+
+  class ConvenienceInitDisappearsSub : D3_ConvenienceInitDisappears {}
+  _ = ConvenienceInitDisappearsSub()
+  _ = ConvenienceInitDisappearsSub(value: 0) // expected-error {{incorrect argument label in call}}
+  _ = ConvenienceInitDisappearsSub(convenience: 0) // still inheritable
+
+  class UnknownInitDisappearsSub : D4_UnknownInitDisappears {}
+  _ = UnknownInitDisappearsSub()
+  _ = UnknownInitDisappearsSub(value: 0) // expected-error {{argument passed to call that takes no arguments}}
+
+  class OnlyUnknownInitDisappearsSub : D5_OnlyUnknownInitDisappears {}
+  _ = OnlyUnknownInitDisappearsSub() // expected-error {{cannot be constructed because it has no accessible initializers}}
+  _ = OnlyUnknownInitDisappearsSub(value: 0) // expected-error {{cannot be constructed because it has no accessible initializers}}
+}
+
+#else // TEST
 
 import Overrides
 
@@ -111,3 +163,74 @@ public class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappear
 // CHECK-RECOVERY-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+open class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
+  public override init() { fatalError() }
+  public override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
+// CHECK-NEXT: init()
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D1_DesignatedInitDisappears : DesignatedInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+open class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
+  public override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D2_OnlyDesignatedInitDisappears : OnlyDesignatedInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+open class D3_ConvenienceInitDisappears : ConvenienceInitDisappearsBase {
+  public override init() { fatalError() }
+}
+
+// CHECK-LABEL: class D3_ConvenienceInitDisappears : ConvenienceInitDisappearsBase {
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D3_ConvenienceInitDisappears : ConvenienceInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+open class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
+  public override init() { fatalError() }
+  public override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
+// CHECK-NEXT: init()
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D4_UnknownInitDisappears : UnknownInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+open class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
+  public override init(value: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
+// CHECK-NEXT: init(value: Int)
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class D5_OnlyUnknownInitDisappears : OnlyUnknownInitDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+#endif // TEST

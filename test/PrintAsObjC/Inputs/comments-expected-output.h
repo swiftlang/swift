@@ -451,4 +451,5 @@ SWIFT_CLASS("_TtC8comments13UnorderedList")
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
+SWIFT_MODULE_NAMESPACE_POP
 #pragma clang diagnostic pop

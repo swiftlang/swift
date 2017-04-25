@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen %s | %FileCheck %s
 
+func modify<T>(_ x: inout T) {}
+
 public struct S {
   var i: Int
   var o: AnyObject?
@@ -111,3 +113,25 @@ func testClassInstanceProperties(c: C) {
 // CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[CX]] : $*Int
 // CHECK-NEXT:  assign [[Y]] to [[ACCESS]]
 // CHECK-NEXT:  end_access [[ACCESS]]
+
+class D {
+  var x: Int = 0
+}
+//   materializeForSet callback
+// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSifmytfU_
+// CHECK:       end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+//   materializeForSet
+// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSifm
+// CHECK:       [[T0:%.*]] = ref_element_addr %2 : $D, #D.x
+// CHECK-NEXT:  begin_unpaired_access [modify] [dynamic] [[T0]] : $*Int
+
+func testDispatchedClassInstanceProperty(d: D) {
+  modify(&d.x)
+}
+// CHECK-LABEL: sil hidden @_T017access_marker_gen35testDispatchedClassInstancePropertyyAA1DC1d_tF
+// CHECK:       [[D:%.*]] = begin_borrow %0 : $D
+// CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!materializeForSet.1
+// CHECK:       apply [[METHOD]]({{.*}}, [[D]])
+// CHECK-NOT:   begin_access
+// CHECK:       end_borrow [[D]] from %0 : $D

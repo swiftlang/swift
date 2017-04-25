@@ -113,6 +113,9 @@ public:
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
+  
+  std::string mangleKeyPathGetterThunkHelper(const VarDecl *property);
+  std::string mangleKeyPathSetterThunkHelper(const VarDecl *property);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
                                     GenericEnvironment *GE);

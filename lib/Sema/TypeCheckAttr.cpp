@@ -42,8 +42,19 @@ public:
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
-    TC.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
-      .fixItRemove(attr->getRangeWithAt());
+    assert(!D->hasClangNode() && "Clang imported propagated a bogus attribute");
+    if (!D->hasClangNode()) {
+      SourceLoc loc = attr->getLocation();
+      assert(loc.isValid() && "Diagnosing attribute with invalid location");
+      if (loc.isInvalid()) {
+        loc = D->getLoc();
+      }
+      if (loc.isValid()) {
+        TC.diagnose(loc, std::forward<ArgTypes>(Args)...)
+          .fixItRemove(attr->getRangeWithAt());
+      }
+    }
+
     attr->setInvalid();
   }
 
@@ -306,10 +317,8 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
   const FuncDecl *FD = cast<FuncDecl>(D);
-  if (!FD->getDeclContext()->getAsClassOrClassExtensionContext() ||
-      FD->isStatic() || FD->isAccessor())
+  if (!FD->isPotentialIBActionTarget())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
-
 }
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
@@ -1630,7 +1639,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Form a new generic signature based on the old one.
   GenericSignatureBuilder Builder(D->getASTContext(),
-                           LookUpConformanceInModule(DC->getParentModule()));
+                                  TypeChecker::LookUpConformance(TC, DC));
 
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);

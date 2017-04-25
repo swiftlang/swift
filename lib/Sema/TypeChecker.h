@@ -488,6 +488,9 @@ enum TypeResolutionFlags : unsigned {
   /// clause on something other than an enum (i.e. V, but not U or W, in class
   /// T: U.V<W>)
   TR_NonEnumInheritanceClauseOuterLayer = 0x2000000,
+
+  /// Whether we are checking the underlying type of a typealias.
+  TR_TypeAliasUnderlyingType = 0x4000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -1539,7 +1542,7 @@ public:
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr,
+  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
                                       bool requireResultType = false);
 
   /// \brief Type check whether the given type declaration includes members of
@@ -1819,6 +1822,23 @@ public:
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance through a particular declaration context using the given
+  /// type checker.
+  class LookUpConformance {
+    TypeChecker &tc;
+    DeclContext *dc;
+
+  public:
+    explicit LookUpConformance(TypeChecker &tc, DeclContext *dc)
+      : tc(tc), dc(dc) { }
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const;
+  };
+
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
 
@@ -1919,6 +1939,11 @@ public:
   LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
                             NameLookupOptions options
                               = defaultMemberLookupOptions);
+
+  /// \brief Check whether the given declaration can be written as a
+  /// member of the given base type.
+  bool isUnsupportedMemberTypeAccess(Type type,
+                                     TypeDecl *typeDecl);
 
   /// \brief Look up a member type within the given type.
   ///

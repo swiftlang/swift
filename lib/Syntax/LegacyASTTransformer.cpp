@@ -1147,14 +1147,6 @@ LegacyASTTransformer::visitPointerToPointerExpr(
   return getUnknownExpr(E);
 }
 
-RC<SyntaxData>
-LegacyASTTransformer::visitLValueToPointerExpr(
-    LValueToPointerExpr *E,
-    const SyntaxData *Parent,
-    const CursorIndex IndexInParent) {
-  return getUnknownExpr(E);
-}
-
 RC<SyntaxData> LegacyASTTransformer::visitForeignObjectConversionExpr(
     ForeignObjectConversionExpr *E,
     const SyntaxData *Parent,
@@ -1180,6 +1172,13 @@ LegacyASTTransformer::visitForcedCheckedCastExpr(
 
 RC<SyntaxData> LegacyASTTransformer::visitConditionalCheckedCastExpr(
     ConditionalCheckedCastExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData> LegacyASTTransformer::visitKeyPathApplicationExpr(
+    KeyPathApplicationExpr *E,
     const SyntaxData *Parent,
     const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
@@ -1258,9 +1257,9 @@ LegacyASTTransformer::visitObjCSelectorExpr(ObjCSelectorExpr *E,
 }
 
 RC<SyntaxData>
-LegacyASTTransformer::visitObjCKeyPathExpr(ObjCKeyPathExpr *E,
-                                           const SyntaxData *Parent,
-                                           const CursorIndex IndexInParent) {
+LegacyASTTransformer::visitKeyPathExpr(KeyPathExpr *E,
+                                       const SyntaxData *Parent,
+                                       const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
 }
 

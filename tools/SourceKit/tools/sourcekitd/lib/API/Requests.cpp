@@ -818,10 +818,7 @@ handleSemanticRequest(RequestDict Req,
     }
     std::transform(ArgParts.begin(), ArgParts.end(),
                    std::back_inserter(Input.ArgNames),
-      [](const char *C) {
-        StringRef Original(C);
-        return Original == "_" ? StringRef() : Original;
-      });
+                   [](const char *C) { return StringRef(C); });
     std::transform(Selectors.begin(), Selectors.end(),
                    std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });

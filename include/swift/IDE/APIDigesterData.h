@@ -69,6 +69,9 @@ struct CommonDiffItem: public APIDiffItem {
   SDKNodeKind NodeKind;
   NodeAnnotation DiffKind;
   StringRef ChildIndex;
+private:
+  llvm::SmallVector<uint8_t, 4> ChildIndexPieces;
+public:
   StringRef LeftUsr;
   StringRef RightUsr;
   StringRef LeftComment;
@@ -80,6 +83,7 @@ struct CommonDiffItem: public APIDiffItem {
                  StringRef LeftComment, StringRef RightComment,
                  StringRef ModuleName);
 
+  ArrayRef<uint8_t> getChildIndices() { return ChildIndexPieces; }
   static StringRef head();
   bool operator<(CommonDiffItem Other) const;
   static bool classof(const APIDiffItem *D);
@@ -87,6 +91,8 @@ struct CommonDiffItem: public APIDiffItem {
   static void undef(llvm::raw_ostream &os);
   void streamDef(llvm::raw_ostream &S) const override;
   StringRef getKey() const override { return LeftUsr; }
+  bool isRename() const { return DiffKind == NodeAnnotation::Rename; }
+  StringRef getNewName() const { assert(isRename()); return RightComment; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
   }
@@ -248,6 +254,7 @@ struct APIDiffItemStore {
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
   ArrayRef<APIDiffItem*> getAllDiffItems() const;
+  void printIncomingUsr(bool print = true);
 
   /// Add a path of a JSON file dumped from swift-api-digester that contains
   /// API changes we care about. Calling this can be heavy since the procedure

@@ -2946,17 +2946,7 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
                                        Type conformingReplacementType,
                                        ProtocolType *conformedProtocol) const {
-  auto result = Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
-  if ((result && result->isConcrete()) ||
-      conformingReplacementType->hasError() ||
-      conformingReplacementType->isTypeParameter())
-    return result;
-
-  // FIXME: Rip this out once ConformanceAccessPaths are plumbed through
-  auto *M = conformedProtocol->getDecl()->getParentModule();
-  return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              nullptr);
+  return Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
 }
 
 Optional<ProtocolConformanceRef>
@@ -4014,6 +4004,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
+    (void)layout;
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())

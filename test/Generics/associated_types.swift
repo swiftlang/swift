@@ -178,7 +178,7 @@ C<CC>().c()
 
 // SR-511
 protocol sr511 {
-  typealias Foo // expected-error {{typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  typealias Foo // expected-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
 }
 
 associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}

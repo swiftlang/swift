@@ -102,3 +102,8 @@ def objc_name : Separate<["-"], "objc-name">,
 
 def objc_selector : Separate<["-"], "objc-selector">,
   HelpText<"Objective-C selector name to translate from">;
+
+def help : Flag<["-", "--"], "help">,
+  HelpText<"Display available options">;
+
+def h : Flag<["-"], "h">, Alias<help>;

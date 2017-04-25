@@ -300,8 +300,11 @@ class DeclNameViewer {
   SmallVector<StringRef, 4> Labels;
 public:
   DeclNameViewer(StringRef Text);
+  DeclNameViewer() : DeclNameViewer(StringRef()) {}
+  operator bool() const { return !BaseName.empty(); }
   StringRef base() const { return BaseName; }
   llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
 };
@@ -397,6 +400,16 @@ public:
   ~SourceEditOutputConsumer();
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
+
+enum class LabelRangeEndAt: int8_t {
+  BeforeElemStart,
+  LabelNameOnly,
+};
+
+// Get the ranges of argument labels from an Arg, either tuple or paren.
+std::vector<CharSourceRange>
+getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
+
 } // namespace ide
 } // namespace swift
 

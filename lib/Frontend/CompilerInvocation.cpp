@@ -917,6 +917,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
+  Opts.EnableExperimentalKeyPaths |=
+    Args.hasArg(OPT_enable_experimental_keypaths);
+
   Opts.EnableExperimentalSubclassExistentials |=
     Args.hasArg(OPT_enable_experimental_subclass_existentials);
 
@@ -1589,6 +1592,7 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
   using namespace options;
 
   Opts.AddObjC |= Args.hasArg(OPT_warn_swift3_objc_inference);
+  Opts.DumpUsr = Args.hasArg(OPT_dump_usr);
 
   if (Args.hasArg(OPT_disable_migrator_fixits)) {
     Opts.EnableMigratorFixits = false;

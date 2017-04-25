@@ -265,6 +265,29 @@ namespace {
       return true;
     }
 
+    bool visitBeginAccessInst(const BeginAccessInst *right) {
+      auto left = cast<BeginAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndAccessInst(const EndAccessInst *right) {
+      auto left = cast<EndAccessInst>(LHS);
+      return left->isAborting() == right->isAborting();
+    }
+
+    bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
+      auto left = cast<BeginUnpairedAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
+      auto left = cast<EndUnpairedAccessInst>(LHS);
+      return left->getEnforcement() == right->getEnforcement()
+          && left->isAborting() == right->isAborting();
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       return true;
     }

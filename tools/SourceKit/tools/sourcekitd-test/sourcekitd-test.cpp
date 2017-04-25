@@ -592,7 +592,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestNameTranslation);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     StringRef BaseName;
-    llvm::SmallVector<StringRef, 4> ArgPices;
+    llvm::SmallVector<StringRef, 4> ArgPieces;
     sourcekitd_uid_t ArgName;
     if (!Opts.SwiftName.empty()) {
       sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameSwift);
@@ -609,13 +609,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
           return 1;
         }
         StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
-        AllArgs.split(ArgPices, ':');
+        AllArgs.split(ArgPieces, ':');
         if (!Args.empty()) {
-          if (!ArgPices.back().empty()) {
+          if (!ArgPieces.back().empty()) {
             llvm::errs() << "Swift name is malformed.\n";
             return 1;
           }
-          ArgPices.pop_back();
+          ArgPieces.pop_back();
         }
       }
     } else if (!Opts.ObjCName.empty()) {
@@ -625,11 +625,13 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     } else if (!Opts.ObjCSelector.empty()) {
       sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameObjc);
       StringRef Name(Opts.ObjCSelector);
-      Name.split(ArgPices, ':', -1, /*keep empty*/false);
+      Name.split(ArgPieces, ':');
+      if (ArgPieces.back().empty())
+        ArgPieces.pop_back();
       ArgName = KeySelectorPieces;
-      std::transform(ArgPices.begin(), ArgPices.end(), ArgPices.begin(),
+      std::transform(ArgPieces.begin(), ArgPieces.end(), ArgPieces.begin(),
         [Name] (StringRef T) {
-        if (T.data() + T.size() < Name.data() + Name.size() &&
+        if (!T.empty() && T.data() + T.size() < Name.data() + Name.size() &&
             *(T.data() + T.size()) == ':') {
           // Include the colon belonging to the piece.
           return StringRef(T.data(), T.size() + 1);
@@ -644,9 +646,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       std::string S = BaseName;
       sourcekitd_request_dictionary_set_string(Req, KeyBaseName, S.c_str());
     }
-    if (!ArgPices.empty()) {
+    if (!ArgPieces.empty()) {
       sourcekitd_object_t Arr = sourcekitd_request_array_create(nullptr, 0);
-      for (StringRef A: ArgPices) {
+      for (StringRef A : ArgPieces) {
         std::string S = A;
         sourcekitd_request_array_set_string(Arr, SOURCEKITD_ARRAY_APPEND,
                                             S.c_str());

@@ -3,7 +3,7 @@
 func bet() where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
 typealias gimel where A : B // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-// expected-error@-1 {{expected '=' in typealias declaration}}
+// expected-error@-1 {{expected '=' in type alias declaration}}
 
 class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 

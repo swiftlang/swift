@@ -5,6 +5,14 @@ public struct S1 {
   public static func foo3() {}
   public func foo4() {}
   public func foo5(x : Int, y: Int, z: Int) {}
+
+  public func foo6(x : Int, y: Int?) -> Int? { return 0 }
+  public func foo7(x : Int, y: Int) -> Int { return 0 }
+  public func foo8(x : Int, y: Int?) -> Int? { return 0 }
+  public func foo9(x : [[Int: String]], y: [Int?]) {}
+  public func foo10(x : (Int, [Int: [String: [Int?]]])->String) {}
+  public func foo11(x : (Int, [Int: Int])->String) {}
+  public func foo12(x : (Int, [Int: [String: [(((String)))]]])->String) {}
 }
 
 public class C1 {

@@ -2096,7 +2096,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     // statements are processed, even ones from non-primary files. Thus, only
     // one of those jobs needs to emit the file, and we can get it to write
     // straight to the desired final location.
-    auto tracePathEnvVar = getenv("SWIFT_LOADED_MODULE_TRACE_PATH");
+    auto tracePathEnvVar = getenv("SWIFT_LOADED_MODULE_TRACE_FILE");
     auto shouldEmitTrace =
         tracePathEnvVar ||
         C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,

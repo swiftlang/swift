@@ -43,9 +43,10 @@ func tuple_patterns() {
   // CHECK: [[PBC:%.*]] = project_box [[CADDR]]
   // CHECK: [[DADDR:%[0-9]+]] = alloc_box ${ var Float }
   // CHECK: [[PBD:%.*]] = project_box [[DADDR]]
-  // CHECK: copy_addr [[PBA]] to [initialization] [[PBC]]
-  // CHECK: copy_addr [[PBB]] to [initialization] [[PBD]]
-
+  // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
+  // CHECK: copy_addr [[READA]] to [initialization] [[PBC]]
+  // CHECK: [[READB:%.*]] = begin_access [read] [unknown] [[PBB]] : $*Float
+  // CHECK: copy_addr [[READB]] to [initialization] [[PBD]]
   // CHECK: [[EADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBE:%.*]] = project_box [[EADDR]]
   // CHECK: [[FADDR:%[0-9]+]] = alloc_box ${ var Float }
@@ -65,8 +66,10 @@ func tuple_patterns() {
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
   // CHECK-NOT: alloc_box ${ var Float }
-  // CHECK: copy_addr [[PBA]] to [initialization] [[PBI]]
-  // CHECK: [[B:%[0-9]+]] = load [trivial] [[PBB]]
+  // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
+  // CHECK: copy_addr [[READA]] to [initialization] [[PBI]]
+  // CHECK: [[READB:%.*]] = begin_access [read] [unknown] [[PBB]] : $*Float
+  // CHECK: [[B:%[0-9]+]] = load [trivial] [[READB]]
   // CHECK-NOT: store [[B]]
   var (i,_) = (a, b)
 
@@ -133,7 +136,9 @@ func store_to_global(x: Int) {
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @_T05decls6globalSifau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
-  // CHECK: copy_addr [[PBX]] to [[ADDR]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBX]] : $*Int
+  // CHECK: [[COPY:%.*]] = load [trivial] [[READ]] : $*Int
+  // CHECK: assign [[COPY]] to [[ADDR]] : $*Int
   // CHECK: return
 }
 

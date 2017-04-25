@@ -124,6 +124,7 @@ namespace irgen {
   class IRGenFunction;
   class LinkEntity;
   class LoadableTypeInfo;
+  class NecessaryBindings;
   class ProtocolInfo;
   class TypeConverter;
   class TypeInfo;
@@ -660,6 +661,9 @@ public:
                                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                            ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
+                                          SILLocation diagLoc);
+
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
@@ -746,6 +750,7 @@ private:
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
+  llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {

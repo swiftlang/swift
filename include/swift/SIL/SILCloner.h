@@ -755,6 +755,29 @@ void SILCloner<ImplClass>::visitEndAccessInst(EndAccessInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitBeginUnpairedAccessInst(
+                                           BeginUnpairedAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createBeginUnpairedAccess(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getSource()),
+                                           getOpValue(Inst->getBuffer()),
+                                           Inst->getAccessKind(),
+                                           Inst->getEnforcement()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndUnpairedAccessInst(
+                                             EndUnpairedAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createEndUnpairedAccess(getOpLocation(Inst->getLoc()),
+                                                 getOpValue(Inst->getOperand()),
+                                                 Inst->getEnforcement(),
+                                                 Inst->isAborting()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -2250,6 +2273,16 @@ void SILCloner<ImplClass>::visitObjCProtocolInst(ObjCProtocolInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createObjCProtocol(
                           getOpLocation(Inst->getLoc()), Inst->getProtocol(),
+                          getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createKeyPath(
+                          getOpLocation(Inst->getLoc()),
+                          Inst->getPattern(),
+                          getOpSubstitutions(Inst->getSubstitutions()),
                           getOpType(Inst->getType())));
 }
 

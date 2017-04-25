@@ -6,8 +6,12 @@ int barGlobalFunc(int a);
 
 int barGlobalVariable = 1;
 
+int barGlobalFuncOldName(int a);
+
 @interface BarForwardDeclaredClass
+- (id)initWithOldLabel0:(int)frame;
 - (void) barInstanceFunc0;
+- (void) barInstanceFunc1:(int)info anotherValue:(int)info1 anotherValue1:(int)info2 anotherValue2:(int)info3;
 @end
 
 enum BarForwardDeclaredEnum {
@@ -18,6 +22,7 @@ enum BarForwardDeclaredEnum {
 
 typedef struct {
   int count;
+  int theSimpleOldName;
 } SomeItemSet;
 
 typedef SomeItemSet SomeEnvironment;

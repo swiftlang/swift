@@ -166,6 +166,22 @@ public:
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
 
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireAddressType(SILType type, const Twine &valueDescription,
+                      const char *typeName) {
+    _require(type.isAddress(), valueDescription + " must be an address");
+    auto result = type.getAs<T>();
+    _require(bool(result), valueDescription + " must have type " + typeName);
+    return result;
+  }
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireAddressType(SILValue value, const Twine &valueDescription,
+                     const char *typeName) {
+    return _requireAddressType<T>(value->getType(), valueDescription, typeName);
+  }
+#define requireAddressType(type, value, valueDescription) \
+  _requireAddressType<type>(value, valueDescription, #type)
+
   template <class T>
   typename CanTypeWrapperTraits<T>::type
   _forbidObjectType(SILType type, const Twine &valueDescription,
@@ -1259,18 +1275,7 @@ public:
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
 
-    require(isa<GlobalAddrInst>(op) ||
-            isa<AllocStackInst>(op) ||
-            isa<ProjectBoxInst>(op) ||
-            isa<RefElementAddrInst>(op) ||
-            isa<PointerToAddressInst>(op) ||
-            isa<SILFunctionArgument>(op) ||
-            isa<BeginAccessInst>(op) ||
-            isa<MarkUninitializedInst>(op),
-            "begin_access operand must be a root address derivation");
-
-    // Any kind of access marker can be used in the raw stage if either kind
-    // of enforcement is enabled globally.
+    // Any kind of access marker can be used in the raw stage.
     // After the raw stage, only dynamic access markers can be used, and
     // only if dynamic enforcement is enabled globally.
     // Eventually, we should allow access markers to persist in SIL, and
@@ -1278,23 +1283,20 @@ public:
     // passes first.
     switch (BAI->getEnforcement()) {
     case SILAccessEnforcement::Unknown:
-      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
-              && BAI->getModule().getStage() == SILStage::Raw,
+      require(BAI->getModule().getStage() == SILStage::Raw,
               "access must have known enforcement outside raw stage");
       break;
 
     case SILAccessEnforcement::Static:
     case SILAccessEnforcement::Unsafe:
-      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
-              && BAI->getModule().getStage() == SILStage::Raw,
+      require(BAI->getModule().getStage() == SILStage::Raw,
               "non-dynamic enforcement is currently disallowed outside "
               "raw stage");
       break;
 
     case SILAccessEnforcement::Dynamic:
-      require(F.getModule().getOptions().EnforceExclusivityDynamic ||
-              (F.getModule().getOptions().EnforceExclusivityStatic &&
-               BAI->getModule().getStage() == SILStage::Raw),
+      require(F.getModule().getOptions().EnforceExclusivityDynamic
+              || BAI->getModule().getStage() == SILStage::Raw,
               "dynamic access enforcement is only allowed after raw stage when "
               "globally enabled");
       break;
@@ -1323,6 +1325,22 @@ public:
               BAI->getAccessKind() == SILAccessKind::Deinit,
               "aborting access must apply to init or deinit");
     }
+  }
+
+  void checkBeginUnpairedAccessInst(BeginUnpairedAccessInst *I) {
+    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+            "unpaired access can never use unknown enforcement");
+    require(I->getSource()->getType().isAddress(),
+            "address operand must have address type");
+    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+                       "scratch buffer operand");
+  }
+
+  void checkEndUnpairedAccessInst(EndUnpairedAccessInst *I) {
+    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+            "unpaired access can never use unknown enforcement");
+    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+                       "scratch buffer operand");
   }
 
   void checkStoreInst(StoreInst *SI) {
@@ -3663,6 +3681,90 @@ public:
             "objc_metatype_to_object must produce a value");
     require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
             "objc_metatype_to_object must produce an AnyObject value");
+  }
+  
+  void checkKeyPathInst(KeyPathInst *KPI) {
+    auto kpTy = KPI->getType();
+    
+    require(kpTy.isObject(), "keypath result must be an object type");
+    
+    auto kpBGT = kpTy.getAs<BoundGenericType>();
+    require(kpBGT, "keypath result must be a generic type");
+    auto &C = F.getASTContext();
+    require(kpBGT->getDecl() == C.getKeyPathDecl()
+            || kpBGT->getDecl() == C.getWritableKeyPathDecl()
+            || kpBGT->getDecl() == C.getReferenceWritableKeyPathDecl(),
+            "keypath result must be a key path type");
+    
+    auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
+    auto pattern = KPI->getPattern();
+    SubstitutionMap patternSubs;
+    if (pattern->getGenericSignature())
+      patternSubs = pattern->getGenericSignature()
+                           ->getSubstitutionMap(KPI->getSubstitutions());
+    require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
+            "keypath root type should match root type of keypath pattern");
+
+    auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
+    require(leafTy == pattern->getValueType().subst(patternSubs)->getCanonicalType(),
+            "keypath value type should match value type of keypath pattern");
+    
+    {
+      Lowering::GenericContextScope scope(F.getModule().Types,
+                                          pattern->getGenericSignature());
+      
+      for (auto &component : pattern->getComponents()) {
+        auto loweredBaseTy =
+          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             baseTy);
+        auto componentTy = component.getComponentType().subst(patternSubs)
+          ->getCanonicalType();
+        auto loweredComponentTy =
+          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             componentTy);
+        
+        switch (auto kind = component.getKind()) {
+        case KeyPathPatternComponent::Kind::StoredProperty: {
+          auto property = component.getStoredPropertyDecl();
+          require(property->getDeclContext()
+                   == baseTy->getAnyNominal(),
+                  "property decl should be a member of the component base type");
+          switch (property->getStorageKind()) {
+          case AbstractStorageDecl::Stored:
+          case AbstractStorageDecl::StoredWithObservers:
+          case AbstractStorageDecl::StoredWithTrivialAccessors:
+            break;
+          case AbstractStorageDecl::Addressed:
+          case AbstractStorageDecl::AddressedWithObservers:
+          case AbstractStorageDecl::AddressedWithTrivialAccessors:
+          case AbstractStorageDecl::Computed:
+          case AbstractStorageDecl::ComputedWithMutableAddress:
+          case AbstractStorageDecl::InheritedWithObservers:
+            require(false, "property must be stored");
+          }
+          auto propertyTy = loweredBaseTy.getFieldType(property, F.getModule());
+          require(propertyTy.getObjectType()
+                    == loweredComponentTy.getObjectType(),
+                  "component type should match the maximal abstraction of the "
+                  "formal type");
+          break;
+        }
+          
+        case KeyPathPatternComponent::Kind::GettableProperty:
+        case KeyPathPatternComponent::Kind::SettableProperty: {
+          require(component.getComputedPropertyIndices().empty(),
+                  "subscripts not implemented");
+
+          // TODO: Verify the signatures of the getter and setter
+          break;
+        }
+        }
+        
+        baseTy = componentTy;
+      }
+    }
+    require(CanType(baseTy) == CanType(leafTy),
+            "final component should match leaf value type of key path type");
   }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {

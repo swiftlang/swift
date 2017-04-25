@@ -97,7 +97,7 @@ namespace swift {
     Normal,
 
     /// Type check the argument to an Objective-C #keyPath.
-    ObjCKeyPath,
+    KeyPath,
   };
 
   /// \brief Return the type of an expression parsed during code completion, or
