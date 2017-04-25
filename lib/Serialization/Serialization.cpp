@@ -3845,7 +3845,7 @@ class YamlGroupInputParser {
   static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
-                 std::string &ParentName) {
+                 StringRef ParentName) {
     llvm::yaml::MappingNode *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
     if (!MapNode) {
       return true;
