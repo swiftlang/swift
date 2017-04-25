@@ -128,7 +128,7 @@ def main():
     RATIO_MAX = 1 + float(args.delta_threshold)
 
     for row in old_data:
-        if (len(row) > 7 and row[MIN].isdigit()):
+        if (len(row) > 8):  # skip Totals row
             if row[TESTNAME] in old_results:
                 if old_results[row[TESTNAME]] > int(row[MIN]):
                     old_results[row[TESTNAME]] = int(row[MIN])
@@ -139,7 +139,7 @@ def main():
                 old_max_results[row[TESTNAME]] = int(row[MAX])
 
     for row in new_data:
-        if (len(row) > 7 and row[MIN].isdigit()):
+        if (len(row) > 8):  # skip Totals row
             if row[TESTNAME] in new_results:
                 if int(new_results[row[TESTNAME]]) > int(row[MIN]):
                     new_results[row[TESTNAME]] = int(row[MIN])
@@ -150,7 +150,12 @@ def main():
                 new_max_results[row[TESTNAME]] = int(row[MAX])
 
     ratio_total = 0
-    for key in new_results.keys():
+
+    new_tests = set(new_results.keys())
+    old_tests = set(old_results.keys())
+    comparable_tests = new_tests.intersection(old_tests)
+
+    for key in comparable_tests:
             ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
             ratio_list[key] = round(ratio, 2)
             ratio_total *= ratio
