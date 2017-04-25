@@ -118,7 +118,6 @@ def instrument_test(driver_path, test, num_samples):
     return avg_test_output
 
 
-
 def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     tests = subprocess.check_output([driver_path, '--list']).split()[2:]
@@ -377,9 +376,9 @@ def main():
         help='Run benchmarks and submit results to LNT',
         parents=[parent_parser])
     submit_parser.add_argument(
-            '-o', '--optimization', nargs='+',
-            help='optimization levels to use (default: O Onone Ounchecked)',
-            default=['O', 'Onone', 'Ounchecked'])
+        '-o', '--optimization', nargs='+',
+        help='optimization levels to use (default: O Onone Ounchecked)',
+        default=['O', 'Onone', 'Ounchecked'])
     submit_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 10)',
@@ -403,7 +402,8 @@ def main():
         '-o', '--optimization',
         metavar='OPT',
         choices=['O', 'Onone', 'Ounchecked'],
-        help='optimization level to use (default: O)', default='O')
+        help='optimization level to use: {O,Onone,Ounchecked}, (default: O)',
+        default='O')
     run_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 1)',
