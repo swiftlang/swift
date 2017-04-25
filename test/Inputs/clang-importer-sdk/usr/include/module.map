@@ -98,6 +98,10 @@ module objc_structs {
   export *
 }
 
+module enums_using_attributes {
+  header "enums_using_attributes.h"
+}
+
 module errors {
   header "errors.h"
   export *
