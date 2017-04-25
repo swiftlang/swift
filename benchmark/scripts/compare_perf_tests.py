@@ -32,6 +32,13 @@ class PerformanceTestResult:
         self.median = int(csv_row[7])   # Median runtime (ms)
         self.max_rss = int(csv_row[8])  # Maximum Resident Set Size (B)
 
+    header = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
+    # Tuple of values formatted for display in results table:
+    # (name, min value, max value, mean value, max_rss)
+    def values(self):
+        return (self.name, str(self.min), str(self.max),
+                str(self.mean),str(self.max_rss))
+
 
 class ResultComparison:
     def __init__(self, old, new):
@@ -47,16 +54,17 @@ class ResultComparison:
         self.delta = ((ratio - 1) * 100)
 
         self.is_dubious = (  # FIXME this is legacy
-            '(?)' if ((old.min < new.min and new.min < old.max) or
+            ' (?)' if ((old.min < new.min and new.min < old.max) or
                       (new.min < old.min and old.min < new.max))
             else '')
 
+    header = ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
     # Tuple of values formatted for display in results table:
     # (name, old value, new value, delta [%], speedup ratio)
     def values(self):
         return (self.name, str(self.old.min), str(self.new.min),
                 '{0:+.1f}%'.format(self.delta),
-                '{0:.2f}x {1}'.format(self.ratio, self.is_dubious))
+                '{0:.2f}x{1}'.format(self.ratio, self.is_dubious))
 
 
 class TestComparator:
@@ -67,6 +75,8 @@ class TestComparator:
                         return len(row) > 8
             tests = map(PerformanceTestResult,
                         filter(skip_totals, csv.reader(open(filename))))
+            # FIXME merge test with same name  into single results
+            # Support for merged(appended) outputs from Benchmark_Driver
             names = map(lambda t: t.name, tests)
             return dict(zip(names, tests))
 
@@ -74,9 +84,14 @@ class TestComparator:
         new_results = load_from_CSV(new_file)
         old_tests = set(old_results.keys())
         new_tests = set(new_results.keys())
-        # added_tests = new_tests.difference(old_tests)
-        # removed_tests = old_tests.difference(new_tests)
         comparable_tests = new_tests.intersection(old_tests)
+        added_tests = new_tests.difference(old_tests)
+        removed_tests = old_tests.difference(new_tests)
+
+        self.added = sorted(map(lambda t: new_results[t], added_tests),
+                            key=lambda r: r.name)
+        self.removed = sorted(map(lambda t: old_results[t], removed_tests),
+                              key=lambda r: r.name)
 
         def compare(name):
             return ResultComparison(old_results[name], new_results[name])
@@ -93,14 +108,14 @@ class TestComparator:
             not_decreased, lambda c: c.ratio > (1 + delta_threshold))
 
         # sorted partitions
-        comp_map = dict(zip(map(lambda c: c.name, comparisons), comparisons))
-        self.decreased = map(lambda t: comp_map[t.name],
+        names = map(lambda c: c.name, comparisons)
+        comparisons = dict(zip(names, comparisons))
+        self.decreased = map(lambda c: comparisons[c.name],
                              sorted(decreased, key=lambda c: -c.delta))
-        self.increased = map(lambda t: comp_map[t.name],
+        self.increased = map(lambda c: comparisons[c.name],
                              sorted(increased, key=lambda c: c.delta))
-        self.unchanged = map(lambda t: comp_map[t.name],
+        self.unchanged = map(lambda c: comparisons[c.name],
                              sorted(unchanged, key=lambda c: c.name))
-        # TODO add alphabetically sorted lists for added, removed
 
 
 class ReportFormatter:
@@ -112,12 +127,12 @@ class ReportFormatter:
 
     MARKDOWN_DETAIL = """
 <details {3}>
-  <summary>{0} ({2})</summary>
-  {1}
+  <summary>{0} ({1})</summary>
+  {2}
 </details>
 """
     GIT_DETAIL = """
-{0}: {1}"""
+{0} ({1}): {2}"""
 
     def markdown(self):
         return self.__formatted_text(
@@ -131,26 +146,23 @@ class ReportFormatter:
             HEADER_SEPARATOR='   ',
             DETAIL=self.GIT_DETAIL)
 
-    def __column_widths(self, header):
+    def __column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
         comparisons = (changed if self.changes_only else
                        changed + self.comparator.unchanged)
+        comparisons += self.comparator.added + self.comparator.removed
+
         values = map(lambda c: c.values(), comparisons)
+        widths = map(lambda columns: map(len, columns),
+            [PerformanceTestResult.header, ResultComparison.header] + values)
 
-        def col_widths(contents):
-            return map(len, contents)
+        def max_widths(maximum, widths):
+            return tuple(map(max, zip(maximum, widths)))
 
-        def max_widths(maximum, contents):
-            return tuple(map(max, zip(maximum, col_widths(contents))))
-
-        widths = reduce(max_widths, values, col_widths(header))
-        return widths
+        return reduce(max_widths, widths, tuple([0] * 5))
 
     def __formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
-        header = (
-            'TEST', self.old_branch, self.new_branch, 'DELTA', 'SPEEDUP')
-
-        widths = self.__column_widths(header)
+        widths = self.__column_widths()
 
         def justify_columns(contents):
             return tuple(map(lambda (w, c): c.ljust(w), zip(widths, contents)))
@@ -158,30 +170,33 @@ class ReportFormatter:
         def row(contents):
             return ROW.format(*justify_columns(contents))
 
-        header = '\n' + row(header) + row(tuple([HEADER_SEPARATOR] * 5))
+        def header(header):
+            return '\n' + row(header) + row(tuple([HEADER_SEPARATOR] * 5))
 
-        def format_result(r, strong):
+        def format_columns(r, strong):
             return (r if not strong else
                     r[:-1] + ('**{0}**'.format(r[-1]), ))
 
-        def results(title, comp_list, is_strong=False, is_open=False):
+        def table(title, results, is_strong=False, is_open=False):
             rows = [
-                row(format_result(result_comparison.values(), is_strong))
-                for result_comparison in comp_list
+                row(format_columns(result_comparison.values(), is_strong))
+                for result_comparison in results
             ]
             return ('' if not rows else
                     DETAIL.format(*[
-                        title,
-                        (header + ''.join(rows)),
-                        len(comp_list),
+                        title, len(results),
+                        (header(results[0].header) + ''.join(rows)),
                         ('open' if is_open else '')
                     ]))
 
         return ''.join([
-            results('Regression', self.comparator.decreased, True, True),
-            results('Improvement', self.comparator.increased, True),
+            # FIXME print self.old_branch, self.new_branch
+            table('Regression', self.comparator.decreased, True, True),
+            table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else
-             results('No Changes', self.comparator.unchanged))
+             table('No Changes', self.comparator.unchanged)),
+            table('Added', self.comparator.added, is_open=True),
+            table('Removed', self.comparator.removed, is_open=True)
         ])
 
     HTML = """
@@ -189,23 +204,34 @@ class ReportFormatter:
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <style>
+        body {{ font-family: -apple-system, sans-serif; font-size: 14px; }}
+        table {{ border-spacing: 2px; border-color: grey; border-spacing: 0;
+                border-collapse: collapse; }}
+        table tr {{ background-color: #fff; border-top: 1px solid #c6cbd1; }}
+        table th, table td {{ padding: 6px 13px; border: 1px solid #dfe2e5; }}
+        th {{ text-align: center; padding-top: 130px; }}
+        td {{ text-align: right; }}
+        table td:first-child {{ text-align: left; }}
+        tr:nth-child(even) {{ background-color: #000000; }}
+        tr:nth-child(2n) {{ background-color: #f6f8fa; }}
+    </style>
 </head>
 <body>
+<table>
 {0}
+</table>
 </body>
 </html>"""
 
-    HTML_TABLE = """
-<table>
+    HTML_HEADER_ROW = """
         <tr>
-                <th align='left'>{0}</th>
-                <th align='left'>{1}</th>
+                <th align='left'>{0} ({1})</th>
                 <th align='left'>{2}</th>
                 <th align='left'>{3}</th>
                 <th align='left'>{4}</th>
+                <th align='left'>{5}</th>
         </tr>
-        {5}
-</table>
 """
 
     HTML_ROW = """
@@ -224,26 +250,29 @@ class ReportFormatter:
             return self.HTML_ROW.format(
                 name, old, new, delta, speedup_color, speedup)
 
-        def header(title):
-            return row('<strong>{0}:</strong>'.format(title),
-                       '', '', '', '', 'black')
+        def header(contents):
+            # exit(contents)
+            return self.HTML_HEADER_ROW.format(* contents)
 
-        def results(title, comp_list, speedup_color):
+        def table(title, results, speedup_color):
             rows = [
                 row(*(result_comparison.values() + (speedup_color,)))
-                for result_comparison in comp_list
+                for result_comparison in results
             ]
             return ('' if not rows else
-                    header(title) + ''.join(rows))
+                    header((title, len(results)) + results[0].header[1:]) +
+                    ''.join(rows))
 
-        return self.HTML.format(self.HTML_TABLE.format(
-            'TEST', self.old_branch, self.new_branch, 'DELTA', 'SPEEDUP',
+        return self.HTML.format(
             ''.join([
-                results('Regression', self.comparator.decreased, 'red'),
-                results('Improvement', self.comparator.increased, 'green'),
+                # FIXME print self.old_branch, self.new_branch
+                table('Regression', self.comparator.decreased, 'red'),
+                table('Improvement', self.comparator.increased, 'green'),
                 ('' if self.changes_only else
-                 results('No Changes', self.comparator.unchanged, 'black'))
-            ])))
+                 table('No Changes', self.comparator.unchanged, 'black')),
+                table('Added', self.comparator.added, ''),
+                table('Removed', self.comparator.removed, '')
+            ]))
 
 
 def main():
