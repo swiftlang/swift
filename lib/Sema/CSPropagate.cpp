@@ -22,7 +22,7 @@
 using namespace swift;
 using namespace constraints;
 
-bool isBindOverloadDisjunction(ConstraintSystem &CS, Constraint *disjunction) {
+bool isBindOverloadDisjunction(Constraint *disjunction) {
   assert(disjunction->getKind() == ConstraintKind::Disjunction &&
          "Expected disjunction constraint!");
 
@@ -64,7 +64,7 @@ getBindOverloadDisjunction(ConstraintSystem &CS, Constraint *applicableFn) {
 #endif
 
   // Verify the disjunction consists of BindOverload constraints.
-  assert(isBindOverloadDisjunction(CS, found));
+  assert(isBindOverloadDisjunction(found));
 
   return found;
 }
@@ -80,7 +80,7 @@ void ConstraintSystem::collectNeighboringBindOverloadDisjunctions(
     assert(!constraint->isDisabled() && "Unexpected disabled constraint!");
 
     if (constraint->getKind() == ConstraintKind::Disjunction) {
-      if (isBindOverloadDisjunction(*this, constraint)) {
+      if (isBindOverloadDisjunction(constraint)) {
         neighbors.insert(constraint);
       }
     } else if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
@@ -303,7 +303,7 @@ bool ConstraintSystem::propagateConstraints() {
   llvm::SetVector<Constraint *> workList;
   for (auto &constraint : getConstraints())
     if (constraint.getKind() == ConstraintKind::Disjunction)
-      if (isBindOverloadDisjunction(*this, &constraint))
+      if (isBindOverloadDisjunction(&constraint))
         workList.insert(&constraint);
 
   // Process each disjunction in the work list. If we modify the
