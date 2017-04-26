@@ -540,7 +540,7 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
     [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
     tags)
   expectEqual(["Глокая", " ", "куздра"], tokens)
-  let sentence = String(s[startIndex..<endIndex])
+  let sentence = s[startIndex..<endIndex]
   expectEqual([sentence, sentence, sentence], sentences)
 }
 
@@ -571,7 +571,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
        enclosingRange: Range<String.Index>, stop: inout Bool)
     in
       expectNil(substring_)
-      let substring = String(s[substringRange])
+      let substring = s[substringRange]
       substrings.append(substring)
       expectEqual(substring, s[enclosingRange])
     }
