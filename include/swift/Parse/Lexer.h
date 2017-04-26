@@ -519,9 +519,6 @@ private:
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker();
-
-  /// Check multiline string literal is indented correctly.
-  void validateMultilineIndents(const Token &Str);
 };
   
 } // end namespace swift
