@@ -2212,7 +2212,10 @@ enum class SILAccessKind : uint8_t {
   Modify,
 
   /// An access which takes initialized memory and leaves it uninitialized.
-  Deinit
+  Deinit,
+
+  // This enum is encoded.
+  Last = Deinit
 };
 StringRef getSILAccessKindName(SILAccessKind kind);
 
@@ -2235,7 +2238,10 @@ enum class SILAccessEnforcement : uint8_t {
   /// The access is not statically known to not conflict with anything
   /// but dynamic checking should be suppressed, leaving it undefined
   /// behavior.
-  Unsafe
+  Unsafe,
+
+  // This enum is encoded.
+  Last = Unsafe
 };
 StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
 
@@ -2253,6 +2259,10 @@ class BeginAccessInst
       : UnaryInstructionBase(loc, lvalue, lvalue->getType()),
         AccessKind(accessKind), Enforcement(enforcement) {
 
+    static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
+                  "reserve sufficient bits for serialized SIL");
+    static_assert(unsigned(SILAccessEnforcement::Last) < (1 << 2),
+                  "reserve sufficient bits for serialized SIL");
   }
 
 public:
