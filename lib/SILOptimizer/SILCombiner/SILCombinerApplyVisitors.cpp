@@ -794,10 +794,13 @@ getConformanceAndConcreteType(FullApplySite AI,
     if (Requirement->inheritsFrom(Protocol)) {
       // If Requirement != Protocol, then the abstract conformance cannot be used
       // as is and we need to create a proper conformance.
-      return std::make_tuple(Conformance.isAbstract()
-                                ? ProtocolConformanceRef(Protocol)
-                                : Conformance,
-                            ConcreteType, ConcreteTypeDef);
+      return std::make_tuple(
+          Conformance.isAbstract()
+              ? ProtocolConformanceRef(Protocol)
+              : ProtocolConformanceRef(
+                    Conformance.getConcrete()->getInheritedConformance(
+                        Protocol)),
+          ConcreteType, ConcreteTypeDef);
     }
   }
 
