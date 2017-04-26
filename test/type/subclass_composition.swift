@@ -496,3 +496,37 @@ protocol CompositionInAssociatedTypeInheritanceClause {
   associatedtype A : BaseIntAndP2
   // FIXME expected-error@-1 {{}}
 }
+
+// Members of metatypes and existential metatypes
+
+protocol ProtocolWithStaticMember {
+  static func staticProtocolMember()
+  func instanceProtocolMember()
+}
+
+class ClassWithStaticMember {
+  static func staticClassMember() {}
+  func instanceClassMember() {}
+}
+
+func staticMembers(
+    m1: (ProtocolWithStaticMember & ClassWithStaticMember).Protocol,
+    m2: (ProtocolWithStaticMember & ClassWithStaticMember).Type) {
+  _ = m1.staticProtocolMember() // expected-error {{static member 'staticProtocolMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
+  _ = m1.staticProtocolMember // expected-error {{static member 'staticProtocolMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
+
+  _ = m1.staticClassMember() // expected-error {{static member 'staticClassMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
+  _ = m1.staticClassMember // expected-error {{static member 'staticClassMember' cannot be used on protocol metatype '(ClassWithStaticMember & ProtocolWithStaticMember).Protocol'}}
+
+  _ = m1.instanceProtocolMember
+  _ = m1.instanceClassMember
+
+  _ = m2.staticProtocolMember()
+  _ = m2.staticProtocolMember
+
+  _ = m2.staticClassMember()
+  _ = m2.staticClassMember
+
+  _ = m2.instanceProtocolMember // expected-error {{instance member 'instanceProtocolMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
+  _ = m2.instanceClassMember // expected-error {{instance member 'instanceClassMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
+}
