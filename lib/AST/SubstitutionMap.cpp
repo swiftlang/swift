@@ -107,6 +107,13 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
           return conformance;
       }
 
+      // FIXME: Hack to deal with substitution maps created with incorrect
+      // conformances. This better go away soon or I'll be sad.
+      for (auto conformance : known->second) {
+        if (conformance.getRequirement()->inheritsFrom(proto))
+          return conformance.getInherited(proto);
+      }
+
       return None;
     };
 
