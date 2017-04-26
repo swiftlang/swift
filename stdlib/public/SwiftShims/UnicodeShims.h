@@ -323,14 +323,14 @@ struct __swift_stdlib_UTextFuncs {
     __swift_stdlib_UTextNativeLength *nativeLength;
     __swift_stdlib_UTextAccess *access;
     __swift_stdlib_UTextExtract *extract;
-    __swift_stdlib_UTextReplace *__null_unspecified replace;
-    __swift_stdlib_UTextCopy *__null_unspecified copy;
+    __swift_stdlib_UTextReplace *_Null_unspecified replace;
+    __swift_stdlib_UTextCopy *_Null_unspecified copy;
     __swift_stdlib_UTextMapOffsetToNative *mapOffsetToNative;
     __swift_stdlib_UTextMapNativeIndexToUTF16 *mapNativeIndexToUTF16;
-    __swift_stdlib_UTextClose  *__null_unspecified close;
-    __swift_stdlib_UTextClose  *__null_unspecified spare1;
-    __swift_stdlib_UTextClose  *__null_unspecified spare2;
-    __swift_stdlib_UTextClose  *__null_unspecified spare3;
+    __swift_stdlib_UTextClose  *_Null_unspecified close;
+    __swift_stdlib_UTextClose  *_Null_unspecified spare1;
+    __swift_stdlib_UTextClose  *_Null_unspecified spare2;
+    __swift_stdlib_UTextClose  *_Null_unspecified spare3;
 };
 typedef struct __swift_stdlib_UTextFuncs __swift_stdlib_UTextFuncs;
 enum {
@@ -383,8 +383,8 @@ void __swift_stdlib_ubrk_close(__swift_stdlib_UBreakIterator *bi);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UBreakIterator *__swift_stdlib_ubrk_open(
     __swift_stdlib_UBreakIteratorType type,
-    const char *__null_unspecified locale,
-    const __swift_stdlib_UChar *__null_unspecified text,
+    const char *_Null_unspecified locale,
+    const __swift_stdlib_UChar *_Null_unspecified text,
     __swift_int32_t textLength,
     __swift_stdlib_UErrorCode *status
     );
@@ -430,33 +430,33 @@ struct __swift_stdlib_UNormalizer2;
 typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;  
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *__null_unspecified
+const __swift_stdlib_UNormalizer2 *_Null_unspecified
 __swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *__null_unspecified
+const __swift_stdlib_UNormalizer2 *_Null_unspecified
 __swift_stdlib_unorm2_getNFDInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *__null_unspecified
+const __swift_stdlib_UNormalizer2 *_Null_unspecified
 __swift_stdlib_unorm2_getNFKCInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *__null_unspecified
+const __swift_stdlib_UNormalizer2 *_Null_unspecified
 __swift_stdlib_unorm2_getNFKDInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *__null_unspecified
+const __swift_stdlib_UNormalizer2 *_Null_unspecified
 __swift_stdlib_unorm2_getNFKCCasefoldInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *__null_unspecified
-__swift_stdlib_unorm2_getInstance(const char *__null_unspecified packageName,
+const __swift_stdlib_UNormalizer2 *_Null_unspecified
+__swift_stdlib_unorm2_getInstance(const char *_Null_unspecified packageName,
                    const char *name,
                    __swift_stdlib_UNormalization2Mode mode,
                    __swift_stdlib_UErrorCode *pErrorCode);

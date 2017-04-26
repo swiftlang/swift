@@ -357,9 +357,9 @@ swift::__swift_stdlib_unorm2_getNFCInstance(
     unorm2_getNFCInstance(ptr_cast<UErrorCode>(pErrorCode)));
 }
 
-const swift::__swift_stdlib_UNormalizer2 *__null_unspecified
+const swift::__swift_stdlib_UNormalizer2 *_Null_unspecified
 swift::__swift_stdlib_unorm2_getInstance(
-  const char *__null_unspecified packageName,
+  const char *_Null_unspecified packageName,
     const char *name,
     __swift_stdlib_UNormalization2Mode mode,
     __swift_stdlib_UErrorCode *pErrorCode) {
