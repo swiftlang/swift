@@ -183,6 +183,28 @@ func methodCalls(
   // CHECK-NEXT: }
 }
 
+protocol PropertyP {
+  var p: PropertyP & PropertyC { get set }
+}
+
+class PropertyC {
+  var c: PropertyP & PropertyC {
+    get {
+      return self as! PropertyP & PropertyC
+    }
+    set { }
+  }
+}
+
+// CHECK-LABEL: sil hidden @_T021subclass_existentials16propertyAccessesyAA9PropertyP_AA0E1CCXczF : $@convention(thin) (@inout PropertyC & PropertyP) -> () {
+func propertyAccesses(_ x: inout PropertyP & PropertyC) {
+  x.p.p = x
+  x.c.c = x
+
+  propertyAccesses(&x.p)
+  propertyAccesses(&x.c)
+}
+
 // CHECK-LABEL: sil hidden @_T021subclass_existentials19functionConversionsyAA1P_AA4BaseCySiGXcyc07returnsE4AndP_AaC_AFXcXpyc0feG5PTypeAA7DerivedCyc0fI0AJmyc0fI4TypeAA1R_AJXcyc0fiG1RAaM_AJXcXpyc0fiG5RTypetF : $@convention(thin) (@owned @callee_owned () -> @owned Base<Int> & P, @owned @callee_owned () -> @thick (Base<Int> & P).Type, @owned @callee_owned () -> @owned Derived, @owned @callee_owned () -> @thick Derived.Type, @owned @callee_owned () -> @owned Derived & R, @owned @callee_owned () -> @thick (Derived & R).Type) -> () {
 func functionConversions(
   returnsBaseAndP: @escaping () -> (Base<Int> & P),
