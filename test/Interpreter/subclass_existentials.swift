@@ -19,12 +19,20 @@ import StdlibUnittest
 protocol P {
   init(protocolInit: ())
 
-  
+  func protocolMethodReturnsSelf() -> Self
+  static func staticProtocolMethodReturnsSelf() -> Self
+
+  var protocolProperty: Int { get set }
+  static var staticProtocolProperty: Int { get set }
+
+  subscript<U : Hashable>(protocolKey protocolKey: U) -> Int { get set }
 }
 
 // TODO: Member access on R that Base<T> concretely conforms to
 
 protocol R {}
+
+var globalVar = 8
 
 class Base<T> : R {
   var x: T
@@ -50,6 +58,15 @@ class Base<T> : R {
   }
 
   var propertyToOverride: Int = -8
+
+  class var classPropertyToOverride: Int {
+    get {
+      return globalVar
+    }
+    set {
+      globalVar = newValue
+    }
+  }
 
   subscript<U : Hashable>(key: U) -> T {
     get {
@@ -80,6 +97,36 @@ class Derived : Base<Int>, P {
     }
     set {
       super.propertyToOverride = newValue / 2
+    }
+  }
+
+  class override var classPropertyToOverride: Int {
+    get {
+      return super.classPropertyToOverride * 2
+    }
+    set {
+      super.classPropertyToOverride = newValue / 2
+    }
+  }
+
+  func protocolMethodReturnsSelf() -> Self {
+    return self
+  }
+
+  static func staticProtocolMethodReturnsSelf() -> Self {
+    return self.init(x: -1000, y: -2000)
+  }
+
+  var protocolProperty: Int = 100
+
+  static var staticProtocolProperty: Int = 2000
+
+  subscript<U : Hashable>(protocolKey protocolKey: U) -> Int {
+    get {
+      return dict[protocolKey]!
+    }
+    set {
+      self.dict[protocolKey] = newValue
     }
   }
 }
@@ -115,97 +162,52 @@ SubclassExistentialsTestSuite.test("Metadata to string") {
 }
 */
 
-SubclassExistentialsTestSuite.test("Call class methods") {
-  let value: Base<Int> & P = Derived(x: 123, y: 321)
-
-  // Basic method calls
-  expectTrue(value === value.classMethodReturnsSelf())
-  expectTrue((123, 321) == value.finalClassMethod())
-  expectTrue((321, 123) == value.nonFinalClassMethod())
-
-  // Partial application
-  do {
-    let fn = value.classMethodReturnsSelf
-    expectTrue(value === fn())
-  }
-
-  do {
-    let fn = value.finalClassMethod
-    expectTrue((123, 321) == fn())
-  }
-
-  do {
-    let fn = value.nonFinalClassMethod
-    expectTrue((321, 123) == fn())
-  }
-
-  expectEqual(0, LifetimeTracked.instances)
-}
-
-SubclassExistentialsTestSuite.test("Access class properties") {
-  let value: Base<Int> & P = Derived(x: 123, y: 321)
-
-  // FIXME: crash in SILGen
-
-  /*expectEqual(-16, value.propertyToOverride)
-  value.propertyToOverride += 4
-  expectEqual(-20, value.propertyToOverride)
-  value.propertyToOverride += 4
-  expectEqual(-20, value.propertyToOverride)*/
-
-  expectEqual(0, LifetimeTracked.instances)
-}
-
-SubclassExistentialsTestSuite.test("Access class subscripts") {
+SubclassExistentialsTestSuite.test("Call instance methods") {
   do {
     let value: Base<Int> & P = Derived(x: 123, y: 321)
 
-    value[1] = 2
-    value["hi"] = 20
-
-    expectEqual(2, value[1])
-    expectEqual(20, value["hi"])
-
-    value[1] += 1
-    value["hi"] += 1
-
-    expectEqual(3, value[1])
-    expectEqual(21, value["hi"])
-  }
-
-  expectEqual(0, LifetimeTracked.instances)
-}
-
-SubclassExistentialsTestSuite.test("Metatypes") {
-  do {
-    let value: Base<Int> & P = Derived(x: 123, y: 321)
-    let metatype: (Base<Int> & P).Type = type(of: value)
-
-    let newValue = metatype.init(x: 256, y: 512)
-    expectTrue(newValue === newValue.classMethodReturnsSelf())
-    expectTrue((256, 512) == newValue.finalClassMethod())
-    expectTrue((512, 256) == newValue.nonFinalClassMethod())
-  }
-
-  expectEqual(0, LifetimeTracked.instances)
-}
-
-#if false
-SubclassExistentialsTestSuite.test("Call protocol methods") {
-  do {
-    let value: Base<Int> & P = Derived(x: 123, y: 321)
-
+    // Basic method calls
     expectTrue(value === value.classMethodReturnsSelf())
     expectTrue((123, 321) == value.finalClassMethod())
     expectTrue((321, 123) == value.nonFinalClassMethod())
 
-    // FIXME: crash in SILGen
+    // Partial application
+    do {
+      let fn = value.classMethodReturnsSelf
+      expectTrue(value === fn())
+    }
 
-    /*expectEqual(-16, value.propertyToOverride)
+    do {
+      let fn = value.finalClassMethod
+      expectTrue((123, 321) == fn())
+    }
+
+    do {
+      let fn = value.nonFinalClassMethod
+      expectTrue((321, 123) == fn())
+    }
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
+
+SubclassExistentialsTestSuite.test("Access instance properties") {
+  do {
+    let value: Base<Int> & P = Derived(x: 123, y: 321)
+
+    expectEqual(-16, value.propertyToOverride)
     value.propertyToOverride += 4
-    expectEqual(-20, value.propertyToOverride)
-    value.propertyToOverride += 4
-    expectEqual(-20, value.propertyToOverride)*/
+    expectEqual(-12, value.propertyToOverride)
+    value.propertyToOverride += 1
+    expectEqual(-10, value.propertyToOverride)
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
+
+SubclassExistentialsTestSuite.test("Access subscript") {
+  do {
+    let value: Base<Int> & P = Derived(x: 123, y: 321)
 
     value[1] = 2
     value["hi"] = 20
@@ -218,17 +220,92 @@ SubclassExistentialsTestSuite.test("Call protocol methods") {
 
     expectEqual(3, value[1])
     expectEqual(21, value["hi"])
+  }
 
+  expectEqual(0, LifetimeTracked.instances)
+}
+
+SubclassExistentialsTestSuite.test("Call static methods") {
+  do {
+    let value: Base<Int> & P = Derived(x: 123, y: 321)
     let metatype: (Base<Int> & P).Type = type(of: value)
 
     let newValue = metatype.init(x: 256, y: 512)
     expectTrue(newValue === newValue.classMethodReturnsSelf())
     expectTrue((256, 512) == newValue.finalClassMethod())
     expectTrue((512, 256) == newValue.nonFinalClassMethod())
+
+    do {
+      let fn = metatype.init(x:y:)
+      let newValue = fn(1, 2)
+      expectTrue((1, 2) == newValue.finalClassMethod())
+    }
   }
 
   expectEqual(0, LifetimeTracked.instances)
 }
-#endif
+
+SubclassExistentialsTestSuite.test("Access static properties") {
+  do {
+    let value: Base<Int> & P = Derived(x: 123, y: 321)
+
+    expectEqual(16, type(of: value).classPropertyToOverride)
+    type(of: value).classPropertyToOverride += 4
+    expectEqual(20, type(of: value).classPropertyToOverride)
+    type(of: value).classPropertyToOverride += 1
+    expectEqual(20, type(of: value).classPropertyToOverride)
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
+
+SubclassExistentialsTestSuite.test("Call protocol instance methods") {
+  do {
+    let value: Base<Int> & P = Derived(x: 123, y: 321)
+
+    // Basic method calls
+    expectTrue(value === value.protocolMethodReturnsSelf())
+
+    // Partial application
+    do {
+      let fn = value.protocolMethodReturnsSelf
+      expectTrue(value === fn())
+    }
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
+
+SubclassExistentialsTestSuite.test("Access protocol instance properties") {
+  do {
+    var value: Base<Int> & P = Derived(x: 123, y: 321)
+
+    expectEqual(100, value.protocolProperty)
+    value.protocolProperty += 1
+    expectEqual(101, value.protocolProperty)
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
+
+SubclassExistentialsTestSuite.test("Access protocol subscript") {
+  do {
+    var value: Base<Int> & P = Derived(x: 123, y: 321)
+
+    value[protocolKey: 1] = 2
+    value[protocolKey: "hi"] = 20
+
+    expectEqual(2, value[protocolKey: 1])
+    expectEqual(20, value[protocolKey: "hi"])
+
+    value[protocolKey: 1] += 1
+    value[protocolKey: "hi"] += 1
+
+    expectEqual(3, value[protocolKey: 1])
+    expectEqual(21, value[protocolKey: "hi"])
+  }
+
+  expectEqual(0, LifetimeTracked.instances)
+}
 
 runAllTests()
