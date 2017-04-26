@@ -663,28 +663,9 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       return false;
   }
 
-  if (auto Overridden = D->getOverriddenDecl()) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden))
+  for (auto Overriden: getOverriddenDecls(D, /*IncludeProtocolReqs=*/!isSystemModule)) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden))
       return false;
-  }
-
-  {
-    // Collect the protocol requirements this decl can provide default
-    // implementations to, and record them as overriding.
-    llvm::SmallVector<ValueDecl*, 2> Buffer;
-    for (auto Req : canDeclProvideDefaultImplementationFor(D, Buffer)) {
-      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Req))
-        return false;
-    }
-  }
-
-  // FIXME: This is quite expensive and not worth the cost for indexing purposes
-  // of system modules. Revisit if this becomes more efficient.
-  if (!isSystemModule) {
-    for (auto Conf : D->getSatisfiedProtocolRequirements()) {
-      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
-        return false;
-    }
   }
 
   if (auto Parent = getParentDecl()) {
@@ -1397,6 +1378,33 @@ void IndexSwiftASTWalker::getModuleHash(SourceFileOrModule Mod,
   llvm::hash_code code = hashModule(0, Mod);
   OS << llvm::APInt(64, code).toString(36, /*Signed=*/false);
 }
+
+std::vector<ValueDecl*> swift::
+getOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
+                   bool Transitive) {
+  std::vector<ValueDecl*> results;
+
+  if (auto Overridden = VD->getOverriddenDecl()) {
+    results.push_back(Overridden);
+    while (Transitive && (Overridden = Overridden->getOverriddenDecl()))
+      results.push_back(Overridden);
+  }
+
+  // Collect the protocol requirements this decl is a default impl for
+  llvm::SmallVector<ValueDecl*, 2> Buffer;
+  for (auto Req : canDeclProvideDefaultImplementationFor(VD, Buffer)) {
+    results.push_back(Req);
+  }
+
+  if (IncludeProtocolRequirements) {
+    for (auto Satisfied : VD->getSatisfiedProtocolRequirements()) {
+      results.push_back(Satisfied);
+    }
+  }
+
+  return results;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Indexing entry points
