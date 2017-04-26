@@ -1352,8 +1352,6 @@ namespace {
       }
 
       // Figure out the index and result types.
-      auto containerTy
-        = subscript->getDeclContext()->getDeclaredTypeOfContext();
       auto subscriptTy = simplifyType(selected->openedType);
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
@@ -1367,7 +1365,6 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
-        containerTy = baseTy;
       }
 
       // Coerce the index argument.
@@ -1412,7 +1409,7 @@ namespace {
       // Convert the base.
       auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
       auto openedBaseType = openedFullFnType->getInput();
-      containerTy = solution.simplifyType(openedBaseType);
+      auto containerTy = solution.simplifyType(openedBaseType);
       base = coerceObjectArgumentToType(
         base, containerTy, subscript, AccessSemantics::Ordinary,
         locator.withPathElement(ConstraintLocator::MemberRefBase));
