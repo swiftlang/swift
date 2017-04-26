@@ -32,7 +32,7 @@ SuppLookup1BytesPerEntry = 1
 SuppLookup2BytesPerEntry = 1
 SuppDataBytesPerEntry = 1
 
-TrieSize = 18961
+TrieSize = 20241
 
 BMPLookupBytesOffset = 0
 BMPDataBytesOffset = 256
@@ -61,6 +61,8 @@ enum _GraphemeClusterBreakPropertyValue : Int {
   case T = 10
   case LV = 11
   case LVT = 12
+  case ZWJ = 13
+  case E_Modifier = 14
 }
 
 // It is expensive to convert a raw enum value to an enum, so we use this type

@@ -283,14 +283,25 @@ extension String.CharacterView : BidirectionalCollection {
     }
     
     let startIndexUTF16 = start._position
-    let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
-    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
-    var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      unicodeScalars[start].value)
+    let usc0 = unicodeScalars[start].value
     unicodeScalars.formIndex(after: &start)
+
+    // Unicode flag emoji character pairs are a special case
+    // http://apps.timwhitlock.info/emoji/tables/iso3166
+    let flagEmojiA: UInt32 = 0x1F1E6, flagEmojiZ: UInt32 = 0x1F1FF
+    if usc0 >= flagEmojiA && usc0 <= flagEmojiZ && start != end {
+        let usc1 = unicodeScalars[start].value
+        if usc1 >= flagEmojiA && usc1 <= flagEmojiZ {
+            unicodeScalars.formIndex(after: &start)
+            return start._position - startIndexUTF16
+        }
+    }
     
+    let graphemeClusterBreakProperty =
+        _UnicodeGraphemeClusterBreakPropertyTrie()
+    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+    var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(usc0)
+
     while start != end {
       // FIXME(performance): consider removing this "fast path".  A branch
       // that is hard to predict could be worse for performance than a few
@@ -306,7 +317,7 @@ extension String.CharacterView : BidirectionalCollection {
       gcb0 = gcb1
       unicodeScalars.formIndex(after: &start)
     }
-    
+
     return start._position - startIndexUTF16
   }
 
@@ -349,18 +360,28 @@ extension String.CharacterView : BidirectionalCollection {
     }
     
     let endIndexUTF16 = end._position
-    let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
-    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
     var graphemeClusterStart = end
     
     unicodeScalars.formIndex(before: &graphemeClusterStart)
-    var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      unicodeScalars[graphemeClusterStart].value)
-    
+    let usc0 = unicodeScalars[graphemeClusterStart].value
+
+    // Unicode flag emoji character pairs are a special case
+    let flagEmojiA: UInt32 = 0x1F1E6, flagEmojiZ: UInt32 = 0x1F1FF
+    if usc0 >= flagEmojiA && usc0 <= flagEmojiZ && graphemeClusterStart != start {
+        unicodeScalars.formIndex(before: &graphemeClusterStart)
+        let usc1 = unicodeScalars[graphemeClusterStart].value
+        if usc1 >= flagEmojiA && usc1 <= flagEmojiZ {
+            return endIndexUTF16 - graphemeClusterStart._position
+        }
+    }
+
+    let graphemeClusterBreakProperty =
+        _UnicodeGraphemeClusterBreakPropertyTrie()
+    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
+
+    var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(usc0)
     var graphemeClusterStartUTF16 = graphemeClusterStart._position
-    
+
     while graphemeClusterStart != start {
       unicodeScalars.formIndex(before: &graphemeClusterStart)
       let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(

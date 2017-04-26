@@ -42,6 +42,8 @@ enum class GraphemeClusterBreakProperty : uint8_t {
   T,
   LV,
   LVT,
+  ZWJ,
+  E_Modifier
 };
 
 /// Extended grapheme cluster boundary rules, represented as a matrix.  Indexed
