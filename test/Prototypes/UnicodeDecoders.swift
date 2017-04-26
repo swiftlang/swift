@@ -295,7 +295,7 @@ public protocol UnicodeEncoding {
 
 
 public protocol _UTF8Decoder : UnicodeDecoder {
-  func _parseNonASCII() -> (valid: Bool, length: UInt8)
+  func _parseNonASCII() -> (isValid: Bool, length: UInt8)
   var buffer: Buffer { get set }
 }
 
@@ -333,7 +333,7 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     } while buffer._bitCount < 32
 
     // Find one unicode scalar.
-    let (valid, length) = _parseNonASCII()
+    let (isValid, length) = _parseNonASCII()
     _sanityCheck(1...4 ~= length)
     _sanityCheck(length <= buffer.count)
     
@@ -348,10 +348,8 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
       
     buffer._bitCount = buffer._bitCount &- bitsConsumed
 
-    guard _fastPath(valid) else {
-      return .invalid(length: Int(length))
-    }
-    return .valid(encodedScalar)
+    if _fastPath(isValid) { return .valid(encodedScalar) }
+    return .invalid(length: Int(length))
   }
 }
 
@@ -395,7 +393,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _parseNonASCII() -> (valid: Bool, length: UInt8) {
+  func _parseNonASCII() -> (isValid: Bool, length: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     if buffer._storage                & 0b0__1110_0000__1100_0000
                                      == 0b0__1100_0000__1000_0000 {
@@ -462,7 +460,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
   
   public // @testable
-  func _parseNonASCII() -> (valid: Bool, length: UInt8) {
+  func _parseNonASCII() -> (isValid: Bool, length: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     
     if buffer._storage & 0b0__1100_0000__1110_0000
