@@ -99,6 +99,7 @@ import ReversedCollections
 import SetTests
 import SevenBoom
 import Sim2DArray
+import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
 import StackPromo
@@ -166,6 +167,7 @@ addPrecommitTest("ArrayOfRef", run_ArrayOfRef)
 addPrecommitTest("ArrayPlusEqualArrayOfInt", run_ArrayPlusEqualArrayOfInt)
 addPrecommitTest("ArrayPlusEqualFiveElementCollection", run_ArrayPlusEqualFiveElementCollection)
 addPrecommitTest("ArrayPlusEqualSingleElementCollection", run_ArrayPlusEqualSingleElementCollection)
+addPrecommitTest("ArrayPlusEqualThreeElements", run_ArrayPlusEqualThreeElements)
 addPrecommitTest("ArraySubscript", run_ArraySubscript)
 addPrecommitTest("ArrayValueProp", run_ArrayValueProp)
 addPrecommitTest("ArrayValueProp2", run_ArrayValueProp2)
@@ -364,6 +366,7 @@ addPrecommitTest("SetUnion", run_SetUnion)
 addPrecommitTest("SetUnion_OfObjects", run_SetUnion_OfObjects)
 addPrecommitTest("SevenBoom", run_SevenBoom)
 addPrecommitTest("Sim2DArray", run_Sim2DArray)
+addPrecommitTest("SortLargeExistentials", run_SortLargeExistentials)
 addPrecommitTest("SortLettersInPlace", run_SortLettersInPlace)
 addPrecommitTest("SortSortedStrings", run_SortSortedStrings)
 addPrecommitTest("SortStrings", run_SortStrings)
