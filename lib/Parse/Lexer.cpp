@@ -1359,7 +1359,7 @@ static StringRef getMultilineTrailingIndent(const Token &Str,
       return StringRef(start+1, end-(start+1));
     default:
       if (Diags)
-        Diags->diagnose(getSourceLoc(start),
+        Diags->diagnose(Lexer::getSourceLoc(start),
                         diag::lex_illegal_multiline_string_end);
       return "";
     }
