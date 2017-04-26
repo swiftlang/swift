@@ -362,7 +362,7 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
 }
 
 StringTests.test("String.init(_:String)") {
-  let s: String = String("" as String) // should compile without ambiguities
+  let _: String = String("" as String) // should compile without ambiguities
 }
 
 var CStringTests = TestSuite("CStringTests")
