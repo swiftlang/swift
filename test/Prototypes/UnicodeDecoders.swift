@@ -21,7 +21,7 @@
     echo $x
     swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x 
     for i in {1..3}; do
-      time nice -19 /tmp/u3-$x
+      (time nice -19 /tmp/u3-$x) 2>&1 | grep user
     done
   done
 */
