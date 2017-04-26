@@ -848,7 +848,7 @@ namespace swift {
 
 /// A helper class for creating partially specialized function signatures.
 ///
-/// The following naming convention is used to describe the memebrs and
+/// The following naming convention is used to describe the members and
 /// functions:
 /// Caller - the function which invokes the callee.
 /// Callee - the callee to be specialized.

@@ -85,7 +85,7 @@ struct R<T> {
 // CHECK:         switch_enum %2 : $E<(R<T>) -> Builtin.Int32>
 // CHECK-NOT:     project_box
 // CHECK:       } // end sil function '_T023generic_promotable_box2Tf2nni_n'
-sil @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int, <τ_0_0> { var  E<(R<τ_0_0>) -> Int> } <T>) -> () {
+sil @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int, <τ_0_0> { var E<(R<τ_0_0>) -> Int> } <T>) -> () {
 entry(%0: $*R<T>, %1 : $*Int, %b : $<τ_0_0> { var E< (R<τ_0_0>)->Int > } <T>):
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
   %e = load %a : $*E<(R<T>)->Int>

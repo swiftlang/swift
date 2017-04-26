@@ -489,7 +489,7 @@ func checkSortedPredicateThrow(
     result = try c.sorted {
       (lhs, rhs) throws -> Bool in
       _blackHole(closureLifetimeTracker)
-      if  throwElement == extractValue(rhs).value {
+      if throwElement == extractValue(rhs).value {
         thrown = true
         throw SillyError.JazzHands
       }
@@ -1005,7 +1005,7 @@ func checkSortPredicateThrow(
     try c.sort {
       (lhs, rhs) throws -> Bool in
       _blackHole(closureLifetimeTracker)
-      if  throwElement == extractValue(rhs).value {
+      if throwElement == extractValue(rhs).value {
         throw SillyError.JazzHands
       }
       return lessImpl(extractValue(lhs).value, extractValue(rhs).value)

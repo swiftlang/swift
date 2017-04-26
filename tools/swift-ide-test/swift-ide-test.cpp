@@ -2553,7 +2553,7 @@ public:
   }
 
   bool walkToDeclPost(Decl *D) override {
-    if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (isa<ValueDecl>(D))
       NestedDCs.pop_back();
     return true;
   }

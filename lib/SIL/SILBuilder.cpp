@@ -345,7 +345,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
   return createObjCToThickMetatype(Loc, Op, Ty);
 }
 
-/// Add opned archetypes defined or used by the current instruction.
+/// Add opened archetypes defined or used by the current instruction.
 /// If there are no such opened archetypes in the current instruction
 /// and it is an instruction with just one operand, try to perform
 /// the same action for the instruction defining an operand, because

@@ -2687,10 +2687,6 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                               SourceLoc loc) {
   SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
   
-  // Don't noise up diagnostics with reports about global keypath subscripts.
-  SmallVector<std::pair<ValueDecl*, MemberLookupResult::UnviableReason>, 4>
-   unviableCandidatesToReport;
-  
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
     LookupResult correctionResults;

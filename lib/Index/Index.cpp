@@ -312,7 +312,7 @@ private:
     if (NameLoc.isCompound()) {
       size_t LabelIndex = 0;
       SourceLoc ArgLoc;
-      while((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
+      while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
@@ -329,7 +329,7 @@ private:
       return;
 
     auto LabelIt = LabelLocs.begin();
-    for(auto Prop : TypeContext->getStoredProperties()) {
+    for (auto Prop : TypeContext->getStoredProperties()) {
       if (Prop->getParentInitializer() && Prop->isLet())
         continue;
 

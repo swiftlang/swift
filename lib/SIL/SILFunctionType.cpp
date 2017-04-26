@@ -1937,13 +1937,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
                                                 CanType base) {
   // Unwrap optionals, but remember that we did.
   bool derivedWasOptional = false;
-  bool baseWasOptional = false;
   if (auto object = derived.getAnyOptionalObjectType()) {
     derivedWasOptional = true;
     derived = object;
   }
   if (auto object = base.getAnyOptionalObjectType()) {
-    baseWasOptional = true;
     base = object;
   }
 
