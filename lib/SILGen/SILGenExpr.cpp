@@ -3701,11 +3701,10 @@ namespace {
 /// emitOptimizedOptionalEvaluation - Look for cases where we can short-circuit
 /// evaluation of an OptionalEvaluationExpr by pattern matching the AST.
 ///
-static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
-                                            SILValue &LoadableResult,
-                                            Initialization *optInit,
-                                            RValueEmitter &RVE) {
-  auto &SGF = RVE.SGF;
+static bool emitOptimizedOptionalEvaluation(SILGenFunction &SGF,
+                                            OptionalEvaluationExpr *E,
+                                            ManagedValue &result,
+                                            SGFContext ctx) {
   // It is a common occurrence to get conversions back and forth from T! to T?.
   // Peephole these by looking for a subexpression that is a BindOptionalExpr.
   // If we see one, we can produce a single instruction, which doesn't require
@@ -3727,16 +3726,41 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
 
   // SIL defines away abstraction differences between T? and T!,
   // so we can just emit the sub-initialization normally.
-  if (optInit)
-    SGF.emitExprInto(BO->getSubExpr(), optInit);
-  else
-    LoadableResult = SGF.emitRValueAsSingleValue(BO->getSubExpr()).forward(SGF);
+  result = SGF.emitRValueAsSingleValue(BO->getSubExpr(), ctx);
   return true;
 }
 
 RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                                   SGFContext C) {
-  auto &optTL = SGF.getTypeLowering(E->getType());
+  SmallVector<ManagedValue, 1> results;
+  SGF.emitOptionalEvaluation(E, E->getType(), results, C,
+    [&](SmallVectorImpl<ManagedValue> &results, SGFContext primaryC) {
+      ManagedValue result;
+      if (!emitOptimizedOptionalEvaluation(SGF, E, result, primaryC)) {
+        result = SGF.emitRValueAsSingleValue(E->getSubExpr(), primaryC);
+      }
+
+      assert(results.empty());
+      results.push_back(result);
+    });
+
+  assert(results.size() == 1);
+  if (results[0].isInContext()) {
+    return RValue();
+  } else {
+    return RValue(SGF, E, results[0]);
+  }
+}
+
+void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
+                                       SmallVectorImpl<ManagedValue> &results,
+                                            SGFContext C,
+                        llvm::function_ref<void(SmallVectorImpl<ManagedValue> &,
+                                                SGFContext primaryC)>
+                                              generateNormalResults) {
+  assert(results.empty());
+
+  auto &optTL = getTypeLowering(optType);
 
   Initialization *optInit = C.getEmitInto();
   bool usingProvidedContext =
@@ -3745,7 +3769,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
   bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
-                      SGF.silConv.useLoweredAddresses());
+                      silConv.useLoweredAddresses());
 
   std::unique_ptr<TemporaryInitialization> optTemp;
   if (!isByAddress) {
@@ -3756,7 +3780,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
     // Allocate the temporary for the Optional<T> if we didn't get one from the
     // context.  This needs to happen outside of the cleanups scope we're about
     // to push.
-    optTemp = SGF.emitTemporary(E, optTL);
+    optTemp = emitTemporary(loc, optTL);
     optInit = optTemp.get();
   }
   assert(isByAddress == (optInit != nullptr));
@@ -3764,37 +3788,37 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // Acquire the address to emit into outside of the cleanups scope.
   SILValue optAddr;
   if (isByAddress)
-    optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
+    optAddr = optInit->getAddressForInPlaceInitialization(*this, loc);
 
   // Enter a cleanups scope.
-  FullExpr scope(SGF.Cleanups, E);
+  FullExpr scope(Cleanups, CleanupLocation::get(loc));
 
   // Inside of the cleanups scope, create a new initialization to
   // emit into optAddr.
   std::unique_ptr<TemporaryInitialization> normalInit;
   if (isByAddress) {
-    normalInit = SGF.useBufferAsTemporary(optAddr, optTL);
+    normalInit = useBufferAsTemporary(optAddr, optTL);
   }
 
   // Install a new optional-failure destination just outside of the
   // cleanups scope.
-  SILBasicBlock *failureBB = SGF.createBasicBlock();
-  RestoreOptionalFailureDest restoreFailureDest(SGF,
-                    JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
+  SILBasicBlock *failureBB = createBasicBlock();
+  RestoreOptionalFailureDest
+    restoreFailureDest(*this, JumpDest(failureBB, Cleanups.getCleanupsDepth(),
+                                       CleanupLocation::get(loc)));
 
-  SILValue normalArgument = nullptr;
-  if (emitOptimizedOptionalEvaluation(E, normalArgument,
-                                      normalInit.get(), *this)) {
-    // Already emitted code for this.
-  } else if (normalInit) {
-    // Emit the operand into the temporary.
-    SGF.emitExprInto(E->getSubExpr(), normalInit.get());
-  } else {
-    normalArgument = SGF.emitRValueAsSingleValue(E->getSubExpr()).forward(SGF);
+  generateNormalResults(results, SGFContext(normalInit.get()));
+  assert(results.size() >= 1 && "didn't include a normal result");
+  assert(results[0].isInContext() ||
+         results[0].getType().getObjectType()
+           == optTL.getLoweredType().getObjectType());
+
+  // If we're emitting into the context, make sure the normal value is there.
+  if (normalInit && !results[0].isInContext()) {
+    normalInit->copyOrInitValueInto(*this, loc, results[0], /*init*/ true);
+    normalInit->finishInitialization(*this);
+    results[0] = ManagedValue::forInContext();
   }
-
-  assert(isByAddress == (normalArgument == nullptr) &&
-         "shouldn't have emitted as scalar in this case");
 
   // We fell out of the normal result, which generated a T? as either
   // a scalar in normalArgument or directly into normalInit.
@@ -3802,8 +3826,31 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // If we're using by-address initialization, we must've emitted into
   // normalInit.  Forward its cleanup before popping the scope.
   if (isByAddress) {
-    normalInit->getManagedAddress().forward(SGF);
+    normalInit->getManagedAddress().forward(*this);
     normalInit.reset(); // Make sure we don't use this anymore.
+  } else {
+    assert(!results[0].isInContext());
+    results[0].forward(*this);
+  }
+
+  // For all the secondary results, forward their cleanups and make sure
+  // they're of optional type so that we can inject nil into them in
+  // the failure path.
+  // (Should this be controllable by the client?)
+  for (auto &result : MutableArrayRef<ManagedValue>(results).slice(1)) {
+    assert(!result.isInContext() && "secondary result was in context");
+    auto resultTy = result.getType();
+    assert(resultTy.isObject() && "secondary result wasn't an object");
+
+    // Forward the cleanup.
+    SILValue value = result.forward(*this);
+
+    // If it's not already an optional type, make it optional.
+    if (!resultTy.getAnyOptionalObjectType()) {
+      resultTy = SILType::getOptionalType(resultTy);
+      value = B.createOptionalSome(loc, value, resultTy);
+      result = ManagedValue::forUnmanaged(value);
+    }
   }
 
   // This concludes the conditional scope.
@@ -3817,67 +3864,95 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
     // Remove the dead failureBB.
     failureBB->eraseFromParent();
 
-    // Just re-manage normalArgument if we're not using address-based IRGen.
-    if (!isByAddress)
-      return RValue(SGF, E,
-                    SGF.emitManagedRValueWithCleanup(normalArgument, optTL));
+    // Just re-manage all the secondary results.
+    for (auto &result : MutableArrayRef<ManagedValue>(results).slice(1)) {
+      result = emitManagedRValueWithCleanup(result.getValue());
+    }
+
+    // Just re-manage the main result if we're not using address-based IRGen.
+    if (!isByAddress) {
+      results[0] = emitManagedRValueWithCleanup(results[0].getValue(), optTL);
+      return;
+    }
 
     // Otherwise, we must have emitted into normalInit, which means that,
     // now that we're out of the cleanups scope, we need to finish optInit.
-    optInit->finishInitialization(SGF);
+    assert(results[0].isInContext());
+    optInit->finishInitialization(*this);
 
     // If optInit came from the SGFContext, then we've successfully emitted
     // into that.
-    if (usingProvidedContext)
-      return RValue();
+    if (usingProvidedContext) return;
 
     // Otherwise, we must have emitted into optTemp.
-    return RValue(SGF, E, optTemp->getManagedAddress());
+    assert(optTemp);
+    results[0] = optTemp->getManagedAddress();
+    return;
   }
   
   // Okay, we do have uses of the failure block, so we'll need to merge
   // control paths.
 
-  SILBasicBlock *contBB = SGF.createBasicBlock();
+  SILBasicBlock *contBB = createBasicBlock();
 
   // Branch to the continuation block.
-  if (isByAddress)
-    SGF.B.createBranch(E, contBB);
-  else
-    SGF.B.createBranch(E, contBB, normalArgument);
+  SmallVector<SILValue, 4> bbArgs;
+  if (!isByAddress)
+    bbArgs.push_back(results[0].getValue());
+  for (const auto &result : llvm::makeArrayRef(results).slice(1))
+    bbArgs.push_back(result.getValue());
+
+  // Branch to the continuation block.
+  B.createBranch(loc, contBB, bbArgs);
 
   // In the failure block, inject nil into the result.
-  SGF.B.emitBlock(failureBB);
+  B.emitBlock(failureBB);
 
+  // Note that none of the code here introduces any cleanups.
+  // If it did, we'd need to push a scope.
+  bbArgs.clear();
   if (isByAddress) {
-    SGF.emitInjectOptionalNothingInto(E, optAddr, optTL);
-    SGF.B.createBranch(E, contBB);
+    emitInjectOptionalNothingInto(loc, optAddr, optTL);
   } else {
-    auto branchArg = SGF.getOptionalNoneValue(E, optTL);
-    SGF.B.createBranch(E, contBB, branchArg);
+    bbArgs.push_back(getOptionalNoneValue(loc, optTL));
   }
+  for (const auto &result : llvm::makeArrayRef(results).slice(1)) {
+    auto resultTy = result.getType();
+    bbArgs.push_back(getOptionalNoneValue(loc, getTypeLowering(resultTy)));
+  }
+  B.createBranch(loc, contBB, bbArgs);
 
   // Emit the continuation block.
-  SGF.B.emitBlock(contBB);
+  B.emitBlock(contBB);
 
-  // If this was done in SSA registers, then the value is provided as an
-  // argument to the block; manage it and return.
-  if (!isByAddress) {
+  // Create a PHI for the optional result if desired.
+  if (isByAddress) {
+    assert(results[0].isInContext());
+  } else {
     auto arg = contBB->createPHIArgument(optTL.getLoweredType(),
                                          ValueOwnershipKind::Owned);
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
+    results[0] = emitManagedRValueWithCleanup(arg, optTL);
   }
 
-  // Otherwise, we need to manage the value in optInit.
-  optInit->finishInitialization(SGF);
-  
-  // If we emitted into the provided context, we're done.
-  if (usingProvidedContext) {
-    return RValue();
+  // Create PHIs for all the secondary results and manage them.
+  for (auto &result : MutableArrayRef<ManagedValue>(results).slice(1)) {
+    auto arg = contBB->createPHIArgument(result.getType(),
+                                         ValueOwnershipKind::Owned);
+    result = emitManagedRValueWithCleanup(arg);
   }
-  
+
+  // We may need to manage the value in optInit.
+  if (!isByAddress) return;
+
+  assert(results[0].isInContext());
+  optInit->finishInitialization(*this);
+
+  // If we didn't emit into the provided context, the primary result
+  // is really a temporary.
+  if (usingProvidedContext) return;
+
   assert(optTemp);
-  return RValue(SGF, E, optTemp->getManagedAddress());
+  results[0] = optTemp->getManagedAddress();
 }
 
 RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
@@ -4213,10 +4288,9 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
            .getAsSingleValue(*this, loc);
 }
 
-static ManagedValue emitArrayToPointer(SILGenFunction &SGF,
-                                       SILLocation loc,
-                                       ManagedValue array,
-                                SILGenFunction::ArrayAccessInfo accessInfo) {
+static std::pair<ManagedValue, ManagedValue>
+emitArrayToPointer(SILGenFunction &SGF, SILLocation loc, ManagedValue array,
+                   SILGenFunction::ArrayAccessInfo accessInfo) {
   auto &ctx = SGF.getASTContext();
 
   FuncDecl *converter;
@@ -4251,8 +4325,13 @@ static ManagedValue emitArrayToPointer(SILGenFunction &SGF,
     .getAll(resultScalars);
   assert(resultScalars.size() == 2);
 
+  // Mark the dependence of the pointer on the owner value.
+  auto owner = resultScalars[0];
+  auto pointer = resultScalars[1].forward(SGF);
+  pointer = SGF.B.createMarkDependence(loc, pointer, owner.getValue());
+
   // The owner's already in its own cleanup.  Return the pointer.
-  return resultScalars[1];
+  return {ManagedValue::forTrivialObjectRValue(pointer), owner};
 }
 
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
@@ -4273,7 +4352,7 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
     array = SGF.emitRValueAsSingleValue(subExpr);
   }
 
-  auto pointer = ::emitArrayToPointer(SGF, E, array, accessInfo);
+  auto pointer = ::emitArrayToPointer(SGF, E, array, accessInfo).first;
   return RValue(SGF, E, pointer);
 }
 
@@ -4283,34 +4362,54 @@ SILGenFunction::getArrayAccessInfo(Type pointerType, Type arrayType) {
   return { pointerType, arrayType, pointerAccessInfo.AccessKind };
 }
 
-ManagedValue SILGenFunction::emitArrayToPointer(SILLocation loc, LValue &&lv,
-                                                ArrayAccessInfo accessInfo) {
+std::pair<ManagedValue, ManagedValue>
+SILGenFunction::emitArrayToPointer(SILLocation loc, LValue &&lv,
+                                   ArrayAccessInfo accessInfo) {
   auto array =
     emitAddressOfLValue(loc, std::move(lv), accessInfo.AccessKind);
   return ::emitArrayToPointer(*this, loc, array, accessInfo);
 }
 
+std::pair<ManagedValue, ManagedValue>
+SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
+                                   ArrayAccessInfo accessInfo) {
+  return ::emitArrayToPointer(*this, loc, array, accessInfo);
+}
+
 RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
                                                SGFContext C) {
-  auto &Ctx = SGF.getASTContext();
-  FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument(nullptr);
-
   // Get the original value.
   ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  // Perform the conversion.
+  auto results = SGF.emitStringToPointer(E, orig, E->getType());
+
+  // Implicitly leave the owner managed and return the pointer.
+  return RValue(SGF, E, results.first);
+}
+
+std::pair<ManagedValue, ManagedValue>
+SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
+                                    Type pointerType) {
+  auto &Ctx = getASTContext();
+  FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument(nullptr);
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto subMap = E->getType()->getCanonicalType()
-    ->getContextSubstitutionMap(SGF.SGM.M.getSwiftModule(),
-                                SGF.getPointerProtocol());
+  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                       getPointerProtocol());
   SmallVector<ManagedValue, 2> results;
-  SGF.emitApplyOfLibraryIntrinsic(E, converter, subMap, orig, C).getAll(results);
+  emitApplyOfLibraryIntrinsic(loc, converter, subMap, stringValue, SGFContext())
+    .getAll(results);
   assert(results.size() == 2);
-  
-  // Implicitly leave the owner managed and return the pointer.
-  // FIXME: should this be using mark_dependence?
-  auto pointer = results[1];
-  return RValue(SGF, E, pointer);
+
+  // Mark the dependence of the pointer on the owner value.
+  auto owner = results[0];
+  auto pointer = results[1].forward(*this);
+  pointer = B.createMarkDependence(loc, pointer, owner.getValue());
+
+  return {ManagedValue::forTrivialObjectRValue(pointer), owner};
 }
+
 RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
                                                 SGFContext C) {
   auto &Ctx = SGF.getASTContext();

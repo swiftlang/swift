@@ -1361,19 +1361,53 @@ public:
     }
 
     void updateExprToPointerWhitelist(Expr *Base, Expr *Arg) {
-      auto handleSubExpr = [&](Expr *SubExpr) {
-        // if we have an inject into optional, strip it off.
-        if (auto *InjectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(SubExpr)) {
-          SubExpr = InjectIntoOpt->getSubExpr();
+      auto handleSubExpr = [&](Expr *origSubExpr) {
+        auto subExpr = origSubExpr;
+        unsigned optionalDepth = 0;
+
+        auto checkIsBindOptional = [&](Expr *expr) {
+          for (unsigned depth = optionalDepth; depth; --depth) {
+            if (auto bind = dyn_cast<BindOptionalExpr>(expr)) {
+              expr = bind->getSubExpr();
+            } else {
+              Out << "malformed optional pointer conversion\n";
+              origSubExpr->print(Out);
+              Out << '\n';
+              abort();
+            }
+          }
+        };
+
+        // These outer entities will be interleaved in multi-level optionals.
+        while (true) {
+          // Look through optional evaluations.
+          if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+            subExpr = optionalEval->getSubExpr();
+            optionalDepth++;
+            continue;
+          }
+
+          // Look through injections into Optional<Pointer>.
+          if (auto *injectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+            subExpr = injectIntoOpt->getSubExpr();
+            continue;
+          }
+
+          break;
         }
 
-        if (auto *InOutToPtr = dyn_cast<InOutToPointerExpr>(SubExpr)) {
-          WhitelistedInOutToPointerExpr.insert(InOutToPtr);
+        // Whitelist inout-to-pointer conversions.
+        if (auto *inOutToPtr = dyn_cast<InOutToPointerExpr>(subExpr)) {
+          WhitelistedInOutToPointerExpr.insert(inOutToPtr);
+          checkIsBindOptional(inOutToPtr->getSubExpr());
           return;
         }
 
-        if (auto *ArrayToPtr = dyn_cast<ArrayToPointerExpr>(SubExpr)) {
-          WhitelistedArrayToPointerExpr.insert(ArrayToPtr);
+        // Whitelist array-to-pointer conversions.
+        if (auto *arrayToPtr = dyn_cast<ArrayToPointerExpr>(subExpr)) {
+          WhitelistedArrayToPointerExpr.insert(arrayToPtr);
+          checkIsBindOptional(arrayToPtr->getSubExpr());
+          return;
         }
       };
 
