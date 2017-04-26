@@ -2110,9 +2110,9 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
         return nominal == C.getStringDecl() || nominal == C.getIntDecl();
       }
 
-      // Empty enums are allowed to conform as well.
-      return enumDecl->getAllElements().empty() ||
-             enumDecl->hasOnlyCasesWithoutAssociatedValues();
+      // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
+      // empty enumas are allowed to conform as well.
+      return enumDecl->hasOnlyCasesWithoutAssociatedValues();
     }
 
     default:
