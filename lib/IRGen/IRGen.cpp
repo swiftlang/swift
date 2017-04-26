@@ -154,7 +154,8 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   PassManagerBuilderWrapper PMBuilder(Opts);
 
   if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
-    PMBuilder.OptLevel = 3;
+    PMBuilder.OptLevel = 2; // -Os
+    PMBuilder.SizeLevel = 1; // -Os
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
     PMBuilder.SLPVectorize = true;
     PMBuilder.LoopVectorize = true;
@@ -480,7 +481,7 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
     return nullptr;
   }
 
-  CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Aggressive
+  CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Default // -Os
                                              : CodeGenOpt::None;
 
   // Set up TargetOptions and create the target features string.
