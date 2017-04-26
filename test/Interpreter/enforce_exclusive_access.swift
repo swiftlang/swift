@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -enforce-exclusivity=checked
+// RUN: %target-build-swift %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
