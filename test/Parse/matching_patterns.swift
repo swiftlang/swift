@@ -28,17 +28,20 @@ case square(9):
 // 'var' and 'let' patterns.
 case var a:
   a = 1
-case let a:
+case let a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   a = 1         // expected-error {{cannot assign}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
+                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   print(a, terminator: "")
 case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
+                  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   b += 1
 
 // 'Any' pattern.
-case _:
+case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 
 // patterns are resolved in expression-only positions are errors.
@@ -49,7 +52,7 @@ case 1 + (_): // expected-error{{'_' can only appear in a pattern or on the left
 switch (x,x) {
 case (var a, var a): // expected-error {{definition conflicts with previous value}} expected-note {{previous definition of 'a' is here}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   fallthrough
-case _:
+case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 }
 
@@ -153,10 +156,10 @@ struct ContainsEnum {
     // expected-note@-1 {{missing case: '.Mere(_)'}}
     // expected-note@-2 {{missing case: '.Twain(_, _)'}}
     case ContainsEnum.Possible<Int>.Naught,
-         ContainsEnum.Possible.Naught,
-         Possible<Int>.Naught,
-         Possible.Naught,
-         .Naught:
+         ContainsEnum.Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+         Possible<Int>.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+         Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+         .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
       ()
     }
   }
@@ -167,7 +170,7 @@ func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   // expected-note@-1 {{missing case: '.Mere(_)'}}
   // expected-note@-2 {{missing case: '.Twain(_, _)'}}
   case ContainsEnum.Possible<Int>.Naught,
-       .Naught:
+       .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     ()
   }
 }
@@ -176,15 +179,15 @@ var m : ImportedEnum = .Simple
 
 switch m {
 case imported_enums.ImportedEnum.Simple,
-     ImportedEnum.Simple,
-     .Simple:
+     ImportedEnum.Simple, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     .Simple: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 case imported_enums.ImportedEnum.Compound,
-     imported_enums.ImportedEnum.Compound(_),
-     ImportedEnum.Compound,
-     ImportedEnum.Compound(_),
-     .Compound,
-     .Compound(_):
+     imported_enums.ImportedEnum.Compound(_), // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     ImportedEnum.Compound, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     ImportedEnum.Compound(_), // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     .Compound, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     .Compound(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 }
 
@@ -206,22 +209,22 @@ case .Payload(name: 0):
 case let .Payload(x):
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload(name: x):
+case let .Payload(name: x): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload((name: x)):
+case let .Payload((name: x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)):
+case .Payload(let (name: x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)):
+case .Payload(let (name: x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let x):
+case .Payload(let x): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload((let x)):
+case .Payload((let x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
 }
@@ -302,7 +305,7 @@ switch op2 {
 case nil: break
 case _?: break
 case (1?)?: break
-case (_?)?: break
+case (_?)?: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
 }
 
 
