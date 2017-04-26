@@ -295,7 +295,7 @@ public protocol UnicodeEncoding {
 
 
 public protocol _UTF8Decoder : UnicodeDecoder {
-  func _parseNonASCII() -> (isValid: Bool, length: UInt8)
+  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8)
   var buffer: Buffer { get set }
 }
 
@@ -333,23 +333,22 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     } while buffer._bitCount < 32
 
     // Find one unicode scalar.
-    let (isValid, length) = _parseNonASCII()
-    _sanityCheck(1...4 ~= length)
-    _sanityCheck(length <= buffer.count)
+    let (isValid, scalarBitCount) = _parseNonASCII()
+    _sanityCheck(scalarBitCount % 8 == 0 && 1...4 ~= scalarBitCount / 8)
+    _sanityCheck(scalarBitCount <= buffer._bitCount)
     
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
-    let bitsConsumed = length << 3
     var encodedScalar = buffer
-    encodedScalar._bitCount = bitsConsumed
+    encodedScalar._bitCount = scalarBitCount
     
     buffer._storage = UInt32(
       // widen to 64 bits so that we can empty the buffer in the 4-byte case
-      extendingOrTruncating: UInt64(buffer._storage) &>> bitsConsumed)
+      extendingOrTruncating: UInt64(buffer._storage) &>> scalarBitCount)
       
-    buffer._bitCount = buffer._bitCount &- bitsConsumed
+    buffer._bitCount = buffer._bitCount &- scalarBitCount
 
     if _fastPath(isValid) { return .valid(encodedScalar) }
-    return .invalid(length: Int(length))
+    return .invalid(length: Int(scalarBitCount &>> 3))
   }
 }
 
@@ -393,13 +392,13 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _parseNonASCII() -> (isValid: Bool, length: UInt8) {
+  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     if buffer._storage                & 0b0__1110_0000__1100_0000
                                      == 0b0__1100_0000__1000_0000 {
       // 2-byte sequence.  Top 4 bits of decoded result must be nonzero
       let top4Bits =  buffer._storage & 0b0__0001_1110__0000_0000
-      if _fastPath(top4Bits != 0) { return (true, 2) }
+      if _fastPath(top4Bits != 0) { return (true, 2*8) }
     }
     else if buffer._storage     & 0b0__1111_0000__1100_0000__1100_0000
                                == 0b0__1110_0000__1000_0000__1000_0000 {
@@ -408,7 +407,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
       let top5Bits = buffer._storage & 0b0__1111__0010_0000__0000_0000
       if _fastPath(
         top5Bits != 0 &&   top5Bits != 0b0__1101__0010_0000__0000_0000) {
-        return (true, 3)
+        return (true, 3*8)
       }
     }
     else if buffer._storage  & 0b0__1111_1000__1100_0000__1100_0000__1100_0000
@@ -419,9 +418,9 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
       if _fastPath(
         top5bits != 0
         && top5bits <=              0b0__0100__0000_0000__0000_0000__0000_0000
-      ) { return (true, 4) }
+      ) { return (true, 4*8) }
     }
-    return (false, _invalidLength())
+    return (false, _invalidLength() &* 8)
   }
 
   /// Returns the length of the invalid sequence that ends with the LSB of
@@ -460,14 +459,14 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
   
   public // @testable
-  func _parseNonASCII() -> (isValid: Bool, length: UInt8) {
+  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     
     if buffer._storage & 0b0__1100_0000__1110_0000
                       == 0b0__1000_0000__1100_0000 {
       // 2-byte sequence. At least one of the top 4 bits of the decoded result
       // must be nonzero.
-      if _fastPath(buffer._storage & 0b0_0001_1110 != 0) { return (true, 2) }
+      if _fastPath(buffer._storage & 0b0_0001_1110 != 0) { return (true, 2*8) }
     }
     else if buffer._storage         & 0b0__1100_0000__1100_0000__1111_0000
                                    == 0b0__1000_0000__1000_0000__1110_0000 {
@@ -475,7 +474,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
       // and not a surrogate
       let top5Bits =          buffer._storage & 0b0___0010_0000__0000_1111
       if _fastPath(top5Bits != 0 && top5Bits != 0b0___0010_0000__0000_1101) {
-        return (true, 3)
+        return (true, 3*8)
       }
     }
     else if buffer._storage & 0b0__1100_0000__1100_0000__1100_0000__1111_1000
@@ -486,9 +485,9 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
       if _fastPath(
         top5bits != 0
         && top5bits.byteSwapped                  <= 0b0__0000_0100__0000_0000
-      ) { return (true, 4) }
+      ) { return (true, 4*8) }
     }
-    return (false, _invalidLength())
+    return (false, _invalidLength() &* 8)
   }
 
   /// Returns the length of the invalid sequence that starts with the LSB of
