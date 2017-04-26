@@ -437,6 +437,18 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
 def dump_usr: Flag<["-"], "dump-usr">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Dump USR for each declaration reference">;
+
+// FIXME: Remove these once Xcode stops appending these flags.
+// rdar://problem/31844718
+
+def migrator_update_sdk: Flag<["-"], "migrator-update-sdk">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
+
+def migrator_update_swift: Flag<["-"], "migrator-update-swift">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
