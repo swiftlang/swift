@@ -34,8 +34,6 @@ class TermInst;
 /// predecessors. This is done by using an ilist that is embedded into
 /// SILSuccessors.
 class SILSuccessor {
-  friend class SILSuccessorIterator;
-
   /// The terminator instruction that contains this SILSuccessor.
   TermInst *ContainingInst = nullptr;
   
@@ -78,41 +76,40 @@ public:
   // Do not copy or move these.
   SILSuccessor(const SILSuccessor &) = delete;
   SILSuccessor(SILSuccessor &&) = delete;
+
+  /// This is an iterator for walking the predecessor list of a SILBasicBlock.
+  class pred_iterator {
+    SILSuccessor *Cur;
+
+  public:
+    using difference_type = std::ptrdiff_t;
+    using value_type = SILBasicBlock *;
+    using pointer = SILBasicBlock **;
+    using reference = SILBasicBlock *&;
+    using iterator_category = std::forward_iterator_tag;
+
+    pred_iterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
+
+    bool operator==(pred_iterator I2) const { return Cur == I2.Cur; }
+    bool operator!=(pred_iterator I2) const { return Cur != I2.Cur; }
+
+    pred_iterator &operator++() {
+      assert(Cur && "Trying to advance past end");
+      Cur = Cur->Next;
+      return *this;
+    }
+
+    pred_iterator operator++(int) {
+      pred_iterator copy = *this;
+      ++*this;
+      return copy;
+    }
+
+    SILSuccessor *getSuccessorRef() const { return Cur; }
+    SILBasicBlock *operator*();
+    const SILBasicBlock *operator*() const;
+  };
 };
-  
-/// SILSuccessorIterator - This is an iterator for walking the successor list of
-/// a SILBasicBlock.
-class SILSuccessorIterator {
-  SILSuccessor *Cur;
-public:
-  using difference_type = std::ptrdiff_t;
-  using value_type = SILBasicBlock *;
-  using pointer = SILBasicBlock **;
-  using reference = SILBasicBlock *&;
-  using iterator_category = std::forward_iterator_tag;
-  
-  SILSuccessorIterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
-  
-  bool operator==(SILSuccessorIterator I2) const { return Cur == I2.Cur; }
-  bool operator!=(SILSuccessorIterator I2) const { return Cur != I2.Cur; }
-
-  SILSuccessorIterator &operator++() {
-    assert(Cur && "Trying to advance past end");
-    Cur = Cur->Next;
-    return *this;
-  }
-
-  SILSuccessorIterator operator++(int) {
-    SILSuccessorIterator copy = *this;
-    ++*this;
-    return copy;
-  }
-
-  SILSuccessor *getSuccessorRef() const { return Cur; }
-  SILBasicBlock *operator*();
-  const SILBasicBlock *operator*() const;
-};
-  
 
 } // end swift namespace
 

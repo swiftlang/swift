@@ -286,7 +286,7 @@ public:
     return makeTransformRange(getSuccessors(), F);
   }
 
-  using pred_iterator = SILSuccessorIterator;
+  using pred_iterator = SILSuccessor::pred_iterator;
 
   bool pred_empty() const { return PredList == nullptr; }
   pred_iterator pred_begin() const { return pred_iterator(PredList); }
