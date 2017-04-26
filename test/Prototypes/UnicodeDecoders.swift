@@ -34,6 +34,185 @@ extension UnicodeScalar {
   init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: UnicodeScalar.self) }
 }
 //===----------------------------------------------------------------------===//
+@_fixed_layout
+public struct _UIntBuffer<
+  Storage: UnsignedInteger & FixedWidthInteger, 
+  Element: UnsignedInteger & FixedWidthInteger
+> {
+  @_versioned
+  var _storage: Storage
+  @_versioned
+  var _bitCount: UInt8
+}
+
+extension _UIntBuffer : Sequence {
+  @_fixed_layout
+  public struct Iterator : IteratorProtocol {
+    @inline(__always)
+    public init(_ x: _UIntBuffer) { _impl = x }
+    
+    @inline(__always)
+    public mutating func next() -> Element? {
+      if _impl._bitCount == 0 { return nil }
+      defer {
+        _impl._storage = _impl._storage &>> Element.bitWidth
+        _impl._bitCount = _impl._bitCount &- _impl._elementWidth
+      }
+      return Element(extendingOrTruncating: _impl._storage)
+    }
+    @_versioned
+    var _impl: _UIntBuffer
+  }
+  
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
+extension _UIntBuffer : Collection {
+  public typealias _Element = Element
+  
+  public struct Index : Comparable {
+    @_versioned
+    var bitOffset: UInt8
+    
+    @_versioned
+    init(bitOffset: UInt8) { self.bitOffset = bitOffset }
+    
+    public static func == (lhs: Index, rhs: Index) -> Bool {
+      return lhs.bitOffset == rhs.bitOffset
+    }
+    public static func < (lhs: Index, rhs: Index) -> Bool {
+      return lhs.bitOffset < rhs.bitOffset
+    }
+  }
+
+  public var startIndex : Index {
+    @inline(__always)
+    get { return Index(bitOffset: 0) }
+  }
+  
+  public var endIndex : Index {
+    @inline(__always)
+    get { return Index(bitOffset: _bitCount) }
+  }
+  
+  @inline(__always)
+  public func index(after i: Index) -> Index {
+    return Index(bitOffset: i.bitOffset &+ _elementWidth)
+  }
+
+  @_versioned
+  internal var _elementWidth : UInt8 {
+    return UInt8(extendingOrTruncating: Element.bitWidth)
+  }
+  
+  public subscript(i: Index) -> Element {
+    @inline(__always)
+    get {
+      return Element(extendingOrTruncating: _storage &>> i.bitOffset)
+    }
+  }
+}
+
+extension _UIntBuffer : BidirectionalCollection {
+  @inline(__always)
+  public func index(before i: Index) -> Index {
+    return Index(bitOffset: i.bitOffset &- _elementWidth)
+  }
+}
+
+extension _UIntBuffer : RandomAccessCollection {
+  public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
+  public typealias IndexDistance = Int
+  
+  @inline(__always)
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    let x = IndexDistance(i.bitOffset) &+ n &* Element.bitWidth
+    return Index(bitOffset: UInt8(extendingOrTruncating: x))
+  }
+
+  @inline(__always)
+  public func distance(from i: Index, to j: Index) -> IndexDistance {
+    return (Int(j.bitOffset) &- Int(i.bitOffset)) / Element.bitWidth
+  }
+}
+
+extension FixedWidthInteger {
+  @inline(__always)
+  @_versioned
+  func _fullShiftLeft<N: FixedWidthInteger>(_ n: N) -> Self {
+    return (self &<< ((n &+ 1) &>> 1)) &<< (n &>> 1)
+  }
+  @inline(__always)
+  @_versioned
+  func _fullShiftRight<N: FixedWidthInteger>(_ n: N) -> Self {
+    return (self &>> ((n &+ 1) &>> 1)) &>> (n &>> 1)
+  }
+  @inline(__always)
+  @_versioned
+  static func _lowBits<N: FixedWidthInteger>(_ n: N) -> Self {
+    return ~((~0 as Self)._fullShiftLeft(n))
+  }
+}
+
+extension Range {
+  @inline(__always)
+  @_versioned
+  func _contains_(_ other: Range) -> Bool {
+    return other.clamped(to: self) == other
+  }
+}
+
+extension _UIntBuffer : RangeReplaceableCollection {
+  @inline(__always)
+  public init() {
+    _storage = 0
+    _bitCount = 0
+  }
+
+  public var capacity: Int {
+    return Storage.bitWidth / Element.bitWidth
+  }
+
+  @inline(__always)
+  public mutating func append(_ newElement: Element) {
+    _debugPrecondition(count < capacity)
+    _storage |= Storage(newElement) &<< (count &* Element.bitWidth)
+    _bitCount = _bitCount &+ _elementWidth
+  }
+  
+  @inline(__always)
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C._Element == Element {
+    _debugPrecondition(
+      (0..<_bitCount)._contains_(
+        target.lowerBound.bitOffset..<target.upperBound.bitOffset))
+    
+    let replacement1 = _UIntBuffer(replacement)
+
+    let targetCount = distance(
+      from: target.lowerBound, to: target.upperBound)
+    let growth = replacement1.count &- targetCount
+    _debugPrecondition(count + growth <= capacity)
+
+    let headCount = distance(from: startIndex, to: target.lowerBound)
+    let tailOffset = distance(from: startIndex, to: target.upperBound)
+
+    let w = Element.bitWidth
+    let headBits = _storage & ._lowBits(headCount &* w)
+    let tailBits = _storage._fullShiftRight(tailOffset &* w)
+
+    _storage = headBits
+    _storage |= replacement1._storage &<< (headCount &* w)
+    _storage |= tailBits &<< ((tailOffset &+ growth) &* w)
+    _bitCount = UInt8(
+      extendingOrTruncating: IndexDistance(_bitCount) &+ growth &* w)
+  }
+}
+//===----------------------------------------------------------------------===//
 
 public enum Unicode {
   public typealias UTF8 = Swift.UTF8
@@ -57,13 +236,13 @@ extension Unicode {
 }
 
 public protocol UnicodeDecoder {
-  associatedtype BufferLength : BinaryInteger
   associatedtype CodeUnit : UnsignedInteger, FixedWidthInteger
+  associatedtype Buffer : Collection where Buffer.Iterator.Element == CodeUnit
+  
   init()
 
-  /// How many code units are buffered in the decoder
-  var bufferLength: BufferLength { get }
-  
+  var buffer: Buffer { get }
+
   mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> Unicode.ParseResult<UInt32> where I.Element == CodeUnit
@@ -109,19 +288,21 @@ public protocol UnicodeEncoding {
 }
 
 
-internal protocol _UTF8Decoder : UnicodeDecoder {
-  init()
-  var _bufferStorage: UInt32 { get set }
-  var _bitsInBuffer: UInt8 { get set }
-  
+public protocol _UTF8Decoder : UnicodeDecoder {
   func _validateBuffer() -> (valid: Bool, length: UInt8)
+  var buffer: Buffer { get set }
 }
 
-extension _UTF8Decoder {
-  public var bufferLength: UInt8 { return _bitsInBuffer / 8 }
-}
+extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8>  {
+  var _bufferStorage : UInt32 {
+    get { return buffer._storage }
+    set { buffer._storage = newValue }
+  }
+  var _bitsInBuffer : UInt8 {
+    get { return buffer._bitCount }
+    set { buffer._bitCount = newValue }
+  }
 
-extension _UTF8Decoder {
   public mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> Unicode.ParseResult<UInt32> where I.Element == Unicode.UTF8.CodeUnit {
@@ -182,15 +363,14 @@ extension _UTF8Decoder {
 
 extension Unicode.UTF8 : UnicodeEncoding {
   public struct ForwardDecoder {
-    public init() { _bufferStorage = 0; _bitsInBuffer = 0 }
-    var _bufferStorage: UInt32
-    var _bitsInBuffer: UInt8
+    public typealias Buffer = _UIntBuffer<UInt32, UInt8>
+    public init() { buffer = Buffer() }
+    public var buffer: Buffer
   }
-
   public struct ReverseDecoder {
-    public init() { _bufferStorage = 0; _bitsInBuffer = 0 }
-    var _bufferStorage: UInt32
-    var _bitsInBuffer: UInt8
+    public typealias Buffer = _UIntBuffer<UInt32, UInt8>
+    public init() { buffer = Buffer() }
+    public var buffer: Buffer
   }
 }
 
