@@ -31,6 +31,8 @@ using namespace swift;
 namespace {
 
 struct AccessMarkerElimination : SILModuleTransform {
+  virtual bool isFullElimination() = 0;
+
   void replaceBeginAccessUsers(BeginAccessInst *beginAccess) {
 
     // Handle all the uses:
@@ -49,16 +51,24 @@ struct AccessMarkerElimination : SILModuleTransform {
     }
   }
 
-  void run() override {
-    // Don't bother doing anything unless some kind of exclusivity
-    // enforcement is enabled.
+  bool shouldPreserveAccess(SILAccessEnforcement enforcement) {
     auto &M = *getModule();
+    switch (enforcement) {
+    case SILAccessEnforcement::Unknown:
+      return false;
+    case SILAccessEnforcement::Static:
+      // Even though static enforcement is already performed, this flag is
+      // useful to control marker preservation for now.
+      return M.getOptions().EnforceExclusivityStatic;
+    case SILAccessEnforcement::Dynamic:
+      return M.getOptions().EnforceExclusivityDynamic;
+    case SILAccessEnforcement::Unsafe:
+      return false;
+    }
+  };
 
-    auto preserveAccess = [&M](SILAccessEnforcement enforcement) {
-      // Leave dynamic accesses in place, but delete all others.
-      return enforcement == SILAccessEnforcement::Dynamic
-             && M.getOptions().EnforceExclusivityDynamic;
-    };
+  void run() override {
+    auto &M = *getModule();
 
     bool removedAny = false;
 
@@ -77,7 +87,7 @@ struct AccessMarkerElimination : SILModuleTransform {
 
           if (auto beginAccess = dyn_cast<BeginAccessInst>(inst)) {
             // Leave dynamic accesses in place, but delete all others.
-            if (preserveAccess(beginAccess->getEnforcement()))
+            if (shouldPreserveAccess(beginAccess->getEnforcement()))
               continue;
 
             replaceBeginAccessUsers(beginAccess);
@@ -91,7 +101,7 @@ struct AccessMarkerElimination : SILModuleTransform {
           // begin_unpaired_access instructions will be directly removed and
           // simply replaced with their operand.
           if (auto BUA = dyn_cast<BeginUnpairedAccessInst>(inst)) {
-            if (preserveAccess(BUA->getEnforcement()))
+            if (shouldPreserveAccess(BUA->getEnforcement()))
               continue;
 
             BUA->replaceAllUsesWith(BUA->getSource());
@@ -101,7 +111,7 @@ struct AccessMarkerElimination : SILModuleTransform {
           // end_unpaired_access instructions will be directly removed and
           // simply replaced with their operand.
           if (auto EUA = dyn_cast<EndUnpairedAccessInst>(inst)) {
-            if (preserveAccess(EUA->getEnforcement()))
+            if (shouldPreserveAccess(EUA->getEnforcement()))
               continue;
 
             assert(EUA->use_empty() && "use of end_unpaired_access");
@@ -121,8 +131,20 @@ struct AccessMarkerElimination : SILModuleTransform {
   }
 };
 
+struct InactiveAccessMarkerElimination : AccessMarkerElimination {
+  virtual bool isFullElimination() { return false; }
+};
+
+struct FullAccessMarkerElimination : AccessMarkerElimination {
+  virtual bool isFullElimination() { return true; }
+};
+
 } // end anonymous namespace
 
-SILTransform *swift::createAccessMarkerElimination() {
-  return new AccessMarkerElimination();
+SILTransform *swift::createInactiveAccessMarkerElimination() {
+  return new InactiveAccessMarkerElimination();
+}
+
+SILTransform *swift::createFullAccessMarkerElimination() {
+  return new FullAccessMarkerElimination();
 }

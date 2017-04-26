@@ -671,6 +671,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     SharedTimer timer("SIL optimization");
     if (Invocation.getSILOptions().Optimization >
         SILOptions::SILOptMode::None) {
+
+      runSILOptPreparePasses(*SM);
+
       StringRef CustomPipelinePath =
         Invocation.getSILOptions().ExternalPassPipelineFilename;
       if (!CustomPipelinePath.empty()) {

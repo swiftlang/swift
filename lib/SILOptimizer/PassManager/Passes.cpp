@@ -83,6 +83,13 @@ bool swift::runSILOwnershipEliminatorPass(SILModule &Module) {
   return Ctx.hadError();
 }
 
+// Prepare SIL for the -O pipeline.
+void swift::runSILOptPreparePasses(SILModule &Module) {
+  SILPassManager PM(&Module);
+  PM.executePassPipelinePlan(
+      SILPassPipelinePlan::getSILOptPreparePassPipeline(Module.getOptions()));
+}
+
 void swift::runSILOptimizationPasses(SILModule &Module) {
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)

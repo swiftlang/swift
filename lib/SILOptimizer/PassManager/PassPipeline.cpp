@@ -84,10 +84,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addOwnershipModelEliminator();
   P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
-
   P.addAccessEnforcementSelection();
-  P.addAccessMarkerElimination();
-
+  P.addInactiveAccessMarkerElimination();
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
   P.addDiagnosticConstantPropagation();
@@ -440,6 +438,21 @@ static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
 SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
   SILPassPipelinePlan P;
   addIRGenPreparePipeline(P);
+  return P;
+}
+
+SILPassPipelinePlan
+SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P;
+
+  if (Options.DebugSerialization) {
+    addPerfDebugSerializationPipeline(P);
+    return P;
+  }
+
+  P.startPipeline("SILOpt Prepare Passes");
+  P.addFullAccessMarkerElimination();
+
   return P;
 }
 
