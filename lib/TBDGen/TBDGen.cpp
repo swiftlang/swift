@@ -40,6 +40,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
+  bool FileHasEntryPoint;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -81,9 +82,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule)
+                ModuleDecl *swiftModule, bool fileHasEntryPoint)
       : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule) {}
+        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -220,7 +221,10 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
-    addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // Variables in the main file don't get accessors, despite otherwise looking
+    // like globals.
+    if (!FileHasEntryPoint)
+      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
   visitMembers(VD);
@@ -331,10 +335,13 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
-  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
+  auto hasEntryPoint = file->hasEntryPoint();
+
+  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
+                        hasEntryPoint);
   for (auto d : decls)
     visitor.visit(d);
 
-  if (file->hasEntryPoint())
+  if (hasEntryPoint)
     symbols.insert("main");
 }
