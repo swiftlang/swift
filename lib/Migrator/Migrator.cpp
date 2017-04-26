@@ -104,7 +104,6 @@ Migrator::performAFixItMigration() {
   }
 
   FixitApplyDiagnosticConsumer FixitApplyConsumer {
-    getMigratorOptions(),
     InputState->getInputText(),
     getInputFilename(),
   };
