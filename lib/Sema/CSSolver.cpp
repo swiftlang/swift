@@ -1182,7 +1182,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
         // produce an optional of that type as a potential binding. We
         // overwrite the binding in place because the non-optional type
         // will fail to type-check against the nil-literal conformance.
-        auto nominalBindingDecl = binding.BindingType->getAnyNominal();
+        auto nominalBindingDecl =
+          binding.BindingType->getRValueType()->getAnyNominal();
         bool conformsToExprByNilLiteral = false;
         if (nominalBindingDecl) {
           SmallVector<ProtocolConformance *, 2> conformances;
