@@ -79,7 +79,7 @@ class BasicExternalUnion {
 public:
   /// Construct a union member in-place.
   template <class T, class... Args>
-  T &emplaceWithoutIndex(int index, Args &&... args) {
+  T &emplaceWithoutIndex(Args &&... args) {
     constexpr int typeIndex = indexOf<T, Members...>::value;
     static_assert(typeIndex != -1, "type not in union");
 
