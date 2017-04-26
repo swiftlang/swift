@@ -181,6 +181,12 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+    if("${ICU_UC}" STREQUAL "")
+      message(FATAL_ERROR "ICU_UC undefined")
+    endif()
+    if("${ICU_I18N}" STREQUAL "")
+      message(FATAL_ERROR "ICU_I18N undefined")
+    endif()
     list(APPEND swift_core_private_link_libraries
       ICU_UC ICU_I18N)
   else()
