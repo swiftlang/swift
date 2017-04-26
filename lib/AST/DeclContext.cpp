@@ -969,3 +969,60 @@ Accessibility AccessScope::accessibilityForDiagnostics() const {
 
   return Accessibility::Private;
 }
+
+/// Return the DeclContext to compare when checking shared private access in
+/// Swift 4 mode. The shared scope is the type declaration if the context
+/// and the type declaration are in the same file, otherwise it is the types
+/// last extension in the source file. If the context does not refer to a
+/// declaration or extension, the supplied context is returned.
+static const DeclContext *
+getSharedPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+  auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!NTD)
+    return DC;
+
+  // use the type declaration as the private scope if it is in the same
+  // file as useSF. This occurs for both extensions and declarations.
+  if (NTD->getParentSourceFile() == useSF)
+    return NTD;
+
+  // Otherwise use the last extension declaration in the same file.
+  const DeclContext *lastExtension = nullptr;
+  for (ExtensionDecl *ED : NTD->getExtensions())
+    if (ED->getParentSourceFile() == useSF)
+      lastExtension = ED;
+
+  // If there's no last extension, return the supplied context.
+  return lastExtension ?: DC;
+}
+
+bool AccessScope::checkSharedPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
+  // Shared private scope is not performed in Swift 3 mode.
+  if (useDC->getASTContext().isSwiftVersion3())
+    return false;
+
+  // Do not allow access if the sourceDC is in a different file, or if the
+  // sourceDC does not represent a type.
+  auto sourceNTD = sourceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto useSF = useDC->getParentSourceFile();
+  if (useSF != sourceDC->getParentSourceFile() || !sourceNTD)
+    return false;
+
+  // Compare the shared private scopes and iterate over the parent types.
+  sourceDC = getSharedPrivateDeclContext(sourceDC, useSF);
+  while (!useDC->isModuleContext()) {
+    useDC = getSharedPrivateDeclContext(useDC, useSF);
+    if (useDC == sourceDC)
+      return true;
+
+    // Get the parent type. If the context represents a type, look at the types
+    // declaring context instead of the contexts parent. This will crawl up
+    // the type hierarchy in nested extensions correctly.
+    if (auto NTD = useDC->getAsNominalTypeOrNominalTypeExtensionContext())
+      useDC = NTD->getDeclContext();
+    else
+      useDC = useDC->getParent();
+  }
+
+  return false;
+}

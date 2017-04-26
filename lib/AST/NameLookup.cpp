@@ -1262,7 +1262,9 @@ static bool checkAccessibility(const DeclContext *useDC,
   assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
   case Accessibility::Private:
-    return useDC == sourceDC || useDC->isChildContextOf(sourceDC);
+    return (useDC == sourceDC ||
+      useDC->isChildContextOf(sourceDC) ||
+      AccessScope::checkSharedPrivateAccess(useDC, sourceDC));
   case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {

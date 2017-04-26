@@ -30,6 +30,12 @@ public:
 
   static AccessScope getPublic() { return AccessScope(nullptr); }
 
+  /// Perform the shared private access check. Private scope is shared between 
+  /// the declaration and all of the extensions of that type inside the file.
+  /// This will return false in Swift 3 mode because private is not shared
+  /// between types.
+  static bool checkSharedPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC);
+
   /// Returns nullptr if access scope is public.
   const DeclContext *getDeclContext() const { return Value.getPointer(); }
 
@@ -48,7 +54,8 @@ public:
   /// \see DeclContext::isChildContextOf
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
-      return getDeclContext()->isChildContextOf(AS.getDeclContext());
+      return (getDeclContext()->isChildContextOf(AS.getDeclContext()) ||
+        checkSharedPrivateAccess(getDeclContext(), AS.getDeclContext()));
     if (isPublic() && AS.isPublic())
       return false;
     return AS.isPublic();
