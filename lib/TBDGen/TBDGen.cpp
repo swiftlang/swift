@@ -108,6 +108,12 @@ public:
     // any information here is encoded elsewhere
   }
 
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    // Any getters and setters etc. exist as independent FuncDecls in the AST,
+    // so get processed elsewhere; subscripts don't have any symbols other than
+    // these.
+  }
+
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
