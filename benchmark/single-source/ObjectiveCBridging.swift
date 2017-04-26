@@ -53,7 +53,9 @@ func testObjectiveCBridgeFromNSString() {
 public func run_ObjectiveCBridgeFromNSString(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSString()
+    }
   }
 #endif
 }
@@ -76,7 +78,9 @@ func testObjectiveCBridgeFromNSStringForced() {
 public func run_ObjectiveCBridgeFromNSStringForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSStringForced()
+    }
   }
 #endif
 }
@@ -99,7 +103,9 @@ func testObjectiveCBridgeToNSString() {
 public func run_ObjectiveCBridgeToNSString(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeToNSString()
+    }
   }
 #endif
 }
@@ -142,7 +148,9 @@ func testObjectiveCBridgeFromNSArrayAnyObject() {
 public func run_ObjectiveCBridgeFromNSArrayAnyObject(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObject()
+    }
   }
 #endif
 }
@@ -165,7 +173,9 @@ func testObjectiveCBridgeFromNSArrayAnyObjectForced() {
 public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObjectForced()
+    }
   }
 #endif
 }
@@ -189,7 +199,9 @@ func testObjectiveCBridgeToNSArray() {
 public func run_ObjectiveCBridgeToNSArray(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeToNSArray()
+    }
   }
 #endif
 }
@@ -213,7 +225,9 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
 public func run_ObjectiveCBridgeFromNSArrayAnyObjectToString(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObjectToString()
+    }
   }
 #endif
 }
@@ -236,7 +250,9 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
 public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObjectToStringForced()
+    }
   }
 #endif
 }
@@ -289,7 +305,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObject()
+    }
   }
 #endif
 }
@@ -314,7 +332,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObjectForced()
+    }
   }
 #endif
 }
@@ -340,7 +360,9 @@ func testObjectiveCBridgeToNSDictionary() {
 public func run_ObjectiveCBridgeToNSDictionary(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeToNSDictionary()
+    }
   }
 #endif
 }
@@ -366,7 +388,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToString()
+    }
   }
 #endif
 }
@@ -392,7 +416,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced()
+    }
   }
 #endif
 }
@@ -446,7 +472,9 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
 public func run_ObjectiveCBridgeFromNSSetAnyObject(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObject()
+    }
   }
 #endif
 }
@@ -471,7 +499,9 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
 public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObjectForced()
+    }
   }
 #endif
 }
@@ -496,7 +526,9 @@ func testObjectiveCBridgeToNSSet() {
 public func run_ObjectiveCBridgeToNSSet(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
-    testObjectiveCBridgeToNSSet()
+    autoreleasepool {
+      testObjectiveCBridgeToNSSet()
+    }
   }
 #endif
 }
@@ -522,7 +554,9 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
 public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObjectToString()
+    }
   }
 #endif
 }
@@ -548,7 +582,9 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
 public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ N: Int) {
 #if _runtime(_ObjC)
   for _ in 0 ..< N {
+    autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObjectToStringForced()
+    }
   }
 #endif
 }
