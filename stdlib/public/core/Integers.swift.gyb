@@ -3656,7 +3656,7 @@ extension SignedInteger {
     fatalError("Should be overridden in a more specific type")
   }
 
-  @available(swift, obsoleted: 4.0)
+  @available(swift, obsoleted: 4.0, message: "Use the FixedWidthInteger.${op} instead.")
   public static func ${op} (lhs: Self, rhs: Self) -> Self {
     return ${helper}(lhs, rhs)
   }
