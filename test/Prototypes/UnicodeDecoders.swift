@@ -243,7 +243,10 @@ extension Unicode {
 
 public protocol UnicodeDecoder {
   associatedtype CodeUnit : UnsignedInteger, FixedWidthInteger
-  associatedtype Buffer : Collection where Buffer.Iterator.Element == CodeUnit
+  associatedtype Buffer : Collection
+    where Buffer.Iterator.Element == CodeUnit
+  associatedtype EncodedScalar : Collection 
+    where EncodedScalar.Iterator.Element == CodeUnit
   
   init()
 
@@ -251,9 +254,9 @@ public protocol UnicodeDecoder {
 
   mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
-  ) -> Unicode.ParseResult<Buffer> where I.Element == CodeUnit
+  ) -> Unicode.ParseResult<EncodedScalar> where I.Element == CodeUnit
 
-  static func decodeOne(_ content: Buffer) -> UnicodeScalar
+  static func decodeOne(_ content: EncodedScalar) -> UnicodeScalar
 }
 
 extension UnicodeDecoder {
@@ -294,7 +297,7 @@ public protocol UnicodeEncoding {
 }
 
 
-public protocol _UTF8Decoder : UnicodeDecoder {
+public protocol _UTF8Decoder : UnicodeDecoder where Buffer == EncodedScalar {
   func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8)
   var buffer: Buffer { get set }
 }
@@ -302,14 +305,15 @@ public protocol _UTF8Decoder : UnicodeDecoder {
 extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
   public mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
-  ) -> Unicode.ParseResult<Buffer> where I.Element == Unicode.UTF8.CodeUnit {
+  ) -> Unicode.ParseResult<EncodedScalar>
+    where I.Element == Unicode.UTF8.CodeUnit {
 
     // Bufferless ASCII fastpath.
     if _fastPath(buffer.isEmpty) {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
       if codeUnit & 0x80 == 0 {
-        return .valid(Buffer(containing: codeUnit))
+        return .valid(EncodedScalar(containing: codeUnit))
       }
       // Non-ASCII, proceed to buffering mode.
       buffer.append(codeUnit)
@@ -318,7 +322,7 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
       // to bufferless mode once we've exhausted it.
       let codeUnit = UInt8(extendingOrTruncating: buffer._storage)
       buffer.remove(at: buffer.startIndex)
-      return .valid(Buffer(containing: codeUnit))
+      return .valid(EncodedScalar(containing: codeUnit))
     }
     // Buffering mode.
     // Fill buffer back to 4 bytes (or as many as are left in the iterator).
@@ -355,11 +359,14 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
 extension Unicode.UTF8 : UnicodeEncoding {
   public struct ForwardDecoder {
     public typealias Buffer = _UIntBuffer<UInt32, UInt8>
+    public typealias EncodedScalar = Buffer
     public init() { buffer = Buffer() }
     public var buffer: Buffer
   }
+  
   public struct ReverseDecoder {
     public typealias Buffer = _UIntBuffer<UInt32, UInt8>
+    public typealias EncodedScalar = Buffer
     public init() { buffer = Buffer() }
     public var buffer: Buffer
   }
@@ -368,9 +375,9 @@ extension Unicode.UTF8 : UnicodeEncoding {
 extension UTF8.ReverseDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
 
-  public static func decodeOne(_ encodedScalar: Buffer) -> UnicodeScalar {
-    let bits = encodedScalar._storage
-    switch encodedScalar._bitCount {
+  public static func decodeOne(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    switch source._bitCount {
     case 8: return UnicodeScalar(_unchecked: bits)
     case 16:
       var value = bits       & 0b0______________________11_1111
@@ -382,7 +389,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
       value    |= bits &>> 4 & 0b0_________1111_0000__0000_0000
       return UnicodeScalar(_unchecked: value)
     default:
-      _sanityCheck(encodedScalar._bitCount == 32)
+      _sanityCheck(source._bitCount == 32)
       var value = bits       & 0b0______________________11_1111
       value    |= bits &>> 2 & 0b0______________1111__1100_0000
       value    |= bits &>> 4 & 0b0_____11__1111_0000__0000_0000
@@ -515,9 +522,9 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
     return 1
   }
   
-  public static func decodeOne(_ encodedScalar: Buffer) -> UnicodeScalar {
-    let bits = encodedScalar._storage
-    switch encodedScalar._bitCount {
+  public static func decodeOne(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    switch source._bitCount {
     case 8:
       return UnicodeScalar(_unchecked: bits)
     case 16:
@@ -530,7 +537,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
       value    |= (bits & 0b0________________________________0000_1111) &<< 12
       return UnicodeScalar(_unchecked: value)
     default:
-      _sanityCheck(encodedScalar.count == 4)
+      _sanityCheck(source.count == 4)
       var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
       value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
       value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
