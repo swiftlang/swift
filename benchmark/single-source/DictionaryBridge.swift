@@ -57,7 +57,9 @@ class Stuff {
 public func run_DictionaryBridge(_ N: Int) {
 #if _runtime(_ObjC)
     for _ in 1...100*N {
+      autoreleasepool {
         _ = Stuff()
+      }
     }
 #endif
 }
