@@ -1958,12 +1958,14 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
   Builder.createTryApply(Loc, FRI, CalleeSILSubstFnTy, Subs,
                          Arguments, NormalBB, ErrorBB);
-  auto *ErrorVal = ErrorBB->createPHIArgument(specConv.getSILErrorType(),
-                                              ValueOwnershipKind::Owned);
+  auto *ErrorVal = ErrorBB->createPHIArgument(
+      SpecializedFunc->mapTypeIntoContext(specConv.getSILErrorType()),
+      ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
   SILValue ReturnValue = NormalBB->createPHIArgument(
-      specConv.getSILResultType(), ValueOwnershipKind::Owned);
+      SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType()),
+      ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);
   return ReturnValue;
 }
