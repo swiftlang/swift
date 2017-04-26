@@ -1889,6 +1889,11 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   Thunk->setGenericEnvironment(ReInfo.getSpecializedGenericEnvironment());
 
+  // Set proper generic context scope for the type lowering.
+  CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
+  Lowering::GenericContextScope GenericScope(M.Types,
+                                             SpecType->getGenericSignature());
+
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
 
@@ -1979,9 +1984,6 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   SILFunctionConventions substConv(SubstType, M);
 
   assert(specConv.useLoweredAddresses());
-
-  Lowering::GenericContextScope GenericScope(M.Types,
-                                             SpecType->getGenericSignature());
 
   // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.
