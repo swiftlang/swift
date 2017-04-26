@@ -2516,6 +2516,9 @@ public:
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
   unsigned getDepth() const { return BindOptionalExprBits.Depth; }
+  void setDepth(unsigned depth) {
+    BindOptionalExprBits.Depth = depth;
+  }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }
