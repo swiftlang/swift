@@ -191,6 +191,8 @@ extension Substring {
 % end
 }
 
+#if _runtime(_ObjC)
+
 extension Substring {
   public func hasPrefix(_ prefix: String) -> Bool {
     return String(self).hasPrefix(prefix)
@@ -200,6 +202,8 @@ extension Substring {
     return String(self).hasSuffix(suffix)
   }
 }
+
+#endif
 
 extension Substring {
   public func lowercased() -> String {
