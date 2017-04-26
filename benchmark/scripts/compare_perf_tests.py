@@ -34,7 +34,8 @@ class PerformanceTestResult:
         self.S_runtime = (0 if self.samples < 2 else
                           (sd * sd) * (self.samples - 1))
         self.median = int(csv_row[7])   # Median runtime (ms)
-        self.max_rss = int(csv_row[8])  # Maximum Resident Set Size (B)
+        self.max_rss = (                # Maximum Resident Set Size (B)
+            int(csv_row[8]) if len(csv_row) > 8 else None)
         # TODO if we really want to compute mean MAX_RSS: self.S_memory
 
     @property
@@ -77,8 +78,8 @@ class PerformanceTestResult:
     # Tuple of values formatted for display in results table:
     # (name, min value, max value, mean value, max_rss)
     def values(self):
-        return (self.name, str(self.min), str(self.max),
-                str(self.mean), str(self.max_rss))
+        return (self.name, str(self.min), str(self.max), str(int(self.mean)),
+                str(self.max_rss) if self.max_rss else '—')
 
 
 class ResultComparison:
@@ -112,9 +113,9 @@ class ResultComparison:
 class TestComparator:
     def __init__(self, old_file, new_file, delta_threshold, changes_only):
 
-        def load_from_CSV(filename):
-            def skip_totals(row):
-                        return len(row) > 8
+        def load_from_CSV(filename):  # handles output from Benchmark_O and
+            def skip_totals(row):     # Benchmark_Driver (added MAX_RSS column)
+                        return len(row) > 7 and row[0].isdigit()
             tests = map(PerformanceTestResult,
                         filter(skip_totals, csv.reader(open(filename))))
 
