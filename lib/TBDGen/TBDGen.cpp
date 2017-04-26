@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -103,6 +104,8 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *PBD);
 
   void visitValueDecl(ValueDecl *VD);
+
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // any information here is encoded elsewhere
@@ -201,6 +204,26 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
 void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
   addSymbol(SILDeclRef(VD));
   visitMembers(VD);
+}
+
+void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  // Default arguments (of public functions) are public symbols, as the default
+  // values are computed at the call site.
+  auto index = 0;
+  auto paramLists = AFD->getParameterLists();
+  // Skip the first arguments, which contains Self (etc.), can't be defaulted,
+  // and are ignored for the purposes of default argument indices.
+  if (AFD->getDeclContext()->isTypeContext())
+    paramLists = paramLists.slice(1);
+  for (auto *paramList : paramLists) {
+    for (auto *param : *paramList) {
+      if (auto defaultArg = param->getDefaultValue())
+        addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
+      index++;
+    }
+  }
+
+  visitValueDecl(AFD);
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
