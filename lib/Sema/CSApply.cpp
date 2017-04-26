@@ -5101,6 +5101,8 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   Type fromValueType = fromType->getAnyOptionalObjectType();
   Type toValueType = toType->getAnyOptionalObjectType();
 
+  // FIXME: this depth is wrong, it needs to be the depth of
+  // OptionalEvaluationExprs introduced by the call to coerceToType below.
   expr =
     cs.cacheType(new (tc.Context) BindOptionalExpr(expr,
                                                    expr->getSourceRange().End,

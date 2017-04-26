@@ -1512,6 +1512,13 @@ public:
   void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
                         unsigned depth);
 
+  void emitOptionalEvaluation(SILLocation loc, Type optionalType,
+                              SmallVectorImpl<ManagedValue> &results,
+                              SGFContext C,
+                      llvm::function_ref<void(SmallVectorImpl<ManagedValue> &,
+                                              SGFContext primaryC)>
+                                generateNormalResults);
+
   //===--------------------------------------------------------------------===//
   // Bridging thunks
   //===--------------------------------------------------------------------===//
@@ -1751,8 +1758,17 @@ public:
     swift::AccessKind AccessKind;
   };
   ArrayAccessInfo getArrayAccessInfo(Type pointerType, Type arrayType);
-  ManagedValue emitArrayToPointer(SILLocation loc, LValue &&lvalue,
-                                  ArrayAccessInfo accessInfo);
+  std::pair<ManagedValue,ManagedValue>
+  emitArrayToPointer(SILLocation loc, LValue &&lvalue,
+                     ArrayAccessInfo accessInfo);
+
+  std::pair<ManagedValue,ManagedValue>
+  emitArrayToPointer(SILLocation loc, ManagedValue arrayValue,
+                     ArrayAccessInfo accessInfo);
+
+  std::pair<ManagedValue,ManagedValue>
+  emitStringToPointer(SILLocation loc, ManagedValue stringValue,
+                      Type pointerType);
 
   class ForceTryEmission {
     SILGenFunction &SGF;
