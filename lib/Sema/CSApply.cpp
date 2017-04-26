@@ -897,18 +897,19 @@ namespace {
 
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
-        auto selfParamTy = selfTy;
+        auto selfParamTy = isDynamic ? selfTy : containerTy;
 
         if (selfTy->isEqual(baseTy))
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
+
         base = coerceObjectArgumentToType(
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(selfTy),
+                            MetatypeType::get(isDynamic ? selfTy : containerTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
