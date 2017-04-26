@@ -123,23 +123,7 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED);
 
-  void visitProtocolDecl(ProtocolDecl *PD) {
-    addSymbol(LinkEntity::forProtocolDescriptor(PD));
-
-#ifndef NDEBUG
-    // There's no (currently) relevant information about members of a protocol
-    // at individual protocols, each conforming type has to handle them
-    // individually. Let's assert this fact:
-    for (auto *member : PD->getMembers()) {
-      auto isExpectedKind =
-          isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
-          isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-          isa<AbstractFunctionDecl>(member);
-      assert(isExpectedKind &&
-             "unexpected member of protocol during TBD generation");
-    }
-#endif
-  }
+  void visitProtocolDecl(ProtocolDecl *PD);
 
   void visitVarDecl(VarDecl *VD);
 
@@ -317,6 +301,25 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
   }
 
   visitMembers(ED);
+}
+
+void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
+  if (!PD->isObjC())
+    addSymbol(LinkEntity::forProtocolDescriptor(PD));
+
+#ifndef NDEBUG
+  // There's no (currently) relevant information about members of a protocol
+  // at individual protocols, each conforming type has to handle them
+  // individually. Let's assert this fact:
+  for (auto *member : PD->getMembers()) {
+    auto isExpectedKind =
+        isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
+        isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
+        isa<AbstractFunctionDecl>(member);
+    assert(isExpectedKind &&
+           "unexpected member of protocol during TBD generation");
+  }
+#endif
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
