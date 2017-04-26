@@ -295,7 +295,7 @@ public protocol UnicodeEncoding {
 
 
 public protocol _UTF8Decoder : UnicodeDecoder {
-  func _validateBuffer() -> (valid: Bool, length: UInt8)
+  func _parseNonASCII() -> (valid: Bool, length: UInt8)
   var buffer: Buffer { get set }
 }
 
@@ -333,7 +333,7 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     } while buffer._bitCount < 32
 
     // Find one unicode scalar.
-    let (valid, length) = _validateBuffer()
+    let (valid, length) = _parseNonASCII()
     _sanityCheck(1...4 ~= length)
     _sanityCheck(length <= buffer.count)
     
@@ -373,14 +373,6 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
 
   public static func decodeOne(_ encodedScalar: Buffer) -> UnicodeScalar {
     let bits = encodedScalar._storage
-    /*
-    if _fastPath(bits & 0x80 == 0) {
-      _sanityCheck(encodedScalar.count == 1)
-      _sanityCheck(bits == bits & 0xff)
-      return UnicodeScalar(_unchecked: bits)
-    }
-    */
-    
     switch encodedScalar._bitCount {
     case 8: return UnicodeScalar(_unchecked: bits)
     case 16:
@@ -403,12 +395,8 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _validateBuffer() -> (valid: Bool, length: UInt8) {
-    // FIXME: is this check eliminated when inlined into parseOne?
-    if buffer._storage & 0x80 == 0 {
-      return (true, 1)
-    }
-
+  func _parseNonASCII() -> (valid: Bool, length: UInt8) {
+    _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     if buffer._storage                & 0b0__1110_0000__1100_0000
                                      == 0b0__1100_0000__1000_0000 {
       // 2-byte sequence.  Top 4 bits of decoded result must be nonzero
@@ -474,11 +462,9 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
   
   public // @testable
-  func _validateBuffer() -> (valid: Bool, length: UInt8) {
-    if buffer._storage & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ ... ... ... CU0 ].
-      return (true, 1)
-    }
-
+  func _parseNonASCII() -> (valid: Bool, length: UInt8) {
+    _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
+    
     if buffer._storage & 0b0__1100_0000__1110_0000
                       == 0b0__1000_0000__1100_0000 {
       // 2-byte sequence. At least one of the top 4 bits of the decoded result
