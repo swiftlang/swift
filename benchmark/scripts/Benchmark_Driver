@@ -352,7 +352,7 @@ def positive_int(value):
 
 def main():
     parser = argparse.ArgumentParser(
-        epilog='Example: ./Benchmark_Driver run -i 5 -f Array'
+        epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f Suffix -f Drop'
     )
     subparsers = parser.add_subparsers(
         title='Swift benchmark driver commands',
@@ -365,8 +365,9 @@ def main():
         default=[],
         help='benchmark to run (default: all)', nargs='*', metavar="BENCHMARK")
     benchmarks_group.add_argument(
-        '-f', '--filter', dest='filters', nargs='*',
-        help='run all tests whose name starts with PREFIX', metavar="PREFIX")
+        '-f', '--filter', dest='filters', action='append',
+        help='run all tests whose name starts with PREFIX, '+
+        'multiple filters are supported', metavar="PREFIX")
     parent_parser.add_argument(
         '-t', '--tests',
         help='directory containing Benchmark_O{,none,unchecked} ' +
