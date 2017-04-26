@@ -18,26 +18,42 @@
 #include <iterator>
 
 namespace swift {
+
 class SILBasicBlock;
 class TermInst;
 
-/// SILSuccessor - This represents a reference to a SILBasicBlock in a
-/// terminator instruction, forming a list of TermInst references to
-/// BasicBlocks.  This forms the predecessor list, ensuring that it is always
-/// kept up to date.
+/// \brief An edge in the control flow graph.
+///
+/// A SILSuccessor is stored in the terminator instruction of the tail block of
+/// the CFG edge. Internally it has a back reference to the terminator that
+/// contains it (ContainingInst). It also contains the SuccessorBlock that is
+/// the "head" of the CFG edge. This makes it very simple to iterate over the
+/// successors of a specific block.
+///
+/// SILSuccessor also enables given a "head" edge the ability to iterate over
+/// predecessors. This is done by using an ilist that is embedded into
+/// SILSuccessors.
 class SILSuccessor {
   friend class SILSuccessorIterator;
-  /// ContainingInst - This is the Terminator instruction that contains this
-  /// successor.
+
+  /// The terminator instruction that contains this SILSuccessor.
   TermInst *ContainingInst = nullptr;
   
-  /// SuccessorBlock - If non-null, this is the BasicBlock that the terminator
-  /// branches to.
+  /// If non-null, this is the BasicBlock that the terminator branches to.
   SILBasicBlock *SuccessorBlock = nullptr;
-  
-  /// This is the prev and next terminator reference to SuccessorBlock, or
-  /// null if SuccessorBlock is null.
-  SILSuccessor **Prev = nullptr, *Next = nullptr;
+
+  /// A pointer to the SILSuccessor that represents the previous SILSuccessor in the
+  /// predecessor list for SuccessorBlock.
+  ///
+  /// Must be nullptr if SuccessorBlock is.
+  SILSuccessor **Prev = nullptr;
+
+  /// A pointer to the SILSuccessor that represents the next SILSuccessor in the
+  /// predecessor list for SuccessorBlock.
+  ///
+  /// Must be nullptr if SuccessorBlock is.
+  SILSuccessor *Next = nullptr;
+
 public:
   SILSuccessor() {}
 
