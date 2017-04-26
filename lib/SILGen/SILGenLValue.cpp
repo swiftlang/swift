@@ -130,11 +130,18 @@ static LValueTypeData getPhysicalStorageTypeData(SILGenModule &SGM,
 }
 
 static bool shouldUseUnsafeEnforcement(VarDecl *var) {
-  return false; // TODO
+  if (var->isDebuggerVar())
+    return true;
+
+  // TODO: Check for the explicit "unsafe" attribute.
+  return false;
 }
 
 Optional<SILAccessEnforcement>
 SILGenFunction::getStaticEnforcement(VarDecl *var) {
+  if (var && shouldUseUnsafeEnforcement(var))
+    return SILAccessEnforcement::Unsafe;
+
   return SILAccessEnforcement::Static;
 }
 
@@ -150,6 +157,9 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
 
 Optional<SILAccessEnforcement>
 SILGenFunction::getUnknownEnforcement(VarDecl *var) {
+  if (var && shouldUseUnsafeEnforcement(var))
+    return SILAccessEnforcement::Unsafe;
+
   return SILAccessEnforcement::Unknown;
 }
 
