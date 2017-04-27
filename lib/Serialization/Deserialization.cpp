@@ -127,6 +127,18 @@ const char XRefError::ID = '\0';
 void XRefError::anchor() {}
 const char OverrideError::ID = '\0';
 void OverrideError::anchor() {}
+const char TypeError::ID = '\0';
+void TypeError::anchor() {}
+
+LLVM_NODISCARD
+static std::unique_ptr<llvm::ErrorInfoBase> takeErrorInfo(llvm::Error error) {
+  std::unique_ptr<llvm::ErrorInfoBase> result;
+  llvm::handleAllErrors(std::move(error),
+                        [&](std::unique_ptr<llvm::ErrorInfoBase> info) {
+    result = std::move(info);
+  });
+  return result;
+}
 
 
 /// Skips a single record in the bitstream.
@@ -2492,7 +2504,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isObjC, hasStubImplementation, throws;
     GenericEnvironmentID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
-    TypeID interfaceID;
+    TypeID interfaceID, canonicalTypeID;
     DeclID overriddenID;
     ArrayRef<uint64_t> argNameIDs;
 
@@ -2501,8 +2513,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                isObjC, hasStubImplementation,
                                                throws, storedInitKind,
                                                genericEnvID, interfaceID,
-                                               overriddenID, rawAccessLevel,
-                                               argNameIDs);
+                                               canonicalTypeID, overriddenID,
+                                               rawAccessLevel, argNameIDs);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2595,15 +2607,15 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, isLet, hasNonPatternBindingInit;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
-    TypeID interfaceTypeID;
+    TypeID interfaceTypeID, canonicalTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
     DeclID addressorID, mutableAddressorID, overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, isLet,
                                        hasNonPatternBindingInit, storageKind,
-                                       interfaceTypeID, getterID,
-                                       setterID, materializeForSetID,
+                                       interfaceTypeID, canonicalTypeID,
+                                       getterID, setterID, materializeForSetID,
                                        addressorID, mutableAddressorID,
                                        willSetID, didSetID, overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel);
@@ -2615,6 +2627,10 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       llvm::consumeError(overridden.takeError());
       return llvm::make_error<OverrideError>(name);
     }
+
+    auto canonicalType = getTypeChecked(canonicalTypeID);
+    if (!canonicalType)
+      return llvm::make_error<TypeError>(name, takeErrorInfo(canonicalType.takeError()));
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2703,7 +2719,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isObjC, isMutating, hasDynamicSelf, throws;
     unsigned numParamPatterns;
     GenericEnvironmentID genericEnvID;
-    TypeID interfaceTypeID;
+    TypeID interfaceTypeID, canonicalTypeID;
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
@@ -2714,10 +2730,11 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         isStatic, rawStaticSpelling, isObjC,
                                         isMutating, hasDynamicSelf, throws,
                                         numParamPatterns, genericEnvID,
-                                        interfaceTypeID, associatedDeclID,
-                                        overriddenID, accessorStorageDeclID,
-                                        hasCompoundName, rawAddressorKind,
-                                        rawAccessLevel, nameIDs);
+                                        interfaceTypeID, canonicalTypeID,
+                                        associatedDeclID, overriddenID,
+                                        accessorStorageDeclID, hasCompoundName,
+                                        rawAddressorKind, rawAccessLevel,
+                                        nameIDs);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
@@ -3237,7 +3254,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     bool isImplicit, isObjC;
     GenericEnvironmentID genericEnvID;
-    TypeID interfaceTypeID;
+    TypeID interfaceTypeID, canonicalTypeID;
     DeclID getterID, setterID, materializeForSetID;
     DeclID addressorID, mutableAddressorID, willSetID, didSetID;
     DeclID overriddenID;
@@ -3248,7 +3265,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC, rawStorageKind,
                                              genericEnvID,
-                                             interfaceTypeID,
+                                             interfaceTypeID, canonicalTypeID,
                                              getterID, setterID,
                                              materializeForSetID,
                                              addressorID, mutableAddressorID,
@@ -3587,17 +3604,20 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID canonicalTypeID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
                                                  canonicalTypeID);
-    auto alias = dyn_cast_or_null<TypeAliasDecl>(getDecl(underlyingID));
-    if (!alias) {
-      error();
-      return nullptr;
-    }
+    auto aliasOrError = getDeclChecked(underlyingID);
+    if (!aliasOrError)
+      return aliasOrError.takeError();
+    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
 
     if (ctx.LangOpts.EnableDeserializationRecovery) {
-      if (Type expectedType = getType(canonicalTypeID)) {
-        if (!alias->getDeclaredInterfaceType()->isEqual(expectedType)) {
+      Expected<Type> expectedType = getTypeChecked(canonicalTypeID);
+      if (!expectedType)
+        return expectedType.takeError();
+      if (expectedType.get()) {
+        if (!alias ||
+            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
           // Fall back to the canonical type.
-          typeOrOffset = expectedType;
+          typeOrOffset = expectedType.get();
           break;
         }
       }
@@ -3619,12 +3639,22 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID parentID;
     decls_block::NominalTypeLayout::readRecord(scratch, declID, parentID);
 
-    Type parentTy = getType(parentID);
+    Expected<Type> parentTy = getTypeChecked(parentID);
+    if (!parentTy)
+      return parentTy.takeError();
 
-    // Record the type as soon as possible. Members of a nominal type often
-    // try to refer back to the type.
-    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
-    typeOrOffset = NominalType::get(nominal, parentTy, ctx);
+    auto nominalOrError = getDeclChecked(declID);
+    if (!nominalOrError)
+      return nominalOrError.takeError();
+
+    auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
+    if (!nominal) {
+      XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
+      tinyTrace.addValue(cast<ValueDecl>(nominalOrError.get())->getName());
+      return llvm::make_error<XRefError>("declaration is not a nominal type",
+                                         tinyTrace);
+    }
+    typeOrOffset = NominalType::get(nominal, parentTy.get(), ctx);
 
     assert(typeOrOffset.isComplete());
     break;

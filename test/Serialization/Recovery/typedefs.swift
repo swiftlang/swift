@@ -3,7 +3,9 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
-// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery | %FileCheck -check-prefix CHECK-RECOVERY %s
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery > %t.txt
+// RUN: %FileCheck -check-prefix CHECK-RECOVERY %s < %t.txt
+// RUN: %FileCheck -check-prefix CHECK-RECOVERY-NEGATIVE %s < %t.txt
 
 // RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery -DVERIFY %s -verify
 // RUN: %target-swift-frontend -emit-silgen -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery %s | %FileCheck -check-prefix CHECK-SIL %s
@@ -30,6 +32,9 @@ let _: Int32? = useAssoc(ImportedType.self)
 let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert call result type '_.Assoc?' to expected type 'String'}}
 let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'Bool?'}}
 let _: Int32? = useAssoc(AnotherType.self)
+
+let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
+let _ = unwrapped // okay
 #endif // VERIFY
 
 #else // TEST
@@ -58,5 +63,13 @@ public let usesAssoc = useAssoc(ImportedType.self)
 // CHECK-DAG: let usesAssoc2: AnotherType.Assoc?
 // CHECK-RECOVERY-DAG: let usesAssoc2: AnotherType.Assoc?
 public let usesAssoc2 = useAssoc(AnotherType.self)
+
+
+// CHECK-DAG: let wrapped: WrappedInt
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrapped:
+public let wrapped = WrappedInt(0)
+// CHECK-DAG: let unwrapped: UnwrappedInt
+// CHECK-RECOVERY-DAG: let unwrapped: Int32
+public let unwrapped: UnwrappedInt = 0
 
 #endif // TEST

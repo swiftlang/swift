@@ -2761,6 +2761,7 @@ void Serializer::writeDecl(const Decl *D) {
     if (var->isSettable(nullptr))
       rawSetterAccessLevel =
         getRawStableAccessibility(var->getSetterAccessibility());
+    Type ty = var->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2772,7 +2773,8 @@ void Serializer::writeDecl(const Decl *D) {
                           var->isLet(),
                           var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
-                          addTypeRef(var->getInterfaceType()),
+                          addTypeRef(ty),
+                          addTypeRef(ty->getCanonicalType()),
                           addDeclRef(accessors.Get),
                           addDeclRef(accessors.Set),
                           addDeclRef(accessors.MaterializeForSet),
@@ -2824,6 +2826,7 @@ void Serializer::writeDecl(const Decl *D) {
       getRawStableAccessibility(fn->getFormalAccess());
     uint8_t rawAddressorKind =
       getRawStableAddressorKind(fn->getAddressorKind());
+    Type ty = fn->getInterfaceType();
 
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            contextID,
@@ -2838,7 +2841,8 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->getParameterLists().size(),
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                           addTypeRef(fn->getInterfaceType()),
+                           addTypeRef(ty),
+                           addTypeRef(ty->getCanonicalType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
@@ -2906,6 +2910,7 @@ void Serializer::writeDecl(const Decl *D) {
     if (subscript->isSettable())
       rawSetterAccessLevel =
         getRawStableAccessibility(subscript->getSetterAccessibility());
+    Type ty = subscript->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2915,7 +2920,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 (unsigned) accessors.Kind,
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
-                                addTypeRef(subscript->getInterfaceType()),
+                                addTypeRef(ty),
+                                addTypeRef(ty->getCanonicalType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
                                 addDeclRef(accessors.MaterializeForSet),
@@ -2946,6 +2952,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(ctor->getFormalAccess());
+    Type ty = ctor->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2960,7 +2967,8 @@ void Serializer::writeDecl(const Decl *D) {
                                     ctor->getInitKind()),
                                   addGenericEnvironmentRef(
                                                  ctor->getGenericEnvironment()),
-                                  addTypeRef(ctor->getInterfaceType()),
+                                  addTypeRef(ty),
+                                  addTypeRef(ty->getCanonicalType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   nameComponents);

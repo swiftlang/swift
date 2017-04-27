@@ -248,6 +248,30 @@ public:
   }
 };
 
+class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  DeclName name;
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+public:
+  explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason)
+      : name(name), underlyingReason(std::move(reason)) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize type for '" << name << "'";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 } // end namespace serialization
 } // end namespace swift
 

@@ -44,7 +44,7 @@ const unsigned char MODULE_DOC_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x07 };
 
 /// Serialized module format major version number.
 ///
-/// Always 0 for Swift 1.x - 3.x.
+/// Always 0 for Swift 1.x - 4.x.
 const uint16_t VERSION_MAJOR = 0;
 
 /// Serialized module format minor version number.
@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 338; // Last change: OPERAND_WITH_ATTR format.
+const uint16_t VERSION_MINOR = 339; // Last change: member canonical types
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -858,7 +858,8 @@ namespace decls_block {
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     GenericEnvironmentIDField, // generic environment
-    TypeIDField, // type (interface)
+    TypeIDField, // interface type
+    TypeIDField, // canonical interface type
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
     BCArray<IdentifierIDField> // argument names
@@ -877,6 +878,7 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     StorageKindField,   // StorageKind
     TypeIDField,  // interface type
+    TypeIDField,  // canonical interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
     DeclIDField,  // materializeForSet
@@ -911,6 +913,7 @@ namespace decls_block {
     BCVBR<5>,     // number of parameter patterns
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // interface type
+    TypeIDField,  // canonical interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
@@ -982,6 +985,7 @@ namespace decls_block {
     StorageKindField,   // StorageKind
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
+    TypeIDField,  // canonical interface type
     DeclIDField, // getter
     DeclIDField, // setter
     DeclIDField, // materializeForSet
