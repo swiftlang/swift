@@ -30,6 +30,32 @@ namespace migrator {
 bool updateCodeAndEmitRemap(CompilerInstance *Instance,
                             const CompilerInvocation &Invocation);
 
+struct Replacement {
+  size_t Offset;
+  size_t Remove;
+  std::string Text;
+
+  bool isRemove() const {
+    return Remove > 0;
+  }
+
+  bool isInsert() const {
+    return Remove == 0 && Text.size() > 0;
+  }
+
+  bool isReplace() const {
+    return Remove > 0 && Text.size() > 0;
+  }
+
+  size_t endOffset() const {
+    if (isInsert()) {
+      return Offset + Text.size();
+    } else {
+      return Offset + Remove;
+    }
+  }
+};
+
 struct Migrator {
   CompilerInstance *StartInstance;
   const CompilerInvocation &StartInvocation;
