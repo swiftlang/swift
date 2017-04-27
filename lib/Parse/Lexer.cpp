@@ -1258,7 +1258,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // issues with malformed tokens or other problems.
     switch (*CurPtr++) {
     // String literals in general cannot be split across multiple lines;
-    // interpolated ones are no exception (unless multiline strings).
+    // interpolated ones are no exception (unless multiline literals).
     case '\n':
     case '\r':
       if (MultilineString)
