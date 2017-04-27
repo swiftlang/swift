@@ -1247,7 +1247,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     return !OpenDelimiters.empty() &&
            (OpenDelimiters.back() == '"' || OpenDelimiters.back() == '\'');
   };
-  while (true) {
+  while (CurPtr < EndPtr) {
     // This is a simple scanner, capable of recognizing nested parentheses and
     // string literals but not much else.  The implications of this include not
     // being able to break an expression over multiple lines in an interpolated
@@ -1258,7 +1258,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // issues with malformed tokens or other problems.
     switch (*CurPtr++) {
     // String literals in general cannot be split across multiple lines;
-    // interpolated ones are no exception (unless multiline literals).
+    // interpolated ones are no exception - unless multiline literals.
     case '\n':
     case '\r':
       if (MultilineString)
@@ -1332,6 +1332,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       continue;
     }
   }
+
+  // Out of buffer.
+  return CurPtr-1;
 }
 
 /// getStringLiteralContent:
