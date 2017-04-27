@@ -1,5 +1,4 @@
-//===--- Migrator.cpp -----------------------------------------------------===//
-//
+//===--- Migrator.cpp -----------------------------------------------------===////
 // This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
@@ -26,13 +25,13 @@
 using namespace swift;
 using namespace swift::migrator;
 
-bool migrator::updateCodeAndEmitRemap(const CompilerInvocation &Invocation) {
-  Migrator M { Invocation }; // Provide inputs and configuration
+bool migrator::updateCodeAndEmitRemap(CompilerInstance &Instance,
+                                      const CompilerInvocation &Invocation) {
+  Migrator M { Instance, Invocation }; // Provide inputs and configuration
 
   // Phase 1:
   // Perform any syntactic transformations if requested.
 
-  // TODO
   auto FailedSyntacticPasses = M.performSyntacticPasses();
   if (FailedSyntacticPasses) {
     return true;
@@ -59,8 +58,9 @@ bool migrator::updateCodeAndEmitRemap(const CompilerInvocation &Invocation) {
   return EmitRemapFailed || EmitMigratedFailed || DumpMigrationStatesFailed;
 }
 
-Migrator::Migrator(const CompilerInvocation &StartInvocation)
-  : StartInvocation(StartInvocation) {
+Migrator::Migrator(CompilerInstance &StartInstance,
+                   const CompilerInvocation &StartInvocation)
+  : StartInstance(StartInstance), StartInvocation(StartInvocation) {
 
     auto ErrorOrStartBuffer = llvm::MemoryBuffer::getFile(getInputFilename());
     auto &StartBuffer = ErrorOrStartBuffer.get();
@@ -87,11 +87,10 @@ repeatFixitMigrations(const unsigned Iterations) {
 
 llvm::Optional<RC<MigrationState>>
 Migrator::performAFixItMigration() {
-
   auto InputState = States.back();
   auto InputBuffer =
     llvm::MemoryBuffer::getMemBufferCopy(InputState->getOutputText(),
-                                     getInputFilename());
+                                         getInputFilename());
 
   CompilerInvocation Invocation { StartInvocation };
   Invocation.clearInputs();
@@ -100,7 +99,6 @@ Migrator::performAFixItMigration() {
 
   CompilerInstance Instance;
   if (Instance.setup(Invocation)) {
-    // TODO: Return a state with an error attached?
     return None;
   }
 
@@ -146,30 +144,9 @@ bool Migrator::performSyntacticPasses() {
   clang::LangOptions ClangLangOpts;
   clang::edit::EditedSource Edits { ClangSourceManager, ClangLangOpts };
 
-  // Make a CompilerInstance
-  // Perform Sema
-  // auto SF = CI.getPrimarySourceFile() ?
-
-  CompilerInvocation Invocation { StartInvocation };
-
   auto InputState = States.back();
-  auto TempInputBuffer =
-    llvm::MemoryBuffer::getMemBufferCopy(InputState->getOutputText(),
-                                         getInputFilename());
-  Invocation.clearInputs();
-  Invocation.addInputBuffer(TempInputBuffer.get());
 
-  CompilerInstance Instance;
-  if (Instance.setup(StartInvocation)) {
-    return true;
-  }
-
-  Instance.performSema();
-  if (Instance.getDiags().hasFatalErrorOccurred()) {
-    return true;
-  }
-
-  EditorAdapter Editor { Instance.getSourceMgr(), ClangSourceManager };
+  EditorAdapter Editor { StartInstance.getSourceMgr(), ClangSourceManager };
 
   // const auto SF = Instance.getPrimarySourceFile();
 
@@ -183,7 +160,7 @@ bool Migrator::performSyntacticPasses() {
   // Once it has run, push the edits into Edits above:
   // Edits.commit(YourPass.getEdits());
 
-  SyntacticMigratorPass SPass(Editor, Instance.getPrimarySourceFile(),
+  SyntacticMigratorPass SPass(Editor, StartInstance.getPrimarySourceFile(),
     getMigratorOptions());
   SPass.run();
   Edits.commit(SPass.getEdits());
@@ -195,7 +172,7 @@ bool Migrator::performSyntacticPasses() {
   RewriteBufferEditsReceiver Rewriter {
     ClangSourceManager,
     Editor.getClangFileIDForSwiftBufferID(
-      Instance.getPrimarySourceFile()->getBufferID().getValue()),
+      StartInstance.getPrimarySourceFile()->getBufferID().getValue()),
     InputState->getOutputText()
   };
     

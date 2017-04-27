@@ -460,14 +460,15 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
 
   ASTContext &Context = Instance->getASTContext();
 
+  if (!Context.hadError() &&
+      Invocation.getMigratorOptions().shouldRunMigrator()) {
+    migrator::updateCodeAndEmitRemap(*Instance, Invocation);
+  }
+
   if (Action == FrontendOptions::REPL) {
     runREPL(*Instance, ProcessCmdLine(Args.begin(), Args.end()),
             Invocation.getParseStdlib());
     return Context.hadError();
-  }
-
-  if (Action == FrontendOptions::UpdateCode) {
-    return migrator::updateCodeAndEmitRemap(Invocation);
   }
 
   SourceFile *PrimarySourceFile = Instance->getPrimarySourceFile();

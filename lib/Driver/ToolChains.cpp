@@ -402,7 +402,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   const std::string &FixitsPath =
     context.Output.getAdditionalOutputForType(types::TY_Remapping);
   if (!FixitsPath.empty()) {
-    Arguments.push_back("-emit-fixits-path");
+    Arguments.push_back("-emit-remap-file-path");
     Arguments.push_back(FixitsPath.c_str());
   }
 

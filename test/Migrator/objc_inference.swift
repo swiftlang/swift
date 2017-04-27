@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -update-code -warn-swift3-objc-inference -primary-file %s -emit-migrated-file-path %t/migrated_objc_inference.swift -o %t/objc_inference.remap
+// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -warn-swift3-objc-inference -primary-file %s -emit-migrated-file-path %t/migrated_objc_inference.swift -emit-remap-file-path %t/migrated_objc_inference.swift.remap
 // RUN: not diff -u %s %t/migrated_objc_inference.swift > %t/objc_inference.diff
 // RUN: %FileCheck %s < %t/objc_inference.diff
 // REQUIRES: objc_interop

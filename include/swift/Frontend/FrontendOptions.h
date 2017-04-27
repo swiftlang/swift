@@ -172,8 +172,6 @@ public:
     EmitIR, ///< Emit LLVM IR
     EmitBC, ///< Emit LLVM BC
     EmitObject, ///< Emit object file
-
-    UpdateCode, ///< Update Swift code
   };
 
   /// Indicates the action the user requested that the frontend perform.

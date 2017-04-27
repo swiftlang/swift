@@ -94,7 +94,7 @@ public:
 
   /// Whether the compiler picked the current module name, rather than the user.
   bool ModuleNameIsFallback = false;
-  
+
   /// The number of threads for multi-threaded compilation.
   unsigned numThreads = 0;
 
