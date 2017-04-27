@@ -183,7 +183,8 @@ func methodCalls(
   // CHECK-NEXT: }
 }
 
-protocol PropertyP {
+// FIXME: Various Sema and SILGen crashes if this is not ': class'
+protocol PropertyP : class {
   var p: PropertyP & PropertyC { get set }
 
   subscript(key: Int) -> Int { get set }
@@ -197,16 +198,20 @@ class PropertyC {
     set { }
   }
 
-  subscript(key: (Int, Int)) -> Int { get set }
+  subscript(key: (Int, Int)) -> Int {
+    get {
+      return 0
+    } set { }
+  }
 }
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials16propertyAccessesyAA9PropertyP_AA0E1CCXczF : $@convention(thin) (@inout PropertyC & PropertyP) -> () {
-func propertyAccesses(_ x: inout PropertyP & PropertyC) {
+// CHECK-LABEL: sil hidden @_T021subclass_existentials16propertyAccessesyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@owned PropertyC & PropertyP) -> () {
+func propertyAccesses(_ x: PropertyP & PropertyC) {
   x.p.p = x
   x.c.c = x
 
-  propertyAccesses(&x.p)
-  propertyAccesses(&x.c)
+  propertyAccesses(x.p)
+  propertyAccesses(x.c)
 
   _ = x[1]
   x[1] = 1
