@@ -26,6 +26,7 @@ namespace swift {
   class Decl;
   class DiagnosticEngine;
   class SourceManager;
+  class ValueDecl;
   
   enum class PatternKind : uint8_t;
   enum class StaticSpellingKind : uint8_t;
@@ -70,6 +71,7 @@ namespace swift {
     Unsigned,
     Identifier,
     ObjCSelector,
+    ValueDecl,
     Type,
     TypeRepr,
     PatternKind,
@@ -96,6 +98,7 @@ namespace swift {
       StringRef StringVal;
       DeclName IdentifierVal;
       ObjCSelector ObjCSelectorVal;
+      ValueDecl *TheValueDecl;
       Type TypeVal;
       TypeRepr *TyR;
       PatternKind PatternKindVal;
@@ -129,6 +132,10 @@ namespace swift {
 
     DiagnosticArgument(ObjCSelector S)
       : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
+    }
+
+    DiagnosticArgument(ValueDecl *VD)
+      : Kind(DiagnosticArgumentKind::ValueDecl), TheValueDecl(VD) {
     }
 
     DiagnosticArgument(Type T)
@@ -205,6 +212,11 @@ namespace swift {
     ObjCSelector getAsObjCSelector() const {
       assert(Kind == DiagnosticArgumentKind::ObjCSelector);
       return ObjCSelectorVal;
+    }
+
+    ValueDecl *getAsValueDecl() const {
+      assert(Kind == DiagnosticArgumentKind::ValueDecl);
+      return TheValueDecl;
     }
 
     Type getAsType() const {

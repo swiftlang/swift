@@ -3153,6 +3153,11 @@ public:
     return getElements()[i];
   }
 
+  unsigned getElementIndex(Operand *operand) {
+    assert(operand->getUser() == this);
+    return operand->getOperandNumber();
+  }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -3217,6 +3222,8 @@ public:
 
   bool hasOperand() const { return OptionalOperand.hasValue(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
+
+  Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
 
   ArrayRef<Operand> getAllOperands() const {
     return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};

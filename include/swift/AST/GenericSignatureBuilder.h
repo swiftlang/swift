@@ -82,12 +82,17 @@ public:
 
   class FloatingRequirementSource;
 
-  /// Describes a constraint that is bounded on one side by a concrete type.
-  struct ConcreteConstraint {
+  /// Describes a specific constraint on a potential archetype.
+  template<typename T>
+  struct Constraint {
     PotentialArchetype *archetype;
-    Type concreteType;
+    T value;
     const RequirementSource *source;
   };
+
+  /// Describes a concrete constraint on a potential archetype where, where the
+  /// other parameter is a concrete type.
+  typedef Constraint<Type> ConcreteConstraint;
 
   /// Describes an equivalence class of potential archetypes.
   struct EquivalenceClass {
@@ -339,9 +344,11 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, FloatingRequirementSource source);
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap = nullptr);
 
   bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add a new requirement.
@@ -371,7 +378,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type);
+  void inferRequirements(ModuleDecl &module, TypeLoc type);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -385,7 +392,8 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
+  void inferRequirements(ModuleDecl &module, ParameterList *params,
+                         GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
@@ -418,7 +426,7 @@ private:
     Conflicting,
   };
 
-  /// Check a list of concrete constraints, removing self-derived constraints
+  /// Check a list of constraints, removing self-derived constraints
   /// and diagnosing redundant constraints.
   ///
   /// \param isSuitableRepresentative Determines whether the given constraint
@@ -429,17 +437,18 @@ private:
   /// emitted.
   ///
   /// \returns the representative constraint.
-  ConcreteConstraint checkConstraintList(
+  template<typename T>
+  Constraint<T> checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
-                           std::vector<ConcreteConstraint> &constraints,
-                           llvm::function_ref<bool(const ConcreteConstraint &)>
+                           std::vector<Constraint<T>> &constraints,
+                           llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(Type)>
+                           llvm::function_ref<ConstraintRelation(const T&)>
                              checkConstraint,
-                           Optional<Diag<unsigned, Type, Type, Type>>
+                           Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
-                           Diag<Type, Type> redundancyDiag,
-                           Diag<bool, Type, Type> otherNoteDiag);
+                           Diag<Type, T> redundancyDiag,
+                           Diag<bool, Type, T> otherNoteDiag);
 
   /// Check for redundant concrete type constraints within the equivalence
   /// class of the given potential archetype.
@@ -774,8 +783,17 @@ public:
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
 
+  /// Retrieve the root requirement source.
+  const RequirementSource *getRoot() const;
+
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
+
+  /// Whether the requirement is inferred or derived from an inferred
+  /// requirment.
+  bool isInferredRequirement() const {
+    return getRoot()->kind == Inferred;
+  }
 
   /// Whether the requirement can be derived from something in its path.
   ///
@@ -820,6 +838,9 @@ public:
     return getTrailingObjects<WrittenRequirementLoc>()[0]
              .dyn_cast<const RequirementRepr *>();
   }
+
+  /// Retrieve the type stored in this requirement.
+  Type getStoredType() const;
 
   /// Retrieve the protocol for this requirement, if there is one.
   ProtocolDecl *getProtocolDecl() const;

@@ -1804,6 +1804,11 @@ namespace {
               GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
     }
 
+    void clearGlobalMissingWitnesses() {
+      GlobalMissingWitnesses.clear();
+      LocalMissingWitnessesStartIndex = GlobalMissingWitnesses.size();
+    }
+
   public:
     /// Call this to diagnose currently known missing witnesses.
     void diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
@@ -2662,7 +2667,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   if (LocalMissing.empty())
     return;
 
-  llvm::SetVector<ValueDecl*> MissingWitnesses = GlobalMissingWitnesses;
+  llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
+                                               GlobalMissingWitnesses.end());
   auto InsertFixitCallback = [MissingWitnesses](NormalProtocolConformance *Conf) {
     DeclContext *DC = Conf->getDeclContext();
     // The location where to insert stubs.
@@ -2712,7 +2718,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
-    GlobalMissingWitnesses.clear();
+    clearGlobalMissingWitnesses();
     return;
   }
   case MissingWitnessDiagnosisKind::ErrorOnly: {
@@ -2722,7 +2728,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   }
   case MissingWitnessDiagnosisKind::FixItOnly:
     InsertFixitCallback(Conformance);
-    GlobalMissingWitnesses.clear();
+    clearGlobalMissingWitnesses();
     return;
   }
 }
@@ -4867,8 +4873,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
-  // Diagnose missing value witnesses later.
-  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
 
   // Resolution attempts to have the witnesses be correct by construction, but
   // this isn't guaranteed, so let's double check.
@@ -4887,6 +4891,9 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
     Conformance->setInvalid();
     return;
   }
+
+  // Diagnose missing value witnesses later.
+  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
 
   // Ensure the associated type conformances are used.
   addUsedConformances(Conformance);
@@ -5250,6 +5257,27 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
       sf->addUsedConformance(normalConf);
     }
   }
+
+  // Debugging aid: display the conformance access path for archetype
+  // conformances.
+  if (Context.LangOpts.DebugGenericSignatures && InExpression &&
+      T->is<ArchetypeType>() && lookupResult->isAbstract() &&
+      T->castTo<ArchetypeType>()->getGenericEnvironment()
+        == DC->getGenericEnvironmentOfContext()) {
+    auto interfaceType = DC->mapTypeOutOfContext(T);
+    if (interfaceType->isTypeParameter()) {
+      llvm::errs() << "Conformance access path for ";
+      T.print(llvm::errs());
+      llvm::errs() << ": " << Proto->getName() << " is ";
+
+      auto genericSig = DC->getGenericSignatureOfContext();
+      genericSig->getConformanceAccessPath(interfaceType, Proto,
+                                           *DC->getParentModule())
+        .print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+
   return lookupResult;
 }
 

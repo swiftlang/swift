@@ -125,6 +125,9 @@ ERROR(error_conflicting_options, none,
       "conflicting options '%0' and '%1'",
       (StringRef, StringRef))
 
+WARNING(warn_ignore_embed_bitcode, none,
+        "ignoring -embed-bitcode since no object file is being generated", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

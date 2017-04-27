@@ -18,17 +18,17 @@ APInt swift::constantFoldBitOperation(APInt lhs, APInt rhs, BuiltinValueKind ID)
   switch (ID) {
     default: llvm_unreachable("Not all cases are covered!");
     case BuiltinValueKind::And:
-      return lhs.And(rhs);
+      return lhs & rhs;
     case BuiltinValueKind::AShr:
       return lhs.ashr(rhs);
     case BuiltinValueKind::LShr:
       return lhs.lshr(rhs);
     case BuiltinValueKind::Or:
-      return lhs.Or(rhs);
+      return lhs | rhs;
     case BuiltinValueKind::Shl:
       return lhs.shl(rhs);
     case BuiltinValueKind::Xor:
-      return lhs.Xor(rhs);
+      return lhs ^ rhs;
   }
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -optimize-opaque-address-lowering -emit-sorted-sil -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 import Builtin
 
@@ -16,7 +16,6 @@ sil hidden @f010_addrlower_identity : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $T):
   return %0 : $T
 }
-
 
 sil hidden [noinline] @f020_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
 bb0(%0 : $T):
@@ -63,12 +62,9 @@ bb0(%0 : $Int):
 
 // CHECK-LABEL: sil @f030_returnPair : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
-// CHECK:   %[[LOCAL:.*]] = alloc_stack $T
-// CHECK:   copy_addr %2 to [initialization] %[[LOCAL]] : $*T
-// CHECK:   copy_addr [take] %[[LOCAL]] to [initialization] %0 : $*T
+// CHECK:   copy_addr %2 to [initialization] %0 : $*T
 // CHECK:   copy_addr [take] %2 to [initialization] %1 : $*T
 // CHECK:   %[[R:.*]] = tuple ()
-// CHECK:   dealloc_stack %[[LOCAL]] : $*T
 // CHECK:   return %[[R]] : $()
 // CHECK-LABEL: } // end sil function 'f030_returnPair'
 sil @f030_returnPair : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
@@ -84,20 +80,17 @@ bb0(%0 : $T):
 // CHECK:   %[[OUT1:.*]] = alloc_stack $T
 // CHECK:   %[[LOC1:.*]] = alloc_stack $T
 // CHECK:   %[[OUT2:.*]] = alloc_stack $T
-// CHECK:   %[[LOC2:.*]] = alloc_stack $T
 // CHECK:   // function_ref f030_returnPair
 // CHECK:   %[[F:.*]] = function_ref @f030_returnPair : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0)
 // CHECK:   copy_addr %1 to [initialization] %[[LOC0]] : $*T
 // CHECK:   %[[R0:.*]] = apply %[[F]]<T>(%[[OUT1]], %[[OUT2]], %[[LOC0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0)
 // CHECK:   copy_addr %[[OUT1]] to [initialization] %[[LOC1]] : $*T
-// CHECK:   copy_addr %[[OUT2]] to [initialization] %[[LOC2]] : $*T
+// CHECK:   copy_addr %[[OUT2]] to [initialization] %0 : $*T
 // CHECK:   destroy_addr %[[OUT1]] : $*T
 // CHECK:   destroy_addr %[[OUT2]] : $*T
 // CHECK:   destroy_addr %[[LOC1]] : $*T
 // CHECK:   destroy_addr %1 : $*T
-// CHECK:   copy_addr [take] %[[LOC2]] to [initialization] %0 : $*T
 // CHECK:   %[[R:.*]] = tuple ()
-// CHECK:   dealloc_stack %[[LOC2]] : $*T
 // CHECK:   dealloc_stack %[[OUT2]] : $*T
 // CHECK:   dealloc_stack %[[LOC1]] : $*T
 // CHECK:   dealloc_stack %[[OUT1]] : $*T
@@ -149,27 +142,21 @@ bb0(%0 : $T):
 
 // CHECK-LABEL: sil @f050_storeinout : $@convention(thin) <T> (@inout T, @inout T, @in T) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
-// CHECK:   %[[ARG1:.*]] = alloc_stack $T
 // CHECK:   %[[PREV1:.*]] = alloc_stack $T
-// CHECK:   %[[ARG2:.*]] = alloc_stack $T
 // CHECK:   %[[PREV2:.*]] = alloc_stack $T
 // CHECK:   debug_value_addr %0 : $*T, var, name "t", argno 1
 // CHECK:   debug_value_addr %1 : $*T, var, name "u", argno 2
 // CHECK:   debug_value_addr %2 : $*T
-// CHECK:   copy_addr %2 to [initialization] %[[ARG1]] : $*T
 // CHECK:   copy_addr [take] %0 to [initialization] %[[PREV1]] : $*T
-// CHECK:   copy_addr [take] %[[ARG1]] to [initialization] %0 : $*T
+// CHECK:   copy_addr %2 to [initialization] %0 : $*T
 // CHECK:   destroy_addr %[[PREV1]] : $*T
-// CHECK:   copy_addr %2 to [initialization] %[[ARG2]] : $*T
 // CHECK:   copy_addr [take] %1 to [initialization] %[[PREV2]] : $*T
-// CHECK:   copy_addr [take] %[[ARG2]] to [initialization] %1 : $*T
+// CHECK:   copy_addr %2 to [initialization] %1 : $*T
 // CHECK:   destroy_addr %[[PREV2]] : $*T
 // CHECK:   destroy_addr %2 : $*T
 // CHECK:   %[[R:.*]] = tuple ()
 // CHECK:   dealloc_stack %[[PREV2]] : $*T
-// CHECK:   dealloc_stack %[[ARG2]] : $*T
 // CHECK:   dealloc_stack %[[PREV1]] : $*T
-// CHECK:   dealloc_stack %[[ARG1]] : $*T
 // CHECK:   return %[[R]] : $()
 // CHECK-LABEL: } // end sil function 'f050_storeinout'
 sil @f050_storeinout : $@convention(thin) <T> (@inout T, @inout T, @in T) -> () {
@@ -203,20 +190,17 @@ bb0(%0 : $*T, %1 : $T):
 
 // CHECK-LABEL: sil @f061_callinout : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
-// CHECK:   %[[LOC1:.*]] = alloc_stack $T
 // CHECK:   %[[LOC2:.*]] = alloc_stack $T
-// CHECK:   %[[INOUT:.*]] = alloc_stack $T, var, name "u"
+// CHECK:   %[[LOC1:.*]] = alloc_stack $T
 // CHECK:   copy_addr %0 to [initialization] %[[LOC1]] : $*T
-// CHECK:   copy_addr [take] %[[LOC1]] to [initialization] %[[INOUT]] : $*T
 // CHECK:   %[[FN:.*]] = function_ref @f060_mutate : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in τ_0_0) -> ()
 // CHECK:   copy_addr %0 to [initialization] %[[LOC2]] : $*T
-// CHECK:   %{{.*}} = apply %[[FN]]<T>(%[[INOUT]], %[[LOC2]]) : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in τ_0_0) -> ()
-// CHECK:   destroy_addr %[[INOUT]] : $*T
+// CHECK:   %{{.*}} = apply %[[FN]]<T>(%[[LOC1]], %[[LOC2]]) : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in τ_0_0) -> ()
+// CHECK:   destroy_addr %[[LOC1]] : $*T
 // CHECK:   destroy_addr %0 : $*T
 // CHECK:   %[[R:.*]] = tuple ()
-// CHECK:   dealloc_stack %[[INOUT]] : $*T
-// CHECK:   dealloc_stack %[[LOC2]] : $*T
 // CHECK:   dealloc_stack %[[LOC1]] : $*T
+// CHECK:   dealloc_stack %[[LOC2]] : $*T
 // CHECK:   return %[[R]] : $()
 // CHECK-LABEL: } // end sil function 'f061_callinout'
 sil @f061_callinout : $@convention(thin) <T> (@in T) -> () {
@@ -249,13 +233,10 @@ bb0(%0 : $T, %1 : $C):
 
 // CHECK-LABEL: sil @f071_mixedResult2 : $@convention(thin) <T> (@in T, @owned C) -> (@out T, @out T, @owned C, @owned C) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T, %3 : $C):
-// CHECK:   %[[L:.*]] = alloc_stack $T
-// CHECK:   copy_addr %2 to [initialization] %[[L]] : $*T
+// CHECK:   copy_addr %2 to [initialization] %0 : $*T
 // CHECK:   strong_retain %3 : $C
-// CHECK:   copy_addr [take] %[[L]] to [initialization] %0 : $*T
 // CHECK:   copy_addr [take] %2 to [initialization] %1 : $*T
 // CHECK:   %[[T:.*]] = tuple (%3 : $C, %3 : $C)
-// CHECK:   dealloc_stack %[[L]] : $*T
 // CHECK:   return %[[T]] : $(C, C)
 // CHECK-LABEL: } // end sil function 'f071_mixedResult2'
 sil @f071_mixedResult2 : $@convention(thin) <T> (@in T, @owned C) -> (@out T, @out T, @owned C, @owned C) {
@@ -270,20 +251,17 @@ bb0(%0 : $T, %1 : $C):
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $C):
 // CHECK:   %[[LIN:.*]] = alloc_stack $T
 // CHECK:   %[[OUT:.*]] = alloc_stack $T
-// CHECK:   %[[LOUT:.*]] = alloc_stack $T
 // CHECK:   // function_ref f070_mixedResult1
 // CHECK:   %[[F:.*]] = function_ref @f070_mixedResult1 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> (@out τ_0_0, @owned C)
 // CHECK:   copy_addr %1 to [initialization] %[[LIN]] : $*T
 // CHECK:   strong_retain %2 : $C
 // CHECK:   %[[R:.*]] = apply %[[F]]<T>(%[[OUT]], %[[LIN]], %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> (@out τ_0_0, @owned C)
-// CHECK:   copy_addr %[[OUT]] to [initialization] %[[LOUT]] : $*T
+// CHECK:   copy_addr %[[OUT]] to [initialization] %0 : $*T
 // CHECK:   strong_retain %[[R]] : $C
 // CHECK:   destroy_addr %[[OUT]] : $*T
 // CHECK:   strong_release %[[R]] : $C
 // CHECK:   strong_release %2 : $C
 // CHECK:   destroy_addr %1 : $*T
-// CHECK:   copy_addr [take] %[[LOUT]] to [initialization] %0 : $*T
-// CHECK:   dealloc_stack %[[LOUT]] : $*T
 // CHECK:   dealloc_stack %[[OUT]] : $*T
 // CHECK:   dealloc_stack %[[LIN]] : $*T
 // CHECK:   return %[[R]] : $C
@@ -309,17 +287,15 @@ bb0(%0 : $T, %1 : $C):
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T, %3 : $C):
 // CHECK:   %[[LOC0:.*]] = alloc_stack $T
 // CHECK:   %[[OUT1:.*]] = alloc_stack $T
-// CHECK:   %[[LOC1:.*]] = alloc_stack $T
 // CHECK:   %[[OUT2:.*]] = alloc_stack $T
-// CHECK:   %[[LOC2:.*]] = alloc_stack $T
 // CHECK:   %[[F:.*]] = function_ref @f071_mixedResult2 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> (@out τ_0_0, @out τ_0_0, @owned C, @owned C)
 // CHECK:   copy_addr %2 to [initialization] %[[LOC0]] : $*T
 // CHECK:   strong_retain %3 : $C
 // CHECK:   %[[R:.*]] = apply %[[F]]<T>(%[[OUT1]], %[[OUT2]], %[[LOC0]], %3) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> (@out τ_0_0, @out τ_0_0, @owned C, @owned C)
 // CHECK:   %[[T2:.*]] = tuple_extract %[[R]] : $(C, C), 1
 // CHECK:   %[[T1:.*]] = tuple_extract %[[R]] : $(C, C), 0
-// CHECK:   copy_addr %[[OUT1]] to [initialization] %[[LOC1]] : $*T
-// CHECK:   copy_addr %[[OUT2]] to [initialization] %[[LOC2]] : $*T
+// CHECK:   copy_addr %[[OUT1]] to [initialization] %0 : $*T
+// CHECK:   copy_addr %[[OUT2]] to [initialization] %1 : $*T
 // CHECK:   strong_retain %[[T1]] : $C
 // CHECK:   strong_retain %[[T2]] : $C
 // CHECK:   destroy_addr %[[OUT1]] : $*T
@@ -328,12 +304,8 @@ bb0(%0 : $T, %1 : $C):
 // CHECK:   strong_release %[[T2]] : $C
 // CHECK:   strong_release %3 : $C
 // CHECK:   destroy_addr %2 : $*T
-// CHECK:   copy_addr [take] %[[LOC1]] to [initialization] %0 : $*T
-// CHECK:   copy_addr [take] %[[LOC2]] to [initialization] %1 : $*T
 // CHECK:   %[[T:.*]] = tuple (%[[T1]] : $C, %[[T2]] : $C)
-// CHECK:   dealloc_stack %[[LOC2]] : $*T
 // CHECK:   dealloc_stack %[[OUT2]] : $*T
-// CHECK:   dealloc_stack %[[LOC1]] : $*T
 // CHECK:   dealloc_stack %[[OUT1]] : $*T
 // CHECK:   dealloc_stack %[[LOC0]] : $*T
 // CHECK:   return %[[T]] : $(C, C)
@@ -368,17 +340,11 @@ enum Optional<T> {
 
 // CHECK-LABEL: sil @f080_optional : $@convention(thin) <T> (@in T) -> @out Optional<T> {
 // CHECK: bb0(%0 : $*Optional<T>, %1 : $*T):
-// CHECK:   %[[L1:.*]] = alloc_stack $T
-// CHECK:   %[[L2:.*]] = alloc_stack $Optional<T>
-// CHECK:   copy_addr %1 to [initialization] %[[L1]] : $*T
-// CHECK:   %[[DATA:.*]] = init_enum_data_addr %[[L2]] : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK:   copy_addr [take] %[[L1]] to [initialization] %[[DATA]] : $*T
-// CHECK:   inject_enum_addr %[[L2]] : $*Optional<T>, #Optional.some!enumelt.1
+// CHECK:   %[[DATA:.*]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
+// CHECK:   copy_addr %1 to [initialization] %[[DATA]] : $*T
+// CHECK:   inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK:   destroy_addr %1 : $*T
-// CHECK:   copy_addr [take] %[[L2]] to [initialization] %0 : $*Optional<T>
 // CHECK:   %[[T:.*]] = tuple ()
-// CHECK:   dealloc_stack %[[L2]] : $*Optional<T>
-// CHECK:   dealloc_stack %[[L1]] : $*T
 // CHECK:   return %[[T]] : $()
 // CHECK-LABEL: } // end sil function 'f080_optional'
 sil @f080_optional : $@convention(thin) <T> (@in T) -> @out Optional<T> {
@@ -455,17 +421,14 @@ bb0(%0 : $Any):
 
 // CHECK-LABEL: sil @f101_passAny : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0(%0 : $*T):
-// CHECK:   %[[T1:.*]] = alloc_stack $T
 // CHECK:   %[[A:.*]] = alloc_stack $Any
 // CHECK:   %[[F:.*]] = function_ref @f100_any : $@convention(thin) (@in Any) -> ()
-// CHECK:   copy_addr %0 to [initialization] %[[T1]] : $*T
-// CHECK:   %[[T2:.*]] = init_existential_addr %[[A]] : $*Any, $T
-// CHECK:   copy_addr [take] %[[T1]] to [initialization] %[[T2]] : $*T
+// CHECK:   %[[T:.*]] = init_existential_addr %[[A]] : $*Any, $T
+// CHECK:   copy_addr %0 to [initialization] %[[T]] : $*T
 // CHECK:   %{{.*}} = apply %[[F]](%[[A]]) : $@convention(thin) (@in Any) -> ()
 // CHECK:   destroy_addr %0 : $*T
 // CHECK:   %[[R:.*]] = tuple ()
 // CHECK:   dealloc_stack %[[A]] : $*Any
-// CHECK:   dealloc_stack %[[T1]] : $*T
 // CHECK:   return %[[R]] : $()
 // CHECK-LABEL: } // end sil function 'f101_passAny'
 sil @f101_passAny : $@convention(thin) <T> (@in T) -> () {

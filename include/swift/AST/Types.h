@@ -990,8 +990,10 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType)
-      : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties::HasError) {
+  ErrorType(ASTContext &C, Type originalType,
+            RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Error, &C, properties) {
+    assert(properties.hasError());
     if (originalType) {
       ErrorTypeBits.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
