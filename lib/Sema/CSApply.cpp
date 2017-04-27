@@ -700,12 +700,17 @@ namespace {
 
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
 
+      bool isClassOrClassExistential =
+        member->getDeclContext()->getDeclaredTypeOfContext()
+          ->isAnyClassReferenceType();
+
       // If the base was an lvalue but it will only be treated as an
       // rvalue, turn the base into an rvalue now. This results in
       // better SILGen.
       if (isLValue &&
           (isNonMutatingMember(member) ||
-           isMetatype || baseTy->isClassExistentialType())) {
+           isMetatype ||
+           isClassOrClassExistential)) {
         base = cs.coerceToRValue(base);
         isLValue = false;
       }
@@ -6322,10 +6327,20 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                          Type baseTy, ValueDecl *member,
                                          AccessSemantics semantics,
                                          ConstraintLocatorBuilder locator) {
+  llvm::errs() << "coerce object argument\n";
+  expr->dump();
+  baseTy->dump();
+  member->dumpRef(); llvm::errs() << "\n";
+  member->getInterfaceType()->dump();
+  
   Type toType = adjustSelfTypeForMember(baseTy, member, semantics, dc);
+  llvm::errs() << "===== TO TYPE:\n";
+  toType->dump();
 
   // If our expression already has the right type, we're done.
   Type fromType = cs.getType(expr);
+  llvm::errs() << "===== FROM TYPE:\n";
+  fromType->dump();
   if (fromType->isEqual(toType))
     return expr;
 
