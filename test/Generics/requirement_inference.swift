@@ -91,7 +91,7 @@ func inferSuperclassRequirement2<T : Canidae>(_ v: U<T>) {}
 // ----------------------------------------------------------------------------
 
 protocol P3 {
-  associatedtype P3Assoc : P2
+  associatedtype P3Assoc : P2  // expected-note{{declared here}}
 }
 
 protocol P4 {
@@ -388,4 +388,19 @@ protocol P27a {
 protocol P27b {
   associatedtype A
   associatedtype B where A == X26<B>
+}
+
+// ----------------------------------------------------------------------------
+// Inference of associated type relationships within a protocol hierarchy
+// ----------------------------------------------------------------------------
+
+struct X28 : P2 {
+  func p1() { }
+}
+
+// CHECK-LABEL: .P28@
+// CHECK-NEXT: Requirement signature: <Self where Self : P3, Self.P3Assoc == X28>
+// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : P3, τ_0_0.P3Assoc == X28>
+protocol P28: P3 {
+  typealias P3Assoc = X28   // expected-warning{{typealias overriding associated type}}
 }
