@@ -27,15 +27,18 @@ namespace migrator {
 
 /// Run the migrator on the compiler invocation's input file and emit a
 /// "replacement map" describing the requested changes to the source file.
-bool updateCodeAndEmitRemap(const CompilerInvocation &Invocation);
+bool updateCodeAndEmitRemap(CompilerInstance &Instance,
+                            const CompilerInvocation &Invocation);
 
 class Migrator {
+  CompilerInstance &StartInstance;
   const CompilerInvocation &StartInvocation;
   SourceManager SrcMgr;
   std::vector<RC<MigrationState>> States;
 
 public:
-  Migrator(const CompilerInvocation &StartInvocation);
+  Migrator(CompilerInstance &StartInstance,
+           const CompilerInvocation &StartInvocation);
 
   /// The maximum number of times to run the compiler over the input to get
   /// fix-its. Nullability changes may expose other fix-its in subsequent

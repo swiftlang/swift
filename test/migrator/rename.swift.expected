@@ -1,5 +1,5 @@
 // REQUIRES: objc_interop
-// RUN: rm -rf %t && mkdir -p %t && %swift -update-code -primary-file %s  -F %S/mock-sdk -api-diff-data-file %S/API.json -emit-migrated-file-path %t/rename.swift.result -o %t/rename.swift.remap
+// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -primary-file %s -F %S/mock-sdk -api-diff-data-file %S/API.json -emit-migrated-file-path %t/rename.swift.result -emit-remap-file-path %t/rename.swift.remap
 // RUN: diff -u %S/rename.swift.expected %t/rename.swift.result
 
 import Bar

@@ -415,9 +415,19 @@ def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
 // Migrator Options
+
+def update_code : Flag<["-"], "update-code">,
+  HelpText<"Update Swift code">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 def disable_migrator_fixits: Flag<["-"], "disable-migrator-fixits">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Disable the Migrator phase which automatically applies fix-its">;
+
+def emit_remap_file_path: Separate<["-"], "emit-remap-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the replacement map describing Swift Migrator changes to <path>">,
+  MetaVarName<"<path>">;
 
 def emit_migrated_file_path: Separate<["-"], "emit-migrated-file-path">,
   Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -507,10 +517,6 @@ def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def S: Flag<["-"], "S">, Alias<emit_assembly>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
-
-def update_code : Flag<["-"], "update-code">,
-  HelpText<"Update Swift code">, ModeOpt,
-  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def fixit_all : Flag<["-"], "fixit-all">,
   HelpText<"Apply all fixits from diagnostics without any filtering">,
