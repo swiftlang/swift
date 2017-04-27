@@ -1570,7 +1570,6 @@ extension BinaryInteger {
   public init?<T : FloatingPoint>(exactly source: T) {
     // FIXME(integers): implement
     fatalError()
-    return nil
   }
 
   @_transparent
