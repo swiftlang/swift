@@ -96,6 +96,7 @@ Migrator::performAFixItMigration() {
   CompilerInvocation Invocation { StartInvocation };
   Invocation.clearInputs();
   Invocation.addInputBuffer(InputBuffer.get());
+  Invocation.getLangOptions().EffectiveLanguageVersion = { 4, 0, 0 };
 
   CompilerInstance Instance;
   if (Instance.setup(Invocation)) {
