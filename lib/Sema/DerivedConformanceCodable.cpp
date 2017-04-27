@@ -887,7 +887,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   initDecl->setBodySynthesizer(deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
-  if (isa<ClassDecl>(type) && type->getAttrs().hasAttribute<FinalAttr>()) {
+  if (isa<ClassDecl>(type) && !type->getAttrs().hasAttribute<FinalAttr>()) {
     auto *reqAttr = new (C) SimpleDeclAttr<DAK_Required>(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }
