@@ -2756,6 +2756,10 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return llvm::make_error<OverrideError>(name);
     }
 
+    auto canonicalType = getTypeChecked(canonicalTypeID);
+    if (!canonicalType)
+      return llvm::make_error<TypeError>(name, takeErrorInfo(canonicalType.takeError()));
+
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -4021,9 +4025,15 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto info = GenericFunctionType::ExtInfo(*rep, throws);
 
     auto sig = GenericSignature::get(genericParams, requirements);
-    typeOrOffset = GenericFunctionType::get(sig,
-                                            getType(inputID),
-                                            getType(resultID),
+
+    auto inputTy = getTypeChecked(inputID);
+    if (!inputTy)
+      return inputTy.takeError();
+    auto resultTy = getTypeChecked(resultID);
+    if (!resultTy)
+      return resultTy.takeError();
+
+    typeOrOffset = GenericFunctionType::get(sig, inputTy.get(), resultTy.get(),
                                             info);
     break;
   }

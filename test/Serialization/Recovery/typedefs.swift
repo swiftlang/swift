@@ -36,6 +36,9 @@ let _: Int32? = useAssoc(AnotherType.self)
 let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
 let _ = unwrapped // okay
 
+_ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
+_ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
+
 #endif // VERIFY
 
 #else // TEST
@@ -123,5 +126,20 @@ public var normalFirst: Int?, wrappedSecond: WrappedInt?
 // CHECK-RECOVERY-NEGATIVE-NOT: var wrappedThird:
 // CHECK-RECOVERY-NEGATIVE-NOT: var wrappedFourth:
 public var wrappedThird, wrappedFourth: WrappedInt?
+
+// CHECK-DAG: func usesWrapped(_ wrapped: WrappedInt)
+// CHECK-RECOVERY-NEGATIVE-NOT: func usesWrapped(
+public func usesWrapped(_ wrapped: WrappedInt) {}
+// CHECK-DAG: func usesUnwrapped(_ unwrapped: UnwrappedInt)
+// CHECK-RECOVERY-DAG: func usesUnwrapped(_ unwrapped: Int32)
+public func usesUnwrapped(_ unwrapped: UnwrappedInt) {}
+
+// CHECK-DAG: func returnsWrapped() -> WrappedInt
+// CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrapped(
+public func returnsWrapped() -> WrappedInt { fatalError() }
+
+// CHECK-DAG: func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt
+// CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedGeneric
+public func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt { fatalError() }
 
 #endif // TEST
