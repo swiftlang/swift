@@ -60,5 +60,27 @@
     "RightUsr": "",
     "RightComment": "NewEnum.enumElement",
     "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)PropertyUserInterface(im)field",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "SetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)PropertyUserInterface(im)setField:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "bar"
   }
 ]
