@@ -6,6 +6,8 @@ int barGlobalFunc(int a);
 
 int barGlobalVariable = 1;
 
+int barGlobalVariableOldEnumElement = 1;
+
 int barGlobalFuncOldName(int a);
 
 @interface BarForwardDeclaredClass
