@@ -392,7 +392,7 @@
     "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:scheme:options:usingBlock:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "NSLinguisticTag",
+    "RightComment": "NSLinguisticTag?",
     "ModuleName": "Foundation"
   },
   {
@@ -634,7 +634,7 @@
     "LeftUsr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "NSLinguisticTag",
+    "RightComment": "NSLinguisticTag?",
     "ModuleName": "Foundation"
   },
   {
@@ -881,6 +881,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)WCSession(cm)defaultSession",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "WatchConnectivity"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "1",
@@ -1043,6 +1054,20 @@
     "RightUsr": "",
     "RightComment": "matrix_float4x4",
     "ModuleName": "SpriteKit"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@HMSignificantEventSunrise",
+    "OldPrintedName": "HMSignificantEventSunrise",
+    "NewPrintedName": "sunrise",
+    "NewTypeName": "HMSignificantEvent"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@HMSignificantEventSunset",
+    "OldPrintedName": "HMSignificantEventSunset",
+    "NewPrintedName": "sunset",
+    "NewTypeName": "HMSignificantEvent"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -1311,6 +1336,20 @@
     "NewTypeName": "NSLinguisticTagScheme"
   },
   {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@GKPlayerDidChangeNotificationName",
+    "OldPrintedName": "GKPlayerDidChangeNotificationName",
+    "NewPrintedName": "GKPlayerDidChangeNotificationName",
+    "NewTypeName": "NSNotification.Name"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@GKPlayerAuthenticationDidChangeNotificationName",
+    "OldPrintedName": "GKPlayerAuthenticationDidChangeNotificationName",
+    "NewPrintedName": "GKPlayerAuthenticationDidChangeNotificationName",
+    "NewTypeName": "NSNotification.Name"
+  },
+  {
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)NSAttributedString(im)enumerateAttributesInRange:options:usingBlock:",
     "Index": 3
@@ -1319,6 +1358,31 @@
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)NSAttributedString(im)enumerateAttribute:inRange:options:usingBlock:",
     "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateReadingItemAtURL:options:error:byAccessor:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateWritingItemAtURL:options:error:byAccessor:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateReadingItemAtURL:options:writingItemAtURL:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateWritingItemAtURL:options:writingItemAtURL:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)prepareForReadingItemsAtURLs:options:writingItemsAtURLs:options:error:byAccessor:",
+    "Index": 6
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
@@ -1420,6 +1484,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:maximumPointSize:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)AVAudioRecorder(im)recordAtTime:"
   },
   {
@@ -1452,6 +1524,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringBeforeSignificantEvent:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringAfterSignificantEvent:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)SCNAnimatable(im)removeAnimationForKey:"
   },
   {
@@ -1469,6 +1549,34 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)SCNNode(im)convertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertPosition:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertPosition:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertVector:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertTransform:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertTransform:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdLookAt:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
