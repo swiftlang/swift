@@ -247,6 +247,33 @@ public:
   const_succ_iterator succ_begin() const { return getSuccessors().begin(); }
   const_succ_iterator succ_end() const { return getSuccessors().end(); }
 
+  using succblock_iterator =
+      TransformIterator<SILSuccessor *,
+                        std::function<SILBasicBlock *(const SILSuccessor &)>>;
+  using const_succblock_iterator = TransformIterator<
+      const SILSuccessor *,
+      std::function<const SILBasicBlock *(const SILSuccessor &)>>;
+  succblock_iterator succblock_begin() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().begin(), F);
+  }
+  succblock_iterator succblock_end() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().end(), F);
+  }
+  const_succblock_iterator succblock_begin() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().begin(), F);
+  }
+  const_succblock_iterator succblock_end() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().end(), F);
+  }
+
   SILBasicBlock *getSingleSuccessorBlock() {
     if (succ_empty() || std::next(succ_begin()) != succ_end())
       return nullptr;
