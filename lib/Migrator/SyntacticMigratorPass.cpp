@@ -152,6 +152,38 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
     }
   }
 
+  void handleFunctionCallToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,
+                                          Expr *Arg) {
+    for(auto *Item :getRelatedDiffItems(FD)) {
+      if (auto *CD = dyn_cast<CommonDiffItem>(Item)) {
+        switch (CD->DiffKind) {
+        case NodeAnnotation::GetterToProperty: {
+          // Remove "()"
+          Editor.remove(Lexer::getCharSourceRangeFromSourceRange(SM,
+                                                        Arg->getSourceRange()));
+          return;
+        }
+        case NodeAnnotation::SetterToProperty: {
+          ReferenceCollector Walker(FD);
+          Walker.walk(FuncRefContainer);
+          auto ReplaceRange = CharSourceRange(SM, Walker.Result.getStart(),
+                                          Arg->getStartLoc().getAdvancedLoc(1));
+
+          // Replace "x.getY(" with "x.Y =".
+          Editor.replace(ReplaceRange, (llvm::Twine(Walker.Result.str().
+                                                   substr(3)) + " = ").str());
+          // Remove ")"
+          Editor.remove(CharSourceRange(SM, Arg->getEndLoc(), Arg->getEndLoc().
+                                        getAdvancedLoc(1)));
+          return;
+        }
+        default:
+          break;
+        }
+      }
+    }
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
@@ -164,8 +196,10 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
       }
       case ExprKind::DotSyntaxCall: {
         auto DSC = cast<DotSyntaxCallExpr>(Fn);
-        if (auto FD = DSC->getFn()->getReferencedDecl().getDecl())
+        if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
           handleFuncRename(FD, DSC->getFn(), Args);
+          handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
+        }
         break;
       }
       case ExprKind::ConstructorRefCall: {

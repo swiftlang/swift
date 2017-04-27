@@ -20,6 +20,11 @@ enum BarForwardDeclaredEnum {
   BarForwardDeclaredEnumValue = 42
 };
 
+@interface PropertyUserInterface
+- (int) field;
+- (void) setField:(int)info;
+@end
+
 #define BAR_MACRO_1 0
 
 typedef struct {
