@@ -48,3 +48,21 @@ func foo13(a : [AnyHashable : Any]) {}
 func foo14(b : [NSObject : AnyObject]) {
   foo13(a : b)
 }
+
+
+// Add a minimal test for inout-to-pointer conversion involving a
+// generic function with a protocol constraint of Equatable.
+infix operator =*= : ComparisonPrecedence
+func =*= <T : Equatable>(lhs: T, rhs: T) -> Bool {
+ return lhs == rhs
+}
+func =*= <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
+ return lhs == rhs
+}
+
+class C {}
+
+var o = C()
+var p: UnsafeMutablePointer<C>? = nil
+
+_ = p =*= &o
