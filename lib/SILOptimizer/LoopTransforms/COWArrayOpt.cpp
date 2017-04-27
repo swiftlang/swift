@@ -486,6 +486,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kReserveCapacityForAppend:
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
@@ -824,6 +825,7 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
 
   case ArrayCallKind::kNone:
   case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kReserveCapacityForAppend:
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:

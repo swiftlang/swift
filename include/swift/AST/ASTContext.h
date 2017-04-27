@@ -457,6 +457,10 @@ public:
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;
 
+  /// Retrieve the declaration of
+  /// Array.reserveCapacityForAppend(newElementsCount: Int)
+  FuncDecl *getArrayReserveCapacityDecl() const;
+
   /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 

@@ -170,7 +170,43 @@ SILInstruction *SILCombiner::visitSelectValueInst(SelectValueInst *SVI) {
 }
 
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
-  return nullptr;
+  SILValue Cond = SVI->getOperand();
+  BuiltinIntegerType *CondTy = Cond->getType().getAs<BuiltinIntegerType>();
+  if (!CondTy || !CondTy->isFixedWidth(1))
+    return nullptr;
+
+  SILBasicBlock *FalseBB = nullptr;
+  SILBasicBlock *TrueBB = nullptr;
+  for (unsigned Idx = 0, Num = SVI->getNumCases(); Idx < Num; ++Idx) {
+    auto Case = SVI->getCase(Idx);
+    IntegerLiteralInst *CaseVal = dyn_cast<IntegerLiteralInst>(Case.first);
+    if (!CaseVal)
+      return nullptr;
+    SILBasicBlock *DestBB = Case.second;
+    assert(DestBB->args_empty() &&
+           "switch_value case destination cannot take arguments");
+    if (CaseVal->getValue() == 0) {
+      assert(!FalseBB && "double case value 0 in switch_value");
+      FalseBB = DestBB;
+    } else {
+      assert(!TrueBB && "double case value 1 in switch_value");
+      TrueBB = DestBB;
+    }
+  }
+  if (SVI->hasDefault()) {
+    assert(SVI->getDefaultBB()->args_empty() &&
+           "switch_value default destination cannot take arguments");
+    if (!FalseBB) {
+      FalseBB = SVI->getDefaultBB();
+    } else if (!TrueBB) {
+      TrueBB = SVI->getDefaultBB();
+    }
+  }
+  if (!FalseBB || !TrueBB)
+    return nullptr;
+
+  Builder.setCurrentDebugScope(SVI->getDebugScope());
+  return Builder.createCondBranch(SVI->getLoc(), Cond, TrueBB, FalseBB);
 }
 
 namespace {
