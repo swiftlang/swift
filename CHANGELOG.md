@@ -21,6 +21,21 @@ CHANGELOG
 Swift 4.0
 ---------
 
+* [SE-0142][]
+
+  Protocols and associated types can now contain `where` clauses that
+  provide additional restrictions on associated types. For example:
+
+    ```swift
+    protocol StringRepresentable: RawRepresentable
+    where RawValue == String { }
+
+    protocol RawStringWrapper {
+      associatedtype Wrapped: RawRepresentable
+        where Wrapper.RawValue == String
+    }
+    ```
+
 * [SE-0160][]
 
   In Swift 4 mode, a declaration is inferred to be `@objc` where it is required for semantic consistency of the programming model. Specifically, it is inferred when:
