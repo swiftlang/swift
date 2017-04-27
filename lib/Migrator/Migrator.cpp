@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Diff.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
@@ -233,10 +234,116 @@ bool Migrator::performSyntacticPasses() {
   return false;
 }
 
+namespace {
+/// Print a replacement from a diff edit scriptto the given output stream.
+///
+/// \param Filename The filename of the original file
+/// \param Offset The absolute offset in the original file
+/// \param RemoveLength The amount of text to remove at Offset (can be zero).
+/// \param Replacement What to insert at the offset (can be empty)
+/// \param OS The output stream
+void printReplacement(const StringRef Filename,
+                      const size_t Offset,
+                      const size_t RemoveLength,
+                      const StringRef Replacement,
+                      llvm::raw_ostream &OS) {
+  assert(!Filename.empty());
+  if (RemoveLength == 0 && Replacement.empty()) {
+    return;
+  }
+  OS << "  {\n";
+
+  OS << "    \"file:\" \"";
+  OS.write_escaped(Filename);
+  OS << "\",\n";
+
+  OS << "    \"offset:\" " << Offset << ",\n";
+  if (RemoveLength > 0) {
+    OS << "    \"remove:\" " << RemoveLength << ",\n";
+  }
+  if (!Replacement.empty()) {
+    OS << "    \"text\": \"";
+    OS.write_escaped(Replacement);
+    OS << "\"\n";
+  }
+  OS << "  }";
+}
+
+/// Print a remap file to the given output stream.
+///
+/// \param OriginalFilename The filename of the file that was edited
+/// not the output file for printing here.
+/// \param InputText The input text without any changes.
+/// \param OutputText The result text after any changes.
+/// \param OS The output stream.
+void printRemap(const StringRef OriginalFilename,
+                const StringRef InputText,
+                const StringRef OutputText,
+                llvm::raw_ostream &OS) {
+  assert(!OriginalFilename.empty());
+
+  diff_match_patch<std::string> DMP;
+  const auto Diffs = DMP.diff_main(InputText, OutputText);
+
+  OS << "[\n";
+
+  size_t ReplacementsPrinted = 0;
+  size_t Offset = 0;
+  size_t Insertion = 0;
+  size_t Deletion = 0;
+
+  for (const auto &Diff : Diffs) {
+    switch (Diff.operation) {
+      case decltype(DMP)::EQUAL:
+        break;
+      case decltype(DMP)::INSERT:
+        if (ReplacementsPrinted > 0) {
+          OS << ",\n";
+        }
+        printReplacement(OriginalFilename,
+                         Offset + Deletion - Insertion,
+                         0, Diff.text, OS);
+        ++ReplacementsPrinted;
+        Insertion += Diff.text.size();
+        break;
+      case decltype(DMP)::DELETE:
+        if (ReplacementsPrinted > 0) {
+          OS << ",\n";
+        }
+        printReplacement(OriginalFilename,
+                         Offset + Deletion - Insertion,
+                         Diff.text.size(), "", OS);
+        ++ReplacementsPrinted;
+        Deletion += Diff.text.size();
+        break;
+    }
+    Offset += Diff.text.size();
+  }
+
+  OS << "\n]";
+}
+
+} // end anonymous namespace
+
 bool Migrator::emitRemap() const {
-  // TODO: Need to integrate diffing library to diff start and end state's
-  // output text.
-  return false;
+  const auto &RemapPath = getMigratorOptions().EmitRemapFilePath;
+  if (RemapPath.empty()) {
+    return false;
+  }
+
+  std::error_code Error;
+  llvm::raw_fd_ostream FileOS(RemapPath,
+                              Error, llvm::sys::fs::F_Text);
+  if (FileOS.has_error()) {
+    return true;
+  }
+
+  auto InputText = States.front()->getOutputText();
+  auto OutputText = States.back()->getOutputText();
+  printRemap(getInputFilename(), InputText, OutputText, FileOS);
+
+  FileOS.flush();
+  return FileOS.has_error();
 }
 
 bool Migrator::emitMigratedFile() const {
