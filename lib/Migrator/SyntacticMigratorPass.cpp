@@ -152,8 +152,8 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
     }
   }
 
-  void handleFunToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,
-                                 Expr *Arg) {
+  void handleFunctionCallToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,
+                                          Expr *Arg) {
     for(auto *Item :getRelatedDiffItems(FD)) {
       if (auto *CD = dyn_cast<CommonDiffItem>(Item)) {
         switch (CD->DiffKind) {
@@ -198,7 +198,7 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
         auto DSC = cast<DotSyntaxCallExpr>(Fn);
         if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
           handleFuncRename(FD, DSC->getFn(), Args);
-          handleFunToPropertyChange(FD, DSC->getFn(), Args);
+          handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
         }
         break;
       }
