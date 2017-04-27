@@ -705,17 +705,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
         },
         [&](CanType origTy, Type substTy,
             ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
-          if (substTy->getCanonicalType() == ConcreteType) {
-            if (proto->getDecl() != Conformance.getRequirement()) {
-              assert(
-                  Conformance.getRequirement()->inheritsFrom(proto->getDecl()));
-              if (Conformance.isAbstract())
-                return ProtocolConformanceRef(proto->getDecl());
-              Conformance = ProtocolConformanceRef(
-                  Conformance.getConcrete()->getInheritedConformance(
-                      proto->getDecl()));
-            }
-            return Conformance;
+          if (substTy->isEqual(ConcreteType)) {
+            return Conformance.getInherited(proto->getDecl());
           }
           return ProtocolConformanceRef(proto->getDecl());
         });
@@ -807,13 +798,8 @@ getConformanceAndConcreteType(FullApplySite AI,
     if (Requirement->inheritsFrom(Protocol)) {
       // If Requirement != Protocol, then the abstract conformance cannot be used
       // as is and we need to create a proper conformance.
-      return std::make_tuple(
-          Conformance.isAbstract()
-              ? ProtocolConformanceRef(Protocol)
-              : ProtocolConformanceRef(
-                    Conformance.getConcrete()->getInheritedConformance(
-                        Protocol)),
-          ConcreteType, ConcreteTypeDef);
+      return std::make_tuple(Conformance.getInherited(Protocol), ConcreteType,
+                             ConcreteTypeDef);
     }
   }
 
