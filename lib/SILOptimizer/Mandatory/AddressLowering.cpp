@@ -207,6 +207,7 @@ public:
   ValueStorage &insertValue(SILValue value) {
     auto hashResult =
         valueHashMap.insert(std::make_pair(value, valueVector.size()));
+    (void)hashResult;
     assert(hashResult.second && "SILValue already mapped");
 
     valueVector.emplace_back(value, ValueStorage());
@@ -1070,6 +1071,7 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   }
 
   SILFunctionConventions origFnConv(pass.F->getConventions());
+  (void)origFnConv;
 
   // Convert each result.
   SmallVector<SILValue, 8> newDirectResults;
@@ -1484,9 +1486,10 @@ void AddressLowering::runOnFunction(SILFunction *F) {
       continue;
 
     DEBUG(llvm::dbgs() << "DEAD "; deadInst->dump());
+#ifndef NDEBUG
     for (Operand *operand : deadInst->getUses())
       assert(pass.instsToDelete.count(operand->getUser()));
-
+#endif
     pass.instsToDelete.insert(deadInst);
   }
   pass.valueStorageMap.clear();

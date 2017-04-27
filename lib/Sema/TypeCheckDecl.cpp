@@ -7393,6 +7393,40 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     validateAccessibility(assocType);
     break;
   }
+  case DeclKind::TypeAlias: {
+    auto typealias = cast<TypeAliasDecl>(D);
+    if (typealias->getUnderlyingTypeLoc().getType())
+      return;
+
+    // Perform earlier validation of typealiases in protocols.
+    if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+      if (!typealias->getGenericParams()) {
+        ProtocolRequirementTypeResolver resolver(proto);
+        TypeResolutionOptions options;
+
+        if (typealias->isBeingValidated()) return;
+
+        typealias->setIsBeingValidated();
+        SWIFT_DEFER { typealias->setIsBeingValidated(false); };
+
+        validateAccessibility(typealias);
+        if (typealias->getFormalAccess() <= Accessibility::FilePrivate)
+          options |= TR_KnownNonCascadingDependency;
+
+        if (validateType(typealias->getUnderlyingTypeLoc(),
+                         typealias, options, &resolver)) {
+          typealias->setInvalid();
+          typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+        }
+
+        typealias->setUnderlyingType(
+                                typealias->getUnderlyingTypeLoc().getType());
+
+        return;
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
 
   default:
     validateDecl(D);

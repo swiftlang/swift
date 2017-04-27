@@ -26,6 +26,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Unicode.h"
@@ -1937,16 +1938,361 @@ static CanType claimNextParamClause(CanAnyFunctionType &type) {
   return result;
 }
 
-using InOutArgument = std::pair<LValue, SILLocation>;
+namespace {
 
-/// Begin all the formal accesses for a set of inout arguments.
-static void beginInOutFormalAccesses(SILGenFunction &SGF,
-                                     MutableArrayRef<InOutArgument> inoutArgs,
+/// The original argument expression for some sort of complex
+/// argument emission.
+class OriginalArgument {
+  llvm::PointerIntPair<Expr*, 1, bool> ExprAndIsIndirect;
+
+public:
+  OriginalArgument() = default;
+  OriginalArgument(Expr *expr, bool indirect)
+    : ExprAndIsIndirect(expr, indirect) {}
+
+  Expr *getExpr() const { return ExprAndIsIndirect.getPointer(); }
+  bool isIndirect() const { return ExprAndIsIndirect.getInt(); }
+};
+
+/// A delayed argument.  Call arguments are evaluated in two phases:
+/// a formal evaluation phase and a formal access phase.  The primary
+/// example of this is an l-value that is passed by reference, where
+/// the access to the l-value does not begin until the formal access
+/// phase, but there are other examples, generally relating to pointer
+/// conversions.
+///
+/// A DelayedArgument represents the part of evaluating an argument
+/// that's been delayed until the formal access phase.
+class DelayedArgument {
+public:
+  enum KindTy {
+    /// This is a true inout argument.
+    InOut,
+
+    /// This is a borrowed direct argument.
+    BorrowDirect,
+
+    /// This is a borrowed indirect argument.
+    BorrowIndirect,
+
+    LastLVKindWithoutExtra = BorrowIndirect,
+
+    /// The l-value needs to be converted to a pointer type.
+    LValueToPointer,
+
+    /// An array l-value needs to be converted to a pointer type.
+    LValueArrayToPointer,
+
+    LastLVKind = LValueArrayToPointer,
+
+    /// An array r-value needs to be converted to a pointer type.
+    RValueArrayToPointer,
+
+    /// A string r-value needs to be converted to a pointer type.
+    RValueStringToPointer,
+  };
+
+private:
+  KindTy Kind;
+
+  struct LValueStorage {
+    LValue LV;
+    SILLocation Loc;
+
+    LValueStorage(LValue &&lv, SILLocation loc) : LV(std::move(lv)), Loc(loc) {}
+  };
+  struct RValueStorage {
+    ManagedValue RV;
+
+    RValueStorage(ManagedValue rv) : RV(rv) {}
+  };
+
+  static int getUnionIndexForValue(KindTy kind) {
+    return (kind <= LastLVKind ? 0 : 1);
+  }
+
+  /// Storage for either the l-value or the r-value.
+  ExternalUnion<KindTy, getUnionIndexForValue,
+                LValueStorage, RValueStorage> Value;
+
+  LValueStorage &LV() { return Value.get<LValueStorage>(Kind); }
+  const LValueStorage &LV() const { return Value.get<LValueStorage>(Kind); }
+  RValueStorage &RV() { return Value.get<RValueStorage>(Kind); }
+  const RValueStorage &RV() const { return Value.get<RValueStorage>(Kind); }
+
+  /// The original argument expression, which will be emitted down
+  /// to the point from which the l-value or r-value was generated.
+  OriginalArgument Original;
+
+  using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
+  using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
+  static int getUnionIndexForExtra(KindTy kind) {
+    switch (kind) {
+    case LValueToPointer:
+      return 0;
+    case LValueArrayToPointer:
+    case RValueArrayToPointer:
+      return 1;
+    default:
+      return -1;
+    }
+  }
+  ExternalUnion<KindTy, getUnionIndexForExtra,
+                PointerAccessInfo, ArrayAccessInfo> Extra;
+
+public:
+  DelayedArgument(KindTy kind, LValue &&lv, SILLocation loc)
+      : Kind(kind) {
+    assert(kind <= LastLVKindWithoutExtra &&
+           "this constructor should only be used for simple l-value kinds");
+    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
+  }
+
+  DelayedArgument(KindTy kind, ManagedValue rv, OriginalArgument original)
+      : Kind(kind), Original(original) {
+    Value.emplace<RValueStorage>(Kind, rv);
+  }
+
+  DelayedArgument(SILGenFunction::PointerAccessInfo pointerInfo,
+                  LValue &&lv, SILLocation loc, OriginalArgument original)
+      : Kind(LValueToPointer), Original(original) {
+    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
+    Extra.emplace<PointerAccessInfo>(Kind, pointerInfo);
+  }
+
+  DelayedArgument(SILGenFunction::ArrayAccessInfo arrayInfo,
+                  LValue &&lv, SILLocation loc, OriginalArgument original)
+      : Kind(LValueArrayToPointer), Original(original) {
+    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
+    Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
+  }
+
+  DelayedArgument(KindTy kind,
+                  SILGenFunction::ArrayAccessInfo arrayInfo,
+                  ManagedValue rv, OriginalArgument original)
+      : Kind(kind), Original(original) {
+    Value.emplace<RValueStorage>(Kind, rv);
+    Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
+  }
+
+  DelayedArgument(DelayedArgument &&other)
+      : Kind(other.Kind), Original(other.Original) {
+    Value.moveConstruct(Kind, std::move(other.Value));
+    Extra.moveConstruct(Kind, std::move(other.Extra));
+  }
+
+  DelayedArgument &operator=(DelayedArgument &&other) {
+    Value.moveAssign(Kind, other.Kind, std::move(other.Value));
+    Extra.moveAssign(Kind, other.Kind, std::move(other.Extra));
+    Kind = other.Kind;
+    Original = other.Original;
+    return *this;
+  }
+
+  ~DelayedArgument() {
+    Extra.destruct(Kind);
+    Value.destruct(Kind);
+  }
+
+  bool isSimpleInOut() const { return Kind == InOut; }
+  SILLocation getInOutLocation() const {
+    assert(isSimpleInOut());
+    return LV().Loc;
+  }
+
+  ManagedValue emit(SILGenFunction &SGF) {
+    switch (Kind) {
+    case InOut:
+      return emitInOut(SGF);
+    case BorrowDirect:
+      return emitBorrowDirect(SGF);
+    case BorrowIndirect:
+      return emitBorrowIndirect(SGF);
+    case LValueToPointer:
+    case LValueArrayToPointer:
+    case RValueArrayToPointer:
+    case RValueStringToPointer:
+      return finishOriginalArgument(SGF);
+    }
+    llvm_unreachable("bad kind");
+  }
+
+private:
+  ManagedValue emitInOut(SILGenFunction &SGF) {
+    return emitAddress(SGF, AccessKind::ReadWrite);
+  }
+
+  ManagedValue emitBorrowIndirect(SILGenFunction &SGF) {
+    return emitAddress(SGF, AccessKind::Read);
+  }
+
+  ManagedValue emitBorrowDirect(SILGenFunction &SGF) {
+    ManagedValue address = emitAddress(SGF, AccessKind::Read);
+    return SGF.B.createLoadBorrow(LV().Loc, address);
+  }
+
+  ManagedValue emitAddress(SILGenFunction &SGF, AccessKind accessKind) {
+    auto tsanKind =
+      (accessKind == AccessKind::Read ? TSanKind::None : TSanKind::InoutAccess);
+    return SGF.emitAddressOfLValue(LV().Loc, std::move(LV().LV),
+                                   accessKind, tsanKind);
+  }
+
+  /// Replay the original argument expression.
+  ManagedValue finishOriginalArgument(SILGenFunction &SGF) {
+    auto results = finishOriginalExpr(SGF, Original.getExpr());
+    auto value = results.first; // just let the owner go
+
+    if (Original.isIndirect() && !value.getType().isAddress()) {
+      value = value.materialize(SGF, Original.getExpr());
+    }
+
+    return value;
+  }
+
+  // (value, owner)
+  std::pair<ManagedValue, ManagedValue>
+  finishOriginalExpr(SILGenFunction &SGF, Expr *expr) {
+
+    // This needs to handle all of the recursive cases from
+    // ArgEmission::maybeEmitDelayed.
+
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Handle injections into optionals.
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr)) {
+      auto ownedValue =
+        finishOriginalExpr(SGF, inject->getSubExpr());
+      auto &optionalTL = SGF.getTypeLowering(expr->getType());
+
+      auto optValue = SGF.emitInjectOptional(inject, optionalTL, SGFContext(),
+                              [&](SGFContext ctx) { return ownedValue.first; });
+      return {optValue, ownedValue.second};
+    }
+
+    // Handle try!.
+    if (auto forceTry = dyn_cast<ForceTryExpr>(expr)) {
+      // Handle throws from the accessor?  But what if the writeback throws?
+      SILGenFunction::ForceTryEmission emission(SGF, forceTry);
+      return finishOriginalExpr(SGF, forceTry->getSubExpr());
+    }
+
+    // Handle optional evaluations.
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
+      return finishOptionalEvaluation(SGF, optEval);
+    }
+
+    // Done with the recursive cases.  Make sure we handled everything.
+    assert(isa<InOutToPointerExpr>(expr) ||
+           isa<ArrayToPointerExpr>(expr) ||
+           isa<StringToPointerExpr>(expr));
+
+    switch (Kind) {
+    case InOut:
+    case BorrowDirect:
+    case BorrowIndirect:
+      llvm_unreachable("no original expr to finish in these cases");
+
+    case LValueToPointer:
+      return {SGF.emitLValueToPointer(LV().Loc, std::move(LV().LV),
+                                      Extra.get<PointerAccessInfo>(Kind)),
+              /*owner*/ ManagedValue()};
+
+    case LValueArrayToPointer:
+      return SGF.emitArrayToPointer(LV().Loc, std::move(LV().LV),
+                                    Extra.get<ArrayAccessInfo>(Kind));
+
+    case RValueArrayToPointer: {
+      auto pointerExpr = cast<ArrayToPointerExpr>(expr);
+      auto optArrayValue = RV().RV;
+      auto arrayValue = emitBindOptionals(SGF, optArrayValue,
+                                          pointerExpr->getSubExpr());
+      return SGF.emitArrayToPointer(pointerExpr, arrayValue,
+                                    Extra.get<ArrayAccessInfo>(Kind));
+    }
+
+    case RValueStringToPointer: {
+      auto pointerExpr = cast<StringToPointerExpr>(expr);
+      auto optStringValue = RV().RV;
+      auto stringValue =
+        emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
+      return SGF.emitStringToPointer(pointerExpr, stringValue,
+                                     pointerExpr->getType());
+    }
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  ManagedValue emitBindOptionals(SILGenFunction &SGF, ManagedValue optValue,
+                                 Expr *expr) {
+    expr = expr->getSemanticsProvidingExpr();
+    auto bind = dyn_cast<BindOptionalExpr>(expr);
+
+    // If we don't find a bind, the value isn't optional.
+    if (!bind) return optValue;
+
+    // Recurse.
+    optValue = emitBindOptionals(SGF, optValue, bind->getSubExpr());
+
+    // Check whether the value is non-nil.
+    SGF.emitBindOptional(bind, optValue, bind->getDepth());
+
+    // Extract the non-optional value.
+    auto &optTL = SGF.getTypeLowering(optValue.getType());
+    auto value = SGF.emitUncheckedGetOptionalValueFrom(bind, optValue, optTL);
+    return value;
+  }
+
+  std::pair<ManagedValue, ManagedValue>
+  finishOptionalEvaluation(SILGenFunction &SGF, OptionalEvaluationExpr *eval) {
+    SmallVector<ManagedValue, 2> results;
+
+    SGF.emitOptionalEvaluation(eval, eval->getType(), results, SGFContext(),
+      [&](SmallVectorImpl<ManagedValue> &results, SGFContext C) {
+        // Recurse.
+        auto values = finishOriginalExpr(SGF, eval->getSubExpr());
+
+        // Our primary result is the value.
+        results.push_back(values.first);
+
+        // Our secondary result is the owner, if we have one.
+        if (auto owner = values.second) results.push_back(owner);
+      });
+
+    assert(results.size() == 1 || results.size() == 2);
+
+    ManagedValue value = results[0];
+
+    ManagedValue owner;
+    if (results.size() == 2) {
+      owner = results[1];
+
+      // Create a new value-dependence here if the primary result is
+      // trivial.
+      auto &valueTL = SGF.getTypeLowering(value.getType());
+      if (valueTL.isTrivial()) {
+        SILValue dependentValue =
+          SGF.B.createMarkDependence(eval, value.forward(SGF),
+                                     owner.getValue());
+        value = SGF.emitManagedRValueWithCleanup(dependentValue, valueTL);
+      }
+    }
+
+    return {value, owner};
+  }
+};
+
+} // end anonymous namespace
+
+/// Perform the formal-access phase of call argument emission by emitting
+/// all of the delayed arguments.
+static void emitDelayedArguments(SILGenFunction &SGF,
+                                 MutableArrayRef<DelayedArgument> delayedArgs,
                          MutableArrayRef<SmallVector<ManagedValue, 4>> args) {
-  assert(!inoutArgs.empty());
+  assert(!delayedArgs.empty());
 
   SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
-  auto inoutNext = inoutArgs.begin();
+  auto delayedNext = delayedArgs.begin();
 
   // The assumption we make is that 'args' and 'inoutArgs' were built
   // up in parallel, with empty spots being dropped into 'args'
@@ -1957,15 +2303,22 @@ static void beginInOutFormalAccesses(SILGenFunction &SGF,
     for (ManagedValue &siteArg : siteArgs) {
       if (siteArg) continue;
 
-      LValue &inoutArg = inoutNext->first;
-      SILLocation loc = inoutNext->second;
-      ManagedValue address = SGF.emitAddressOfLValue(loc, std::move(inoutArg),
-                                                     AccessKind::ReadWrite,
-                                                     TSanKind::InoutAccess);
-      siteArg = address;
-      emittedInoutArgs.push_back({address.getValue(), loc});
+      assert(delayedNext != delayedArgs.end());
+      auto &delayedArg = *delayedNext;
 
-      if (++inoutNext == inoutArgs.end())
+      // Emit the delayed argument and replace it in the arguments array.
+      auto value = delayedArg.emit(SGF);
+      siteArg = value;
+
+      // Remember all the simple inouts we emitted so we can perform
+      // a basic inout-aliasing analysis.
+      // This should be completely obviated by static enforcement.
+      if (delayedArg.isSimpleInOut()) {
+        emittedInoutArgs.push_back({value.getValue(),
+                                    delayedArg.getInOutLocation()});
+      }
+
+      if (++delayedNext == delayedArgs.end())
         goto done;
     }
   }
@@ -1988,29 +2341,6 @@ done:
       SGF.SGM.diagnose(j->second, diag::previous_inout_alias)
         .highlight(j->second.getSourceRange());
     }
-  }
-}
-
-/// Given a scalar value, materialize it into memory with the
-/// exact same level of cleanup it had before.
-static ManagedValue emitMaterializeIntoTemporary(SILGenFunction &SGF,
-                                                 SILLocation loc,
-                                                 ManagedValue object) {
-  auto temporary = SGF.emitTemporaryAllocation(loc, object.getType());
-  bool hadCleanup = object.hasCleanup();
-
-  // The temporary memory is +0 if the value was.
-  if (hadCleanup) {
-    SGF.B.emitStoreValueOperation(loc, object.forward(SGF), temporary,
-                                  StoreOwnershipQualifier::Init);
-
-    // SEMANTIC SIL TODO: This should really be called a temporary LValue.
-    return ManagedValue::forOwnedAddressRValue(temporary,
-                                               SGF.enterDestroyCleanup(temporary));
-  } else {
-    object = SGF.emitManagedBeginBorrow(loc, object.getValue());
-    SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
-    return ManagedValue::forBorrowedAddressRValue(temporary);
   }
 }
 
@@ -2268,23 +2598,23 @@ class ArgEmitter {
   ClaimedParamsRef ParamInfos;
   SmallVectorImpl<ManagedValue> &Args;
 
-  /// Track any inout arguments that are emitted.  Each corresponds
+  /// Track any delayed arguments that are emitted.  Each corresponds
   /// in order to a "hole" (a null value) in Args.
-  SmallVectorImpl<InOutArgument> &InOutArguments;
+  SmallVectorImpl<DelayedArgument> &DelayedArguments;
 
   Optional<ArgSpecialDestArray> SpecialDests;
 public:
   ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
              ClaimedParamsRef paramInfos,
              SmallVectorImpl<ManagedValue> &args,
-             SmallVectorImpl<InOutArgument> &inoutArgs,
+             SmallVectorImpl<DelayedArgument> &delayedArgs,
              const Optional<ForeignErrorConvention> &foreignError,
              ImportAsMemberStatus foreignSelf,
              Optional<ArgSpecialDestArray> specialDests = None)
     : SGF(SGF), Rep(Rep), ForeignError(foreignError),
       ForeignSelf(foreignSelf),
       ParamInfos(paramInfos),
-      Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
+      Args(args), DelayedArguments(delayedArgs), SpecialDests(specialDests) {
     assert(!specialDests || specialDests->size() == paramInfos.size());
   }
 
@@ -2367,9 +2697,7 @@ private:
       Args.push_back(ManagedValue::forInContext());
       return;
     } else if (SGF.silConv.isSILIndirect(param)) {
-      auto value = emitIndirect(std::move(arg), loweredSubstArgType,
-                                origParamType, param);
-      Args.push_back(value);
+      emitIndirect(std::move(arg), loweredSubstArgType, origParamType, param);
       return;
     }
 
@@ -2458,31 +2786,43 @@ private:
 
   void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
 
-  ManagedValue emitIndirect(ArgumentSource &&arg,
-                            SILType loweredSubstArgType,
-                            AbstractionPattern origParamType,
-                            SILParameterInfo param) {
+  void emitIndirect(ArgumentSource &&arg,
+                    SILType loweredSubstArgType,
+                    AbstractionPattern origParamType,
+                    SILParameterInfo param) {
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+    ManagedValue result;
 
     // If no abstraction is required, try to honor the emission contexts.
     if (!contexts.RequiresReabstraction) {
       auto loc = arg.getLocation();
-      ManagedValue result =
-        std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
 
-      // If it's already in memory, great.
-      if (result.getType().isAddress()) {
-        return result;
+      // Peephole certain argument emissions.
+      if (arg.isExpr()) {
+        auto expr = std::move(arg).asKnownExpr();
 
-      // Otherwise, put it there.
+        // Try the peepholes.
+        if (maybeEmitDelayed(expr, OriginalArgument(expr, /*indirect*/ true)))
+          return;
+
+        // Otherwise, just use the default logic.
+        result = SGF.emitRValueAsSingleValue(expr, contexts.ForEmission);
       } else {
-        return emitMaterializeIntoTemporary(SGF, loc, result);
+        result = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
       }
-    }
+
+      // If it's not already in memory, put it there.
+      if (!result.getType().isAddress()) {
+        result = result.materialize(SGF, loc);
+      }
 
     // Otherwise, simultaneously emit and reabstract.
-    return std::move(arg).materialize(SGF, origParamType,
-                                      SGF.getSILType(param));
+    } else {
+      result = std::move(arg).materialize(SGF, origParamType,
+                                          SGF.getSILType(param));
+    }
+
+    Args.push_back(result);
   }
 
   void emitIndirectInto(ArgumentSource &&arg,
@@ -2535,7 +2875,7 @@ private:
 
     // Leave an empty space in the ManagedValue sequence and
     // remember that we had an inout argument.
-    InOutArguments.push_back({std::move(lv), loc});
+    DelayedArguments.emplace_back(DelayedArgument::InOut, std::move(lv), loc);
     Args.push_back(ManagedValue());
     return;
   }
@@ -2556,6 +2896,17 @@ private:
             std::move(arg), loweredSubstArgType, origParamType, param);
         break;
       }
+
+    // Peephole certain argument emissions.
+    } else if (arg.isExpr()) {
+      auto expr = std::move(arg).asKnownExpr();
+
+      // Try the peepholes.
+      if (maybeEmitDelayed(expr, OriginalArgument(expr, /*indirect*/ false)))
+        return;
+
+      // Otherwise, just use the default logic.
+      value = SGF.emitRValueAsSingleValue(expr, contexts.ForEmission);
     } else {
       value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
     }
@@ -2578,7 +2929,112 @@ private:
 
     Args.push_back(value);
   }
-  
+
+  bool maybeEmitDelayed(Expr *expr, OriginalArgument original) {
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Delay accessing inout-to-pointer arguments until the call.
+    if (auto inoutToPointer = dyn_cast<InOutToPointerExpr>(expr)) {
+      return emitDelayedConversion(inoutToPointer, original);
+    }
+
+    // Delay accessing array-to-pointer arguments until the call.
+    if (auto arrayToPointer = dyn_cast<ArrayToPointerExpr>(expr)) {
+      return emitDelayedConversion(arrayToPointer, original);
+    }
+
+    // Delay accessing string-to-pointer arguments until the call.
+    if (auto stringToPointer = dyn_cast<StringToPointerExpr>(expr)) {
+      return emitDelayedConversion(stringToPointer, original);
+    }
+
+    // Any recursive cases we handle here need to be handled in
+    // DelayedArgument::finishOriginalExpr.
+
+    // Handle optional evaluations.
+    if (auto optional = dyn_cast<OptionalEvaluationExpr>(expr)) {
+      // The validity of just recursing here depends on the fact
+      // that we only return true for the specific conversions above,
+      // which are constrained by the ASTVerifier to only appear in
+      // specific forms.
+      return maybeEmitDelayed(optional->getSubExpr(), original);
+    }
+
+    // Handle injections into optionals.
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr)) {
+      return maybeEmitDelayed(inject->getSubExpr(), original);
+    }
+
+    // Handle try! expressions.
+    if (auto forceTry = dyn_cast<ForceTryExpr>(expr)) {
+      // Any expressions in the l-value must be routed appropriately.
+      SILGenFunction::ForceTryEmission emission(SGF, forceTry);
+
+      return maybeEmitDelayed(forceTry->getSubExpr(), original);
+    }
+
+    return false;
+  }
+
+  bool emitDelayedConversion(InOutToPointerExpr *pointerExpr,
+                             OriginalArgument original) {
+    auto info = SGF.getPointerAccessInfo(pointerExpr->getType());
+    LValue lv = SGF.emitLValue(pointerExpr->getSubExpr(), info.AccessKind);
+    DelayedArguments.emplace_back(info, std::move(lv), pointerExpr, original);
+    Args.push_back(ManagedValue());
+    return true;
+  }
+
+  bool emitDelayedConversion(ArrayToPointerExpr *pointerExpr,
+                             OriginalArgument original) {
+    auto arrayExpr = pointerExpr->getSubExpr();
+
+    // If the source of the conversion is an inout, emit the l-value
+    // but delay the formal access.
+    if (auto inoutType = arrayExpr->getType()->getAs<InOutType>()) {
+      auto info = SGF.getArrayAccessInfo(pointerExpr->getType(),
+                                         inoutType->getObjectType());
+      LValue lv = SGF.emitLValue(arrayExpr, info.AccessKind);
+      DelayedArguments.emplace_back(info, std::move(lv), pointerExpr,
+                                    original);
+      Args.push_back(ManagedValue());
+      return true;
+    }
+
+    // Otherwise, it's an r-value conversion.
+    auto info = SGF.getArrayAccessInfo(pointerExpr->getType(),
+                                       arrayExpr->getType());
+
+    auto rvalueExpr = lookThroughBindOptionals(arrayExpr);
+    ManagedValue value = SGF.emitRValueAsSingleValue(rvalueExpr);
+    DelayedArguments.emplace_back(DelayedArgument::RValueArrayToPointer,
+                                  info, value, original);
+    Args.push_back(ManagedValue());
+    return true;
+  }
+
+  /// Emit an rvalue-array-to-pointer conversion as a delayed argument.
+  bool emitDelayedConversion(StringToPointerExpr *pointerExpr,
+                             OriginalArgument original) {
+    auto rvalueExpr = lookThroughBindOptionals(pointerExpr->getSubExpr());
+    ManagedValue value = SGF.emitRValueAsSingleValue(rvalueExpr);
+    DelayedArguments.emplace_back(DelayedArgument::RValueStringToPointer,
+                                  value, original);
+    Args.push_back(ManagedValue());
+    return true;
+  }
+
+  static Expr *lookThroughBindOptionals(Expr *expr) {
+    while (true) {
+      expr = expr->getSemanticsProvidingExpr();
+      if (auto bind = dyn_cast<BindOptionalExpr>(expr)) {
+        expr = bind->getSubExpr();
+      } else {
+        return expr;
+      }
+    }
+  }
+
   ManagedValue emitSubstToOrigArgument(ArgumentSource &&arg,
                                        SILType loweredSubstArgType,
                                        AbstractionPattern origParamType,
@@ -2921,7 +3377,7 @@ struct ElementExtent {
   ArrayRef<ManagedValue> Args;
   /// The inout arguments which feed this tuple element.
   /// This is set in the second pass.
-  MutableArrayRef<InOutArgument> InOutArgs;
+  MutableArrayRef<DelayedArgument> DelayedArgs;
 
   ElementExtent()
       : HasDestIndex(false)
@@ -2962,7 +3418,7 @@ class TupleShuffleArgEmitter {
   // Used by flattenPatternFromInnerExtendIntoInnerParams and
   // splitInnerArgumentsCorrectly.
   SmallVector<ManagedValue, 8> innerArgs;
-  SmallVector<InOutArgument, 2> innerInOutArgs;
+  SmallVector<DelayedArgument, 2> innerDelayedArgs;
 
 public:
   TupleShuffleArgEmitter(TupleShuffleExpr *e, ArrayRef<TupleTypeElt> innerElts,
@@ -3125,7 +3581,7 @@ void TupleShuffleArgEmitter::flattenPatternFromInnerExtendIntoInnerParams(
 
 void TupleShuffleArgEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
   ArrayRef<ManagedValue> nextArgs = innerArgs;
-  MutableArrayRef<InOutArgument> nextInOutArgs = innerInOutArgs;
+  MutableArrayRef<DelayedArgument> nextDelayedArgs = innerDelayedArgs;
   for (auto &extent : innerExtents) {
     auto length = extent.Params.size();
 
@@ -3134,18 +3590,18 @@ void TupleShuffleArgEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
     nextArgs = nextArgs.slice(length);
 
     // Claim the correct number of inout arguments as well.
-    unsigned numInOut = 0;
+    size_t numDelayed = 0;
     for (auto arg : extent.Args) {
       assert(!arg.isInContext() || extent.HasDestIndex);
       if (!arg)
-        numInOut++;
+        numDelayed++;
     }
-    extent.InOutArgs = nextInOutArgs.slice(0, numInOut);
-    nextInOutArgs = nextInOutArgs.slice(numInOut);
+    extent.DelayedArgs = nextDelayedArgs.slice(0, numDelayed);
+    nextDelayedArgs = nextDelayedArgs.slice(numDelayed);
   }
 
   assert(nextArgs.empty() && "didn't claim all args");
-  assert(nextInOutArgs.empty() && "didn't claim all inout args");
+  assert(nextDelayedArgs.empty() && "didn't claim all inout args");
 }
 
 void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
@@ -3166,8 +3622,8 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
 
       // Move the appropriate inner arguments over as outer arguments.
       parent.Args.append(extent.Args.begin(), extent.Args.end());
-      for (auto &inoutArg : extent.InOutArgs)
-        parent.InOutArguments.push_back(std::move(inoutArg));
+      for (auto &delayedArg : extent.DelayedArgs)
+        parent.DelayedArguments.push_back(std::move(delayedArg));
       continue;
     }
 
@@ -3251,7 +3707,7 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
   // Emit the inner expression.
   if (!innerParams.empty()) {
     ArgEmitter(parent.SGF, parent.Rep, ClaimedParamsRef(innerParams), innerArgs,
-               innerInOutArgs,
+               innerDelayedArgs,
                /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
                (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                   : Optional<ArgSpecialDestArray>()))
@@ -3564,13 +4020,13 @@ namespace {
     /// Evaluate arguments and begin any inout formal accesses.
     void emit(SILGenFunction &SGF, AbstractionPattern origParamType,
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
-              SmallVectorImpl<InOutArgument> &inoutArgs,
+              SmallVectorImpl<DelayedArgument> &delayedArgs,
               const Optional<ForeignErrorConvention> &foreignError,
               const ImportAsMemberStatus &foreignSelf) && {
       auto params = lowering.claimParams(origParamType, getSubstArgType(),
                                          foreignError, foreignSelf);
 
-      ArgEmitter emitter(SGF, lowering.Rep, params, args, inoutArgs,
+      ArgEmitter emitter(SGF, lowering.Rep, params, args, delayedArgs,
                          foreignError, foreignSelf);
       emitter.emitTopLevel(std::move(ArgValue), origParamType);
     }
@@ -4151,7 +4607,7 @@ void CallEmission::emitArgumentsForNormalApply(
     SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
-  SmallVector<InOutArgument, 2> inoutArgs;
+  SmallVector<DelayedArgument, 2> delayedArgs;
   auto expectedUncurriedOrigFormalType =
       getUncurriedOrigFormalType(origFormalType);
   (void)expectedUncurriedOrigFormalType;
@@ -4191,7 +4647,7 @@ void CallEmission::emitArgumentsForNormalApply(
       bool isParamSite = &site == &uncurriedSites.back();
 
       std::move(site).emit(SGF, origParamType, paramLowering, args.back(),
-                           inoutArgs,
+                           delayedArgs,
                            // Claim the foreign error with the method
                            // formal params.
                            isParamSite ? foreignError : None,
@@ -4206,9 +4662,10 @@ void CallEmission::emitArgumentsForNormalApply(
              expectedUncurriedOrigFormalType.getType() &&
          "getUncurriedOrigFormalType and emitArgumentsForNormalCall are out of "
          "sync");
-  // Begin the formal accesses to any inout arguments we have.
-  if (!inoutArgs.empty()) {
-    beginInOutFormalAccesses(SGF, inoutArgs, args);
+
+  // Emit any delayed arguments: formal accesses to inout arguments, etc.
+  if (!delayedArgs.empty()) {
+    emitDelayedArguments(SGF, delayedArgs, args);
   }
 
   // Uncurry the arguments in calling convention order.
@@ -4242,7 +4699,7 @@ RValue CallEmission::applyRemainingCallSites(
     ParamLowering paramLowering(substFnType, SGF);
 
     SmallVector<ManagedValue, 4> siteArgs;
-    SmallVector<InOutArgument, 2> inoutArgs;
+    SmallVector<DelayedArgument, 2> delayedArgs;
 
     // TODO: foreign errors for block or function pointer values?
     assert(substFnType->hasErrorResult() ||
@@ -4266,10 +4723,10 @@ RValue CallEmission::applyRemainingCallSites(
     ArgumentScope argScope(SGF, loc);
 
     std::move(extraSites[i])
-        .emit(SGF, origParamType, paramLowering, siteArgs, inoutArgs,
+        .emit(SGF, origParamType, paramLowering, siteArgs, delayedArgs,
               foreignError, foreignSelf);
-    if (!inoutArgs.empty()) {
-      beginInOutFormalAccesses(SGF, inoutArgs, siteArgs);
+    if (!delayedArgs.empty()) {
+      emitDelayedArguments(SGF, delayedArgs, siteArgs);
     }
 
     ApplyOptions options = ApplyOptions::None;
@@ -4853,7 +5310,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
              isNonClassProtocolMember(accessor.getDecl()))) &&
            "passing unmaterialized r-value as inout argument");
 
-    base = emitMaterializeIntoTemporary(SGF, loc, base);
+    base = base.materialize(SGF, loc);
     if (selfParam.isIndirectInOut()) {
       // Drop the cleanup if we have one.
       auto baseLV = ManagedValue::forLValue(base.getValue());

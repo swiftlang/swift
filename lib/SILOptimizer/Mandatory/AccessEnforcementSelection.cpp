@@ -329,9 +329,11 @@ struct AccessEnforcementSelection : SILFunctionTransform {
         SILInstruction *inst = &*ii;
         ++ii;
 
-        if (auto access = dyn_cast<BeginAccessInst>(inst)) {
+        if (auto access = dyn_cast<BeginAccessInst>(inst))
           handleAccess(access);
-        }
+
+        if (auto access = dyn_cast<BeginUnpairedAccessInst>(inst))
+          assert(access->getEnforcement() == SILAccessEnforcement::Dynamic);
       }
     }
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

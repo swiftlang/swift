@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
@@ -15,6 +15,9 @@ public func testInt(_ a: inout [Int]) {
 }
 
 // CHECK-LABEL: sil @{{.*}}testThreeInt
+// CHECK-NOT: apply
+// CHECK:        [[FR:%[0-9]+]] = function_ref @_T0Sa15reserveCapacityySiFSi_Tg5
+// CHECK-NEXT:   apply [[FR]]
 // CHECK-NOT: apply
 // CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyxFSi_Tg
 // CHECK-NOT: apply

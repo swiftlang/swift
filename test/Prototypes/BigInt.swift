@@ -122,7 +122,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     let wordRatio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(wordRatio != 0)
     for i in 0..<source.countRepresentedWords {
-      var sourceWord = source.word(at: i)
+      var sourceWord = source._word(at: i)
       for _ in 0..<wordRatio {
         _data.append(Word(extendingOrTruncating: sourceWord))
         sourceWord >>= Word.bitWidth
@@ -660,7 +660,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
   }
 
-  public func word(at n: Int) -> UInt {
+  public func _word(at n: Int) -> UInt {
     let ratio = UInt.bitWidth / Word.bitWidth
     _sanityCheck(ratio != 0)
 
@@ -1293,7 +1293,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     return self
   }
 
-  func word(at n: Int) -> UInt {
+  func _word(at n: Int) -> UInt {
     return UInt(value)
   }
 

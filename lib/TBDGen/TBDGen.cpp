@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -39,6 +40,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
+  bool FileHasEntryPoint;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -80,9 +82,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule)
+                ModuleDecl *swiftModule, bool fileHasEntryPoint)
       : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule) {}
+        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -104,8 +106,16 @@ public:
 
   void visitValueDecl(ValueDecl *VD);
 
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
+
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // any information here is encoded elsewhere
+  }
+
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    // Any getters and setters etc. exist as independent FuncDecls in the AST,
+    // so get processed elsewhere; subscripts don't have any symbols other than
+    // these.
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
@@ -114,23 +124,7 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED);
 
-  void visitProtocolDecl(ProtocolDecl *PD) {
-    addSymbol(LinkEntity::forProtocolDescriptor(PD));
-
-#ifndef NDEBUG
-    // There's no (currently) relevant information about members of a protocol
-    // at individual protocols, each conforming type has to handle them
-    // individually. Let's assert this fact:
-    for (auto *member : PD->getMembers()) {
-      auto isExpectedKind =
-          isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
-          isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-          isa<AbstractFunctionDecl>(member);
-      assert(isExpectedKind &&
-             "unexpected member of protocol during TBD generation");
-    }
-#endif
-  }
+  void visitProtocolDecl(ProtocolDecl *PD);
 
   void visitVarDecl(VarDecl *VD);
 
@@ -197,6 +191,26 @@ void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
   visitMembers(VD);
 }
 
+void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  // Default arguments (of public functions) are public symbols, as the default
+  // values are computed at the call site.
+  auto index = 0;
+  auto paramLists = AFD->getParameterLists();
+  // Skip the first arguments, which contains Self (etc.), can't be defaulted,
+  // and are ignored for the purposes of default argument indices.
+  if (AFD->getDeclContext()->isTypeContext())
+    paramLists = paramLists.slice(1);
+  for (auto *paramList : paramLists) {
+    for (auto *param : *paramList) {
+      if (auto defaultArg = param->getDefaultValue())
+        addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
+      index++;
+    }
+  }
+
+  visitValueDecl(AFD);
+}
+
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   if (isPrivateDecl(VD))
     return;
@@ -207,7 +221,10 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
-    addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // Variables in the main file don't get accessors, despite otherwise looking
+    // like globals.
+    if (!FileHasEntryPoint)
+      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
   visitMembers(VD);
@@ -290,6 +307,25 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
   visitMembers(ED);
 }
 
+void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
+  if (!PD->isObjC())
+    addSymbol(LinkEntity::forProtocolDescriptor(PD));
+
+#ifndef NDEBUG
+  // There's no (currently) relevant information about members of a protocol
+  // at individual protocols, each conforming type has to handle them
+  // individually. Let's assert this fact:
+  for (auto *member : PD->getMembers()) {
+    auto isExpectedKind =
+        isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
+        isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
+        isa<AbstractFunctionDecl>(member);
+    assert(isExpectedKind &&
+           "unexpected member of protocol during TBD generation");
+  }
+#endif
+}
+
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    bool hasMultipleIRGenThreads,
                                    bool isWholeModule) {
@@ -299,10 +335,13 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
-  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
+  auto hasEntryPoint = file->hasEntryPoint();
+
+  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
+                        hasEntryPoint);
   for (auto d : decls)
     visitor.visit(d);
 
-  if (file->hasEntryPoint())
+  if (hasEntryPoint)
     symbols.insert("main");
 }

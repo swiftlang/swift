@@ -321,8 +321,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::REPL;
     } else if (Opt.matches(OPT_interpret)) {
       Action = FrontendOptions::Immediate;
-    } else if (Opt.matches(OPT_update_code)) {
-      Action = FrontendOptions::UpdateCode;
     } else {
       llvm_unreachable("Unhandled mode option");
     }
@@ -560,10 +558,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Suffix = "importedmodules";
       break;
 
-    case FrontendOptions::UpdateCode:
-      Suffix = REMAP_EXTENSION;
-      break;
-
     case FrontendOptions::EmitTBD:
       if (Opts.OutputFilenames.empty())
         Opts.setSingleOutputFilename("-");
@@ -714,7 +708,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
       return true;
     case FrontendOptions::Parse:
@@ -747,7 +740,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
       return true;
     case FrontendOptions::Parse:
@@ -779,7 +771,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(),
                      diag::error_mode_cannot_emit_loaded_module_trace);
       return true;
@@ -816,7 +807,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       if (!Opts.ModuleOutputPath.empty())
         Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
       else
@@ -1578,9 +1568,14 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
   using namespace options;
 
   Opts.AddObjC |= Args.hasArg(OPT_warn_swift3_objc_inference);
+  Opts.DumpUsr = Args.hasArg(OPT_dump_usr);
 
   if (Args.hasArg(OPT_disable_migrator_fixits)) {
     Opts.EnableMigratorFixits = false;
+  }
+
+  if (auto RemapFilePath = Args.getLastArg(OPT_emit_remap_file_path)) {
+    Opts.EmitRemapFilePath = RemapFilePath->getValue();
   }
 
   if (auto MigratedFilePath = Args.getLastArg(OPT_emit_migrated_file_path)) {
@@ -1610,6 +1605,7 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
     if (Supported)
       Opts.APIDigesterDataStorePath = dataPath.str();
   }
+
   return false;
 }
 

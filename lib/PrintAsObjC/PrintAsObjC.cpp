@@ -558,8 +558,8 @@ private:
     auto paramLists = AFD->getParameterLists();
     assert(paramLists.size() == 2 && "not an ObjC-compatible method");
 
-    ArrayRef<Identifier> selectorPieces
-      = AFD->getObjCSelector().getSelectorPieces();
+    auto selector = AFD->getObjCSelector();
+    ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
     
     const auto &params = paramLists[1]->getArray();
     unsigned paramIndex = 0;
@@ -2330,6 +2330,25 @@ public:
            "#if !defined(__has_feature)\n"
            "# define __has_feature(x) 0\n"
            "#endif\n"
+           "#if !defined(__has_warning)\n"
+           "# define __has_warning(x) 0\n"
+           "#endif\n"
+           "\n"
+           "#if __has_attribute(external_source_symbol)\n"
+           "# define SWIFT_STRINGIFY(str) #str\n"
+           "# define SWIFT_MODULE_NAMESPACE_PUSH(module_name) "
+             "_Pragma(SWIFT_STRINGIFY(clang attribute "
+             "push(__attribute__((external_source_symbol(language=\"Swift\", "
+             "defined_in=module_name, generated_declaration))), "
+             "apply_to=any(function, enum, objc_interface, objc_category, "
+             "objc_protocol))))\n"
+           "# define SWIFT_MODULE_NAMESPACE_POP "
+             "_Pragma(\"clang attribute pop\")\n"
+           "#else\n"
+           "# define SWIFT_MODULE_NAMESPACE_PUSH(module_name)\n"
+           "# define SWIFT_MODULE_NAMESPACE_POP\n"
+           "#endif\n"
+           "\n"
            "#if __has_include(<swift/objc-prologue.h>)\n"
            "# include <swift/objc-prologue.h>\n"
            "#endif\n"
@@ -2682,8 +2701,15 @@ public:
     out <<
         "#pragma clang diagnostic ignored \"-Wproperty-attribute-mismatch\"\n"
         "#pragma clang diagnostic ignored \"-Wduplicate-method-arg\"\n"
+        "#if __has_warning(\"-Wpragma-clang-attribute\")\n"
+        "# pragma clang diagnostic ignored \"-Wpragma-clang-attribute\"\n"
+        "#endif\n"
+        "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
+        "\n"
+        "SWIFT_MODULE_NAMESPACE_PUSH(\"" << M.getNameStr() << "\")\n"
       << os.str()
-      << "#pragma clang diagnostic pop\n";
+      << "SWIFT_MODULE_NAMESPACE_POP\n"
+         "#pragma clang diagnostic pop\n";
     return false;
   }
 };

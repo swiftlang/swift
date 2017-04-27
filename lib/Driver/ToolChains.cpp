@@ -300,6 +300,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           Arguments.push_back("-api-diff-data-file");
           Arguments.push_back(DataPath->getValue());
         }
+        if (context.Args.hasArg(options::OPT_dump_usr)) {
+          Arguments.push_back("-dump-usr");
+        }
       }
     }
     break;
@@ -399,7 +402,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   const std::string &FixitsPath =
     context.Output.getAdditionalOutputForType(types::TY_Remapping);
   if (!FixitsPath.empty()) {
-    Arguments.push_back("-emit-fixits-path");
+    Arguments.push_back("-emit-remap-file-path");
     Arguments.push_back(FixitsPath.c_str());
   }
 

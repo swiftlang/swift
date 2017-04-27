@@ -436,6 +436,7 @@ static bool resolveKnownTypeWitness(NormalProtocolConformance *conformance,
   if (!knownKind) return false;
 
   auto &ctx = nominal->getASTContext();
+  (void)ctx;
 
   // Local function to handle resolution via lookup directly into the nominal
   // type.
@@ -696,10 +697,10 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  auto *genericEnv = GenericConformance->getGenericEnvironment();
+  auto *genericSig = GenericConformance->getGenericSignature();
 
   auto substitutionMap =
-      genericEnv->getSubstitutionMap(GenericSubstitutions);
+      genericSig->getSubstitutionMap(GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessAndDecl(assocType, resolver);
@@ -730,8 +731,8 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol, resolver);
 
-  auto genericEnv = GenericConformance->getGenericEnvironment();
-  auto subMap = genericEnv->getSubstitutionMap(GenericSubstitutions);
+  auto genericSig = GenericConformance->getGenericSignature();
+  auto subMap = genericSig->getSubstitutionMap(GenericSubstitutions);
 
   Type origType =
     (conformance.isConcrete()
@@ -811,30 +812,10 @@ ProtocolConformance::subst(Type substType,
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
 
-      // Since this is a normal conformance, the substitution maps archetypes
-      // in the environment of the conformance to types containing archetypes
-      // of some other generic environment.
-      //
-      // ASTContext::getSpecializedConformance() wants a substitution map
-      // with interface types as keys, so do the mapping here.
-      //
-      // Once the type of a normal conformance becomes an interface type,
-      // we can remove this.
       SubstitutionMap subMap;
-      if (auto *genericSig = getGenericSignature()) {
+      if (getGenericSignature()) {
         auto *genericEnv = getGenericEnvironment();
-        subMap = genericSig->getSubstitutionMap(
-          [&](SubstitutableType *t) -> Type {
-            return genericEnv->mapTypeIntoContext(
-              t).subst(subs, conformances, SubstFlags::UseErrorType);
-          },
-          [&](CanType origType, Type substType, ProtocolType *protoType)
-            -> Optional<ProtocolConformanceRef> {
-            origType = CanType(
-              genericEnv->mapTypeIntoContext(
-                origType)->castTo<ArchetypeType>());
-            return conformances(origType, substType, protoType);
-          });
+        subMap = genericEnv->getSubstitutionMap(subs, conformances);
       }
 
       return substType->getASTContext()

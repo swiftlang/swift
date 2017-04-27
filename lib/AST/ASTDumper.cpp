@@ -2083,11 +2083,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitLValueToPointerExpr(LValueToPointerExpr *E) {
-    printCommon(E, "lvalue_to_pointer") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
     printCommon(E, "inject_into_optional") << '\n';
     printRec(E->getSubExpr());

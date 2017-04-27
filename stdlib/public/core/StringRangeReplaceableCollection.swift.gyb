@@ -21,6 +21,8 @@ extension String : RangeReplaceableCollection, BidirectionalCollection {
   /// the other through zero or more applications of `index(after:)`.
   public typealias IndexDistance = CharacterView.IndexDistance
 
+  public typealias SubSequence = Substring
+
   /// Creates a string representing the given character repeated the specified
   /// number of times.
   ///
@@ -169,22 +171,6 @@ extension String : RangeReplaceableCollection, BidirectionalCollection {
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
   public subscript(i: Index) -> Character { return characters[i] }
-
-  /// Accesses the text in the given range.
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
-  }
-
-  /// Accesses the text in the given range.
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
-  }
 }
 
 extension String.Index {
@@ -425,16 +411,15 @@ extension String {
 }
 
 extension String {
-  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a seqeunce of strings")
+  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
   public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
     where S.Iterator.Element == String {
       fatalError()
   }
 
-  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a seqeunce of strings")
+  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
   public static func + <S : Sequence>(lhs: String, rhs: S) -> Never
     where S.Iterator.Element == String {
       fatalError()
   }
 }
-

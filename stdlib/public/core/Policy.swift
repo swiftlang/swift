@@ -390,7 +390,7 @@ public typealias AnyClass = AnyObject.Type
 ///
 /// - SeeAlso: `OptionSet`
 @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
-typealias BitwiseOperations = _BitwiseOperations
+public typealias BitwiseOperations = _BitwiseOperations
 
 public protocol _BitwiseOperations {
   /// Returns the intersection of bits set in the two arguments.

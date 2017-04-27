@@ -624,8 +624,8 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
 }
 
 class NewtypeUser {
-  @objc func stringNewtype(a: SNTErrorDomain) {}
-  @objc func stringNewtypeOptional(a: SNTErrorDomain?) {}
+  @objc func stringNewtype(a: SNTErrorDomain) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{31-45=ErrorDomain}}
+  @objc func stringNewtypeOptional(a: SNTErrorDomain?) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{39-53=ErrorDomain}}
   @objc func intNewtype(a: MyInt) {}
   @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }

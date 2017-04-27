@@ -1464,7 +1464,7 @@ public protocol BinaryInteger :
   /// Returns the n-th word, counting from the least significant to most
   /// significant, of this value's binary representation.
   ///
-  /// The `word(at:)` method returns negative values in two's complement
+  /// The `_word(at:)` method returns negative values in two's complement
   /// representation, regardless of a type's underlying implementation. If `n`
   /// is greater than the number of words in this value's current
   /// representation, the result is `0` for positive numbers and `~0` for
@@ -1474,7 +1474,13 @@ public protocol BinaryInteger :
   ///   most significant. `n` must be greater than or equal to zero.
   /// - Returns: An word-sized, unsigned integer with the bit pattern of the
   ///   n-th word of this value.
-  func word(at n: Int) -> UInt
+  func _word(at n: Int) -> UInt
+
+  // FIXME(integers): add doc comments
+  // FIXME: Should be `Words : Collection where Words.Iterator.Element == UInt`
+  // See <rdar://problem/31798916> for why it isn't.
+  associatedtype Words
+  var words: Words { get }
 
   /// The number of bits in the current binary representation of this value.
   ///
@@ -1564,7 +1570,6 @@ extension BinaryInteger {
   public init?<T : FloatingPoint>(exactly source: T) {
     // FIXME(integers): implement
     fatalError()
-    return nil
   }
 
   @_transparent
@@ -1918,6 +1923,18 @@ extension BinaryInteger {
 }
 #endif
 
+extension BinaryInteger {
+  // FIXME(integers): inefficient. Should get rid of _word(at:) and
+  // countRepresentedWords, and make `words` the basic operation.
+  public var words: [UInt] {
+    var result = [UInt]()
+    result.reserveCapacity(countRepresentedWords)
+    for i in 0..<self.countRepresentedWords {
+      result.append(_word(at: i))
+    }
+    return result
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
@@ -2172,6 +2189,7 @@ extension FixedWidthInteger {
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
 
+  @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
 }
@@ -2306,7 +2324,7 @@ ${unsafeOperationComment(x.operator)}
   @inline(__always)
   public init<T : BinaryInteger>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
-      self = Self.init(_truncatingBits: source.word(at: 0))
+      self = Self.init(_truncatingBits: source._word(at: 0))
     }
     else {
       var result: Self = source < (0 as T) ? ~0 : 0
@@ -2317,7 +2335,7 @@ ${unsafeOperationComment(x.operator)}
         // that Self.bitWidth > ${word_bits}.  Not masking results in
         // infinite recursion.
         result &<<= (${word_bits} as Self)
-        result |= Self(_truncatingBits: source.word(at: n))
+        result |= Self(_truncatingBits: source._word(at: n))
         n -= 1
       }
 
@@ -2865,7 +2883,7 @@ ${operatorComment(x.operator, True)}
   }
 
   @_transparent
-  public func word(at n: Int) -> UInt {
+  public func _word(at n: Int) -> UInt {
     _precondition(n >= 0, "Negative word index")
     if _fastPath(n < countRepresentedWords) {
       let shift = UInt(n._value) &* ${word_bits}
@@ -3302,15 +3320,15 @@ public struct DoubleWidth<T : FixedWidthInteger>
     fatalError()
   }
 
-  public func word(at n: Int) -> UInt {
+  public func _word(at n: Int) -> UInt {
     if T.bitWidth < ${word_bits} || T.bitWidth % ${word_bits} != 0 {
-      fatalError("word(at:) is not supported on this type")
+      fatalError("_word(at:) is not supported on this type")
     }
     // TODO: move to Int128 just like init(_builtinIntegerLiteral:) ?
     let wordsInT = T.bitWidth / ${word_bits}
     return (n < wordsInT) ?
-      _storage.low.word(at: n) :
-      _storage.high.word(at: n - wordsInT)
+      _storage.low._word(at: n) :
+      _storage.high._word(at: n - wordsInT)
   }
 
   public static var isSigned: Bool {

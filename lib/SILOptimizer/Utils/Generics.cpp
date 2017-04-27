@@ -620,10 +620,12 @@ static void verifySubstitutionList(SubstitutionList Subs, StringRef Name) {
         for (auto Sub : Subs) {
           Sub.getReplacement()->dump();
         });
+#ifndef NDEBUG
   for (auto Sub : Subs) {
     assert(!Sub.getReplacement()->hasError() &&
            "There should be no error types in substitutions");
   }
+#endif
 }
 
 /// This is a fast path for full specializations.
@@ -846,7 +848,7 @@ namespace swift {
 
 /// A helper class for creating partially specialized function signatures.
 ///
-/// The following naming convention is used to describe the memebrs and
+/// The following naming convention is used to describe the members and
 /// functions:
 /// Caller - the function which invokes the callee.
 /// Callee - the callee to be specialized.
@@ -1115,6 +1117,7 @@ void FunctionSignaturePartialSpecializer::
     // Create an equivalent generic parameter.
     auto SubstGenericParam = createGenericParam();
     auto SubstGenericParamCanTy = SubstGenericParam->getCanonicalType();
+    (void)SubstGenericParamCanTy;
 
     CallerInterfaceToSpecializedInterfaceMapping
         [CallerGenericParam->getCanonicalType()
@@ -1886,6 +1889,11 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   Thunk->setGenericEnvironment(ReInfo.getSpecializedGenericEnvironment());
 
+  // Set proper generic context scope for the type lowering.
+  CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
+  Lowering::GenericContextScope GenericScope(M.Types,
+                                             SpecType->getGenericSignature());
+
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
 
@@ -1950,12 +1958,14 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
   Builder.createTryApply(Loc, FRI, CalleeSILSubstFnTy, Subs,
                          Arguments, NormalBB, ErrorBB);
-  auto *ErrorVal = ErrorBB->createPHIArgument(specConv.getSILErrorType(),
-                                              ValueOwnershipKind::Owned);
+  auto *ErrorVal = ErrorBB->createPHIArgument(
+      SpecializedFunc->mapTypeIntoContext(specConv.getSILErrorType()),
+      ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
   SILValue ReturnValue = NormalBB->createPHIArgument(
-      specConv.getSILResultType(), ValueOwnershipKind::Owned);
+      SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType()),
+      ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);
   return ReturnValue;
 }
@@ -1972,12 +1982,10 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   CanSILFunctionType SubstType = ReInfo.getSubstitutedType();
   auto specConv = SpecializedFunc->getConventions();
+  (void)specConv;
   SILFunctionConventions substConv(SubstType, M);
 
   assert(specConv.useLoweredAddresses());
-
-  Lowering::GenericContextScope GenericScope(M.Types,
-                                             SpecType->getGenericSignature());
 
   // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.

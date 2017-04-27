@@ -521,6 +521,9 @@ public:
   /// Get the builtin word type as a SILType;
   static SILType getBuiltinWordType(const ASTContext &C);
 
+  /// Given a value type, return an optional type wrapping it.
+  static SILType getOptionalType(SILType valueType);
+
   /// Get the standard exception type.
   static SILType getExceptionType(const ASTContext &C);
 

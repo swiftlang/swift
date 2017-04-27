@@ -36,7 +36,7 @@ public:
   const clang::edit::Commit &getEdits() const;
 };
 
-} // end namespae migrator
+} // end namespace migrator
 } // end namespace swift
 
 #endif // SWIFT_MIGRATOR_SYNTACTICMIGRATORPASS_H

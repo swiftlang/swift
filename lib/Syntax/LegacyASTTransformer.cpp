@@ -1147,14 +1147,6 @@ LegacyASTTransformer::visitPointerToPointerExpr(
   return getUnknownExpr(E);
 }
 
-RC<SyntaxData>
-LegacyASTTransformer::visitLValueToPointerExpr(
-    LValueToPointerExpr *E,
-    const SyntaxData *Parent,
-    const CursorIndex IndexInParent) {
-  return getUnknownExpr(E);
-}
-
 RC<SyntaxData> LegacyASTTransformer::visitForeignObjectConversionExpr(
     ForeignObjectConversionExpr *E,
     const SyntaxData *Parent,

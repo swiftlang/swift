@@ -2516,6 +2516,9 @@ public:
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
   unsigned getDepth() const { return BindOptionalExprBits.Depth; }
+  void setDepth(unsigned depth) {
+    BindOptionalExprBits.Depth = depth;
+  }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }
@@ -2775,26 +2778,6 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InjectIntoOptional;
-  }
-};
-  
-/// Convert the address of an lvalue to a raw pointer.
-class LValueToPointerExpr : public ImplicitConversionExpr {
-  Type AbstractionPattern;
-public:
-  LValueToPointerExpr(Expr *subExpr, Type ty, Type abstractionTy)
-    : ImplicitConversionExpr(ExprKind::LValueToPointer, subExpr, ty),
-      AbstractionPattern(abstractionTy) {}
-  
-  /// Get the declared type of the type for which we are performing this
-  /// conversion. This defines the abstraction level at which the lvalue should
-  /// be emitted before taking its address.
-  Type getAbstractionPatternType() const {
-    return AbstractionPattern;
-  }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::LValueToPointer;
   }
 };
   

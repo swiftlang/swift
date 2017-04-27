@@ -17,6 +17,14 @@ import Glibc
 import Darwin
 #endif
 
+extension String {
+  @inline(__always)
+  func dropFirst(_ n: Int = 1) -> String {
+    let startIndex = self.index(self.startIndex, offsetBy: n)
+    return self[startIndex ..< self.endIndex]
+  }
+}
+
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {
   if regexp.first == "^" {

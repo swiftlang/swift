@@ -270,6 +270,10 @@ public:
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
+  /// Given a scalar value, materialize it into memory with the
+  /// exact same level of cleanup it had before.
+  ManagedValue materialize(SILGenFunction &SGF, SILLocation loc) const;
+
   /// Disable the cleanup for this value.
   void forwardCleanup(SILGenFunction &SGF) const;
   

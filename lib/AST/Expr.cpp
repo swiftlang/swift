@@ -494,7 +494,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(ArrayToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(StringToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(PointerToPointer, getSubExpr);
-  PASS_THROUGH_REFERENCE(LValueToPointer, getSubExpr);
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
   NO_REFERENCE(Coerce);
@@ -778,7 +777,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::ArrayToPointer:
   case ExprKind::StringToPointer:
   case ExprKind::PointerToPointer:
-  case ExprKind::LValueToPointer:
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
   case ExprKind::EnumIsCase:

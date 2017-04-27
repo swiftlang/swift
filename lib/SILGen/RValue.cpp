@@ -93,6 +93,7 @@ public:
       auto eltTy = tuple.getType().getTupleElementType(i);
       assert(eltTy.isAddress() == tuple.getType().isAddress());
       auto &eltTI = SGF.getTypeLowering(eltTy);
+      (void)eltTI;
 
       // Project the element.
       assert(eltTI.isLoadable() || !SGF.silConv.useLoweredAddresses());

@@ -77,6 +77,14 @@ module Newtype {
   header "Newtype.h"
 }
 
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *

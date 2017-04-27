@@ -34,7 +34,6 @@ bool FrontendOptions::actionHasOutput() const {
   case EmitSIBGen:
   case EmitSIB:
   case EmitModuleOnly:
-  case UpdateCode:
     return true;
   case Immediate:
   case REPL:
@@ -67,7 +66,6 @@ bool FrontendOptions::actionIsImmediate() const {
   case EmitSIBGen:
   case EmitSIB:
   case EmitModuleOnly:
-  case UpdateCode:
     return false;
   case Immediate:
   case REPL:

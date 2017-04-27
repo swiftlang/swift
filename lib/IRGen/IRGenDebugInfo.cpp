@@ -697,7 +697,7 @@ IRGenDebugInfo::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   llvm::DITemplateParameterArray TemplateParameters = nullptr;
   llvm::DISubprogram *Decl = nullptr;
 
-  // Various flags
+  // Various flags.
   bool IsLocalToUnit = Fn ? Fn->hasInternalLinkage() : true;
   bool IsDefinition = true;
   bool IsOptimized = Opts.Optimize;
@@ -722,9 +722,20 @@ IRGenDebugInfo::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
         == SILFunctionType::Representation::Block)
     Flags |= llvm::DINode::FlagAppleBlock;
 
+  // Get the throws information.
+  llvm::DITypeArray Error = nullptr;
+  if (FnTy)
+    if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
+      auto DTI = DebugTypeInfo::getFromTypeInfo(
+          nullptr, nullptr, ErrorInfo->getType(),
+          IGM.getTypeInfo(IGM.silConv.getSILType(*ErrorInfo)));
+      Error = DBuilder.getOrCreateArray({getOrCreateType(DTI)}).get();
+    }
+
+  // Construct the DISubprogram.
   llvm::DISubprogram *SP = DBuilder.createFunction(
       Scope, Name, LinkageName, File, Line, DIFnTy, IsLocalToUnit, IsDefinition,
-      ScopeLine, Flags, IsOptimized, TemplateParameters, Decl);
+      ScopeLine, Flags, IsOptimized, TemplateParameters, Decl, Error);
 
   if (Fn && !Fn->isDeclaration())
     Fn->setSubprogram(SP);

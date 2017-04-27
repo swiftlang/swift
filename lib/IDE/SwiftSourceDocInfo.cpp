@@ -912,3 +912,30 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
                                        DeclarationLoc, Filename);
   }
 }
+
+std::vector<CharSourceRange> swift::ide::
+getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
+  std::vector<CharSourceRange> Ranges;
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(Arg)) {
+    size_t ElemIndex = 0;
+    for (Expr *Elem : TE->getElements()) {
+      SourceLoc LabelStart(Elem->getStartLoc());
+      SourceLoc LabelEnd(LabelStart);
+
+      auto NameIdentifier = TE->getElementName(ElemIndex);
+      if (!NameIdentifier.empty()) {
+        LabelStart = TE->getElementNameLoc(ElemIndex);
+        if (EndKind == LabelRangeEndAt::LabelNameOnly)
+          LabelEnd = LabelStart.getAdvancedLoc(NameIdentifier.getLength());
+      }
+
+      Ranges.push_back(CharSourceRange(SM, LabelStart, LabelEnd));
+      ++ElemIndex;
+    }
+  } else if (ParenExpr *PE = dyn_cast<ParenExpr>(Arg)) {
+    if (PE->getSubExpr())
+      Ranges.push_back(CharSourceRange(PE->getSubExpr()->getStartLoc(), 0));
+  }
+
+  return Ranges;
+}

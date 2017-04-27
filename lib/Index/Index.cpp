@@ -13,6 +13,7 @@
 #include "swift/Index/Index.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -22,6 +23,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Markup/Markup.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
@@ -310,7 +312,7 @@ private:
     if (NameLoc.isCompound()) {
       size_t LabelIndex = 0;
       SourceLoc ArgLoc;
-      while((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
+      while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
@@ -327,7 +329,7 @@ private:
       return;
 
     auto LabelIt = LabelLocs.begin();
-    for(auto Prop : TypeContext->getStoredProperties()) {
+    for (auto Prop : TypeContext->getStoredProperties()) {
       if (Prop->getParentInitializer() && Prop->isLet())
         continue;
 
@@ -451,6 +453,8 @@ private:
   bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info);
+
+  bool indexComment(const Decl *D);
 
   std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
@@ -644,6 +648,11 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   SourceLoc Loc = D->getLoc();
   if (Loc.isInvalid() && !IsModuleFile)
     return false;
+
+  if (!IsModuleFile) {
+    if (!indexComment(D))
+      return false;
+  }
 
   IndexSymbol Info;
   if (auto FD = dyn_cast<FuncDecl>(D)) {
@@ -1192,6 +1201,62 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, S
   }
   
   return false;
+}
+
+bool IndexSwiftASTWalker::indexComment(const Decl *D) {
+  // FIXME: Workaround for getting tag locations. We should enhance cmark to
+  // keep track of node offsets in the original comment text.
+  struct TagLoc {
+    StringRef Text;
+    SourceLoc Loc;
+  };
+  SmallVector<TagLoc, 3> tagLocs;
+  for (const auto &single : D->getRawComment().Comments) {
+    size_t idx = single.RawText.find("- Tag:");
+    if (idx != StringRef::npos) {
+      tagLocs.push_back(TagLoc{single.RawText,
+                               single.Range.getStart().getAdvancedLoc(idx)});
+    }
+  }
+  if (tagLocs.empty())
+    return true;
+
+  swift::markup::MarkupContext MC;
+  auto DC = getSingleDocComment(MC, D);
+  if (!DC.hasValue())
+    return true;
+  for (StringRef tagName : DC.getValue()->getTags()) {
+    tagName = tagName.trim();
+    if (tagName.empty())
+      continue;
+    SourceLoc loc;
+    for (const auto &tagLoc : tagLocs) {
+      if (tagLoc.Text.contains(tagName)) {
+        loc = tagLoc.Loc;
+        break;
+      }
+    }
+    if (loc.isInvalid())
+      continue;
+    IndexSymbol Info;
+    Info.decl = nullptr;
+    Info.symInfo = SymbolInfo{ SymbolKind::CommentTag, SymbolSubKind::None,
+      SymbolPropertySet(), SymbolLanguage::Swift };
+    Info.roles |= (unsigned)SymbolRole::Definition;
+    Info.name = StringRef();
+    SmallString<128> storage;
+    {
+      llvm::raw_svector_ostream OS(storage);
+      OS << "t:" << tagName;
+      Info.USR = stringStorage.copyString(OS.str());
+    }
+    std::tie(Info.line, Info.column) = getLineCol(loc);
+    if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
+      Cancelled = true;
+      break;
+    }
+  }
+  return !Cancelled;
 }
 
 llvm::hash_code

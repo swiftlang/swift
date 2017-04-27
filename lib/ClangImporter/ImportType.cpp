@@ -575,7 +575,7 @@ namespace {
         genericEnv = ext->getGenericEnvironment();
       } else if (auto *interface =
           dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
-        auto cls = cast_or_null<ClassDecl>(
+        auto cls = castIgnoringCompatibilityAlias<ClassDecl>(
             Impl.importDecl(interface, Impl.CurrentVersion));
         if (!cls)
           return ImportResult();
@@ -852,7 +852,7 @@ namespace {
       // If this object pointer refers to an Objective-C class (possibly
       // qualified),
       if (auto objcClass = type->getInterfaceDecl()) {
-        auto imported = cast_or_null<ClassDecl>(
+        auto imported = castIgnoringCompatibilityAlias<ClassDecl>(
             Impl.importDecl(objcClass, Impl.CurrentVersion));
         if (!imported)
           return nullptr;
@@ -1037,7 +1037,7 @@ namespace {
 
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
-          auto proto = cast_or_null<ProtocolDecl>(
+          auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(*cp, Impl.CurrentVersion));
           if (!proto)
             return Type();
@@ -2431,7 +2431,8 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   for (auto decl : lookupResult) {
     if (auto swiftDecl =
             impl.importDecl(decl->getUnderlyingDecl(), impl.CurrentVersion)) {
-      if (auto protoDecl = dyn_cast<ProtocolDecl>(swiftDecl)) {
+      if (auto protoDecl =
+              dynCastIgnoringCompatibilityAlias<ProtocolDecl>(swiftDecl)) {
         return protoDecl->getDeclaredType();
       }
     }

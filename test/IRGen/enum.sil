@@ -2647,6 +2647,34 @@ bb4:
   return %9 : $()
 }
 
+struct LargeStruct {
+  var x: Builtin.Int64
+  var x2: Builtin.Int64
+  var x3: Builtin.Int64
+  var x4: Builtin.Int64
+  var x5: Builtin.Int64
+  var x6: Builtin.NativeObject
+}
+
+enum MyOptional {
+  case None
+  case Some(LargeStruct)
+}
+
+// Make sure we use a memcpy for the none branch of the enum copy.
+
+// CHECK-LABEL: define{{.*}} @test_large_optional
+// CHECK: llvm.memcpy
+// CHECK: ret void
+sil @test_large_optional : $@convention(thin) (@in MyOptional) -> () {
+entry(%x : $*MyOptional):
+ %stk = alloc_stack $MyOptional
+ copy_addr %x to [initialization] %stk : $*MyOptional
+ dealloc_stack %stk: $*MyOptional
+ %tuple = tuple ()
+ return %tuple : $()
+}
+
 // -- Fill function for dynamic singleton. The value witness table flags just
 //    get copied over from the element.
 // CHECK: define{{( protected)?}} private %swift.type* @create_generic_metadata_DynamicSingleton(%swift.type_pattern*, i8**) {{.*}} {

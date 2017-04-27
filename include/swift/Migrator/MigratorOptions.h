@@ -28,6 +28,14 @@ struct MigratorOptions {
   /// compiler and applies them. This is generally for debugging.
   bool EnableMigratorFixits = true;
 
+  /// Whether to print each USR we query the api change data store about.
+  bool DumpUsr = false;
+
+  /// If non-empty, print a replacement map describing changes to get from
+  /// the first MigrationState's output text to the last MigrationState's
+  /// output text.
+  std::string EmitRemapFilePath = "";
+
   /// If non-empty, print the last MigrationState's output text to the given
   /// file path.
   std::string EmitMigratedFilePath = "";
@@ -37,6 +45,11 @@ struct MigratorOptions {
 
   /// If non-empty, use the api change data serialized to this path.
   std::string APIDigesterDataStorePath = "";
+
+  bool shouldRunMigrator() const {
+    return !(EmitRemapFilePath.empty() && EmitMigratedFilePath.empty() &&
+             DumpMigrationStatesDir.empty());
+  }
 };
 
 } // end namespace swift

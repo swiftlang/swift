@@ -2646,7 +2646,7 @@ buildThunkSignature(SILGenFunction &gen,
     genericEnv = gen.F.getGenericEnvironment();
     auto subsArray = gen.F.getForwardingSubstitutions();
     interfaceSubs = genericSig->getSubstitutionMap(subsArray);
-    contextSubs = genericEnv->getSubstitutionMap(subsArray);
+    contextSubs = interfaceSubs;
     return genericSig;
   }
 
@@ -2681,11 +2681,11 @@ buildThunkSignature(SILGenFunction &gen,
 
   // Calculate substitutions to map the caller's archetypes to the thunk's
   // archetypes.
-  if (auto *calleeGenericEnv = gen.F.getGenericEnvironment()) {
-    contextSubs = calleeGenericEnv->getSubstitutionMap(
+  if (auto calleeGenericSig = gen.F.getLoweredFunctionType()
+          ->getGenericSignature()) {
+    contextSubs = calleeGenericSig->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type {
-        auto depTy = calleeGenericEnv->mapTypeOutOfContext(type);
-        return genericEnv->mapTypeIntoContext(depTy);
+        return genericEnv->mapTypeIntoContext(type);
       },
       MakeAbstractConformanceForGenericType());
   }

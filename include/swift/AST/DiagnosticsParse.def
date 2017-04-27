@@ -125,9 +125,17 @@ ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
-       "invalid unicode scalar", ())
+      "invalid unicode scalar", ())
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
+ERROR(lex_illegal_multiline_string_start,none,
+      "invalid start of multi-line string literal", ())
+ERROR(lex_illegal_multiline_string_end,none,
+      "invalid end of multi-line string literal", ())
+ERROR(lex_ambiguous_string_indent,none,
+      "invalid mix of multi-line string literal indentation", ())
+ERROR(lex_multiline_inside_interpolation,none,
+      "multi-line string literals are not allowed inside an interpolation", ())
 
 
 ERROR(lex_invalid_character,none,
@@ -542,8 +550,6 @@ ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
 ERROR(found_unqualified_instruction_in_qualified_function,none,
       "found unqualified instruction in qualified function '%0'", (StringRef))
-ERROR(sil_unknown_access_kind_or_enforcement,none,
-      "expected access kind or enforcement", ())
 ERROR(sil_expected_access_kind,none,
       "%0 instruction must have explicit access kind", (StringRef))
 ERROR(sil_expected_access_enforcement,none,
@@ -1172,8 +1178,6 @@ ERROR(expr_keypath_expected_property_or_type,PointsToFirstBadToken,
       "expected property or type name within '#keyPath(...)'", ())
 ERROR(expr_keypath_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#keyPath' expression", ())
-ERROR(expr_keypath_compound_name,none,
-      "cannot use compound name %0 in '#keyPath' expression", (DeclName))
 
 // Selector expressions.
 ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,

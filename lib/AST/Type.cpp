@@ -4004,6 +4004,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
+    (void)layout;
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
