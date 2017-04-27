@@ -361,6 +361,8 @@ extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
 extension Unicode.DefaultScalarView {
   struct Index {
     var codeUnitIndex: CodeUnits.Index
+    var scalar: UnicodeScalar
+    var stride: UInt8
   }
 }
 
@@ -384,44 +386,52 @@ extension Unicode.DefaultScalarView.Index : Comparable {
 
 extension Unicode.DefaultScalarView : Collection {
   public var startIndex: Index {
-    return Index(codeUnitIndex: codeUnits.startIndex)
+    @inline(__always)
+    get {
+      return index(
+        after: Index(
+          codeUnitIndex: codeUnits.startIndex,
+          scalar: UnicodeScalar(_unchecked: 0),
+          stride: 0)
+      )
+    }
   }
 
   public var endIndex: Index {
-    return Index(codeUnitIndex: codeUnits.endIndex)
+    @inline(__always)
+    get {
+      return Index(
+        codeUnitIndex: codeUnits.endIndex,
+        scalar: UnicodeScalar(_unchecked: 0),
+        stride: 0)
+    }
   }
 
   public subscript(i: Index) -> UnicodeScalar {
-    @inline(__always)
-    get {
-      var d = Encoding.ForwardDecoder()
-      var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
-      switch d.parseOne(&input) {
-      case .valid(let scalarContent):
-        return Encoding.ForwardDecoder.decodeOne(scalarContent)
-      case .invalid:
-        return UnicodeScalar(_unchecked: 0xFFFD)
-      case .emptyInput:
-        fatalError("subscripting at endIndex")
-      }
-    }
+    @inline(__always) get { return i.scalar }
   }
 
   @inline(__always)
   public func index(after i: Index) -> Index {
+    let nextPosition = codeUnits.index(
+      i.codeUnitIndex, offsetBy: numericCast(i.stride))
+    var i = IndexingIterator(
+      _elements: codeUnits, _position: nextPosition
+    )
     var d = Encoding.ForwardDecoder()
-    var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
-    switch d.parseOne(&input) {
+    switch d.parseOne(&i) {
     case .valid(let scalarContent):
       return Index(
-        codeUnitIndex: codeUnits.index(
-          i.codeUnitIndex, offsetBy: numericCast(scalarContent.count)))
-    case .invalid(let l):
+        codeUnitIndex: nextPosition,
+        scalar: Encoding.ForwardDecoder.decodeOne(scalarContent),
+        stride: numericCast(scalarContent.count))
+    case .invalid(let stride):
       return Index(
-        codeUnitIndex: codeUnits.index(
-          i.codeUnitIndex, offsetBy: numericCast(l)))
+        codeUnitIndex: nextPosition,
+        scalar: UnicodeScalar(_unchecked: 0xfffd),
+        stride: numericCast(stride))
     case .emptyInput:
-      fatalError("indexing past endIndex")
+      return endIndex
     }
   }
 }
@@ -461,19 +471,24 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
   @inline(__always)
   public func index(before i: Index) -> Index {
     var d = Encoding.ReverseDecoder()
-    var input = ReverseIndexingIterator(
+    
+    var more = ReverseIndexingIterator(
       _elements: codeUnits, _position: i.codeUnitIndex)
-    switch d.parseOne(&input) {
+    
+    switch d.parseOne(&more) {
     case .valid(let scalarContent):
+      let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
       return Index(
-        codeUnitIndex: codeUnits.index(
-          i.codeUnitIndex, offsetBy: -numericCast(scalarContent.count)))
-    case .invalid(let l):
+        codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d),
+        scalar: Encoding.ReverseDecoder.decodeOne(scalarContent),
+        stride: numericCast(scalarContent.count))
+    case .invalid(let stride):
+      let d: CodeUnits.IndexDistance = -numericCast(stride)
       return Index(
-        codeUnitIndex: codeUnits.index(
-          i.codeUnitIndex, offsetBy: -numericCast(l)))
-    case .emptyInput:
-      fatalError("indexing past startIndex")
+        codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d) ,
+        scalar: UnicodeScalar(_unchecked: 0xfffd),
+        stride: numericCast(stride))
+    case .emptyInput: fatalError("index out of bounds.")
     }
   }
 }
