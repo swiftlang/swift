@@ -734,7 +734,8 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
       Builder.createIntegerLiteral(Loc, BuiltinIntTy, Vals.size());
     StructInst *Capacity = Builder.createStruct(Loc,
         SILType::getPrimitiveObjectType(CanType(IntType)), {CapacityLiteral});
-    Builder.createApply(Loc, ReserveFnRef, FnTy.substGenericArgs(M, Subs),
+    Builder.createApply(Loc, ReserveFnRef,
+                        ReserveFnRef->getType().substGenericArgs(M, Subs),
                         ReserveFnTy->getAllResultsType(), Subs,
                         {Capacity, ArrRef}, false);
   }
