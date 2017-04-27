@@ -35,6 +35,7 @@ let _: Int32? = useAssoc(AnotherType.self)
 
 let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
 let _ = unwrapped // okay
+
 #endif // VERIFY
 
 #else // TEST
@@ -71,5 +72,56 @@ public let wrapped = WrappedInt(0)
 // CHECK-DAG: let unwrapped: UnwrappedInt
 // CHECK-RECOVERY-DAG: let unwrapped: Int32
 public let unwrapped: UnwrappedInt = 0
+
+// CHECK-DAG: let wrappedMetatype: WrappedInt.Type
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedMetatype:
+public let wrappedMetatype = WrappedInt.self
+// CHECK-DAG: let wrappedOptional: WrappedInt?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedOptional:
+public let wrappedOptional: WrappedInt? = nil
+// CHECK-DAG: let wrappedIUO: WrappedInt!
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedIUO:
+public let wrappedIUO: WrappedInt! = nil
+// CHECK-DAG: let wrappedArray: [WrappedInt]
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedArray:
+public let wrappedArray: [WrappedInt] = []
+// CHECK-DAG: let wrappedDictionary: [Int : WrappedInt]
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedDictionary:
+public let wrappedDictionary: [Int: WrappedInt] = [:]
+// CHECK-DAG: let wrappedTuple: (WrappedInt, Int)?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedTuple:
+public let wrappedTuple: (WrappedInt, Int)? = nil
+// CHECK-DAG: let wrappedTuple2: (Int, WrappedInt)?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedTuple2:
+public let wrappedTuple2: (Int, WrappedInt)? = nil
+// CHECK-DAG: let wrappedClosure: ((WrappedInt) -> Void)?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedClosure:
+public let wrappedClosure: ((WrappedInt) -> Void)? = nil
+// CHECK-DAG: let wrappedClosure2: (() -> WrappedInt)?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedClosure2:
+public let wrappedClosure2: (() -> WrappedInt)? = nil
+// CHECK-DAG: let wrappedClosure3: ((Int, WrappedInt) -> Void)?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedClosure3:
+public let wrappedClosure3: ((Int, WrappedInt) -> Void)? = nil
+// CHECK-DAG: let wrappedClosureInout: ((inout WrappedInt) -> Void)?
+// CHECK-RECOVERY-NEGATIVE-NOT: let wrappedClosureInout:
+public let wrappedClosureInout: ((inout WrappedInt) -> Void)? = nil
+
+
+// CHECK-DAG: var wrappedFirst: WrappedInt?
+// CHECK-DAG: var normalSecond: Int?
+// CHECK-RECOVERY-NEGATIVE-NOT: var wrappedFirst:
+// CHECK-RECOVERY-DAG: var normalSecond: Int?
+public var wrappedFirst: WrappedInt?, normalSecond: Int?
+// CHECK-DAG: var normalFirst: Int?
+// CHECK-DAG: var wrappedSecond: WrappedInt?
+// CHECK-RECOVERY-DAG: var normalFirst: Int?
+// CHECK-RECOVERY-NEGATIVE-NOT: var wrappedSecond:
+public var normalFirst: Int?, wrappedSecond: WrappedInt?
+// CHECK-DAG: var wrappedThird: WrappedInt?
+// CHECK-DAG: var wrappedFourth: WrappedInt?
+// CHECK-RECOVERY-NEGATIVE-NOT: var wrappedThird:
+// CHECK-RECOVERY-NEGATIVE-NOT: var wrappedFourth:
+public var wrappedThird, wrappedFourth: WrappedInt?
 
 #endif // TEST
