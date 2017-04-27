@@ -69,6 +69,11 @@ struct Access {
   Access **getHere() const {
     return reinterpret_cast<Access**>(HereAndAction & HereMask);
   }
+
+  void setHere(Access **newHere) {
+    HereAndAction = reinterpret_cast<uintptr_t>(newHere) | uintptr_t(getAccessAction());
+  }
+
   ExclusivityFlags getAccessAction() const {
     return ExclusivityFlags(HereAndAction & ActionMask);
   }
@@ -114,10 +119,14 @@ public:
     }
 
     access->initialize(pointer, curP, action);
+    *curP = access;
   }
 
   static void remove(Access *access) {
-    *access->getHere() = access->Next;
+    Access **here = access->getHere();
+    *here = access->Next;
+    if (access->Next != nullptr)
+      access->Next->setHere(here);
   }
 };
 
