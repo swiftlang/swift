@@ -1122,13 +1122,13 @@ ConstraintSystem::getTypeOfMemberReference(
     // We want to track if the generic context is represented by a
     // class-bound existential so we won't inappropriately wrap the
     // self type in an inout later on.
-    auto isClassOrClassExistential = outerDC->getDeclaredTypeOfContext()
-        ->isAnyClassReferenceType();
-    llvm::errs() << "FOO: " << isClassOrClassExistential << "\n";
-    baseTy->dump();
+    auto isClassBoundExistential = outerDC->getDeclaredTypeOfContext()
+        ->isClassExistentialType();
+
     // If self is a struct, properly qualify it based on our base
     // qualification.  If we have an lvalue coming in, we expect an inout.
-    if (!isClassOrClassExistential &&
+    if (!isClassBoundExistential &&
+        !selfTy->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
       selfTy = InOutType::get(selfTy);
