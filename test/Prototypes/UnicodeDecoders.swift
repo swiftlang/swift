@@ -361,8 +361,6 @@ extension Unicode {
 }
 extension Unicode.DefaultScalarView {
   struct Index {
-    var parsedLength: UInt8
-    var impl: Unicode.IndexImpl<Encoding>
     var codeUnitIndex: CodeUnits.Index
   }
 }
@@ -384,78 +382,41 @@ extension Unicode.DefaultScalarView.Index : Comparable {
 }
 
 extension Unicode.DefaultScalarView : Collection {
-  func _forwardIndex(atCodeUnit i: CodeUnits.Index) -> Index {
-    return index(
-      after: Index(
-        parsedLength: 0,
-        impl: .forward(
-          Encoding.ForwardDecoder(),
-          Encoding.ForwardDecoder.replacement),
-        codeUnitIndex: i
-      ))
-  }
-  
   var startIndex: Index {
-    return codeUnits.isEmpty ? endIndex
-      : _forwardIndex(atCodeUnit: codeUnits.startIndex)
+    return Index(codeUnitIndex: codeUnits.startIndex)
   }
 
   var endIndex: Index {
-    return Index(
-      parsedLength: 0,
-      impl: .reverse(
-        Encoding.ReverseDecoder(),
-        Encoding.ReverseDecoder.replacement),
-      codeUnitIndex: codeUnits.endIndex
-    )
+    return Index(codeUnitIndex: codeUnits.endIndex)
   }
 
   subscript(i: Index) -> UnicodeScalar {
-    switch i.impl {
-    case .forward(_, let s):
-      return Encoding.ForwardDecoder.decodeOne(s)
-    case .reverse(_, let s):
-      return Encoding.ReverseDecoder.decodeOne(s)
+    var d = Encoding.ForwardDecoder()
+    var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
+    switch d.parseOne(&input) {
+    case .valid(let scalarContent):
+      return Encoding.ForwardDecoder.decodeOne(scalarContent)
+    case .invalid:
+      return UnicodeScalar(_unchecked: 0xFFFD)
+    case .emptyInput:
+      fatalError("subscripting at endIndex")
     }
   }
 
   func index(after i: Index) -> Index {
-    switch i.impl {
-    case .forward(var d, _):
-      let stride = i.parsedLength
-      
-      // position of the code unit after the last one we've processed
-      let i0 = codeUnits.index(
-        i.codeUnitIndex,
-        offsetBy: CodeUnits.IndexDistance(d.buffer.count) + numericCast(stride))
-
-      var tail = codeUnits[i0..<codeUnits.endIndex].makeIterator()
-      switch d.parseOne(&tail) {
-        
-      case .valid(let s):
-        return Index(
-          parsedLength: UInt8(extendingOrTruncating: s.count),
-          impl: .forward(d, s),
-          codeUnitIndex:
-            codeUnits.index(i.codeUnitIndex, offsetBy: numericCast(stride)))
-        
-      case .invalid(let l):
-        return Index(
-          parsedLength: UInt8(extendingOrTruncating: l),
-          impl: .forward(d, Encoding.ForwardDecoder.replacement),
-          codeUnitIndex:
-            codeUnits.index(i.codeUnitIndex, offsetBy: numericCast(stride)))
-        
-      case .emptyInput:
-        return endIndex
-      }
-      
-    case .reverse(_,_):
-      fatalError("implement me")
-      // The following has the right semantics but kills inlining.  Needs a
-      // refactor to be right.
-      //
-      // return index(after: _forwardIndex(atCodeUnit: i.codeUnitIndex))
+    var d = Encoding.ForwardDecoder()
+    var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
+    switch d.parseOne(&input) {
+    case .valid(let scalarContent):
+      return Index(
+        codeUnitIndex: codeUnits.index(
+          i.codeUnitIndex, offsetBy: numericCast(scalarContent.count)))
+    case .invalid(let l):
+      return Index(
+        codeUnitIndex: codeUnits.index(
+          i.codeUnitIndex, offsetBy: numericCast(l)))
+    case .emptyInput:
+      fatalError("advancing past endIndex")
     }
   }
 }
