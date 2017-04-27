@@ -17,7 +17,7 @@
 // The BASELINE timings come from the existing standard library Codecs
 
 /* 
-  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION ; do 
+  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION REVERSE_COLLECTION ; do 
     echo $x
     swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x 
     for i in {1..3}; do
@@ -326,6 +326,11 @@ extension Unicode {
     Encoding: UnicodeEncoding
   > where CodeUnits.Iterator.Element == Encoding.CodeUnit {
     var codeUnits: CodeUnits
+    init(
+      _ codeUnits: CodeUnits,
+      fromEncoding _: Encoding.Type = Encoding.self) {
+      self.codeUnits = codeUnits
+    }
   }
 }
 
@@ -353,12 +358,6 @@ extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
   }
 }
 
-extension Unicode {
-  enum IndexImpl<E: UnicodeEncoding> {
-    case forward(E.ForwardDecoder, E.ForwardDecoder.EncodedScalar)
-    case reverse(E.ReverseDecoder, E.ReverseDecoder.EncodedScalar)
-  }
-}
 extension Unicode.DefaultScalarView {
   struct Index {
     var codeUnitIndex: CodeUnits.Index
@@ -366,14 +365,16 @@ extension Unicode.DefaultScalarView {
 }
 
 extension Unicode.DefaultScalarView.Index : Comparable {
-  static func < (
+  @inline(__always)
+  public static func < (
     lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
     rhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
   ) -> Bool {
     return lhs.codeUnitIndex < rhs.codeUnitIndex
   }
   
-  static func == (
+  @inline(__always)
+  public static func == (
     lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
     rhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
   ) -> Bool {
@@ -382,28 +383,32 @@ extension Unicode.DefaultScalarView.Index : Comparable {
 }
 
 extension Unicode.DefaultScalarView : Collection {
-  var startIndex: Index {
+  public var startIndex: Index {
     return Index(codeUnitIndex: codeUnits.startIndex)
   }
 
-  var endIndex: Index {
+  public var endIndex: Index {
     return Index(codeUnitIndex: codeUnits.endIndex)
   }
 
-  subscript(i: Index) -> UnicodeScalar {
-    var d = Encoding.ForwardDecoder()
-    var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
-    switch d.parseOne(&input) {
-    case .valid(let scalarContent):
-      return Encoding.ForwardDecoder.decodeOne(scalarContent)
-    case .invalid:
-      return UnicodeScalar(_unchecked: 0xFFFD)
-    case .emptyInput:
-      fatalError("subscripting at endIndex")
+  public subscript(i: Index) -> UnicodeScalar {
+    @inline(__always)
+    get {
+      var d = Encoding.ForwardDecoder()
+      var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
+      switch d.parseOne(&input) {
+      case .valid(let scalarContent):
+        return Encoding.ForwardDecoder.decodeOne(scalarContent)
+      case .invalid:
+        return UnicodeScalar(_unchecked: 0xFFFD)
+      case .emptyInput:
+        fatalError("subscripting at endIndex")
+      }
     }
   }
 
-  func index(after i: Index) -> Index {
+  @inline(__always)
+  public func index(after i: Index) -> Index {
     var d = Encoding.ForwardDecoder()
     var input = codeUnits[i.codeUnitIndex..<codeUnits.endIndex].makeIterator()
     switch d.parseOne(&input) {
@@ -416,7 +421,59 @@ extension Unicode.DefaultScalarView : Collection {
         codeUnitIndex: codeUnits.index(
           i.codeUnitIndex, offsetBy: numericCast(l)))
     case .emptyInput:
-      fatalError("advancing past endIndex")
+      fatalError("indexing past endIndex")
+    }
+  }
+}
+
+// This should go in the standard library; see
+// https://github.com/apple/swift/pull/9074 and
+// https://bugs.swift.org/browse/SR-4721
+@_fixed_layout
+public struct ReverseIndexingIterator<
+  Elements : BidirectionalCollection
+> : IteratorProtocol, Sequence {
+
+  @_inlineable
+  @inline(__always)
+  /// Creates an iterator over the given collection.
+  public /// @testable
+  init(_elements: Elements, _position: Elements.Index) {
+    self._elements = _elements
+    self._position = _position
+  }
+  
+  @_inlineable
+  @inline(__always)
+  public mutating func next() -> Elements._Element? {
+    guard _fastPath(_position != _elements.startIndex) else { return nil }
+    _position = _elements.index(before: _position)
+    return _elements[_position]
+  }
+  
+  @_versioned
+  internal let _elements: Elements
+  @_versioned
+  internal var _position: Elements.Index
+}
+
+extension Unicode.DefaultScalarView : BidirectionalCollection {
+  @inline(__always)
+  public func index(before i: Index) -> Index {
+    var d = Encoding.ReverseDecoder()
+    var input = ReverseIndexingIterator(
+      _elements: codeUnits, _position: i.codeUnitIndex)
+    switch d.parseOne(&input) {
+    case .valid(let scalarContent):
+      return Index(
+        codeUnitIndex: codeUnits.index(
+          i.codeUnitIndex, offsetBy: -numericCast(scalarContent.count)))
+    case .invalid(let l):
+      return Index(
+        codeUnitIndex: codeUnits.index(
+          i.codeUnitIndex, offsetBy: -numericCast(l)))
+    case .emptyInput:
+      fatalError("indexing past startIndex")
     }
   }
 }
@@ -793,8 +850,9 @@ func checkDecodeUTF8(
     }
   }
   
-  let scalars = Unicode.DefaultScalarView<[UInt8], UTF8>(codeUnits: utf8Str)
+  let scalars = Unicode.DefaultScalarView(utf8Str, fromEncoding: UTF8.self)
   expectEqualSequence(expected, scalars)
+  expectEqualSequence(expected.reversed(), scalars.reversed())
   
   do {
     var x = scalars.makeIterator()
@@ -2435,15 +2493,22 @@ public func run_UTF8Decode(_ N: Int) {
       typealias D = UTF8.ReverseDecoder
       D.decode(&it, repairingIllFormedSequences: true) { total = total &+ $0.value }
   #elseif SEQUENCE
-      for s in Unicode.DefaultScalarView<[UInt8], UTF8>(codeUnits: string) {
+      for s in Unicode.DefaultScalarView(string, fromEncoding: UTF8.self) {
         total = total &+ s.value
       }
   #elseif COLLECTION
-      let scalars = Unicode.DefaultScalarView<[UInt8], UTF8>(codeUnits: string)
+      let scalars = Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
       var i = scalars.startIndex
       while i != scalars.endIndex {
         total = total &+ scalars[i].value
         i = scalars.index(after: i)
+      }
+#elseif REVERSE_COLLECTION
+      let scalars = Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
+      var i = scalars.endIndex
+      while i != scalars.startIndex {
+        i = scalars.index(before: i)
+        total = total &+ scalars[i].value
       }
   #else
       Error_Unknown_Benchmark()

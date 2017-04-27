@@ -386,6 +386,14 @@ public struct IndexingIterator<
     self._position = _elements.startIndex
   }
 
+  @_inlineable
+  /// Creates an iterator over the given collection.
+  public /// @testable
+  init(_elements: Elements, _position: Elements.Index) {
+    self._elements = _elements
+    self._position = _position
+  }
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
