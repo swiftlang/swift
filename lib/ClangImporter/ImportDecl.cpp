@@ -1893,28 +1893,54 @@ namespace {
     /// Note: Use this rather than calling Impl.importFullName directly!
     ImportedName importFullName(const clang::NamedDecl *D,
                                 Optional<ImportedName> &correctSwiftName) {
-      if (isActiveSwiftVersion()) {
-        // Just import the current Swift name.
-        correctSwiftName = None;
-        return Impl.importFullName(D, getVersion());
+      ImportNameVersion canonicalVersion = getActiveSwiftVersion();
+      if (isa<clang::TypeDecl>(D) || isa<clang::ObjCContainerDecl>(D)) {
+        canonicalVersion = ImportNameVersion::ForTypes;
+      }
+      correctSwiftName = None;
+
+      // First, import based on the Swift name of the canonical declaration:
+      // the latest version for types and the current version for non-type
+      // values. If that fails, we won't do anything.
+      auto canonicalName = Impl.importFullName(D, canonicalVersion);
+      if (!canonicalName)
+        return ImportedName();
+
+      if (getVersion() == canonicalVersion) {
+        // Make sure we don't try to import the same type twice as canonical.
+        if (canonicalVersion != getActiveSwiftVersion()) {
+          auto activeName = Impl.importFullName(D, getActiveSwiftVersion());
+          if (activeName &&
+              activeName.getDeclName() == canonicalName.getDeclName()) {
+            return ImportedName();
+          }
+        }
+
+        return canonicalName;
       }
 
       // Special handling when we import using the older Swift name.
       //
-      // First, import based on the current Swift name. If that fails, we won't
-      // do anything.
-      correctSwiftName = Impl.importFullName(D, getActiveSwiftVersion());
-      if (!*correctSwiftName)
-        return {};
-
       // Import using the alternate Swift name. If that fails, or if it's
       // identical to the active Swift name, we won't introduce an alternate
       // Swift name stub declaration.
       auto alternateName = Impl.importFullName(D, getVersion());
-      if (!alternateName || alternateName.getDeclName() == correctSwiftName->getDeclName())
+      if (!alternateName)
         return ImportedName();
 
-      // Okay, return the alternate Swift name.
+      if (alternateName.getDeclName() == canonicalName.getDeclName()) {
+        if (getVersion() == getActiveSwiftVersion()) {
+          assert(canonicalVersion != getActiveSwiftVersion());
+          return alternateName;
+        }
+        return ImportedName();
+      }
+
+      // Always use the active version as the preferred name, even if the
+      // canonical name is a different version.
+      correctSwiftName = Impl.importFullName(D, getActiveSwiftVersion());
+      assert(correctSwiftName);
+
       return alternateName;
     }
 
@@ -2035,6 +2061,15 @@ namespace {
     /// Mark the given declaration as an older Swift version variant of the
     /// current name.
     void markAsVariant(Decl *decl, ImportedName correctSwiftName) {
+      // Types always import using the latest version. Make sure all names up
+      // to that version are considered available.
+      if (isa<TypeDecl>(decl)) {
+        cast<TypeAliasDecl>(decl)->markAsCompatibilityAlias();
+
+        if (getVersion() >= getActiveSwiftVersion())
+          return;
+      }
+
       // TODO: some versions should be deprecated instead of unavailable
 
       ASTContext &ctx = decl->getASTContext();
@@ -3853,7 +3888,7 @@ namespace {
         return nullptr;
 
       // Find the Swift class being extended.
-      auto objcClass = cast_or_null<ClassDecl>(
+      auto objcClass = castIgnoringCompatibilityAlias<ClassDecl>(
           Impl.importDecl(decl->getClassInterface(), getActiveSwiftVersion()));
       if (!objcClass)
         return nullptr;
@@ -4669,7 +4704,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     if (auto attr = record->getAttr<clang::ObjCBridgeAttr>()) {
       // Record the Objective-C class to which this CF type is toll-free
       // bridged.
-      if (ClassDecl *objcClass = dyn_cast_or_null<ClassDecl>(
+      if (ClassDecl *objcClass = dynCastIgnoringCompatibilityAlias<ClassDecl>(
               Impl.importDeclByName(attr->getBridgedType()->getName()))) {
         theClass->getAttrs().add(new (Impl.SwiftContext)
                                      ObjCBridgedAttr(objcClass));
@@ -4679,7 +4714,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     if (auto attr = record->getAttr<clang::ObjCBridgeMutableAttr>()) {
       // Record the Objective-C class to which this CF type is toll-free
       // bridged.
-      if (ClassDecl *objcClass = dyn_cast_or_null<ClassDecl>(
+      if (ClassDecl *objcClass = dynCastIgnoringCompatibilityAlias<ClassDecl>(
               Impl.importDeclByName(attr->getBridgedType()->getName()))) {
         theClass->getAttrs().add(new (Impl.SwiftContext)
                                      ObjCBridgedAttr(objcClass));
@@ -4696,7 +4731,11 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     ImportedName correctSwiftName) {
   // Import the referenced declaration. If it doesn't come in as a type,
   // we don't care.
-  auto importedDecl = Impl.importDecl(decl, getActiveSwiftVersion());
+  Decl *importedDecl = nullptr;
+  if (getVersion() >= getActiveSwiftVersion())
+    importedDecl = Impl.importDecl(decl, ImportNameVersion::ForTypes);
+  if (!importedDecl)
+    importedDecl = Impl.importDecl(decl, getActiveSwiftVersion());
   auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
   if (!typeDecl)
     return nullptr;
@@ -6193,7 +6232,7 @@ void SwiftDeclConverter::importObjCProtocols(
 
   for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
        cp != cpEnd; ++cp) {
-    if (auto proto = cast_or_null<ProtocolDecl>(
+    if (auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(*cp, getActiveSwiftVersion()))) {
       addProtocols(proto, protocols, knownProtocols);
       inheritedTypes.push_back(TypeLoc::withoutLoc(proto->getDeclaredType()));
@@ -6275,7 +6314,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         inherited.push_back(TypeLoc::withoutLoc(superclassType));
       }
       for (clang::ObjCProtocolDecl *clangProto : clangBound->quals()) {
-        ProtocolDecl *proto = cast_or_null<ProtocolDecl>(
+        ProtocolDecl *proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
             Impl.importDecl(clangProto, getActiveSwiftVersion()));
         if (!proto) {
           return None;
@@ -6915,7 +6954,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 
       if (hasMissingRequiredMember) {
         // Mark the protocol as having missing requirements.
-        if (auto proto = cast_or_null<ProtocolDecl>(
+        if (auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
                 importDecl(clangProto, CurrentVersion))) {
           proto->setHasMissingRequirements(true);
         }
@@ -6929,7 +6968,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
         // Only allow this to affect declarations in the same top-level module
         // as the original class.
         if (getClangModuleForDecl(theClass) == getClangModuleForDecl(method)) {
-          if (auto swiftClass = cast_or_null<ClassDecl>(
+          if (auto swiftClass = castIgnoringCompatibilityAlias<ClassDecl>(
                   importDecl(theClass, CurrentVersion))) {
             swiftClass->setHasMissingDesignatedInitializers();
           }

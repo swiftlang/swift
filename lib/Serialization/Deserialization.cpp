@@ -3829,6 +3829,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       }
     }
 
+    // Look through compatibility aliases that are now unavailable.
+    if (alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      break;
+    }
+
     typeOrOffset = alias->getDeclaredInterfaceType();
     break;
   }

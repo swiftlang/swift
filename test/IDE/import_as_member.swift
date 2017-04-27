@@ -68,9 +68,8 @@
 // PRINT-APINOTES-3-NEXT:   init(oldLabel _: Int32)
 // PRINT-APINOTES-3-NEXT:   @available(swift, introduced: 4, renamed: "Struct1.init(oldLabel:)")
 // PRINT-APINOTES-3-NEXT:   init(newLabel _: Int32)
-// PRINT-APINOTES-3-NEXT:   typealias OldApiNoteType = Double
-// PRINT-APINOTES-3-NEXT:   @available(swift, introduced: 4, renamed: "Struct1.OldApiNoteType")
-// PRINT-APINOTES-3-NEXT:   typealias NewApiNoteType = Struct1.OldApiNoteType
+// PRINT-APINOTES-3-NEXT:   typealias OldApiNoteType = Struct1.NewApiNoteType
+// PRINT-APINOTES-3-NEXT:   typealias NewApiNoteType = Double
 // PRINT-APINOTES-3-NEXT: }
 // PRINT-APINOTES-3-NOT: @available
 // PRINT-APINOTES-3:     var IAMStruct1APINoteVarInSwift4: Double

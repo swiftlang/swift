@@ -322,6 +322,8 @@ static bool isInterestingTypealias(Type type) {
     return false;
   if (type->is<BuiltinType>())
     return false;
+  if (aliasTy->getDecl()->isCompatibilityAlias())
+    return isInterestingTypealias(aliasTy->getSinglyDesugaredType());
   return true;
 }
 
