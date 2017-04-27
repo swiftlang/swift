@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -686,27 +687,30 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   }
   Args.push_back(NewSelf);
 
+  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
+  SILType SubstCalleeType = AI.getSubstCalleeSILType();
+  SILType NewSubstCalleeType;
+
   // Form a new set of substitutions where Self is
   // replaced by a concrete type.
   SmallVector<Substitution, 8> Substitutions;
-  for (auto Subst : AI.getSubstitutions()) {
-    auto *A = Subst.getReplacement()->getAs<ArchetypeType>();
-    if (A && A == OpenedArchetype) {
-      auto Conformances = AI.getModule().getASTContext()
-                            .AllocateUninitialized<ProtocolConformanceRef>(1);
-      Conformances[0] = Conformance;
-      Substitution NewSubst(ConcreteType, Conformances);
-      Substitutions.push_back(NewSubst);
-    } else
-      Substitutions.push_back(Subst);
-  }
-
-  SILType SubstCalleeType = AI.getSubstCalleeSILType();
-
-  SILType NewSubstCalleeType;
-
-  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
   if (FnTy->isPolymorphic()) {
+    auto FnSubsMap =
+        FnTy->getGenericSignature()->getSubstitutionMap(AI.getSubstitutions());
+    auto FinalSubsMap = FnSubsMap.subst(
+        [&](SubstitutableType *type) -> Type {
+          if (type == OpenedArchetype)
+            return ConcreteType;
+          return type;
+        },
+        [&](CanType origTy, Type substTy,
+            ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
+          if (substTy->isEqual(ConcreteType)) {
+            return Conformance.getInherited(proto->getDecl());
+          }
+          return ProtocolConformanceRef(proto->getDecl());
+        });
+    FnTy->getGenericSignature()->getSubstitutions(FinalSubsMap, Substitutions);
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
@@ -794,10 +798,8 @@ getConformanceAndConcreteType(FullApplySite AI,
     if (Requirement->inheritsFrom(Protocol)) {
       // If Requirement != Protocol, then the abstract conformance cannot be used
       // as is and we need to create a proper conformance.
-      return std::make_tuple(Conformance.isAbstract()
-                                ? ProtocolConformanceRef(Protocol)
-                                : Conformance,
-                            ConcreteType, ConcreteTypeDef);
+      return std::make_tuple(Conformance.getInherited(Protocol), ConcreteType,
+                             ConcreteTypeDef);
     }
   }
 
