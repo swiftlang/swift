@@ -238,33 +238,32 @@ namespace {
 /// Print a replacement from a diff edit scriptto the given output stream.
 ///
 /// \param Filename The filename of the original file
-/// \param Offset The absolute offset in the original file
-/// \param RemoveLength The amount of text to remove at Offset (can be zero).
-/// \param Replacement What to insert at the offset (can be empty)
+/// \param Rep The Replacement to print
 /// \param OS The output stream
 void printReplacement(const StringRef Filename,
-                      const size_t Offset,
-                      const size_t RemoveLength,
-                      const StringRef Replacement,
+                      const Replacement &Rep,
                       llvm::raw_ostream &OS) {
   assert(!Filename.empty());
-  if (RemoveLength == 0 && Replacement.empty()) {
+  if (Rep.Remove == 0 && Rep.Text.empty()) {
     return;
   }
   OS << "  {\n";
 
-  OS << "    \"file:\" \"";
+  OS << "    \"file\": \"";
   OS.write_escaped(Filename);
   OS << "\",\n";
 
-  OS << "    \"offset:\" " << Offset << ",\n";
-  if (RemoveLength > 0) {
-    OS << "    \"remove:\" " << RemoveLength << ",\n";
+  OS << "    \"offset\": " << Rep.Offset << ",\n";
+  if (Rep.Remove > 0) {
+    OS << "    \"remove\": " << Rep.Remove;
   }
-  if (!Replacement.empty()) {
+  if (!Rep.Text.empty()) {
+    OS << ",\n";
     OS << "    \"text\": \"";
-    OS.write_escaped(Replacement);
+    OS.write_escaped(Rep.Text);
     OS << "\"\n";
+  } else {
+    OS << "\n";
   }
   OS << "  }";
 }
@@ -287,37 +286,54 @@ void printRemap(const StringRef OriginalFilename,
 
   OS << "[\n";
 
-  size_t ReplacementsPrinted = 0;
   size_t Offset = 0;
-  size_t Insertion = 0;
-  size_t Deletion = 0;
+
+  llvm::SmallVector<Replacement, 32> Replacements;
 
   for (const auto &Diff : Diffs) {
+    size_t OffsetIncrement = 0;
     switch (Diff.operation) {
       case decltype(DMP)::EQUAL:
+        OffsetIncrement += Diff.text.size();
         break;
       case decltype(DMP)::INSERT:
-        if (ReplacementsPrinted > 0) {
-          OS << ",\n";
+        if (!Replacements.empty()) {
+          auto &Prev = Replacements.back();
+          if (Prev.isRemove() && Prev.endOffset() == Offset) {
+            Prev.Text = Diff.text;
+            break;
+          } else if (Prev.isInsert()) {
+            Prev.Text += Diff.text;
+            break;
+          }
         }
-        printReplacement(OriginalFilename,
-                         Offset + Deletion - Insertion,
-                         0, Diff.text, OS);
-        ++ReplacementsPrinted;
-        Insertion += Diff.text.size();
+        Replacements.push_back({ Offset, 0, Diff.text });
         break;
       case decltype(DMP)::DELETE:
-        if (ReplacementsPrinted > 0) {
-          OS << ",\n";
+        if (!Replacements.empty()) {
+          auto &Prev = Replacements.back();
+          if (Prev.isInsert() && Prev.endOffset() == Offset) {
+            Prev.Remove = Diff.text.size();
+            break;
+          } else if (Prev.isRemove()) {
+            Prev.Remove += Diff.text.size();
+            break;
+          }
         }
-        printReplacement(OriginalFilename,
-                         Offset + Deletion - Insertion,
-                         Diff.text.size(), "", OS);
-        ++ReplacementsPrinted;
-        Deletion += Diff.text.size();
+        Replacements.push_back({ Offset, Diff.text.size(), "" });
+        OffsetIncrement = Diff.text.size();
         break;
     }
-    Offset += Diff.text.size();
+    Offset += OffsetIncrement;
+  }
+
+  for (auto Rep = Replacements.begin(); Rep != Replacements.end(); ++Rep) {
+    if (Rep != Replacements.begin()) {
+      OS << ",\n";
+    } else {
+      OS << "\n";
+    }
+    printReplacement(OriginalFilename, *Rep, OS);
   }
 
   OS << "\n]";
