@@ -1217,91 +1217,91 @@ public protocol UnkeyedEncodingContainer {
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Bool
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Bool
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int8
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int8
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int16
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int16
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int32
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int32
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int64
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int64
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt8
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt8
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt16
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt16
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt32
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt32
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt64
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt64
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Float
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Float
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Double
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Double
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == String
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == String
 
     /// Encodes the elements of the given sequence.
     ///
     /// - parameter sequence: The sequences whose contents to encode.
     /// - throws: An error if any of the contained values throws an error.
-    mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element : Encodable
+    mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element : Encodable
 
     /// Encodes a nested container keyed by the given type and returns it.
     ///
@@ -2895,91 +2895,91 @@ public extension UnkeyedEncodingContainer {
         try encode(object)
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Bool {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Bool {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int8 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int8 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int16 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int16 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int32 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int32 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Int64 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Int64 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt8 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt8 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt16 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt16 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt32 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt32 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == UInt64 {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == UInt64 {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Float {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Float {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == Double {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == Double {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element == String {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element == String {
         for element in sequence {
             try encode(element)
         }
     }
 
-    public mutating func encode<Sequence : Swift.Sequence>(contentsOf sequence: Sequence) throws where Sequence.Iterator.Element : Encodable {
+    public mutating func encode<T : Sequence>(contentsOf sequence: T) throws where T.Iterator.Element : Encodable {
         for element in sequence {
             try encode(element)
         }
