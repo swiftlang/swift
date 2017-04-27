@@ -41,47 +41,40 @@ namespace swift {
 class GenericSignature;
 class GenericEnvironment;
 class SubstitutableType;
+typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 
 template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
 
+enum class CombineSubstitutionMaps {
+  AtDepth,
+  AtIndex
+};
+
 class SubstitutionMap {
-  using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
+  /// The generic signature for which we are performing substitutions.
+  GenericSignature *genericSig;
 
   // FIXME: Switch to a more efficient representation.
-  llvm::DenseMap<SubstitutableType *, Type> subMap;
+  llvm::DenseMap<GenericTypeParamType *, Type> subMap;
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
-  llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
-
-  // Call the given function for each parent of the given type. The
-  // function \c fn should return an \c Optional<T>. \c forEachParent() will
-  // return the first non-empty \C Optional<T> returned by \c fn.
-  template<typename T>
-  Optional<T> forEachParent(
-                CanType type,
-                llvm::SmallPtrSetImpl<CanType> &visitedParents,
-                llvm::function_ref<Optional<T>(CanType,
-                                               AssociatedTypeDecl *)> fn) const;
-
-  // Call the given function for each conformance of the given type. The
-  // function \c fn should return an \c Optional<T>. \c forEachConformance()
-  // will return the first non-empty \C Optional<T> returned by \c fn.
-  template<typename T>
-  Optional<T> forEachConformance(
-                  CanType type,
-                  llvm::SmallPtrSetImpl<CanType> &visitedParents,
-                  llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn)
-                const;
 
 public:
-  Optional<ProtocolConformanceRef>
-  lookupConformance(
-                CanType type, ProtocolDecl *proto,
-                llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
+  SubstitutionMap()
+    : SubstitutionMap(static_cast<GenericSignature *>(nullptr)) { }
 
-  /// Retrieve the conformances for the given type.
-  ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
+  SubstitutionMap(GenericSignature *genericSig)
+    : genericSig(genericSig) { }
+
+  SubstitutionMap(GenericEnvironment *genericEnv);
+
+  /// Retrieve the generic signature describing the environment in which
+  /// substitutions occur.
+  GenericSignature *getGenericSignature() const { return genericSig; }
+
+  Optional<ProtocolConformanceRef>
+  lookupConformance(CanType type, ProtocolDecl *proto) const;
 
   bool empty() const {
     return subMap.empty();
@@ -90,8 +83,21 @@ public:
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;
 
+  /// Query whether any replacement types in the map contain an opened
+  /// existential.
+  bool hasOpenedExistential() const;
+
   /// Query whether any replacement type sin the map contain dynamic Self.
   bool hasDynamicSelf() const;
+
+  /// Apply a substitution to all replacement types in the map. Does not
+  /// change keys.
+  SubstitutionMap subst(const SubstitutionMap &subMap) const;
+
+  /// Apply a substitution to all replacement types in the map. Does not
+  /// change keys.
+  SubstitutionMap subst(TypeSubstitutionFn subs,
+                        LookupConformanceFn conformances) const;
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
@@ -106,8 +112,7 @@ public:
   static SubstitutionMap
   getOverrideSubstitutions(const ValueDecl *baseDecl,
                            const ValueDecl *derivedDecl,
-                           Optional<SubstitutionMap> derivedSubs,
-                           LazyResolver *resolver);
+                           Optional<SubstitutionMap> derivedSubs);
 
   /// Variant of the above for when we have the generic signatures but not
   /// the decls for 'derived' and 'base'.
@@ -116,24 +121,30 @@ public:
                            const ClassDecl *derivedClass,
                            GenericSignature *baseSig,
                            GenericSignature *derivedSig,
-                           Optional<SubstitutionMap> derivedSubs,
-                           LazyResolver *resolver);
+                           Optional<SubstitutionMap> derivedSubs);
 
   /// Combine two substitution maps as follows.
   ///
-  /// The result is written in terms of the generic parameters of 'baseSig'.
+  /// The result is written in terms of the generic parameters of 'genericSig'.
   ///
-  /// Generic parameters with a depth less than 'baseDepth' come from
-  /// 'baseSubs'.
+  /// Generic parameters with a depth or index less than 'firstDepthOrIndex'
+  /// come from 'firstSubMap'.
   ///
-  /// Generic parameters with a depth greater than 'baseDepth' come from
-  /// 'origSubs', but are looked up starting with a depth of 'origDepth'.
+  /// Generic parameters with a depth greater than 'firstDepthOrIndex' come
+  /// from 'secondSubMap', but are looked up starting with a depth or index of
+  /// 'secondDepthOrIndex'.
+  ///
+  /// The 'how' parameter determines if we're looking at the depth or index.
   static SubstitutionMap
-  combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
-                          const SubstitutionMap &origSubMap,
-                          unsigned baseDepth,
-                          unsigned origDepth,
-                          GenericSignature *baseSig);
+  combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
+                          const SubstitutionMap &secondSubMap,
+                          CombineSubstitutionMaps how,
+                          unsigned baseDepthOrIndex,
+                          unsigned origDepthOrIndex,
+                          GenericSignature *genericSig);
+
+  /// Verify that this substitution map is valid.
+  void verify() const;
 
   /// Dump the contents of this substitution map for debugging purposes.
   void dump(llvm::raw_ostream &out) const;
@@ -155,10 +166,8 @@ private:
   // instead, use GenericSignature::getSubstitutionMap() or
   // GenericEnvironment::getSubstitutionMap().
 
-  void addSubstitution(CanSubstitutableType type, Type replacement);
+  void addSubstitution(CanGenericTypeParamType type, Type replacement);
   void addConformance(CanType type, ProtocolConformanceRef conformance);
-  void addParent(CanType type, CanType parent,
-                 AssociatedTypeDecl *assocType);
 };
 
 } // end namespace swift

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -I %t -emit-sil -emit-verbose-sil -o - \
+// RUN: %target-swift-frontend %s -O -I %t -emit-sil -emit-verbose-sil -o - \
 // RUN:    | %FileCheck %s --check-prefix=CHECK-SIL
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -I %t -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | %FileCheck %s
 
 public var glob : Int = 0
 @inline(never) public func hold(_ n : Int) { glob = n }
@@ -51,3 +51,4 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
 // CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
+

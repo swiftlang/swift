@@ -41,7 +41,7 @@
 ///   - sequence2: The second sequence or collection to zip.
 /// - Returns: A sequence of tuple pairs, where the elements of each pair are
 ///   corresponding elements of `sequence1` and `sequence2`.
-public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
+public func zip<Sequence1, Sequence2>(
   _ sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
   return Zip2Sequence(_sequence1: sequence1, _sequence2: sequence2)

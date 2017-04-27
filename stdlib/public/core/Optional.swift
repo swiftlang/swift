@@ -157,6 +157,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
+  @_inlineable
   public func map<U>(
     _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
@@ -187,6 +188,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///   of the instance.  
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
+  @_inlineable
   public func flatMap<U>(
     _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
@@ -235,6 +237,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///   `unsafelyUnwrapped` only when you are confident that this instance
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
+  @_inlineable
   public var unsafelyUnwrapped: Wrapped {
     @inline(__always)
     get {
@@ -249,6 +252,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
+  @_inlineable
   public // SPI(SwiftExperimental)
   var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
@@ -348,6 +352,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
 /// - Parameters:
 ///   - lhs: An optional value to compare.
 ///   - rhs: Another optional value to compare.
+@_inlineable
 public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -392,6 +397,7 @@ public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
 /// - Parameters:
 ///   - lhs: An optional value to compare.
 ///   - rhs: Another optional value to compare.
+@_inlineable
 public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
@@ -670,6 +676,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
 }
 
 extension Optional {
+
   @available(*, unavailable, renamed: "none")
   public static var None: Optional<Wrapped> {
     return .none

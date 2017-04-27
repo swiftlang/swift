@@ -43,11 +43,17 @@ KNOWN_STDLIB_TYPE_DECL(Float,  NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Double, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(String, NominalTypeDecl, 0)
+KNOWN_STDLIB_TYPE_DECL(Substring, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Array, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Set, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Sequence, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Dictionary, NominalTypeDecl, 2)
 KNOWN_STDLIB_TYPE_DECL(AnyHashable, NominalTypeDecl, 0)
+
+KNOWN_STDLIB_TYPE_DECL(PartialKeyPath, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(KeyPath, NominalTypeDecl, 2)
+KNOWN_STDLIB_TYPE_DECL(WritableKeyPath, NominalTypeDecl, 2)
+KNOWN_STDLIB_TYPE_DECL(ReferenceWritableKeyPath, NominalTypeDecl, 2)
 
 KNOWN_STDLIB_TYPE_DECL(Optional, EnumDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(ImplicitlyUnwrappedOptional, EnumDecl, 1)

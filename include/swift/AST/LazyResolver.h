@@ -52,11 +52,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve an inherited conformance.
-  virtual ProtocolConformance *resolveInheritedConformance(
-                                 const NormalProtocolConformance *conformance,
-                                 ProtocolDecl *inherited) = 0;
-
   /// Resolve the accessibility of a value.
   ///
   /// It does no type-checking.
@@ -127,12 +122,6 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
-  ProtocolConformance *resolveInheritedConformance(
-                         const NormalProtocolConformance *conformance,
-                         ProtocolDecl *inherited) override {
-    return Principal.resolveInheritedConformance(conformance, inherited);
-  }
-
   void resolveAccessibility(ValueDecl *VD) override {
     Principal.resolveAccessibility(VD);
   }
@@ -183,6 +172,8 @@ public:
     return Principal.isProtocolExtensionUsable(dc, type, protocolExtension);
   }
 };
+
+class LazyMemberLoader;
 
 /// Context data for lazy deserialization.
 class LazyContextData {

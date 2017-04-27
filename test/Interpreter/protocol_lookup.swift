@@ -96,14 +96,14 @@ let foo: Fooable = 2
 if let bar = foo as? Barrable {
   bar.bar() // CHECK-NEXT: Int.bar
 } else {
-  print("not barrable")
+  print("not barrable 1")
 }
 
 let foo2: Fooable = S()
 if let bar2 = foo2 as? Barrable {
   bar2.bar()
 } else {
-  print("not barrable") // CHECK-NEXT: not barrable
+  print("not barrable 2") // CHECK-NEXT: not barrable
 }
 
 protocol Runcible: class {

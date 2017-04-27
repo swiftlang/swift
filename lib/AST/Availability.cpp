@@ -14,11 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AST.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeWalker.h"
+#include <map>
 
 using namespace swift;
 

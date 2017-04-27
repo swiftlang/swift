@@ -455,7 +455,7 @@ template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getFullName()];
-  SmallVector<ValueDecl *, 8> RelatedDecls;
+  SmallVector<UnqualifiedLookupResult, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
@@ -473,13 +473,16 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
 
     if (RelatedVD != VD) {
       ++NamesSeen[RelatedVD->getFullName()];
-      RelatedDecls.push_back(RelatedVD);
+      RelatedDecls.push_back(result);
     }
   }
 
   // Now provide the results along with whether the name is duplicate or not.
-  for (auto RelatedVD : RelatedDecls) {
-    Fn(RelatedVD, NamesSeen[RelatedVD->getFullName()] > 1);
+  ValueDecl *OriginalBase = VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  for (auto Related : RelatedDecls) {
+    ValueDecl *RelatedVD = Related.getValueDecl();
+    bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;
+    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getFullName()] > 1);
   }
 }
 
@@ -608,6 +611,28 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   }
   Receiver(Info);
   return false;
+}
+
+static Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD) {
+  SourceLoc Loc;
+  if (auto PD = dyn_cast<ParamDecl>(VD)) {
+    auto *DC = PD->getDeclContext();
+    switch (DC->getContextKind()) {
+      case DeclContextKind::SubscriptDecl:
+        Loc = cast<SubscriptDecl>(DC)->getNameLoc();
+        break;
+      case DeclContextKind::AbstractFunctionDecl:
+        Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
+        break;
+      default:
+        break;
+    }
+  }
+  if (Loc.isInvalid())
+    return None;
+  auto &SM = VD->getASTContext().SourceMgr;
+  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
+    getBufferIdentifierForLoc(Loc)).getValue());
 }
 
 /// Returns true for failure to resolve.
@@ -741,7 +766,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   });
 
   DelayedStringRetriever RelDeclsStream(SS);
-  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool DuplicateName) {
+  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool UseOriginalBase, bool DuplicateName) {
     RelDeclsStream.startPiece();
     {
       RelDeclsStream<<"<RelatedName usr=\"";
@@ -755,7 +780,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(RelDeclsStream);
-        if (BaseType) {
+        if (UseOriginalBase && BaseType) {
           PO.setBaseType(BaseType);
           PO.PrintAsMember = true;
         }
@@ -850,12 +875,15 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
+  Info.ParentNameOffset = getParamParentNameOffset(VD);
   Receiver(Info);
   return false;
 }
 
 static clang::DeclarationName
-getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
+getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
+  auto &Ctx = ND->getASTContext();
+  auto OrigName = ND->getDeclName();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::ObjC);
   if (Info.BaseName.empty() == Info.ArgNames.empty()) {
     // cannot have both.
@@ -864,26 +892,61 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
   if (!Info.BaseName.empty()) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
+    StringRef last = Info.ArgNames.back();
+
+    switch (OrigName.getNameKind()) {
+    case clang::DeclarationName::ObjCZeroArgSelector:
+      if (last.endswith(":"))
+        return clang::DeclarationName();
+      break;
+    case clang::DeclarationName::ObjCOneArgSelector:
+    case clang::DeclarationName::ObjCMultiArgSelector:
+      if (!last.empty() && !last.endswith(":"))
+        return clang::DeclarationName();
+      break;
+    default:
+      return clang::DeclarationName();
+    }
+
+    auto OrigSel = OrigName.getObjCSelector();
+    unsigned NumPieces = OrigSel.isUnarySelector() ? 1 : OrigSel.getNumArgs();
+    if (Info.ArgNames.size() > NumPieces)
+      return clang::DeclarationName();
+
     ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
-    std::vector<clang::IdentifierInfo *> Pieces(Args.size(), nullptr);
-    std::transform(Args.begin(), Args.end(), Pieces.begin(),
-      [&](StringRef T) { return &Ctx.Idents.get(T.endswith(":") ?
-                                                T.drop_back() : T); });
-    return clang::DeclarationName(Ctx.Selectors.getSelector(
-      /*Calculate Args*/std::accumulate(Args.begin(), Args.end(), (unsigned)0,
-        [](unsigned I, StringRef T) { return I + (T.endswith(":") ? 1 : 0); }),
-      Pieces.data()));
+    std::vector<clang::IdentifierInfo *> Pieces;
+    for (unsigned i = 0; i < NumPieces; ++i) {
+      if (i >= Info.ArgNames.size() || Info.ArgNames[i].empty()) {
+        Pieces.push_back(OrigSel.getIdentifierInfoForSlot(i));
+      } else {
+        StringRef T = Args[i];
+        Pieces.push_back(&Ctx.Idents.get(T.endswith(":") ? T.drop_back() : T));
+      }
+    }
+    return clang::DeclarationName(
+        Ctx.Selectors.getSelector(OrigSel.getNumArgs(), Pieces.data()));
   }
 }
 
-static DeclName
-getSwiftDeclName(ASTContext &Ctx, NameTranslatingInfo &Info) {
+static DeclName getSwiftDeclName(const ValueDecl *VD,
+                                 NameTranslatingInfo &Info) {
+  auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
-  std::vector<Identifier> Args(Info.ArgNames.size(), Identifier());
-  std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Args.begin(),
-                 [&](StringRef T) { return Ctx.getIdentifier(T); });
-  return DeclName(Ctx, Ctx.getIdentifier(Info.BaseName),
-                  llvm::makeArrayRef(Args));
+  DeclName OrigName = VD->getFullName();
+  Identifier BaseName = Info.BaseName.empty()
+                            ? OrigName.getBaseName()
+                            : Ctx.getIdentifier(Info.BaseName);
+  auto OrigArgs = OrigName.getArgumentNames();
+  SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
+  if (Info.ArgNames.size() > OrigArgs.size())
+    return DeclName();
+  for (unsigned i = 0; i < OrigArgs.size(); ++i) {
+    if (i < Info.ArgNames.size() && !Info.ArgNames[i].empty()) {
+      StringRef Arg = Info.ArgNames[i];
+      Args[i] = Ctx.getIdentifier(Arg == "_" ? StringRef() : Arg);
+    }
+  }
+  return DeclName(Ctx, BaseName, llvm::makeArrayRef(Args));
 }
 
 /// Returns true for failure to resolve.
@@ -892,13 +955,16 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
     NameTranslatingInfo Result;
-    auto &Ctx = VD->getDeclContext()->getASTContext();
-    auto ResultPair = swift::objc_translation::getObjCNameForSwiftDecl(VD,
-      getSwiftDeclName(Ctx, Info));
+    auto DeclName = getSwiftDeclName(VD, Info);
+    if (!DeclName)
+      return true;
+    auto ResultPair =
+        swift::objc_translation::getObjCNameForSwiftDecl(VD, DeclName);
     Identifier Name = ResultPair.first;
     if (!Name.empty()) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       Result.BaseName = Name.str();
+      Receiver(Result);
     } else if (ObjCSelector Selector = ResultPair.second) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       SmallString<64> Buffer;
@@ -912,11 +978,11 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
           [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
       }
       Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
+      Receiver(Result);
     } else {
       Receiver(Result);
       return true;
     }
-    Receiver(Result);
     return false;
   }
   case NameKind::ObjC: {
@@ -924,15 +990,17 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       getASTContext().getClangModuleLoader());
 
     if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-      DeclName Name = Importer->importName(Named,
-        getClangDeclarationName(Named->getASTContext(), Info));
+      auto ObjCName = getClangDeclarationName(Named, Info);
+      if (!ObjCName)
+        return true;
+
+      DeclName Name = Importer->importName(Named, ObjCName);
       NameTranslatingInfo Result;
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
       Result.BaseName = Name.getBaseName().str();
-      Result.ArgNames.resize(Name.getArgumentNames().size());
       std::transform(Name.getArgumentNames().begin(),
                      Name.getArgumentNames().end(),
-                     Result.ArgNames.begin(),
+                     std::back_inserter(Result.ArgNames),
                      [](Identifier Id) { return Id.str(); });
       Receiver(Result);
       return false;
@@ -1019,6 +1087,7 @@ public:
     return false;
   }
 };
+
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
                           unsigned Length, bool Actionables,
@@ -1524,7 +1593,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         }
         bool Failed =
             passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
-                                  /*isRef=*/false, BufferID, Lang, CompInvok,
+                                  /*IsRef=*/false, BufferID, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
         if (Failed) {
           if (!PreviousASTSnaps.empty()) {
@@ -1626,7 +1695,7 @@ private:
   }
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          SemaReferenceKind Kind) override {
+                          ReferenceMetaData Data) override {
     if (Cancelled)
       return false;
     if (CtorTyRef)
@@ -1643,7 +1712,7 @@ private:
   }
 };
 
-}
+} // end anonymous namespace
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef InputFile, unsigned Offset,
@@ -1710,7 +1779,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
              isa<DestructorDecl>(VD) ||
              isa<SubscriptDecl>(VD)))
           return;
-        if (VD->getName().isOperator())
+        if (VD->isOperator())
           return;
 
         RelatedIdScanner Scanner(SrcFile, BufferID, VD, Ranges);

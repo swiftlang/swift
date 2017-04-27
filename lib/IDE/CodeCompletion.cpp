@@ -18,6 +18,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
@@ -302,15 +303,20 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   if (D->getName().isEditorPlaceholder())
     return true;
 
+  if (!D->isUserAccessible())
+    return true;
+
   return false;
 }
 
 typedef std::function<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
-DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
-DeclFilter KeyPathFilter = [](ValueDecl* decl, DeclVisibilityKind) -> bool {
+static bool DefaultFilter(ValueDecl* VD, DeclVisibilityKind Kind) {
+  return true;
+}
+static bool KeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
   return isa<TypeDecl>(decl) ||
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
-};
+}
 
 std::string swift::ide::removeCodeCompletionTokens(
     StringRef Input, StringRef TokenName, unsigned *CompletionOffset) {
@@ -1295,8 +1301,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Type DT = DC->getDeclaredTypeOfContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
-    OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
-    Type ST = DT->getSuperclass(TypeResolver.get());
+    Type ST = DT->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
       return;
     if (ST->getNominalOrBoundGenericNominal()) {
@@ -1377,7 +1382,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto CheckKind = CompletionTypeCheckKind::Normal;
     if (Kind == CompletionKind::KeyPathExpr ||
         Kind == CompletionKind::KeyPathExprDot)
-      CheckKind = CompletionTypeCheckKind::ObjCKeyPath;
+      CheckKind = CompletionTypeCheckKind::KeyPath;
 
     // If we've already successfully type-checked the expression for some
     // reason, just return the type.
@@ -1428,7 +1433,7 @@ public:
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
-  void completeExprKeyPath(ObjCKeyPathExpr *KPE, bool HasDot) override;
+  void completeExprKeyPath(KeyPathExpr *KPE, bool HasDot) override;
 
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
@@ -1937,7 +1942,8 @@ public:
       SmallVector<Type, 2> types;
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(M->getASTContext(), types);
+      return ProtocolCompositionType::get(M->getASTContext(), types,
+                                          /*HasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
@@ -2035,8 +2041,7 @@ public:
         if (Conformance && Conformance->isConcrete()) {
           return Conformance->getConcrete()
               ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD),
-                               TypeResolver.get())
-              .getReplacement();
+                               TypeResolver.get());
         }
       }
     }
@@ -2045,7 +2050,6 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
-        !VD->isUserAccessible() ||
         (VD->hasAccessibility() && !VD->isAccessibleFrom(CurrDeclContext)) ||
         shouldHideDeclFromCompletionResults(VD))
       return;
@@ -3112,14 +3116,14 @@ public:
     NeedLeadingDot = !HaveDot;
 
     // This is horrible
+    ExprType = ExprType->getRValueType();
     this->ExprType = ExprType;
     if (ExprType->hasTypeParameter()) {
       DeclContext *DC;
       if (VD) {
         DC = VD->getInnermostDeclContext();
         this->ExprType = DC->mapTypeIntoContext(ExprType);
-      } else if (auto NTD = ExprType->getRValueType()->getRValueInstanceType()
-          ->getAnyNominal()) {
+      } else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal()) {
         DC = NTD;
         this->ExprType = DC->mapTypeIntoContext(ExprType);
       }
@@ -3137,7 +3141,7 @@ public:
         Done = true;
       }
     }
-    if (auto *TT = ExprType->getRValueType()->getAs<TupleType>()) {
+    if (auto *TT = ExprType->getAs<TupleType>()) {
       getTupleExprCompletions(TT);
       Done = true;
     }
@@ -3571,7 +3575,7 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
-        if (T->getAs<TupleType>()) {
+        if (T->is<TupleType>()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           break;
@@ -4095,6 +4099,11 @@ public:
       != ParsedKeywords.end();
   }
 
+  bool missingOverride(DeclVisibilityKind Reason) {
+    return !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
+           !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
+  }
+
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
     assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
@@ -4145,10 +4154,7 @@ public:
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.
-    bool missingOverride =
-      !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-      !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
-    if (!hasDeclIntroducer && missingOverride)
+    if (!hasDeclIntroducer && missingOverride(Reason))
       Builder.addOverrideKeyword();
 
     if (!hasDeclIntroducer)
@@ -4167,6 +4173,14 @@ public:
   }
 
   void addVarOverride(const VarDecl *VD, DeclVisibilityKind Reason) {
+    // Overrides cannot use 'let', but if the 'override' keyword is specified
+    // then the intention is clear, so provide the results anyway.  The compiler
+    // can then provide an error telling you to use 'var' instead.
+    // If we don't need override then it's a protocol requirement, so show it.
+    if (missingOverride(Reason) && hasVarIntroducer &&
+        isKeywordSpecified("let"))
+      return;
+
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
@@ -4198,9 +4212,7 @@ public:
     if (!hasAccessModifier)
       addAccessControl(CD, Builder);
 
-    if (!hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-        !CurrDeclContext->getAsProtocolOrProtocolExtensionContext() &&
-        CD->isDesignatedInit() && !CD->isRequired())
+    if (missingOverride(Reason) && CD->isDesignatedInit() && !CD->isRequired())
       Builder.addOverrideKeyword();
 
     // Emit 'required' if we're in class context, 'required' is not specified,
@@ -4497,7 +4509,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeExprKeyPath(ObjCKeyPathExpr *KPE,
+void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       bool HasDot) {
   Kind = HasDot ? CompletionKind::KeyPathExprDot : CompletionKind::KeyPathExpr;
   ParsedExpr = KPE;
@@ -4646,9 +4658,7 @@ void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
 }
 
 static bool isDynamicLookup(Type T) {
-  if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
-    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-  return false;
+  return T->getRValueType()->isAnyObject();
 }
 
 static bool isClangSubModule(ModuleDecl *TheModule) {

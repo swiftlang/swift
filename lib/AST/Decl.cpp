@@ -17,7 +17,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -28,9 +27,12 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "clang/Lex/MacroInfo.h"
@@ -191,7 +193,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MaterializeForSet;
      }
 
-     if (!func->getName().empty() && func->getName().isOperator())
+     if (func->isOperator())
        return DescriptiveDeclKind::OperatorFunction;
 
      if (func->getDeclContext()->isLocalContext())
@@ -308,7 +310,7 @@ void Decl::setDeclContext(DeclContext *DC) {
 }
 
 bool Decl::isUserAccessible() const {
-  if (auto VD = dyn_cast<VarDecl>(this)) {
+  if (auto VD = dyn_cast<ValueDecl>(this)) {
     return VD->isUserAccessible();
   }
   return true;
@@ -359,6 +361,8 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
 
   llvm_unreachable("Unknown decl kind");
 }
+
+SourceLoc BehaviorRecord::getLoc() const { return ProtocolName->getLoc(); }
 
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
@@ -628,12 +632,7 @@ GenericSignature *GenericContext::getGenericSignature() const {
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    GenericTypeParamType *params[] = {self};
-    Requirement reqs[] = {req};
-
-    auto &ctx = getASTContext();
-    return GenericSignature::get(ctx.AllocateCopy(params),
-                                 ctx.AllocateCopy(reqs));
+    return GenericSignature::get({self}, {req});
   }
 
   return nullptr;
@@ -1454,9 +1453,7 @@ bool ValueDecl::needsCapture() const {
   if (!getDeclContext()->isLocalContext())
     return false;
   // We don't need to capture types.
-  if (isa<TypeDecl>(this))
-    return false;
-  return true;
+  return !isa<TypeDecl>(this);
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
@@ -1881,10 +1878,14 @@ static bool isVersionedInternalDecl(const ValueDecl *VD) {
   if (VD->getAttrs().hasAttribute<VersionedAttr>())
     return true;
 
-  if (auto *fn = dyn_cast<FuncDecl>(VD))
-    if (auto *ASD = fn->getAccessorStorageDecl())
+  if (auto *FD = dyn_cast<FuncDecl>(VD))
+    if (auto *ASD = FD->getAccessorStorageDecl())
       if (ASD->getAttrs().hasAttribute<VersionedAttr>())
         return true;
+
+  if (auto *EED = dyn_cast<EnumElementDecl>(VD))
+    if (EED->getParentEnum()->getAttrs().hasAttribute<VersionedAttr>())
+      return true;
 
   return false;
 }
@@ -2089,11 +2090,13 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     // Hashable conformance.
     case KnownProtocolKind::Equatable:
     case KnownProtocolKind::Hashable:
-      return enumDecl->hasOnlyCasesWithoutAssociatedValues();
-    
+      return enumDecl->hasCases()
+          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+
     // @objc enums can explicitly derive their _BridgedNSError conformance.
     case KnownProtocolKind::BridgedNSError:
-      return isObjC() && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+      return isObjC() && enumDecl->hasCases()
+          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
     default:
       return false;
@@ -2219,6 +2222,11 @@ Type NominalTypeDecl::getDeclaredInterfaceType() const {
 }
 
 void NominalTypeDecl::prepareExtensions() {
+  // Types in local contexts can't have extensions
+  if (getLocalContext() != nullptr) {
+    return;
+  }
+  
   auto &context = Decl::getASTContext();
 
   // If our list of extensions is out of date, update it now.
@@ -2310,8 +2318,10 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
-  auto *dc = getDeclContext();
-  auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
+  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
+  assert(genericEnv != nullptr && "Too much circularity");
+
+  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getSuperclass();
 
@@ -2321,8 +2331,10 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 
 ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
-  auto *dc = getDeclContext();
-  auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
+  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
+  assert(genericEnv != nullptr && "Too much circularity");
+
+  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getConformsTo();
 
@@ -2403,6 +2415,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 {
   EnumDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
+  EnumDeclBits.HasAssociatedValues
+    = static_cast<unsigned>(AssociatedValueCheck::Unchecked);
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -2428,7 +2442,8 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
-  ClassDeclBits.ObjCClassKind = 0;
+  ObjCKind = 0;
+  HasMissingDesignatedInitializers = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2439,7 +2454,18 @@ DestructorDecl *ClassDecl::getDestructor() {
   return cast<DestructorDecl>(results.front());
 }
 
+bool ClassDecl::hasMissingDesignatedInitializers() const {
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  (void)mutableThis->lookupDirect(getASTContext().Id_init,
+                                  /*ignoreNewExtensions*/true);
+  return HasMissingDesignatedInitializers;
+}
+
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
+  // Get a resolver from the ASTContext if we don't have one already.
+  if (resolver == nullptr)
+    resolver = getASTContext().getLazyResolver();
+
   // Check whether we already have a cached answer.
   switch (static_cast<StoredInheritsSuperclassInits>(
             ClassDeclBits.InheritsSuperclassInits)) {
@@ -2463,6 +2489,14 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     return false;
   }
 
+  // If the superclass has known-missing designated initializers, inheriting
+  // is unsafe.
+  if (superclassDecl->hasMissingDesignatedInitializers()) {
+    ClassDeclBits.InheritsSuperclassInits
+      = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
+    return false;
+  }
+
   // Look at all of the initializers of the subclass to gather the initializers
   // they override from the superclass.
   auto &ctx = getASTContext();
@@ -2480,8 +2514,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
       return false;
 
     // Resolve this initializer, if needed.
-    if (!ctor->hasInterfaceType())
+    if (!ctor->hasInterfaceType()) {
+      assert(resolver && "Should have a resolver here");
       resolver->resolveDeclSignature(ctor);
+    }
 
     // Ignore any stub implementations.
     if (ctor->hasStubImplementation())
@@ -2523,8 +2559,8 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
   // See if we've already computed this.
-  if (ClassDeclBits.ObjCClassKind)
-    return ObjCClassKind(ClassDeclBits.ObjCClassKind - 1);
+  if (ObjCKind)
+    return ObjCClassKind(ObjCKind - 1);
 
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
@@ -2561,9 +2597,16 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     kind = ObjCClassKind::ObjCWithSwiftRoot;
 
   // Save the result for later.
-  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCClassKind
+  const_cast<ClassDecl *>(this)->ObjCKind
     = unsigned(kind) + 1;
   return kind;
+}
+
+ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
+  assert(getASTContext().LangOpts.EnableObjCInterop &&
+         "querying metaclass kind without objc interop");
+  auto objc = checkObjCAncestry() != ObjCClassKind::NonObjC;
+  return objc ? MetaclassKind::ObjC : MetaclassKind::SwiftStub;
 }
 
 /// Mangle the name of a protocol or class for use in the Objective-C
@@ -2571,7 +2614,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    NewMangling::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler;
     std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();
@@ -2677,23 +2720,38 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
 }
 
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
-  // FIXME: Should probably cache this.
-  bool hasElements = false;
-  for (auto elt : getAllElements()) {
-    hasElements = true;
-    if (!elt->getArgumentTypeLoc().isNull())
+  // Check whether we already have a cached answer.
+  switch (static_cast<AssociatedValueCheck>(
+            EnumDeclBits.HasAssociatedValues)) {
+    case AssociatedValueCheck::Unchecked:
+      // Compute below.
+      break;
+
+    case AssociatedValueCheck::NoAssociatedValues:
+      return true;
+
+    case AssociatedValueCheck::HasAssociatedValues:
       return false;
   }
-  return hasElements;
+  for (auto elt : getAllElements()) {
+    if (elt->hasAssociatedValues()) {
+      EnumDeclBits.HasAssociatedValues
+        = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
+      return false;
+    }
+  }
+  EnumDeclBits.HasAssociatedValues
+    = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
+  return true;
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           MutableArrayRef<TypeLoc> Inherited)
-  : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
-                    nullptr),
-    ProtocolLoc(ProtocolLoc)
-{
+                           MutableArrayRef<TypeLoc> Inherited,
+                           TrailingWhereClause *TrailingWhere)
+    : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
+                      nullptr),
+      ProtocolLoc(ProtocolLoc), TrailingWhere(TrailingWhere) {
   ProtocolDeclBits.RequiresClassValid = false;
   ProtocolDeclBits.RequiresClass = false;
   ProtocolDeclBits.ExistentialConformsToSelfValid = false;
@@ -2711,15 +2769,16 @@ ProtocolDecl::getInheritedProtocols() const {
   // FIXME: Gather inherited protocols from the "inherited" list.
   // We shouldn't need this, but it shows up in recursive invocations.
   if (!isRequirementSignatureComputed()) {
+    SmallPtrSet<ProtocolDecl *, 4> known;
     for (auto inherited : getInherited()) {
-      SmallPtrSet<ProtocolDecl *, 4> known;
       if (auto type = inherited.getType()) {
-        SmallVector<ProtocolDecl *, 4> protocols;
-        if (type->isExistentialType(protocols)) {
-          for (auto proto : protocols) {
-            if (known.insert(proto).second)
-              result.push_back(proto);
-          }
+        // Only protocols can appear in the inheritance clause
+        // of a protocol -- anything else should get diagnosed
+        // elsewhere.
+        if (auto *protoTy = type->getAs<ProtocolType>()) {
+          auto *protoDecl = protoTy->getDecl();
+          if (known.insert(protoDecl).second)
+            result.push_back(protoDecl);
         }
       }
     }
@@ -2914,10 +2973,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 
   // Special handling for associated types.
   if (!skipAssocTypes && type->is<DependentMemberType>()) {
-    while (auto depMemTy = type->getAs<DependentMemberType>()) {
-      type = depMemTy->getBase();
-    }
-
+    type = type->getRootGenericParam();
     if (proto->getProtocolSelfType()->isEqual(type))
       return SelfReferenceKind::Other();
   }
@@ -3050,20 +3106,15 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 }
 
 GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
-  // Find the depth of the 'Self' parameter. This is zero in all valid
-  // code; however, we compute it nonetheless to maintain the AST
-  // invariants around generic parameter depths.
-  unsigned depth = 0;
-  GenericParamList *outerGenericParams
-    = dc->getParent()->getGenericParamsOfContext();
-  if (outerGenericParams)
-    depth = outerGenericParams->getDepth() + 1;
+  auto *outerGenericParams = dc->getParent()->getGenericParamsOfContext();
 
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
   auto selfId = ctx.Id_Self;
-  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId,
-                                                 SourceLoc(), depth, 0);
+  auto selfDecl = new (ctx) GenericTypeParamDecl(
+      dc, selfId,
+      SourceLoc(),
+      GenericTypeParamDecl::InvalidDepth, /*index=*/0);
   auto protoType = getDeclaredType();
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
@@ -3104,10 +3155,15 @@ void ProtocolDecl::computeRequirementSignature() {
   GenericSignatureBuilder builder(getASTContext(),
                                   LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
+  auto selfPA =
+      builder.resolveArchetype(selfType,
+                               ArchetypeResolutionKind::CompleteWellFormed);
+
   builder.addRequirement(
          requirement,
          GenericSignatureBuilder::RequirementSource
-          ::forRequirementSignature(builder.resolveArchetype(selfType), this));
+          ::forRequirementSignature(selfPA, this),
+         nullptr);
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();
@@ -3796,8 +3852,7 @@ bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
     return true;
   // Otherwise, we only dispatch by @objc if the declaration is dynamic or
   // NSManaged.
-  return getAttrs().hasAttribute<DynamicAttr>() ||
-         getAttrs().hasAttribute<NSManagedAttr>();
+  return isDynamic() || getAttrs().hasAttribute<NSManagedAttr>();
 }
 
 
@@ -4293,6 +4348,14 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   llvm_unreachable("Invalid parameter index");
 }
 
+Type AbstractFunctionDecl::getMethodInterfaceType() const {
+  assert(getDeclContext()->isTypeContext());
+  auto Ty = getInterfaceType();
+  if (Ty->hasError())
+    return ErrorType::get(getASTContext());
+  return Ty->castTo<AnyFunctionType>()->getResult();
+}
+
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))
@@ -4652,9 +4715,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   setParameterLists(SelfDecl, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
-  ConstructorDeclBits.InitKind
-    = static_cast<unsigned>(CtorInitializerKind::Designated);
   ConstructorDeclBits.HasStubImplementation = 0;
+  this->InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
   this->Failability = static_cast<unsigned>(Failability);
 }
 
@@ -4877,9 +4939,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
     bool walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      if (isa<NominalTypeDecl>(D))
-        return false;
-      return true;
+      return !isa<NominalTypeDecl>(D);
     }
     
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
@@ -5066,6 +5126,12 @@ void PrecedenceGroupDecl::collectOperatorKeywordRanges(
 
 bool FuncDecl::isDeferBody() const {
   return getName() == getASTContext().getIdentifier("$defer");
+}
+
+bool FuncDecl::isPotentialIBActionTarget() const {
+  return isInstanceMember() &&
+    getDeclContext()->getAsClassOrClassExtensionContext() &&
+    !isAccessor();
 }
 
 Type TypeBase::getSwiftNewtypeUnderlyingType() {

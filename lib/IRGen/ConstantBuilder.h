@@ -13,7 +13,6 @@
 //  This file implements IR generation of constant packed LLVM structs.
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Mangle.h"
 #include "swift/ABI/MetadataValues.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"

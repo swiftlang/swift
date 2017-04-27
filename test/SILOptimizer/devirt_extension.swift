@@ -3,7 +3,7 @@
 protocol DrawingElementDispatch {}
 
 extension DrawingElementDispatch {
-  final var boundingBox: Int32 {
+  var boundingBox: Int32 {
     return 0
   }
 }

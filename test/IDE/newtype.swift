@@ -1,9 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype -skip-unavailable > %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t
 // REQUIRES: objc_interop
 
 // PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
@@ -11,6 +11,8 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ErrorDomain {
 // PRINT-NEXT:    func process()
@@ -30,6 +32,8 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
 // PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
@@ -41,29 +45,33 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
 // PRINT-NEXT:    init(_ rawValue: Float)
 // PRINT-NEXT:    init(rawValue: Float)
 // PRINT-NEXT:    let rawValue: Float
+// PRINT-NEXT:    typealias RawValue = Float
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
-// PRINT-NEXT:    static let globalFloat: MyFloat
-// PRINT-NEXT:    static let PI: MyFloat
-// PRINT-NEXT:    static let version: MyFloat
+// PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
+// PRINT-NEXT:    static let PI: MyFloat{{$}}
+// PRINT-NEXT:    static let version: MyFloat{{$}}
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
 // PRINT-NEXT:    init(_ rawValue: Int32)
 // PRINT-NEXT:    init(rawValue: Int32)
 // PRINT-NEXT:    let rawValue: Int32
+// PRINT-NEXT:    typealias RawValue = Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
-// PRINT-NEXT:    static let zero: MyInt!
-// PRINT-NEXT:    static let one: MyInt!
+// PRINT-NEXT:    static let zero: MyInt{{$}}
+// PRINT-NEXT:    static let one: MyInt{{$}}
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kRawInt: Int32
-// PRINT-NEXT:  func takesMyInt(_: MyInt!)
+// PRINT-NEXT:  func takesMyInt(_: MyInt)
 //
 // PRINT-LABEL: extension NSURLResourceKey {
 // PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
@@ -83,6 +91,7 @@
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:    typealias RawValue = CFString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension CFNewType {
 // PRINT-NEXT:    static let MyCFNewTypeValue: CFNewType
@@ -96,6 +105,7 @@
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:    typealias RawValue = CFString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldType = CFString
 // PRINT-NEXT:  extension MyABINewType {
@@ -113,6 +123,8 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldTypeNS = NSString
 // PRINT-NEXT:  func getMyABINewTypeNS() -> MyABINewTypeNS!
@@ -131,6 +143,8 @@
 // PRINT-NEXT:      init(rawValue: String)
 // PRINT-NEXT:      var _rawValue: NSString
 // PRINT-NEXT:      var rawValue: String { get }
+// PRINT-NEXT:      typealias RawValue = String
+// PRINT-NEXT:      typealias _ObjectiveCType = NSString
 // PRINT-NEXT:    }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext.Name {
@@ -180,6 +194,3 @@ func testFixit() {
 	let _ = NSMyContextName
 	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}} {{10-25=NSSomeContext.Name.myContextName}}
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: 'NSMyContextName' was obsoleted in Swift 3

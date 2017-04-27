@@ -66,8 +66,8 @@ sil @optional_user : $@convention(thin) (Optional<Builtin.Int32>) -> ()
 sil @blocker : $@convention(thin) () -> ()
 sil @get_object : $@convention(thin) () -> Builtin.NativeObject
 sil @foo_init : $@convention(thin) (@thin foo.Type) -> foo
-sil [fragile] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+sil [serialized] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil [serialized] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
 
 // CHECK-LABEL: sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb1:
@@ -313,7 +313,7 @@ bb3:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [fragile] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -321,7 +321,7 @@ bb3:
 // CHECK: strong_release
 // CHECK: bb2(
 // CHECK: strong_release
-sil [fragile] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+sil [serialized] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()

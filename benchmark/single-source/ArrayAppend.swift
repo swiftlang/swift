@@ -267,6 +267,19 @@ public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
   }
 }
 
+@inline(never)
+public func appendThreeElements(_ a: inout [Int]) {
+  a += [1, 2, 3]
+}
+
+@inline(never)
+public func run_ArrayPlusEqualThreeElements(_ N: Int) {
+  for _ in 0..<(10_000 * N) {
+    var a: [Int] = []
+    appendThreeElements(&a)
+  }
+}
+
 // Append the utf8 elements of an ascii string to a [UInt8]
 @inline(never)
 public func run_ArrayAppendAscii(_ N: Int) {

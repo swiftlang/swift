@@ -91,11 +91,12 @@ def main():
             return
         suffix = sys.argv[1]
 
-    blocks = {}
+    block_list = []
+    block_map = {}
     cur_block = None
     sil_block_pattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
     llvm_block_pattern1 = re.compile(r'^(\S+): *; *preds =(.*)?$')
-    llvm_block_pattern2 = re.compile(r'^; <label>:(\d+) *; *preds =(.*)?$')
+    llvm_block_pattern2 = re.compile(r'^; <label>:(\d+):? *; *preds =(.*)?$')
 
     # Scan the input file.
 
@@ -118,39 +119,40 @@ def main():
             if cur_block is not None:
                 cur_block.add_line(line)
         elif not line[:1].isspace():
-            if line.startswith('}') and blocks:
+            if line.startswith('}') and block_map:
                 break
             cur_block = None
 
         if block_name is not None:
             cur_block = Block(block_name, preds)
             cur_block.add_line(line)
-            blocks[block_name] = cur_block
+            block_list.append(cur_block)
+            block_map[block_name] = cur_block
 
     # Add empty blocks which we didn't see, but which are referenced.
     new_blocks = {}
-    for name, block in blocks.iteritems():
+    for block in block_list:
         for adj_name in (block.preds + block.get_succs()):
-            if adj_name not in blocks:
+            if adj_name not in block_map:
                 new_blocks[adj_name] = Block(adj_name, None)
 
-    blocks = dict(blocks.items() + new_blocks.items())
+    block_map = dict(block_map.items() + new_blocks.items())
 
     # Add missing edges if we didn't see a successor in the terminator
     # but the block is mentioned in the pred list of the successor.
 
-    for name, block in blocks.iteritems():
+    for block in block_list:
         for pred_name in block.preds:
-            pred_block = blocks[pred_name]
-            if name not in pred_block.get_succs():
-                pred_block.get_succs().append(name)
+            pred_block = block_map[pred_name]
+            if block.name not in pred_block.get_succs():
+                pred_block.get_succs().append(block.name)
 
     # Write the output dot file.
 
     file_name = tempfile.gettempdir() + "/viewcfg" + suffix + ".dot"
     with open(file_name, 'w') as out_file:
         out_file.write('digraph "CFG" {\n')
-        for name, block in blocks.iteritems():
+        for block in block_list:
             if block.content is not None:
                 out_file.write(
                     "\tNode" + str(block.index) +
@@ -162,7 +164,7 @@ def main():
                     block.name + "}\"];\n")
 
             for succ_name in block.get_succs():
-                succ_block = blocks[succ_name]
+                succ_block = block_map[succ_name]
                 out_file.write(
                     "\tNode" + str(block.index) + " -> Node" +
                     str(succ_block.index) + ";\n")
@@ -172,6 +174,7 @@ def main():
     # Open the dot file (should be done with Graphviz).
 
     subprocess.call(["open", file_name])
+
 
 if __name__ == '__main__':
     main()

@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.4.3)
+include("../../../../cmake/modules/StandaloneOverlay.cmake")
+
 set(DISABLE_APPLICATION_EXTENSION ON)
 
 add_swift_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY

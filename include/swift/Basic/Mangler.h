@@ -13,25 +13,16 @@
 #ifndef SWIFT_BASIC_MANGLER_H
 #define SWIFT_BASIC_MANGLER_H
 
-#include "swift/Basic/ManglingUtils.h"
+#include "swift/Demangling/ManglingUtils.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/raw_ostream.h"
 
-using llvm::StringRef;
-using llvm::ArrayRef;
-
 namespace swift {
-namespace NewMangling {
-
-/// Select an old or new mangled string, based on useNewMangling().
-///
-/// Also performs test to check if the demangling of both string yield the same
-/// demangling tree.
-/// TODO: remove this function when the old mangling is removed.
-std::string selectMangling(const std::string &Old, const std::string &New,
-                           bool compareTrees = true);
+namespace Mangle {
 
 void printManglingStats();
 
@@ -47,7 +38,7 @@ protected:
   friend class SubstitutionMerging;
 
   /// The storage for the mangled symbol.
-  llvm::SmallVector<char, 128> Storage;
+  llvm::SmallString<128> Storage;
 
   /// The output stream for the mangled symbol.
   llvm::raw_svector_ostream Buffer;
@@ -71,6 +62,9 @@ protected:
 
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode = true;
+
+  /// If enabled, repeated entities are mangled using substitutions ('A...').
+  bool UseSubstitutions = true;
 
   /// A helpful little wrapper for an integer value that should be mangled
   /// in a particular, compressed value.
@@ -110,14 +104,19 @@ protected:
   /// \p stream.
   void finalize(llvm::raw_ostream &stream);
 
+  /// Verify that demangling and remangling works.
+  static void verify(StringRef mangledName);
+
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);
 
   void addSubstitution(const void *ptr) {
-    Substitutions[ptr] = Substitutions.size() + StringSubstitutions.size();
+    if (UseSubstitutions)
+      Substitutions[ptr] = Substitutions.size() + StringSubstitutions.size();
   }
   void addSubstitution(StringRef Str) {
-    StringSubstitutions[Str] = Substitutions.size() + StringSubstitutions.size();
+    if (UseSubstitutions)
+      StringSubstitutions[Str] = Substitutions.size() + StringSubstitutions.size();
   }
 
   bool tryMangleSubstitution(const void *ptr);

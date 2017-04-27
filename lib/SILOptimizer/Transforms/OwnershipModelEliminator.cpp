@@ -39,8 +39,13 @@ namespace {
 struct OwnershipModelEliminatorVisitor
     : SILInstructionVisitor<OwnershipModelEliminatorVisitor, bool> {
   SILBuilder &B;
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
-  OwnershipModelEliminatorVisitor(SILBuilder &B) : B(B) {}
+  OwnershipModelEliminatorVisitor(SILBuilder &B)
+      : B(B), OpenedArchetypesTracker(B.getFunction()) {
+    B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  }
+
   void beforeVisit(ValueBase *V) {
     auto *I = cast<SILInstruction>(V);
     B.setInsertionPoint(I);
@@ -78,6 +83,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
   bool visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
+  bool visitSwitchEnumInst(SwitchEnumInst *SWI);
 };
 
 } // end anonymous namespace
@@ -224,41 +230,63 @@ bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
+    SwitchEnumInst *SWEI) {
+  // In ownership qualified SIL, switch_enum must pass its argument to the fail
+  // case so we can clean it up. In non-ownership qualified SIL, we expect no
+  // argument from the switch_enum in the default case. The way that we handle
+  // this transformation is that:
+  //
+  // 1. We replace all uses of the argument to the false block with a use of the
+  // checked cast branch's operand.
+  // 2. We delete the argument from the false block.
+  if (!SWEI->hasDefault())
+    return false;
+
+  SILBasicBlock *DefaultBlock = SWEI->getDefaultBB();
+  if (DefaultBlock->getNumArguments() == 0)
+    return false;
+  DefaultBlock->getArgument(0)->replaceAllUsesWith(SWEI->getOperand());
+  DefaultBlock->eraseArgument(0);
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-struct OwnershipModelEliminator : SILFunctionTransform {
+struct OwnershipModelEliminator : SILModuleTransform {
   void run() override {
-    SILFunction *F = getFunction();
+    for (auto &F : *getModule()) {
+      // Set F to have unqualified ownership.
+      F.setUnqualifiedOwnership();
 
-    // Set F to have unqualified ownership.
-    F->setUnqualifiedOwnership();
+      bool MadeChange = false;
+      SILBuilder B(F);
+      OwnershipModelEliminatorVisitor Visitor(B);
 
-    bool MadeChange = false;
-    SILBuilder B(*F);
-    OwnershipModelEliminatorVisitor Visitor(B);
+      for (auto &BB : F) {
+        for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+          // Since we are going to be potentially removing instructions, we need
+          // to make sure to increment our iterator before we perform any
+          // visits.
+          SILInstruction *I = &*II;
+          ++II;
 
-    for (auto &BB : *F) {
-      for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-        // Since we are going to be potentially removing instructions, we need
-        // to make sure to grab out instruction and increment first.
-        SILInstruction *I = &*II;
-        ++II;
-
-        MadeChange |= Visitor.visit(I);
+          MadeChange |= Visitor.visit(I);
+        }
       }
-    }
 
-    if (MadeChange) {
-      invalidateAnalysis(
-          SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      if (MadeChange) {
+        auto InvalidKind =
+            SILAnalysis::InvalidationKind::BranchesAndInstructions;
+        invalidateAnalysis(&F, InvalidKind);
+      }
     }
   }
 
-  StringRef getName() override { return "Ownership Model Eliminator"; }
 };
 
 } // end anonymous namespace

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 public protocol Foo { 
   func foo(_ x:Int) -> Int
@@ -6,7 +6,7 @@ public protocol Foo {
 
 public extension Foo {
   func boo(_ x:Int) -> Int32 {
-    return 2222 + x
+    return 2222 + Int32(x)
   }
 
   func getSelf() -> Self {
@@ -68,7 +68,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // be propagated from init_existential_addr into witness_method and 
 // apply instructions.
 
-// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b1_C11_invocationSiAA1CCFTf4g_n
+// CHECK-LABEL: sil shared [noinline] @_T034devirt_protocol_method_invocations05test_a1_b1_C11_invocationSiAA1CCFTf4g_n
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -99,7 +99,7 @@ public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocations5Int32VAA1CCFTf4d_n
+// CHECK-LABEL: sil shared [noinline] @_T034devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocations5Int32VAA1CCFTf4d_n
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method
@@ -204,10 +204,11 @@ public final class V {
 }
 
 // Check that all witness_method invocations are devirtualized.
-// CHECK-LABEL: sil @_T034devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistentialyAA1VC1v_s5Int32V1xtFTf4gd_n
+// CHECK-LABEL: sil shared [noinline] @_T034devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistentialyAA1VC1v_s5Int32V1xtFTf4gd_n
 // CHECK-NOT: witness_method
 // CHECK-NOT: class_method
 // CHECK: return
+@inline(never)
 public func testPropagationOfConcreteTypeIntoExistential(v: V, x: Int32) {
   let y = v.a.plus()
   defer {

@@ -19,6 +19,7 @@
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include <tuple>
 using namespace swift;
 
@@ -255,9 +256,13 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     // Collect existential types.
     // FIXME: We'd prefer to keep what the user wrote here.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
-      for (auto inheritedProtocol: protocols) {
+    if (inherited.getType()->isExistentialType()) {
+      auto layout = inherited.getType()->getExistentialLayout();
+      assert(!layout.superclass && "Need to redo inheritance clause "
+             "typechecking");
+      for (auto inheritedProtocolTy: layout.getProtocols()) {
+        auto *inheritedProtocol = inheritedProtocolTy->getDecl();
+
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {
           if (!diagnosedCircularity) {
@@ -335,7 +340,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
         typeAliasDecl->getGenericParams() == nullptr) {
       typeAliasDecl->setValidationStarted();
 
-      TypeResolutionOptions options;
+      TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 

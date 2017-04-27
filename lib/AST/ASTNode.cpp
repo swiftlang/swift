@@ -76,3 +76,14 @@ void ASTNode::walk(SourceEntityWalker &Walker) {
   else
     llvm_unreachable("unsupported AST node");
 }
+
+#define FUNC(T)                                                               \
+bool ASTNode::is##T(T##Kind Kind) const {                                     \
+  if (!is<T*>())                                                              \
+    return false;                                                             \
+  return get<T*>()->getKind() == Kind;                                        \
+}
+FUNC(Stmt)
+FUNC(Expr)
+FUNC(Decl)
+#undef FUNC

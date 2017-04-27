@@ -20,7 +20,7 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -43,9 +43,11 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                          DiagnosticKind Kind, StringRef Text,
-                                          const DiagnosticInfo &Info) {
+void EditorDiagConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+
   if (Kind == DiagnosticKind::Error) {
     HadAnyError = true;
   }
@@ -68,7 +70,13 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
 
   DiagnosticEntryInfo SKInfo;
 
-  SKInfo.Description = Text;
+  // Actually substitute the diagnostic arguments into the diagnostic text.
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+  }
+  SKInfo.Description = Text.str();
 
   unsigned BufferID = SM.findBufferContainingLoc(Loc);
 
@@ -777,7 +785,7 @@ public:
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          SemaReferenceKind Kind) override {
+                          ReferenceMetaData Data) override {
     if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
       return true;
 
@@ -795,7 +803,7 @@ public:
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                              SemaReferenceKind::SubscriptRef);
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
@@ -1988,7 +1996,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         }
         if (HasSignature)
           OS << "in";
-        OS << "\n<#code#>\n";
+        OS << "\n" << getCodePlaceholder() << "\n";
         OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
@@ -2126,6 +2134,17 @@ void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
 void SwiftLangSupport::editorExtractTextFromComment(StringRef Source,
                                                     EditorConsumer &Consumer) {
   Consumer.handleSourceText(extractPlainTextFromComment(Source));
+}
+
+void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
+                                                EditorConsumer &Consumer) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  if (convertMarkupToXML(Source, OS)) {
+    Consumer.handleRequestError("Conversion failed.");
+    return;
+  }
+  Consumer.handleSourceText(Result);
 }
 
 //===----------------------------------------------------------------------===//

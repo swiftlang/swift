@@ -51,7 +51,7 @@ set(SWIFTLIB_ESSENTIAL
   ErrorType.swift
   Existential.swift
   Filter.swift.gyb
-  FixedPoint.swift.gyb
+  #FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
   FloatingPoint.swift.gyb
@@ -70,10 +70,11 @@ set(SWIFTLIB_ESSENTIAL
   Index.swift
   Indices.swift.gyb
   InputStream.swift
-  IntegerArithmetic.swift.gyb
+  #IntegerArithmetic.swift.gyb
   IntegerParsing.swift.gyb
   Integers.swift.gyb
   Join.swift
+  KeyPath.swift
   LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift
@@ -126,6 +127,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
+  Substring.swift.gyb
   SwiftNativeNSArray.swift
   UnavailableStringAPIs.swift.gyb
   Unicode.swift

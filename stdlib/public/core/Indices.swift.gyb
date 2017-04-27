@@ -29,6 +29,7 @@ from gyb_stdlib_support import (
 // <rdar://problem/17144340>
 
 /// A collection of indices for an arbitrary ${collection}.
+@_fixed_layout
 public struct ${Self}<
   Elements : _${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
   // FIXME(ABI)#43 (Recursive Protocol Constraints):
@@ -39,6 +40,8 @@ public struct ${Self}<
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias Index = Elements.Index
 
+  @_inlineable
+  @_versioned
   internal init(
     _elements: Elements,
     startIndex: Elements.Index,
@@ -49,14 +52,17 @@ public struct ${Self}<
     self._endIndex = endIndex
   }
 
+  @_inlineable
   public var startIndex: Elements.Index {
     return _startIndex
   }
 
+  @_inlineable
   public var endIndex: Elements.Index {
     return _endIndex
   }
 
+  @_inlineable
   public subscript(i: Index) -> Elements.Index {
     // FIXME: swift-3-indexing-model: range check.
     return i
@@ -65,6 +71,7 @@ public struct ${Self}<
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias SubSequence = ${Self}<Elements>
 
+  @_inlineable
   public subscript(bounds: Range<Index>) -> ${Self}<Elements> {
     // FIXME: swift-3-indexing-model: range check.
     return ${Self}(
@@ -73,22 +80,26 @@ public struct ${Self}<
       endIndex: bounds.upperBound)
   }
 
+  @_inlineable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(after: i)
   }
 
+  @_inlineable
   public func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formIndex(after: &i)
   }
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
+  @_inlineable
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(before: i)
   }
 
+  @_inlineable
   public func formIndex(before i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formIndex(before: &i)
@@ -98,12 +109,16 @@ public struct ${Self}<
   // FIXME(compiler limitation): this typealias should be inferred.
   public typealias Indices = ${Self}<Elements>
 
+  @_inlineable
   public var indices: Indices {
     return self
   }
 
+  @_versioned
   internal var _elements: Elements
+  @_versioned
   internal var _startIndex: Elements.Index
+  @_versioned
   internal var _endIndex: Elements.Index
 }
 

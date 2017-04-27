@@ -87,9 +87,6 @@ public protocol BidirectionalCollection
   associatedtype SubSequence : _BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
   // FIXME(ABI)#93 (Recursive Protocol Constraints):
-  // FIXME(ABI)#94 (Associated Types with where clauses):
-  // This is dependent on both recursive protocol constraints AND associated 
-  // types with where clauses.
   // associatedtype SubSequence : BidirectionalCollection
 
   /// A type that represents the indices that are valid for subscripting the
@@ -97,9 +94,6 @@ public protocol BidirectionalCollection
   associatedtype Indices : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
   // FIXME(ABI)#95 (Recursive Protocol Constraints):
-  // FIXME(ABI)#96 (Associated Types with where clauses):
-  // This is dependent on both recursive protocol constraints AND associated 
-  // types with where clauses.
   // associatedtype Indices : BidirectionalCollection
 
   /// The indices that are valid for subscripting the collection, in ascending

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/vtable_multi_file_helper.swift -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/vtable_multi_file_helper.swift -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

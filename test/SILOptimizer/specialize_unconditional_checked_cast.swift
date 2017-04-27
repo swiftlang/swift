@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -o - -O %s | %FileCheck %s
+// RUN: %target-swift-frontend  -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -o - -O %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -98,6 +98,8 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // x -> x where x is not a class.
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{[_0-9a-zA-Z]*}}3Not{{.*}}Tg5 : $@convention(thin) (NotUInt8) -> NotUInt8 {
 // CHECK: bb0
+// CHECK-NEXT: debug_value %0
+// TODO: the second debug_value is redundant and should be removed
 // CHECK-NEXT: debug_value %0
 // CHECK-NEXT: return %0
 

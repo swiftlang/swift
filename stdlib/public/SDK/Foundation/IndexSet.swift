@@ -41,52 +41,6 @@ extension IndexSet.RangeView {
     }
 }
 
-// We currently cannot use this mechanism because NSIndexSet is not abstract; it has its own ivars and therefore subclassing it using the same trick as NSData, etc. does not work.
-
-/*
-private final class _SwiftNSIndexSet : _SwiftNativeNSIndexSet, _SwiftNativeFoundationType {
-    public typealias ImmutableType = NSIndexSet
-    public typealias MutableType = NSMutableIndexSet
-
-    var __wrapped : _MutableUnmanagedWrapper<ImmutableType, MutableType>
-
-    init(immutableObject: AnyObject) {
-      // Take ownership.
-      __wrapped = .Immutable(
-        Unmanaged.passRetained(
-          _unsafeReferenceCast(immutableObject, to: ImmutableType.self)))
-
-      super.init()
-    }
-
-    init(mutableObject: AnyObject) {
-      // Take ownership.
-      __wrapped = .Mutable(
-       Unmanaged.passRetained(
-         _unsafeReferenceCast(mutableObject, to: MutableType.self)))
-      super.init()
-    }
-
-    public required init(unmanagedImmutableObject: Unmanaged<ImmutableType>) {
-      // Take ownership.
-      __wrapped = .Immutable(unmanagedImmutableObject)
-
-      super.init()
-    }
-
-    public required init(unmanagedMutableObject: Unmanaged<MutableType>) {
-      // Take ownership.
-      __wrapped = .Mutable(unmanagedMutableObject)
-
-      super.init()
-    }
-
-    deinit {
-      releaseWrappedObject()
-    }
-}
-*/
-
 /// Manages a `Set` of integer values, which are commonly used as an index type in Cocoa API.
 ///
 /// The range of valid integer values is 0..<INT_MAX-1. Anything outside this range is an error.
@@ -258,9 +212,9 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     private func _indexOfRange(containing integer : Element) -> RangeView.Index? {
         let result = _handle.map { 
-            __NSIndexSetIndexOfRangeContainingIndex($0, UInt(integer))
+            __NSIndexSetIndexOfRangeContainingIndex($0, integer)
         }
-        if result == UInt(NSNotFound) {
+        if result == NSNotFound {
             return nil
         } else {
             return Int(result)
@@ -269,9 +223,9 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     private func _range(at index: RangeView.Index) -> Range<Element> {
         return _handle.map {
-            var location: UInt = 0
-            var length: UInt = 0
-            __NSIndexSetRangeAtIndex($0, UInt(index), &location, &length)
+            var location: Int = 0
+            var length: Int = 0
+            __NSIndexSetRangeAtIndex($0, index, &location, &length)
             return Int(location)..<Int(location)+Int(length)
         }
     }

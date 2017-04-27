@@ -17,12 +17,9 @@ struct S { func foo() {} }
 // RUN: %sourcekitd-test -req=range -pos=4:1 -length 25 %s -- %s | %FileCheck %s -check-prefix=CHECK3
 // RUN: %sourcekitd-test -req=range -pos=4:1 -length 26 %s -- %s | %FileCheck %s -check-prefix=CHECK3
 // RUN: %sourcekitd-test -req=range -pos=4:1 -length 27 %s -- %s | %FileCheck %s -check-prefix=CHECK3
-// RUN: %sourcekitd-test -req=range -pos=4:4 -length 22 %s -- %s | %FileCheck %s -check-prefix=CHECK3
 
 // RUN: %sourcekitd-test -req=range -pos=5:1 -length 12 %s -- %s | %FileCheck %s -check-prefix=CHECK4
 // RUN: %sourcekitd-test -req=range -pos=5:2 -length 11 %s -- %s | %FileCheck %s -check-prefix=CHECK4
-// RUN: %sourcekitd-test -req=range -pos=5:5 -length 8 %s -- %s | %FileCheck %s -check-prefix=CHECK4
-// RUN: %sourcekitd-test -req=range -pos=5:5 -length 9 %s -- %s | %FileCheck %s -check-prefix=CHECK4
 
 // RUN: %sourcekitd-test -req=range -pos=8:1 -length 31 %s -- %s | %FileCheck %s -check-prefix=CHECK5
 // RUN: %sourcekitd-test -req=range -pos=9:1 -length 25 %s -- %s | %FileCheck %s -check-prefix=CHECK6

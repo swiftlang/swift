@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -9,7 +9,7 @@ import Foundation
 import gizmo
 
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
-// CHECK: [[NSRECT:%TSC6NSRectV]] = type <{ [[NSPOINT:%TSC7NSPointV]], [[NSSIZE:%TSC6NSSizeV]] }>
+// CHECK: [[NSRECT:%TSo6NSRectV]] = type <{ [[NSPOINT:%TSo7NSPointV]], [[NSSIZE:%TSo6NSSizeV]] }>
 // CHECK: [[NSPOINT]] = type <{ [[DOUBLE:%TSd]], [[DOUBLE]] }>
 // CHECK: [[DOUBLE]] = type <{ double }>
 // CHECK: [[NSSIZE]] = type <{ [[DOUBLE]], [[DOUBLE]] }>
@@ -61,7 +61,7 @@ func convertRectFromBase(_ v: NSView, r: NSRect) -> NSRect {
 }
 // CHECK: }
 
-// CHECK: define hidden swiftcc { {{.*}}*, {{.*}}*, {{.*}}*, {{.*}}* } @_T012objc_structs20useStructOfNSStringsSC0deF0VADF({{.*}}*, {{.*}}*, {{.*}}*, {{.*}}*)
+// CHECK: define hidden swiftcc { {{.*}}*, {{.*}}*, {{.*}}*, {{.*}}* } @_T012objc_structs20useStructOfNSStringsSo0deF0VADF({{.*}}*, {{.*}}*, {{.*}}*, {{.*}}*)
 // CHECK:   call void @useStructOfNSStringsInObjC(%struct.StructOfNSStrings* noalias nocapture sret {{%.*}}, %struct.StructOfNSStrings* byval align 8 {{%.*}})
 func useStructOfNSStrings(_ s: StructOfNSStrings) -> StructOfNSStrings {
   return useStructOfNSStringsInObjC(s)

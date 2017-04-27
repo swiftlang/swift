@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/QuotedString.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -117,18 +117,18 @@ void RequirementRepr::dump() const {
   llvm::errs() << "\n";
 }
 
-void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
+void RequirementRepr::printImpl(ASTPrinter &out, bool AsWritten) const {
   auto printTy = [&](const TypeLoc &TyLoc) {
     if (AsWritten && TyLoc.getTypeRepr()) {
-      TyLoc.getTypeRepr()->print(out);
+      TyLoc.getTypeRepr()->print(out, PrintOptions());
     } else {
-      TyLoc.getType().print(out);
+      TyLoc.getType().print(out, PrintOptions());
     }
   };
 
   auto printLayoutConstraint =
       [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
-        LayoutConstraintLoc.getLayoutConstraint()->print(out);
+        LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
       };
 
   switch (getKind()) {
@@ -153,24 +153,24 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
 }
 
 void RequirementRepr::print(raw_ostream &out) const {
-  printImpl(out, /*AsWritten=*/false);
+  StreamPrinter printer(out);
+  printImpl(printer, /*AsWritten=*/true);
+}
+void RequirementRepr::print(ASTPrinter &out) const {
+  printImpl(out, /*AsWritten=*/true);
 }
 
 void GenericParamList::print(llvm::raw_ostream &OS) {
   OS << '<';
-  bool First = true;
-  for (auto P : *this) {
-    if (First) {
-      First = false;
-    } else {
-      OS << ", ";
-    }
-    OS << P->getName();
-    if (!P->getInherited().empty()) {
-      OS << " : ";
-      P->getInherited()[0].getType().print(OS);
-    }
-  }
+  interleave(*this,
+             [&](const GenericTypeParamDecl *P) {
+               OS << P->getName();
+               if (!P->getInherited().empty()) {
+                 OS << " : ";
+                 P->getInherited()[0].getType().print(OS);
+               }
+             },
+             [&] { OS << ", "; });
 
   if (!getRequirements().empty()) {
     OS << " where ";
@@ -359,6 +359,10 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::UTF16: return "utf16";
+    case StringLiteralExpr::UTF8ConstString:
+      return "utf8_const_string";
+    case StringLiteralExpr::UTF16ConstString:
+      return "utf16_const_string";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
@@ -578,15 +582,8 @@ namespace {
       if (Inherited.empty())
         return;
       OS << " inherits: ";
-      bool First = true;
-      for (auto Super : Inherited) {
-        if (First)
-          First = false;
-        else
-          OS << ", ";
-
-        Super.getType().print(OS);
-      }
+      interleave(Inherited, [&](TypeLoc Super) { Super.getType().print(OS); },
+                 [&] { OS << ", "; });
     }
 
     void visitImportDecl(ImportDecl *ID) {
@@ -662,13 +659,33 @@ namespace {
         OS << " default=";
         defaultDef.print(OS);
       }
-      
+      if (auto whereClause = decl->getTrailingWhereClause()) {
+        OS << " where requirements: ";
+        interleave(whereClause->getRequirements(),
+                   [&](const RequirementRepr &req) { req.print(OS); },
+                   [&] { OS << ", "; });
+      }
+
       OS << ")";
     }
 
     void visitProtocolDecl(ProtocolDecl *PD) {
       printCommon(PD, "protocol");
+
+      OS << " requirement signature=";
+      if (PD->isRequirementSignatureComputed()) {
+        OS << PD->getRequirementSignature()->getAsString();
+      } else {
+        OS << "<null>";
+      }
       printInherited(PD->getInherited());
+      if (auto whereClause = PD->getTrailingWhereClause()) {
+        OS << " where requirements: ";
+        interleave(whereClause->getRequirements(),
+                   [&](const RequirementRepr &req) { req.print(OS); },
+                   [&] { OS << ", "; });
+      }
+
       for (auto VD : PD->getMembers()) {
         OS << '\n';
         printRec(VD);
@@ -1934,6 +1951,14 @@ public:
     printRec(E->getIndex());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+    printCommon(E, "keypath_application_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getKeyPath());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
     printCommon(E, "dynamic_subscript_expr")
       << " decl=";
@@ -2055,11 +2080,6 @@ public:
   }
   void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E) {
     printCommon(E, "archetype_to_super_expr") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-  void visitLValueToPointerExpr(LValueToPointerExpr *E) {
-    printCommon(E, "lvalue_to_pointer") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2391,20 +2411,61 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+  void visitKeyPathExpr(KeyPathExpr *E) {
     printCommon(E, "keypath_expr");
-    for (unsigned i = 0, n = E->getNumComponents(); i != n; ++i) {
-      OS << "\n";
-      OS.indent(Indent + 2);
-      OS << "component=";
-      if (auto decl = E->getComponentDecl(i))
-        decl->dumpRef(OS);
-      else
-        OS << E->getComponentName(i);
-    }
-    if (auto semanticE = E->getSemanticExpr()) {
+    if (E->isObjC())
+      OS << " objc";
+    for (auto &component : E->getComponents()) {
       OS << '\n';
-      printRec(semanticE);
+      OS.indent(Indent + 2);
+      OS << "(component=";
+      switch (component.getKind()) {
+      case KeyPathExpr::Component::Kind::OptionalChain:
+        OS << "optional_chain ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::OptionalForce:
+        OS << "optional_force ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+        OS << "optional_wrap ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::Property:
+        OS << "property ";
+        component.getDeclRef().dump(OS);
+        OS << " ";
+        break;
+      
+      case KeyPathExpr::Component::Kind::Subscript:
+        OS << "subscript ";
+        component.getDeclRef().dump(OS);
+        OS << '\n';
+        component.getIndexExpr()->print(OS, Indent + 4);
+        OS.indent(Indent + 4);
+        break;
+      
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        OS << "unresolved_property ";
+        component.getUnresolvedDeclName().print(OS);
+        OS << " ";
+        break;
+        
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+        OS << "unresolved_subscript";
+        OS << '\n';
+        component.getIndexExpr()->print(OS, Indent + 4);
+        OS.indent(Indent + 4);
+        break;
+      }
+      OS << "type=";
+      component.getComponentType().print(OS);
+      OS << ")";
+    }
+    if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
+      OS << '\n';
+      printRec(stringLiteral);
     }
     OS << ")";
   }
@@ -2622,6 +2683,7 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
     out.indent(indent) << "(abstract_conformance protocol="
                        << getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
+    out << '\n';
   }
 }
 
@@ -3057,7 +3119,9 @@ namespace {
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
       printCommon(T, label, "protocol_composition_type");
-      for (auto proto : T->getProtocols()) {
+      if (T->hasExplicitAnyObject())
+        OS << " any_object";
+      for (auto proto : T->getMembers()) {
         printRec(proto);
       }
       OS << ")";

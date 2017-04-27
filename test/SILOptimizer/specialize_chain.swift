@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -O -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -primary-file %s | %FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.

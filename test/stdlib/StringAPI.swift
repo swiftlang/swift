@@ -361,6 +361,10 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   )
 }
 
+StringTests.test("String.init(_:String)") {
+  let _: String = String("" as String) // should compile without ambiguities
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 
 // Test if all methods which go into a vtable have at least the visibility of its class.
 // Reason: Derived classes from "outside" still have to put the less visible base members
@@ -21,7 +21,7 @@ class Base {
   }
 }
 class Derived : Base {
-  // CHECK: define hidden swiftcc void @_T014method_linkage7Derived{{.*}}3foo0
+  // CHECK: define internal swiftcc void @_T014method_linkage7Derived{{.*}}3foo0
   @inline(never)
   fileprivate final override func foo() {
   }
@@ -35,12 +35,24 @@ extension Base {
 }
 
 public class PublicClass {
-  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage11PublicClass{{.*}}4pfoo0
+  // CHECK: define hidden swiftcc void @_T014method_linkage11PublicClass{{.*}}4pfoo0
   @inline(never)
   fileprivate func pfoo() {
   }
 
-  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage11PublicClassC4pbaryyF
+  // CHECK: define hidden swiftcc void @_T014method_linkage11PublicClassC4pbaryyF
+  @inline(never)
+  internal func pbar() {
+  }
+}
+
+open class OpenClass {
+  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage9OpenClass{{.*}}4pfoo0
+  @inline(never)
+  fileprivate func pfoo() {
+  }
+
+  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage9OpenClassC4pbaryyF
   @inline(never)
   internal func pbar() {
   }

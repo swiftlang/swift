@@ -21,6 +21,7 @@
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
+    "Substring.swift",
     "Unicode.swift",
     "UnicodeScalar.swift",
     "UnicodeTrie.swift",
@@ -94,6 +95,9 @@
     "VarArgs.swift",
     "CTypes.swift",
     "MemoryLayout.swift"
+  ],
+  "KeyPaths": [
+    "KeyPath.swift"
   ],
   "Reflection": [
     "Dump.swift",

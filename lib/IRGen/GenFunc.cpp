@@ -679,6 +679,24 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         silConv.getSILType(substParam), in, out);
 }
 
+static CanType getArgumentLoweringType(CanType type,
+                                       SILParameterInfo paramInfo) {
+  switch (paramInfo.getConvention()) {
+  // Capture value parameters by value, consuming them.
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    return type;
+
+  // Capture inout parameters by pointer.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    return CanInOutType::get(type);
+  }
+}
+
 /// Emit the forwarding stub function for a partial application.
 ///
 /// If 'layout' is null, there is a single captured value of
@@ -700,21 +718,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
   SILFunctionConventions outConv(outType, IGM.getSILModule());
 
-  // Build a name for the thunk. If we're thunking a static function reference,
-  // include its symbol name in the thunk name.
-  llvm::SmallString<20> OldThunkName;
   StringRef FnName;
-  OldThunkName += "_TPA";
-  if (staticFnPtr) {
+  if (staticFnPtr)
     FnName = staticFnPtr->getName();
-    OldThunkName += '_';
-    OldThunkName += FnName;
-  }
-  IRGenMangler Mangler;
-  std::string NewThunkName = Mangler.manglePartialApplyForwarder(FnName);
 
-  std::string thunkName = NewMangling::selectMangling(OldThunkName.str(),
-                                                      NewThunkName);
+  IRGenMangler Mangler;
+  std::string thunkName = Mangler.manglePartialApplyForwarder(FnName);
 
   // FIXME: Maybe cache the thunk by function and closure types?.
   llvm::Function *fwd =
@@ -738,17 +747,37 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
 
+  Address resultValueAddr;
+
   {
     // Lower the forwarded arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getGenericSignature());
-    
-    // Forward the indirect return values.
-    auto &nativeSchema = IGM.getTypeInfo(outConv.getSILResultType())
-                             .nativeReturnValueSchema(IGM);
-    if (nativeSchema.requiresIndirect())
-      args.add(origParams.claimNext());
 
     SILFunctionConventions origConv(origType, IGM.getSILModule());
+    auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
+    auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
+    auto &origResultTI = IGM.getTypeInfo(origConv.getSILResultType());
+    auto &origNativeSchema = origResultTI.nativeReturnValueSchema(IGM);
+
+    // Forward the indirect return values. We might have to reabstract the
+    // return value.
+    if (nativeResultSchema.requiresIndirect()) {
+      assert(origNativeSchema.requiresIndirect());
+      auto resultAddr = origParams.claimNext();
+      resultAddr = subIGF.Builder.CreateBitCast(
+          resultAddr, IGM.getStoragePointerType(origConv.getSILResultType()));
+      args.add(resultAddr);
+    } else if (origNativeSchema.requiresIndirect()) {
+      assert(!nativeResultSchema.requiresIndirect());
+      auto stackAddr = outResultTI.allocateStack(
+          subIGF, outConv.getSILResultType(), false, "return.temp");
+      resultValueAddr = stackAddr.getAddress();
+      auto resultAddr = subIGF.Builder.CreateBitCast(
+          resultValueAddr,
+          IGM.getStoragePointerType(origConv.getSILResultType()));
+      args.add(resultAddr.getAddress());
+    }
+
     for (auto resultType : origConv.getIndirectSILResultTypes()) {
       auto addr = origParams.claimNext();
       addr = subIGF.Builder.CreateBitCast(
@@ -1031,6 +1060,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       }
       
       // Reemit the capture params as unsubstituted.
+
+      // Skip empty parameters.
+      while (origParamI < origType->getParameters().size()) {
+        auto param = substType->getParameters()[origParamI];
+        SILType argType = IGM.silConv.getSILType(param);
+        auto argLoweringTy =
+            getArgumentLoweringType(argType.getSwiftRValueType(), param);
+        auto &ti = subIGF.getTypeInfoForLowered(argLoweringTy);
+        // Empty values don't matter.
+        if (ti.getSchema().size() != 0 || param.isFormalIndirect())
+          break;
+        origParamI++;
+      }
+
       if (origParamI < origType->getParameters().size()) {
         Explosion origParam;
         auto origParamInfo = origType->getParameters()[origParamI];
@@ -1151,23 +1194,48 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime)
     subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
-  
-  // FIXME: Reabstract the result value as substituted.
 
-  if (call->getType()->isVoidTy())
-    subIGF.Builder.CreateRetVoid();
-  else {
+  // Reabstract the result value as substituted.
+  SILFunctionConventions origConv(origType, IGM.getSILModule());
+  auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
+  auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
+  if (call->getType()->isVoidTy()) {
+    if (!resultValueAddr.isValid())
+      subIGF.Builder.CreateRetVoid();
+    else {
+      // Okay, we have called a function that expects an indirect return type
+      // but the partially applied return type is direct.
+      assert(!nativeResultSchema.requiresIndirect());
+      Explosion loadedResult;
+      cast<LoadableTypeInfo>(outResultTI)
+          .loadAsTake(subIGF, resultValueAddr, loadedResult);
+      Explosion nativeResult = nativeResultSchema.mapIntoNative(
+          IGM, subIGF, loadedResult, outConv.getSILResultType());
+      outResultTI.deallocateStack(subIGF, resultValueAddr,
+                                  outConv.getSILResultType());
+      if (nativeResult.size() == 1)
+        subIGF.Builder.CreateRet(nativeResult.claimNext());
+      else {
+        llvm::Value *nativeAgg =
+            llvm::UndefValue::get(nativeResultSchema.getExpandedType(IGM));
+        for (unsigned i = 0, e = nativeResult.size(); i != e; ++i) {
+          auto *elt = nativeResult.claimNext();
+          nativeAgg = subIGF.Builder.CreateInsertValue(nativeAgg, elt, i);
+        }
+        subIGF.Builder.CreateRet(nativeAgg);
+      }
+    }
+  } else {
     llvm::Value *callResult = call;
-    // If the result type is dependent on a type parameter we might have to cast
-    // to the result type - it could be substituted.
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    // If the result type is dependent on a type parameter we might have to
+    // cast to the result type - it could be substituted.
     if (origConv.getSILResultType().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
       callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
     }
     subIGF.Builder.CreateRet(callResult);
   }
-  
+
   return fwd;
 }
 
@@ -1199,7 +1267,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   if (auto genericSig = origType->getGenericSignature())
     subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                   origType, substType, subMap);
+                                                            origType, subMap);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
@@ -1214,27 +1282,18 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param);
 
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getSwiftRValueType(), param);
+
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+
+    // Empty values don't matter.
+    auto schema = ti.getSchema();
+    if (schema.size() == 0 && !param.isFormalIndirect())
+      continue;
+
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
-    
-    auto argLoweringTy = argType.getSwiftRValueType();
-    switch (param.getConvention()) {
-    // Capture value parameters by value, consuming them.
-    case ParameterConvention::Direct_Owned:
-    case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Guaranteed:
-      break;
-      
-    // Capture inout parameters by pointer.
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-      argLoweringTy = CanInOutType::get(argLoweringTy);
-      break;
-    }
-    
-    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
     argTypeInfos.push_back(&ti);
 
     // Update the single-swift-refcounted check, unless we already ruled that
@@ -1242,10 +1301,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     if (hasSingleSwiftRefcountedContext == No)
       continue;
     
-    // Empty values don't matter.
-    auto schema = ti.getSchema();
-    if (schema.size() == 0)
-      continue;
     
     // Adding nonempty values when we already have a single refcounted pointer
     // means we don't have a single value anymore.

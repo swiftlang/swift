@@ -1,7 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil -parse-as-library %s | %FileCheck %s
-
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | %FileCheck %s
 
 // Test the absence of a 'strict' flag.
 // CHECK-LABEL: _T018unsafe_pointer_gen13test_raw_loadSiSV2rp_tF

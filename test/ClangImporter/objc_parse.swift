@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
@@ -403,6 +403,23 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   _ = value
 }
 
+func testPropertyAndMethodCollisionInOneClass(
+  obj: PropertyAndMethodCollisionInOneClass,
+  rev: PropertyAndMethodReverseCollisionInOneClass
+) {
+  obj.object = nil
+  obj.object()
+
+  type(of: obj).classRef = nil
+  type(of: obj).classRef()
+
+  rev.object = nil
+  rev.object()
+
+  type(of: rev).classRef = nil
+  type(of: rev).classRef()
+}
+
 func testSubscriptAndPropertyRedeclaration(_ obj: SubscriptAndProperty) {
   _ = obj.x
   obj.x = 5
@@ -607,11 +624,8 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
 }
 
 class NewtypeUser {
-  @objc func stringNewtype(a: SNTErrorDomain) {}
-  @objc func stringNewtypeOptional(a: SNTErrorDomain?) {}
+  @objc func stringNewtype(a: SNTErrorDomain) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{31-45=ErrorDomain}}
+  @objc func stringNewtypeOptional(a: SNTErrorDomain?) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{39-53=ErrorDomain}}
   @objc func intNewtype(a: MyInt) {}
   @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: did you mean 'makingHoney'?

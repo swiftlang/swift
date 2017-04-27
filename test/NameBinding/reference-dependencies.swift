@@ -107,12 +107,12 @@ typealias MyArray = Array<Bool>
 
 // CHECK-DAG: "ExpressibleByArrayLiteral"
 extension ExpressibleByArrayLiteral {
-  final func useless() {}
+  func useless() {}
 }
 
 // CHECK-DAG: OtherFileElementType
 extension ExpressibleByArrayLiteral where Element == OtherFileElementType {
-  final func useless2() {}
+  func useless2() {}
 }
 
 // CHECK-DAG: "IntegerLiteralType"

@@ -121,14 +121,14 @@ default: // expected-error{{additional 'case' blocks cannot appear after the 'de
   x = 0
 }
 
-switch x {
+switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
   x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
-} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
+}
 
-switch x {
+switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
   x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
   x = 2
-} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
+}
 
 switch x {
 default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}} {{9-9= break}}

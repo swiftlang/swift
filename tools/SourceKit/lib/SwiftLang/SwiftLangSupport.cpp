@@ -16,8 +16,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"

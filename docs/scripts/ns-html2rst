@@ -54,5 +54,6 @@ usage: nshtml2rst < NSString.html > NSString.rst
 
     sys.stdout.write(rst)
 
+
 if __name__ == '__main__':
     run()

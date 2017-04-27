@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
@@ -84,8 +85,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
 
     // A non-exhaustive switch would also produce an unreachable instruction.
     if (L.isASTNode<SwitchStmt>()) {
-      diagnoseMissingCases(Context, L.getAsASTNode<SwitchStmt>(),
-                           diag::non_exhaustive_switch);
+      diagnoseMissingCases(Context, L.getAsASTNode<SwitchStmt>());
       return;
     }
 
@@ -121,8 +121,6 @@ static void diagnoseStaticReports(const SILInstruction *I,
 namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
   ~EmitDFDiagnostics() override {}
-
-  StringRef getName() override { return "Emit Dataflow Diagnostics"; }
 
   /// The entry point to the transformation.
   void run() override {

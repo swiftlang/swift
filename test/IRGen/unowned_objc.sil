@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -16,7 +16,7 @@ protocol P : class {
   func explode()
 }
 
-sil @_TFC12unowned_objc1CD : $@convention(method) (C) -> ()
+sil @_T012unowned_objc1CCfD : $@convention(method) (C) -> ()
 
 struct A {
   unowned var x : C

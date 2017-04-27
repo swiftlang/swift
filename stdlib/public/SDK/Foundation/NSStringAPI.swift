@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_exported import Foundation // Clang module
+
 // Open Issues
 // ===========
 //
@@ -391,11 +393,7 @@ extension String {
   /// Returns an array containing substrings from the `String`
   /// that have been divided by characters in a given set.
   public func components(separatedBy separator: CharacterSet) -> [String] {
-    // FIXME: two steps due to <rdar://16971181>
-    let nsa = _ns.components(separatedBy: separator) as NSArray
-    // Since this function is effectively a bridge thunk, use the
-    // bridge thunk semantics for the NSArray conversion
-    return nsa as! [String]
+    return _ns.components(separatedBy: separator)
   }
 
 
@@ -404,10 +402,7 @@ extension String {
   /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
   public func components(separatedBy separator: String) -> [String] {
-    let nsa = _ns.components(separatedBy: separator) as NSArray
-    // Since this function is effectively a bridge thunk, use the
-    // bridge thunk semantics for the NSArray conversion
-    return nsa as! [String]
+    return _ns.components(separatedBy: separator)
   }
 
   // - (const char *)cStringUsingEncoding:(NSStringEncoding)encoding
@@ -621,7 +616,7 @@ extension String {
     return _withOptionalOutParameter(leftover) {
       self._ns.getBytes(
         &buffer,
-        maxLength: min(buffer.count, maxBufferCount),
+        maxLength: Swift.min(buffer.count, maxBufferCount),
         usedLength: usedBufferCount,
         encoding: encoding.rawValue,
         options: options,
@@ -641,7 +636,8 @@ extension String {
   public func getCString(
     _ buffer: inout [CChar], maxLength: Int, encoding: Encoding
   ) -> Bool {
-    return _ns.getCString(&buffer, maxLength: min(buffer.count, maxLength),
+    return _ns.getCString(&buffer,
+                          maxLength: Swift.min(buffer.count, maxLength),
                           encoding: encoding.rawValue)
   }
 
@@ -657,7 +653,7 @@ extension String {
   public func getFileSystemRepresentation(
     _ buffer: inout [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
-      &buffer, maxLength: min(buffer.count, maxLength))
+      &buffer, maxLength: Swift.min(buffer.count, maxLength))
   }
 
   // - (void)

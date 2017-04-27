@@ -323,3 +323,88 @@ done:
 ; CHECK: ret i1
   ret i1 %result
 }
+
+; Check self recursive functions
+
+; CHECK-LABEL: define internal void @recursive1(i32 %x, i32 %y)
+; CHECK: tail call void @recursive1_merged(i32 %x, i32 %y, i32* @g1, void (i32, i32)* @recursive1)
+; CHECK: ret void
+define internal void @recursive1(i32 %x, i32 %y) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  %l = load i32, i32* @g1, align 4
+  call void @recursive1(i32 %x, i32 %y)
+  br label %bb2
+
+bb2:
+  ret void
+}
+
+; CHECK-LABEL: define internal void @recursive2(i32 %x, i32 %y)
+; CHECK: tail call void @recursive1_merged(i32 %x, i32 %y, i32* @g2, void (i32, i32)* @recursive2)
+; CHECK: ret void
+define internal void @recursive2(i32 %x, i32 %y) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  %l = load i32, i32* @g2, align 4
+  call void @recursive2(i32 %x, i32 %y)
+  br label %bb2
+
+bb2:
+  ret void
+}
+; CHECK-LABEL: define internal void @recursive1_merged(i32, i32, i32*, void (i32, i32)*)
+; CHECK: load i32, i32* %2
+; CHECK: call void %3(i32 %0, i32 %1)
+; CHECK: ret void
+
+
+; CHECK-LABEL: define internal void @another_recursive_func(i32 %x)
+; CHECK: tail call void @another_recursive_func_merged(i32 %x, i32* @g1, void (i32)* @another_recursive_func)
+; CHECK: ret void
+define internal void @another_recursive_func(i32 %x) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  store i32 %x, i32 *@g1, align 4
+  call void @another_recursive_func(i32 %x)
+  br label %bb2
+
+bb2:
+  ret void
+}
+; CHECK-NOT: @not_really_recursive(
+
+; CHECK-LABEL: define internal void @another_recursive_func_merged(i32, i32*, void (i32)*)
+; CHECK: store i32 %0, i32* %1
+; CHECK: call void %2(i32 %0)
+; CHECK: ret void
+define internal void @not_really_recursive(i32 %x) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  store i32 %x, i32 *@g2, align 4
+  call void @callee1(i32 %x)
+  br label %bb2
+
+bb2:
+  ret void
+}
+; CHECK-NOT: @not_really_recursive(
+
+; CHECK-LABEL: define void @call_recursive_funcs(i32 %x)
+; CHECK: call void @recursive1(i32 %x, i32 %x)
+; CHECK: call void @recursive2(i32 %x, i32 %x)
+; CHECK: call void @another_recursive_func(i32 %x)
+; CHECK: call void @another_recursive_func_merged(i32 %x, i32* @g2, void (i32)* @callee1)
+; CHECK: ret void
+define void @call_recursive_funcs(i32 %x) {
+  call void @recursive1(i32 %x, i32 %x)
+  call void @recursive2(i32 %x, i32 %x)
+  call void @another_recursive_func(i32 %x)
+  call void @not_really_recursive(i32 %x)
+  ret void
+}
+

@@ -59,14 +59,16 @@ public:
 
   Kind getKind() const { return kind; }
 
-  void finish(SILGenFunction &gen) { finishImpl(gen); }
+  void finish(SILGenFunction &SGF) { finishImpl(SGF); }
 
   void setFinished() { finished = true; }
 
   bool isFinished() const { return finished; }
 
+  void verify(SILGenFunction &SGF) const;
+
 protected:
-  virtual void finishImpl(SILGenFunction &gen) = 0;
+  virtual void finishImpl(SILGenFunction &SGF) = 0;
 };
 
 class SharedBorrowFormalAccess : public FormalAccess {
@@ -83,7 +85,7 @@ public:
   SILValue getOriginalValue() const { return originalValue; }
 
 private:
-  void finishImpl(SILGenFunction &gen) override;
+  void finishImpl(SILGenFunction &SGF) override;
 };
 
 class OwnedFormalAccess : public FormalAccess {
@@ -97,7 +99,7 @@ public:
   SILValue getValue() const { return value; }
 
 private:
-  void finishImpl(SILGenFunction &gen) override;
+  void finishImpl(SILGenFunction &SGF) override;
 };
 
 class FormalEvaluationContext {
@@ -139,16 +141,46 @@ public:
   /// is the top element of the stack.
   void pop(stable_iterator stable_iter) { stack.pop(stable_iter); }
 
-  void dump(SILGenFunction &gen);
+  void dump(SILGenFunction &SGF);
 };
 
+/// A scope associated with the beginning of the formal evaluation of an lvalue.
+///
+/// A formal evaluation of an lvalue occurs when emitting:
+///
+///   1. accessors.
+///   2. getters.
+///   3. materializeForSets.
+///
+/// for lvalues. The general form of such an evaluation is:
+///
+///   formally evaluate the lvalue "x" into memory
+///   begin formal access to "x"
+///   end formal access to "x"
+///   ... *more formal access*
+///   begin formal access to "x"
+///   end formal access to "x"
+///   end formal evaluation of lvalue into memory
+///
+/// *NOTE* All formal access contain a pointer to a cleanup in the normal
+/// cleanup stack. This is to ensure that when SILGen calls
+/// Cleanups.emitBranchAndCleanups (and other special cleanup code along error
+/// edges), writebacks are properly created. What is key to notice is that all
+/// of these cleanup emission types are non-destructive. Contrast this with
+/// normal scope popping. In such a case, the scope pop is destructive. This
+/// means that any pointers from the formal access to the cleanup stack is now
+/// invalid.
+///
+/// In order to avoid this issue, it is important to /never/ create a formal
+/// access cleanup when the "top level" scope is not a formal evaluation scope.
 class FormalEvaluationScope {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
   llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
   bool wasInWritebackScope;
+  bool wasInInOutConversionScope;
 
 public:
-  FormalEvaluationScope(SILGenFunction &gen);
+  FormalEvaluationScope(SILGenFunction &SGF);
   ~FormalEvaluationScope() {
     if (!savedDepth.hasValue())
       return;
@@ -158,6 +190,9 @@ public:
   bool isPopped() const { return !savedDepth.hasValue(); }
 
   void pop() {
+    if (wasInInOutConversionScope)
+      return;
+
     assert(!isPopped() && "popping an already-popped writeback scope!");
     popImpl();
     savedDepth.reset();
@@ -168,6 +203,10 @@ public:
 
   FormalEvaluationScope(FormalEvaluationScope &&o);
   FormalEvaluationScope &operator=(FormalEvaluationScope &&o) = delete;
+
+  /// Verify that we can successfully access all of the inner lexical scopes
+  /// that would be popped by this scope.
+  void verify() const;
 
 private:
   void popImpl();

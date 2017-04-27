@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/generic_extension_1.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck %s
 
 // We have to perform IRGen to actually check that the generic substitutions
 // are being used.

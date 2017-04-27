@@ -8,7 +8,7 @@
 
 import Builtin
 
-// CHECK: SIL verification failed: return with stack allocs that haven't been deallocated: stack.empty()
+// CHECK: SIL verification failed: return with stack allocs that haven't been deallocated: state.Stack.empty()
 
 sil @fail1: $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):

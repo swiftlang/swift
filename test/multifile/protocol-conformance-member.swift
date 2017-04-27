@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift -Xllvm -new-mangling-for-tests -emit-library %s %S/Inputs/protocol-conformance-member-helper.swift -o %t/libTest.dylib -module-name Test
+// RUN: %target-build-swift -emit-library %s %S/Inputs/protocol-conformance-member-helper.swift -o %t/libTest.dylib -module-name Test
 // RUN: llvm-nm %t/libTest.dylib | %FileCheck %s
 
 // CHECK: _T04Test10CoolStructV10coolFactorSdfg

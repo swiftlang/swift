@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
-#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -40,7 +39,6 @@ class CallerAnalysisPrinterPass : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Caller Analysis Printer"; }
 };
 
 } // end anonymous namespace

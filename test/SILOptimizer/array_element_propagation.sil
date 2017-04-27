@@ -31,6 +31,9 @@ sil [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) 
 sil [_semantics "array.get_element"] @getElement : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> @out MyInt
 sil [_semantics "array.get_element"] @getElement2 : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
 sil @unknown_array_use : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyBool
+sil [_semantics "array.uninitialized"] @arrayAdoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
+sil @arrayInit : $@convention(method) (@thin Array<MyInt>.Type) -> @owned Array<MyInt>
+sil [_semantics "array.append_contentsOf"] @arrayAppendContentsOf : $@convention(method) (@owned Array<MyInt>, @inout Array<MyInt>) -> ()
 
 // CHECK-LABEL: sil @propagate01
 // CHECK:    struct $MyInt
@@ -299,4 +302,84 @@ sil @unknown_use : $@convention(thin) () -> () {
   dealloc_stack %26 : $*MyInt
   strong_release %25 : $Builtin.BridgeObject
   return %52 : $()
+}
+
+// CHECK-LABEL: sil @append_contentsOf_int
+// CHECK:      [[ASFUN:%.*]] = function_ref @arrayAdoptStorage
+// CHECK-NEXT: [[ARR:%.*]] = apply [[ASFUN]]
+// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[ARR]]{{.*}}, 0
+// CHECK-NOT:    apply [[ACFUN]]
+// CHECK:      [[AEFUN:%.*]] = function_ref @_T0Sa6appendyxF
+// CHECK-NEXT: [[STACK:%.*]] = alloc_stack $MyInt
+// CHECK-NEXT: store %{{[0-9]+}} to [[STACK]]
+// CHECK-NEXT: apply [[AEFUN]]<MyInt>([[STACK]]
+// CHECK-NEXT: dealloc_stack [[STACK]]
+// CHECK-NEXT: release_value [[OWNER]]
+// CHECK:      return
+sil @append_contentsOf_int : $@convention(thin) () -> () {
+  %0 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %3 = apply %0() : $@convention(thin) () -> @owned AnyObject
+  %4 = metatype $@thin Array<MyInt>.Type
+  %5 = function_ref @arrayAdoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
+  %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
+  %7 = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 0
+  %8 = tuple_extract %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>), 1
+  %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
+  %11 = integer_literal $Builtin.Int64, 27
+  %12 = struct $MyInt (%11 : $Builtin.Int64)
+  store %12 to %10 : $*MyInt
+  %13 = alloc_stack $Array<MyInt>
+  %14 = metatype $@thin Array<MyInt>.Type
+  %15 = function_ref @arrayInit : $@convention(method) (@thin Array<MyInt>.Type) -> @owned Array<MyInt>
+  %16 = apply %15(%14) : $@convention(method) (@thin Array<MyInt>.Type) -> @owned Array<MyInt>
+  store %16 to %13 : $*Array<MyInt>
+  %17 = function_ref @arrayAppendContentsOf : $@convention(method) (@owned Array<MyInt>, @inout Array<MyInt>) -> ()
+  %18 = apply %17(%7, %13) : $@convention(method) (@owned Array<MyInt>, @inout Array<MyInt>) -> ()
+  dealloc_stack %13 : $*Array<MyInt>
+  %19 = tuple ()
+  return %19 : $()
+}
+
+class Hello {
+}
+
+sil [_semantics "array.uninitialized"] @adoptStorageHello : $@convention(method) (@owned _ContiguousArrayStorage<Hello>, MyInt, @thin Array<Hello>.Type) -> (@owned Array<Hello>, UnsafeMutablePointer<Hello>)
+sil [_semantics "array.append_contentsOf"] @arrayAppendContentsOfHello : $@convention(method) (@owned Array<Hello>, @inout Array<Hello>) -> ()
+
+// CHECK-LABEL: sil @append_contentsOf_class
+// CHECK:      [[ASFUN:%.*]] = function_ref @adoptStorageHello
+// CHECK-NEXT: [[ARR:%.*]] = apply [[ASFUN]]
+// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[ARR]]{{.*}}, 0
+// CHECK:      strong_retain %1 : $Hello
+// CHECK-NEXT: store %1 to %{{[0-9]+}} : $*Hello
+// CHECK-NOT:     apply
+// CHECK:      [[AEFUN:%.*]] = function_ref @_T0Sa6appendyxF
+// CHECK-NEXT: strong_retain %1 : $Hello
+// CHECK-NEXT: [[STACK:%.*]] = alloc_stack $Hello
+// CHECK-NEXT: store %1 to [[STACK]]
+// CHECK-NEXT: apply [[AEFUN]]<Hello>([[STACK]], %0)
+// CHECK-NEXT: dealloc_stack [[STACK]]
+// CHECK-NEXT: release_value [[OWNER]]
+// CHECK-NEXT: return
+sil @append_contentsOf_class : $@convention(thin) (@inout Array<Hello>, @owned Hello) -> @owned Hello {
+bb0(%0 : $*Array<Hello>, %1 : $Hello):
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = struct $MyInt (%5 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Hello * %4 : $Builtin.Word] $_ContiguousArrayStorage<Hello>
+  %8 = metatype $@thin Array<Hello>.Type
+  %9 = function_ref @adoptStorageHello : $@convention(method) (@owned _ContiguousArrayStorage<Hello>, MyInt, @thin Array<Hello>.Type) -> (@owned Array<Hello>, UnsafeMutablePointer<Hello>)
+  %10 = apply %9(%7, %6, %8) : $@convention(method) (@owned _ContiguousArrayStorage<Hello>, MyInt, @thin Array<Hello>.Type) -> (@owned Array<Hello>, UnsafeMutablePointer<Hello>)
+  %11 = tuple_extract %10 : $(Array<Hello>, UnsafeMutablePointer<Hello>), 0
+  %12 = tuple_extract %10 : $(Array<Hello>, UnsafeMutablePointer<Hello>), 1
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Hello>, #UnsafeMutablePointer._rawValue
+  %22 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Hello
+  strong_retain %1 : $Hello
+  store %1 to %22 : $*Hello
+  %25 = function_ref @arrayAppendContentsOfHello : $@convention(method) (@owned Array<Hello>, @inout Array<Hello>) -> ()
+  %26 = apply %25(%11, %0) : $@convention(method) (@owned Array<Hello>, @inout Array<Hello>) -> ()
+  return %1 : $Hello
 }

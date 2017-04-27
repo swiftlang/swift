@@ -52,20 +52,16 @@ void CaptureInfo::print(raw_ostream &OS) const {
   if (hasDynamicSelfCapture())
     OS << "<dynamic_self> ";
 
-  bool isFirst = true;
-  
-  for (auto capture : getCaptures()) {
-    if (isFirst)
-      isFirst = false;
-    else
-      OS << ", ";
-    OS << capture.getDecl()->getName();
-    
-    if (capture.isDirect())
-      OS << "<direct>";
-    if (capture.isNoEscape())
-      OS << "<noescape>";
-  }
+  interleave(getCaptures(),
+             [&](const CapturedValue &capture) {
+               OS << capture.getDecl()->getName();
+
+               if (capture.isDirect())
+                 OS << "<direct>";
+               if (capture.isNoEscape())
+                 OS << "<noescape>";
+             },
+             [&] { OS << ", "; });
   OS << ')';
 }
 

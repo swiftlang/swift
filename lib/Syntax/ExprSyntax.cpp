@@ -114,6 +114,13 @@ IntegerLiteralExprSyntax::withDigits(RC<TokenSyntax> NewDigits) const {
                                                       Cursor::Digits);
 }
 
+IntegerLiteralExprSyntax
+IntegerLiteralExprSyntax::withSign(RC<swift::syntax::TokenSyntax> NewSign)
+    const {
+    assert(NewSign->getTokenKind() == tok::oper_prefix);
+    return Data->replaceChild<IntegerLiteralExprSyntax>(NewSign, Cursor::Sign);
+}
+
 #pragma mark - symbolic-reference Data
 
 SymbolicReferenceExprSyntaxData::

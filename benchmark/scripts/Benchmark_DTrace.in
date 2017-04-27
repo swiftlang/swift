@@ -105,6 +105,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
         return DTraceResult(test_name, 0, results, self.csv_output)
 
+
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -122,6 +123,7 @@ def parse_args():
         help="Emit csv output",
         dest='csv_output')
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()

@@ -489,6 +489,8 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
     return false;
   }
 
@@ -825,6 +827,8 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
   case ArrayCallKind::kWithUnsafeMutableBufferPointer:
   case ArrayCallKind::kArrayInit:
   case ArrayCallKind::kArrayUninitialized:
+  case ArrayCallKind::kAppendContentsOf:
+  case ArrayCallKind::kAppendElement:
     return true;
   }
 
@@ -1379,15 +1383,11 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // Checking
         // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {
-          SameTy =
-              Sem.getSelf()->getType().getSwiftRValueType()->getCanonicalType();
+          SameTy = Sem.getSelf()->getType().getSwiftRValueType();
           continue;
         }
         
-        if (Sem.getSelf()
-                       ->getType()
-                       .getSwiftRValueType()
-                       ->getCanonicalType() != SameTy) {
+        if (Sem.getSelf()->getType().getSwiftRValueType() != SameTy) {
           DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
           return ReturnWithCleanup(false);
         }
@@ -1602,7 +1602,6 @@ class COWArrayOptPass : public SILFunctionTransform {
       }
   }
 
-  StringRef getName() override { return "SIL COW Array Optimization"; }
 };
 } // end anonymous namespace
 
@@ -1863,15 +1862,8 @@ private:
   }
 
   bool isClassElementTypeArray(SILValue Arr) {
-    auto Ty = Arr->getType().getSwiftRValueType();
-    auto *Struct = Ty->getStructOrBoundGenericStruct();
-    assert(Struct && "Array must be a struct !?");
-    if (Struct) {
-      // No point in hoisting generic code.
-      auto BGT = dyn_cast<BoundGenericType>(Ty);
-      if (!BGT)
-        return false;
-
+    auto Ty = Arr->getType();
+    if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
       // Check the array element type parameter.
       bool isClass = false;
       for (auto EltTy : BGT->getGenericArgs()) {
@@ -2141,9 +2133,8 @@ static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
 
 static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
                                     ASTContext &C) {
-  CanType IntTy = IntSILTy.getSwiftRValueType();
-  unsigned NumBits =
-      cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
+  auto IntTy = IntSILTy.castTo<BuiltinIntegerType>();
+  unsigned NumBits = IntTy->getWidth().getFixedWidth();
   // Name is something like: add_Int64
   std::string NameStr = Name;
   NameStr += "_Int" + llvm::utostr(NumBits);
@@ -2354,7 +2345,6 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
 } // end anonymous namespace
 

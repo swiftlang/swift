@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SwiftDemangle/SwiftDemangle.h"
 
 static size_t swift_demangle_getDemangledName_Options(const char *MangledName,

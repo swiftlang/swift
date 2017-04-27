@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -escapes-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -escapes-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -1436,6 +1436,7 @@ bb3(%6: $X):
 // CHECKL:      End
 sil @_T04main1XCfD: $@convention(method) (@owned X) -> () {
 bb0(%0 : $X):
+  fix_lifetime %0 : $X
   %1 = tuple ()
   return %1 : $()
 }

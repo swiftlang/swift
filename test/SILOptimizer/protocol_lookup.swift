@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
 
 // Check that this file can be compiled using -O at all (it used to crash due to a bug in the SILCloner)
 // Check that it can be compiled correctly.

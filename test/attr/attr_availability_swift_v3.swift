@@ -59,3 +59,23 @@ swiftFourPointOh() // expected-error {{is unavailable}}
 swiftFourPointOhWithMessage() // expected-error {{is unavailable: uses abc}}
 let aa : SwiftShortFour // expected-error {{is unavailable}}
 let bb : SwiftFourWithMessage // expected-error {{is unavailable: uses pqr}}
+
+@available(*, deprecated, message: "found the top-level decl")
+func shadowedByMember3() {}
+@available(*, deprecated, message: "found the top-level decl")
+func shadowedByMember4() {}
+
+struct Wrapper {
+  @available(swift, introduced: 3.0, obsoleted: 4.0)
+  @available(*, deprecated, message: "found the member decl")
+  func shadowedByMember3() {}
+
+  @available(swift, introduced: 4.0)
+  @available(*, deprecated, message: "found the member decl")
+  func shadowedByMember4() {}
+
+  func test() {
+    shadowedByMember3() // expected-warning {{found the member decl}}
+    shadowedByMember4() // expected-warning {{found the top-level decl}}
+  }
+}

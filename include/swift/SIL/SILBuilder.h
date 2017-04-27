@@ -26,6 +26,8 @@ namespace swift {
 using Atomicity = RefCountingInst::Atomicity;
 
 class SILDebugScope;
+class IntegerLiteralExpr;
+class FloatLiteralExpr;
 
 class SILBuilder {
   friend class SILBuilderWithScope;
@@ -151,8 +153,7 @@ public:
     if (InsertPt == BB->end())
       return;
     // Set the opened archetype context from the instruction.
-    this->getOpenedArchetypes().addOpenedArchetypeOperands(
-        InsertPt->getTypeDependentOperands());
+    addOpenedArchetypeOperands(&*InsertPt);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -198,10 +199,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Opened archetypes handling
   //===--------------------------------------------------------------------===//
-  void addOpenedArchetypeOperands(SILInstruction *I) {
-    getOpenedArchetypes().addOpenedArchetypeOperands(
-        I->getTypeDependentOperands());
-  }
+  void addOpenedArchetypeOperands(SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
   // Type remapping
@@ -425,9 +423,8 @@ public:
                       GlobalAddrInst(getSILDebugLocation(Loc), g));
   }
 
-  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
-    return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E), F));
-  }
+  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
+
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
                                            intmax_t Value) {
     return insert(
@@ -439,9 +436,8 @@ public:
         IntegerLiteralInst::create(getSILDebugLocation(Loc), Ty, Value, F));
   }
 
-  FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E) {
-    return insert(FloatLiteralInst::create(E, getSILDebugLocation(E), F));
-  }
+  FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E);
+
   FloatLiteralInst *createFloatLiteral(SILLocation Loc, SILType Ty,
                                        const APFloat &Value) {
     return insert(
@@ -461,6 +457,21 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
+  ConstStringLiteralInst *
+  createConstStringLiteral(SILLocation Loc, StringRef text,
+                           ConstStringLiteralInst::Encoding encoding) {
+    return insert(ConstStringLiteralInst::create(getSILDebugLocation(Loc), text,
+                                                 encoding, F));
+  }
+
+  ConstStringLiteralInst *
+  createConstStringLiteral(SILLocation Loc, const Twine &text,
+                           ConstStringLiteralInst::Encoding encoding) {
+    SmallVector<char, 256> Out;
+    return insert(ConstStringLiteralInst::create(
+        getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
@@ -473,6 +484,14 @@ public:
            || LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
+  }
+  
+  KeyPathInst *createKeyPath(SILLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
+                             SILType Ty) {
+    return insert(KeyPathInst::create(getSILDebugLocation(Loc),
+                                      Pattern, Subs, Ty, F));
   }
 
   /// Convenience function for calling emitLoad on the type lowering for
@@ -527,6 +546,35 @@ public:
                                                  SILValue Arg) {
     return insert(new (F.getModule()) EndBorrowArgumentInst(
         getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
+  }
+
+  BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
+                                     SILAccessKind accessKind,
+                                     SILAccessEnforcement enforcement) {
+    return insert(new (F.getModule()) BeginAccessInst(
+        getSILDebugLocation(loc), address, accessKind, enforcement));
+  }
+
+  EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
+                                 bool aborted) {
+    return insert(new (F.getModule()) EndAccessInst(
+        getSILDebugLocation(loc), address, aborted));
+  }
+
+  BeginUnpairedAccessInst *
+  createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
+                            SILAccessKind accessKind,
+                            SILAccessEnforcement enforcement) {
+    return insert(new (F.getModule()) BeginUnpairedAccessInst(
+        getSILDebugLocation(loc), address, buffer, accessKind, enforcement));
+  }
+
+  EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
+                                                 SILValue buffer,
+                                              SILAccessEnforcement enforcement,
+                                                 bool aborted) {
+    return insert(new (F.getModule()) EndUnpairedAccessInst(
+        getSILDebugLocation(loc), buffer, enforcement, aborted));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
@@ -657,9 +705,11 @@ public:
   }
 
   PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
-                                               SILType Ty, bool isStrict) {
+                                               SILType Ty,
+                                               bool isStrict,
+                                               bool isInvariant = false){
     return insert(new (F.getModule()) PointerToAddressInst(
-                    getSILDebugLocation(Loc), Op, Ty, isStrict));
+                    getSILDebugLocation(Loc), Op, Ty, isStrict, isInvariant));
   }
 
   UncheckedRefCastInst *createUncheckedRefCast(SILLocation Loc, SILValue Op,
@@ -798,11 +848,13 @@ public:
         targetType));
   }
 
-  UnconditionalCheckedCastOpaqueInst *
-  createUnconditionalCheckedCastOpaque(SILLocation Loc, SILValue op,
-                                       SILType destTy) {
-    return insert(UnconditionalCheckedCastOpaqueInst::create(
-        getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
+  UnconditionalCheckedCastValueInst *
+  createUnconditionalCheckedCastValue(SILLocation Loc,
+                                      CastConsumptionKind consumption,
+                                      SILValue op, SILType destTy) {
+    return insert(UnconditionalCheckedCastValueInst::create(
+        getSILDebugLocation(Loc), consumption, op, destTy, F,
+        OpenedArchetypes));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,

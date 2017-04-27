@@ -206,7 +206,7 @@ struct CommentToXMLConverter {
         printInlinesUnder(N, S);
       S << "\"";
     }
-    S << "\\>";
+    S << "/>";
     printRawHTML(S.str());
   }
 
@@ -344,6 +344,8 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     PO.PrintDocumentationComments = false;
     PO.TypeDefinitions = false;
     PO.VarInitializers = false;
+    PO.ShouldQualifyNestedDeclarations =
+        PrintOptions::QualifyNestedDeclarations::TypesOnly;
 
     OS << "<Declaration>";
     llvm::SmallString<32> DeclSS;
@@ -354,8 +356,10 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     appendWithXMLEscaping(OS, DeclSS);
     OS << "</Declaration>";
   }
-
+  
+  OS << "<CommentParts>";
   visitCommentParts(DC->getParts());
+  OS << "</CommentParts>";
 
   OS << RootEndTag;
 }
@@ -397,9 +401,10 @@ static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
     OS << Doc;
 }
 
-std::string ide::extractPlainTextFromComment(const StringRef Text) {
+static LineList getLineListFromComment(SourceManager &SourceMgr,
+                                       swift::markup::MarkupContext &MC,
+                                       const StringRef Text) {
   LangOptions LangOpts;
-  SourceManager SourceMgr;
   auto Tokens = swift::tokenize(LangOpts, SourceMgr,
                                 SourceMgr.addMemBufferCopy(Text));
   std::vector<SingleRawComment> Comments;
@@ -413,8 +418,13 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
     return {};
 
   RawComment Comment(Comments);
+  return MC.getLineList(Comment);
+}
+
+std::string ide::extractPlainTextFromComment(const StringRef Text) {
+  SourceManager SourceMgr;
   swift::markup::MarkupContext MC;
-  return MC.getLineList(Comment).str();
+  return getLineListFromComment(SourceMgr, MC, Text).str();
 }
 
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
@@ -455,6 +465,24 @@ bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
   }
 
   return false;
+}
+
+bool ide::convertMarkupToXML(StringRef Text, raw_ostream &OS) {
+  std::string Comment;
+  {
+    llvm::raw_string_ostream OS(Comment);
+    OS << "/**\n" << Text << "\n" << "*/";
+  }
+  SourceManager SourceMgr;
+  MarkupContext MC;
+  LineList LL = getLineListFromComment(SourceMgr, MC, Comment);
+  if (auto *Doc = swift::markup::parseDocument(MC, LL)) {
+    CommentToXMLConverter Converter(OS);
+    Converter.visitCommentParts(extractCommentParts(MC, Doc));
+    OS.flush();
+    return false;
+  }
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -664,7 +692,7 @@ public:
         printInlinesUnder(Child, S);
       S << "\"";
     }
-    S << "\\>";
+    S << "/>";
     print(S.str());
   }
 

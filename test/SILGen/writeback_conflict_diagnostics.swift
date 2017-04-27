@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -o /dev/null -emit-silgen -verify
-
+// RUN: %target-swift-frontend -enforce-exclusivity=checked %s -o /dev/null -emit-silgen -verify
 
 struct MutatorStruct {
   mutating func f(_ x : inout MutatorStruct) {}

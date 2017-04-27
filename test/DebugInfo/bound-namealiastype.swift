@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-ir -g %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -g %s -o - | %FileCheck %s
 
 public protocol OS_dispatch_queue {
 }

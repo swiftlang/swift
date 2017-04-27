@@ -19,13 +19,13 @@ entry(%f : $@convention(c) () -> ()):
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @c_function_pointer_metadata()
 sil @c_function_pointer_metadata : $@convention(thin) () -> @thick Any.Type {
 entry:
-  // CHECK: call %swift.type* @_TMacT_T_()
+  // CHECK: call %swift.type* @_T0yyXCMa()
   %m = metatype $@thick (@convention(c) () -> ()).Type
   %a = init_existential_metatype %m : $@thick (@convention(c) () -> ()).Type, $@thick Any.Type
   return %a : $@thick Any.Type
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMacT_T_()
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0yyXCMa()
 // --                                                                               0x3000001 -- C convention, 1 argument
 // CHECK:         call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(32|64)]] 50331649
 

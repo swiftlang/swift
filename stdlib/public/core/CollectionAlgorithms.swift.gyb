@@ -32,6 +32,7 @@ extension BidirectionalCollection {
   ///         print(lastNumber)
   ///     }
   ///     // Prints "50"
+  @_inlineable
   public var last: Iterator.Element? {
     return isEmpty ? nil : self[index(before: endIndex)]
   }
@@ -62,6 +63,7 @@ extension Collection where ${IElement} : Equatable {
   ///   found in the collection, returns `nil`.
   ///
   /// - SeeAlso: `index(where:)`
+  @_inlineable
   public func index(of element: ${IElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
@@ -101,6 +103,7 @@ extension Collection {
   ///   returns `nil`.
   ///
   /// - SeeAlso: `index(of:)`
+  @_inlineable
   public func index(
     where predicate: (${IElement}) throws -> Bool
   ) rethrows -> Index? {
@@ -143,6 +146,7 @@ orderingExplanation = """\
 //===----------------------------------------------------------------------===//
 
 extension MutableCollection {
+  @_inlineable
   public mutating func partition(
     by belongsInSecondPartition: (${IElement}) throws -> Bool
   ) rethrows -> Index {
@@ -171,6 +175,7 @@ extension MutableCollection {
 }
 
 extension MutableCollection where Self : BidirectionalCollection {
+  @_inlineable
   public mutating func partition(
     by belongsInSecondPartition: (${IElement}) throws -> Bool
   ) rethrows -> Index {
@@ -257,6 +262,7 @@ extension ${Self} where Self.Iterator.Element : Comparable {
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
   /// - SeeAlso: `sorted(by:)`, `sort()`
+  @_inlineable
   public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort()
@@ -330,12 +336,13 @@ ${orderingExplanation}
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
   /// - SeeAlso: `sorted()`, `sort(by:)`
+  @_inlineable
   public func sorted(
     by areInIncreasingOrder:
-      (${IElement}, ${IElement}) -> Bool
-  ) -> [Iterator.Element] {
+      (${IElement}, ${IElement}) throws -> Bool
+  ) rethrows -> [Iterator.Element] {
     var result = ContiguousArray(self)
-    result.sort(by: areInIncreasingOrder)
+    try result.sort(by: areInIncreasingOrder)
     return Array(result)
   }
 }
@@ -371,6 +378,7 @@ extension MutableCollection
   ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  @_inlineable
   public mutating func sort() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
@@ -389,6 +397,9 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   /// Sorts the collection in place, using the given predicate as the
   /// comparison between elements.
+  ///
+  /// This method can take throwing closure. If closure throws error while sorting,
+  /// order of elements may change. No elements will be lost.
   ///
   /// When you want to sort a collection of elements that doesn't conform to
   /// the `Comparable` protocol, pass a closure to this method that returns
@@ -441,21 +452,22 @@ ${orderingExplanation}
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its first
   ///   argument should be ordered before its second argument; otherwise,
   ///   `false`.
+  @_inlineable
   public mutating func sort(
     by areInIncreasingOrder:
-      (${IElement}, ${IElement}) -> Bool
-  ) {
+      (${IElement}, ${IElement}) throws -> Bool
+  ) rethrows {
 
     let didSortUnsafeBuffer: Void? =
-      _withUnsafeMutableBufferPointerIfSupported {
+      try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(by: areInIncreasingOrder)
+      try bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(
+      try _introSort(
         &self,
         subRange: startIndex..<endIndex,
         by: areInIncreasingOrder)
@@ -505,6 +517,7 @@ extension ${Self} {
 ${subscriptCommentPre}
 ${subscriptCommentMid}
 ${subscriptCommentPost}
+  @_inlineable
   public subscript(bounds: ClosedRange<Index>) -> SubSequence {
     get {
       return self[
@@ -533,6 +546,7 @@ extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
 ${subscriptCommentPre}
 ${subscriptCommentMid}
 ${subscriptCommentPost}
+  @_inlineable
   public subscript(bounds: CountableRange<Index>) -> SubSequence {
     get {
       return self[Range(bounds)]
@@ -547,6 +561,7 @@ ${subscriptCommentPost}
 ${subscriptCommentPre}
 ${subscriptCommentMid}
 ${subscriptCommentPost}
+  @_inlineable
   public subscript(bounds: CountableClosedRange<Index>) -> SubSequence {
     get {
       return self[ClosedRange(bounds)]

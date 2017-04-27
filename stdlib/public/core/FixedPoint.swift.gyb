@@ -56,7 +56,7 @@ public protocol _Integer
     CustomStringConvertible,
     Hashable,
     IntegerArithmetic,
-    BitwiseOperations,
+    _BitwiseOperations,
     _Incrementable
 {
 }
@@ -146,6 +146,7 @@ extension UnsignedInteger {
 ///
 ///     func f(_ x: Int32) {}
 ///     func g(_ x: Int64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
   T : _SignedInteger, U : _SignedInteger
 >(_ x: T) -> U {
@@ -160,6 +161,7 @@ public func numericCast<
 ///
 ///     func f(_ x: UInt32) {}
 ///     func g(_ x: UInt64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
   T : UnsignedInteger, U : UnsignedInteger
 >(_ x: T) -> U {
@@ -174,6 +176,7 @@ public func numericCast<
 ///
 ///     func f(_ x: UInt32) {}
 ///     func g(_ x: Int64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
   T : _SignedInteger, U : UnsignedInteger
 >(_ x: T) -> U {
@@ -188,6 +191,7 @@ public func numericCast<
 ///
 ///     func f(_ x: Int32) {}
 ///     func g(_ x: UInt64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
 T : UnsignedInteger, U : _SignedInteger
 >(_ x: T) -> U {
@@ -607,7 +611,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // Bitwise negate
 /// Returns the inverse of the bits set in the argument.
 ///
-/// - SeeAlso: `BitwiseOperations`
+/// - SeeAlso: `FixedWidthInteger`
 @_transparent
 public prefix func ~ (rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
@@ -653,7 +657,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % ):
 /// Returns the ${comment} the two arguments.
 ///
-/// - SeeAlso: `BitwiseOperations`
+/// - SeeAlso: `FixedWidthInteger`
 @_transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs._value, rhs._value))
@@ -662,7 +666,7 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 /// Calculates the ${comment} the two arguments
 /// and stores the result in the first argument.
 ///
-/// - SeeAlso: `BitwiseOperations`
+/// - SeeAlso: `FixedWidthInteger`
 @_transparent
 public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
@@ -670,7 +674,7 @@ public func ${op}=(lhs: inout ${Self}, rhs: ${Self}) {
 % end
 
 // Bitwise operations
-extension ${Self} : BitwiseOperations {
+extension ${Self} : FixedWidthInteger {
   /// The empty bitset of type `${Self}`.
   @_transparent
   public static var allZeros: ${Self} { return 0 }

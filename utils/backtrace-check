@@ -79,5 +79,6 @@ formatting.""")
     # one stack trace entry.
     assert(found_stack_trace_entry)
 
+
 if __name__ == '__main__':
     main()

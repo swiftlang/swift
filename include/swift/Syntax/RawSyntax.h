@@ -21,7 +21,7 @@
 // to expressSwiftTypeConverter that at this layer.
 //
 // These are internal implementation ONLY - do not expose anything involving
-// RawSyntax publically. Clients of lib/Syntax should not be aware that they
+// RawSyntax publicly. Clients of lib/Syntax should not be aware that they
 // exist.
 //
 //===----------------------------------------------------------------------===//
@@ -150,6 +150,7 @@ public:
 enum class SyntaxKind {
   Token,
 #define SYNTAX(Id, Parent) Id,
+#define SYNTAX_COLLECTION(Id, Element) Id,
 #define MISSING_SYNTAX(Id, Parent) Id,
 #define SYNTAX_RANGE(Id, First, Last) First_##Id = First, Last_##Id = Last,
 #include "swift/Syntax/SyntaxKinds.def"

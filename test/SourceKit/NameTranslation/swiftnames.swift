@@ -53,6 +53,9 @@ class C2 {}
 
 // REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a:b:c:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
+// RUN: %sourcekitd-test -req=translate -swift-name "bar(x:y:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKFEWER1 %s
+// RUN: %sourcekitd-test -req=translate -swift-name "bar(::)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING1 %s
+// RUN: %sourcekitd-test -req=translate -swift-name "(x:y:z:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING2 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a1:b1:c1:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(_:b1:c1:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK3 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo1(_:_:c2:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK4 %s
@@ -92,3 +95,7 @@ class C2 {}
 // CHECK14: CustomErrorA2
 // CHECK15: C2ObjC
 // CHECK16: bar:other:
+
+// CHECKFEWER1: barWithX:y:c:
+// CHECKMISSING1: barWithA:b:c:
+// CHECKMISSING2: fooWithX:y:z:

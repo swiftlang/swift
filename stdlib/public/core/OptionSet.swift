@@ -21,7 +21,7 @@
 ///
 /// When creating an option set, include a `rawValue` property in your type
 /// declaration. The `rawValue` property must be of a type that conforms to
-/// the `BitwiseOperations` protocol, such as `Int` or `UInt8`. Next, create
+/// the `FixedWidthInteger` protocol, such as `Int` or `UInt8`. Next, create
 /// unique options as static properties of your custom type using unique
 /// powers of two (1, 2, 4, 8, 16, and so forth) for each individual
 /// property's raw value so that each property can be represented by a single
@@ -83,7 +83,7 @@
 ///     }
 ///     // Prints "You've earned free priority shipping!"
 ///
-/// - SeeAlso: `BitwiseOperations`, `SetAlgebra`
+/// - SeeAlso: `FixedWidthInteger`, `SetAlgebra`
 public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
@@ -307,7 +307,7 @@ extension OptionSet where Element == Self {
 }
 
 /// `OptionSet` requirements for which default implementations are
-/// supplied when `RawValue` conforms to `BitwiseOperations`,
+/// supplied when `RawValue` conforms to `FixedWidthInteger`,
 /// which is the usual case.  Each distinct bit of an option set's
 /// `.rawValue` corresponds to a disjoint value of the `OptionSet`.
 ///
@@ -320,12 +320,12 @@ extension OptionSet where Element == Self {
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension OptionSet where RawValue : BitwiseOperations {
+extension OptionSet where RawValue : FixedWidthInteger {
   /// Creates an empty option set.
   ///
   /// This initializer creates an option set with a raw value of zero.
   public init() {
-    self.init(rawValue: .allZeros)
+    self.init(rawValue: 0)
   }
 
   /// Inserts the elements of another set into this option set.

@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
@@ -36,8 +36,8 @@ using namespace Lowering;
 // \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
 static void
-collectDependentTypeInfo(Type Ty,
-                         SmallVectorImpl<ArchetypeType *> &openedArchetypes,
+collectDependentTypeInfo(CanType Ty,
+                         SmallVectorImpl<CanArchetypeType> &openedArchetypes,
                          bool &hasDynamicSelf) {
   if (!Ty)
     return;
@@ -45,13 +45,13 @@ collectDependentTypeInfo(Type Ty,
     hasDynamicSelf = true;
   if (!Ty->hasOpenedExistential())
     return;
-  Ty.visit([&](Type t) {
+  Ty.visit([&](CanType t) {
     if (t->isOpenedExistential()) {
       // Add this opened archetype if it was not seen yet.
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
-      auto *archetypeTy = t->castTo<ArchetypeType>();
+      auto archetypeTy = cast<ArchetypeType>(t);
       if (std::find(openedArchetypes.begin(), openedArchetypes.end(),
                     archetypeTy) == openedArchetypes.end())
         openedArchetypes.push_back(archetypeTy);
@@ -62,7 +62,7 @@ collectDependentTypeInfo(Type Ty,
 // Takes a set of open archetypes as input and produces a set of
 // references to open archetype definitions.
 static void buildTypeDependentOperands(
-    SmallVectorImpl<ArchetypeType *> &OpenedArchetypes,
+    SmallVectorImpl<CanArchetypeType> &OpenedArchetypes,
     bool hasDynamicSelf,
     SmallVectorImpl<SILValue> &TypeDependentOperands,
     SILOpenedArchetypesState &OpenedArchetypesState, SILFunction &F) {
@@ -88,13 +88,14 @@ static void collectTypeDependentOperands(
                       SmallVectorImpl<SILValue> &TypeDependentOperands,
                       SILOpenedArchetypesState &OpenedArchetypesState,
                       SILFunction &F,
-                      Type Ty,
+                      CanType Ty,
                       SubstitutionList subs = SubstitutionList()) {
-  SmallVector<ArchetypeType *, 4> openedArchetypes;
+  SmallVector<CanArchetypeType, 4> openedArchetypes;
   bool hasDynamicSelf = false;
   collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
   for (auto sub : subs) {
-    auto ReplTy = sub.getReplacement();
+    // Substitutions in SIL should really be canonical.
+    auto ReplTy = sub.getReplacement()->getCanonicalType();
     collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
   }
   buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
@@ -192,6 +193,8 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
     collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
                                  ElemType.getSwiftRValueType());
   }
+  collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
+                               ObjectType.getSwiftRValueType());
   void *Buffer = F.getModule().allocateInst(
                       sizeof(AllocRefInst)
                         + decltype(Operands)::getExtraSize(AllOperands.size())
@@ -657,6 +660,31 @@ uint64_t StringLiteralInst::getCodeUnitCount() {
   return Length;
 }
 
+ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
+                                               StringRef Text,
+                                               Encoding encoding, SILType Ty)
+    : LiteralInst(ValueKind::ConstStringLiteralInst, Loc, Ty),
+      Length(Text.size()), TheEncoding(encoding) {
+  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
+}
+
+ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
+                                                       StringRef text,
+                                                       Encoding encoding,
+                                                       SILFunction &F) {
+  void *buf =
+      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(F, text.size());
+
+  auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
+  return ::new (buf) ConstStringLiteralInst(Loc, text, encoding, Ty);
+}
+
+uint64_t ConstStringLiteralInst::getCodeUnitCount() {
+  if (TheEncoding == Encoding::UTF16)
+    return unicode::getUTF16Length(getValue());
+  return Length;
+}
+
 StoreInst::StoreInst(
     SILDebugLocation Loc, SILValue Src, SILValue Dest,
     StoreOwnershipQualifier Qualifier = StoreOwnershipQualifier::Unqualified)
@@ -676,6 +704,26 @@ EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
 EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
                                              SILArgument *Arg)
     : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
+
+StringRef swift::getSILAccessKindName(SILAccessKind kind) {
+  switch (kind) {
+  case SILAccessKind::Init: return "init";
+  case SILAccessKind::Read: return "read";
+  case SILAccessKind::Modify: return "modify";
+  case SILAccessKind::Deinit: return "deinit";
+  }
+  llvm_unreachable("bad access kind");
+}
+
+StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
+  switch (enforcement) {
+  case SILAccessEnforcement::Unknown: return "unknown";
+  case SILAccessEnforcement::Static: return "static";
+  case SILAccessEnforcement::Dynamic: return "dynamic";
+  case SILAccessEnforcement::Unsafe: return "unsafe";
+  }
+  llvm_unreachable("bad access enforcement");
+}
 
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
@@ -1316,6 +1364,28 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
 
+void SwitchEnumInstBase::swapCase(unsigned i, unsigned j) {
+  assert(i < getNumCases() && "First index is out of bounds?!");
+  assert(j < getNumCases() && "Second index is out of bounds?!");
+
+  auto *succs = getSuccessorBuf();
+
+  // First grab our destination blocks.
+  SILBasicBlock *iBlock = succs[i].getBB();
+  SILBasicBlock *jBlock = succs[j].getBB();
+
+  // Then destroy the sil successors and reinitialize them with the new things
+  // that they are pointing at.
+  succs[i].~SILSuccessor();
+  ::new (succs + i) SILSuccessor(this, jBlock);
+  succs[j].~SILSuccessor();
+  ::new (succs + j) SILSuccessor(this, iBlock);
+
+  // Now swap our cases.
+  auto *cases = getCaseBuf();
+  std::swap(cases[i], cases[j]);
+}
+
 namespace {
   template <class Inst> EnumElementDecl *
   getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {
@@ -1773,8 +1843,9 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
                                                      TypeDependentOperands, DestTy);
 }
 
-UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
+UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
+    SILDebugLocation DebugLoc, CastConsumptionKind consumption,
+    SILValue Operand, SILType DestTy, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -1783,9 +1854,9 @@ UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer =
-      Mod.allocateInst(size, alignof(UnconditionalCheckedCastOpaqueInst));
-  return ::new (Buffer) UnconditionalCheckedCastOpaqueInst(
-      DebugLoc, Operand, TypeDependentOperands, DestTy);
+      Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
+  return ::new (Buffer) UnconditionalCheckedCastValueInst(
+      DebugLoc, consumption, Operand, TypeDependentOperands, DestTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
@@ -1833,4 +1904,176 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
                        alignof(MetatypeInst));
 
   return ::new (Buffer) MetatypeInst(Loc, Ty, TypeDependentOperands);
+}
+
+bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
+  switch (getKind()) {
+  case Kind::StoredProperty:
+  case Kind::GettableProperty:
+    llvm_unreachable("not a settable computed property");
+  case Kind::SettableProperty: {
+    auto setter = getComputedPropertySetter();
+    return setter->getLoweredFunctionType()->getParameters()[1].getConvention()
+       == ParameterConvention::Indirect_Inout;
+  }
+  }
+}
+
+KeyPathPattern *
+KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
+                    CanType rootType, CanType valueType,
+                    ArrayRef<KeyPathPatternComponent> components,
+                    StringRef objcString) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, signature, rootType, valueType, components, objcString);
+  
+  void *insertPos;
+  auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+  
+  // Determine the number of operands.
+  for (auto component : components) {
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty:
+      break;
+      
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      assert(component.getComputedPropertyIndices().empty()
+             && "todo");
+    }
+  }
+  
+  auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
+                                           components, objcString,
+                                           0 /*todo: num operands*/);
+  M.KeyPathPatterns.InsertNode(newPattern, insertPos);
+  return newPattern;
+}
+
+KeyPathPattern *
+KeyPathPattern::create(SILModule &M, CanGenericSignature signature,
+                       CanType rootType, CanType valueType,
+                       ArrayRef<KeyPathPatternComponent> components,
+                       StringRef objcString,
+                       unsigned numOperands) {
+  auto totalSize = totalSizeToAlloc<KeyPathPatternComponent>(components.size());
+  void *mem = M.allocate(totalSize, alignof(KeyPathPatternComponent));
+  return ::new (mem) KeyPathPattern(signature, rootType, valueType,
+                                    components, objcString, numOperands);
+}
+
+KeyPathPattern::KeyPathPattern(CanGenericSignature signature,
+                               CanType rootType, CanType valueType,
+                               ArrayRef<KeyPathPatternComponent> components,
+                               StringRef objcString,
+                               unsigned numOperands)
+  : NumOperands(numOperands), NumComponents(components.size()),
+    Signature(signature), RootType(rootType), ValueType(valueType),
+    ObjCString(objcString)
+{
+  auto *componentsBuf = getTrailingObjects<KeyPathPatternComponent>();
+  std::uninitialized_copy(components.begin(), components.end(),
+                          componentsBuf);
+}
+
+ArrayRef<KeyPathPatternComponent>
+KeyPathPattern::getComponents() const {
+  return {getTrailingObjects<KeyPathPatternComponent>(), NumComponents};
+}
+
+void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
+                             CanGenericSignature signature,
+                             CanType rootType,
+                             CanType valueType,
+                             ArrayRef<KeyPathPatternComponent> components,
+                             StringRef objcString) {
+  ID.AddPointer(signature.getPointer());
+  ID.AddPointer(rootType.getPointer());
+  ID.AddPointer(valueType.getPointer());
+  ID.AddString(objcString);
+  
+  for (auto &component : components) {
+    ID.AddInteger((unsigned)component.getKind());
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty:
+      ID.AddPointer(component.getStoredPropertyDecl());
+      break;
+      
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      ID.AddPointer(component.getComputedPropertySetter());
+      LLVM_FALLTHROUGH;
+    case KeyPathPatternComponent::Kind::GettableProperty:
+      ID.AddPointer(component.getComputedPropertyGetter());
+      auto id = component.getComputedPropertyId();
+      ID.AddInteger(id.getKind());
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        auto declRef = id.getDeclRef();
+        ID.AddPointer(declRef.loc.getOpaqueValue());
+        ID.AddInteger((unsigned)declRef.kind);
+        ID.AddInteger(declRef.uncurryLevel);
+        ID.AddBoolean(declRef.Expansion);
+        ID.AddBoolean(declRef.isCurried);
+        ID.AddBoolean(declRef.isForeign);
+        ID.AddBoolean(declRef.isDirectReference);
+        ID.AddBoolean(declRef.defaultArgIndex);
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Function: {
+        ID.AddPointer(id.getFunction());
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Property: {
+        ID.AddPointer(id.getProperty());
+        break;
+      }
+      }
+      assert(component.getComputedPropertyIndices().empty()
+             && "todo");
+      break;
+    }
+  }
+}
+
+KeyPathInst *
+KeyPathInst::create(SILDebugLocation Loc,
+                    KeyPathPattern *Pattern,
+                    SubstitutionList Subs,
+                    SILType Ty,
+                    SILFunction &F) {
+  auto totalSize = totalSizeToAlloc<Substitution>(Subs.size());
+  void *mem = F.getModule().allocateInst(totalSize, alignof(Substitution));
+  return ::new (mem) KeyPathInst(Loc, Pattern, Subs, Ty);
+}
+
+KeyPathInst::KeyPathInst(SILDebugLocation Loc,
+                         KeyPathPattern *Pattern,
+                         SubstitutionList Subs,
+                         SILType Ty)
+  : SILInstruction(ValueKind::KeyPathInst, Loc, Ty),
+    Pattern(Pattern), NumSubstitutions(Subs.size())
+{
+  auto *subsBuf = getTrailingObjects<Substitution>();
+  std::uninitialized_copy(Subs.begin(), Subs.end(), subsBuf);
+}
+
+MutableArrayRef<Substitution>
+KeyPathInst::getSubstitutions() {
+  return {getTrailingObjects<Substitution>(), NumSubstitutions};
+}
+
+MutableArrayRef<Operand>
+KeyPathInst::getAllOperands() {
+  // TODO: subscript indexes
+  return {};
+}
+
+KeyPathInst::~KeyPathInst() {
+  // TODO: destroy operands
+}
+
+KeyPathPattern *KeyPathInst::getPattern() const {
+  return Pattern;
 }

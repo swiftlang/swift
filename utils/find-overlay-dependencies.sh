@@ -65,8 +65,9 @@ CMAKE_DEPENDS_NAME[watchos]="SWIFT_MODULE_DEPENDS_WATCHOS"
 echo $1
 for sdk in ${(k)SDKS}; do
   arch=$SDKS[$sdk]
-  printf "%s:\n\t" "$sdk"
-  deps=$(echo "@import $1;" | xcrun -sdk $sdk clang -arch $arch -x objective-c - -M -fmodules 2>/dev/null)
+  sdkfull="$sdk$SUFFIX"
+  printf "%s:\n\t" "$sdkfull"
+  deps=$(echo "@import $1;" | xcrun -sdk "${sdkfull}" clang -arch $arch -x objective-c -F $(xcrun -show-sdk-path -sdk "${sdkfull}")/System/Library/PrivateFrameworks - -M -fmodules 2>/dev/null)
   if [[ $? != 0 ]]; then
     # Clear the cmake file of this unsupported platform and loop
     echo "unsupported"

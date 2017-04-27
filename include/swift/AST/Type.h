@@ -51,6 +51,7 @@ class SubstitutionMap;
 class TypeBase;
 class Type;
 class TypeWalker;
+struct ExistentialLayout;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -350,12 +351,6 @@ class CanType : public Type {
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
-  static bool isExistentialTypeImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
-  static bool isAnyExistentialTypeImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
-  static void getAnyExistentialTypeProtocolsImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
@@ -370,6 +365,13 @@ public:
   explicit CanType(Type T) : Type(T) {
     assert(isActuallyCanonicalOrNull() &&
            "Forming a CanType out of a non-canonical type!");
+  }
+
+  void visit(llvm::function_ref<void (CanType)> fn) const {
+    findIf([&fn](Type t) -> bool {
+        fn(CanType(t));
+        return false;
+      });
   }
 
   // Provide a few optimized accessors that are really type-class queries.
@@ -397,27 +399,13 @@ public:
     return isExistentialTypeImpl(*this);
   }
 
-  /// Is this type existential?
-  bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return isExistentialTypeImpl(*this, protocols);
-  }
-
   /// Is this type an existential or an existential metatype?
   bool isAnyExistentialType() const {
     return isAnyExistentialTypeImpl(*this);
   }
 
-  /// Is this type an existential or an existential metatype?
-  bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return isAnyExistentialTypeImpl(*this, protocols);
-  }
-
-  /// Given that this type is any kind of existential, return its
-  /// protocols in a canonical order.
-  void getAnyExistentialTypeProtocols(
-                                SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return getAnyExistentialTypeProtocolsImpl(*this, protocols);
-  }
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
 
   /// Is this an ObjC-compatible existential type?
   bool isObjCExistentialType() const {
@@ -431,11 +419,6 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
-
-  /// Returns information about the layout constraint represented by
-  /// this type. If this type does not represent a layout constraint,
-  /// it returns an empty LayoutConstraint.
-  LayoutConstraint getLayoutConstraint() const;
 
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;

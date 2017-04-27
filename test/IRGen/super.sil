@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_struct -o %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_class -o %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
 
 sil_stage canonical
 

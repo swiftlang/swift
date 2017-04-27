@@ -884,6 +884,8 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
     OrigArg.replaceAllUsesWith(&NewArg);
   }
 
+  SmallPtrSet<Function *, 8> SelfReferencingFunctions;
+
   // Replace all differing operands with a parameter.
   for (const ParamInfo &PI : Params) {
     Argument *NewArg = &*NewArgIter++;
@@ -891,11 +893,20 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
       OL.I->setOperand(OL.OpIndex, NewArg);
     }
     ParamTypes.push_back(PI.Values[0]->getType());
+
+    // Collect all functions which are referenced by any parameter.
+    for (Value *V : PI.Values) {
+      if (Function *F = dyn_cast<Function>(V))
+        SelfReferencingFunctions.insert(F);
+    }
   }
 
   for (unsigned FIdx = 0, NumFuncs = FInfos.size(); FIdx < NumFuncs; ++FIdx) {
     Function *OrigFunc = FInfos[FIdx].F;
-    if (replaceDirectCallers(OrigFunc, NewFunction, Params, FIdx)) {
+    // Don't try to replace all callers of functions which are used as
+    // parameters because we must not delete such functions.
+    if (SelfReferencingFunctions.count(OrigFunc) == 0 &&
+        replaceDirectCallers(OrigFunc, NewFunction, Params, FIdx)) {
       // We could replace all uses (and the function is not externally visible),
       // so we can delete the original function.
       auto Iter = FuncEntries.find(OrigFunc);
@@ -903,6 +914,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
       assert(!isInEquivalenceClass(&*Iter->second));
       Iter->second->F = nullptr;
       FuncEntries.erase(Iter);
+      DEBUG(dbgs() << "    Erase " << OrigFunc->getName() << '\n');
       OrigFunc->eraseFromParent();
     } else {
       // Otherwise we need a thunk which calls the merged function.
@@ -1062,8 +1074,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     // Add the new parameters.
     for (const ParamInfo &PI : Params) {
       assert(ParamIdx < NewFuncTy->getNumParams());
-      NewArgs.push_back(PI.Values[FuncIdx]);
-      OldParamTypes.push_back(PI.Values[FuncIdx]->getType());
+      Constant *ArgValue = PI.Values[FuncIdx];
+      assert(ArgValue != Old &&
+        "should not try to replace all callers of self referencing functions");
+      NewArgs.push_back(ArgValue);
+      OldParamTypes.push_back(ArgValue->getType());
       ++ParamIdx;
     }
 
@@ -1080,6 +1095,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
   }
+  assert(Old->use_empty() && "should have replaced all uses of old function");
   return Old->hasLocalLinkage();
 }
 

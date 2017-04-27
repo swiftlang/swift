@@ -5,18 +5,18 @@
 // RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypes -source-filename %s | %FileCheck %s
 
 public func singleFunc() {
-  // CHECK-DAG: VF10LocalTypes10singleFuncFT_T_L_16SingleFuncStruct
+  // CHECK-DAG: 10LocalTypes10singleFuncyyF06SingleD6StructL_V
   struct SingleFuncStruct {
     let sfsi: Int
   }
-  // CHECK-DAG: CF10LocalTypes10singleFuncFT_T_L_15SingleFuncClass
+  // CHECK-DAG: 10LocalTypes10singleFuncyyF06SingleD5ClassL_C
   class SingleFuncClass {
     let sfcs: String
     init(s: String) {
       self.sfcs = s
     }
   }
-  // CHECK-DAG: OF10LocalTypes10singleFuncFT_T_L_14SingleFuncEnum
+  // CHECK-DAG: 10LocalTypes10singleFuncyyF06SingleD4EnumL_O
   enum SingleFuncEnum {
     case SFEI(Int)
   }
@@ -24,34 +24,34 @@ public func singleFunc() {
 
 public func singleFuncWithDuplicates(_ fake: Bool) {
   if fake {
-    // CHECK-DAG: VF10LocalTypes24singleFuncWithDuplicatesFSbT_L_16SingleFuncStruct
+    // CHECK-DAG: 10LocalTypes24singleFuncWithDuplicatesySbF06SingleD6StructL_V
     struct SingleFuncStruct {
       let sfsi: Int
     }
-    // CHECK-DAG: CF10LocalTypes24singleFuncWithDuplicatesFSbT_L_15SingleFuncClass
+    // CHECK-DAG: 10LocalTypes24singleFuncWithDuplicatesySbF06SingleD5ClassL_C
     class SingleFuncClass {
       let sfcs: String
       init(s: String) {
         self.sfcs = s
       }
     }
-    // CHECK-DAG: OF10LocalTypes24singleFuncWithDuplicatesFSbT_L_14SingleFuncEnum
+    // CHECK-DAG: 10LocalTypes24singleFuncWithDuplicatesySbF06SingleD4EnumL_O
     enum SingleFuncEnum {
       case SFEI(Int)
     }
   } else {
-    // CHECK-DAG: VF10LocalTypes24singleFuncWithDuplicatesFSbT_L0_16SingleFuncStruct
+    // CHECK-DAG: 10LocalTypes24singleFuncWithDuplicatesySbF06SingleD6StructL0_V
     struct SingleFuncStruct {
       let sfsi: Int
     }
-    // CHECK-DAG: CF10LocalTypes24singleFuncWithDuplicatesFSbT_L0_15SingleFuncClass
+    // CHECK-DAG: 10LocalTypes24singleFuncWithDuplicatesySbF06SingleD5ClassL0_C
     class SingleFuncClass {
       let sfcs: String
       init(s: String) {
         self.sfcs = s
       }
     }
-    // CHECK-DAG: OF10LocalTypes24singleFuncWithDuplicatesFSbT_L0_14SingleFuncEnum
+    // CHECK-DAG: 10LocalTypes24singleFuncWithDuplicatesySbF06SingleD4EnumL0_O
     enum SingleFuncEnum {
       case SFEI(Int)
     }
@@ -59,36 +59,36 @@ public func singleFuncWithDuplicates(_ fake: Bool) {
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: VF10LocalTypesU_FT_T_L_19SingleClosureStruct
+  // CHECK-DAG: 10LocalTypesyycfU_19SingleClosureStructL_V
   struct SingleClosureStruct {
     let scsi: Int
   }
-  // CHECK-DAG: CF10LocalTypesU_FT_T_L_18SingleClosureClass
+  // CHECK-DAG: 10LocalTypesyycfU_18SingleClosureClassL_C
   class SingleClosureClass {
     let sccs: String
     init(s: String) {
       self.sccs = s
     }
   }
-  // CHECK-DAG: OF10LocalTypesU_FT_T_L_17SingleClosureEnum
+  // CHECK-DAG: 10LocalTypesyycfU_17SingleClosureEnumL_O
   enum SingleClosureEnum {
     case SCEI(Int)
   }
 }
 
 public var singlePattern: Int {
-  // CHECK-DAG: VF10LocalTypesg13singlePatternSiL_19SinglePatternStruct
+  // CHECK-DAG: 10LocalTypes13singlePatternSifg06SingleD6StructL_V
   struct SinglePatternStruct {
     let spsi: Int
   }
-  // CHECK-DAG: CF10LocalTypesg13singlePatternSiL_18SinglePatternClass
+  // CHECK-DAG: 10LocalTypes13singlePatternSifg06SingleD5ClassL_C
   class SinglePatternClass {
     let spcs: String
     init(s: String) {
       self.spcs = s
     }
   }
-  // CHECK-DAG: OF10LocalTypesg13singlePatternSiL_17SinglePatternEnum
+  // CHECK-DAG: 10LocalTypes13singlePatternSifg06SingleD4EnumL_O
   enum SinglePatternEnum {
     case SPEI(Int)
   }
@@ -96,18 +96,18 @@ public var singlePattern: Int {
 }
 
 public func singleDefaultArgument(i: Int = {
-  //CHECK-DAG: VFIF10LocalTypes21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_27SingleDefaultArgumentStruct
+  //CHECK-DAG: 10LocalTypes21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingledE6StructL_V
   struct SingleDefaultArgumentStruct {
     let sdasi: Int
   }
-  // CHECK-DAG: CFIF10LocalTypes21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_26SingleDefaultArgumentClass
+  // CHECK-DAG: 10LocalTypes21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingledE5ClassL_C
   class SingleDefaultArgumentClass {
     let sdacs: String
     init(s: String) {
       self.sdacs = s
     }
   }
-  // CHECK-DAG: OFIF10LocalTypes21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_25SingleDefaultArgumentEnum
+  // CHECK-DAG: 10LocalTypes21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingledE4EnumL_O
   enum SingleDefaultArgumentEnum {
     case SDAEI(Int)
   }
@@ -120,18 +120,18 @@ public func singleDefaultArgument(i: Int = {
 
 public func doubleFunc() {
   func innerFunc() {
-    // CHECK-DAG: VFF10LocalTypes10doubleFuncFT_T_L_9innerFuncFT_T_L_16DoubleFuncStruct
+    // CHECK-DAG: 10LocalTypes10doubleFuncyyF05innerD0L_yyF06DoubleD6StructL_V
     struct DoubleFuncStruct {
       let dfsi: Int
     }
-    // CHECK-DAG: CFF10LocalTypes10doubleFuncFT_T_L_9innerFuncFT_T_L_15DoubleFuncClass
+    // CHECK-DAG: 10LocalTypes10doubleFuncyyF05innerD0L_yyF06DoubleD5ClassL_C
     class DoubleFuncClass {
       let dfcs: String
       init(s: String) {
         self.dfcs = s
       }
     }
-    // CHECK-DAG: OFF10LocalTypes10doubleFuncFT_T_L_9innerFuncFT_T_L_14DoubleFuncEnum
+    // CHECK-DAG: 10LocalTypes10doubleFuncyyF05innerD0L_yyF06DoubleD4EnumL_O
     enum DoubleFuncEnum {
       case DFEI(Int)
     }
@@ -141,18 +141,18 @@ public func doubleFunc() {
 
 public let doubleClosure: () -> () = {
   let singleClosure: () -> () = {
-    // CHECK-DAG: VFF10LocalTypesU0_FT_T_U_FT_T_L_19DoubleClosureStruct
+    // CHECK-DAG: 10LocalTypesyycfU0_yycfU_19DoubleClosureStructL_V
     struct DoubleClosureStruct {
       let dcsi: Int
     }
-    // CHECK-DAG: CFF10LocalTypesU0_FT_T_U_FT_T_L_18DoubleClosureClass
+    // CHECK-DAG: 10LocalTypesyycfU0_yycfU_18DoubleClosureClassL_C
     class DoubleClosureClass {
       let dccs: String
       init(s: String) {
         self.dccs = s
       }
     }
-    // CHECK-DAG: OFF10LocalTypesU0_FT_T_U_FT_T_L_17DoubleClosureEnum
+    // CHECK-DAG: 10LocalTypesyycfU0_yycfU_17DoubleClosureEnumL_O
     enum DoubleClosureEnum {
       case DCEI(Int)
     }

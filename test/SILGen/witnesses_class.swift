@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 protocol Fooable: class {
   func foo()
@@ -9,17 +9,17 @@ protocol Fooable: class {
 class Foo: Fooable {
   
   func foo() { }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableA2aDP3foo{{[_0-9a-zA-Z]*}}FTW
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableA2aDP3foo{{[_0-9a-zA-Z]*}}FTW
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 
   class func bar() {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableA2aDP3bar{{[_0-9a-zA-Z]*}}FZTW
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableA2aDP3bar{{[_0-9a-zA-Z]*}}FZTW
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 
   required init() {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableA2aDP{{[_0-9a-zA-Z]*}}fCTW
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T015witnesses_class3FooCAA7FooableA2aDP{{[_0-9a-zA-Z]*}}fCTW
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 }

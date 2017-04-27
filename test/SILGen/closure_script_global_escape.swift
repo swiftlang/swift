@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -module-name foo -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name foo -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name foo -emit-sil -verify %s
 
 // CHECK-LABEL: sil @main

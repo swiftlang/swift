@@ -73,7 +73,7 @@ protocol Mine {}
 class M1: Mine {}
 class M2: Mine {}
 extension Collection where Iterator.Element : Mine {
-    final func takeAll() {}
+    func takeAll() {}
 }
 
 func foo() {

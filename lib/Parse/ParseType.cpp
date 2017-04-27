@@ -111,24 +111,24 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
     // There was an error during parsing.
     skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   if (!consumeIf(tok::r_paren)) {
     // Expected a closing r_paren.
     diagnose(Tok.getLoc(), diag::expected_rparen_layout_constraint);
     consumeToken();
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   if (size < 0) {
     diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   if (alignment < 0) {
     diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   // Otherwise it is a trivial layout constraint with

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s -check-prefix=MAIN
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -emit-silgen %s | %FileCheck %s -check-prefix=LIBRARY
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s -check-prefix=MAIN
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s -check-prefix=LIBRARY
 
 // The following code is valid as a library or as a main source file. Script
 // variables should be accessed directly, whereas library global variables

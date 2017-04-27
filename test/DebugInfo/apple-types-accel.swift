@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -c -g -o %t.o
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -c -g -o %t.o
 // RUN: dwarfdump --apple-types %t.o | %FileCheck --check-prefix=CHECK-ACCEL %s
 // RUN: dwarfdump --debug-info %t.o | %FileCheck --check-prefix=CHECK-DWARF %s
 // DISABLED <rdar://problem/28232630>: dwarfdump --verify %t.o

@@ -22,9 +22,12 @@
 #include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/raw_ostream.h"
 #include <string>
 #include <vector>
 
@@ -155,12 +158,22 @@ namespace swift {
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
+    /// The maximum depth to which to test decl circularity.
+    unsigned MaxCircularityDepth = 500;
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
+    /// \brief Enable classes to appear in protocol composition types.
+    bool EnableExperimentalSubclassExistentials = false;
+
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
+
+    /// \brief Staging flag for treating inout parameters as Thread Sanitizer
+    /// accesses.
+    bool DisableTsanInoutInstrumentation = false;
 
     /// \brief Staging flag for class resilience, which we do not want to enable
     /// fully until more code is in place, to allow the standard library to be
@@ -170,6 +183,12 @@ namespace swift {
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
+
+    /// Whether to attempt to recover from missing cross-references and other
+    /// errors when deserializing from a Swift module.
+    ///
+    /// This is a staging flag; eventually it will be on by default.
+    bool EnableDeserializationRecovery = false;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
@@ -185,6 +204,21 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
+
+    /// If set to true, the diagnosis engine can assume the emitted diagnostics
+    /// will be used in editor. This usually leads to more aggressive fixit.
+    bool DiagnosticsEditorMode = false;
+
+    /// Whether to enable Swift 3 @objc inference, e.g., for members of
+    /// Objective-C-derived classes and 'dynamic' members.
+    bool EnableSwift3ObjCInference = false;
+
+    /// Warn about cases where Swift 3 would infer @objc but later versions
+    /// of Swift do not.
+    bool WarnSwift3ObjCInference = false;
+    
+    /// Enable keypaths.
+    bool EnableExperimentalKeyPaths = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -261,6 +295,17 @@ namespace swift {
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
       std::vector<StringRef> &suggestions);
+
+    /// Return a hash code of any components from these options that should
+    /// contribute to a Swift Bridging PCH hash.
+    llvm::hash_code getPCHHashComponents() const {
+      auto code = llvm::hash_value(Target.str());
+      SmallString<16> Scratch;
+      llvm::raw_svector_ostream OS(Scratch);
+      OS << EffectiveLanguageVersion;
+      code = llvm::hash_combine(code, OS.str());
+      return code;
+    }
 
   private:
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>,

@@ -17,6 +17,12 @@ if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
 endif()
 
+if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+  # Only build Darwin-specific tools when deploying to OS X.
+  add_swift_tool_subdirectory(swift-stdlib-tool)
+endif()
+
+
 is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
 if(SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
   add_swift_tool_subdirectory(swift-reflection-dump)

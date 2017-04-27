@@ -248,11 +248,23 @@ emitInvocation(SILBuilder &Builder,
   SILFunctionConventions fnConv(CalleeSILSubstFnTy.castTo<SILFunctionType>(),
                                 Builder.getModule());
 
-  if (!CanSILFuncTy->hasErrorResult()) {
-    return Builder.createApply(
-        CalleeFunc->getLocation(), FuncRefInst, CalleeSILSubstFnTy,
-        fnConv.getSILResultType(), Subs, CallArgs, false);
+  bool isNonThrowing = false;
+  // It is a function whose type claims it is throwing, but
+  // it actually never throws inside its body?
+  if (CanSILFuncTy->hasErrorResult() &&
+      CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    isNonThrowing = true;
   }
+
+  // Is callee a non-throwing function according to its type
+  // or de-facto?
+  if (!CanSILFuncTy->hasErrorResult() ||
+      CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    return Builder.createApply(CalleeFunc->getLocation(), FuncRefInst,
+                               CalleeSILSubstFnTy, fnConv.getSILResultType(),
+                               Subs, CallArgs, isNonThrowing);
+  }
+
   return emitApplyWithRethrow(Builder, CalleeFunc->getLocation(),
                               FuncRefInst, CalleeSubstFnTy, Subs,
                               CallArgs,
@@ -324,7 +336,10 @@ protected:
 /// given specialized function. Converts call arguments. Emits an invocation of
 /// the specialized function. Handle the return value.
 void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
-  SILBasicBlock *OldReturnBB = &*GenericFunc->findReturnBB();
+  SILBasicBlock *OldReturnBB = nullptr;
+  auto ReturnBB = GenericFunc->findReturnBB();
+  if (ReturnBB != GenericFunc->end())
+      OldReturnBB = &*ReturnBB;
   // 1. Emit a cascading sequence of type checks blocks.
 
   // First split the entry BB, moving all instructions to the FailedTypeCheckBB.
@@ -346,15 +361,15 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     if (!Replacement->hasArchetype()) {
       // Dispatch on concrete type.
       emitTypeCheck(FailedTypeCheckBB, ParamTy, Replacement);
-    } else {
+    } else if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
       // If Replacement has a layout constraint, then dispatch based
       // on its size and the fact that it is trivial.
-      auto LayoutInfo = Replacement->getLayoutConstraint();
+      auto LayoutInfo = Archetype->getLayoutConstraint();
       if (LayoutInfo && LayoutInfo->isTrivial()) {
         // Emit a check that it is a trivial type of a certain size.
         emitTrivialAndSizeCheck(FailedTypeCheckBB, ParamTy,
                                 Replacement, LayoutInfo);
-      } else if (LayoutInfo && LayoutInfo->isRefCountedObject()) {
+      } else if (LayoutInfo && LayoutInfo->isRefCounted()) {
         // Emit a check that it is an object of a reference counted type.
         emitRefCountedObjectCheck(FailedTypeCheckBB, ParamTy,
                                   Replacement, LayoutInfo);
@@ -395,7 +410,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     Result = Builder.createTuple(Loc, VoidTy, { });
 
   // Function marked as @NoReturn must be followed by 'unreachable'.
-  if (NewFunc->isNoReturnFunction())
+  if (NewFunc->isNoReturnFunction() || !OldReturnBB)
     Builder.createUnreachable(Loc);
   else {
     auto resultTy = GenericFunc->getConventions().getSILResultType();
@@ -535,11 +550,11 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                         {CanBeClass, ClassConst});
 
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  auto *MayBeCalssCheckBB = Builder.getFunction().createBasicBlock();
+  auto *MayBeCallsCheckBB = Builder.getFunction().createBasicBlock();
   Builder.createCondBranch(Loc, Cmp1, SuccessBB,
-                           MayBeCalssCheckBB);
+                           MayBeCallsCheckBB);
 
-  Builder.emitBlock(MayBeCalssCheckBB);
+  Builder.emitBlock(MayBeCallsCheckBB);
 
   auto MayBeClassConst =
       Builder.createIntegerLiteral(Loc, Int8Ty, 2);
@@ -685,7 +700,6 @@ public:
 
   void run() override;
 
-  StringRef getName() override { return "Eager Specializer"; }
 };
 } // end anonymous namespace
 
@@ -705,7 +719,7 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
 
   GenericFuncSpecializer
         FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutions(),
-                        GenericFunc->isFragile(), ReInfo);
+                        GenericFunc->isSerialized(), ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
@@ -719,7 +733,6 @@ void EagerSpecializerTransform::run() {
     return;
 
   // Process functions in any order.
-  bool Changed = false;
   for (auto &F : *getModule()) {
     if (!F.shouldOptimize()) {
       DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
@@ -744,6 +757,7 @@ void EagerSpecializerTransform::run() {
       auto AttrRequirements = SA->getRequirements();
       ReInfoVec.emplace_back(&F, AttrRequirements);
       auto *NewFunc = eagerSpecialize(&F, *SA, ReInfoVec.back());
+      notifyAddFunction(NewFunc);
 
       SpecializedFuncs.push_back(NewFunc);
 
@@ -755,6 +769,7 @@ void EagerSpecializerTransform::run() {
 
     // TODO: Optimize the dispatch code to minimize the amount
     // of checks. Use decision trees for this purpose.
+    bool Changed = false;
     for_each3(F.getSpecializeAttrs(), SpecializedFuncs, ReInfoVec,
               [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
                   const ReabstractionInfo &ReInfo) {
@@ -763,13 +778,13 @@ void EagerSpecializerTransform::run() {
                   EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
                 }
               });
+    // Invalidate everything since we delete calls as well as add new
+    // calls and branches.
+    if (Changed) {
+      invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+    }
     // As specializations are created, the attributes should be removed.
     F.clearSpecializeAttrs();
-  }
-  // Invalidate everything since we delete calls as well as add new
-  // calls and branches.
-  if (Changed) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 }
 

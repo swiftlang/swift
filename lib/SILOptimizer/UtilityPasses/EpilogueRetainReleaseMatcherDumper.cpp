@@ -67,7 +67,6 @@ class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Epilogue Retain/Release Matcher Dumper"; }
 };
         
 } // end anonymous namespace

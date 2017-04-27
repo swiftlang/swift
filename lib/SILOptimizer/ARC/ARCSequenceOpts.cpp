@@ -309,8 +309,6 @@ class ARCSequenceOpts : public SILFunctionTransform {
     }
 
   }
-
-  StringRef getName() override { return "ARC Sequence Opts"; }
 };
 
 } // end anonymous namespace

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // <rdar://problem/21665983> IRGen crash with protocol extension involving same-type constraint to X<T>
 public struct DefaultFoo<T> {
@@ -19,7 +19,7 @@ public extension P where Foo == DefaultFoo<Self> {
 
 // <rdar://26873036> IRGen crash with derived class declaring same-type constraint on constrained associatedtype.
 public class C1<T: Equatable> { }
-public class C2<T: Equatable, U: P where T == U.Foo>: C1<T> {}
+public class C2<T: Equatable, U: P>: C1<T> where T == U.Foo {}
 
 // CHECK: define{{( protected)?}} swiftcc void @_T021same_type_constraints2C1CfD
 

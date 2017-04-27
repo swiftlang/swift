@@ -1,0 +1,315 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+extension String {
+  // FIXME(strings): at least temporarily remove it to see where it was applied
+  public init(_ substring: Substring) {
+    self = String(substring._slice)
+  }
+}
+
+public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
+  public typealias Index = String.Index
+  public typealias IndexDistance = String.IndexDistance
+  public typealias SubSequence = Substring
+
+  internal var _slice: RangeReplaceableBidirectionalSlice<String>
+
+  public init() {
+    _slice = RangeReplaceableBidirectionalSlice()
+  }
+
+  public init(_base base: String, _ bounds: Range<Index>) {
+    _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
+  }
+
+  internal init(_base base: String, _ bounds: ClosedRange<Index>) {
+    self.init(_base: base, base._makeHalfOpen(bounds))
+  }
+
+  public var startIndex: Index { return _slice.startIndex }
+  public var endIndex: Index { return _slice.endIndex }
+
+  public func index(after i: Index) -> Index {
+    _precondition(i < endIndex, "Cannot increment beyond endIndex")
+    _precondition(i >= startIndex, "Cannot increment an invalid index")
+    // FIXME(strings): slice types currently lack necessary bound checks
+    return _slice.index(after: i)
+  }
+
+  public func index(before i: Index) -> Index {
+    _precondition(i <= endIndex, "Cannot decrement an invalid index")
+    _precondition(i > startIndex, "Cannot decrement beyond startIndex")
+    // FIXME(strings): slice types currently lack necessary bound checks
+    return _slice.index(before: i)
+  }
+
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    let result = _slice.index(i, offsetBy: n)
+    // FIXME(strings): slice types currently lack necessary bound checks
+    _precondition(
+      (_slice._startIndex ..< _slice.endIndex).contains(result),
+      "Operation results in an invalid index")
+    return result
+  }
+
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    let result = _slice.index(i, offsetBy: n, limitedBy: limit)
+    // FIXME(strings): slice types currently lack necessary bound checks
+    _precondition(result.map {
+        (_slice._startIndex ..< _slice.endIndex).contains($0)
+      } ?? true,
+      "Operation results in an invalid index")
+    return result
+  }
+
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return _slice.distance(from: start, to: end)
+  }
+
+  public subscript(i: Index) -> Character {
+    return _slice[i]
+  }
+
+  public mutating func replaceSubrange<C>(
+    _ bounds: Range<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Iterator.Element {
+    // FIXME(strings): slice types currently lack necessary bound checks
+    _slice.replaceSubrange(bounds, with: newElements)
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+
+  public mutating func replaceSubrange(
+    _ bounds: ${Range}<Index>, with newElements: Substring
+  ) {
+    replaceSubrange(bounds, with: newElements._slice)
+  }
+
+% end
+}
+
+
+extension Substring : CustomReflectable {
+  public var customMirror: Mirror {
+    return String(self).customMirror
+  }
+}
+
+extension Substring : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return String(self).customPlaygroundQuickLook
+  }
+}
+
+extension Substring : CustomStringConvertible {
+  public var description: String {
+    return String(self)
+  }
+}
+
+extension Substring : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return String(self).debugDescription
+  }
+}
+
+extension Substring : LosslessStringConvertible {
+  public init?(_ description: String) {
+    self.init(_base: description, description.startIndex ..< description.endIndex)
+  }
+}
+
+extension Substring : Equatable {
+  public static func ==(lhs: Substring, rhs: Substring) -> Bool {
+    return String(lhs) == String(rhs)
+  }
+
+  // These are not Equatable requirements, but sufficiently similar to be in
+  // this extension.
+  // FIXME(strings): should be gone if/when an implicit conversion from/to
+  // String is available.
+  // FIXME(ABI):
+  public static func ==(lhs: String, rhs: Substring) -> Bool {
+    return lhs == String(rhs)
+  }
+
+  public static func ==(lhs: Substring, rhs: String) -> Bool {
+    return String(lhs) == rhs
+  }
+
+  public static func !=(lhs: String, rhs: Substring) -> Bool {
+    return lhs != String(rhs)
+  }
+
+  public static func !=(lhs: Substring, rhs: String) -> Bool {
+    return String(lhs) != rhs
+  }
+}
+
+extension Substring : Comparable {
+  public static func <(lhs: Substring, rhs: Substring) -> Bool {
+    return String(lhs) < String(rhs)
+  }
+}
+
+extension Substring : Hashable {
+  public var hashValue : Int {
+    return String(self).hashValue
+  }
+}
+
+extension Substring {
+% for (property, ViewPrefix) in [
+%   ('utf8', 'UTF8'),
+%   ('utf16', 'UTF16'),
+%   ('unicodeScalars', 'UnicodeScalar'),
+%   ('characters', 'Character')]:
+  public typealias ${ViewPrefix}Index = String.${ViewPrefix}View.Index
+
+  public var ${property}: String.${ViewPrefix}View {
+    get {
+      return String(self).${property}
+    }
+    set {
+      let base = String(describing: newValue)
+      self = Substring(_base: base, base.startIndex ..< base.endIndex)
+    }
+  }
+% end
+}
+
+#if _runtime(_ObjC)
+
+extension Substring {
+  public func hasPrefix(_ prefix: String) -> Bool {
+    return String(self).hasPrefix(prefix)
+  }
+
+  public func hasSuffix(_ suffix: String) -> Bool {
+    return String(self).hasSuffix(suffix)
+  }
+}
+
+#endif
+
+extension Substring {
+  public func lowercased() -> String {
+    return String(self).lowercased()
+  }
+
+  public func uppercased() -> String {
+    return String(self).uppercased()
+  }
+}
+
+extension Substring : TextOutputStream {
+  public mutating func write(_ other: String) {
+    append(contentsOf: other)
+  }
+}
+
+extension Substring : TextOutputStreamable {
+  public func write<Target : TextOutputStream>(to target: inout Target) {
+    target.write(String(self))
+  }
+}
+
+extension Substring : ExpressibleByUnicodeScalarLiteral {
+  public init(unicodeScalarLiteral value: String) {
+     self.init(_base: value, value.startIndex ..< value.endIndex)
+  }
+}
+extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
+  public init(extendedGraphemeClusterLiteral value: String) {
+     self.init(_base: value, value.startIndex ..< value.endIndex)
+  }
+}
+
+extension Substring : ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+     self.init(_base: value, value.startIndex ..< value.endIndex)
+  }
+}
+
+// The purpose of this protocol is backward compatibility with Swift 3 code,
+// where String subscripts returned String.
+// Since the Substring returning subscripts are introduced by the protocol
+// extension, they will be less specific than the String-returning ones
+// declared on the String type itself, thus avoiding ambiguity.
+public protocol _RangeSubscriptableString {
+  associatedtype Index : Comparable
+  func _subscript(_ bounds: Range<Index>) -> Substring
+  func _subscript(_ bounds: ClosedRange<Index>) -> Substring
+}
+
+// Without the `where` subscripts will be ambiguous
+extension _RangeSubscriptableString where Self : RangeReplaceableCollection {
+% for Range in ['Range', 'ClosedRange']:
+  public subscript(bounds: ${Range}<Index>) -> Substring {
+    return _subscript(bounds)
+  }
+% end
+}
+
+extension String : _RangeSubscriptableString {
+% for Range in ['Range', 'ClosedRange']:
+  /// Accesses the text in the given range.
+  ///
+  /// - Complexity: O(*n*) if the underlying string is bridged from
+  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+  public func _subscript(_ bounds: ${Range}<Index>) -> Substring {
+    return Substring(_base: String(self._core), bounds)
+  }
+% end
+}
+
+extension Substring : _RangeSubscriptableString {
+% for Range in ['Range', 'ClosedRange']:
+  public func _subscript(_ bounds: ${Range}<Index>) -> Substring {
+    let subSlice = _slice[bounds]
+    let bounds = (lower: subSlice.startIndex, upper: subSlice.endIndex)
+%   if Range == 'ClosedRange':
+    // Creating Substring using the half-open range, since subSlice already
+    // handled the ClosedRange case.
+%   end
+    return Substring(_base: _slice._base, Range(uncheckedBounds: bounds))
+  }
+% end
+}
+
+extension String {
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String {
+    return String(characters[bounds])
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String {
+    return String(characters[bounds])
+  }
+}
+
+extension Substring {
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String {
+    return String(self[bounds])
+  }
+
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: ClosedRange<Index>) -> String {
+    return String(self[bounds])
+  }
+}

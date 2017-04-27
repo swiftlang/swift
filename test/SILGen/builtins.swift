@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -45,6 +45,22 @@ func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
+}
+
+// CHECK-LABEL: sil hidden @_T08builtins18load_invariant_pod{{[_0-9a-zA-Z]*}}F
+func load_invariant_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [invariant] $*Builtin.Int64
+  // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadInvariant(x)
+}
+
+// CHECK-LABEL: sil hidden @_T08builtins18load_invariant_obj{{[_0-9a-zA-Z]*}}F
+func load_invariant_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [invariant] $*Builtin.NativeObject
+  // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadInvariant(x)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins8load_gen{{[_0-9a-zA-Z]*}}F
@@ -181,20 +197,28 @@ class C {}
 class D {}
 
 // CHECK-LABEL: sil hidden @_T08builtins22class_to_native_object{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   debug_value
+// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT:   [[COPY_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[COPY_BORROWED_ARG:%.*]] to $Builtin.NativeObject
+// CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT:   destroy_value [[ARG]]
+// CHECK-NEXT:   return [[OBJ]]
 func class_to_native_object(_ c:C) -> Builtin.NativeObject {
-  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[OBJ]]
   return Builtin.castToNativeObject(c)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins23class_to_unknown_object{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   debug_value
+// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT:   [[COPY_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[COPY_BORROWED_ARG:%.*]] to $Builtin.UnknownObject
+// CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT:   destroy_value [[ARG]]
+// CHECK-NEXT:   return [[OBJ]]
 func class_to_unknown_object(_ c:C) -> Builtin.UnknownObject {
-  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.UnknownObject
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[OBJ]]
   return Builtin.castToUnknownObject(c)
 }
 
@@ -217,10 +241,17 @@ func class_archetype_to_unknown_object<T : C>(_ t: T) -> Builtin.UnknownObject {
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins34class_existential_to_native_object{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[ARG:%.*]] : $ClassProto):
+// CHECK-NEXT:   debug_value
+// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT:   [[COPY_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[COPY_BORROWED_ARG]] : $ClassProto
+// CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
+// CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT:   destroy_value [[ARG]]
+// CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
-  // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
-  // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
-  return Builtin.castToNativeObject(t)
+  return Builtin.unsafeCastToNativeObject(t)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins35class_existential_to_unknown_object{{[_0-9a-zA-Z]*}}F
@@ -639,7 +670,8 @@ func pinUnpin(_ object : Builtin.NativeObject) {
 // NativeObject
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
-// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Optional<Builtin.NativeObject>
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Builtin.NativeObject>
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.NativeObject>
 // CHECK: return
 func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
@@ -648,7 +680,8 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 // NativeObject nonNull
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.NativeObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.NativeObject
 // CHECK: return
 func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
@@ -657,7 +690,8 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
 // NativeObject pinned
 // CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Optional<Builtin.NativeObject>
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Optional<Builtin.NativeObject>
 // CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
@@ -666,7 +700,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
 // NativeObject pinned nonNull
 // CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.NativeObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.NativeObject
 // CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
@@ -675,7 +710,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
 // UnknownObject (ObjC)
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
-// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Optional<Builtin.UnknownObject>
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
 // CHECK: return
 func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
@@ -684,7 +720,8 @@ func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
 // UnknownObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
-// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.UnknownObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
 // CHECK: return
 func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
@@ -693,7 +730,8 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
 // UnknownObject (ObjC) pinned nonNull
 // CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.UnknownObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.UnknownObject
 // CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
@@ -702,7 +740,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
 // BridgeObject nonNull
 // CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.BridgeObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.BridgeObject
 // CHECK: return
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
@@ -711,7 +750,8 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
 // BridgeObject pinned nonNull
 // CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.BridgeObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.BridgeObject
 // CHECK: return
 func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned(&ref))
@@ -720,7 +760,8 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 // BridgeObject nonNull native
 // CHECK-LABEL: sil hidden @_T08builtins15isUnique_native{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK: [[CAST:%.*]] = unchecked_addr_cast %0 : $*Builtin.BridgeObject to $*Builtin.NativeObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[WRITE]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: return
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique_native(&ref))
@@ -729,7 +770,8 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 // BridgeObject pinned nonNull native
 // CHECK-LABEL: sil hidden @_T08builtins23isUniqueOrPinned_native{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
-// CHECK: [[CAST:%.*]] = unchecked_addr_cast %0 : $*Builtin.BridgeObject to $*Builtin.NativeObject
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[WRITE]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[CAST]] : $*Builtin.NativeObject
 // CHECK: return
 func isUniqueOrPinned_native(_ ref: inout Builtin.BridgeObject) -> Bool {

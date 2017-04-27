@@ -905,7 +905,6 @@ class SILMem2Reg : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "SIL Mem2Reg"; }
 };
 } // end anonymous namespace
 

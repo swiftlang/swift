@@ -1,6 +1,46 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 protocol AddrOnly {}
+
+func callMethodsOnD<U>(d: D, b: B, a: AddrOnly, u: U, i: Int) {
+  _ = d.iuo(x: b, y: b, z: b)
+  _ = d.f(x: b, y: b)
+  _ = d.f2(x: b, y: b)
+  _ = d.f3(x: b, y: b)
+  _ = d.f4(x: b, y: b)
+  _ = d.g(x: a, y: a)
+  _ = d.g2(x: a, y: a)
+  _ = d.g3(x: a, y: a)
+  _ = d.g4(x: a, y: a)
+  _ = d.h(x: u, y: u)
+  _ = d.h2(x: u, y: u)
+  _ = d.h3(x: u, y: u)
+  _ = d.h4(x: u, y: u)
+  _ = d.i(x: i, y: i)
+  _ = d.i2(x: i, y: i)
+  _ = d.i3(x: i, y: i)
+  _ = d.i4(x: i, y: i)
+}
+
+func callMethodsOnF<U>(d: F, b: B, a: AddrOnly, u: U, i: Int) {
+  _ = d.iuo(x: b, y: b, z: b)
+  _ = d.f(x: b, y: b)
+  _ = d.f2(x: b, y: b)
+  _ = d.f3(x: b, y: b)
+  _ = d.f4(x: b, y: b)
+  _ = d.g(x: a, y: a)
+  _ = d.g2(x: a, y: a)
+  _ = d.g3(x: a, y: a)
+  _ = d.g4(x: a, y: a)
+  _ = d.h(x: u, y: u)
+  _ = d.h2(x: u, y: u)
+  _ = d.h3(x: u, y: u)
+  _ = d.h4(x: u, y: u)
+  _ = d.i(x: i, y: i)
+  _ = d.i2(x: i, y: i)
+  _ = d.i3(x: i, y: i)
+  _ = d.i4(x: i, y: i)
+}
 
 @objc class B {
   // We only allow B! -> B overrides for @objc methods.
@@ -98,7 +138,7 @@ class F: D {
 // CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
 // CHECK: [[NONE_BB]]:
-// CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional{{.*}}
+// CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{.*}}
 // CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
 // CHECK:   unreachable
 
@@ -187,7 +227,7 @@ class Noot : Aap {
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T013vtable_thunks1SVIxd_ACSgIxd_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVIxd_ACSgIxd_TR
 // CHECK:         [[INNER:%.*]] = apply %0()
 // CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %1 : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
@@ -199,7 +239,7 @@ class Noot : Aap {
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIxo_Ixyo_AcA3AapCSgIxo_Ixyo_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIxo_Ixyo_AcA3AapCSgIxo_Ixyo_TR
 // CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
 // CHECK:         [[INNER:%.*]] = apply %1(%2)
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>

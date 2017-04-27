@@ -1,14 +1,14 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/mangling_private_helper.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %S/Inputs/mangling_private_helper.swift | %FileCheck %s -check-prefix=CHECK-BASE
+// RUN: %target-swift-frontend -emit-silgen %S/Inputs/mangling_private_helper.swift | %FileCheck %s -check-prefix=CHECK-BASE
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -I %t -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend %s -I %t -emit-silgen | %FileCheck %s
 
 // RUN: cp %s %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %t/mangling_private.swift -I %t -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend %t/mangling_private.swift -I %t -emit-silgen | %FileCheck %s
 
 // RUN: cp %s %t/other_name.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %t/other_name.swift -I %t -emit-silgen -module-name mangling_private | %FileCheck %s -check-prefix=OTHER-NAME
+// RUN: %target-swift-frontend %t/other_name.swift -I %t -emit-silgen -module-name mangling_private | %FileCheck %s -check-prefix=OTHER-NAME
 
 import mangling_private_helper
 
@@ -53,7 +53,7 @@ extension PrivateStruct {
   private func extPrivateMethod() {}
 }
 
-// CHECK-LABEL: sil shared @_T016mangling_private10localTypesyyF11LocalStructL_V0B6MethodyyFZ
+// CHECK-LABEL: sil private @_T016mangling_private10localTypesyyF11LocalStructL_V0B6MethodyyFZ
 
 // CHECK-LABEL: sil_vtable Sub {
 class Sub : Base {

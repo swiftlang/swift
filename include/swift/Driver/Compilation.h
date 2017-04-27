@@ -21,6 +21,7 @@
 #include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -134,6 +135,9 @@ private:
   /// execute.
   bool ShowDriverTimeCompilation;
 
+  /// When non-null, record various high-level counters to this.
+  std::unique_ptr<UnifiedStatsReporter> Stats;
+
   /// When true, dumps information about why files are being scheduled to be
   /// rebuilt.
   bool ShowIncrementalBuildDecisions = false;
@@ -141,6 +145,10 @@ private:
   /// When true, traces the lifecycle of each driver job. Provides finer
   /// detail than ShowIncrementalBuildDecisions.
   bool ShowJobLifecycle = false;
+
+  /// When true, some frontend job has requested permission to pass
+  /// -emit-loaded-module-trace, so no other job needs to do it.
+  bool PassedEmitLoadedModuleTraceToFrontendJob = false;
 
   static const Job *unwrap(const std::unique_ptr<const Job> &p) {
     return p.get();
@@ -156,7 +164,8 @@ public:
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
-              bool ShowDriverTimeCompilation = false);
+              bool ShowDriverTimeCompilation = false,
+              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
 
   ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
@@ -226,6 +235,22 @@ public:
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
   int performJobs();
+
+  /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
+  /// to a frontend job.
+  ///
+  /// This only returns true once, because only one job should pass that
+  /// argument.
+  bool requestPermissionForFrontendToEmitLoadedModuleTrace() {
+    if (PassedEmitLoadedModuleTraceToFrontendJob)
+      // Someone else has already done it!
+      return false;
+    else {
+      // We're the first and only (to execute this path).
+      PassedEmitLoadedModuleTraceToFrontendJob = true;
+      return true;
+    }
+  }
 
 private:
   /// \brief Perform all jobs.

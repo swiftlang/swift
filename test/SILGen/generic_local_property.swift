@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 func use<T>(_: T) {}
 
@@ -21,10 +21,10 @@ func foo<T>(x: T, y: Int) {
     }
   }
 
-  // CHECK-LABEL: function_ref (foo<A> (x : A, y : Int) -> ()).(readonly #1).getter
+  // CHECK-LABEL: function_ref getter of readonly #1 in foo<A>(x:y:)
   _ = readonly
-  // CHECK-LABEL: function_ref (foo<A> (x : A, y : Int) -> ()).(mutable #1).getter
+  // CHECK-LABEL: function_ref getter of mutable #1 in foo<A>(x:y:)
   _ = mutable
-  // CHECK-LABEL: function_ref (foo<A> (x : A, y : Int) -> ()).(mutable #1).setter
+  // CHECK-LABEL: function_ref setter of mutable #1 in foo<A>(x:y:)
   mutable = y
 }

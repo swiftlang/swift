@@ -179,8 +179,13 @@ BUILTIN_SIL_OPERATION(Load, "load", Special)
 
 /// LoadRaw has type (Builtin.RawPointer) -> T
 /// This is a load of T from raw memory.
-/// It's address does not adhere to strict aliasing.
+/// Its address does not adhere to strict aliasing.
 BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
+
+/// LoadInvariant has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// The load is marked as invariant.
+BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
 
 /// Take has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Take, "take", Special)
@@ -201,7 +206,14 @@ BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
 BUILTIN_SIL_OPERATION(CastFromUnknownObject, "castFromUnknownObject", Special)
 
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin asserts if the underlying type /could/ be objc.
 BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
+
+/// UnsafeCastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin does not check if the underlying type /could/ be objc.
+BUILTIN_SIL_OPERATION(UnsafeCastToNativeObject, "unsafeCastToNativeObject", Special)
 
 /// CastFromNativeObject has type (Builtin.NativeObject) -> T
 BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
@@ -451,6 +463,8 @@ BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
+/// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
+BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
 
 /// unreachable has type () -> Never
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
@@ -475,6 +489,9 @@ BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
 
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
+
+// Swift3ImplicitObjCEntrypoint has type () -> ()
+BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

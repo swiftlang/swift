@@ -132,11 +132,17 @@ namespace irgen {
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
                                                         ClassDecl *theClass);
-  
-  /// What reference counting mechanism does a class use?
-  ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
-                                                 ClassDecl *theClass);
-  
+  /// Emit the constant fragile offset of the given property inside an instance
+  /// of the class.
+  llvm::Constant *
+  tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
+                                                  SILType baseType,
+                                                  VarDecl *field);
+
+  /// What reference counting mechanism does a class-like type use?
+  ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
+                                                CanType type);
+
   /// What isa-encoding mechanism does a type use?
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
   
@@ -147,6 +153,14 @@ namespace irgen {
   /// the runtime?
   bool doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
                                                      ClassDecl *theClass);
+    
+  /// Returns true if a conformance of the \p conformingType references the
+  /// nominal type descriptor of the type.
+  ///
+  /// Otherwise the conformance references the foreign metadata of the
+  /// \p conformingType.
+  bool doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
+                                                     CanType conformingType);
 } // end namespace irgen
 } // end namespace swift
 

@@ -381,7 +381,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
           CalleeFunction->isTransparent() == IsNotTransparent)
         continue;
 
-      if (F->isFragile() &&
+      if (F->isSerialized() &&
           !CalleeFunction->hasValidLinkageForFragileRef()) {
         if (!CalleeFunction->hasValidLinkageForFragileInline()) {
           llvm::errs() << "caller: " << F->getName() << "\n";
@@ -557,6 +557,8 @@ class MandatoryInlining : public SILModuleTransform {
     for (auto FI = M->begin(), E = M->end(); FI != E; ) {
       SILFunction &F = *FI++;
 
+      invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+
       if (F.getRefCount() != 0) continue;
 
       // Leave non-transparent functions alone.
@@ -572,15 +574,14 @@ class MandatoryInlining : public SILModuleTransform {
       // even if not referenced inside SIL.
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
-      
+
+      notifyDeleteFunction(&F);
+
       // Okay, just erase the function from the module.
       M->eraseFunction(&F);
     }
-
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 
-  StringRef getName() override { return "Mandatory Inlining"; }
 };
 } // end anonymous namespace
 

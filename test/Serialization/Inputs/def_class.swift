@@ -52,7 +52,7 @@ public protocol Resettable {
 }
 
 public extension Resettable {
-  final func doReset() { self.reset() }
+  func doReset() { self.reset() }
 }
 
 open class ResettableIntWrapper : Resettable {
@@ -80,7 +80,7 @@ public protocol PairLike {
 }
 
 public extension PairLike where FirstType : Cacheable {
-  final func cacheFirst() { }
+  func cacheFirst() { }
 }
 
 public protocol ClassProto : class {}

@@ -243,6 +243,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
+  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+    list(APPEND swift_flags "-Xfrontend" "-enable-cow-existentials")
+  endif()
+
   if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
   endif()
@@ -266,6 +270,10 @@ function(_compile_swift_files
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
+  endif()
+
+  if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-warn-swift3-objc-inference")
   endif()
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
@@ -325,9 +333,12 @@ function(_compile_swift_files
     endif()
   endif()
 
-  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      FILES "${module_file}" "${module_doc_file}"
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  # If we want to build a single overlay, don't install the swiftmodule and swiftdoc files.
+  if(NOT BUILD_STANDALONE)
+    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+        FILES "${module_file}" "${module_doc_file}"
+        DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
@@ -483,6 +494,8 @@ function(_compile_swift_files
         module_dependency_target
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}

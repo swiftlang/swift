@@ -48,23 +48,19 @@ public:
   
   Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
 
+  /// Checks whether the current substitution is canonical.
+  bool isCanonical() const;
+
+  /// Get the canonicalized substitution. If wasCanonical is not nullptr,
+  /// store there whether the current substitution was canonical already.
+  Substitution getCanonicalSubstitution(bool *wasCanonical = nullptr) const;
+
   bool operator!=(const Substitution &other) const { return !(*this == other); }
   bool operator==(const Substitution &other) const;
   void print(llvm::raw_ostream &os,
              const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
   void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
-  
-  /// Apply a substitution to this substitution's replacement type and
-  /// conformances.
-  Substitution subst(ModuleDecl *module,
-                     const SubstitutionMap &subMap) const;
-  Substitution subst(ModuleDecl *module,
-                     TypeSubstitutionFn subs,
-                     LookupConformanceFn conformances) const;
-
-private:
-  friend class ProtocolConformance;
 };
 
 } // end namespace swift

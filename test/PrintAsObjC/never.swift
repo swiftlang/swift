@@ -8,7 +8,7 @@
 // REQUIRES: objc_interop
 
 @objc public class NeverClass {
-  func doesNotReturn() -> Never { while true {} }
+  @objc func doesNotReturn() -> Never { while true {} }
 }
 
 // CHECK-LABEL: @interface NeverClass

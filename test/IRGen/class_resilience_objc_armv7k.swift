@@ -13,12 +13,12 @@ public class FixedLayoutObjCSubclass : NSObject {
   public final var field: Int32 = 0
 };
 
-// CHECK-LABEL: define hidden swiftcc void @_TF28class_resilience_objc_armv7k29testConstantDirectFieldAccessFCS_23FixedLayoutObjCSubclassT_(%C28class_resilience_objc_armv7k23FixedLayoutObjCSubclass*)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC28class_resilience_objc_armv7k23FixedLayoutObjCSubclass5fieldVs5Int32
-// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C28class_resilience_objc_armv7k23FixedLayoutObjCSubclass* %0 to i8*
+// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k29testConstantDirectFieldAccessyAA23FixedLayoutObjCSubclassCF(%T28class_resilience_objc_armv7k23FixedLayoutObjCSubclassC*)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T028class_resilience_objc_armv7k23FixedLayoutObjCSubclassC5fields5Int32VvWvd
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k23FixedLayoutObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Ts5Int32V*
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
 func testConstantDirectFieldAccess(_ o: FixedLayoutObjCSubclass) {
@@ -31,12 +31,12 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
   public final var field: Int32 = 0
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_TF28class_resilience_objc_armv7k32testNonConstantDirectFieldAccessFCS_26NonFixedLayoutObjCSubclassT_(%C28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclass*)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclass5fieldVs5Int32
-// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclass* %0 to i8*
+// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k32testNonConstantDirectFieldAccessyAA0F23FixedLayoutObjCSubclassCF(%T28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC*)
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T028class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC5fields5Int32VvWvd
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Ts5Int32V*
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
 func testNonConstantDirectFieldAccess(_ o: NonFixedLayoutObjCSubclass) {
@@ -52,22 +52,22 @@ public class GenericObjCSubclass<T> : NSCoder {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_TF28class_resilience_objc_armv7k31testConstantIndirectFieldAccessurFGCS_19GenericObjCSubclassx_T_(%C28class_resilience_objc_armv7k19GenericObjCSubclass*)
+// CHECK-LABEL: define hidden swiftcc void @_T028class_resilience_objc_armv7k31testConstantIndirectFieldAccessyAA19GenericObjCSubclassCyxGlF(%T28class_resilience_objc_armv7k19GenericObjCSubclassC*)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
 
 // CHECK:      call %objc_class* @object_getClass
-// CHECK:      [[ADDR:%.*]] = bitcast %C28class_resilience_objc_armv7k19GenericObjCSubclass* %0 to %objc_object*
+// CHECK:      [[ADDR:%.*]] = bitcast %T28class_resilience_objc_armv7k19GenericObjCSubclassC* %0 to %objc_object*
 // CHECK-NEXT: [[KLASS:%.*]] = call %objc_class* @object_getClass(%objc_object* [[ADDR]])
 // CHECK-NEXT: [[ISA:%.*]] = bitcast %objc_class* [[KLASS]] to %swift.type*
 // CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
 // CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 16
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
-// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C28class_resilience_objc_armv7k19GenericObjCSubclass* %0 to i8*
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k19GenericObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Ts5Int32V*
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
 func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {

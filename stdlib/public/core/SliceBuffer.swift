@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for `ArraySlice<Element>`.
+@_fixed_layout
 @_versioned
 internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,
@@ -19,6 +20,8 @@ internal struct _SliceBuffer<Element>
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
+  @_inlineable
+  @_versioned
   internal init(
     owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<Element>,
     indices: Range<Int>, hasNativeBuffer: Bool
@@ -31,6 +34,8 @@ internal struct _SliceBuffer<Element>
     _invariantCheck()
   }
 
+  @_inlineable
+  @_versioned
   internal init() {
     let empty = _ContiguousArrayBuffer<Element>()
     self.owner = empty.owner
@@ -40,6 +45,8 @@ internal struct _SliceBuffer<Element>
     _invariantCheck()
   }
 
+  @_inlineable
+  @_versioned
   internal init(_buffer buffer: NativeBuffer, shiftedToStartIndex: Int) {
     let shift = buffer.startIndex - shiftedToStartIndex
     self.init(
@@ -49,6 +56,7 @@ internal struct _SliceBuffer<Element>
       hasNativeBuffer: true)
   }
 
+  @_versioned
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
     let isNativeStorage: Bool = owner is _ContiguousArrayStorageBase
@@ -58,16 +66,19 @@ internal struct _SliceBuffer<Element>
     }
   }
 
+  @_versioned
   internal var _hasNativeBuffer: Bool {
     return (endIndexAndFlags & 1) != 0
   }
 
+  @_versioned
   internal var nativeBuffer: NativeBuffer {
     _sanityCheck(_hasNativeBuffer)
     return NativeBuffer(
       owner as? _ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
+  @_versioned
   internal var nativeOwner: AnyObject {
     _sanityCheck(_hasNativeBuffer, "Expect a native array")
     return owner
@@ -79,6 +90,7 @@ internal struct _SliceBuffer<Element>
   /// - Precondition: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
+  @_versioned
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with insertCount: Int,
@@ -114,12 +126,15 @@ internal struct _SliceBuffer<Element>
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
+  @_versioned
   internal var identity: UnsafeRawPointer {
     return UnsafeRawPointer(firstElementAddress)
   }
 
   /// An object that keeps the elements stored in this buffer alive.
+  @_versioned
   internal var owner: AnyObject
+  @_versioned
   internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
 
   @_versioned
@@ -127,15 +142,18 @@ internal struct _SliceBuffer<Element>
     return subscriptBaseAddress + startIndex
   }
 
+  @_versioned
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return firstElementAddress
   }
 
   /// [63:1: 63-bit index][0: has a native buffer]
+  @_versioned
   internal var endIndexAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
 
+  @_versioned
   internal mutating func requestUniqueMutableBackingBuffer(
     minimumCapacity: Int
   ) -> NativeBuffer? {
@@ -165,10 +183,14 @@ internal struct _SliceBuffer<Element>
     return nil
   }
 
+  @_inlineable
+  @_versioned
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
+  @_inlineable
+  @_versioned
   internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return _hasNativeBuffer && isUniquelyReferencedOrPinned()
   }
@@ -176,6 +198,7 @@ internal struct _SliceBuffer<Element>
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
+  @_versioned
   internal func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
@@ -184,6 +207,7 @@ internal struct _SliceBuffer<Element>
     return nil
   }
 
+  @_versioned
   @discardableResult
   internal func _copyContents(
     subRange bounds: Range<Int>,
@@ -199,10 +223,12 @@ internal struct _SliceBuffer<Element>
   }
 
   /// True, if the array is native and does not need a deferred type check.
+  @_versioned
   internal var arrayPropertyIsNativeTypeChecked: Bool {
     return _hasNativeBuffer
   }
 
+  @_versioned
   internal var count: Int {
     get {
       return endIndex - startIndex
@@ -219,11 +245,13 @@ internal struct _SliceBuffer<Element>
 
   /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
+  @_versioned
   internal func _checkValidSubscript(_ index : Int) {
     _precondition(
       index >= startIndex && index < endIndex, "Index out of bounds")
   }
 
+  @_versioned
   internal var capacity: Int {
     let count = self.count
     if _slowPath(!_hasNativeBuffer) {
@@ -237,10 +265,12 @@ internal struct _SliceBuffer<Element>
     return count
   }
 
+  @_versioned
   internal mutating func isUniquelyReferenced() -> Bool {
     return isKnownUniquelyReferenced(&owner)
   }
 
+  @_versioned
   internal mutating func isUniquelyReferencedOrPinned() -> Bool {
     return _isKnownUniquelyReferencedOrPinned(&owner)
   }
@@ -267,6 +297,7 @@ internal struct _SliceBuffer<Element>
     }
   }
 
+  @_versioned
   internal subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
       _sanityCheck(bounds.lowerBound >= startIndex)
@@ -287,6 +318,7 @@ internal struct _SliceBuffer<Element>
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
+  @_versioned
   internal var startIndex: Int
 
   /// The collection's "past the end" position---that is, the position one
@@ -294,6 +326,7 @@ internal struct _SliceBuffer<Element>
   ///
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
+  @_versioned
   internal var endIndex: Int {
     get {
       return Int(endIndexAndFlags >> 1)
@@ -308,6 +341,8 @@ internal struct _SliceBuffer<Element>
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
+  @_inlineable
+  @_versioned
   internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -318,6 +353,8 @@ internal struct _SliceBuffer<Element>
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
+  @_inlineable
+  @_versioned
   internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {

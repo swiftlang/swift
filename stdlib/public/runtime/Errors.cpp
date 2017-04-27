@@ -33,7 +33,7 @@
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #if !defined(_MSC_VER)
@@ -262,6 +262,21 @@ swift::fatalError(uint32_t flags, const char *format, ...)
 
   swift_reportError(flags, log);
   abort();
+}
+
+// Report a warning to system console and stderr.
+void
+swift::warning(uint32_t flags, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  char *log;
+  swift_vasprintf(&log, format, args);
+
+  reportNow(flags, log);
+
+  free(log);
 }
 
 // Crash when a deleted method is called by accident.

@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../../lib/Basic/Demangle.cpp"
-#include "../../../lib/Basic/Demangler.cpp"
-#include "../../../lib/Basic/ManglingUtils.cpp"
-#include "../../../lib/Basic/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Strings.h"
 #include "Private.h"
+
+#include <vector>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
+
+using namespace swift;
 
 // FIXME: This stuff should be merged with the existing logic in
 // include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
@@ -130,9 +131,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
     
-    // ObjC classes mangle as being in the magic "__ObjC" module.
-    auto module = Dem.createNode(Node::Kind::Module, "__ObjC");
-    
+    auto module = Dem.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     auto node = Dem.createNode(Node::Kind::Class);
     node->addChild(module, Dem);
     node->addChild(Dem.createNode(Node::Kind::Identifier,
@@ -170,14 +169,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     
     for (auto *protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      NodePointer protocolNode = nullptr;
       StringRef ProtoName(protocol->Name);
-      if (ProtoName.startswith("_Tt")) {
-        protocolNode = demangleOldSymbolAsNode(ProtoName, Dem);
-      } else {
-        protocolNode = Dem.demangleSymbol(ProtoName);
-      }
-      
+      NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
+
       // ObjC protocol names aren't mangled.
       if (!protocolNode) {
         auto module = Dem.createNode(Node::Kind::Module,
@@ -248,7 +242,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     NodePointer totalInput = nullptr;
     if (inputs.size() > 1) {
-      auto tuple = Dem.createNode(Node::Kind::NonVariadicTuple);
+      auto tuple = Dem.createNode(Node::Kind::Tuple);
       for (auto &input : inputs)
         tuple->addChild(input, Dem);
       totalInput = tuple;
@@ -284,7 +278,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Tuple: {
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
     const char *labels = tuple->Labels;
-    auto tupleNode = Dem.createNode(Node::Kind::NonVariadicTuple);
+    auto tupleNode = Dem.createNode(Node::Kind::Tuple);
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
       auto elt = Dem.createNode(Node::Kind::TupleElement);
 

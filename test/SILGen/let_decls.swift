@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -7,7 +7,9 @@ func takeClosure(_ a : () -> Int) {}
 // CHECK-LABEL: sil hidden @{{.*}}test1
 func test1(_ a : Int) -> Int {
   // CHECK-NOT: alloc_box
-  // CHECK-NOT: alloc_stack
+  // FIXME(integers): the following check should be updated for the new way +
+  // gets invoked. <rdar://problem/29939484>
+  // XCHECK-NOT: alloc_stack
 
   let (b,c) = (a, 32)
 
@@ -41,7 +43,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil shared @_T09let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
+// CHECK: sil private @_T09let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : $Int):
 // CHECK:  return %0 : $Int
 
@@ -92,12 +94,16 @@ struct AddressOnlyStruct<T> {
 func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
+// CHECK: bb0([[FUNC_ARG:%.*]] : $*T):
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK: [[ARG:%.*]] = alloc_stack $T
+  // CHECK: copy_addr [[FUNC_ARG]] to [initialization] [[ARG]]
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
+  // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
   // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [copy] [[STRADDR]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -111,7 +117,9 @@ func testAddressOnlyStructElt<T>(_ a : T) -> T {
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK: [[ARG:%.*]] = alloc_stack $T
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
+  // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
   // CHECK-NEXT: copy_addr [[ELTADDR]] to [initialization] %0 : $*T
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -238,14 +246,16 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
-  // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[PB]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+  // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSifs
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
   
   // The getter is mutating, so it takes the box address.
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSifg
-  // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[PB]])
+  // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[WRITE]])
   // CHECK: return [[RES]]
   return v.p
 }
@@ -470,7 +480,8 @@ struct LetPropertyStruct {
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
-// CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[A]] : $*LetPropertyStruct
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[READ]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
 // CHECK:   destroy_value [[ABOX]] : ${ var LetPropertyStruct }
 // CHECK:   return [[PROP]] : $Int

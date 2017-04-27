@@ -1,0 +1,96 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil @argument_only_destroy_user_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+sil @argument_only_destroy_user_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @argument_diamond_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject):
+// CHECK-NEXT: [[RESULT:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: cond_br undef, [[LHSBB:bb[0-9]+]], [[RHSBB:bb[0-9]+]]
+//
+// CHECK: [[LHSBB]]:
+// CHECK-NEXT: br [[EPILOGBB:bb[0-9]+]]
+//
+// CHECK: [[RHSBB]]:
+// CHECK-NEXT: br [[EPILOGBB]]
+//
+// CHECK: [[EPILOGBB]]:
+// CHECK-NEXT: return [[RESULT]]
+sil @argument_diamond_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = copy_value %1 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @argument_copy_borrow_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject
+// CHECK-NOT: copy_value
+// CHECK-NOT: begin_borrow
+// CHECK: apply {{%.*}}([[ARG]])
+// CHECK-NOT: end_borrow
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'argument_copy_borrow_test_case'
+sil @argument_copy_borrow_test_case : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = begin_borrow %1 : $Builtin.NativeObject
+  apply %2(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = end_borrow %3 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @argument_copy_of_copy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'argument_copy_of_copy'
+sil @argument_copy_of_copy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  %3 = copy_value %2 : $Builtin.NativeObject
+  %4 = begin_borrow %3 : $Builtin.NativeObject
+  end_borrow %4 from %3 : $Builtin.NativeObject, $Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %2 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

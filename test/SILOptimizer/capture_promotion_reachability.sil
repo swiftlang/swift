@@ -47,7 +47,7 @@ bb1:
 bb2:
   %14 = alloc_box $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
   %14a = project_box %14 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>, 0
-  // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure0 :
+  // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_T08closure0Tf2i_n :
   %15 = function_ref @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%.*}})
@@ -57,7 +57,7 @@ bb2:
   cond_br %19, bb3, bb4
 
 bb3:
-  // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure1 :
+  // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_T08closure1Tf2i_n :
   %21 = function_ref @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE1_PROMOTE0]]({{%.*}})
@@ -139,7 +139,7 @@ bb2:
   cond_br %19, bb3, bb4
 
 bb3:
-  // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure3 :
+  // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_T08closure3Tf2i_n :
   %21 = function_ref @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE3_PROMOTE0]]({{%.*}})

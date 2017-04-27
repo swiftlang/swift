@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Demangler.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
@@ -160,7 +161,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 }
 
 /// Report a dynamic cast failure.
-// This is noinline with asm("") to preserve this frame in stack traces.
+// This is noinline to preserve this frame in stack traces.
 // We want "dynamicCastFailure" to appear in crash logs even we crash 
 // during the diagnostic because some Metadata is invalid.
 LLVM_ATTRIBUTE_NORETURN
@@ -169,8 +170,6 @@ void
 swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
                                 const void *targetType, const char *targetName, 
                                 const char *message) {
-  asm("");
-
   swift::fatalError(/* flags = */ 0,
                     "Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
                     sourceName, sourceType, 
@@ -432,6 +431,7 @@ static bool shouldDeallocateSource(bool castSucceeded, DynamicCastFlags flags) {
         (!castSucceeded && (flags & DynamicCastFlags::DestroyOnFailure));
 }
 
+#ifndef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
 /// Given that a cast operation is complete, maybe deallocate an
 /// opaque existential value.
 static void _maybeDeallocateOpaqueExistential(OpaqueValue *srcExistential,
@@ -443,6 +443,7 @@ static void _maybeDeallocateOpaqueExistential(OpaqueValue *srcExistential,
     container->Type->vw_deallocateBuffer(&container->Buffer);
   }
 }
+#endif
 
 static bool
 isAnyObjectExistentialType(const ExistentialTypeMetadata *targetType) {
@@ -478,6 +479,9 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   }
 
   case MetadataKind::Existential: {
+    auto existentialType = cast<ExistentialTypeMetadata>(type);
+    inoutCanTake &= existentialType->mayTakeValue(value);
+
     // We can't drill through existential containers unless the result is an
     // existential metatype.
     if (!isTargetExistentialMetatype) {
@@ -485,7 +489,6 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
       outType = type;
       return;
     }
-    auto existentialType = cast<ExistentialTypeMetadata>(type);
     
     switch (existentialType->getRepresentation()) {
     case ExistentialTypeRepresentation::Class: {
@@ -513,7 +516,6 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
       }
       OpaqueValue *innerValue
         = existentialType->projectValue(value);
-      inoutCanTake &= existentialType->mayTakeValue(value);
 
       return findDynamicValueAndType(innerValue, innerType,
                                      outValue, outType, inoutCanTake, false,
@@ -559,6 +561,7 @@ swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self,
   return outType;
 }
 
+
 /// Given a possibly-existential value, deallocate any buffer in its storage.
 static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
   switch (type->getKind()) {
@@ -575,6 +578,12 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
       break;
       
     case ExistentialTypeRepresentation::Opaque:
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+      swift::fatalError(
+          0 /* flags */,
+          "Attempting to move out of a copy-on-write existential");
+      break;
+#else
       auto existential =
         reinterpret_cast<OpaqueExistentialContainer*>(value);
 
@@ -586,6 +595,7 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
       // Deallocate the buffer.
       existential->Type->vw_deallocateBuffer(&existential->Buffer);
       break;
+#endif
     }
     return;
   }
@@ -730,7 +740,12 @@ static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
   ValueBuffer buffer;
   bool mustDeallocBuffer = false;
   if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    auto *valueAddr = sourceType->allocateBufferIn(&buffer);
+    source = sourceType->vw_initializeWithCopy(valueAddr, source);
+#else
     source = sourceType->vw_initializeBufferWithCopy(&buffer, source);
+#endif
     mustDeallocBuffer = true;
   }
 
@@ -740,7 +755,11 @@ static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
 
   // Deallocate the buffer if we used it.
   if (mustDeallocBuffer) {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    sourceType->deallocateBufferIn(&buffer);
+#else
     sourceType->vw_deallocateBuffer(&buffer);
+#endif
   }
 
   // The cast succeeded.
@@ -951,7 +970,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
     if (!canConsumeDynamicValue || !(flags & DynamicCastFlags::TakeOnSuccess)) {
-      swift_retain(object);
+      swift_unknownRetain(object);
     }
     maybeDeallocateSource(true);
     return true;
@@ -969,11 +988,21 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     // Fill in the type and value.
     destExistential->Type = srcDynamicType;
     if (canConsumeDynamicValue && (flags & DynamicCastFlags::TakeOnSuccess)) {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+      auto *value = srcDynamicType->allocateBoxForExistentialIn(&destExistential->Buffer);
+      srcDynamicType->vw_initializeWithTake(value, srcDynamicValue);
+#else
       srcDynamicType->vw_initializeBufferWithTake(&destExistential->Buffer,
                                                   srcDynamicValue);
+#endif
     } else {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+      auto *value = srcDynamicType->allocateBoxForExistentialIn(&destExistential->Buffer);
+      srcDynamicType->vw_initializeWithCopy(value, srcDynamicValue);
+#else
       srcDynamicType->vw_initializeBufferWithCopy(&destExistential->Buffer,
                                                   srcDynamicValue);
+#endif
     }
     maybeDeallocateSource(true);
     return true;
@@ -1487,6 +1516,21 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
     auto opaqueContainer =
       reinterpret_cast<OpaqueExistentialContainer*>(src);
     auto srcCapturedType = opaqueContainer->Type;
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    OpaqueValue *srcValue = srcType->projectValue(src);
+    // Can't 'take' out of a non-unique box. So we will force a copy.
+    auto subFlags = flags;
+    if (src != srcValue)
+      subFlags = subFlags - (DynamicCastFlags::DestroyOnFailure
+                             | DynamicCastFlags::TakeOnSuccess);
+    bool result = swift_dynamicCast(dest, srcValue, srcCapturedType, targetType,
+                                    subFlags);
+    // We were supposed to 'take' the source but we have copied. Reconcile by
+    // destroying the source.
+    if (src != srcValue)
+      if (shouldDeallocateSource(result, flags))
+        srcType->vw_destroy(src);
+#else
     OpaqueValue *srcValue =
       srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
     bool result = swift_dynamicCast(dest,
@@ -1496,6 +1540,7 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
                                     flags);
     if (src != srcValue)
       _maybeDeallocateOpaqueExistential(src, result, flags);
+#endif
     return result;
   }
   case ExistentialTypeRepresentation::Error: {
@@ -1545,11 +1590,21 @@ static void unwrapExistential(OpaqueValue *src,
       break;
     }
     case ExistentialTypeRepresentation::Opaque: {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+      auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
+      srcCapturedType = opaqueContainer->Type;
+      srcValue = srcType->projectValue(src);
+      // Can't take out of possibly shared existential boxes.
+      canTake = (src == srcValue);
+      assert(canTake == srcCapturedType->getValueWitnesses()->isValueInline() &&
+             "Only inline storage is take-able");
+#else
       auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
       srcCapturedType = opaqueContainer->Type;
       srcValue = srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
-      isOutOfLine = (src != srcValue);
       canTake = true;
+#endif
+      isOutOfLine = (src != srcValue);
       break;
     }
     case ExistentialTypeRepresentation::Error: {
@@ -1600,6 +1655,10 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
     if (shouldDeallocateSource(result, flags))
       srcType->vw_destroy(src);
   } else {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    assert(!isOutOfLine &&
+           "Should only see inline representations of existentials");
+#else
     // swift_dynamicCast took or destroyed the value as per the original request
     // We may still have an opaque existential container to deallocate.
     if (isOutOfLine) {
@@ -1607,6 +1666,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
                == ExistentialTypeRepresentation::Opaque);
       _maybeDeallocateOpaqueExistential(src, result, flags);
     }
+#endif
   }
 
   return result;
@@ -1703,11 +1763,27 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
     case ExistentialTypeRepresentation::Opaque: {
       auto srcExistential = (OpaqueExistentialContainer*) src;
       auto srcValueType = srcExistential->Type;
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+      // Can't 'take' out of a non-unique box. So we will force a copy.
+      auto subFlags = flags;
+      auto srcValue = srcExistentialType->projectValue(src);
+      if (src != srcValue)
+        subFlags = subFlags - (DynamicCastFlags::DestroyOnFailure |
+                               DynamicCastFlags::TakeOnSuccess);
+      bool result = _dynamicCastToMetatype(dest, srcValue, srcValueType,
+                                           targetType, subFlags);
+      // We were supposed to 'take' the source but we have copied. Reconcile by
+      // destroying the source.
+      if (src != srcValue)
+        if (shouldDeallocateSource(result, flags))
+          srcType->vw_destroy(src);
+#else
       auto srcValue = srcValueType->vw_projectBuffer(&srcExistential->Buffer);
       bool result = _dynamicCastToMetatype(dest, srcValue, srcValueType,
                                            targetType, flags);
       if (src != srcValue)
         _maybeDeallocateOpaqueExistential(src, result, flags);
+#endif
       return result;
     }
     case ExistentialTypeRepresentation::Error: {
@@ -1873,11 +1949,27 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
     case ExistentialTypeRepresentation::Opaque: {
       auto srcExistential = (OpaqueExistentialContainer*) src;
       auto srcValueType = srcExistential->Type;
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+      auto subFlags = flags;
+      auto srcValue = srcExistentialType->projectValue(src);
+      // Can't 'take' out of a non-unique box. So we will force a copy.
+      if (src != srcValue)
+        subFlags = subFlags - (DynamicCastFlags::DestroyOnFailure |
+                               DynamicCastFlags::TakeOnSuccess);
+      bool result = _dynamicCastToExistentialMetatype(
+          dest, srcValue, srcValueType, targetType, subFlags);
+      // We were supposed to 'take' the source but we have copied. Reconcile by
+      // destroying the source.
+      if (src != srcValue)
+        if (shouldDeallocateSource(result, flags))
+          srcType->vw_destroy(src);
+#else
       auto srcValue = srcValueType->vw_projectBuffer(&srcExistential->Buffer);
       bool result = _dynamicCastToExistentialMetatype(dest, srcValue, srcValueType,
                                                       targetType, flags);
       if (src != srcValue)
         _maybeDeallocateOpaqueExistential(src, result, flags);
+#endif
       return result;
     }
     case ExistentialTypeRepresentation::Error: {
@@ -2104,6 +2196,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                                           const Metadata *srcType,
                                           const Metadata *targetType,
                                           DynamicCastFlags flags) {
+  // These flag combinations are not handled here.
+  assert(!(flags & DynamicCastFlags::Unconditional));
+  assert(!(flags & DynamicCastFlags::DestroyOnFailure));
+
   // Swift type should be AnyObject or a class type.
   if (!srcType->isAnyClass()) {
     auto existential = dyn_cast<ExistentialTypeMetadata>(srcType);
@@ -2143,7 +2239,8 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   
   // Maybe we can cast the boxed value to our destination type somehow.
   auto innerFlags = flags - DynamicCastFlags::TakeOnSuccess
-                          - DynamicCastFlags::DestroyOnFailure;
+                          - DynamicCastFlags::DestroyOnFailure
+                          - DynamicCastFlags::Unconditional;
   if (swift_dynamicCast(dest, const_cast<OpaqueValue*>(boxedValue),
                         boxedType, targetType, innerFlags)) {
     // Release the box if we need to.
@@ -2434,10 +2531,19 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
     return unwrapResult.success;
 
 #if SWIFT_OBJC_INTEROP
-  // A class or AnyObject reference may point at a boxed _SwiftValue.
-  if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
-                                    targetType, flags)) {
-    return true;
+  // A class or AnyObject reference may point to a _SwiftValue box.
+  {
+    auto innerFlags = flags - DynamicCastFlags::Unconditional
+                            - DynamicCastFlags::DestroyOnFailure;
+    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
+                                      targetType, innerFlags)) {
+      // TakeOnSuccess was handled inside tryDynamicCastBoxedSwiftValue().
+      return true;
+    } else {
+      // Couldn't cast boxed value to targetType.
+      // Fall through and try to cast the _SwiftValue box itself to targetType.
+      // (for example, casting _SwiftValue to NSObject will be successful)
+    }
   }
 #endif
 
@@ -2841,7 +2947,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   }
 
   // The extra byte is for the tag.
-  auto targetSize = targetType->getValueWitnesses()->size + 1;
+  auto targetSize = targetType->getValueWitnesses()->getSize() + 1;
   auto targetAlignMask = targetType->getValueWitnesses()->getAlignmentMask();
 
   // Object that frees a buffer when it goes out of scope.
@@ -2934,11 +3040,19 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     if (consume) {
       if (canTake) {
         if (isOutOfLine) {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+          // Copy-on-write existentials share boxed and can't be 'take'n out of
+          // without a uniqueness check (which we currently don't do).
+          swift::fatalError(
+              0 /* flags */,
+              "Attempting to move out of a copy-on-write existential");
+#else
           // Should only be true of opaque existentials right now.
           assert(srcExistentialTy->getRepresentation()
                    == ExistentialTypeRepresentation::Opaque);
           auto container = reinterpret_cast<OpaqueExistentialContainer*>(src);
           srcInnerType->vw_deallocateBuffer(&container->Buffer);
+#endif
         }
       } else {
         // We didn't take the value, so clean up the existential value.
@@ -2998,8 +3112,7 @@ id _swift_bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 //===----------------------------------------------------------------------===//
 
 #define BRIDGING_CONFORMANCE_SYM \
-  SELECT_MANGLING(WPVs19_BridgeableMetatypes21_ObjectiveCBridgeables, \
-                  s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
+  MANGLE_SYM(s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
 
 extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
 

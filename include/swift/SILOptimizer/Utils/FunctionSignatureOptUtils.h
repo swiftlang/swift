@@ -22,6 +22,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -35,7 +36,7 @@ struct ArgumentDescriptor {
   SILFunctionArgument *Arg;
 
   /// Parameter Info.
-  SILParameterInfo PInfo;
+  Optional<SILParameterInfo> PInfo;
 
   /// The original index of this argument.
   unsigned Index;
@@ -77,11 +78,17 @@ struct ArgumentDescriptor {
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
   ArgumentDescriptor(SILFunctionArgument *A)
-      : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
+      : Arg(A),
+        PInfo(A->getKnownParameterInfo()),
+        Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
         OwnedToGuaranteed(false), IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), A->getType()) {}
+        ProjTree(A->getModule(), A->getType()) {
+        if (!A->isIndirectResult()) {
+           PInfo = Arg->getKnownParameterInfo();
+        }
+  }
 
   ArgumentDescriptor(const ArgumentDescriptor &) = delete;
   ArgumentDescriptor(ArgumentDescriptor &&) = default;
@@ -94,7 +101,15 @@ struct ArgumentDescriptor {
   }
 
   bool canOptimizeLiveArg() const {
-    return Arg->getType().isObject();
+    if (Arg->getType().isObject())
+      return true;
+    // @in arguments of generic types can be processed.
+    if (Arg->getType().getSwiftRValueType()->hasArchetype() &&
+        Arg->getType().isAddress() &&
+        (Arg->hasConvention(SILArgumentConvention::Indirect_In) ||
+         Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)))
+      return true;
+    return false;
   }
 
   /// Return true if it's both legal and a good idea to explode this argument.
@@ -176,7 +191,9 @@ struct ResultDescriptor {
 
 /// Returns true if F is a function which the pass know show to specialize
 /// function signatures for.
-bool canSpecializeFunction(SILFunction *F);
+bool canSpecializeFunction(SILFunction *F,
+                           const CallerAnalysis::FunctionInfo *FuncInfo,
+                           bool OptForPartialApply);
 
 /// Return true if this argument is used in a non-trivial way.
 bool hasNonTrivialNonDebugUse(SILArgument *Arg);

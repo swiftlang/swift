@@ -26,6 +26,20 @@ __attribute__((objc_root_class))
 + (void)classRef:(id)obj doSomething:(SEL)selector;
 @end
 
+@interface PropertyAndMethodCollisionInOneClass
+- (void)object;
++ (void)classRef;
+@property (getter=getObject) id object;
+@property (class,getter=getClassRef) id classRef;
+@end
+
+@interface PropertyAndMethodReverseCollisionInOneClass
+@property (getter=getObject) id object;
+@property (class,getter=getClassRef) id classRef;
+- (void)object;
++ (void)classRef;
+@end
+
 @protocol PropertyProto
 @property id protoProp;
 @property(readonly) id protoPropRO;

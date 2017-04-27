@@ -86,10 +86,27 @@ enum {
   NumSILLinkageBits = 3
 };
 
-/// Related to linkage: flag if a function or global variable is fragile.
-enum IsFragile_t {
-  IsNotFragile,
-  IsFragile
+/// Related to linkage: flag if a function or global variable is serialized,
+/// either unconditionally, or if referenced from another serialized function.
+enum IsSerialized_t : unsigned char {
+  // Never serialized.
+  IsNotSerialized,
+  // Serialized if referenced from another serialized function.
+  IsSerializable,
+  // Always serialized.
+  IsSerialized
+};
+
+/// The scope in which a subclassable class can be subclassed.
+enum class SubclassScope : unsigned char {
+  /// This class can be subclassed in other modules.
+  External,
+
+  /// This class can only be subclassed in this module.
+  Internal,
+
+  /// There is no class to subclass, or it is final.
+  NotApplicable,
 };
 
 /// Strip external from public_external, hidden_external. Otherwise just return
@@ -211,6 +228,28 @@ inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
     l2 = SILLinkage::Private;
 
   return unsigned(l1) > unsigned(l2);
+}
+
+inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
+                                                 SubclassScope scope) {
+  switch (scope) {
+  case SubclassScope::External:
+    if (linkage == SILLinkage::Private || linkage == SILLinkage::Hidden)
+      return SILLinkage::Public;
+    if (linkage == SILLinkage::PrivateExternal ||
+        linkage == SILLinkage::HiddenExternal)
+      return SILLinkage::PublicExternal;
+    break;
+
+  case SubclassScope::Internal:
+    if (linkage == SILLinkage::Private)
+      return SILLinkage::Hidden;
+    break;
+
+  case SubclassScope::NotApplicable:
+    break;
+  }
+  return linkage;
 }
 
 } // end swift namespace

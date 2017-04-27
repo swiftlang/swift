@@ -55,13 +55,6 @@ namespace swift {
       /// has been modified.
       Branches = 0x4,
 
-      /// The pass delete or created new functions.
-      ///
-      /// The intent behind this is so that analyses that cache
-      /// SILFunction* to be able to be invalidated and later
-      /// recomputed so that they are not holding dangling pointers.
-      Functions = 0x8,
-
       /// Convenience states:
       FunctionBody = Calls | Branches | Instructions,
 
@@ -69,7 +62,7 @@ namespace swift {
 
       BranchesAndInstructions = Branches | Instructions,
 
-      Everything = Functions | Calls | Branches | Instructions,
+      Everything = Calls | Branches | Instructions,
     };
 
     /// A list of the known analysis.
@@ -112,22 +105,20 @@ namespace swift {
     bool isLocked() { return invalidationLock; }
 
     /// Invalidate all information in this analysis.
-    virtual void invalidate(InvalidationKind K) {}
+    virtual void invalidate() = 0;
 
     /// Invalidate all of the information for a specific function.
-    virtual void invalidate(SILFunction *F, InvalidationKind K) {}
+    virtual void invalidate(SILFunction *F, InvalidationKind K) = 0;
 
-    /// Invalidate all of the information for a specific function. Also, we
-    /// know that this function is a dead function and going to be deleted from
-    /// the module.
-    virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
-      // Call the normal invalidate function unless overridden by specific
-      // analysis.
-      invalidate(F, K);
-    }
-    
     /// Notify the analysis about a newly created function.
-    virtual void notifyAnalysisOfFunction(SILFunction *F) {}
+    virtual void notifyAddFunction(SILFunction *F) = 0;
+
+    /// Notify the analysis about a function which will be deleted from the
+    /// module.
+    virtual void notifyDeleteFunction(SILFunction *F) = 0;
+
+    /// Notify the analysis about changed witness or vtables.
+    virtual void invalidateFunctionTables() = 0;
 
     /// Verify the state of this analysis.
     virtual void verify() const {}
@@ -177,6 +168,12 @@ namespace swift {
     /// meant to be overridden by subclasses.
     virtual void verify(AnalysisTy *A) const {}
 
+    void deleteAllAnalysisProviders() {
+      for (auto D : Storage)
+        delete D.second;
+      Storage.clear();
+    }
+
   public:
     /// Returns an analysis provider for a specific function \p F.
     AnalysisTy *get(SILFunction *F) {
@@ -190,19 +187,13 @@ namespace swift {
       return it.second;
     }
 
-    virtual void invalidate(SILAnalysis::InvalidationKind K) override {
-      if (!shouldInvalidate(K)) return;
-
-      for (auto D : Storage)
-        delete D.second;
-
-      Storage.clear();
+    /// Invalidate all information in this analysis.
+    virtual void invalidate() override {
+      deleteAllAnalysisProviders();
     }
 
-    virtual void invalidate(SILFunction *F,
-                            SILAnalysis::InvalidationKind K) override {
-      if (!shouldInvalidate(K)) return;
-
+    /// Helper function to remove the analysis data for a function.
+    void invalidateFunction(SILFunction *F) {
       auto &it = Storage.FindAndConstruct(F);
       if (it.second) {
         delete it.second;
@@ -210,10 +201,28 @@ namespace swift {
       }
     }
 
+    /// Invalidate all of the information for a specific function.
+    virtual void invalidate(SILFunction *F,
+                            SILAnalysis::InvalidationKind K) override {
+      if (shouldInvalidate(K))
+        invalidateFunction(F);
+    }
+
+    /// Notify the analysis about a newly created function.
+    virtual void notifyAddFunction(SILFunction *F) override { }
+
+    /// Notify the analysis about a function which will be deleted from the
+    /// module.
+    virtual void notifyDeleteFunction(SILFunction *F) override {
+      invalidateFunction(F);
+    }
+
+    /// Notify the analysis about changed witness or vtables.
+    virtual void invalidateFunctionTables() override { }
+
     FunctionAnalysisBase() {}
     virtual ~FunctionAnalysisBase() {
-      for (auto D : Storage)
-        delete D.second;
+      deleteAllAnalysisProviders();
     }
     FunctionAnalysisBase(AnalysisKind K) : SILAnalysis(K), Storage() {}
     FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;

@@ -1442,3 +1442,33 @@ func singleElementTupleArgument(completion: ((didAdjust: Bool)) -> Void) {
     completion((didAdjust: true))
 }
 
+
+// SR-4378 -- FIXME -- this should type check, it used to work in Swift 3.0
+
+final public class MutableProperty<Value> {
+    public init(_ initialValue: Value) {}
+}
+
+enum DataSourcePage<T> {
+    case notLoaded
+}
+
+let pages1: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
+    // expected-error@-1 {{cannot convert value of type 'MutableProperty<(data: _, totalCount: Int)>' to specified type 'MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)>'}}
+    data: .notLoaded,
+    totalCount: 0
+))
+
+
+let pages2: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
+    // expected-error@-1 {{cannot convert value of type 'MutableProperty<(data: DataSourcePage<_>, totalCount: Int)>' to specified type 'MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)>'}}
+    data: DataSourcePage.notLoaded,
+    totalCount: 0
+))
+
+
+let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
+    // expected-error@-1 {{expression type 'MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)>' is ambiguous without more context}}
+    data: DataSourcePage<Int>.notLoaded,
+    totalCount: 0
+))

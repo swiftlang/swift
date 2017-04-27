@@ -235,10 +235,9 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
   assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
          "A deallocation instruction expected");
   auto Ty = I->getOperand(0)->getType();
-  while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
-    Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
-                                    .getAnyOptionalObjectType());
-  auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
+  while (auto payloadTy = Ty.getAnyOptionalObjectType())
+    Ty = payloadTy;
+  auto Class = Ty.getClassOrBoundGenericClass();
   if (!Class || Class->hasClangNode() || !Class->hasDestructor())
     return CalleeList();
   SILDeclRef Destructor = SILDeclRef(Class->getDestructor());

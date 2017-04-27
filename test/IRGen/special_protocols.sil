@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -parse-stdlib -module-name Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 public protocol AnyObject: class {}
-// CHECK-LABEL: @_TMps9AnyObject = {{(protected )?}}constant %swift.protocol {
+// CHECK-LABEL: @_T0s9AnyObjectMp = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0049: special protocol 01, class, empty, swift
 // CHECK:         i32 73,
 // CHECK:         i16 0,
@@ -9,7 +9,7 @@ public protocol AnyObject: class {}
 // CHECK:         i32 0 }
 
 public protocol Error {}
-// CHECK-LABEL: @_TMps5Error = {{(protected )?}}constant %swift.protocol {
+// CHECK-LABEL: @_T0s5ErrorMp = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0087: special protocol 02, non-class, witness, swift
 // CHECK:         i32 135,
 // CHECK:         i16 0,
@@ -17,7 +17,7 @@ public protocol Error {}
 // CHECK:         i32 0 }
 
 public protocol PlainOldProtocol {}
-// CHECK-LABEL: @_TMps16PlainOldProtocol = {{(protected )?}}constant %swift.protocol {
+// CHECK-LABEL: @_T0s16PlainOldProtocolMp = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0007: no special protocol, non-class, witness, swift
 // CHECK:         i32 7,
 // CHECK:         i16 0,

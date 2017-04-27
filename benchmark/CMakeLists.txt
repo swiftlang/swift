@@ -29,6 +29,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySubscript
     single-source/BitCount
     single-source/ByteSwap
+    single-source/CString
     single-source/Calculator
     single-source/CaptureProp
     single-source/CharacterLiteralsLarge
@@ -43,7 +44,11 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySwap
+    single-source/DropFirst
+    single-source/DropLast
+    single-source/DropWhile
     single-source/ErrorHandling
+    single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/GlobalClass
     single-source/Hanoi
@@ -53,6 +58,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Integrate
     single-source/IterateData
     single-source/Join
+    single-source/LazyFilter
     single-source/LinkedList
     single-source/MapReduce
     single-source/Memset
@@ -75,6 +81,8 @@ set(SWIFT_BENCH_MODULES
     single-source/PolymorphicCalls
     single-source/PopFront
     single-source/PopFrontGeneric
+    single-source/Prefix
+    single-source/PrefixWhile
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
@@ -86,6 +94,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
+    single-source/SortLargeExistentials
     single-source/SortLettersInPlace
     single-source/SortStrings
     single-source/StackPromo
@@ -93,9 +102,12 @@ set(SWIFT_BENCH_MODULES
     single-source/StrComplexWalk
     single-source/StrToInt
     single-source/StringBuilder
+    single-source/StringEdits
     single-source/StringInterpolation
+    single-source/StringMatch
     single-source/StringTests
     single-source/StringWalk
+    single-source/Suffix
     single-source/SuperChars
     single-source/TwoSum
     single-source/TypeFlood

@@ -11,6 +11,30 @@ func test() {
 
 // Swift == 1
 // CHECK-LABEL:  key.name: "abs(:)",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
+// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
+// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
+// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
+// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.num_bytes_to_erase: 0,
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "Swift"
+// CHECK-NEXT: },
+
+// CHECK-LABEL:  key.name: "abs(:)",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
+// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
+// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
+// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
+// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.num_bytes_to_erase: 0,
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "Swift"
+// CHECK-NEXT: },
+
+// CHECK-LABEL:  key.name: "abs(:)",
 // CHECK-NEXT:   key.sourcetext: "abs(<#T##x: FloatingPoint##FloatingPoint#>)",
 // CHECK-NEXT:   key.description: "abs(x: FloatingPoint)",
 // CHECK-NEXT:   key.typename: "FloatingPoint",
@@ -18,8 +42,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "s:s3absxxs12SignedNumberRzlF",
-// CHECK-NEXT:   key.modulename: "Swift"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "Swift"
 // CHECK-NEXT: },
 
 // FooHelper.FooHelperExplicit == 1
@@ -30,8 +54,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "c:@F@fooHelperExplicitFrameworkFunc1",
-// CHECK-NEXT:   key.modulename: "FooHelper.FooHelperExplicit"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "FooHelper.FooHelperExplicit"
 // CHECK-NEXT: },
 
 // ImportsImportsFoo == 1
@@ -42,8 +66,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "c:@F@importsImportsFoo",
-// CHECK-NEXT:   key.modulename: "ImportsImportsFoo"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "ImportsImportsFoo"
 // CHECK-NEXT: },
 
 // Bar == 2
@@ -54,8 +78,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 2,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "c:objc(cs)BarForwardDeclaredClass",
-// CHECK-NEXT:   key.modulename: "Bar"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "Bar"
 // CHECK-NEXT: },
 
 // ImportsFoo == 2
@@ -66,8 +90,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 2,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "c:@F@importsFoo",
-// CHECK-NEXT:   key.modulename: "ImportsFoo"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "ImportsFoo"
 // CHECK-NEXT: },
 
 // Foo == FooSub == 3
@@ -78,8 +102,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 3,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "c:objc(cs)FooClassBase",
-// CHECK-NEXT:   key.modulename: "Foo"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "Foo"
 // CHECK-NEXT: },
 
 // CHECK-LABEL:  key.name: "FooSubEnum1",
@@ -89,8 +113,8 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 3,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "c:@E@FooSubEnum1",
-// CHECK-NEXT:   key.modulename: "Foo.FooSub"
+// CHECK-NOT:    key.modulename
+// CHECK:        key.modulename: "Foo.FooSub"
 // CHECK-NEXT: },
 
 // FooHelper == 4
@@ -103,6 +127,6 @@ func test() {
 // xCHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // xCHECK-NEXT:   key.moduleimportdepth: 4,
 // xCHECK-NEXT:   key.num_bytes_to_erase: 0,
-// xCHECK:   key.associated_usrs: "c:FooHelper.h@Ea@FooHelperUnnamedEnumeratorA2",
-// xCHECK-NEXT:   key.modulename: "FooHelper"
+// xCHECK-NOT:    key.modulename
+// xCHECK:        key.modulename: "FooHelper"
 // xCHECK-NEXT: },

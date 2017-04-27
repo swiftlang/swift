@@ -104,16 +104,6 @@ public struct Selector : ExpressibleByStringLiteral {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
-  /// Create an instance initialized to `value`.
-  public init(unicodeScalarLiteral value: String) {
-    self.init(value)
-  }
-
-  /// Construct a selector from `value`.
-  public init(extendedGraphemeClusterLiteral value: String) {
-    self.init(value)
-  }
-
   // FIXME: Fast-path this in the compiler, so we don't end up with
   // the sel_registerName call at compile time.
   /// Create an instance initialized to `value`.
@@ -142,11 +132,7 @@ extension Selector : Equatable, Hashable {
 extension Selector : CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
-    let name = sel_getName(self)
-    if name == nil {
-      return "<NULL>"
-    }
-    return String(cString: name!)
+    return String(_sel: self)
   }
 }
 
@@ -220,6 +206,7 @@ extension NSObject : Equatable, Hashable {
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
+  @objc
   open var hashValue: Int {
     return hash
   }

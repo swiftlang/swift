@@ -353,18 +353,8 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   }
 }
 
-extension String : ExpressibleByUnicodeScalarLiteral {
-  /// Creates an instance initialized to the given Unicode scalar value.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal that contains a single
-  /// Unicode scalar value.
-  public init(unicodeScalarLiteral value: String) {
-    self = value
-  }
-}
-
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+  @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -379,19 +369,8 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   }
 }
 
-extension String : ExpressibleByExtendedGraphemeClusterLiteral {
-  /// Creates an instance initialized to the given extended grapheme cluster
-  /// literal.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal containing a single
-  /// extended grapheme cluster.
-  public init(extendedGraphemeClusterLiteral value: String) {
-    self = value
-  }
-}
-
 extension String : _ExpressibleByBuiltinUTF16StringLiteral {
+  @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF16")
   public init(
@@ -409,6 +388,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
 }
 
 extension String : _ExpressibleByBuiltinStringLiteral {
+  @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -554,6 +534,7 @@ extension String {
   ///
   /// Low-level construction interface used by introspection
   /// implementation in the runtime library.
+  @_inlineable
   @_silgen_name("swift_stringFromUTF8InRawMemory")
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(
@@ -744,13 +725,13 @@ extension String {
         // }
         let value = source[i]
         let isUpper =
-          _asciiUpperCaseTable >>
-          UInt64(((value &- 1) & 0b0111_1111) >> 1)
-        let add = (isUpper & 0x1) << 5
+          _asciiUpperCaseTable &>>
+          UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+        let add = (isUpper & 0x1) &<< 5
         // Since we are left with either 0x0 or 0x20, we can safely truncate to
         // a UInt8 and add to our ASCII value (this will not overflow numbers in
         // the ASCII range).
-        dest.storeBytes(of: value &+ UInt8(truncatingBitPattern: add),
+        dest.storeBytes(of: value &+ UInt8(extendingOrTruncating: add),
           toByteOffset: i, as: UInt8.self)
       }
       return String(_storage: buffer)
@@ -786,10 +767,10 @@ extension String {
         // See the comment above in lowercaseString.
         let value = source[i]
         let isLower =
-          _asciiLowerCaseTable >>
-          UInt64(((value &- 1) & 0b0111_1111) >> 1)
-        let add = (isLower & 0x1) << 5
-        dest.storeBytes(of: value &- UInt8(truncatingBitPattern: add),
+          _asciiLowerCaseTable &>>
+          UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+        let add = (isLower & 0x1) &<< 5
+        dest.storeBytes(of: value &- UInt8(extendingOrTruncating: add),
           toByteOffset: i, as: UInt8.self)
       }
       return String(_storage: buffer)

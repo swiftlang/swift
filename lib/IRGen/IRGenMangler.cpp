@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenMangler.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/AST/ExistentialLayout.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
 using namespace irgen;
@@ -24,7 +25,7 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
   switch (witness) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitness::NAME: Code = #MANGLING; break;
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
     case ValueWitness::Size:
     case ValueWitness::Flags:
     case ValueWitness::Stride:
@@ -76,21 +77,41 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
 
 std::string IRGenMangler::
 mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
-  SmallVector<ProtocolDecl *, 4> protocols;
-  type->getAnyExistentialTypeProtocols(protocols);
+  ExistentialLayout layout = type->getExistentialLayout();
 
-  if (protocols.empty()) {
+  if (type->isAny()) {
     Buffer << "Any";
+  } else if (layout.isAnyObject()) {
+    Buffer << "AnyObject";
   } else {
     // To make LLVM IR more readable we always add a 'T' prefix so that type names
     // don't start with a digit and don't need to be quoted.
     Buffer << 'T';
+    auto protocols = layout.getProtocols();
     for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      appendProtocolName(protocols[i]);
+      appendProtocolName(protocols[i]->getDecl());
       if (i == 0)
         appendOperator("_");
     }
-    appendOperator("p");
+    if (layout.superclass) {
+      auto superclassTy = layout.superclass;
+
+      // We share type infos for different instantiations of a generic type
+      // when the archetypes have the same exemplars.  We cannot mangle
+      // archetypes, and the mangling does not have to be unique, so we just
+      // mangle the unbound generic form of the type.
+      if (superclassTy->hasArchetype()) {
+        superclassTy = superclassTy->getClassOrBoundGenericClass()
+          ->getDeclaredType();
+      }
+
+      appendType(CanType(superclassTy));
+      appendOperator("Xc");
+    } else if (layout.getLayoutConstraint()) {
+      appendOperator("Xl");
+    } else {
+      appendOperator("p");
+    }
   }
   return finalize();
 }

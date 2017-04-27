@@ -55,8 +55,19 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
   IsZeroKind RHS = isZeroValue(BI->getArguments()[1]);
 
   // Can't handle unknown values.
-  if (LHS == IsZeroKind::Unknown || RHS == IsZeroKind::Unknown)
+  if (LHS == IsZeroKind::Unknown) {
     return nullptr;
+  }
+
+  // Canonicalize i1_const == X to X == i1_const.
+  // Canonicalize i1_const != X to X != i1_const.
+  if (RHS == IsZeroKind::Unknown) {
+    auto *CanonI =
+        Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
+                              {BI->getArguments()[1], BI->getArguments()[0]});
+    replaceInstUsesWith(*BI, CanonI);
+    return eraseInstFromFunction(*BI);
+  }
 
   // Can't handle non-zero ptr values.
   if (LHS == IsZeroKind::NotZero && RHS == IsZeroKind::NotZero)
@@ -92,8 +103,7 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
 }
 
 static unsigned getTypeWidth(SILType Ty) {
-  if (auto BuiltinIntTy =
-          dyn_cast<BuiltinIntegerType>(Ty.getSwiftRValueType())) {
+  if (auto BuiltinIntTy = Ty.getAs<BuiltinIntegerType>()) {
     if (BuiltinIntTy->isFixedWidth()) {
       return BuiltinIntTy->getFixedWidth();
     }
@@ -289,7 +299,8 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
 
   // index_raw_pointer's address type is currently always strict.
   auto *NewPTAI = Builder.createPointerToAddress(
-    I->getLoc(), Ptr, InstanceType.getAddressType(), /*isStrict*/ true);
+    I->getLoc(), Ptr, InstanceType.getAddressType(),
+    /*isStrict*/ true, /*isInvariant*/ false);
 
   auto *DistanceAsWord =
       Builder.createBuiltin(I->getLoc(), TruncOrBitCast->getName(),

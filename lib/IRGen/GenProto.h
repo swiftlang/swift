@@ -71,26 +71,6 @@ namespace irgen {
                                              llvm::Value *wtable,
                                            AssociatedTypeDecl *associatedType);
 
-  /// Given a type T and an associated type path X.Y of a protocol PT to which
-  /// T conforms, where X is required to implement some protocol PX, return
-  /// the witness table witnessing the conformance of T.X.Y to PX.
-  ///
-  /// PX must be a direct requirement of PT.
-  ///
-  /// \param parentMetadata - the type metadata for T
-  /// \param wtable - the witness table witnessing the conformance of T to PT
-  /// \param parentProtocol - PT
-  /// \param associatedType - the path X.Y, a dependent type within PT
-  /// \param associatedTypeMetadata - the type metadata for T.X.Y
-  /// \param associatedProtocol - the declaration of PX
-  llvm::Value *emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
-                                                 llvm::Value *parentMetadata,
-                                                 llvm::Value *wtable,
-                                          ProtocolDecl *parentProtocol,
-                                          CanType associatedType,
-                                          llvm::Value *associatedTypeMetadata,
-                                          ProtocolDecl *associatedProtocol);
-
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,

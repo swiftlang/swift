@@ -285,6 +285,7 @@ struct CursorInfo {
   /// All available actions on the code under cursor.
   ArrayRef<StringRef> AvailableActions;
   bool IsSystem = false;
+  llvm::Optional<unsigned> ParentNameOffset;
 };
 
 struct RangeInfo {
@@ -327,6 +328,7 @@ struct DocGenericParam {
 struct DocEntityInfo {
   UIdent Kind;
   llvm::SmallString<32> Name;
+  llvm::SmallString<32> SubModuleName;
   llvm::SmallString<32> Argument;
   llvm::SmallString<64> USR;
   llvm::SmallString<64> OriginalUSR;
@@ -462,6 +464,9 @@ public:
 
   virtual void editorExtractTextFromComment(StringRef Source,
                                             EditorConsumer &Consumer) = 0;
+
+  virtual void editorConvertMarkupToXML(StringRef Source,
+                                        EditorConsumer &Consumer) = 0;
 
   virtual void editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                        unsigned Length,

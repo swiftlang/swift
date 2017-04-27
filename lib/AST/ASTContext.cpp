@@ -17,8 +17,8 @@
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -28,6 +28,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
@@ -111,6 +112,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.DefaultPrecedence.
   PrecedenceGroupDecl *DefaultPrecedence = nullptr;
 
+  /// The AnyObject type.
+  CanType AnyObjectType;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -162,6 +166,9 @@ struct ASTContext::Implementation {
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
+  /// func append(Element) -> void
+  FuncDecl *ArrayAppendElementDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -205,6 +212,12 @@ struct ASTContext::Implementation {
   llvm::DenseMap<NormalProtocolConformance *,
                  std::vector<ASTContext::DelayedConformanceDiag>>
     DelayedConformanceDiags;
+
+  /// Map from normal protocol conformances to missing witnesses that have
+  /// been delayed until the conformance is fully checked, so that we can
+  /// issue a fixit that fills the entire protocol stub.
+  llvm::DenseMap<NormalProtocolConformance *, std::vector<ValueDecl*>>
+    DelayedMissingWitnesses;
 
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
@@ -260,11 +273,8 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
+    llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
-
-    llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
-                   SubstitutionList>
-      BoundGenericSubstitutions;
 
     /// The set of normal protocol conformances.
     llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
@@ -306,7 +316,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
-  llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
@@ -409,7 +418,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>())),
+    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                            /*HasExplicitAnyObject=*/false)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -664,6 +674,29 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
   llvm_unreachable("bad pointer kind");
 }
 
+CanType ASTContext::getAnyObjectType() const {
+  if (Impl.AnyObjectType) {
+    return Impl.AnyObjectType;
+  }
+
+  // Go find 'AnyObject' in the Swift module.
+  //
+  // FIXME: This is going away.
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("AnyObject", results);
+  for (auto result : results) {
+    if (auto proto = dyn_cast<ProtocolDecl>(result)) {
+      Impl.AnyObjectType = proto->getDeclaredType()->getCanonicalType();
+      return Impl.AnyObjectType;
+    }
+  }
+
+  Impl.AnyObjectType = CanType(
+    ProtocolCompositionType::get(
+      *this, {}, /*HasExplicitAnyObject=*/true));
+  return Impl.AnyObjectType;
+}
+
 CanType ASTContext::getNeverType() const {
   return getNeverDecl()->getDeclaredType()->getCanonicalType();
 }
@@ -879,6 +912,56 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
         resultType->isEqual(boolType)) {
       Impl.EqualIntDecl = funcDecl;
       return funcDecl;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getArrayAppendElementDecl() const {
+  if (Impl.ArrayAppendElementDecl)
+    return Impl.ArrayAppendElementDecl;
+
+  auto AppendFunctions = getArrayDecl()->lookupDirect(getIdentifier("append"));
+
+  for (auto CandidateFn : AppendFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.append_element")
+        continue;
+
+      auto ParamLists = FnDecl->getParameterLists();
+      if (ParamLists.size() != 2)
+        return nullptr;
+      if (ParamLists[0]->size() != 1)
+        return nullptr;
+
+      InOutType *SelfInOutTy =
+        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
+      if (!SelfInOutTy)
+        return nullptr;
+
+      BoundGenericStructType *SelfGenericStructTy =
+        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      if (!SelfGenericStructTy)
+        return nullptr;
+      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+        return nullptr;
+
+      if (ParamLists[1]->size() != 1)
+        return nullptr;
+      GenericTypeParamType *ElementType = ParamLists[1]->get(0)->
+                             getInterfaceType()->getAs<GenericTypeParamType>();
+      if (!ElementType)
+        return nullptr;
+      if (ElementType->getName() != getIdentifier("Element"))
+        return nullptr;
+
+      if (!FnDecl->getResultInterfaceType()->isVoid())
+        return nullptr;
+
+      Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
     }
   }
   return nullptr;
@@ -1101,52 +1184,6 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
                         : AllocationArena::Permanent;
 }
 
-Optional<SubstitutionList>
-ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
-                                       DeclContext *gpContext) const {
-  assert(gpContext && "No generic parameter context");
-  assert(gpContext->getGenericEnvironmentOfContext() != nullptr &&
-         "Not type-checked yet");
-  assert(BGT->getGenericArgs().size() == 1);
-  Substitution Subst(BGT->getGenericArgs()[0], {});
-  auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
-  auto arena = getArena(BGT->getRecursiveProperties());
-  Impl.getArena(arena).BoundGenericSubstitutions
-    .insert(std::make_pair(std::make_pair(BGT, gpContext), Substitutions));
-  return Substitutions;
-}
-
-Optional<SubstitutionList>
-ASTContext::getSubstitutions(TypeBase *type,
-                             DeclContext *gpContext) const {
-  assert(gpContext && "Missing generic parameter context");
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &boundGenericSubstitutions
-    = Impl.getArena(arena).BoundGenericSubstitutions;
-  auto known = boundGenericSubstitutions.find({type, gpContext});
-  if (known != boundGenericSubstitutions.end())
-    return known->second;
-
-  // We can trivially create substitutions for Array and Optional.
-  if (auto bound = dyn_cast<BoundGenericType>(type))
-    if (bound->getDecl() == getArrayDecl() ||
-        bound->getDecl() == getOptionalDecl())
-      return createTrivialSubstitutions(bound, gpContext);
-
-  return None;
-}
-
-void ASTContext::setSubstitutions(TypeBase* type,
-                                  DeclContext *gpContext,
-                                  SubstitutionList Subs) const {
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &boundGenericSubstitutions
-    = Impl.getArena(arena).BoundGenericSubstitutions;
-  assert(boundGenericSubstitutions.count({type, gpContext}) == 0 &&
-         "Already have substitutions?");
-  boundGenericSubstitutions[{type, gpContext}] = Subs;
-}
-
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
                                bool isSystem) {
   OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
@@ -1260,6 +1297,60 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   builder->addGenericSignature(sig);
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
+
+#ifndef NDEBUG
+  if (builder->getGenericSignature()->getCanonicalSignature() != sig) {
+    llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
+    llvm::errs() << "Original generic signature   : ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\nReprocessed generic signature: ";
+    auto reprocessedSig =
+    builder->getGenericSignature()->getCanonicalSignature();
+
+    reprocessedSig->print(llvm::errs());
+    llvm::errs() << "\n";
+
+    if (sig->getGenericParams().size() ==
+          reprocessedSig->getGenericParams().size() &&
+        sig->getRequirements().size() ==
+          reprocessedSig->getRequirements().size()) {
+      for (unsigned i : indices(sig->getRequirements())) {
+        auto sigReq = sig->getRequirements()[i];
+        auto reprocessedReq = reprocessedSig->getRequirements()[i];
+        if (sigReq.getKind() != reprocessedReq.getKind()) {
+          llvm::errs() << "Requirement mismatch:\n";
+          llvm::errs() << "  Original: ";
+          sigReq.print(llvm::errs(), PrintOptions());
+          llvm::errs() << "\n  Reprocessed: ";
+          reprocessedReq.print(llvm::errs(), PrintOptions());
+          llvm::errs() << "\n";
+          break;
+        }
+
+        if (!sigReq.getFirstType()->isEqual(reprocessedReq.getFirstType())) {
+          llvm::errs() << "First type mismatch, original is:\n";
+          sigReq.getFirstType().dump(llvm::errs());
+          llvm::errs() << "Reprocessed:\n";
+          reprocessedReq.getFirstType().dump(llvm::errs());
+          llvm::errs() << "\n";
+          break;
+        }
+
+        if (sigReq.getKind() == RequirementKind::SameType &&
+            !sigReq.getSecondType()->isEqual(reprocessedReq.getSecondType())) {
+          llvm::errs() << "Second type mismatch, original is:\n";
+          sigReq.getSecondType().dump(llvm::errs());
+          llvm::errs() << "Reprocessed:\n";
+          reprocessedReq.getSecondType().dump(llvm::errs());
+          llvm::errs() << "\n";
+          break;
+        }
+      }
+    }
+
+    llvm_unreachable("idempotency problem with a generic signature");
+  }
+#endif
 
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
@@ -1385,16 +1476,14 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 
 NormalProtocolConformance *
 ASTContext::getBehaviorConformance(Type conformingType,
-                                   Type conformingInterfaceType,
                                    ProtocolDecl *protocol,
                                    SourceLoc loc,
                                    AbstractStorageDecl *storage,
                                    ProtocolConformanceState state) {
   auto conformance = new (*this, AllocationArena::Permanent)
-    NormalProtocolConformance(conformingType, conformingInterfaceType,
-                              protocol, loc, storage, state);
+    NormalProtocolConformance(conformingType, protocol, loc, storage, state);
 
-  if (auto nominal = conformingInterfaceType->getAnyNominal()) {
+  if (auto nominal = conformingType->getRValueInstanceType()->getAnyNominal()) {
     // Note: this is an egregious hack. The conformances need to be associated
     // with the actual storage declarations.
     SmallVector<ProtocolConformance *, 2> conformances;
@@ -1437,7 +1526,7 @@ ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       SubstitutionList substitutions) {
   llvm::FoldingSetNodeID id;
-  SpecializedProtocolConformance::Profile(id, type, generic);
+  SpecializedProtocolConformance::Profile(id, type, generic, substitutions);
 
   // Figure out which arena this conformance should go into.
   AllocationArena arena = getArena(type->getRecursiveProperties());
@@ -1455,6 +1544,17 @@ ASTContext::getSpecializedConformance(Type type,
                                                         substitutions);
   specializedConformances.InsertNode(result, insertPos);
   return result;
+}
+
+SpecializedProtocolConformance *
+ASTContext::getSpecializedConformance(Type type,
+                                      ProtocolConformance *generic,
+                                      const SubstitutionMap &subMap) {
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = generic->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
+
+  return getSpecializedConformance(type, generic, subs);
 }
 
 InheritedProtocolConformance *
@@ -1530,6 +1630,24 @@ void ASTContext::addDelayedConformanceDiag(
   Impl.DelayedConformanceDiags[conformance].push_back(std::move(fn));
 }
 
+void ASTContext::
+addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
+                           ArrayRef<ValueDecl*> witnesses) {
+  auto &bucket = Impl.DelayedMissingWitnesses[conformance];
+  bucket.insert(bucket.end(), witnesses.begin(), witnesses.end());
+}
+
+std::vector<ValueDecl*> ASTContext::
+takeDelayedMissingWitnesses(NormalProtocolConformance *conformance) {
+  std::vector<ValueDecl*> result;
+  auto known = Impl.DelayedMissingWitnesses.find(conformance);
+  if (known != Impl.DelayedMissingWitnesses.end()) {
+    result = std::move(known->second);
+    Impl.DelayedMissingWitnesses.erase(known);
+  }
+  return result;
+}
+
 std::vector<ASTContext::DelayedConformanceDiag>
 ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
   std::vector<ASTContext::DelayedConformanceDiag> result;
@@ -1598,13 +1716,12 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
-    llvm::capacity_in_bytes(DynamicSelfTypes) +
+    llvm::capacity_in_bytes(DynamicSelfTypes);
     // EnumTypes ?
     // StructTypes ?
     // ClassTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
-    llvm::capacity_in_bytes(BoundGenericSubstitutions);
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
@@ -2742,28 +2859,38 @@ void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
 }
 
 ProtocolCompositionType *
-ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
+ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
+                               bool HasExplicitAnyObject) {
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Protocols);
-  if (ProtocolCompositionType *Result
-        = C.Impl.ProtocolCompositionTypes.FindNodeOrInsertPos(ID, InsertPos))
-    return Result;
+  ProtocolCompositionType::Profile(ID, Members, HasExplicitAnyObject);
 
   bool isCanonical = true;
-  for (Type t : Protocols) {
+  RecursiveTypeProperties properties;
+  for (Type t : Members) {
     if (!t->isCanonical())
       isCanonical = false;
+    properties |= t->getRecursiveProperties();
   }
 
   // Create a new protocol composition type.
-  ProtocolCompositionType *New
-    = new (C, AllocationArena::Permanent)
+  auto arena = getArena(properties);
+
+  if (auto compTy
+      = C.Impl.getArena(arena).ProtocolCompositionTypes
+          .FindNodeOrInsertPos(ID, InsertPos))
+    return compTy;
+
+  auto compTy
+    = new (C, arena)
         ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Protocols));
-  C.Impl.ProtocolCompositionTypes.InsertNode(New, InsertPos);
-  return New;
+                                C.AllocateCopy(Members),
+                                HasExplicitAnyObject,
+                                properties);
+  C.Impl.getArena(arena).ProtocolCompositionTypes
+    .InsertNode(compTy, InsertPos);
+  return compTy;
 }
 
 ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
@@ -3404,20 +3531,27 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
     knownID = UUID::fromTime();
   }
 
-  llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
-  assert(existential->isExistentialType());
-  existential->getAnyExistentialTypeProtocols(conformsTo);
-  Type superclass = existential->getSuperclass(nullptr);
+  auto layout = existential->getExistentialLayout();
+
+  SmallVector<ProtocolDecl *, 2> protos;
+  for (auto proto : layout.getProtocols())
+    protos.push_back(proto->getDecl());
+
+  auto layoutConstraint = layout.getLayoutConstraint();
 
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
       totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-        conformsTo.size(), superclass ? 1 : 0, 0, 1),
+      protos.size(),
+      layout.superclass ? 1 : 0,
+      layoutConstraint ? 1 : 0, 1),
       alignof(ArchetypeType), arena);
 
+  // FIXME: Pass in class layout constraint
   auto result =
-      ::new (mem) ArchetypeType(ctx, existential, conformsTo, superclass,
-                                existential->getLayoutConstraint(), *knownID);
+      ::new (mem) ArchetypeType(ctx, existential,
+                                protos, layout.superclass,
+                                layoutConstraint, *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);
@@ -3543,18 +3677,18 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
-                                         Identifier baseName,
+                                         DeclBaseName baseName,
                                          ArrayRef<Identifier> argumentNames) {
-  id.AddPointer(baseName.get());
+  id.AddPointer(baseName.getAsOpaquePointer());
   id.AddInteger(argumentNames.size());
   for (auto arg : argumentNames)
     id.AddPointer(arg.get());
 }
 
-void DeclName::initialize(ASTContext &C, Identifier baseName,
+void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
   if (argumentNames.size() == 0) {
-    SimpleOrCompound = IdentifierAndCompound(baseName, true);
+    SimpleOrCompound = BaseNameAndCompound(baseName, true);
     return;
   }
 
@@ -3580,7 +3714,7 @@ void DeclName::initialize(ASTContext &C, Identifier baseName,
 
 /// Build a compound value name given a base name and a set of argument names
 /// extracted from a parameter list.
-DeclName::DeclName(ASTContext &C, Identifier baseName,
+DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
   
@@ -3645,19 +3779,19 @@ ForeignRepresentationInfo
 ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                          ForeignLanguage language,
                                          const DeclContext *dc) {
-  if (Impl.ForeignRepresentableCache.empty()) {
-    // Local function to add a type with the given name and module as
-    // trivially-representable.
-    auto addTrivial = [&](Identifier name, ModuleDecl *module,
-                          bool allowOptional = false) {
-      if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
-        auto info = ForeignRepresentationInfo::forTrivial();
-        if (allowOptional)
-          info = ForeignRepresentationInfo::forTrivialWithOptional();
-        Impl.ForeignRepresentableCache.insert({type, info});
-      }
-    };
+  // Local function to add a type with the given name and module as
+  // trivially-representable.
+  auto addTrivial = [&](Identifier name, ModuleDecl *module,
+                        bool allowOptional = false) {
+    if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
+      auto info = ForeignRepresentationInfo::forTrivial();
+      if (allowOptional)
+        info = ForeignRepresentationInfo::forTrivialWithOptional();
+      Impl.ForeignRepresentableCache.insert({type, info});
+    }
+  };
 
+  if (Impl.ForeignRepresentableCache.empty()) {
     // Pre-populate the foreign-representable cache with known types.
     if (auto stdlib = getStdlibModule()) {
       addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
@@ -3709,7 +3843,45 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   // yet. If we've never seen this nominal type before, or if we have
   // an out-of-date negative cached value, we'll have to go looking.
   auto known = Impl.ForeignRepresentableCache.find(nominal);
-  if (known == Impl.ForeignRepresentableCache.end() ||
+  bool wasNotFoundInCache = known == Impl.ForeignRepresentableCache.end();
+
+  // For the REPL. We might have initialized the cache above before CoreGraphics
+  // was loaded.
+  //   let s = "" // Here we initialize the ForeignRepresentableCache.
+  //   import Foundation
+  //   let pt = CGPoint(x: 1.0, y: 2.0) // Here we query for CGFloat.
+  // Add CGFloat as trivial if we encounter it later.
+  // If the type was not found check if it would be found after having recently
+  // loaded the module.
+  // Similar for types for other non stdlib modules.
+  auto conditionallyAddTrivial = [&](NominalTypeDecl *nominalDecl,
+                                     Identifier typeName, Identifier moduleName,
+                                     bool allowOptional = false) {
+    if (nominal->getName() == typeName && wasNotFoundInCache) {
+      if (auto module = getLoadedModule(moduleName)) {
+        addTrivial(typeName, module, allowOptional);
+        known = Impl.ForeignRepresentableCache.find(nominal);
+        wasNotFoundInCache = known == Impl.ForeignRepresentableCache.end();
+      }
+    }
+  };
+  conditionallyAddTrivial(nominal, getIdentifier("DarwinBoolean") , Id_Darwin);
+  conditionallyAddTrivial(nominal, Id_Selector, Id_ObjectiveC, true);
+  conditionallyAddTrivial(nominal, getIdentifier("ObjCBool"), Id_ObjectiveC);
+  conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
+  conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreGraphics"));
+  const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
+#define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
+  {                                                                            \
+    char name[] = #BASENAME "0";                                               \
+    for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {         \
+      *(std::end(name) - 2) = '0' + i;                                         \
+      conditionallyAddTrivial(nominal, getIdentifier(name), Id_simd);          \
+    }                                                                          \
+  }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+
+  if (wasNotFoundInCache ||
       (known->second.getKind() == ForeignRepresentableKind::None &&
        known->second.getGeneration() < CurrentGeneration)) {
     Optional<ForeignRepresentationInfo> result;
@@ -3798,6 +3970,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
+          nominal == getSubstringDecl() ||
           nominal == getErrorDecl() ||
           nominal == getAnyHashableDecl() ||
           // Foundation's overlay depends on the CoreGraphics overlay, but
@@ -4051,8 +4224,13 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionList Args) {
   llvm::FoldingSetNodeID id;
+
+  // Canonicalize substitutions.
+  SmallVector<Substitution, 4> CanArgs;
+  Args = getCanonicalSubstitutionList(Args, CanArgs);
+
   Profile(id, Layout, Args);
-  
+
   // Return an existing layout if there is one.
   void *insertPos;
   auto &SILBoxTypes = C.Impl.SILBoxTypes;
@@ -4090,6 +4268,12 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
                                                       unsigned SizeInBits,
                                                       unsigned Alignment,
                                                       ASTContext &C) {
+  if (!LayoutConstraintInfo::isKnownSizeTrivial(Kind)) {
+    assert(SizeInBits == 0);
+    assert(Alignment == 0);
+    return getLayoutConstraint(Kind);
+  }
+
   // Check to see if we've already seen this tuple before.
   llvm::FoldingSetNodeID ID;
   LayoutConstraintInfo::Profile(ID, Kind, SizeInBits, Alignment);
@@ -4110,7 +4294,4 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
-LayoutConstraint LayoutConstraint::getUnknownLayout(ASTContext &C) {
-  return getLayoutConstraint(LayoutConstraintKind::UnknownLayout, 0, 0, C);
-}
 

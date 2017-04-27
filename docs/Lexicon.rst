@@ -70,6 +70,12 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     `mandatory passes <mandatory passes / mandatory optimizations>` have run.
     This can be used as input to IRGen to generate LLVM IR or object files.
 
+  canonical type
+    A unique representation of a type, with any `sugar <sugared type>` removed.
+    These can usually be directly compared to test whether two types are the
+    same; the exception is when generics get involved. In this case you'll need
+    a `generic environment`. Contrast with `sugared type`.
+
   Clang importer
     The part of the compiler that reads C and Objective-C declarations and
     exposes them as Swift. Essentially contains a small instance of Clang
@@ -110,6 +116,20 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Describes a type or function where making changes will break binary
     compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
 
+  generic environment
+    Provides context for interpreting a type that may have generic parameters
+    in it. Generic parameter types are normally just represented as "first
+    generic parameter in the outermost context" (or similar), so it's up to the
+    generic environment to note that that type must be a Collection. (Another
+    way of looking at it is that the generic environment connects
+    `interface types <interface type>` with
+    `contextual types <contextual type>`).
+
+  generic signature
+    A representation of all generic parameters and their requirements. Like
+    types, generic signatures can be `canonicalized <canonical type>` to be
+    compared directly.
+
   iff
     "`if and only if`__". This term comes from mathematics.
 
@@ -123,6 +143,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     conformances and requirements in the generic signature and not in the types
     themselves. They can be compared across declarations but cannot be used
     directly from within the context.
+
+  irrefutable pattern
+    A pattern that always matches. These patterns either bind to a variable or
+    perform structural modification, e.x.:
+
+    1. ``case _:``.
+    2. ``case let x:``.
+    3. ``case (_, _):``.
 
   IR
     1. "intermediate representation": a generic term for a format representing
@@ -284,6 +312,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     An implicit representation change that occurs when a value is used with
     a different `abstraction pattern` from its current representation.
 
+  refutable pattern
+    A pattern that may not always match. These include patterns such as:
+
+    1. Isa check, e.g. ``case let x as String:``.
+    2. Enum case check: e.g. ``case .none:``.
+    3. Expr pattern: e.g. ``case foo():``.
+
   resilient
     Describes a type or function where making certain changes will not break
     binary compatibility. See :doc:`LibraryEvolution.rst <LibraryEvolution>`.
@@ -323,6 +358,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     "Standard library". Sometimes this just means the "Swift" module (also
     known as "swiftCore"); sometimes it means everything in the stdlib/
     directory. Pronounced "stid-lib" or "ess-tee-dee-lib".
+
+  sugared type
+    A type that may have been written in a more convenient way, using special
+    language syntax or a typealias. (For example, ``Int?`` is the sugared form
+    of ``Optional<Int>``.) Sugared types preserve information about the form
+    and use of the type even though the behavior usually does not change
+    (except for things like access control). Contrast with `canonical type`.
 
   thunk
     In the Swift compiler, a synthesized function whose only purpose is to

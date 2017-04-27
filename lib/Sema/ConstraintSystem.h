@@ -33,6 +33,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -408,6 +409,8 @@ enum ScoreKind {
   SK_ArrayPointerConversion,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
+  /// A key path application subscript.
+  SK_KeyPathSubscript,
   
   SK_LastScoreKind = SK_EmptyExistentialConversion,
 };
@@ -493,7 +496,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.
-typedef std::pair<CanType, TypeVariableType *> OpenedType;
+typedef std::pair<GenericTypeParamType *, TypeVariableType *> OpenedType;
+
+typedef llvm::DenseMap<GenericTypeParamType *, TypeVariableType *> OpenedTypeMap;
 
 /// \brief A complete solution to a constraint system.
 ///
@@ -610,24 +615,23 @@ public:
   /// contains a value.
   Expr *convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const;
 
-  /// Compute the set of substitutions required to map the given type
-  /// to the provided "opened" type.
+  /// Compute the set of substitutions for a generic signature opened at the
+  /// given locator.
   ///
   /// \param sig The generic signature.
-  ///
-  /// \param openedType The type to which this reference to the given
-  /// generic function type was opened.
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
   ///
   /// \param substitutions Will be populated with the set of substitutions
   /// to be applied to the generic function type.
-  ///
-  /// \returns The opened type after applying the computed substitutions.
-  Type computeSubstitutions(GenericSignature *sig,
-                            Type openedType,
+  void computeSubstitutions(GenericSignature *sig,
                             ConstraintLocator *locator,
+                            SmallVectorImpl<Substitution> &substitutions) const;
+
+  /// Same as above but with a lazily-constructed locator.
+  void computeSubstitutions(GenericSignature *sig,
+                            ConstraintLocatorBuilder locator,
                             SmallVectorImpl<Substitution> &substitutions) const;
 
   /// Return the disjunction choice for the given constraint location.
@@ -1161,8 +1165,10 @@ private:
         : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
 
     Expr *walkToExprPost(Expr *expr) override {
-      if (ExcludeRoot && expr == RootExpr)
+      if (ExcludeRoot && expr == RootExpr) {
+        assert(!expr->getType() && "Unexpected type in root of expression!");
         return expr;
+      }
 
       if (expr->getType())
         CS.cacheType(expr);
@@ -1428,14 +1434,12 @@ public:
   void setType(Expr *E, Type T) {
     assert(T && "Expected non-null type!");
 
-    // FIXME: Ideally this would be enabled but there are currently at
-    // least a few places where we set types to different values. We
-    // should track down and fix those places.
-
+    // FIXME: We sometimes set the type and then later set it to a
+    //        value that is slightly different, e.g. not an lvalue.
     // assert((ExprTypes.find(E) == ExprTypes.end() ||
     //         ExprTypes.find(E)->second->isEqual(T) ||
     //         ExprTypes.find(E)->second->hasTypeVariable()) &&
-    //        "Expected type to be set exactly once!");
+    //        "Expected type to be invariant!");
 
     ExprTypes[E] = T.getPointer();
 
@@ -1452,9 +1456,10 @@ public:
   /// Get the type for an expression.
   Type getType(const Expr *E) const {
     assert(hasType(E) && "Expected type to have been set!");
-    assert((!E->getType() ||
-            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
-           "Mismatched types!");
+    // FIXME: lvalue differences
+    //    assert((!E->getType() ||
+    //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
+    //           "Mismatched types!");
     return ExprTypes.find(E)->second;
   }
 
@@ -1573,6 +1578,16 @@ public:
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
                      bool isFavored = false);
+
+  /// \brief Add a key path application constraint to the constraint system.
+  void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
+                                       ConstraintLocatorBuilder locator,
+                                       bool isFavored = false);
+
+  /// \brief Add a key path constraint to the constraint system.
+  void addKeyPathConstraint(Type keypath, Type root, Type value,
+                            ConstraintLocatorBuilder locator,
+                            bool isFavored = false);
 
   /// Add a new constraint with a restriction on its application.
   void addRestrictedConstraint(ConstraintKind kind,
@@ -1873,7 +1888,7 @@ public:
   ///
   /// \returns The opened type.
   Type openType(Type type, ConstraintLocatorBuilder locator) {
-    llvm::DenseMap<CanType, TypeVariableType *> replacements;
+    OpenedTypeMap replacements;
     return openType(type, locator, replacements);
   }
 
@@ -1888,7 +1903,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type,
                 ConstraintLocatorBuilder locator,
-                llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+                OpenedTypeMap &replacements);
 
   /// \brief "Open" the given function type.
   ///
@@ -1913,7 +1928,7 @@ public:
       AnyFunctionType *funcType,
       unsigned numArgumentLabelsToRemove,
       ConstraintLocatorBuilder locator,
-      llvm::DenseMap<CanType, TypeVariableType *> &replacements,
+      OpenedTypeMap &replacements,
       DeclContext *innerDC,
       DeclContext *outerDC,
       bool skipProtocolSelfConstraint);
@@ -1937,19 +1952,19 @@ public:
                    GenericSignature *signature,
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+                   OpenedTypeMap &replacements);
   void openGeneric(DeclContext *innerDC,
                    DeclContext *outerDC,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+                   OpenedTypeMap &replacements);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+         const OpenedTypeMap &replacements);
 
   /// \brief Retrieve the type of a reference to the given value declaration.
   ///
@@ -1996,8 +2011,7 @@ public:
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
-                          llvm::DenseMap<CanType, TypeVariableType *>
-                            *replacements = nullptr);
+                          OpenedTypeMap *replacements = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
@@ -2053,7 +2067,10 @@ public:
 
   /// \brief Propagate constraints in an effort to enforce local
   /// consistency to reduce the time to solve the system.
-  void propagateConstraints();
+  ///
+  /// \returns true if the system is known to be inconsistent (have no
+  /// solutions).
+  bool propagateConstraints();
 
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.
@@ -2272,6 +2289,27 @@ private:
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the given OpenedExistentialOf constraint.
+  SolutionKind simplifyOpenedExistentialOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify the given KeyPathApplication constraint.
+  SolutionKind simplifyKeyPathApplicationConstraint(
+                                         Type keyPath,
+                                         Type root,
+                                         Type value,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify the given KeyPath constraint.
+  SolutionKind simplifyKeyPathConstraint(Type keyPath,
+                                         Type root,
+                                         Type value,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(Type first, Type second,
                                              TypeMatchOptions flags,
@@ -2350,8 +2388,17 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
- public:
+  bool simplifyForConstraintPropagation();
+  void collectNeighboringBindOverloadDisjunctions(
+      llvm::SetVector<Constraint *> &neighbors);
+  bool isBindOverloadConsistent(Constraint *bindConstraint,
+                                llvm::SetVector<Constraint *> &workList);
+  void reviseBindOverloadDisjunction(Constraint *disjunction,
+                                     llvm::SetVector<Constraint *> &workList,
+                                     bool *foundConsistent);
+  bool areBindPairConsistent(Constraint *first, Constraint *second);
 
+public:
   /// \brief Solve the system of constraints generated from provided expression.
   ///
   /// \param expr The expression to generate constraints from.
@@ -2496,7 +2543,7 @@ public:
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
     return MaxMemory > threshold;
   }
-
+  
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

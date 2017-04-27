@@ -18,8 +18,9 @@
 #define SWIFT_IRGEN_GENEXISTENTIAL_H
 
 #include "Address.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace llvm {
   class Value;
@@ -92,7 +93,27 @@ namespace irgen {
                                           Address base,
                                           SILType baseTy,
                                           CanArchetypeType openedArchetype);
-  
+
+  /// Allocate the storage for an opaque existential in the existential
+  /// container.
+  /// If the value is not inline, this will allocate a box for the value and
+  /// store the reference to the box in the existential container's buffer.
+  Address emitAllocateBoxedOpaqueExistentialBuffer(IRGenFunction &IGF,
+                                                   SILType destType,
+                                                   SILType valueType,
+                                                   Address existentialContainer,
+                                                   GenericEnvironment *genEnv);
+  /// Deallocate the storage for an opaque existential in the existential
+  /// container.
+  /// If the value is not stored inline, this will deallocate the box for the
+  /// value.
+  void emitDeallocateBoxedOpaqueExistentialBuffer(IRGenFunction &IGF,
+                                                  SILType existentialType,
+                                                  Address existentialContainer);
+  Address emitOpaqueBoxedExistentialProjection(
+      IRGenFunction &IGF, OpenedExistentialAccess accessKind, Address base,
+      SILType existentialType, CanArchetypeType openedArchetype);
+
   /// Extract the instance pointer from a class existential value.
   ///
   /// \param openedArchetype If non-null, the archetype that will capture the

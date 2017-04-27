@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -15,14 +15,14 @@ import gizmo
 // CHECK: [[OBJC:%objc_object]] = type
 // CHECK: [[ID:%T4objc2idV]] = type <{ %Ts9AnyObjectP }>
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type
-// CHECK: [[RECT:%TSC4RectV]] = type
+// CHECK: [[RECT:%TSo4RectV]] = type
 // CHECK: [[FLOAT:%TSf]] = type
 
 // CHECK: @"\01L_selector_data(bar)" = private global [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
-// CHECK: @_T0SC4RectVMn = linkonce_odr hidden constant
-// CHECK: @_T0SC4RectVN = linkonce_odr hidden global
+// CHECK: @_T0So4RectVMn = linkonce_odr hidden constant
+// CHECK: @_T0So4RectVN = linkonce_odr hidden global
 
 // CHECK: @"\01L_selector_data(acquiesce)"
 // CHECK-NOT: @"\01L_selector_data(disharmonize)"
@@ -124,8 +124,8 @@ func test10(_ g: Gizmo, r: Rect) {
 // Force the emission of the Rect metadata.
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
-// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11ySC4RectVF
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0SC4RectVN
+// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11ySo4RectVF
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0So4RectVN
 func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {

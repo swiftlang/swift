@@ -191,9 +191,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (doIt(TAD->getUnderlyingTypeLoc()))
-      return true;
-    return false;
+    return doIt(TAD->getUnderlyingTypeLoc());
   }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
@@ -489,6 +487,19 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     
     if (Expr *Index = doIt(E->getIndex()))
       E->setIndex(Index);
+    else
+      return nullptr;
+    
+    return E;
+  }
+  Expr *visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+    if (Expr *Base = doIt(E->getBase()))
+      E->setBase(Base);
+    else
+      return nullptr;
+    
+    if (Expr *KeyPath = doIt(E->getKeyPath()))
+      E->setKeyPath(KeyPath);
     else
       return nullptr;
     
@@ -895,8 +906,56 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
+  Expr *visitKeyPathExpr(KeyPathExpr *E) {
+    // For an ObjC key path, the string literal expr serves as the semantic
+    // expression.
+    if (auto objcStringLiteral = E->getObjCStringLiteralExpr()) {
+      Expr *sub = doIt(objcStringLiteral);
+      if (!sub) return nullptr;
+      E->setObjCStringLiteralExpr(sub);
+      return E;
+    }
+  
+    SmallVector<KeyPathExpr::Component, 4> updatedComponents;
+    bool didChangeComponents = false;
+    for (auto &origComponent : E->getComponents()) {
+      auto component = origComponent;
+      switch (auto kind = component.getKind()) {
+      case KeyPathExpr::Component::Kind::Subscript:
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+        Expr *origIndex = component.getIndexExpr();
+        Expr *newIndex = doIt(origIndex);
+        if (!newIndex) return nullptr;
+        if (newIndex != origIndex) {
+          didChangeComponents = true;
+          component = kind == KeyPathExpr::Component::Kind::Subscript
+            ? KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+                component.getDeclRef(),
+                newIndex,
+                component.getComponentType(),
+                component.getLoc())
+            : KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
+                newIndex, component.getLoc());
+        }
+        break;
+      }
+        
+      case KeyPathExpr::Component::Kind::OptionalChain:
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+      case KeyPathExpr::Component::Kind::OptionalForce:
+      case KeyPathExpr::Component::Kind::Property:
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        // No subexpr to visit.
+        break;
+      }
+      updatedComponents.push_back(component);
+    }
+    
+    if (didChangeComponents) {
+      E->resolveComponents(E->getType()->getASTContext(),
+                           updatedComponents);
+    }
+    
     return E;
   }
 
@@ -985,7 +1044,8 @@ public:
         return true;
       if (Decl *ParentD = Walker.Parent.getAsDecl())
         return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));
-      if (dyn_cast_or_null<BraceStmt>(Walker.Parent.getAsStmt()))
+      auto walkerParentAsStmt = Walker.Parent.getAsStmt();
+      if (walkerParentAsStmt && isa<BraceStmt>(walkerParentAsStmt))
         return true;
     }
     return false;
@@ -1501,9 +1561,7 @@ bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
 }
 
 bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
-  if (doIt(T->getTypeRepr()))
-    return true;
-  return false;
+  return doIt(T->getTypeRepr());
 }
 
 bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
@@ -1527,37 +1585,23 @@ bool Traversal::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
 }
 
 bool Traversal::visitFunctionTypeRepr(FunctionTypeRepr *T) {
-  if (doIt(T->getArgsTypeRepr()))
-    return true;
-  if (doIt(T->getResultTypeRepr()))
-    return true;
-  return false;
+  return doIt(T->getArgsTypeRepr()) || doIt(T->getResultTypeRepr());
 }
 
 bool Traversal::visitArrayTypeRepr(ArrayTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
-  if (doIt(T->getKey()))
-    return true;
-  if (doIt(T->getValue()))
-    return true;
-  return false;
+  return doIt(T->getKey()) || doIt(T->getValue());
 }
 
 bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
@@ -1577,21 +1621,15 @@ bool Traversal::visitCompositionTypeRepr(CompositionTypeRepr *T) {
 }
 
 bool Traversal::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {

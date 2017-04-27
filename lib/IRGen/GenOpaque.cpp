@@ -23,11 +23,12 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "swift/IRGen/ValueWitness.h"
 
+#include "FixedTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "ProtocolInfo.h"
-#include "ValueWitness.h"
 
 #include "GenOpaque.h"
 
@@ -883,4 +884,315 @@ llvm::Value *irgen::emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
                           Size(ExtraInhabitantFlags::NumExtraInhabitantsMask));
   return IGF.Builder.CreateAnd(xiFlags, mask,
                                xiFlags->getName() + ".extraInhabitantCount");
+}
+
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata) {
+  auto *flags =
+      emitLoadOfValueWitnessFromMetadata(IGF, metadata, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonInline));
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return std::make_pair(
+      IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+                               flags->getName() + ".isInline"),
+      flags);
+}
+
+llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, llvm::Value *metadata) {
+  auto *size =
+      emitLoadOfValueWitnessFromMetadata(IGF, metadata, ValueWitness::Size);
+  return size;
+}
+
+llvm::Value *irgen::emitAlignMaskFromFlags(IRGenFunction &IGF,
+                                           llvm::Value *flags) {
+  auto *alignMask = IGF.IGM.getSize(Size(ValueWitnessFlags::AlignmentMask));
+  return IGF.Builder.CreateAnd(flags, alignMask,
+                               flags->getName() + ".alignmentMask");
+}
+
+llvm::Value *irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
+                                               llvm::Value *metadata,
+                                               Address dest, Address src) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(
+      IGF, metadata, ValueWitness::InitializeWithCopy);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      copyFn, {dest.getAddress(), src.getAddress(), metadata});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+
+  return call;
+}
+
+llvm::Value *irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
+                                               llvm::Value *metadata,
+                                               Address dest, Address src) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(
+      IGF, metadata, ValueWitness::InitializeWithTake);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      copyFn, {dest.getAddress(), src.getAddress(), metadata});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+
+  return call;
+}
+
+void irgen::emitDestroyCall(IRGenFunction &IGF, llvm::Value *metadata,
+                            Address object) {
+  llvm::Value *fn =
+      emitLoadOfValueWitnessFromMetadata(IGF, metadata, ValueWitness::Destroy);
+  llvm::CallInst *call =
+      IGF.Builder.CreateCall(fn, {object.getAddress(), metadata});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  setHelperAttributes(call);
+}
+
+static llvm::Constant *getAllocateValueBufferFunction(IRGenModule &IGM) {
+
+  llvm::Type *argTys[] = {IGM.TypeMetadataPtrTy, IGM.OpaquePtrTy};
+
+  llvm::SmallString<40> fnName("__swift_allocate_value_buffer");
+
+  return IGM.getOrCreateHelperFunction(
+      fnName, IGM.OpaquePtrTy, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto *metadata = &*(it++);
+        auto buffer = Address(&*(it++), Alignment(1));
+
+        // Dynamically check whether this type is inline or needs an allocation.
+        llvm::Value *isInline, *flags;
+        std::tie(isInline, flags) = emitLoadOfIsInline(IGF, metadata);
+
+        auto *outlineBB = IGF.createBasicBlock("outline.allocateValueInBuffer");
+        auto *doneBB = IGF.createBasicBlock("done");
+        llvm::Value *addressInline, *addressOutline;
+        addressInline = buffer.getAddress();
+        auto *origBB = IGF.Builder.GetInsertBlock();
+        IGF.Builder.CreateCondBr(isInline, doneBB, outlineBB);
+
+        IGF.Builder.emitBlock(outlineBB);
+        {
+          auto *size = emitLoadOfSize(IGF, metadata);
+          auto *alignMask = emitAlignMaskFromFlags(IGF, flags);
+          auto valueAddr =
+              IGF.emitAllocRawCall(size, alignMask, "outline.ValueBuffer");
+          IGF.Builder.CreateStore(
+              valueAddr, Address(IGF.Builder.CreateBitCast(
+                                     buffer.getAddress(),
+                                     valueAddr->getType()->getPointerTo()),
+                                 Alignment(1)));
+          addressOutline =
+              IGF.Builder.CreateBitCast(valueAddr, IGM.OpaquePtrTy);
+          IGF.Builder.CreateBr(doneBB);
+        }
+
+        IGF.Builder.emitBlock(doneBB);
+        auto *addressOfValue = IGF.Builder.CreatePHI(IGM.OpaquePtrTy, 2);
+        addressOfValue->addIncoming(addressInline, origBB);
+        addressOfValue->addIncoming(addressOutline, outlineBB);
+        IGF.Builder.CreateRet(addressOfValue);
+      },
+      true /*noinline*/);
+}
+
+Address irgen::emitAllocateValueInBuffer(IRGenFunction &IGF, SILType type,
+                                         Address buffer) {
+  // Handle FixedSize types.
+  auto &IGM = IGF.IGM;
+  auto storagePtrTy = IGM.getStoragePointerType(type);
+  auto &Builder = IGF.Builder;
+  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&IGF.getTypeInfo(type))) {
+    auto packing = fixedTI->getFixedPacking(IGM);
+
+    // Inline representation.
+    if (packing == FixedPacking::OffsetZero) {
+      return Address(Builder.CreateBitCast(buffer.getAddress(), storagePtrTy),
+                     buffer.getAlignment());
+    }
+
+    // Outline representation.
+    assert(packing == FixedPacking::Allocate && "Expect non dynamic packing");
+    auto size = fixedTI->getStaticSize(IGM);
+    auto alignMask = fixedTI->getStaticAlignmentMask(IGM);
+    auto valueAddr =
+        IGF.emitAllocRawCall(size, alignMask, "outline.ValueBuffer");
+    Builder.CreateStore(
+        valueAddr,
+        Address(Builder.CreateBitCast(buffer.getAddress(),
+                                      valueAddr->getType()->getPointerTo()),
+                buffer.getAlignment()));
+    return Address(Builder.CreateBitCast(valueAddr, storagePtrTy),
+                   buffer.getAlignment());
+  }
+
+  // Dynamic packing.
+
+  /// Call a function to handle the non-fixed case.
+  auto *allocateFun = getAllocateValueBufferFunction(IGF.IGM);
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(type);
+  auto *call = Builder.CreateCall(
+      allocateFun,
+      {metadata, Builder.CreateBitCast(buffer.getAddress(), IGM.OpaquePtrTy)});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+
+  auto addressOfValue = Builder.CreateBitCast(call, storagePtrTy);
+  return Address(addressOfValue, Alignment(1));
+}
+
+static llvm::Constant *getProjectValueInBufferFunction(IRGenModule &IGM) {
+
+  llvm::Type *argTys[] = {IGM.TypeMetadataPtrTy, IGM.OpaquePtrTy};
+
+  llvm::SmallString<40> fnName("__swift_project_value_buffer");
+
+  return IGM.getOrCreateHelperFunction(
+      fnName, IGM.OpaquePtrTy, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto *metadata = &*(it++);
+        auto buffer = Address(&*(it++), Alignment(1));
+        auto &Builder = IGF.Builder;
+
+        // Dynamically check whether this type is inline or needs an allocation.
+        llvm::Value *isInline, *flags;
+        std::tie(isInline, flags) = emitLoadOfIsInline(IGF, metadata);
+
+        auto *outlineBB = IGF.createBasicBlock("outline.projectValueInBuffer");
+        auto *doneBB = IGF.createBasicBlock("done");
+        llvm::Value *addressInline, *addressOutline;
+        auto *origBB = Builder.GetInsertBlock();
+        addressInline = buffer.getAddress();
+
+        Builder.CreateCondBr(isInline, doneBB, outlineBB);
+
+        Builder.emitBlock(outlineBB);
+        {
+          addressOutline = Builder.CreateLoad(
+              Address(Builder.CreateBitCast(buffer.getAddress(),
+                                            IGM.OpaquePtrTy->getPointerTo()),
+                      Alignment(1)));
+          Builder.CreateBr(doneBB);
+        }
+
+        Builder.emitBlock(doneBB);
+        auto *addressOfValue = Builder.CreatePHI(IGM.OpaquePtrTy, 2);
+        addressOfValue->addIncoming(addressInline, origBB);
+        addressOfValue->addIncoming(addressOutline, outlineBB);
+
+        Builder.CreateRet(addressOfValue);
+      },
+      true /*noinline*/);
+}
+
+Address irgen::emitProjectValueInBuffer(IRGenFunction &IGF, SILType type,
+                                        Address buffer) {
+  // Handle FixedSize types.
+  auto &IGM = IGF.IGM;
+  auto storagePtrTy = IGM.getStoragePointerType(type);
+  auto &Builder = IGF.Builder;
+  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&IGF.getTypeInfo(type))) {
+    auto packing = fixedTI->getFixedPacking(IGM);
+
+    // Inline representation.
+    if (packing == FixedPacking::OffsetZero) {
+      return Address(Builder.CreateBitCast(buffer.getAddress(), storagePtrTy),
+                     buffer.getAlignment());
+    }
+
+    // Outline representation.
+    assert(packing == FixedPacking::Allocate && "Expect non dynamic packing");
+    auto valueAddr = Builder.CreateLoad(
+        Address(Builder.CreateBitCast(buffer.getAddress(),
+                                      storagePtrTy->getPointerTo()),
+                buffer.getAlignment()));
+    return Address(Builder.CreateBitCast(valueAddr, storagePtrTy),
+                   buffer.getAlignment());
+  }
+
+  // Dynamic packing.
+  auto *projectFun = getProjectValueInBufferFunction(IGF.IGM);
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(type);
+  auto *call = Builder.CreateCall(
+      projectFun,
+      {metadata, Builder.CreateBitCast(buffer.getAddress(), IGM.OpaquePtrTy)});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+
+  auto addressOfValue = Builder.CreateBitCast(call, storagePtrTy);
+  return Address(addressOfValue, Alignment(1));
+}
+
+static llvm::Constant *getDeallocateValueInBufferFunction(IRGenModule &IGM) {
+
+  llvm::Type *argTys[] = {IGM.TypeMetadataPtrTy, IGM.OpaquePtrTy};
+
+  llvm::SmallString<40> fnName("__swift_deallocate_value_buffer");
+
+  return IGM.getOrCreateHelperFunction(
+      fnName, IGM.VoidTy, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        auto *metadata = &*(it++);
+        auto buffer = Address(&*(it++), Alignment(1));
+        auto &Builder = IGF.Builder;
+
+        // Dynamically check whether this type is inline or needs an allocation.
+        llvm::Value *isInline, *flags;
+        std::tie(isInline, flags) = emitLoadOfIsInline(IGF, metadata);
+        auto *outlineBB = IGF.createBasicBlock("outline.deallocateValueInBuffer");
+        auto *doneBB = IGF.createBasicBlock("done");
+
+        Builder.CreateCondBr(isInline, doneBB, outlineBB);
+
+        Builder.emitBlock(outlineBB);
+        {
+          auto *size = emitLoadOfSize(IGF, metadata);
+          auto *alignMask = emitAlignMaskFromFlags(IGF, flags);
+          auto *ptr = Builder.CreateLoad(Address(
+              Builder.CreateBitCast(buffer.getAddress(), IGM.Int8PtrPtrTy),
+              buffer.getAlignment()));
+          IGF.emitDeallocRawCall(ptr, size, alignMask);
+          Builder.CreateBr(doneBB);
+        }
+
+        Builder.emitBlock(doneBB);
+        Builder.CreateRetVoid();
+      },
+      true /*noinline*/);
+}
+
+void irgen::emitDeallocateValueInBuffer(IRGenFunction &IGF,
+                                 SILType type,
+                                 Address buffer) {
+  // Handle FixedSize types.
+  auto &IGM = IGF.IGM;
+  auto &Builder = IGF.Builder;
+  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&IGF.getTypeInfo(type))) {
+    auto packing = fixedTI->getFixedPacking(IGM);
+
+    // Inline representation.
+    if (packing == FixedPacking::OffsetZero)
+      return;
+
+    // Outline representation.
+    assert(packing == FixedPacking::Allocate && "Expect non dynamic packing");
+    auto size = fixedTI->getStaticSize(IGM);
+    auto alignMask = fixedTI->getStaticAlignmentMask(IGM);
+    auto *ptr = Builder.CreateLoad(Address(
+        Builder.CreateBitCast(buffer.getAddress(), IGM.Int8PtrPtrTy),
+        buffer.getAlignment()));
+    IGF.emitDeallocRawCall(ptr, size, alignMask);
+    return;
+  }
+
+  // Dynamic packing.
+  auto *projectFun = getDeallocateValueInBufferFunction(IGF.IGM);
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(type);
+  auto *call = Builder.CreateCall(
+      projectFun,
+      {metadata, Builder.CreateBitCast(buffer.getAddress(), IGM.OpaquePtrTy)});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
 }

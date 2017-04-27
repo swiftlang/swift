@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -17,19 +17,19 @@
 
 // CHECK: define hidden swiftcc i8* @_T012lazy_globals1xSifau() {{.*}} {
 // CHECK: entry:
-// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*))
+// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), i8* undef)
 // CHECK:   ret i8* bitcast (%TSi* @_T012lazy_globals1xSiv to i8*)
 // CHECK: }
 
 // CHECK: define hidden swiftcc i8* @_T012lazy_globals1ySifau() {{.*}} {
 // CHECK: entry:
-// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*))
+// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), i8* undef)
 // CHECK:   ret i8* bitcast (%TSi* @_T012lazy_globals1ySiv to i8*)
 // CHECK: }
 
 // CHECK: define hidden swiftcc i8* @_T012lazy_globals1zSifau() {{.*}} {
 // CHECK: entry:
-// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*))
+// CHECK:   call void @swift_once(i64* @globalinit_[[T]]_token0, i8* bitcast (void ()* @globalinit_[[T]]_func0 to i8*), i8* undef)
 // CHECK:   ret i8* bitcast (%TSi* @_T012lazy_globals1zSiv to i8*)
 // CHECK: }
 var (x, y, z) = (1, 2, 3)

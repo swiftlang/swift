@@ -70,7 +70,7 @@
 # define SOURCEKITD_HAS_BLOCKS 0
 #endif
 
-#ifdef __GNUC__
+#if defined(__clang__) || defined(__GNUC__)
 # define SOURCEKITD_WARN_RESULT __attribute__((__warn_unused_result__))
 # define SOURCEKITD_NONNULL1 __attribute__((__nonnull__(1)))
 # define SOURCEKITD_NONNULL2 __attribute__((__nonnull__(2)))

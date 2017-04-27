@@ -12,11 +12,17 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollector.h"
+#include "swift/AST/Expr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringExtras.h"
+
+#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
+#error "Included ownership header?!"
+#endif
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -347,12 +353,9 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
 static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
                                           SILLocation Loc,
                                       SmallVectorImpl<SILValue> &ElementAddrs) {
-  CanType AggType = Pointer->getType().getSwiftRValueType();
-  TupleType *TT = AggType->castTo<TupleType>();
-  for (auto &Field : TT->getElements()) {
-    (void)Field;
-    ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer,
-                                                    ElementAddrs.size()));
+  TupleType *TT = Pointer->getType().castTo<TupleType>();
+  for (auto Index : indices(TT->getElements())) {
+    ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer, Index));
   }
 }
 
@@ -361,10 +364,9 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().getSwiftRValueType()->castTo<TupleType>();
-  for (auto &Field : TT->getElements()) {
-    (void)Field;
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
+  TupleType *TT = V->getType().castTo<TupleType>();
+  for (auto Index : indices(TT->getElements())) {
+    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
   }
 }
 
@@ -597,6 +599,34 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   }
 }
 
+/// Return the underlying accessed pointer value. This peeks through
+/// begin_access patterns such as:
+///
+/// %mark = mark_uninitialized [rootself] %alloc : $*T
+/// %access = begin_access [modify] [unknown] %mark : $*T
+/// apply %f(%access) : $(@inout T) -> ()
+static SILValue getAccessedPointer(SILValue Pointer) {
+  if (auto *Access = dyn_cast<BeginAccessInst>(Pointer))
+    return Access->getSource();
+
+  return Pointer;
+}
+
+/// Returns true when the instruction represents added instrumentation for
+/// run-time sanitizers.
+static bool isSanitizerInstrumentation(SILInstruction *Instruction,
+                                       ASTContext &Ctx) {
+  auto *BI = dyn_cast<BuiltinInst>(Instruction);
+  if (!BI)
+    return false;
+
+  Identifier Name = BI->getName();
+  if (Name == Ctx.getIdentifier("tsanInoutAccess"))
+    return true;
+
+  return false;
+}
+
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
@@ -620,6 +650,17 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Instructions that compute a subelement are handled by a helper.
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
       collectTupleElementUses(TEAI, BaseEltNo);
+      continue;
+    }
+
+    // Look through begin_access.
+    if (isa<BeginAccessInst>(User)) {
+      collectUses(User, BaseEltNo);
+      continue;
+    }
+
+    // Ignore end_access.
+    if (isa<EndAccessInst>(User)) {
       continue;
     }
     
@@ -766,8 +807,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
         auto Kind = DIUseKind::InOutUse;
-        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf()) &&
-            Pointer == TheMemory.getAddress())
+        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf())
+            && getAccessedPointer(Pointer) == TheMemory.getAddress())
           Kind = DIUseKind::Escape;
  
         addElementUses(BaseEltNo, PointeeType, User, Kind);
@@ -834,6 +875,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     if (isa<DeallocStackInst>(User)) {
       continue;
     }
+
+    // Sanitizer instrumentation is not user visible, so it should not
+    // count as a use and must not affect compile-time diagnostics.
+    if (isSanitizerInstrumentation(User, Module.getASTContext()))
+      continue;
 
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);

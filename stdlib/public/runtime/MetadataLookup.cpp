@@ -16,7 +16,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/Demangler.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"

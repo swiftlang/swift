@@ -245,7 +245,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
   return Result;
 }
 
-void Lexer::formToken(tok Kind, const char *TokStart) {
+void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
@@ -261,12 +261,14 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
-  lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
+  if (!MultilineString)
+    lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
 
-  NextToken.setToken(Kind, TokenText, CommentLength);
-  if (!TrailingTrivia.empty() &&
-      TrailingTrivia.front().Kind == syntax::TriviaKind::Backtick)
-    ++CurPtr;
+  NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
+  if (!MultilineString)
+    if (!TrailingTrivia.empty() &&
+        TrailingTrivia.front().Kind == syntax::TriviaKind::Backtick)
+      ++CurPtr;
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -638,8 +640,11 @@ void Lexer::lexHash() {
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
-  while (clang::isLetter(*tmpPtr))
-    ++tmpPtr;
+  if (clang::isIdentifierHead(*tmpPtr)) {
+    do {
+      ++tmpPtr;
+    } while (clang::isIdentifierBody(*tmpPtr));
+  }
 
   // Map the character sequence onto
   tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))
@@ -731,7 +736,7 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-syntax::RC<syntax::TokenSyntax> Lexer::fullLex() {
+RC<syntax::TokenSyntax> Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
     TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
@@ -1126,7 +1131,7 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
-                             bool EmitDiagnostics) {
+                             bool EmitDiagnostics, bool MultilineString) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -1134,8 +1139,9 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     // If this is a "high" UTF-8 character, validate it.
     if ((signed char)(CurPtr[-1]) >= 0) {
       if (isPrintable(CurPtr[-1]) == 0)
-        if (EmitDiagnostics)
-          diagnose(CharStart, diag::lex_unprintable_ascii_character);
+        if (!(MultilineString && (CurPtr[-1] == '\t')))
+          if (EmitDiagnostics)
+            diagnose(CharStart, diag::lex_unprintable_ascii_character);
       return CurPtr[-1];
     }
     --CurPtr;
@@ -1163,9 +1169,13 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     }
     // Move the pointer back to EOF.
     --CurPtr;
-    LLVM_FALLTHROUGH;
+    if (EmitDiagnostics)
+      diagnose(CurPtr-1, diag::lex_unterminated_string);
+    return ~1U;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
+    if (MultilineString) // ... unless they are multiline
+      return CurPtr[-1];
     if (EmitDiagnostics)
       diagnose(CurPtr-1, diag::lex_unterminated_string);
     return ~1U;
@@ -1192,6 +1202,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '"': ++CurPtr; return '"';
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
+
   case 'u': {  //  \u HEX HEX HEX HEX
     ++CurPtr;
     if (*CurPtr != '{') {
@@ -1261,6 +1272,10 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         }
         // Otherwise it's an ordinary character; treat it normally.
       } else {
+        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
+          Diags->diagnose(Lexer::getSourceLoc(CurPtr-1),
+                          diag::lex_multiline_inside_interpolation);
+        }
         OpenDelimiters.push_back(CurPtr[-1]);
       }
       continue;
@@ -1316,16 +1331,85 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
   }
 }
 
+/// getStringLiteralContent:
+/// Extract content of string literal from inside quotes.
+static StringRef getStringLiteralContent(const Token &Str) {
+  StringRef Bytes = Str.getText();
+
+  if (Str.IsMultilineString())
+    Bytes = Bytes.drop_front(3).drop_back(3);
+  else
+    Bytes = Bytes.drop_front().drop_back();
+
+  return Bytes;
+}
+
+/// getMultilineTrailingIndent:
+/// Determine trailing indent to be used for multiline literal indent stripping.
+static StringRef getMultilineTrailingIndent(const Token &Str,
+                                            DiagnosticEngine *Diags) {
+  StringRef Bytes = getStringLiteralContent(Str);
+  const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
+
+  // Work back from the end to find whitespace to strip.
+  while (start > begin) {
+    switch (*--start) {
+    case ' ':
+    case '\t':
+      continue;
+    case '\n':
+    case '\r':
+      return StringRef(start+1, end-(start+1));
+    default:
+      if (Diags)
+        Diags->diagnose(Lexer::getSourceLoc(start),
+                        diag::lex_illegal_multiline_string_end);
+      return "";
+    }
+  }
+
+  return "";
+}
+
+/// validateMultilineIndents:
+/// Diagnose contents of string literal that have inconsistent indentation.
+void Lexer::validateMultilineIndents(const Token &Str) {
+  StringRef Indent = getMultilineTrailingIndent(Str, Diags);
+  if (Indent.empty())
+    return;
+
+  StringRef Bytes = getStringLiteralContent(Str);
+  const char *BytesPtr = Bytes.begin();
+  size_t pos = 0;
+  while ((pos = Bytes.find('\n', pos)) != StringRef::npos) {
+    size_t nextpos = pos + 1;
+    if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
+      if (Bytes.substr(nextpos, Indent.size()) != Indent)
+        diagnose(BytesPtr + nextpos, diag::lex_ambiguous_string_indent);
+    }
+    pos = nextpos;
+  }
+}
+
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
+///   string_literal ::= ["]["]["].*["]["]["] - approximately
 void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
 
-  bool wasErroneous = false;
-  
+  bool wasErroneous = false, MultilineString = false;
+
+  // Is this the start of a multiline string literal?
+  if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
+    MultilineString = true;
+    CurPtr += 2;
+    if (*CurPtr != '\n' && *CurPtr != '\r')
+      diagnose(CurPtr, diag::lex_illegal_multiline_string_start);
+  }
+
   while (true) {
     if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
       // Consume tokens until we hit the corresponding ')'.
@@ -1343,13 +1427,14 @@ void Lexer::lexStringLiteral() {
       continue;
     }
 
-    // String literals cannot have \n or \r in them.
-    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
+    // String literals cannot have \n or \r in them (unless multiline).
+    if (((*CurPtr == '\r' || *CurPtr == '\n') && !MultilineString)
+        || CurPtr == BufferEnd) {
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
-    
-    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true);
+
+    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true, MultilineString);
     wasErroneous |= CharValue == ~1U;
 
     // If this is the end of string, we are done.  If it is a normal character
@@ -1392,7 +1477,20 @@ void Lexer::lexStringLiteral() {
           .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
                              replacement);
       }
-      return formToken(tok::string_literal, TokStart);
+
+      // Is this the end of a multiline string literal?
+      if (MultilineString) {
+        if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr + 2) != '"') {
+          CurPtr += 2;
+          formToken(tok::string_literal, TokStart, MultilineString);
+          validateMultilineIndents(NextToken);
+          return;
+        }
+        else
+          continue;
+      }
+
+      return formToken(tok::string_literal, TokStart, MultilineString);
     }
   }
 }
@@ -1558,14 +1656,33 @@ void Lexer::tryLexEditorPlaceholder() {
 }
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
-                                         SmallVectorImpl<char> &TempString) {
+                                         SmallVectorImpl<char> &TempString,
+                                         bool IsFirstSegment,
+                                         bool IsLastSegment,
+                                         unsigned IndentToStrip) {
+
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
-  while (BytesPtr != Bytes.end()) {
+  while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
+
+    // Multiline string line ending normalization and indent stripping.
+    if (CurChar == '\r' || CurChar == '\n') {
+      bool stripNewline = IsFirstSegment && BytesPtr - 1 == Bytes.begin();
+      if (CurChar == '\r' && *BytesPtr == '\n')
+        BytesPtr++;
+      if (*BytesPtr != '\r' && *BytesPtr != '\n')
+        BytesPtr += IndentToStrip;
+      if (IsLastSegment && BytesPtr == Bytes.end())
+        stripNewline = true;
+      if (!stripNewline)
+        TempString.push_back('\n');
+      continue;
+    }
+
     if (CurChar != '\\') {
       TempString.push_back(CurChar);
       continue;
@@ -1586,8 +1703,8 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     case '"': TempString.push_back('"'); continue;
     case '\'': TempString.push_back('\''); continue;
     case '\\': TempString.push_back('\\'); continue;
-      
-        
+
+
     // String interpolation.
     case '(':
       llvm_unreachable("string contained interpolated segments");
@@ -1625,8 +1742,15 @@ void Lexer::getStringLiteralSegments(
               SmallVectorImpl<StringSegment> &Segments,
               DiagnosticEngine *Diags) {
   assert(Str.is(tok::string_literal));
-  // Get the bytes behind the string literal, dropping the double quotes.
-  StringRef Bytes = Str.getText().drop_front().drop_back();
+  // Get the bytes behind the string literal, dropping any double quotes.
+  StringRef Bytes = getStringLiteralContent(Str);
+
+  // Are substitutions required either for indent stripping or line ending
+  // normalization?
+  bool MultilineString = Str.IsMultilineString(), IsFirstSegment = true;
+  unsigned IndentToStrip = 0;
+  if (MultilineString)
+      IndentToStrip = getMultilineTrailingIndent(Str, /*Diags=*/nullptr).size();
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
@@ -1647,7 +1771,9 @@ void Lexer::getStringLiteralSegments(
     // Push the current segment.
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
-                                  BytesPtr-SegmentStartPtr-2));
+                                  BytesPtr-SegmentStartPtr-2,
+                                  IsFirstSegment, false, IndentToStrip));
+    IsFirstSegment = false;
 
     // Find the closing ')'.
     const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
@@ -1668,7 +1794,8 @@ void Lexer::getStringLiteralSegments(
 
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
-                                Bytes.end()-SegmentStartPtr));
+                                Bytes.end()-SegmentStartPtr,
+                                IsFirstSegment, true, IndentToStrip));
 }
 
 
@@ -2063,8 +2190,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferID,
                                             unsigned Offset,
                                             unsigned BufferStart,
-                                            unsigned BufferEnd,
-                                            bool InInterpolatedString) {
+                                            unsigned BufferEnd) {
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOptions;
@@ -2089,7 +2215,6 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
       // Current token encompasses our source location.
 
       if (Tok.is(tok::string_literal)) {
-        assert(!InInterpolatedString);
         SmallVector<Lexer::StringSegment, 4> Segments;
         Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
         for (auto &Seg : Segments) {
@@ -2102,8 +2227,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
           if (Seg.Kind == Lexer::StringSegment::Expr && Offset < SegEnd)
             return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
                                               /*BufferStart=*/SegOffs,
-                                              /*BufferEnd=*/SegEnd,
-                                              /*InInterpolatedString=*/true);
+                                              /*BufferEnd=*/SegEnd);
         }
       }
 
@@ -2159,8 +2283,7 @@ SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
 
   return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
                                     /*BufferStart=*/LexStart-BufStart,
-                                    /*BufferEnd=*/Buffer.size(),
-                                    /*InInterpolatedString=*/false);
+                                    /*BufferEnd=*/Buffer.size());
 }
 
 SourceLoc Lexer::getLocForStartOfLine(SourceManager &SM, SourceLoc Loc) {

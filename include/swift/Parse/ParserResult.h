@@ -14,6 +14,7 @@
 #define SWIFT_PARSER_PARSER_RESULT_H
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "swift/AST/ParameterList.h"
 #include <type_traits>
 
 namespace swift {

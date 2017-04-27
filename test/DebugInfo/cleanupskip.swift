@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-ir -g %s -o - -O -disable-llvm-optzns | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -g %s -o - -O -disable-llvm-optzns | %FileCheck %s
 // REQUIRES: objc_interop
 import Foundation
 

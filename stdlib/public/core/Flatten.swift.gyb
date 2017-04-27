@@ -414,9 +414,10 @@ extension ${collectionForTraversal(traversal)}
 
 extension LazyCollectionProtocol
   where
+%   if traversal != 'Forward':
   Self : ${collectionForTraversal(traversal)},
   Elements : ${collectionForTraversal(traversal)},
-  ${constraints % {'Base': ''}},
+%   end
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.

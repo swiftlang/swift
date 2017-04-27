@@ -17,7 +17,7 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "messages.h"
 #include "overrides.h"
 

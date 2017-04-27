@@ -819,7 +819,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'To'                 // swift-as-ObjC thunk
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
-  global ::= global 'TV'                 // vtable override thunk
+  global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type 'D'                    // type mangling for the debugger. TODO: check if we really need this
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
@@ -889,7 +889,7 @@ Entities
   entity-spec ::= decl-name type 'i'                 // subscript ('i'ndex) itself (not the individual accessors)
   entity-spec ::= decl-name type 'v'                 // variable
   entity-spec ::= decl-name type 'f' ACCESSOR
-  entity-spec ::= decl-name type 'fp'                // generic type parameter (not used?)
+  entity-spec ::= decl-name type 'fp'                // generic type parameter
   entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
 
   ACCESSOR ::= 'm'                           // materializeForSet
@@ -958,14 +958,15 @@ Types
 
 ::
 
-  nominal-type ::= substitution
-  nominal-type ::= context decl-name 'C'     // nominal class type
-  nominal-type ::= context decl-name 'O'     // nominal enum type
-  nominal-type ::= context decl-name 'V'     // nominal struct type
-  nominal-type ::= protocol 'P'              // nominal protocol type
+  any-generic-type ::= substitution
+  any-generic-type ::= context decl-name 'C'     // nominal class type
+  any-generic-type ::= context decl-name 'O'     // nominal enum type
+  any-generic-type ::= context decl-name 'V'     // nominal struct type
+  any-generic-type ::= protocol 'P'              // nominal protocol type
+  any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
-  nominal-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
-  nominal-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
+  any-generic-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
+  any-generic-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
@@ -995,7 +996,6 @@ Types
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
-  type ::= context decl-name 'a'             // Type alias (DWARF only)
   type ::= function-signature 'c'            // function type
   type ::= function-signature 'X' FUNCTION-KIND // special function type
   type ::= bound-generic-type
@@ -1031,10 +1031,10 @@ Types
 
   throws ::= 'K'                             // 'throws' annotation on function types
 
-  type-list ::= list-type '_' list-type* 'd'?  // list of types with optional variadic specifier
+  type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
-  list-type ::= type identifier? 'z'?        // type with optional label and inout convention
+  list-type ::= type identifier? 'z'? 'd'?   // type with optional label, inout convention and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -1042,8 +1042,10 @@ Types
 
   type ::= archetype
   type ::= associated-type
-  type ::= nominal-type
+  type ::= any-generic-type
   type ::= protocol-list 'p'                 // existential type
+  type ::= protocol-list superclass 'Xc'     // existential type with superclass
+  type ::= protocol-list 'Xl'                // existential type with AnyObject
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -1173,6 +1175,8 @@ Property behaviors are implemented using private protocol conformances.
   LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject 
   LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject 
   LAYOUT-CONSTRAINT ::= 'T'  // Trivial 
+  LAYOUT-CONSTRAINT ::= 'C'  // Class
+  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass 
   LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size 
   LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size 
   LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits 

@@ -173,6 +173,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
                                   clangDiag.getLocation());
 
     ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
+                       ctx.LangOpts.EnableObjCInterop,
                        CurrentImport->getName());
     return;
   }

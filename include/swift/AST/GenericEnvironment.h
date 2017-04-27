@@ -142,8 +142,6 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   };
   friend class QueryArchetypeToInterfaceSubstitutions;
 
-  void populateParentMap(SubstitutionMap &subMap) const;
-
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
@@ -227,12 +225,6 @@ public:
   /// Get the sugared form of a type by substituting any
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
-
-  /// Derive a contextual type substitution map from a substitution array.
-  /// This is just like GenericSignature::getSubstitutionMap(), except
-  /// with contextual types instead of interface types.
-  SubstitutionMap
-  getSubstitutionMap(SubstitutionList subs) const;
 
   /// Build a contextual type substitution map from a type substitution function
   /// and conformance lookup function.

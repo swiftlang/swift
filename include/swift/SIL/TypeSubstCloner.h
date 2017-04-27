@@ -41,8 +41,9 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   }
 
   void computeSubsMap() {
-    if (auto *env = Original.getGenericEnvironment()) {
-      SubsMap = env->getSubstitutionMap(ApplySubs);
+    if (auto genericSig = Original.getLoweredFunctionType()
+          ->getGenericSignature()) {
+      SubsMap = genericSig->getSubstitutionMap(ApplySubs);
     }
   }
 
@@ -93,56 +94,16 @@ protected:
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SubsMap, None)->getCanonicalType();
+    return ty.subst(SubsMap)->getCanonicalType();
   }
 
-  Substitution remapSubstitution(Substitution sub) {
-    // Remap opened archetypes into the cloned context.
-    sub = Substitution(
-        getASTTypeInClonedContext(sub.getReplacement()->getCanonicalType()),
-        sub.getConformances());
-    // Now remap the substitution. 
-    return sub.subst(SwiftMod, SubsMap);
-  }
-
-  ProtocolConformanceRef remapConformance(CanType type,
+  ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
-    Substitution sub(type, conf);
-    return remapSubstitution(sub).getConformances()[0];
+    return conf.subst(type,
+                      QuerySubstitutionMap{SubsMap},
+                      LookUpConformanceInSubstitutionMap(SubsMap));
   }
 
-  void visitClassMethodInst(ClassMethodInst *Inst) {
-    getBuilder().setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
-    doPostProcess(Inst,
-                  getBuilder().createClassMethod(getOpLocation(Inst->getLoc()),
-                                                 getOpValue(Inst->getOperand()),
-                                                 Inst->getMember(),
-                                                 // No need to
-                                                 // translate the
-                                                 // return type
-                                                 // because this is
-                                                 // the type of the
-                                                 // fetched method.
-                                                 Inst->getType(),
-                                                 Inst->isVolatile()));
-  }
-  
-  void visitBuiltinInst(BuiltinInst *Inst) {
-    auto Args = this->template getOpValueArray<8>(Inst->getArguments());
-
-    SmallVector<Substitution, 16> TempSubstList;
-    for (auto &Sub : Inst->getSubstitutions()) {
-      TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
-    }
-
-    getBuilder().setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
-    auto N = getBuilder().createBuiltin(getOpLocation(Inst->getLoc()),
-                                        Inst->getName(),
-                                        getOpType(Inst->getType()),
-                                        TempSubstList, Args);
-    doPostProcess(Inst, N);
-  }
-  
   void visitApplyInst(ApplyInst *Inst) {
     auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
@@ -184,62 +145,43 @@ protected:
     SILValue CalleeVal = Inst->getCallee();
     SILBuilderWithPostProcess<TypeSubstCloner, 4> Builder(this, Inst);
     Builder.setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
+    SmallVector<Substitution, 16> TempSubstList;
     if (!Inlining) {
       FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
       if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+        auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
+        auto GenSig = LoweredFnTy->getGenericSignature();
+        if (GenSig) {
+          GenSig->getSubstitutions(
+              Inst->getFunction()
+                  ->getLoweredFunctionType()
+                  ->getGenericSignature()
+                  ->getSubstitutionMap(Inst->getSubstitutions()),
+              TempSubstList);
+        }
+        for (auto &Sub : TempSubstList) {
+          Sub = asImpl().getOpSubstitution(Sub);
+        }
+        SubstitutionList Subs = TempSubstList;
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                         &Builder.getFunction());
         Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
                                    getOpType(Inst->getSubstCalleeSILType()),
-                                   SubstitutionList(),
+                                   Subs,
                                    Args,
                                    getOpType(Inst->getType()));
         return;
       }
     }
 
-    SmallVector<Substitution, 16> TempSubstList;
     for (auto &Sub : Inst->getSubstitutions()) {
       TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
     }
-    
+
     Builder.createPartialApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
         getOpType(Inst->getType()));
-  }
-
-  void visitWitnessMethodInst(WitnessMethodInst *Inst) {
-    // Specialize the Self substitution of the witness_method.
-    auto sub = Inst->getSelfSubstitution();
-    sub = sub.subst(Inst->getModule().getSwiftModule(), SubsMap);
-
-    assert(sub.getConformances().size() == 1 &&
-           "didn't get conformance from substitution?!");
-
-    auto Conformance = sub.getConformances()[0];
-
-    auto newLookupType = getOpASTType(Inst->getLookupType());
-    if (Conformance.isConcrete()) {
-      CanType Ty = Conformance.getConcrete()->getType()->getCanonicalType();
-
-      if (Ty != newLookupType) {
-        assert(Ty->isExactSuperclassOf(newLookupType, nullptr) &&
-               "Should only create upcasts for sub class.");
-
-        // We use the super class as the new look up type.
-        newLookupType = Ty;
-      }
-    }
-
-    // We already subst so getOpConformance is not needed.
-    getBuilder().setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
-    doPostProcess(
-        Inst,
-        getBuilder().createWitnessMethod(
-            getOpLocation(Inst->getLoc()), newLookupType, Conformance,
-            Inst->getMember(), getOpType(Inst->getType()),
-            Inst->isVolatile()));
   }
 
   /// Attempt to simplify a conditional checked cast.

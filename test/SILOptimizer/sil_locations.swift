@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-sil -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-sil -emit-verbose-sil | %FileCheck %s
 
 func searchForMe(_ x: Float) -> Float {
   return x

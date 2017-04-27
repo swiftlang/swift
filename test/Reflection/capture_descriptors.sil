@@ -41,8 +41,6 @@ bb0(%i: $Int, %p: $@thick P.Type):
 // CHECK-NEXT: (struct Swift.Int)
 // CHECK-NEXT: (sil_box
 // CHECK-NEXT:   (struct Swift.Int))
-// CHECK-NEXT: (metatype
-// CHECK-NEXT:   (struct Swift.Int))
 // CHECK-NEXT: (existential_metatype
 // CHECK-NEXT:   (protocol capture_descriptors.P))
 // CHECK-NEXT: - Metadata sources:
@@ -243,3 +241,27 @@ bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@
 // CHECK-NEXT: (function convention=thin
 // CHECK-NEXT:   (tuple))
 // CHECK-NEXT: - Metadata sources:
+
+// Capturing opened existentials
+//
+// Not supported yet -- make sure we bail out instead of crashing.
+//
+// FIXME: Eventually, we should emit a useful capture descriptor
+// for this case.
+
+sil @existential_callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P {
+bb0(%0 : $*P):
+  unreachable
+}
+
+
+sil @existential_caller : $@convention(thin) (@in P) -> () {
+bb0(%0 : $*P):
+  %payload = open_existential_addr immutable_access %0 : $*P to $*@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P
+  %f = function_ref @existential_callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
+  %result = partial_apply %f<@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
+  destroy_value %result : $@callee_owned () -> @out P
+  destroy_addr %0 : $*P
+  %tuple = tuple ()
+  return %tuple : $()
+}

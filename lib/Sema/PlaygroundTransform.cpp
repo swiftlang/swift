@@ -17,6 +17,11 @@
 #include "InstrumenterSupport.h"
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
 
 #include <random>
 #include <forward_list>
@@ -663,7 +668,7 @@ public:
           useJustFirst = true;
         } else {
           for (Expr *Arg : TE->getElements()) {
-            if (Arg->getType()->getAs<InOutType>()) {
+            if (Arg->getType()->is<InOutType>()) {
               useJustFirst = true;
               break;
             }
@@ -813,10 +818,10 @@ public:
     char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
 
-    ::snprintf(start_line_buf, buf_size, "%d", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%d", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%d", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%d", EndLC.second);
+    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
+    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
+    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
+    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
 
     Expr *StartLine =
         new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);

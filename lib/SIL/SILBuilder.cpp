@@ -10,12 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
 #include "swift/SIL/SILBuilder.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
+
+IntegerLiteralInst *SILBuilder::createIntegerLiteral(IntegerLiteralExpr *E) {
+  return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E), F));
+}
+
+FloatLiteralInst *SILBuilder::createFloatLiteral(FloatLiteralExpr *E) {
+  return insert(FloatLiteralInst::create(E, getSILDebugLocation(E), F));
+}
 
 TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   // Derive the tuple type from the elements.
@@ -333,4 +343,41 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
 
   // Just create the objc_to_thick_metatype instruction.
   return createObjCToThickMetatype(Loc, Op, Ty);
+}
+
+/// Add opened archetypes defined or used by the current instruction.
+/// If there are no such opened archetypes in the current instruction
+/// and it is an instruction with just one operand, try to perform
+/// the same action for the instruction defining an operand, because
+/// it may have some opened archetypes used or defined.
+void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
+  // The list of archetypes from the previous instruction needs
+  // to be replaced, because it may reference a removed instruction.
+  OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
+  if (I && I->getNumTypeDependentOperands() > 0)
+    return;
+
+  while (I && I->getNumOperands() == 1 &&
+         I->getNumTypeDependentOperands() == 0) {
+    I = dyn_cast<SILInstruction>(I->getOperand(0));
+    if (!I)
+      return;
+    // If it is a definition of an opened archetype,
+    // register it and exit.
+    auto Archetype = getOpenedArchetypeOf(I);
+    if (!Archetype)
+      continue;
+    auto Def = OpenedArchetypes.getOpenedArchetypeDef(Archetype);
+    // Return if it is a known open archetype.
+    if (Def)
+      return;
+    // Otherwise register it and return.
+    if (OpenedArchetypesTracker)
+      OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, I);
+    return;
+  }
+
+  if (I && I->getNumTypeDependentOperands() > 0) {
+    OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
+  }
 }

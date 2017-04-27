@@ -279,7 +279,12 @@ macro(swift_common_cxx_warnings)
   # the repository for IDE features such as #pragma mark "Title".
   if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
+    check_cxx_compiler_flag("/permissive-" CXX_SUPPORTS_PERMISSIVE_FLAG)
+    append_if(CXX_SUPPORTS_PERMISSIVE_FLAG "/permissive-" CMAKE_CXX_FLAGS)
   endif()
+
+  # Disallow calls to objc_msgSend() with no function pointer cast.
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOBJC_OLD_DISPATCH_PROTOTYPES=0")
 endmacro()
 
 # Like 'llvm_config()', but uses libraries from the selected build

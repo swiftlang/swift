@@ -129,7 +129,7 @@ case #selector(C1.method1)?:
 }
 
 @objc class SR1827 {
-  func bar() {}
+  @objc func bar() {}
 }
 
 switch optionalSel {

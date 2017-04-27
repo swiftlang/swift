@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -primary-file %s | %FileCheck %s
 
 // Test to ensure that mandatory inlining of generics with a dynamic Self
 // substitution works correctly with thick_metatype instructions and SIL

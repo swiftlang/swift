@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 func fizzbuzz(i: Int) -> String {
   return i % 3 == 0
@@ -41,10 +41,12 @@ func addr_only_ternary_1(x: Bool) -> AddressOnly {
 
   // CHECK:   cond_br {{%.*}}, [[TRUE:bb[0-9]+]], [[FALSE:bb[0-9]+]]
   // CHECK: [[TRUE]]:
-  // CHECK:   copy_addr [[PBa]] to [initialization] [[RET]]
+  // CHECK:   [[READa:%.*]] = begin_access [read] [unknown] [[PBa]]
+  // CHECK:   copy_addr [[READa]] to [initialization] [[RET]]
   // CHECK:   br [[CONT:bb[0-9]+]]
   // CHECK: [[FALSE]]:
-  // CHECK:   copy_addr [[PBb]] to [initialization] [[RET]]
+  // CHECK:   [[READb:%.*]] = begin_access [read] [unknown] [[PBb]]
+  // CHECK:   copy_addr [[READb]] to [initialization] [[RET]]
   // CHECK:   br [[CONT]]
   return x ? a : b
 }

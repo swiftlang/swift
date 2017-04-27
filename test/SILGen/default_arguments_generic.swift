@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -swift-version 3 %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -swift-version 4 %s | %FileCheck %s
 
 func foo<T: ExpressibleByIntegerLiteral>(_: T.Type, x: T = 0) { }
 

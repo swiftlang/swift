@@ -9,8 +9,8 @@ public protocol P1 {
 }
 
 extension P1 {
-  final func extP1a()
-  public final func extP1b()
+  func extP1a()
+  public func extP1b()
 }
 
 // CHECK-LABEL: define hidden swiftcc void @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_

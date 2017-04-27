@@ -165,7 +165,7 @@ extension Measurement {
     ///
     /// If `lhs.unit == rhs.unit`, returns `lhs.value == rhs.value`. Otherwise, converts `rhs` to the same unit as `lhs` and then compares the resulting values.
     /// - returns: `true` if the measurements are equal.
-    public static func ==<LeftHandSideType : Unit, RightHandSideType : Unit>(_ lhs: Measurement<LeftHandSideType>, _ rhs: Measurement<RightHandSideType>) -> Bool {
+    public static func ==<LeftHandSideType, RightHandSideType>(_ lhs: Measurement<LeftHandSideType>, _ rhs: Measurement<RightHandSideType>) -> Bool {
         if lhs.unit == rhs.unit {
             return lhs.value == rhs.value
         } else {
@@ -183,7 +183,7 @@ extension Measurement {
 
     /// Compare two measurements of the same `Unit`.
     /// - returns: `true` if the measurements can be compared and the `lhs` is less than the `rhs` converted value.
-    public static func <<LeftHandSideType : Unit, RightHandSideType : Unit>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
+    public static func <<LeftHandSideType, RightHandSideType>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
         if lhs.unit == rhs.unit {
             return lhs.value < rhs.value
         } else {
@@ -240,7 +240,7 @@ extension NSMeasurement : _HasCustomAnyHashableRepresentation {
 // This workaround is required for the time being, because Swift doesn't support covariance for Measurement (26607639)
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension MeasurementFormatter {
-    public func string<UnitType: Unit>(from measurement: Measurement<UnitType>) -> String {
+    public func string<UnitType>(from measurement: Measurement<UnitType>) -> String {
         if let result = string(for: measurement) {
             return result
         } else {

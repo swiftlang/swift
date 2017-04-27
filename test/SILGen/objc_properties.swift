@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-silgen -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 class A {
-  dynamic var prop: Int
-  dynamic var computedProp: Int {
+  @objc dynamic var prop: Int
+  @objc dynamic var computedProp: Int {
     get {
       return 5
     }
@@ -179,7 +179,7 @@ class HasUnmanaged : NSObject {
   // CHECK-NEXT: destroy_value [[SELF_COPY]] : $HasUnmanaged
   // CHECK-NEXT: return [[RESULT:%.*]]
   // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfsTo'
-  var ref: Unmanaged<AnyObject>?
+  @objc var ref: Unmanaged<AnyObject>?
 }
 
 @_silgen_name("autoreleasing_user")

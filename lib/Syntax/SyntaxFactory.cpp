@@ -174,16 +174,9 @@ FunctionParameterSyntax SyntaxFactory::makeBlankFunctionParameter() {
 #pragma mark - function-parameter-list
 
 FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(
-    const std::vector<FunctionParameterSyntax> &Parameters) {
-  RawSyntax::LayoutList Layout;
-  for (auto Param : Parameters) {
-    Layout.push_back(Param.getRaw());
-  }
-
-  auto Raw = RawSyntax::make(SyntaxKind::FunctionParameterList, Layout,
-                             SourcePresence::Present);
-  auto Data = FunctionParameterListSyntaxData::make(Raw);
-  return { Data, Data.get() };
+    std::vector<FunctionParameterSyntax> Parameters) {
+  auto Data = FunctionParameterListSyntax::makeData(Parameters);
+  return FunctionParameterListSyntax { Data, Data.get() };
 }
 
 FunctionParameterListSyntax SyntaxFactory::makeBlankFunctionParameterList() {
@@ -910,7 +903,7 @@ GenericRequirementListSyntax SyntaxFactory::makeBlankGenericRequirementList() {
 
 /// Make a prefix operator with the given text.
 RC<TokenSyntax>
-SyntaxFactory::makePrefixOpereator(OwnedString Name,
+SyntaxFactory::makePrefixOperator(OwnedString Name,
                                    const Trivia &LeadingTrivia) {
   return TokenSyntax::make(tok::oper_prefix, Name,
                            SourcePresence::Present, LeadingTrivia, {});
@@ -1013,7 +1006,7 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
     {
       SyntaxFactory::makeLeftParenToken({}, {}),
-      RawSyntax::missing(SyntaxKind::TypeArgumentList),
+      RawSyntax::missing(SyntaxKind::TupleTypeElementList),
       SyntaxFactory::makeRightParenToken({}, {}),
     },
     SourcePresence::Present);
@@ -1023,22 +1016,59 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
   };
 }
 
+TupleTypeSyntax
+SyntaxFactory::makeTupleType(RC<TokenSyntax> LParen,
+                             TupleTypeElementListSyntax Elements,
+                             RC<TokenSyntax> RParen) {
+  auto Raw = RawSyntax::make(SyntaxKind::TupleType,
+                             { LParen, Elements.getRaw(), RParen },
+                             SourcePresence::Present);
+  auto Data = TupleTypeSyntaxData::make(std::move(Raw));
+  return TupleTypeSyntax {
+    Data, Data.get()
+  };
+}
+
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
-                                    TypeSyntax ElementTypeSyntax) {
+                                    RC<TokenSyntax> Colon,
+                                    TypeSyntax ElementTypeSyntax,
+                                    Optional<RC<TokenSyntax>> MaybeComma) {
   auto Data = TupleTypeElementSyntaxData::makeBlank();
+  RC<TokenSyntax> Comma;
+  if (MaybeComma.hasValue()) {
+    Comma = MaybeComma.getValue();
+  } else {
+    Comma = TokenSyntax::missingToken(tok::comma, ",");
+  }
   return TupleTypeElementSyntax { Data, Data.get() }
     .withLabel(Name)
-    .withColonToken(SyntaxFactory::makeColonToken({}, Trivia::spaces(1)))
-    .withTypeSyntax(ElementTypeSyntax);
+    .withColonToken(Colon)
+    .withTypeSyntax(ElementTypeSyntax)
+    .withCommaToken(Comma);
 }
 
 
 TupleTypeElementSyntax
-SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType) {
+SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType,
+                                    Optional<RC<TokenSyntax>> MaybeComma) {
   auto Data = TupleTypeElementSyntaxData::makeBlank();
+  RC<TokenSyntax> Comma;
+  if (MaybeComma.hasValue()) {
+    Comma = MaybeComma.getValue();
+  } else {
+    Comma = TokenSyntax::missingToken(tok::comma, ",");
+  }
   return TupleTypeElementSyntax { Data, Data.get() }
-  .withTypeSyntax(ElementType);
+    .withTypeSyntax(ElementType)
+    .withCommaToken(Comma);
+}
+
+TupleTypeElementListSyntax
+SyntaxFactory::makeTupleTypeElementList(
+  std::vector<TupleTypeElementSyntax> ElementTypes) {
+  auto Data = TupleTypeElementListSyntax::makeData(ElementTypes);
+  return TupleTypeElementListSyntax { Data, Data.get() };
 }
 
 #pragma mark - optional-type
@@ -1108,7 +1138,7 @@ MetatypeTypeSyntax SyntaxFactory::makeBlankMetatypeType() {
 
 FunctionTypeSyntax SyntaxFactory::makeFunctionType(
     TypeAttributesSyntax TypeAttributes, RC<TokenSyntax> LeftParen,
-    TypeArgumentListSyntax ArgumentList, RC<TokenSyntax> RightParen,
+    FunctionParameterListSyntax ArgumentList, RC<TokenSyntax> RightParen,
     RC<TokenSyntax> ThrowsOrRethrows, RC<TokenSyntax> Arrow,
     TypeSyntax ReturnType) {
   auto Raw =
@@ -1194,9 +1224,9 @@ TypeAttributesSyntax SyntaxFactory::makeBlankTypeAttributes() {
   return TypeAttributesSyntax { Data, Data.get() };
 }
 
-TypeArgumentListSyntax SyntaxFactory::makeBlankTypeArgumentList() {
-  auto Data =  TypeArgumentListSyntaxData::makeBlank();
-  return TypeArgumentListSyntax { Data, Data.get() };
+TupleTypeElementListSyntax SyntaxFactory::makeBlankTupleTypeElementList() {
+  auto Data = TupleTypeElementListSyntaxData::makeBlank();
+  return TupleTypeElementListSyntax { Data, Data.get() };
 }
 
 #pragma mark - array-type

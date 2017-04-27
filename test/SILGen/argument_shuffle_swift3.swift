@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 3 | %FileCheck %s
 
 func fn(_: Any) {}
 

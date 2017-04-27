@@ -54,6 +54,18 @@ class SyntaxCollection : public Syntax {
   friend class Syntax;
   using DataType = SyntaxCollectionData<CollectionKind, Element>;
 
+private:
+  static RC<DataType>
+  makeData(std::vector<Element> &Elements) {
+    RawSyntax::LayoutList List;
+    for (auto &Elt : Elements) {
+      List.push_back(Elt.getRaw());
+    }
+    auto Raw = RawSyntax::make(CollectionKind, List,
+                               SourcePresence::Present);
+    return DataType::make(Raw);
+  }
+
 protected:
   SyntaxCollection(const RC<SyntaxData> Root, const DataType *Data)
     : Syntax(Root, Data) {}

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ParameterList.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 
@@ -79,6 +80,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_EmptyExistentialConversion:
       log << "empty-existential conversion";
       break;
+    case SK_KeyPathSubscript:
+      log << "key path subscript";
+      break;
     }
     log << ")\n";
   }
@@ -135,6 +139,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   switch (x.getKind()) {
   case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::KeyPathApplication:
     // FIXME: Compare base types after substitution?
     return true;
 
@@ -199,8 +204,7 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
 
   // If the witness and the potential witness are not the same, there's no
   // ordering here.
-  if (conformance->getConcrete()->getWitness(req, &tc).getDecl()
-        != potentialWitness)
+  if (conformance->getConcrete()->getWitnessDecl(req, &tc) != potentialWitness)
     return Comparison::Unordered;
 
   // We have a requirement/witness match.
@@ -227,12 +231,12 @@ namespace {
 
 /// Determines whether the first type is nominally a superclass of the second
 /// type, ignore generic arguments.
-static bool isNominallySuperclassOf(TypeChecker &tc, Type type1, Type type2) {
+static bool isNominallySuperclassOf(Type type1, Type type2) {
   auto nominal1 = type1->getAnyNominal();
   if (!nominal1)
     return false;
 
-  for (auto super2 = type2; super2; super2 = super2->getSuperclass(&tc)) {
+  for (auto super2 = type2; super2; super2 = super2->getSuperclass()) {
     if (super2->getAnyNominal() == nominal1)
       return true;
   }
@@ -261,10 +265,10 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   // If both types can have superclasses, which whether one is a superclass
   // of the other. The subclass is the common base type.
   if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
-    if (isNominallySuperclassOf(tc, type1, type2))
+    if (isNominallySuperclassOf(type1, type2))
       return SelfTypeRelationship::Superclass;
 
-    if (isNominallySuperclassOf(tc, type2, type1))
+    if (isNominallySuperclassOf(type2, type1))
       return SelfTypeRelationship::Subclass;
 
     return SelfTypeRelationship::Unrelated;
@@ -441,7 +445,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+  OpenedTypeMap replacements;
   cs.openGeneric(dc2, dc2, sig2,
                  /*skipProtocolSelfConstraint=*/false,
                  ConstraintLocatorBuilder(nullptr),
@@ -452,7 +456,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   Type selfType1 = sig1->getGenericParams()[0];
   Type selfType2 = sig2->getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
-                   replacements[selfType2->getCanonicalType()],
+                   replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
@@ -567,7 +571,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       auto locator = cs.getConstraintLocator(nullptr);
       // FIXME: Locator when anchored on a declaration.
       // Get the type of a reference to the second declaration.
-      llvm::DenseMap<CanType, TypeVariableType *> unused;
+      OpenedTypeMap unused;
       Type openedType2;
       if (auto *funcType = type2->getAs<AnyFunctionType>()) {
         openedType2 = cs.openFunctionType(
@@ -582,7 +586,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       // Get the type of a reference to the first declaration, swapping in
       // archetypes for the dependent types.
-      llvm::DenseMap<CanType, TypeVariableType *> replacements;
+      OpenedTypeMap replacements;
       auto dc1 = decl1->getInnermostDeclContext();
       Type openedType1;
       if (auto *funcType = type1->getAs<AnyFunctionType>()) {
@@ -853,6 +857,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       continue;
 
     case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::KeyPathApplication:
       llvm_unreachable("Never considered different");
 
     case OverloadChoiceKind::DeclViaDynamic:

@@ -29,8 +29,8 @@ bb0(%0 : $@sil_unmanaged Optional<C>):
 // CHECK-LABEL: sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
 // CHECK: bb0([[ARG:%.*]] : $*Optional<U>):
 // CHECK: [[LOADED_ARG:%.*]] = load [copy] [[ARG]]
-// CHECK: [[UNMANGED_LOADED_ARG:%.*]] = ref_to_unmanaged [[LOADED_ARG]] : $Optional<U> to $@sil_unmanaged Optional<U>
-// CHECK: {{%.*}} = unmanaged_to_ref [[UNMANGED_LOADED_ARG]] : $@sil_unmanaged Optional<U> to $Optional<U>
+// CHECK: [[UNMANAGED_LOADED_ARG:%.*]] = ref_to_unmanaged [[LOADED_ARG]] : $Optional<U> to $@sil_unmanaged Optional<U>
+// CHECK: {{%.*}} = unmanaged_to_ref [[UNMANAGED_LOADED_ARG]] : $@sil_unmanaged Optional<U> to $Optional<U>
 // CHECK: destroy_value [[LOADED_ARG]]
 sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
 bb0(%0 : $*Optional<U>):

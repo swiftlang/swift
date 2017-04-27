@@ -1,14 +1,14 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests %s -emit-ir -num-threads 8 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -num-threads 8 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import gizmo
 
-protocol Runcible {
+public protocol Runcible {
   func runce()
 }
 
@@ -18,13 +18,13 @@ protocol Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
 // -- type metadata
-// CHECK:           @_T0SC6NSRectVN
+// CHECK:           @_T0So6NSRectVN
 // -- witness table
-// CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
+// CHECK:           @_T0So6NSRectV33protocol_conformance_records_objc8RuncibleACWP
 // -- flags 0x02: nonunique direct metadata
 // CHECK:           i32 2 },
 extension NSRect: Runcible {
-  func runce() {}
+  public func runce() {}
 }
 
 // -- TODO class refs should be indirected through their ref variable
@@ -39,5 +39,5 @@ extension NSRect: Runcible {
 // CHECK:           i32 1
 // CHECK:         }
 extension Gizmo: Runcible {
-  func runce() {}
+  public func runce() {}
 }

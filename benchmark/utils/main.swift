@@ -34,6 +34,7 @@ import ArrayOfRef
 import ArraySubscript
 import BitCount
 import ByteSwap
+import CString
 import Calculator
 import CaptureProp
 import CharacterLiteralsLarge
@@ -48,7 +49,11 @@ import DictionaryBridge
 import DictionaryLiteral
 import DictionaryRemove
 import DictionarySwap
+import DropFirst
+import DropLast
+import DropWhile
 import ErrorHandling
+import ExistentialPerformance
 import Fibonacci
 import GlobalClass
 import Hanoi
@@ -58,6 +63,7 @@ import Histogram
 import Integrate
 import IterateData
 import Join
+import LazyFilter
 import LinkedList
 import MapReduce
 import Memset
@@ -80,6 +86,8 @@ import Phonebook
 import PolymorphicCalls
 import PopFront
 import PopFrontGeneric
+import Prefix
+import PrefixWhile
 import Prims
 import ProtocolDispatch
 import ProtocolDispatch2
@@ -91,6 +99,7 @@ import ReversedCollections
 import SetTests
 import SevenBoom
 import Sim2DArray
+import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
 import StackPromo
@@ -98,9 +107,12 @@ import StaticArray
 import StrComplexWalk
 import StrToInt
 import StringBuilder
+import StringEdits
 import StringInterpolation
+import StringMatch
 import StringTests
 import StringWalk
+import Suffix
 import SuperChars
 import TwoSum
 import TypeFlood
@@ -108,186 +120,412 @@ import UTF8Decode
 import Walsh
 import XorLoop
 
-precommitTests = [
-  "AngryPhonebook": run_AngryPhonebook,
-  "AnyHashableWithAClass": run_AnyHashableWithAClass,
-  "Array2D": run_Array2D,
-  "ArrayAppend": run_ArrayAppend,
-  "ArrayAppendArrayOfInt": run_ArrayAppendArrayOfInt,
-  "ArrayAppendAscii": run_ArrayAppendAscii,
-  "ArrayAppendFromGeneric": run_ArrayAppendFromGeneric,
-  "ArrayAppendGenericStructs": run_ArrayAppendGenericStructs,
-  "ArrayAppendLatin1": run_ArrayAppendLatin1,
-  "ArrayAppendLazyMap": run_ArrayAppendLazyMap,
-  "ArrayAppendOptionals": run_ArrayAppendOptionals,
-  "ArrayAppendRepeatCol": run_ArrayAppendRepeatCol,
-  "ArrayAppendReserved": run_ArrayAppendReserved,
-  "ArrayAppendSequence": run_ArrayAppendSequence,
-  "ArrayAppendStrings": run_ArrayAppendStrings,
-  "ArrayAppendToFromGeneric": run_ArrayAppendToFromGeneric,
-  "ArrayAppendToGeneric": run_ArrayAppendToGeneric,
-  "ArrayAppendUTF16": run_ArrayAppendUTF16,
-  "ArrayInClass": run_ArrayInClass,
-  "ArrayLiteral": run_ArrayLiteral,
-  "ArrayOfGenericPOD": run_ArrayOfGenericPOD,
-  "ArrayOfGenericRef": run_ArrayOfGenericRef,
-  "ArrayOfPOD": run_ArrayOfPOD,
-  "ArrayOfRef": run_ArrayOfRef,
-  "ArrayPlusEqualArrayOfInt": run_ArrayPlusEqualArrayOfInt,
-  "ArrayPlusEqualFiveElementCollection": run_ArrayPlusEqualFiveElementCollection,
-  "ArrayPlusEqualSingleElementCollection": run_ArrayPlusEqualSingleElementCollection,
-  "ArraySubscript": run_ArraySubscript,
-  "ArrayValueProp": run_ArrayValueProp,
-  "ArrayValueProp2": run_ArrayValueProp2,
-  "ArrayValueProp3": run_ArrayValueProp3,
-  "ArrayValueProp4": run_ArrayValueProp4,
-  "BitCount": run_BitCount,
-  "ByteSwap": run_ByteSwap,
-  "Calculator": run_Calculator,
-  "CaptureProp": run_CaptureProp,
-  "CharacterLiteralsLarge": run_CharacterLiteralsLarge,
-  "CharacterLiteralsSmall": run_CharacterLiteralsSmall,
-  "Chars": run_Chars,
-  "ClassArrayGetter": run_ClassArrayGetter,
-  "DeadArray": run_DeadArray,
-  "Dictionary": run_Dictionary,
-  "Dictionary2": run_Dictionary2,
-  "Dictionary2OfObjects": run_Dictionary2OfObjects,
-  "Dictionary3": run_Dictionary3,
-  "Dictionary3OfObjects": run_Dictionary3OfObjects,
-  "DictionaryBridge": run_DictionaryBridge,
-  "DictionaryLiteral": run_DictionaryLiteral,
-  "DictionaryOfObjects": run_DictionaryOfObjects,
-  "DictionaryRemove": run_DictionaryRemove,
-  "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
-  "DictionarySwap": run_DictionarySwap,
-  "DictionarySwapOfObjects": run_DictionarySwapOfObjects,
-  "ErrorHandling": run_ErrorHandling,
-  "GlobalClass": run_GlobalClass,
-  "Hanoi": run_Hanoi,
-  "HashQuadratic": run_HashQuadratic,
-  "HashTest": run_HashTest,
-  "Histogram": run_Histogram,
-  "Integrate": run_Integrate,
-  "IterateData": run_IterateData,
-  "Join": run_Join,
-  "LinkedList": run_LinkedList,
-  "MapReduce": run_MapReduce,
-  "MapReduceAnyCollection": run_MapReduceAnyCollection,
-  "MapReduceAnyCollectionShort": run_MapReduceAnyCollectionShort,
-  "MapReduceClass": run_MapReduceClass,
-  "MapReduceClassShort": run_MapReduceClassShort,
-  "MapReduceLazyCollection": run_MapReduceLazyCollection,
-  "MapReduceLazyCollectionShort": run_MapReduceLazyCollectionShort,
-  "MapReduceLazySequence": run_MapReduceLazySequence,
-  "MapReduceSequence": run_MapReduceSequence,
-  "MapReduceShort": run_MapReduceShort,
-  "MapReduceShortString": run_MapReduceShortString,
-  "MapReduceString": run_MapReduceString,
-  "Memset": run_Memset,
-  "MonteCarloE": run_MonteCarloE,
-  "MonteCarloPi": run_MonteCarloPi,
-  "NSDictionaryCastToSwift": run_NSDictionaryCastToSwift,
-  "NSError": run_NSError,
-  "NSStringConversion": run_NSStringConversion,
-  "NopDeinit": run_NopDeinit,
-  "ObjectAllocation": run_ObjectAllocation,
-  "ObjectiveCBridgeFromNSArrayAnyObject": run_ObjectiveCBridgeFromNSArrayAnyObject,
-  "ObjectiveCBridgeFromNSArrayAnyObjectForced": run_ObjectiveCBridgeFromNSArrayAnyObjectForced,
-  "ObjectiveCBridgeFromNSArrayAnyObjectToString": run_ObjectiveCBridgeFromNSArrayAnyObjectToString,
-  "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced": run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced,
-  "ObjectiveCBridgeFromNSDictionaryAnyObject": run_ObjectiveCBridgeFromNSDictionaryAnyObject,
-  "ObjectiveCBridgeFromNSDictionaryAnyObjectForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced,
-  "ObjectiveCBridgeFromNSDictionaryAnyObjectToString": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString,
-  "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced": run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced,
-  "ObjectiveCBridgeFromNSSetAnyObject": run_ObjectiveCBridgeFromNSSetAnyObject,
-  "ObjectiveCBridgeFromNSSetAnyObjectForced": run_ObjectiveCBridgeFromNSSetAnyObjectForced,
-  "ObjectiveCBridgeFromNSSetAnyObjectToString": run_ObjectiveCBridgeFromNSSetAnyObjectToString,
-  "ObjectiveCBridgeFromNSSetAnyObjectToStringForced": run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced,
-  "ObjectiveCBridgeFromNSString": run_ObjectiveCBridgeFromNSString,
-  "ObjectiveCBridgeFromNSStringForced": run_ObjectiveCBridgeFromNSStringForced,
-  "ObjectiveCBridgeStubDataAppend": run_ObjectiveCBridgeStubDataAppend,
-  "ObjectiveCBridgeStubDateAccess": run_ObjectiveCBridgeStubDateAccess,
-  "ObjectiveCBridgeStubDateMutation": run_ObjectiveCBridgeStubDateMutation,
-  "ObjectiveCBridgeStubFromArrayOfNSString": run_ObjectiveCBridgeStubFromArrayOfNSString,
-  "ObjectiveCBridgeStubFromNSDate": run_ObjectiveCBridgeStubFromNSDate,
-  "ObjectiveCBridgeStubFromNSDateRef": run_ObjectiveCBridgeStubFromNSDateRef,
-  "ObjectiveCBridgeStubFromNSString": run_ObjectiveCBridgeStubFromNSString,
-  "ObjectiveCBridgeStubFromNSStringRef": run_ObjectiveCBridgeStubFromNSStringRef,
-  "ObjectiveCBridgeStubNSDataAppend": run_ObjectiveCBridgeStubNSDataAppend,
-  "ObjectiveCBridgeStubNSDateMutationRef": run_ObjectiveCBridgeStubNSDateMutationRef,
-  "ObjectiveCBridgeStubNSDateRefAccess": run_ObjectiveCBridgeStubNSDateRefAccess,
-  "ObjectiveCBridgeStubToArrayOfNSString": run_ObjectiveCBridgeStubToArrayOfNSString,
-  "ObjectiveCBridgeStubToNSDate": run_ObjectiveCBridgeStubToNSDate,
-  "ObjectiveCBridgeStubToNSDateRef": run_ObjectiveCBridgeStubToNSDateRef,
-  "ObjectiveCBridgeStubToNSString": run_ObjectiveCBridgeStubToNSString,
-  "ObjectiveCBridgeStubToNSStringRef": run_ObjectiveCBridgeStubToNSStringRef,
-  "ObjectiveCBridgeStubURLAppendPath": run_ObjectiveCBridgeStubURLAppendPath,
-  "ObjectiveCBridgeStubURLAppendPathRef": run_ObjectiveCBridgeStubURLAppendPathRef,
-  "ObjectiveCBridgeToNSArray": run_ObjectiveCBridgeToNSArray,
-  "ObjectiveCBridgeToNSDictionary": run_ObjectiveCBridgeToNSDictionary,
-  "ObjectiveCBridgeToNSSet": run_ObjectiveCBridgeToNSSet,
-  "ObjectiveCBridgeToNSString": run_ObjectiveCBridgeToNSString,
-  "ObserverClosure": run_ObserverClosure,
-  "ObserverForwarderStruct": run_ObserverForwarderStruct,
-  "ObserverPartiallyAppliedMethod": run_ObserverPartiallyAppliedMethod,
-  "ObserverUnappliedMethod": run_ObserverUnappliedMethod,
-  "OpenClose": run_OpenClose,
-  "Phonebook": run_Phonebook,
-  "PolymorphicCalls": run_PolymorphicCalls,
-  "PopFrontArray": run_PopFrontArray,
-  "PopFrontArrayGeneric": run_PopFrontArrayGeneric,
-  "PopFrontUnsafePointer": run_PopFrontUnsafePointer,
-  "Prims": run_Prims,
-  "ProtocolDispatch": run_ProtocolDispatch,
-  "ProtocolDispatch2": run_ProtocolDispatch2,
-  "RC4": run_RC4,
-  "RGBHistogram": run_RGBHistogram,
-  "RGBHistogramOfObjects": run_RGBHistogramOfObjects,
-  "RangeAssignment": run_RangeAssignment,
-  "RecursiveOwnedParameter": run_RecursiveOwnedParameter,
-  "ReversedArray": run_ReversedArray,
-  "ReversedBidirectional": run_ReversedBidirectional,
-  "ReversedDictionary": run_ReversedDictionary,
-  "SetExclusiveOr": run_SetExclusiveOr,
-  "SetExclusiveOr_OfObjects": run_SetExclusiveOr_OfObjects,
-  "SetIntersect": run_SetIntersect,
-  "SetIntersect_OfObjects": run_SetIntersect_OfObjects,
-  "SetIsSubsetOf": run_SetIsSubsetOf,
-  "SetIsSubsetOf_OfObjects": run_SetIsSubsetOf_OfObjects,
-  "SetUnion": run_SetUnion,
-  "SetUnion_OfObjects": run_SetUnion_OfObjects,
-  "SevenBoom": run_SevenBoom,
-  "Sim2DArray": run_Sim2DArray,
-  "SortLettersInPlace": run_SortLettersInPlace,
-  "SortSortedStrings": run_SortSortedStrings,
-  "SortStrings": run_SortStrings,
-  "SortStringsUnicode": run_SortStringsUnicode,
-  "StackPromo": run_StackPromo,
-  "StaticArray": run_StaticArray,
-  "StrComplexWalk": run_StrComplexWalk,
-  "StrToInt": run_StrToInt,
-  "StringBuilder": run_StringBuilder,
-  "StringEqualPointerComparison": run_StringEqualPointerComparison,
-  "StringHasPrefix": run_StringHasPrefix,
-  "StringHasPrefixUnicode": run_StringHasPrefixUnicode,
-  "StringHasSuffix": run_StringHasSuffix,
-  "StringHasSuffixUnicode": run_StringHasSuffixUnicode,
-  "StringInterpolation": run_StringInterpolation,
-  "StringWalk": run_StringWalk,
-  "StringWithCString": run_StringWithCString,
-  "SuperChars": run_SuperChars,
-  "TwoSum": run_TwoSum,
-  "TypeFlood": run_TypeFlood,
-  "UTF8Decode": run_UTF8Decode,
-  "Walsh": run_Walsh,
-  "XorLoop": run_XorLoop,
-]
+@inline(__always)
+private func addPrecommitTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  precommitTests[name] = function
+}
+@inline(__always)
+private func addStringTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  stringTests[name] = function
+}
+@inline(__always)
+private func addOtherTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  otherTests[name] = function
+}
 
-otherTests = [
-  "Ackermann": run_Ackermann,
-  "Fibonacci": run_Fibonacci,
-]
+// The main test suite: precommit tests
+addPrecommitTest("AngryPhonebook", run_AngryPhonebook)
+addPrecommitTest("AnyHashableWithAClass", run_AnyHashableWithAClass)
+addPrecommitTest("Array2D", run_Array2D)
+addPrecommitTest("ArrayAppend", run_ArrayAppend)
+addPrecommitTest("ArrayAppendArrayOfInt", run_ArrayAppendArrayOfInt)
+addPrecommitTest("ArrayAppendAscii", run_ArrayAppendAscii)
+addPrecommitTest("ArrayAppendFromGeneric", run_ArrayAppendFromGeneric)
+addPrecommitTest("ArrayAppendGenericStructs", run_ArrayAppendGenericStructs)
+addPrecommitTest("ArrayAppendLatin1", run_ArrayAppendLatin1)
+addPrecommitTest("ArrayAppendLazyMap", run_ArrayAppendLazyMap)
+addPrecommitTest("ArrayAppendOptionals", run_ArrayAppendOptionals)
+addPrecommitTest("ArrayAppendRepeatCol", run_ArrayAppendRepeatCol)
+addPrecommitTest("ArrayAppendReserved", run_ArrayAppendReserved)
+addPrecommitTest("ArrayAppendSequence", run_ArrayAppendSequence)
+addPrecommitTest("ArrayAppendStrings", run_ArrayAppendStrings)
+addPrecommitTest("ArrayAppendToFromGeneric", run_ArrayAppendToFromGeneric)
+addPrecommitTest("ArrayAppendToGeneric", run_ArrayAppendToGeneric)
+addPrecommitTest("ArrayAppendUTF16", run_ArrayAppendUTF16)
+addPrecommitTest("ArrayInClass", run_ArrayInClass)
+addPrecommitTest("ArrayLiteral", run_ArrayLiteral)
+addPrecommitTest("ArrayOfGenericPOD", run_ArrayOfGenericPOD)
+addPrecommitTest("ArrayOfGenericRef", run_ArrayOfGenericRef)
+addPrecommitTest("ArrayOfPOD", run_ArrayOfPOD)
+addPrecommitTest("ArrayOfRef", run_ArrayOfRef)
+addPrecommitTest("ArrayPlusEqualArrayOfInt", run_ArrayPlusEqualArrayOfInt)
+addPrecommitTest("ArrayPlusEqualFiveElementCollection", run_ArrayPlusEqualFiveElementCollection)
+addPrecommitTest("ArrayPlusEqualSingleElementCollection", run_ArrayPlusEqualSingleElementCollection)
+addPrecommitTest("ArrayPlusEqualThreeElements", run_ArrayPlusEqualThreeElements)
+addPrecommitTest("ArraySubscript", run_ArraySubscript)
+addPrecommitTest("ArrayValueProp", run_ArrayValueProp)
+addPrecommitTest("ArrayValueProp2", run_ArrayValueProp2)
+addPrecommitTest("ArrayValueProp3", run_ArrayValueProp3)
+addPrecommitTest("ArrayValueProp4", run_ArrayValueProp4)
+addPrecommitTest("BitCount", run_BitCount)
+addPrecommitTest("ByteSwap", run_ByteSwap)
+addPrecommitTest("CStringLongAscii", run_CStringLongAscii)
+addPrecommitTest("CStringLongNonAscii", run_CStringLongNonAscii)
+addPrecommitTest("CStringShortAscii", run_CStringShortAscii)
+addPrecommitTest("Calculator", run_Calculator)
+addPrecommitTest("CaptureProp", run_CaptureProp)
+addPrecommitTest("CharacterLiteralsLarge", run_CharacterLiteralsLarge)
+addPrecommitTest("CharacterLiteralsSmall", run_CharacterLiteralsSmall)
+addPrecommitTest("Chars", run_Chars)
+addPrecommitTest("ClassArrayGetter", run_ClassArrayGetter)
+addPrecommitTest("DeadArray", run_DeadArray)
+addPrecommitTest("Dictionary", run_Dictionary)
+addPrecommitTest("Dictionary2", run_Dictionary2)
+addPrecommitTest("Dictionary2OfObjects", run_Dictionary2OfObjects)
+addPrecommitTest("Dictionary3", run_Dictionary3)
+addPrecommitTest("Dictionary3OfObjects", run_Dictionary3OfObjects)
+addPrecommitTest("DictionaryBridge", run_DictionaryBridge)
+addPrecommitTest("DictionaryLiteral", run_DictionaryLiteral)
+addPrecommitTest("DictionaryOfObjects", run_DictionaryOfObjects)
+addPrecommitTest("DictionaryRemove", run_DictionaryRemove)
+addPrecommitTest("DictionaryRemoveOfObjects", run_DictionaryRemoveOfObjects)
+addPrecommitTest("DictionarySwap", run_DictionarySwap)
+addPrecommitTest("DictionarySwapOfObjects", run_DictionarySwapOfObjects)
+addPrecommitTest("DropFirstAnyCollection", run_DropFirstAnyCollection)
+addPrecommitTest("DropFirstAnyCollectionLazy", run_DropFirstAnyCollectionLazy)
+addPrecommitTest("DropFirstAnySeqCRangeIter", run_DropFirstAnySeqCRangeIter)
+addPrecommitTest("DropFirstAnySeqCRangeIterLazy", run_DropFirstAnySeqCRangeIterLazy)
+addPrecommitTest("DropFirstAnySeqCntRange", run_DropFirstAnySeqCntRange)
+addPrecommitTest("DropFirstAnySeqCntRangeLazy", run_DropFirstAnySeqCntRangeLazy)
+addPrecommitTest("DropFirstAnySequence", run_DropFirstAnySequence)
+addPrecommitTest("DropFirstAnySequenceLazy", run_DropFirstAnySequenceLazy)
+addPrecommitTest("DropFirstArray", run_DropFirstArray)
+addPrecommitTest("DropFirstArrayLazy", run_DropFirstArrayLazy)
+addPrecommitTest("DropFirstCountableRange", run_DropFirstCountableRange)
+addPrecommitTest("DropFirstCountableRangeLazy", run_DropFirstCountableRangeLazy)
+addPrecommitTest("DropFirstSequence", run_DropFirstSequence)
+addPrecommitTest("DropFirstSequenceLazy", run_DropFirstSequenceLazy)
+addPrecommitTest("DropLastAnyCollection", run_DropLastAnyCollection)
+addPrecommitTest("DropLastAnyCollectionLazy", run_DropLastAnyCollectionLazy)
+addPrecommitTest("DropLastAnySeqCRangeIter", run_DropLastAnySeqCRangeIter)
+addPrecommitTest("DropLastAnySeqCRangeIterLazy", run_DropLastAnySeqCRangeIterLazy)
+addPrecommitTest("DropLastAnySeqCntRange", run_DropLastAnySeqCntRange)
+addPrecommitTest("DropLastAnySeqCntRangeLazy", run_DropLastAnySeqCntRangeLazy)
+addPrecommitTest("DropLastAnySequence", run_DropLastAnySequence)
+addPrecommitTest("DropLastAnySequenceLazy", run_DropLastAnySequenceLazy)
+addPrecommitTest("DropLastArray", run_DropLastArray)
+addPrecommitTest("DropLastArrayLazy", run_DropLastArrayLazy)
+addPrecommitTest("DropLastCountableRange", run_DropLastCountableRange)
+addPrecommitTest("DropLastCountableRangeLazy", run_DropLastCountableRangeLazy)
+addPrecommitTest("DropLastSequence", run_DropLastSequence)
+addPrecommitTest("DropLastSequenceLazy", run_DropLastSequenceLazy)
+addPrecommitTest("DropWhileAnyCollection", run_DropWhileAnyCollection)
+addPrecommitTest("DropWhileAnyCollectionLazy", run_DropWhileAnyCollectionLazy)
+addPrecommitTest("DropWhileAnySeqCRangeIter", run_DropWhileAnySeqCRangeIter)
+addPrecommitTest("DropWhileAnySeqCRangeIterLazy", run_DropWhileAnySeqCRangeIterLazy)
+addPrecommitTest("DropWhileAnySeqCntRange", run_DropWhileAnySeqCntRange)
+addPrecommitTest("DropWhileAnySeqCntRangeLazy", run_DropWhileAnySeqCntRangeLazy)
+addPrecommitTest("DropWhileAnySequence", run_DropWhileAnySequence)
+addPrecommitTest("DropWhileAnySequenceLazy", run_DropWhileAnySequenceLazy)
+addPrecommitTest("DropWhileArray", run_DropWhileArray)
+addPrecommitTest("DropWhileArrayLazy", run_DropWhileArrayLazy)
+addPrecommitTest("DropWhileCountableRange", run_DropWhileCountableRange)
+addPrecommitTest("DropWhileCountableRangeLazy", run_DropWhileCountableRangeLazy)
+addPrecommitTest("DropWhileSequence", run_DropWhileSequence)
+addPrecommitTest("DropWhileSequenceLazy", run_DropWhileSequenceLazy)
+addPrecommitTest("ErrorHandling", run_ErrorHandling)
+addPrecommitTest("GlobalClass", run_GlobalClass)
+addPrecommitTest("Hanoi", run_Hanoi)
+addPrecommitTest("HashQuadratic", run_HashQuadratic)
+addPrecommitTest("HashTest", run_HashTest)
+addPrecommitTest("Histogram", run_Histogram)
+addPrecommitTest("Integrate", run_Integrate)
+addPrecommitTest("IterateData", run_IterateData)
+addPrecommitTest("Join", run_Join)
+addPrecommitTest("LazilyFilteredArrays", run_LazilyFilteredArrays)
+addPrecommitTest("LazilyFilteredRange", run_LazilyFilteredRange)
+addPrecommitTest("LinkedList", run_LinkedList)
+addPrecommitTest("MapReduce", run_MapReduce)
+addPrecommitTest("MapReduceAnyCollection", run_MapReduceAnyCollection)
+addPrecommitTest("MapReduceAnyCollectionShort", run_MapReduceAnyCollectionShort)
+addPrecommitTest("MapReduceClass", run_MapReduceClass)
+addPrecommitTest("MapReduceClassShort", run_MapReduceClassShort)
+addPrecommitTest("MapReduceLazyCollection", run_MapReduceLazyCollection)
+addPrecommitTest("MapReduceLazyCollectionShort", run_MapReduceLazyCollectionShort)
+addPrecommitTest("MapReduceLazySequence", run_MapReduceLazySequence)
+addPrecommitTest("MapReduceSequence", run_MapReduceSequence)
+addPrecommitTest("MapReduceShort", run_MapReduceShort)
+addPrecommitTest("MapReduceShortString", run_MapReduceShortString)
+addPrecommitTest("MapReduceString", run_MapReduceString)
+addPrecommitTest("Memset", run_Memset)
+addPrecommitTest("MonteCarloE", run_MonteCarloE)
+addPrecommitTest("MonteCarloPi", run_MonteCarloPi)
+addPrecommitTest("NSDictionaryCastToSwift", run_NSDictionaryCastToSwift)
+addPrecommitTest("NSError", run_NSError)
+addPrecommitTest("NSStringConversion", run_NSStringConversion)
+addPrecommitTest("NopDeinit", run_NopDeinit)
+addPrecommitTest("ObjectAllocation", run_ObjectAllocation)
+addPrecommitTest("ObjectiveCBridgeFromNSArrayAnyObject", run_ObjectiveCBridgeFromNSArrayAnyObject)
+addPrecommitTest("ObjectiveCBridgeFromNSArrayAnyObjectForced", run_ObjectiveCBridgeFromNSArrayAnyObjectForced)
+addPrecommitTest("ObjectiveCBridgeFromNSArrayAnyObjectToString", run_ObjectiveCBridgeFromNSArrayAnyObjectToString)
+addPrecommitTest("ObjectiveCBridgeFromNSArrayAnyObjectToStringForced", run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced)
+addPrecommitTest("ObjectiveCBridgeFromNSDictionaryAnyObject", run_ObjectiveCBridgeFromNSDictionaryAnyObject)
+addPrecommitTest("ObjectiveCBridgeFromNSDictionaryAnyObjectForced", run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced)
+addPrecommitTest("ObjectiveCBridgeFromNSDictionaryAnyObjectToString", run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString)
+addPrecommitTest("ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced", run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced)
+addPrecommitTest("ObjectiveCBridgeFromNSSetAnyObject", run_ObjectiveCBridgeFromNSSetAnyObject)
+addPrecommitTest("ObjectiveCBridgeFromNSSetAnyObjectForced", run_ObjectiveCBridgeFromNSSetAnyObjectForced)
+addPrecommitTest("ObjectiveCBridgeFromNSSetAnyObjectToString", run_ObjectiveCBridgeFromNSSetAnyObjectToString)
+addPrecommitTest("ObjectiveCBridgeFromNSSetAnyObjectToStringForced", run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced)
+addPrecommitTest("ObjectiveCBridgeFromNSString", run_ObjectiveCBridgeFromNSString)
+addPrecommitTest("ObjectiveCBridgeFromNSStringForced", run_ObjectiveCBridgeFromNSStringForced)
+addPrecommitTest("ObjectiveCBridgeStubDataAppend", run_ObjectiveCBridgeStubDataAppend)
+addPrecommitTest("ObjectiveCBridgeStubDateAccess", run_ObjectiveCBridgeStubDateAccess)
+addPrecommitTest("ObjectiveCBridgeStubDateMutation", run_ObjectiveCBridgeStubDateMutation)
+addPrecommitTest("ObjectiveCBridgeStubFromArrayOfNSString", run_ObjectiveCBridgeStubFromArrayOfNSString)
+addPrecommitTest("ObjectiveCBridgeStubFromNSDate", run_ObjectiveCBridgeStubFromNSDate)
+addPrecommitTest("ObjectiveCBridgeStubFromNSDateRef", run_ObjectiveCBridgeStubFromNSDateRef)
+addPrecommitTest("ObjectiveCBridgeStubFromNSString", run_ObjectiveCBridgeStubFromNSString)
+addPrecommitTest("ObjectiveCBridgeStubFromNSStringRef", run_ObjectiveCBridgeStubFromNSStringRef)
+addPrecommitTest("ObjectiveCBridgeStubNSDataAppend", run_ObjectiveCBridgeStubNSDataAppend)
+addPrecommitTest("ObjectiveCBridgeStubNSDateMutationRef", run_ObjectiveCBridgeStubNSDateMutationRef)
+addPrecommitTest("ObjectiveCBridgeStubNSDateRefAccess", run_ObjectiveCBridgeStubNSDateRefAccess)
+addPrecommitTest("ObjectiveCBridgeStubToArrayOfNSString", run_ObjectiveCBridgeStubToArrayOfNSString)
+addPrecommitTest("ObjectiveCBridgeStubToNSDate", run_ObjectiveCBridgeStubToNSDate)
+addPrecommitTest("ObjectiveCBridgeStubToNSDateRef", run_ObjectiveCBridgeStubToNSDateRef)
+addPrecommitTest("ObjectiveCBridgeStubToNSString", run_ObjectiveCBridgeStubToNSString)
+addPrecommitTest("ObjectiveCBridgeStubToNSStringRef", run_ObjectiveCBridgeStubToNSStringRef)
+addPrecommitTest("ObjectiveCBridgeStubURLAppendPath", run_ObjectiveCBridgeStubURLAppendPath)
+addPrecommitTest("ObjectiveCBridgeStubURLAppendPathRef", run_ObjectiveCBridgeStubURLAppendPathRef)
+addPrecommitTest("ObjectiveCBridgeToNSArray", run_ObjectiveCBridgeToNSArray)
+addPrecommitTest("ObjectiveCBridgeToNSDictionary", run_ObjectiveCBridgeToNSDictionary)
+addPrecommitTest("ObjectiveCBridgeToNSSet", run_ObjectiveCBridgeToNSSet)
+addPrecommitTest("ObjectiveCBridgeToNSString", run_ObjectiveCBridgeToNSString)
+addPrecommitTest("ObserverClosure", run_ObserverClosure)
+addPrecommitTest("ObserverForwarderStruct", run_ObserverForwarderStruct)
+addPrecommitTest("ObserverPartiallyAppliedMethod", run_ObserverPartiallyAppliedMethod)
+addPrecommitTest("ObserverUnappliedMethod", run_ObserverUnappliedMethod)
+addPrecommitTest("OpenClose", run_OpenClose)
+addPrecommitTest("Phonebook", run_Phonebook)
+addPrecommitTest("PolymorphicCalls", run_PolymorphicCalls)
+addPrecommitTest("PopFrontArray", run_PopFrontArray)
+addPrecommitTest("PopFrontArrayGeneric", run_PopFrontArrayGeneric)
+addPrecommitTest("PopFrontUnsafePointer", run_PopFrontUnsafePointer)
+addPrecommitTest("PrefixAnyCollection", run_PrefixAnyCollection)
+addPrecommitTest("PrefixAnyCollectionLazy", run_PrefixAnyCollectionLazy)
+addPrecommitTest("PrefixAnySeqCRangeIter", run_PrefixAnySeqCRangeIter)
+addPrecommitTest("PrefixAnySeqCRangeIterLazy", run_PrefixAnySeqCRangeIterLazy)
+addPrecommitTest("PrefixAnySeqCntRange", run_PrefixAnySeqCntRange)
+addPrecommitTest("PrefixAnySeqCntRangeLazy", run_PrefixAnySeqCntRangeLazy)
+addPrecommitTest("PrefixAnySequence", run_PrefixAnySequence)
+addPrecommitTest("PrefixAnySequenceLazy", run_PrefixAnySequenceLazy)
+addPrecommitTest("PrefixArray", run_PrefixArray)
+addPrecommitTest("PrefixArrayLazy", run_PrefixArrayLazy)
+addPrecommitTest("PrefixCountableRange", run_PrefixCountableRange)
+addPrecommitTest("PrefixCountableRangeLazy", run_PrefixCountableRangeLazy)
+addPrecommitTest("PrefixSequence", run_PrefixSequence)
+addPrecommitTest("PrefixSequenceLazy", run_PrefixSequenceLazy)
+addPrecommitTest("PrefixWhileAnyCollection", run_PrefixWhileAnyCollection)
+addPrecommitTest("PrefixWhileAnyCollectionLazy", run_PrefixWhileAnyCollectionLazy)
+addPrecommitTest("PrefixWhileAnySeqCRangeIter", run_PrefixWhileAnySeqCRangeIter)
+addPrecommitTest("PrefixWhileAnySeqCRangeIterLazy", run_PrefixWhileAnySeqCRangeIterLazy)
+addPrecommitTest("PrefixWhileAnySeqCntRange", run_PrefixWhileAnySeqCntRange)
+addPrecommitTest("PrefixWhileAnySeqCntRangeLazy", run_PrefixWhileAnySeqCntRangeLazy)
+addPrecommitTest("PrefixWhileAnySequence", run_PrefixWhileAnySequence)
+addPrecommitTest("PrefixWhileAnySequenceLazy", run_PrefixWhileAnySequenceLazy)
+addPrecommitTest("PrefixWhileArray", run_PrefixWhileArray)
+addPrecommitTest("PrefixWhileArrayLazy", run_PrefixWhileArrayLazy)
+addPrecommitTest("PrefixWhileCountableRange", run_PrefixWhileCountableRange)
+addPrecommitTest("PrefixWhileCountableRangeLazy", run_PrefixWhileCountableRangeLazy)
+addPrecommitTest("PrefixWhileSequence", run_PrefixWhileSequence)
+addPrecommitTest("PrefixWhileSequenceLazy", run_PrefixWhileSequenceLazy)
+addPrecommitTest("Prims", run_Prims)
+addPrecommitTest("ProtocolDispatch", run_ProtocolDispatch)
+addPrecommitTest("ProtocolDispatch2", run_ProtocolDispatch2)
+addPrecommitTest("RC4", run_RC4)
+addPrecommitTest("RGBHistogram", run_RGBHistogram)
+addPrecommitTest("RGBHistogramOfObjects", run_RGBHistogramOfObjects)
+addPrecommitTest("RangeAssignment", run_RangeAssignment)
+addPrecommitTest("RecursiveOwnedParameter", run_RecursiveOwnedParameter)
+addPrecommitTest("ReversedArray", run_ReversedArray)
+addPrecommitTest("ReversedBidirectional", run_ReversedBidirectional)
+addPrecommitTest("ReversedDictionary", run_ReversedDictionary)
+addPrecommitTest("SetExclusiveOr", run_SetExclusiveOr)
+addPrecommitTest("SetExclusiveOr_OfObjects", run_SetExclusiveOr_OfObjects)
+addPrecommitTest("SetIntersect", run_SetIntersect)
+addPrecommitTest("SetIntersect_OfObjects", run_SetIntersect_OfObjects)
+addPrecommitTest("SetIsSubsetOf", run_SetIsSubsetOf)
+addPrecommitTest("SetIsSubsetOf_OfObjects", run_SetIsSubsetOf_OfObjects)
+addPrecommitTest("SetUnion", run_SetUnion)
+addPrecommitTest("SetUnion_OfObjects", run_SetUnion_OfObjects)
+addPrecommitTest("SevenBoom", run_SevenBoom)
+addPrecommitTest("Sim2DArray", run_Sim2DArray)
+addPrecommitTest("SortLargeExistentials", run_SortLargeExistentials)
+addPrecommitTest("SortLettersInPlace", run_SortLettersInPlace)
+addPrecommitTest("SortSortedStrings", run_SortSortedStrings)
+addPrecommitTest("SortStrings", run_SortStrings)
+addPrecommitTest("SortStringsUnicode", run_SortStringsUnicode)
+addPrecommitTest("StackPromo", run_StackPromo)
+addPrecommitTest("StaticArray", run_StaticArray)
+addPrecommitTest("StrComplexWalk", run_StrComplexWalk)
+addPrecommitTest("StrToInt", run_StrToInt)
+addPrecommitTest("StringAdder", run_StringAdder)
+addPrecommitTest("StringBuilder", run_StringBuilder)
+addPrecommitTest("StringBuilderLong", run_StringBuilderLong)
+addPrecommitTest("StringEdits", run_StringEdits)
+addPrecommitTest("StringEqualPointerComparison", run_StringEqualPointerComparison)
+addPrecommitTest("StringHasPrefix", run_StringHasPrefix)
+addPrecommitTest("StringHasPrefixUnicode", run_StringHasPrefixUnicode)
+addPrecommitTest("StringHasSuffix", run_StringHasSuffix)
+addPrecommitTest("StringHasSuffixUnicode", run_StringHasSuffixUnicode)
+addPrecommitTest("StringInterpolation", run_StringInterpolation)
+addPrecommitTest("StringMatch", run_StringMatch)
+addPrecommitTest("StringUTF16Builder", run_StringUTF16Builder)
+addPrecommitTest("StringWalk", run_StringWalk)
+addPrecommitTest("StringWithCString", run_StringWithCString)
+addPrecommitTest("SuffixAnyCollection", run_SuffixAnyCollection)
+addPrecommitTest("SuffixAnyCollectionLazy", run_SuffixAnyCollectionLazy)
+addPrecommitTest("SuffixAnySeqCRangeIter", run_SuffixAnySeqCRangeIter)
+addPrecommitTest("SuffixAnySeqCRangeIterLazy", run_SuffixAnySeqCRangeIterLazy)
+addPrecommitTest("SuffixAnySeqCntRange", run_SuffixAnySeqCntRange)
+addPrecommitTest("SuffixAnySeqCntRangeLazy", run_SuffixAnySeqCntRangeLazy)
+addPrecommitTest("SuffixAnySequence", run_SuffixAnySequence)
+addPrecommitTest("SuffixAnySequenceLazy", run_SuffixAnySequenceLazy)
+addPrecommitTest("SuffixArray", run_SuffixArray)
+addPrecommitTest("SuffixArrayLazy", run_SuffixArrayLazy)
+addPrecommitTest("SuffixCountableRange", run_SuffixCountableRange)
+addPrecommitTest("SuffixCountableRangeLazy", run_SuffixCountableRangeLazy)
+addPrecommitTest("SuffixSequence", run_SuffixSequence)
+addPrecommitTest("SuffixSequenceLazy", run_SuffixSequenceLazy)
+addPrecommitTest("SuperChars", run_SuperChars)
+addPrecommitTest("TwoSum", run_TwoSum)
+addPrecommitTest("TypeFlood", run_TypeFlood)
+addPrecommitTest("UTF8Decode", run_UTF8Decode)
+addPrecommitTest("Walsh", run_Walsh)
+addPrecommitTest("XorLoop", run_XorLoop)
 
+// Other tests
+addOtherTest("Ackermann", run_Ackermann)
+addOtherTest("Fibonacci", run_Fibonacci)
+addOtherTest("ExistentialTestArrayConditionalShift_ClassValueBuffer1", run_ExistentialTestArrayConditionalShift_ClassValueBuffer1)
+addOtherTest("ExistentialTestArrayConditionalShift_ClassValueBuffer2", run_ExistentialTestArrayConditionalShift_ClassValueBuffer2)
+addOtherTest("ExistentialTestArrayConditionalShift_ClassValueBuffer3", run_ExistentialTestArrayConditionalShift_ClassValueBuffer3)
+addOtherTest("ExistentialTestArrayConditionalShift_ClassValueBuffer4", run_ExistentialTestArrayConditionalShift_ClassValueBuffer4)
+addOtherTest("ExistentialTestArrayConditionalShift_IntValueBuffer0", run_ExistentialTestArrayConditionalShift_IntValueBuffer0)
+addOtherTest("ExistentialTestArrayConditionalShift_IntValueBuffer1", run_ExistentialTestArrayConditionalShift_IntValueBuffer1)
+addOtherTest("ExistentialTestArrayConditionalShift_IntValueBuffer2", run_ExistentialTestArrayConditionalShift_IntValueBuffer2)
+addOtherTest("ExistentialTestArrayConditionalShift_IntValueBuffer3", run_ExistentialTestArrayConditionalShift_IntValueBuffer3)
+addOtherTest("ExistentialTestArrayConditionalShift_IntValueBuffer4", run_ExistentialTestArrayConditionalShift_IntValueBuffer4)
+addOtherTest("ExistentialTestArrayMutating_ClassValueBuffer1", run_ExistentialTestArrayMutating_ClassValueBuffer1)
+addOtherTest("ExistentialTestArrayMutating_ClassValueBuffer2", run_ExistentialTestArrayMutating_ClassValueBuffer2)
+addOtherTest("ExistentialTestArrayMutating_ClassValueBuffer3", run_ExistentialTestArrayMutating_ClassValueBuffer3)
+addOtherTest("ExistentialTestArrayMutating_ClassValueBuffer4", run_ExistentialTestArrayMutating_ClassValueBuffer4)
+addOtherTest("ExistentialTestArrayMutating_IntValueBuffer0", run_ExistentialTestArrayMutating_IntValueBuffer0)
+addOtherTest("ExistentialTestArrayMutating_IntValueBuffer1", run_ExistentialTestArrayMutating_IntValueBuffer1)
+addOtherTest("ExistentialTestArrayMutating_IntValueBuffer2", run_ExistentialTestArrayMutating_IntValueBuffer2)
+addOtherTest("ExistentialTestArrayMutating_IntValueBuffer3", run_ExistentialTestArrayMutating_IntValueBuffer3)
+addOtherTest("ExistentialTestArrayMutating_IntValueBuffer4", run_ExistentialTestArrayMutating_IntValueBuffer4)
+addOtherTest("ExistentialTestArrayOneMethodCall_ClassValueBuffer1", run_ExistentialTestArrayOneMethodCall_ClassValueBuffer1)
+addOtherTest("ExistentialTestArrayOneMethodCall_ClassValueBuffer2", run_ExistentialTestArrayOneMethodCall_ClassValueBuffer2)
+addOtherTest("ExistentialTestArrayOneMethodCall_ClassValueBuffer3", run_ExistentialTestArrayOneMethodCall_ClassValueBuffer3)
+addOtherTest("ExistentialTestArrayOneMethodCall_ClassValueBuffer4", run_ExistentialTestArrayOneMethodCall_ClassValueBuffer4)
+addOtherTest("ExistentialTestArrayOneMethodCall_IntValueBuffer0", run_ExistentialTestArrayOneMethodCall_IntValueBuffer0)
+addOtherTest("ExistentialTestArrayOneMethodCall_IntValueBuffer1", run_ExistentialTestArrayOneMethodCall_IntValueBuffer1)
+addOtherTest("ExistentialTestArrayOneMethodCall_IntValueBuffer2", run_ExistentialTestArrayOneMethodCall_IntValueBuffer2)
+addOtherTest("ExistentialTestArrayOneMethodCall_IntValueBuffer3", run_ExistentialTestArrayOneMethodCall_IntValueBuffer3)
+addOtherTest("ExistentialTestArrayOneMethodCall_IntValueBuffer4", run_ExistentialTestArrayOneMethodCall_IntValueBuffer4)
+addOtherTest("ExistentialTestArrayShift_ClassValueBuffer1", run_ExistentialTestArrayShift_ClassValueBuffer1)
+addOtherTest("ExistentialTestArrayShift_ClassValueBuffer2", run_ExistentialTestArrayShift_ClassValueBuffer2)
+addOtherTest("ExistentialTestArrayShift_ClassValueBuffer3", run_ExistentialTestArrayShift_ClassValueBuffer3)
+addOtherTest("ExistentialTestArrayShift_ClassValueBuffer4", run_ExistentialTestArrayShift_ClassValueBuffer4)
+addOtherTest("ExistentialTestArrayShift_IntValueBuffer0", run_ExistentialTestArrayShift_IntValueBuffer0)
+addOtherTest("ExistentialTestArrayShift_IntValueBuffer1", run_ExistentialTestArrayShift_IntValueBuffer1)
+addOtherTest("ExistentialTestArrayShift_IntValueBuffer2", run_ExistentialTestArrayShift_IntValueBuffer2)
+addOtherTest("ExistentialTestArrayShift_IntValueBuffer3", run_ExistentialTestArrayShift_IntValueBuffer3)
+addOtherTest("ExistentialTestArrayShift_IntValueBuffer4", run_ExistentialTestArrayShift_IntValueBuffer4)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1", run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2", run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3", run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4", run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_IntValueBuffer0", run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer0)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_IntValueBuffer1", run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer1)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_IntValueBuffer2", run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer2)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_IntValueBuffer3", run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer3)
+addOtherTest("ExistentialTestArrayTwoMethodCalls_IntValueBuffer4", run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer4)
+addOtherTest("ExistentialTestMutatingAndNonMutating_ClassValueBuffer1", run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer1)
+addOtherTest("ExistentialTestMutatingAndNonMutating_ClassValueBuffer2", run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer2)
+addOtherTest("ExistentialTestMutatingAndNonMutating_ClassValueBuffer3", run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer3)
+addOtherTest("ExistentialTestMutatingAndNonMutating_ClassValueBuffer4", run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer4)
+addOtherTest("ExistentialTestMutatingAndNonMutating_IntValueBuffer0", run_ExistentialTestMutatingAndNonMutating_IntValueBuffer0)
+addOtherTest("ExistentialTestMutatingAndNonMutating_IntValueBuffer1", run_ExistentialTestMutatingAndNonMutating_IntValueBuffer1)
+addOtherTest("ExistentialTestMutatingAndNonMutating_IntValueBuffer2", run_ExistentialTestMutatingAndNonMutating_IntValueBuffer2)
+addOtherTest("ExistentialTestMutatingAndNonMutating_IntValueBuffer3", run_ExistentialTestMutatingAndNonMutating_IntValueBuffer3)
+addOtherTest("ExistentialTestMutatingAndNonMutating_IntValueBuffer4", run_ExistentialTestMutatingAndNonMutating_IntValueBuffer4)
+addOtherTest("ExistentialTestMutating_ClassValueBuffer1", run_ExistentialTestMutating_ClassValueBuffer1)
+addOtherTest("ExistentialTestMutating_ClassValueBuffer2", run_ExistentialTestMutating_ClassValueBuffer2)
+addOtherTest("ExistentialTestMutating_ClassValueBuffer3", run_ExistentialTestMutating_ClassValueBuffer3)
+addOtherTest("ExistentialTestMutating_ClassValueBuffer4", run_ExistentialTestMutating_ClassValueBuffer4)
+addOtherTest("ExistentialTestMutating_IntValueBuffer0", run_ExistentialTestMutating_IntValueBuffer0)
+addOtherTest("ExistentialTestMutating_IntValueBuffer1", run_ExistentialTestMutating_IntValueBuffer1)
+addOtherTest("ExistentialTestMutating_IntValueBuffer2", run_ExistentialTestMutating_IntValueBuffer2)
+addOtherTest("ExistentialTestMutating_IntValueBuffer3", run_ExistentialTestMutating_IntValueBuffer3)
+addOtherTest("ExistentialTestMutating_IntValueBuffer4", run_ExistentialTestMutating_IntValueBuffer4)
+addOtherTest("ExistentialTestOneMethodCall_ClassValueBuffer1", run_ExistentialTestOneMethodCall_ClassValueBuffer1)
+addOtherTest("ExistentialTestOneMethodCall_ClassValueBuffer2", run_ExistentialTestOneMethodCall_ClassValueBuffer2)
+addOtherTest("ExistentialTestOneMethodCall_ClassValueBuffer3", run_ExistentialTestOneMethodCall_ClassValueBuffer3)
+addOtherTest("ExistentialTestOneMethodCall_ClassValueBuffer4", run_ExistentialTestOneMethodCall_ClassValueBuffer4)
+addOtherTest("ExistentialTestOneMethodCall_IntValueBuffer0", run_ExistentialTestOneMethodCall_IntValueBuffer0)
+addOtherTest("ExistentialTestOneMethodCall_IntValueBuffer1", run_ExistentialTestOneMethodCall_IntValueBuffer1)
+addOtherTest("ExistentialTestOneMethodCall_IntValueBuffer2", run_ExistentialTestOneMethodCall_IntValueBuffer2)
+addOtherTest("ExistentialTestOneMethodCall_IntValueBuffer3", run_ExistentialTestOneMethodCall_IntValueBuffer3)
+addOtherTest("ExistentialTestOneMethodCall_IntValueBuffer4", run_ExistentialTestOneMethodCall_IntValueBuffer4)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1", run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2", run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3", run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer4", run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer4)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_IntValueBuffer0", run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer0)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_IntValueBuffer1", run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer1)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_IntValueBuffer2", run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer2)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_IntValueBuffer3", run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer3)
+addOtherTest("ExistentialTestPassExistentialOneMethodCall_IntValueBuffer4", run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer4)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer1", run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer1)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer2", run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer2)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer3", run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer3)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer4", run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer4)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer0", run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer0)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer1", run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer1)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2", run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3", run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3)
+addOtherTest("ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4", run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4)
+addOtherTest("ExistentialTestTwoMethodCalls_ClassValueBuffer1", run_ExistentialTestTwoMethodCalls_ClassValueBuffer1)
+addOtherTest("ExistentialTestTwoMethodCalls_ClassValueBuffer2", run_ExistentialTestTwoMethodCalls_ClassValueBuffer2)
+addOtherTest("ExistentialTestTwoMethodCalls_ClassValueBuffer3", run_ExistentialTestTwoMethodCalls_ClassValueBuffer3)
+addOtherTest("ExistentialTestTwoMethodCalls_ClassValueBuffer4", run_ExistentialTestTwoMethodCalls_ClassValueBuffer4)
+addOtherTest("ExistentialTestTwoMethodCalls_IntValueBuffer0", run_ExistentialTestTwoMethodCalls_IntValueBuffer0)
+addOtherTest("ExistentialTestTwoMethodCalls_IntValueBuffer1", run_ExistentialTestTwoMethodCalls_IntValueBuffer1)
+addOtherTest("ExistentialTestTwoMethodCalls_IntValueBuffer2", run_ExistentialTestTwoMethodCalls_IntValueBuffer2)
+addOtherTest("ExistentialTestTwoMethodCalls_IntValueBuffer3", run_ExistentialTestTwoMethodCalls_IntValueBuffer3)
+addOtherTest("ExistentialTestTwoMethodCalls_IntValueBuffer4", run_ExistentialTestTwoMethodCalls_IntValueBuffer4)
+
+// String tests, an extended benchmark suite exercising finer-granularity
+// behavior of our Strings.
+addStringTest("StringWalkASCIIScalars", run_StringWalkASCIIScalars)
+addStringTest("StringWalkASCIICharacters", run_StringWalkASCIICharacters)
+addStringTest("StringWalkUnicodeScalars", run_StringWalkUnicodeScalars)
+addStringTest("StringWalkUnicodeCharacters", run_StringWalkUnicodeCharacters)
+addStringTest("StringWalkMixedScalars", run_StringWalkMixedScalars)
+addStringTest("StringWalkMixedCharacters", run_StringWalkMixedCharacters)
+addStringTest("StringWalkASCIIScalarsBackwards", run_StringWalkASCIIScalarsBackwards)
+addStringTest("StringWalkASCIICharactersBackwards", run_StringWalkASCIICharactersBackwards)
+addStringTest("StringWalkUnicodeScalarsBackwards", run_StringWalkUnicodeScalarsBackwards)
+addStringTest("StringWalkUnicodeCharactersBackwards", run_StringWalkUnicodeCharactersBackwards)
+addStringTest("StringWalkMixedScalarsBackwards", run_StringWalkMixedScalarsBackwards)
+addStringTest("StringWalkMixedCharactersBackwards", run_StringWalkMixedCharactersBackwards)
 
 main()

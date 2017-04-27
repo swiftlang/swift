@@ -3,13 +3,15 @@
 func bet() where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
 typealias gimel where A : B // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
-// expected-error@-1 {{expected '=' in typealias declaration}}
+// expected-error@-1 {{expected '=' in type alias declaration}}
 
 class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
-protocol he where A : B { // expected-error {{'where' clause cannot be attached to a protocol declaration}}
+protocol he where A : B { // expected-error 2 {{use of undeclared type 'A'}}
+  // expected-error@-1 {{use of undeclared type 'B'}}
 
-  associatedtype vav where A : B // expected-error {{where clauses on associated types are fragile; use '-swift-version 4' to experiment.}}
+  associatedtype vav where A : B // expected-error{{use of undeclared type 'A'}}
+  // expected-error@-1 {{use of undeclared type 'B'}}
 }
 
 
@@ -88,4 +90,14 @@ class OuterGeneric<T> {
       _ = method
     }
   }
+}
+
+// Crash with missing types in requirements.
+protocol P1 {
+  associatedtype A where A == ThisTypeDoesNotExist
+  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  associatedtype B where ThisTypeDoesNotExist == B
+  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  associatedtype C where ThisTypeDoesNotExist == ThisTypeDoesNotExist
+  // expected-error@-1 2{{use of undeclared type 'ThisTypeDoesNotExist'}}
 }

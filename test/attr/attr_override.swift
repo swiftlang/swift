@@ -407,3 +407,33 @@ class GenericSub<T> : ConcreteBase {
   override init<U>(t: Int, u: U) {}
   override func doStuff<U>(t: Int, u: U) {}
 }
+
+// Issue with generic parameter index
+class MoreGenericSub1<T, TT> : GenericBase<T> {
+  override func doStuff<U>(t: T, u: U) {}
+}
+
+class MoreGenericSub2<TT, T> : GenericBase<T> {
+  override func doStuff<U>(t: T, u: U) {}
+}
+
+// Issue with insufficient canonicalization when
+// comparing types
+protocol SI {}
+protocol CI {}
+
+protocol Sequence {
+  associatedtype I : SI // expected-note{{declared here}}
+}
+
+protocol Collection : Sequence {
+  associatedtype I : CI // expected-warning{{redeclaration of associated type 'I'}}
+}
+
+class Index<F, T> {
+  func map(_ f: F) -> T {}
+}
+
+class CollectionIndex<C : Collection> : Index<C, C.I> {
+  override func map(_ f: C) -> C.I {}
+}

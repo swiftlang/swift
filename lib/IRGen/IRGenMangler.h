@@ -14,13 +14,13 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "swift/AST/ASTMangler.h"
-#include "ValueWitness.h"
+#include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
 namespace irgen {
 
 /// The mangler for all kind of symbols produced in IRGen.
-class IRGenMangler : public NewMangling::ASTMangler {
+class IRGenMangler : public Mangle::ASTMangler {
 public:
   IRGenMangler() { }
 
@@ -58,17 +58,6 @@ public:
     beginMangling();
     appendProtocolName(Decl);
     appendOperator("Mp");
-    return finalize();
-  }
-
-  std::string mangleWitnessTableOffset(const ValueDecl *Decl) {
-    beginMangling();
-    if (auto ctor = dyn_cast<ConstructorDecl>(Decl)) {
-      appendConstructorEntity(ctor, /*isAllocating=*/true);
-    } else {
-      appendEntity(Decl);
-    }
-    appendOperator("Wo");
     return finalize();
   }
 
@@ -125,7 +114,7 @@ public:
     beginMangling();
     appendProtocolConformance(Conformance);
     appendAssociatedTypePath(AssociatedType);
-    appendNominalType(Proto);
+    appendAnyGenericType(Proto);
     appendOperator("WT");
     return finalize();
   }
@@ -158,13 +147,13 @@ public:
 
   std::string mangleOutlinedCopyFunction(const NominalTypeDecl *Decl) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator("Wy");
     return finalize();
   }
   std::string mangleOutlinedConsumeFunction(const NominalTypeDecl *Decl) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator("We");
     return finalize();
   }
@@ -201,7 +190,7 @@ protected:
   std::string mangleNominalTypeSymbol(const NominalTypeDecl *Decl,
                                       const char *Op) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator(Op);
     return finalize();
   }

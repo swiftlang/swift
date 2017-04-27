@@ -19,10 +19,9 @@
 #ifndef SWIFT_SIL_SILDeclRef_H
 #define SWIFT_SIL_SILDeclRef_H
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/ClangNode.h"
 #include "swift/AST/ResilienceExpansion.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -33,14 +32,19 @@ namespace llvm {
 }
 
 namespace swift {
-  class ValueDecl;
+  enum class EffectsKind : uint8_t;
+  class AbstractFunctionDecl;
   class AbstractClosureExpr;
+  class ValueDecl;
+  class FuncDecl;
   class ClosureExpr;
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
   class SILFunctionType;
   enum class SILLinkage : unsigned char;
+  enum IsSerialized_t : unsigned char;
+  enum class SubclassScope : unsigned char;
   class SILModule;
   class SILLocation;
   class AnyFunctionRef;
@@ -202,41 +206,25 @@ struct SILDeclRef {
   explicit operator bool() const { return !isNull(); }
   
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
-  bool hasClosureExpr() const {
-    return loc.is<AbstractClosureExpr *>()
-      && isa<ClosureExpr>(getAbstractClosureExpr());
-  }
-  bool hasAutoClosureExpr() const {
-    return loc.is<AbstractClosureExpr *>()
-      && isa<AutoClosureExpr>(getAbstractClosureExpr());
-  }
-  bool hasFuncDecl() const {
-    return loc.is<ValueDecl *>() && isa<FuncDecl>(getDecl());
-  }
+  bool hasClosureExpr() const;
+  bool hasAutoClosureExpr() const;
+  bool hasFuncDecl() const;
 
   ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return loc.dyn_cast<AbstractClosureExpr *>();
   }
-  ClosureExpr *getClosureExpr() const {
-    return dyn_cast<ClosureExpr>(getAbstractClosureExpr());
-  }
-  AutoClosureExpr *getAutoClosureExpr() const {
-    return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
-  }
-  FuncDecl *getFuncDecl() const { return dyn_cast<FuncDecl>(getDecl()); }
+  ClosureExpr *getClosureExpr() const;
+  AutoClosureExpr *getAutoClosureExpr() const;
+  FuncDecl *getFuncDecl() const;
+  AbstractFunctionDecl *getAbstractFunctionDecl() const;
   
-  AbstractFunctionDecl *getAbstractFunctionDecl() const {
-    return dyn_cast<AbstractFunctionDecl>(getDecl());
-  }
-  
-  Optional<AnyFunctionRef> getAnyFunctionRef() const;
+  llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
   
   SILLocation getAsRegularLocation() const;
 
   enum class ManglingKind {
     Default,
-    VTableMethod,
     DynamicThunk,
   };
 
@@ -277,7 +265,7 @@ struct SILDeclRef {
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function should have its body serialized.
-  bool isFragile() const;
+  IsSerialized_t isSerialized() const;
   /// \brief True if the function has noinline attribute.
   bool isNoinline() const;
   /// \brief True if the function has __always inline attribute.
@@ -358,24 +346,12 @@ struct SILDeclRef {
 
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
-  SILDeclRef getOverridden() const {
-    if (!hasDecl())
-      return SILDeclRef();
-    auto overridden = getDecl()->getOverriddenDecl();
-    if (!overridden)
-      return SILDeclRef();
-    
-    return SILDeclRef(overridden, kind, getResilienceExpansion(), uncurryLevel);
-  }
+  SILDeclRef getOverridden() const;
   
   /// Return a SILDeclRef to the declaration whose vtable entry this declaration
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.
   SILDeclRef getNextOverriddenVTableEntry() const;
-
-  /// Return a SILDeclRef referring to the ultimate base class's declaration,
-  /// which must be used with getConstantOverrideInfo.
-  SILDeclRef getBaseOverriddenVTableEntry() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
@@ -389,11 +365,13 @@ struct SILDeclRef {
   bool isClangGenerated() const;
   static bool isClangGenerated(ClangNode node);
 
-  bool isImplicit() const {
-    if (hasDecl())
-      return getDecl()->isImplicit();
-    return getAbstractClosureExpr()->isImplicit();
-  }
+  bool isImplicit() const;
+
+  /// Return the scope in which the parent class of a method (i.e. class
+  /// containing this declaration) can be subclassed, returning NotApplicable if
+  /// this is not a method, there is no such class, or the class cannot be
+  /// subclassed.
+  SubclassScope getSubclassScope() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

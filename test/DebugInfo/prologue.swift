@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -S -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -S -g -o - | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

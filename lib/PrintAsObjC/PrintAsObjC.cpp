@@ -12,8 +12,8 @@
 
 #include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Strings.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -229,6 +229,9 @@ private:
         return true;
       return *knownProtocol != KnownProtocolKind::AnyObject;
     });
+
+    // Drop protocols from the list that are implied by other protocols.
+    ProtocolType::canonicalizeProtocols(protosToPrint);
 
     if (protosToPrint.empty())
       return;
@@ -518,7 +521,7 @@ private:
 
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
-    Type rawMethodTy = AFD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+    Type rawMethodTy = AFD->getMethodInterfaceType();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
     auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
 
@@ -631,6 +634,13 @@ private:
 
     if (!skipAvailability) {
       appendAvailabilityAttribute(AFD);
+    }
+
+    if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->isAccessor()) {
+      printSwift3ObjCDeprecatedInference(
+                              cast<FuncDecl>(AFD)->getAccessorStorageDecl());
+    } else {
+      printSwift3ObjCDeprecatedInference(AFD);
     }
 
     os << ";\n";
@@ -804,7 +814,33 @@ private:
       }
     }
   }
-    
+
+  void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
+    auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
+    if (!attr || !attr->isSwift3Inferred())
+      return;
+
+    os << " SWIFT_DEPRECATED_MSG(\"Swift ";
+    if (isa<VarDecl>(VD))
+      os << "property";
+    else if (isa<SubscriptDecl>(VD))
+      os << "subscript";
+    else if (isa<ConstructorDecl>(VD))
+      os << "initializer";
+    else
+      os << "method";
+    os << " '";
+    auto nominal =
+      VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
+    os << ".";
+    SmallString<32> scratch;
+    printEncodedString(VD->getFullName().getString(scratch),
+                       /*includeQuotes=*/false);
+    os << "' uses '@objc' inference deprecated in Swift 4; add '@objc' to "
+       <<   "provide an Objective-C entrypoint\")";
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (FD->getDeclContext()->isTypeContext())
       printAbstractFunctionAsMethod(FD, FD->isStatic());
@@ -894,7 +930,7 @@ private:
       if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
         copyTy = unwrappedTy;
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
-      if (dyn_cast_or_null<StructDecl>(nominal)) {
+      if (nominal && isa<StructDecl>(nominal)) {
         if (nominal == ctx.getArrayDecl() ||
             nominal == ctx.getDictionaryDecl() ||
             nominal == ctx.getSetDecl() ||
@@ -921,7 +957,7 @@ private:
         case FunctionTypeRepresentation::CFunctionPointer:
           break;
         }
-      } else if ((dyn_cast_or_null<ClassDecl>(nominal) &&
+      } else if ((nominal && isa<ClassDecl>(nominal) &&
                   cast<ClassDecl>(nominal)->getForeignClassKind() !=
                     ClassDecl::ForeignKind::CFType) ||
                  (copyTy->isObjCExistentialType() && !isCFTypeRef(copyTy))) {
@@ -966,6 +1002,8 @@ private:
     } else {
       print(ty, OTK_None, objCName);
     }
+
+    printSwift3ObjCDeprecatedInference(VD);
 
     os << ";";
     if (VD->isStatic()) {
@@ -1389,7 +1427,7 @@ private:
   void printCollectionElement(Type ty) {
     ASTContext &ctx = M.getASTContext();
 
-    auto isSwiftNewtype = [&ctx](const StructDecl *SD) -> bool {
+    auto isSwiftNewtype = [](const StructDecl *SD) -> bool {
       if (!SD)
         return false;
       auto *clangDecl = SD->getClangDecl();
@@ -1402,8 +1440,7 @@ private:
     // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (ty->isAny()) {
-      ty = ctx.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
+      ty = ctx.getAnyObjectType();
     } else if (SD != ctx.getArrayDecl() &&
         SD != ctx.getDictionaryDecl() &&
         SD != ctx.getSetDecl() &&
@@ -1468,7 +1505,15 @@ private:
 
     visitBoundGenericType(BGT, optionalKind);
   }
-  
+
+  void printGenericArgs(BoundGenericType *BGT) {
+    os << '<';
+    interleave(BGT->getGenericArgs(),
+               [this](Type t) { print(t, None); },
+               [this] { os << ", "; });
+    os << '>';
+  }
+
   void visitBoundGenericClassType(BoundGenericClassType *BGT,
                                   Optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
@@ -1484,13 +1529,7 @@ private:
       maybePrintTagKeyword(CD);
       os << clangDecl->getName();
     }
-    os << '<';
-    print(BGT->getGenericArgs()[0], None);
-    for (auto arg : BGT->getGenericArgs().slice(1)) {
-      os << ", ";
-      print(arg, None);
-    }
-    os << '>';
+    printGenericArgs(BGT);
     if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
       os << " *";
     }
@@ -1545,62 +1584,56 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitProtocolType(ProtocolType *PT, 
-                         Optional<OptionalTypeKind> optionalKind, 
-                         bool isMetatype = false) {
-    auto proto = PT->getDecl();
-    if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
+  void visitExistentialType(Type T,
+                            Optional<OptionalTypeKind> optionalKind,
+                            bool isMetatype = false) {
+    auto layout = T->getExistentialLayout();
+    if (layout.isErrorExistential()) {
       if (isMetatype) os << "Class";
       else os << "NSError *";
       printNullability(optionalKind);
       return;
     }
 
-    os << (isMetatype ? "Class" : "id");
-
-    assert(proto->isObjC());
-    if (auto knownKind = proto->getKnownProtocolKind()) {
-      if (*knownKind == KnownProtocolKind::AnyObject) {
-        printNullability(optionalKind);
-        return;
+    if (layout.superclass) {
+      auto *CD = layout.superclass->getClassOrBoundGenericClass();
+      assert(CD->isObjC());
+      if (isMetatype) {
+        os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
+      } else {
+        os << getNameForObjC(CD);
+        if (auto *BGT = layout.superclass->getAs<BoundGenericClassType>())
+          printGenericArgs(BGT);
       }
+    } else {
+      os << (isMetatype ? "Class" : "id");
     }
 
-    printProtocols(proto);
+    SmallVector<ProtocolDecl *, 2> protos;
+    for (auto proto : layout.getProtocols())
+      protos.push_back(proto->getDecl());
+    printProtocols(protos);
+
+    if (layout.superclass && !isMetatype)
+      os << " *";
+
     printNullability(optionalKind);
+  }
+
+  void visitProtocolType(ProtocolType *PT,
+                         Optional<OptionalTypeKind> optionalKind) {
+    visitExistentialType(PT, optionalKind, /*isMetatype=*/false);
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *PCT, 
-                                    Optional<OptionalTypeKind> optionalKind,
-                                    bool isMetatype = false) {
-    CanType canonicalComposition = PCT->getCanonicalType();
-    if (auto singleProto = dyn_cast<ProtocolType>(canonicalComposition))
-      return visitProtocolType(singleProto, optionalKind, isMetatype);
-    PCT = cast<ProtocolCompositionType>(canonicalComposition);
-
-    // Dig out the protocols. If we see 'Error', record that we saw it.
-    SmallVector<ProtocolDecl *, 4> protos;
-    for (auto protoTy : PCT->getProtocols()) {
-      auto proto = protoTy->castTo<ProtocolType>()->getDecl();
-      protos.push_back(proto);
-    }
-
-    os << (isMetatype ? "Class" : "id");
-    printProtocols(protos);
-
-    printNullability(optionalKind);
+                                    Optional<OptionalTypeKind> optionalKind) {
+    visitExistentialType(PCT, optionalKind, /*isMetatype=*/false);
   }
 
-  void visitExistentialMetatypeType(ExistentialMetatypeType *MT, 
+  void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
                                     Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
-    if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
-      visitProtocolType(protoTy, optionalKind, /*isMetatype=*/true);
-    } else if (auto compTy = instanceTy->getAs<ProtocolCompositionType>()) {
-      visitProtocolCompositionType(compTy, optionalKind, /*isMetatype=*/true);
-    } else {
-      visitType(MT, optionalKind);
-    }
+    visitExistentialType(instanceTy, optionalKind, /*isMetatype=*/true);
   }
 
   void visitMetatypeType(MetatypeType *MT, 
@@ -1608,10 +1641,8 @@ private:
     Type instanceTy = MT->getInstanceType();
     if (auto classTy = instanceTy->getAs<ClassType>()) {
       const ClassDecl *CD = classTy->getDecl();
-      if (CD->isObjC())
-        os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
-      else
-        os << "Class";
+      assert(CD->isObjC());
+      os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       printNullability(optionalKind);
     } else {
       visitType(MT, optionalKind);
@@ -1819,8 +1850,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitArchetypeType(ArchetypeType *archetype) {
-    // Appears in protocols and in generic ObjC classes.
-    return;
+    llvm_unreachable("Should not see archetypes in interface types");
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *param) {
@@ -1847,19 +1877,22 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {
-    for (auto proto : composition->getProtocols())
+    auto layout = composition->getExistentialLayout();
+    if (layout.superclass)
+      visit(layout.superclass);
+    for (auto proto : layout.getProtocols())
       visit(proto);
   }
 
   void visitLValueType(LValueType *lvalue) {
-    visit(lvalue->getObjectType());
+    llvm_unreachable("LValue types should not appear in interface types");
   }
 
   void visitInOutType(InOutType *inout) {
     visit(inout->getObjectType());
   }
 
-  /// Returns true if \p archetype has any constraints other than being
+  /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
   static bool isConstrained(ModuleDecl &mod,
                             GenericSignature *sig,
@@ -2288,8 +2321,35 @@ public:
       M.getASTContext().LangOpts.EffectiveLanguageVersion) << "\n"
            "#pragma clang diagnostic push\n"
            "\n"
-           "#if defined(__has_include) && "
-             "__has_include(<swift/objc-prologue.h>)\n"
+           "#if !defined(__has_include)\n"
+           "# define __has_include(x) 0\n"
+           "#endif\n"
+           "#if !defined(__has_attribute)\n"
+           "# define __has_attribute(x) 0\n"
+           "#endif\n"
+           "#if !defined(__has_feature)\n"
+           "# define __has_feature(x) 0\n"
+           "#endif\n"
+           "#if !defined(__has_warning)\n"
+           "# define __has_warning(x) 0\n"
+           "#endif\n"
+           "\n"
+           "#if __has_attribute(external_source_symbol)\n"
+           "# define SWIFT_STRINGIFY(str) #str\n"
+           "# define SWIFT_MODULE_NAMESPACE_PUSH(module_name) "
+             "_Pragma(SWIFT_STRINGIFY(clang attribute "
+             "push(__attribute__((external_source_symbol(language=\"Swift\", "
+             "defined_in=module_name, generated_declaration))), "
+             "apply_to=any(function, enum, objc_interface, objc_category, "
+             "objc_protocol))))\n"
+           "# define SWIFT_MODULE_NAMESPACE_POP "
+             "_Pragma(\"clang attribute pop\")\n"
+           "#else\n"
+           "# define SWIFT_MODULE_NAMESPACE_PUSH(module_name)\n"
+           "# define SWIFT_MODULE_NAMESPACE_POP\n"
+           "#endif\n"
+           "\n"
+           "#if __has_include(<swift/objc-prologue.h>)\n"
            "# include <swift/objc-prologue.h>\n"
            "#endif\n"
            "\n"
@@ -2301,7 +2361,7 @@ public:
            "\n"
            "#if !defined(SWIFT_TYPEDEFS)\n"
            "# define SWIFT_TYPEDEFS 1\n"
-           "# if defined(__has_include) && __has_include(<uchar.h>)\n"
+           "# if __has_include(<uchar.h>)\n"
            "#  include <uchar.h>\n"
            "# elif !defined(__cplusplus) || __cplusplus < 201103L\n"
            "typedef uint_least16_t char16_t;\n"
@@ -2333,38 +2393,35 @@ public:
            "# endif\n"
            "#endif\n"
            "\n"
-           "#if defined(__has_attribute) && "
-             "__has_attribute(objc_runtime_name)\n"
+           "#if __has_attribute(objc_runtime_name)\n"
            "# define SWIFT_RUNTIME_NAME(X) "
              "__attribute__((objc_runtime_name(X)))\n"
            "#else\n"
            "# define SWIFT_RUNTIME_NAME(X)\n"
            "#endif\n"
-           "#if defined(__has_attribute) && "
-             "__has_attribute(swift_name)\n"
+           "#if __has_attribute(swift_name)\n"
            "# define SWIFT_COMPILE_NAME(X) "
              "__attribute__((swift_name(X)))\n"
            "#else\n"
            "# define SWIFT_COMPILE_NAME(X)\n"
            "#endif\n"
-           "#if defined(__has_attribute) && "
-             "__has_attribute(objc_method_family)\n"
+           "#if __has_attribute(objc_method_family)\n"
            "# define SWIFT_METHOD_FAMILY(X) "
              "__attribute__((objc_method_family(X)))\n"
            "#else\n"
            "# define SWIFT_METHOD_FAMILY(X)\n"
            "#endif\n"
-           "#if defined(__has_attribute) && __has_attribute(noescape)\n"
+           "#if __has_attribute(noescape)\n"
            "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
            "#else\n"
            "# define SWIFT_NOESCAPE\n"
            "#endif\n"
-           "#if defined(__has_attribute) && __has_attribute(warn_unused_result)\n"
+           "#if __has_attribute(warn_unused_result)\n"
            "# define SWIFT_WARN_UNUSED_RESULT __attribute__((warn_unused_result))\n"
            "#else\n"
            "# define SWIFT_WARN_UNUSED_RESULT\n"
            "#endif\n"
-           "#if defined(__has_attribute) && __has_attribute(noreturn)\n"
+           "#if __has_attribute(noreturn)\n"
            "# define SWIFT_NORETURN __attribute__((noreturn))\n"
            "#else\n"
            "# define SWIFT_NORETURN\n"
@@ -2379,8 +2436,7 @@ public:
            "# define SWIFT_ENUM_EXTRA\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS)\n"
-           "# if defined(__has_attribute) && "
-             "__has_attribute(objc_subclassing_restricted)\n"
+           "# if __has_attribute(objc_subclassing_restricted)\n"
            "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
              "__attribute__((objc_subclassing_restricted)) "
              "SWIFT_CLASS_EXTRA\n"
@@ -2410,23 +2466,31 @@ public:
            "#endif\n"
            "\n"
            "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"
-           "# if defined(__has_attribute) && "
-             "__has_attribute(objc_designated_initializer)\n"
+           "# if __has_attribute(objc_designated_initializer)\n"
            "#  define OBJC_DESIGNATED_INITIALIZER "
              "__attribute__((objc_designated_initializer))\n"
            "# else\n"
            "#  define OBJC_DESIGNATED_INITIALIZER\n"
            "# endif\n"
            "#endif\n"
+           "#if !defined(SWIFT_ENUM_ATTR)\n"
+           "# if defined(__has_attribute) && "
+             "__has_attribute(enum_extensibility)\n"
+           "#  define SWIFT_ENUM_ATTR "
+             "__attribute__((enum_extensibility(open)))\n"
+           "# else\n"
+           "#  define SWIFT_ENUM_ATTR\n"
+           "# endif\n"
+           "#endif\n"
            "#if !defined(SWIFT_ENUM)\n"
            "# define SWIFT_ENUM(_type, _name) "
              "enum _name : _type _name; "
-             "enum SWIFT_ENUM_EXTRA _name : _type\n"
-           "# if defined(__has_feature) && "
-             "__has_feature(generalized_swift_name)\n"
+             "enum SWIFT_ENUM_ATTR SWIFT_ENUM_EXTRA _name : _type\n"
+           "# if __has_feature(generalized_swift_name)\n"
            "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
              "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); "
-             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) SWIFT_ENUM_EXTRA _name : _type\n"
+             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) SWIFT_ENUM_ATTR "
+             "SWIFT_ENUM_EXTRA _name : _type\n"
            "# else\n"
            "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
              "SWIFT_ENUM(_type, _name)\n"
@@ -2463,7 +2527,7 @@ public:
   }
 
   void writeImports(raw_ostream &out) {
-    out << "#if defined(__has_feature) && __has_feature(modules)\n";
+    out << "#if __has_feature(modules)\n";
 
     // Track printed names to handle overlay modules.
     llvm::SmallPtrSet<Identifier, 8> seenImports;
@@ -2578,8 +2642,8 @@ public:
       // alphabetically first.
       auto mismatch =
         std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
-                      [getSortName] (const ProtocolDecl *nextLHSProto,
-                                     const ProtocolDecl *nextRHSProto) {
+                      [] (const ProtocolDecl *nextLHSProto,
+                          const ProtocolDecl *nextRHSProto) {
         return nextLHSProto->getName() != nextRHSProto->getName();
       });
       if (mismatch.first == lhsProtos.end())
@@ -2637,8 +2701,15 @@ public:
     out <<
         "#pragma clang diagnostic ignored \"-Wproperty-attribute-mismatch\"\n"
         "#pragma clang diagnostic ignored \"-Wduplicate-method-arg\"\n"
+        "#if __has_warning(\"-Wpragma-clang-attribute\")\n"
+        "# pragma clang diagnostic ignored \"-Wpragma-clang-attribute\"\n"
+        "#endif\n"
+        "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
+        "\n"
+        "SWIFT_MODULE_NAMESPACE_PUSH(\"" << M.getNameStr() << "\")\n"
       << os.str()
-      << "#pragma clang diagnostic pop\n";
+      << "SWIFT_MODULE_NAMESPACE_POP\n"
+         "#pragma clang diagnostic pop\n";
     return false;
   }
 };

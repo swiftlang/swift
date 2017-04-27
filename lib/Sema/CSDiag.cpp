@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
@@ -481,6 +482,11 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
         // FIXME: show deduced types, etc, etc.
         if (EmittedDecls.insert(choice.getDecl()).second)
           tc.diagnose(choice.getDecl(), diag::found_candidate);
+        break;
+
+      case OverloadChoiceKind::KeyPathApplication:
+        // Skip key path applications, since we don't want them to noise up
+        // unrelated subscript diagnostics.
         break;
 
       case OverloadChoiceKind::BaseType:
@@ -2877,7 +2883,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
     bindOverload = constraint->getNestedConstraints().front();
 
   auto overloadChoice = bindOverload->getOverloadChoice();
-  auto overloadName = overloadChoice.getDecl()->getFullName();
+  auto overloadName = overloadChoice.getName();
 
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
@@ -2915,6 +2921,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   if (constraint->getKind() == ConstraintKind::Disjunction) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
+      if (!elt->getOverloadChoice().isDecl()) continue;
       auto candidate = elt->getOverloadChoice().getDecl();
       diagnose(candidate, diag::found_candidate);
     }
@@ -5379,17 +5386,22 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     break;    // Interesting case. :-)
   }
   
+  // Don't noise up diagnostics with key path application candidates, since they
+  // appear on every type.
+  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
+  for (auto candidate : result.ViableCandidates)
+    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
+      viableCandidatesToReport.push_back(candidate);
+  
   // If we have unviable candidates (e.g. because of access control or some
   // other problem) we should diagnose the problem.
-  if (result.ViableCandidates.empty()) {
+  if (viableCandidatesToReport.empty()) {
     diagnoseUnviableLookupResults(result, baseType, baseExpr, subscriptName,
                                   DeclNameLoc(SE->getLoc()), SE->getLoc());
     return true;
   }
 
-  
-  
-  CalleeCandidateInfo calleeInfo(Type(), result.ViableCandidates,
+  CalleeCandidateInfo calleeInfo(Type(), viableCandidatesToReport,
                                  SE->hasTrailingClosure(), CS,
                                  /*selfAlreadyApplied*/false);
 
@@ -5760,7 +5772,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
-  return !result.second;
+  return result != RequirementCheckResult::Success;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
@@ -6997,9 +7009,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_Unavailable:
   case CC_Inaccessible:
     // Diagnose some simple and common errors.
-    if (candidateInfo.diagnoseSimpleErrors(E))
-      return true;
-    return false;
+    return candidateInfo.diagnoseSimpleErrors(E);
       
   case CC_ArgumentLabelMismatch: { // Argument labels are not correct.
     auto argExpr = typeCheckArgumentChildIndependently(E->getArgument(),

@@ -44,6 +44,7 @@ extension MutableCollection where Self : BidirectionalCollection {
 
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
+@_fixed_layout
 public struct ReversedIndex<Base : Collection> : Comparable {
   /// Creates a new index into a reversed collection for the position before
   /// the specified index.
@@ -66,6 +67,7 @@ public struct ReversedIndex<Base : Collection> : Comparable {
   /// `"r"`, the character before `"a"` in the `name` string.
   ///
   /// - Parameter base: The position after the element to create an index for.
+  @_inlineable
   public init(_ base: Base.Index) {
     self.base = base
   }
@@ -98,6 +100,7 @@ public struct ReversedIndex<Base : Collection> : Comparable {
   ///     // Prints "Last even number: 40"
   public let base: Base.Index
 
+  @_inlineable
   public static func == (
     lhs: ReversedIndex<Base>,
     rhs: ReversedIndex<Base>
@@ -105,6 +108,7 @@ public struct ReversedIndex<Base : Collection> : Comparable {
     return lhs.base == rhs.base
   }
 
+  @_inlineable
   public static func < (
     lhs: ReversedIndex<Base>,
     rhs: ReversedIndex<Base>
@@ -130,6 +134,7 @@ public struct ReversedIndex<Base : Collection> : Comparable {
 /// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - See also: `ReversedRandomAccessCollection`
+@_fixed_layout
 public struct ReversedCollection<
   Base : BidirectionalCollection
 > : BidirectionalCollection {
@@ -137,6 +142,8 @@ public struct ReversedCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
+  @_versioned
+  @_inlineable
   internal init(_base: Base) {
     self._base = _base
   }
@@ -153,27 +160,33 @@ public struct ReversedCollection<
   /// encapsulates its iteration state.
   public typealias Iterator = IndexingIterator<ReversedCollection>
 
+  @_inlineable
   public var startIndex: Index {
     return ReversedIndex(_base.endIndex)
   }
 
+  @_inlineable
   public var endIndex: Index {
     return ReversedIndex(_base.startIndex)
   }
 
+  @_inlineable
   public func index(after i: Index) -> Index {
     return ReversedIndex(_base.index(before: i.base))
   }
 
+  @_inlineable
   public func index(before i: Index) -> Index {
     return ReversedIndex(_base.index(after: i.base))
   }
 
+  @_inlineable
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     return ReversedIndex(_base.index(i.base, offsetBy: -n))
   }
 
+  @_inlineable
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -181,15 +194,19 @@ public struct ReversedCollection<
     return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { ReversedIndex($0) }
   }
 
+  @_inlineable
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _base.distance(from: end.base, to: start.base)
   }
 
   public typealias _Element = Base.Iterator.Element
+
+  @_inlineable
   public subscript(position: Index) -> Base.Iterator.Element {
     return _base[_base.index(before: position.base)]
   }
 
+  @_inlineable
   public subscript(bounds: Range<Index>) -> BidirectionalSlice<ReversedCollection> {
     return BidirectionalSlice(base: self, bounds: bounds)
   }
@@ -199,6 +216,7 @@ public struct ReversedCollection<
 
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
+@_fixed_layout
 public struct ReversedRandomAccessIndex<
   Base : RandomAccessCollection
 > : Comparable {
@@ -225,6 +243,7 @@ public struct ReversedRandomAccessIndex<
   /// the element *after* `"a"`.
   ///
   /// - Parameter base: The position after the element to create an index for.
+  @_inlineable
   public init(_ base: Base.Index) {
     self.base = base
   }
@@ -257,6 +276,7 @@ public struct ReversedRandomAccessIndex<
   ///     // Prints "Last even number: 40"
   public let base: Base.Index
 
+  @_inlineable
   public static func == (
     lhs: ReversedRandomAccessIndex<Base>,
     rhs: ReversedRandomAccessIndex<Base>
@@ -264,6 +284,7 @@ public struct ReversedRandomAccessIndex<
     return lhs.base == rhs.base
   }
 
+  @_inlineable
   public static func < (
     lhs: ReversedRandomAccessIndex<Base>,
     rhs: ReversedRandomAccessIndex<Base>
@@ -279,6 +300,7 @@ public struct ReversedRandomAccessIndex<
 /// - Note: This type is the result of `x.reversed()` where `x` is a
 ///   collection having random access indices.
 /// - See also: `ReversedCollection`
+@_fixed_layout
 public struct ReversedRandomAccessCollection<
   Base : RandomAccessCollection
 > : RandomAccessCollection {
@@ -289,6 +311,8 @@ public struct ReversedRandomAccessCollection<
   /// reverse order.
   ///
   /// - Complexity: O(1)
+  @_versioned
+  @_inlineable
   internal init(_base: Base) {
     self._base = _base
   }
@@ -307,28 +331,34 @@ public struct ReversedRandomAccessCollection<
     ReversedRandomAccessCollection
   >
 
+  @_inlineable
   public var startIndex: Index {
     return ReversedRandomAccessIndex(_base.endIndex)
   }
 
+  @_inlineable
   public var endIndex: Index {
     return ReversedRandomAccessIndex(_base.startIndex)
   }
 
+  @_inlineable
   public func index(after i: Index) -> Index {
     return ReversedRandomAccessIndex(_base.index(before: i.base))
   }
 
+  @_inlineable
   public func index(before i: Index) -> Index {
     return ReversedRandomAccessIndex(_base.index(after: i.base))
   }
 
+  @_inlineable
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     // FIXME: swift-3-indexing-model: tests.
     return ReversedRandomAccessIndex(_base.index(i.base, offsetBy: -n))
   }
 
+  @_inlineable
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -337,6 +367,7 @@ public struct ReversedRandomAccessCollection<
     return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { Index($0) }
   }
 
+  @_inlineable
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // FIXME: swift-3-indexing-model: tests.
     return _base.distance(from: end.base, to: start.base)
@@ -345,6 +376,7 @@ public struct ReversedRandomAccessCollection<
   public typealias _Element = Base.Iterator.Element
   // FIXME(compiler limitation): this typealias should be inferred.
 
+  @_inlineable
   public subscript(position: Index) -> Base.Iterator.Element {
     return _base[_base.index(before: position.base)]
   }
@@ -380,6 +412,7 @@ extension BidirectionalCollection {
   ///     // Prints "sdrawkcaB"
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func reversed() -> ReversedCollection<Self> {
     return ReversedCollection(_base: self)
   }
@@ -413,6 +446,7 @@ extension RandomAccessCollection {
   ///     // Prints "[7, 5, 3]"
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func reversed() -> ReversedRandomAccessCollection<Self> {
     return ReversedRandomAccessCollection(_base: self)
   }
@@ -426,6 +460,7 @@ extension LazyCollectionProtocol
   /// Returns the elements of the collection in reverse order.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func reversed() -> LazyBidirectionalCollection<
     ReversedCollection<Elements>
   > {
@@ -441,6 +476,7 @@ extension LazyCollectionProtocol
   /// Returns the elements of the collection in reverse order.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func reversed() -> LazyRandomAccessCollection<
     ReversedRandomAccessCollection<Elements>
   > {

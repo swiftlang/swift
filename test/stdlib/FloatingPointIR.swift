@@ -1,6 +1,6 @@
-// RUN: %target-build-swift -Xllvm -new-mangling-for-tests -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
-// RUN: %target-build-swift -Xllvm -new-mangling-for-tests -O -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
-// RUN: %target-build-swift -Xllvm -new-mangling-for-tests -Ounchecked -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-build-swift -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-build-swift -O -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-build-swift -Ounchecked -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
 
 var globalFloat32 : Float32 = 0.0
 var globalFloat64 : Float64 = 0.0

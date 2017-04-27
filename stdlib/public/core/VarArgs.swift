@@ -57,9 +57,13 @@ protocol _CVarArgAligned : CVarArg {
 }
 
 #if arch(x86_64)
+@_versioned
 let _x86_64CountGPRegisters = 6
+@_versioned
 let _x86_64CountSSERegisters = 8
+@_versioned
 let _x86_64SSERegisterWords = 2
+@_versioned
 let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
 #endif
 
@@ -267,6 +271,7 @@ extension UnsafeMutablePointer : CVarArg {
 extension AutoreleasingUnsafeMutablePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
@@ -407,6 +412,7 @@ final internal class _VaListBuilder {
 /// `CVaListPointer`.
 final internal class _VaListBuilder {
 
+  @_versioned
   struct Header {
     var gp_offset = CUnsignedInt(0)
     var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)

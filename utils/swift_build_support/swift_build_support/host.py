@@ -63,7 +63,7 @@ def _darwin_max_num_llvm_parallel_lto_link_jobs():
     #
     # This is a bit conservative, but I have found that this number
     # prevents me from swapping on my test machine.
-    return int((_darwin_system_memory()/1000000000.0 - 3.0)/6.0)
+    return int((_darwin_system_memory() / 1000000000.0 - 3.0) / 6.0)
 
 
 def _darwin_max_num_swift_parallel_lto_link_jobs():
@@ -75,7 +75,7 @@ def _darwin_max_num_swift_parallel_lto_link_jobs():
     #
     # This is a bit conservative, but I have found that this number
     # prevents me from swapping on my test machine.
-    return int((_darwin_system_memory()/1000000000.0 - 3.0)/8.0)
+    return int((_darwin_system_memory() / 1000000000.0 - 3.0) / 8.0)
 
 
 _PER_PLATFORM_MAX_PARALLEL_LTO_JOBS = {

@@ -453,6 +453,10 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   }
 
   case tok::pound_keyPath:
+    return parseExprKeyPathObjC();
+  case tok::pound_keyPath2:
+    if (!Context.LangOpts.EnableExperimentalKeyPaths)
+      return parseExprPostfix(Message, isExprBasic);
     return parseExprKeyPath();
 
   case tok::oper_postfix:
@@ -500,10 +504,141 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
       new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
 }
 
-///   expr-keypath:
+///   expr-keypath-swift:
+///     '#keyPath2' '(' (type ',')? keypath-component+ ')'
+///   keypath-component:
+///     '.' unqualified-name
+///     '[' expr ']'
+///     '?'
+///     '!'
+ParserResult<Expr> Parser::parseExprKeyPath() {
+  // Consume '#keyPath2'.
+  // TODO: Finalize syntax.
+  SourceLoc keywordLoc = consumeToken(tok::pound_keyPath2);
+  // Parse the leading '('.
+  if (!Tok.is(tok::l_paren)) {
+    diagnose(Tok, diag::expr_keypath_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+  
+  TypeRepr *root = nullptr;
+
+  // Can we parse a root type followed by a comma?
+  // We need to look ahead here since `[` could either start a sugar type or
+  // subscript component.
+  bool hasRoot;
+  {
+    BacktrackingScope backtrack(*this);
+    hasRoot = canParseType() && Tok.is(tok::comma);
+  }
+  
+  // Read in the root type, if present.
+  SourceLoc commaLoc;
+  if (hasRoot) {
+    root = parseType().get();
+    commaLoc = consumeToken(tok::comma);
+  }
+  
+  SmallVector<KeyPathExpr::Component, 4> components;
+  // Read in components.
+  ParserStatus status;
+  SourceLoc rParenLoc;
+  while (true) {
+    // A property component.
+    if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
+      DeclNameLoc nameLoc;
+      auto name = parseUnqualifiedDeclName(/*afterDot*/ true, nameLoc,
+                                  diag::expr_keypath_expected_property_or_type);
+      if (!name) {
+        status.setIsParseError();
+        break;
+      }
+      
+      auto component =
+        KeyPathExpr::Component::forUnresolvedProperty(name,
+                                                      nameLoc.getBaseNameLoc());
+      components.push_back(component);
+      continue;
+    }
+    
+    // A subscript component.
+    if (Tok.is(tok::l_square)) {
+      SourceLoc lSquareLoc, rSquareLoc;
+      SmallVector<Expr *, 2> indexArgs;
+      SmallVector<Identifier, 2> indexArgLabels;
+      SmallVector<SourceLoc, 2> indexArgLabelLocs;
+      Expr *trailingClosure;
+      status = parseExprList(tok::l_square, tok::r_square,
+                             /*isPostfix=*/true,
+                             /*isExprBasic*/ true,
+                             lSquareLoc, indexArgs, indexArgLabels,
+                             indexArgLabelLocs,
+                             rSquareLoc,
+                             trailingClosure);
+      if (status.hasCodeCompletion() || status.isError())
+        break;
+      
+      auto component = KeyPathExpr::Component::forUnresolvedSubscript(Context,
+          lSquareLoc, indexArgs, indexArgLabels, indexArgLabelLocs, rSquareLoc,
+          trailingClosure);
+      components.push_back(component);
+      continue;
+    }
+    
+    // An optional forcing or chaining component.
+    if (Tok.is(tok::question_postfix)) {
+      auto loc = consumeToken(tok::question_postfix);
+      auto component = KeyPathExpr::Component::forUnresolvedOptionalChain(loc);
+      components.push_back(component);
+      continue;
+    }
+    if (Tok.is(tok::exclaim_postfix)) {
+      auto loc = consumeToken(tok::exclaim_postfix);
+      auto component = KeyPathExpr::Component::forUnresolvedOptionalForce(loc);
+      components.push_back(component);
+      continue;
+    }
+    
+    // A closing paren ends the expression.
+    if (Tok.is(tok::r_paren)) {
+      rParenLoc = consumeToken(tok::r_paren);
+      break;
+    }
+    
+    // TODO: code completion
+    
+    // Anything else is an error.
+    diagnose(Tok, diag::expr_keypath_invalid_component);
+    status.setIsParseError();
+    break;
+  }
+  
+  if (status.hasCodeCompletion()) {
+    return makeParserCodeCompletionResult<Expr>();
+  }
+
+  // Create an ErrorExpr if we encountered an invalid component, but were able
+  // to parse the closing paren.
+  if (status.isError()) {
+    if (rParenLoc.isValid()) {
+      return makeParserResult<Expr>(
+                  new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+    } else {
+      return makeParserErrorResult<Expr>();
+    }
+  }
+  
+  auto keypath = new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
+                                           root, components, rParenLoc,
+                                           /*isObjC*/ false);
+  return makeParserResult(keypath);
+}
+
+///   expr-keypath-objc:
 ///     '#keyPath' '(' unqualified-name ('.' unqualified-name) * ')'
 ///
-ParserResult<Expr> Parser::parseExprKeyPath() {
+ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   // Consume '#keyPath'.
   SourceLoc keywordLoc = consumeToken(tok::pound_keyPath);
 
@@ -514,14 +649,14 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
-  // Handle code completion.
-  SmallVector<Identifier, 4> names;
-  SmallVector<SourceLoc, 4> nameLocs;
+  SmallVector<KeyPathExpr::Component, 4> components;
+  /// Handler for code completion.
   auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
-    ObjCKeyPathExpr *expr = nullptr;
-    if (!names.empty()) {
-      expr = ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
-                                     nameLocs, Tok.getLoc());
+    KeyPathExpr *expr = nullptr;
+    if (!components.empty()) {
+      expr = new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
+                                       nullptr, components, Tok.getLoc(),
+                                       /*isObjC*/ true);
     }
 
     if (CodeCompletion)
@@ -537,11 +672,11 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   while (true) {
     // Handle code completion.
     if (Tok.is(tok::code_complete))
-      return handleCodeCompletion(!names.empty());
+      return handleCodeCompletion(!components.empty());
 
     // Parse the next name.
     DeclNameLoc nameLoc;
-    bool afterDot = !names.empty();
+    bool afterDot = !components.empty();
     auto name = parseUnqualifiedDeclName(
                   afterDot, nameLoc, 
                   diag::expr_keypath_expected_property_or_type);
@@ -550,16 +685,10 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
       break;
     }
 
-    // Cannot use compound names here.
-    if (name.isCompoundName()) {
-      diagnose(nameLoc.getBaseNameLoc(), diag::expr_keypath_compound_name,
-               name)
-        .fixItReplace(nameLoc.getSourceRange(), name.getBaseName().str());
-    }
-
     // Record the name we parsed.
-    names.push_back(name.getBaseName());
-    nameLocs.push_back(nameLoc.getBaseNameLoc());
+    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
+                                                      nameLoc.getBaseNameLoc());
+    components.push_back(component);
 
     // Handle code completion.
     if (Tok.is(tok::code_complete))
@@ -587,15 +716,16 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   // If we cannot build a useful expression, just return an error
   // expression.
-  if (names.empty() || status.isError()) {
+  if (components.empty() || status.isError()) {
     return makeParserResult<Expr>(
              new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
   }
 
   // We're done: create the key-path expression.
   return makeParserResult<Expr>(
-           ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
-                                   nameLocs, rParenLoc));
+    new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
+                              nullptr, components,
+                              rParenLoc, /*isObjC*/ true));
 }
 
 /// parseExprSelector
@@ -1657,7 +1787,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // covering the range of the token.
     if (!Tok.isAtStartOfLine() && consumeIf(tok::unknown)) {
       Result = makeParserResult(
-                                new (Context) ErrorExpr(Result.get()->getSourceRange()));
+                      new (Context) ErrorExpr(Result.get()->getSourceRange()));
       continue;
     }
     
@@ -1771,25 +1901,46 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       Loc, Context.AllocateCopy(Exprs)));
 }
 
-void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
-  assert(tok.isEscapedIdentifier() && "Only for escaped identifiers");
-  if (!canBeArgumentLabel(tok.getText())) return;
+void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
+  // Check to see if there is an argument label.
+  if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+    auto text = Tok.getText();
 
-  SourceLoc start = tok.getLoc();
-  SourceLoc end = start.getAdvancedLoc(tok.getLength());
-  diagnose(tok, diag::escaped_parameter_name, tok.getText())
-    .fixItRemoveChars(start, start.getAdvancedLoc(1))
-    .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+    // If this was an escaped identifier that need not have been escaped, say
+    // so. Only _ needs escaping, because we take foo(_: 3) to be equivalent
+    // to foo(3), to be more uniform with _ in function declaration as well as
+    // the syntax for referring to the function pointer (foo(_:)),
+    auto escaped = Tok.isEscapedIdentifier();
+    auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
+    if (escaped && !underscore && canBeArgumentLabel(text)) {
+      SourceLoc start = Tok.getLoc();
+      SourceLoc end = start.getAdvancedLoc(Tok.getLength());
+      diagnose(Tok, diag::escaped_parameter_name, text)
+          .fixItRemoveChars(start, start.getAdvancedLoc(1))
+          .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+    }
+
+    auto unescapedUnderscore = underscore && !escaped;
+    if (!unescapedUnderscore)
+      name = Context.getIdentifier(text);
+    loc = consumeToken();
+    consumeToken(tok::colon);
+  }
 }
 
 DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
                                           DeclNameLoc &loc,
-                                          const Diagnostic &diag) {
+                                          const Diagnostic &diag,
+                                          bool allowOperators,
+                                          bool allowZeroArgCompoundNames) {
   // Consume the base name.
   Identifier baseName = Context.getIdentifier(Tok.getText());
   SourceLoc baseNameLoc;
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
     baseNameLoc = consumeIdentifier(&baseName);
+  } else if (allowOperators && Tok.isAnyOperator()) {
+    baseName = Context.getIdentifier(Tok.getText());
+    baseNameLoc = consumeToken();
   } else if (afterDot && Tok.isKeyword()) {
     baseNameLoc = consumeToken();
   } else {
@@ -1802,6 +1953,18 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   if (!Tok.isFollowingLParen()) {
     loc = DeclNameLoc(baseNameLoc);
     return baseName;
+  }
+
+  // If the next token is a ')' then we have a 0-arg compound name. This is
+  // explicitly differentiated from "simple" (non-compound) name in DeclName.
+  // Unfortunately only some places in the grammar are ok with accepting this
+  // kind of name; in other places it's ambiguous with trailing calls.
+  if (allowZeroArgCompoundNames && peekToken().is(tok::r_paren)) {
+    consumeToken(tok::l_paren);
+    consumeToken(tok::r_paren);
+    loc = DeclNameLoc(baseNameLoc);
+    SmallVector<Identifier, 2> argumentLabels;
+    return DeclName(Context, baseName, argumentLabels);
   }
 
   // If the token after that isn't an argument label or ':', we don't have a
@@ -1834,20 +1997,12 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
       argumentLabelLocs.push_back(consumeToken(tok::colon));
     }
 
-    // If we see a potential argument label followed by a ':', consume
-    // it.
-    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
-      // If this was an escaped identifier that need not have been escaped,
-      // say so.
-      if (Tok.isEscapedIdentifier())
-        diagnoseEscapedArgumentLabel(Tok);
-
-      if (Tok.is(tok::kw__))
-        argumentLabels.push_back(Identifier());
-      else
-        argumentLabels.push_back(Context.getIdentifier(Tok.getText()));
-      argumentLabelLocs.push_back(consumeToken());
-      (void)consumeToken(tok::colon);
+    Identifier argName;
+    SourceLoc argLoc;
+    parseOptionalArgumentLabel(argName, argLoc);
+    if (argLoc.isValid()) {
+      argumentLabels.push_back(argName);
+      argumentLabelLocs.push_back(argLoc);
       continue;
     }
 
@@ -2569,19 +2724,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                   [&] () -> ParserStatus {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
-
-    // Check to see if there is an argument label.
-    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
-      // If this was an escaped identifier that need not have been escaped,
-      // say so.
-      if (Tok.isEscapedIdentifier())
-        diagnoseEscapedArgumentLabel(Tok);
-
-      if (!Tok.is(tok::kw__))
-        FieldName = Context.getIdentifier(Tok.getText());
-      FieldNameLoc = consumeToken();
-      consumeToken(tok::colon);
-    }
+    parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor

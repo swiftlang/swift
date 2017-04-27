@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-struct MyType<TyA, TyB> { // expected-note {{declared here}}
+struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
 
@@ -10,8 +10,7 @@ struct MyType<TyA, TyB> { // expected-note {{declared here}}
 // arguments to them.
 //
 
-// FIXME: This should work?
-typealias OurType = MyType  // expected-error {{reference to generic type 'MyType' requires arguments in <...>}}
+typealias OurType = MyType
 
 typealias YourType = Swift.Optional
 
@@ -19,8 +18,9 @@ struct Container {
   typealias YourType = Swift.Optional
 }
 
-let _ : YourType<Int>
-let _ : Container.YourType<Int>
+let _: OurType<Int, String>
+let _: YourType<Int>
+let _: Container.YourType<Int>
 
 //
 // Bona-fide generic type aliases
@@ -164,6 +164,11 @@ class GenericClass<T> {
       return TA(a: x, b: y)
     }
   }
+
+  // Stupid corner case -- underlying type is not dependent
+  typealias NotDependent<T> = Int
+
+  func misleadingCode(_: NotDependent<String>) {}
 }
 
 let gc = GenericClass<Double>()
@@ -340,3 +345,16 @@ func f(x: S.G1<Int>, y: S.G2<Int>) {
   takesMyType(x: x)
   takesMyType(y: y)
 }
+
+//
+// Generic typealiases with requirements
+//
+
+typealias Element<S> = S.Iterator.Element where S : Sequence
+
+func takesInt(_: Element<[Int]>) {}
+
+takesInt(10)
+
+func failsRequirementCheck(_: Element<Int>) {}
+// expected-error@-1 {{type 'Int' does not conform to protocol 'Sequence'}}

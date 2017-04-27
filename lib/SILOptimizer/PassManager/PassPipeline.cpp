@@ -71,13 +71,21 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
   P.addOwnershipModelEliminator();
 }
 
-static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
+static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
+                                    const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
+  if (Options.EnableMandatorySemanticARCOpts) {
+    P.addSemanticARCOpts();
+  }
+  P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
+  P.addOwnershipModelEliminator();
+  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
-
+  P.addAccessEnforcementSelection();
+  P.addInactiveAccessMarkerElimination();
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
   P.addDiagnosticConstantPropagation();
@@ -104,11 +112,8 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
     return P;
   }
 
-  // Lower all ownership instructions right after SILGen for now.
-  addOwnershipModelEliminatorPipeline(P);
-
   // Otherwise run the rest of diagnostics.
-  addMandatoryOptPipeline(P);
+  addMandatoryOptPipeline(P, Options);
 
   if (SILViewGuaranteedCFG) {
     addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
@@ -212,6 +217,14 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+  P.addSimplifyCFG();
+  P.addSILCombine();
+
+  // Mainly for Array.append(contentsOf) optimization.
+  P.addArrayElementPropagation();
+  
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).
@@ -429,6 +442,21 @@ SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
 }
 
 SILPassPipelinePlan
+SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P;
+
+  if (Options.DebugSerialization) {
+    addPerfDebugSerializationPipeline(P);
+    return P;
+  }
+
+  P.startPipeline("SILOpt Prepare Passes");
+  P.addFullAccessMarkerElimination();
+
+  return P;
+}
+
+SILPassPipelinePlan
 SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P;
 
@@ -519,7 +547,7 @@ void SILPassPipelinePlan::addPasses(ArrayRef<PassKind> PassKinds) {
     // updated.
     switch (K) {
 // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION)                                            \
+#define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID: {                                                         \
     add##ID();                                                                 \
     break;                                                                     \
@@ -553,20 +581,17 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
   // rather than use the yaml writer interface. We want to use the yaml reader
   // interface to be resilient against slightly different forms of yaml.
   os << "[\n";
-  bool First = true;
-  for (const SILPassPipeline &Pipeline : getPipelines()) {
-    if (!First) {
-      os << "\n    ],\n";
-    }
-    First = false;
-    os << "    [\n";
+  interleave(getPipelines(),
+             [&](const SILPassPipeline &Pipeline) {
+               os << "    [\n";
 
-    os << "        \"" << Pipeline.Name << "\"";
-    for (PassKind Kind : getPipelinePasses(Pipeline)) {
-      os << ",\n        [\"" << PassKindID(Kind) << "\"," << PassKindName(Kind)
-         << ']';
-    }
-  }
+               os << "        \"" << Pipeline.Name << "\"";
+               for (PassKind Kind : getPipelinePasses(Pipeline)) {
+                 os << ",\n        [\"" << PassKindID(Kind) << "\","
+                    << PassKindTag(Kind) << ']';
+               }
+             },
+             [&] { os << "\n    ],\n"; });
   os << "\n    ]\n";
   os << ']';
 }

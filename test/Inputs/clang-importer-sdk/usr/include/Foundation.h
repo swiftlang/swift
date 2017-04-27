@@ -257,6 +257,9 @@ __attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 @interface NSURL : NSObject
 - (instancetype)URLWithString:(NSString *)URLString;
 + (instancetype)URLWithString:(NSString *)URLString;
+- (BOOL)getResourceValue:(out id _Nullable *)value
+                  forKey:(NSString *)key
+                   error:(out NSError *_Nullable *)error;
 @end
 
 @interface NSAttributedString : NSString
@@ -1083,3 +1086,17 @@ typedef enum __attribute__((ns_error_domain(FictionalServerErrorDomain))) Fictio
   FictionalServerErrorMeltedDown = 1
 } FictionalServerErrorCode;
 
+@protocol Garment
+@end
+
+@protocol Cotton
+@end
+
+@interface Coat
+@end
+
+@protocol NSLaundry
+- (void)wash:(Coat <Garment> * _Nonnull)garment;
+- (void)bleach:(Coat <Garment, Cotton> * _Nonnull)garment;
+- (Coat <Garment> * _Nonnull)dry;
+@end

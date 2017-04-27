@@ -415,8 +415,10 @@ ERROR(expression_unused_keypath_result,none,
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (DeclName))
-ERROR(stdlib_anyobject_not_found,none,
-      "broken standard library: cannot find 'AnyObject' protocol", ())
+WARNING(expr_keypath_swift3_objc_inference,none,
+        "argument of '#keyPath' refers to property %0 in %1 that depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DeclName, Identifier))
 ERROR(expr_keypath_type_of_property,none,
       "cannot refer to type member %0 within instance of type %1",
       (DeclName, Type))
@@ -424,8 +426,21 @@ ERROR(expr_keypath_generic_type,none,
       "'#keyPath' cannot refer to generic type %0", (DeclName))
 ERROR(expr_keypath_not_property,none,
       "'#keyPath' cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(expr_keypath_mutating_getter,none,
+      "'#keyPath' cannot refer to %0, which has a mutating getter",
+      (DeclName))
 ERROR(expr_keypath_empty,none,
       "empty '#keyPath' does not refer to a property", ())
+ERROR(expr_unsupported_objc_key_path_component,none,
+      "an Objective-C key path cannot contain "
+      "%select{BAD|subscript|BAD|BAD|optional-forcing|optional-chaining|BAD} "
+      "components",
+      (unsigned))
+ERROR(expr_unsupported_objc_key_path_compound_name,none,
+      "an Objective-C key path cannot reference a declaration with a "
+      "compound name", ())
+ERROR(expr_keypath_no_keypath_type,none,
+      "broken standard library: no 'KeyPath' type found", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -463,6 +478,10 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
+WARNING(expr_selector_swift3_objc_inference,none,
+        "argument of '#selector' refers to %0 %1 in %2 that depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -540,6 +559,15 @@ ERROR(serialization_target_too_new,Fatal,
 ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
+
+ERROR(serialization_fatal,Fatal,
+      "fatal error encountered while reading from module '%0'; "
+      "please file a bug report with your project and the crash log",
+      (StringRef))
+NOTE(serialization_compatibility_version_mismatch,none,
+     "compiling as Swift %0, with '%1' built as Swift %2 "
+     "(this is supported but may expose additional compiler issues)",
+     (StringRef, StringRef, StringRef))
 
 ERROR(reserved_member_name,none,
       "type member may not be named %0, since it would conflict with the"
@@ -1067,6 +1095,8 @@ ERROR(optional_attribute_non_objc_protocol,none,
 ERROR(optional_attribute_missing_explicit_objc,none,
       "'optional' requirements are an Objective-C compatibility feature; add '@objc'",
       ())
+ERROR(objcmembers_attribute_nonclass,none,
+      "'@objcMembers' attribute can only be applied to a class", ())
 ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,none,
@@ -1110,6 +1140,11 @@ WARNING(unsupported_synthesize_init_variadic,none,
         (Type))
 NOTE(variadic_superclass_init_here,none,
      "variadic superclass initializer defined here", ())
+
+WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
+        "reference to %0 %1 of %2 depends on '@objc' attribute inference "
+        "deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -1236,9 +1271,6 @@ WARNING(function_type_access_warn,none,
         "because its %select{parameter|result}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
         (bool, Accessibility, bool, Accessibility, unsigned, bool))
-WARNING(non_trailing_closure_before_default_args,none,
-        "closure parameter prior to parameters with default arguments will "
-        "not be treated as a trailing closure", ())
 ERROR(noreturn_not_supported,none,
       "'@noreturn' has been removed; functions that never return should have a "
       "return type of 'Never' instead", ())
@@ -1265,7 +1297,7 @@ ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(extension_protocol_via_typealias,none,
       "protocol %0 in the module being compiled cannot be extended via a "
-      "typealias", (Type))
+      "type alias", (Type))
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
@@ -1393,6 +1425,8 @@ NOTE(no_witnesses,none,
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
      "%select{|; do you want to add a stub?}3",
      (RequirementKind, DeclName, Type, bool))
+NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
+     ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
@@ -1522,20 +1556,25 @@ ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 ERROR(typealias_outside_of_protocol,none,
-      "typealias %0 can only be used with a concrete type or "
+      "type alias %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 
 ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
-ERROR(protocol_composition_not_protocol,none,
-      "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 WARNING(protocol_composition_with_postfix,none,
-        "protocol composition with postfix '%0' is ambiguous "
+        "protocol-constrained type with postfix '%0' is ambiguous "
         "and will be rejected in future version of Swift", (StringRef))
+
+ERROR(invalid_protocol_composition_member,none,
+      "non-protocol, non-class type %0 cannot be used within a "
+      "protocol-constrained type", (Type))
+ERROR(protocol_composition_one_class,none,
+      "protocol-constrained type cannot contain class %0 because it already "
+      "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
@@ -1570,27 +1609,55 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 ERROR(protocol_typealias_conflict, none,
-      "typealias %0 requires types %1 and %2 to be the same",
+      "type alias %0 requires types %1 and %2 to be the same",
       (Identifier, Type, Type))
+WARNING(redundant_conformance_constraint,none,
+        "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
+NOTE(redundant_conformance_here,none,
+     "conformance constraint %1: %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, ProtocolDecl *))
+
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
-     "same-type constraint %1 == %2 %select{written here|implied here}0",
-     (bool, Type, Type))
+     "same-type constraint %1 == %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, Type))
 ERROR(requires_superclass_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
       "%2 and %3", (unsigned, Type, Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
-     "superclass constraint %1 : %2 %select{written here|implied here}0",
-     (bool, Type, Type))
+     "superclass constraint %1 : %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, Type))
 
-ERROR(mutiple_layout_constraints,none,
-      "multiple layout constraints cannot be used at the same time: %0 and %1",
-      (LayoutConstraint, LayoutConstraint))
+ERROR(conflicting_layout_constraints,none,
+      "%select{generic parameter |protocol |}0%1 has conflicting layout "
+      "constraints %2 and %3",
+      (unsigned, Type, LayoutConstraint, LayoutConstraint))
+WARNING(redundant_layout_constraint,none,
+        "redundant layout constraint %0 : %1", (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-    "previous layout constraint declaration %0 was here", (LayoutConstraint))
+     "layout constraint constraint %1 : %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, LayoutConstraint))
+
+WARNING(redundant_same_type_constraint,none,
+        "redundant same-type constraint %0 == %1", (Type, Type))
+NOTE(previous_same_type_constraint, none,
+     "previous same-type constraint %1 == %2 "
+     "%select{written here|implied here|inferred from type here}0",
+     (unsigned, Type, Type))
+
+WARNING(inherited_associated_type_redecl,none,
+        "redeclaration of associated type %0 from protocol %1 is better "
+        "expressed as a 'where' clause on the protocol", (DeclName, Type))
+WARNING(typealias_override_associated_type,none,
+        "typealias overriding associated type %0 from protocol %1 is better "
+        "expressed as same-type constraint on the protocol", (DeclName, Type))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
@@ -1714,7 +1781,7 @@ ERROR(override_ownership_mismatch,none,
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
 ERROR(override_class_declaration_in_extension,none,
-      "cannot override a non-dynamic class declaration from an extension", 
+      "cannot override a non-dynamic class declaration from an extension",
       ())
 WARNING(override_class_declaration_in_extension_warning,none,
       "cannot override a non-dynamic class declaration from an extension",
@@ -1764,6 +1831,10 @@ ERROR(decl_already_final,none,
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
 
+WARNING(override_swift3_objc_inference,none,
+        "override of %0 %1 from extension of %2 depends on deprecated "
+        "inference of '@objc'",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
@@ -1889,18 +1960,16 @@ ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
-ERROR(broken_equatable_eq_operator,none,
-      "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
-ERROR(dynamic_self_struct_enum,none,
-      "%select{struct|enum}0 method cannot return 'Self'; "
-      "did you mean to use the %select{struct|enum}0 type %1?",
-      (int, Identifier))
+
+ERROR(self_in_nominal,none,
+      "'Self' is only available in a protocol or as the result of a "
+      "method in a class; did you mean '%0'?", (StringRef))
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,none,
@@ -1985,6 +2054,9 @@ ERROR(override_static,none,
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
+      ())
+WARNING(protocol_extension_cannot_be_final,none,
+      "functions in a protocol extension do not need to be marked with 'final'",
       ())
 
 ERROR(final_not_allowed_here,none,
@@ -2099,6 +2171,17 @@ ERROR(lazy_not_observable,none,
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
+
+// @_implements
+ERROR(implements_attr_protocol_lacks_member,none,
+      "protocol %0 has no member %1", (DeclName, DeclName))
+
+ERROR(implements_attr_non_protocol_type,none,
+      "non-protocol type in @_implements attribute", ())
+
+ERROR(implements_attr_protocol_not_conformed_to,none,
+      "containing type %0 does not conform to protocol %1",
+      (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
@@ -2668,7 +2751,13 @@ ERROR(trailing_closure_requires_parens,none,
       " context", ())
 
 ERROR(empty_switch_stmt,none,
-"'switch' statement body must have at least one 'case' or 'default' block",())
+      "%select{'switch' statement body must have at least one 'case' or 'default' block; |}0"
+      "do you want to add "
+      "%select{missing cases?|a default case?}1",(bool, bool))
+ERROR(non_exhaustive_switch,none,
+      "%select{switch must be exhaustive, consider adding |do you want to add }0"
+      "%select{missing cases|a default clause}1"
+      "%select{|?}0", (bool, bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -2801,12 +2890,19 @@ WARNING(no_throw_in_do_with_catch,none,
 // Type Check Types
 //------------------------------------------------------------------------------
 
-ERROR(unsupported_recursive_type,none,
-      "value type %0 cannot have a stored property that references itself",
+ERROR(unsupported_recursive_struct,none,
+      "value type %0 cannot have a stored property that recursively "
+      "contains it",
       (Type))
 
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))
+ERROR(unsupported_infinitely_sized_type,none,
+      "value type %0 has infinite size", (Type))
+NOTE(note_type_cycle_starts_here,none,
+     "cycle beginning here: %0", (StringRef))
+NOTE(note_recursive_enum_case_here,none,
+     "recursive case here", ())
 
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
@@ -2823,9 +2919,6 @@ ERROR(array_literal_intrinsics_not_found,none,
       "Array<T>", ())
 ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(self_in_nominal,none,
-      "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean %0?", (Identifier))
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
@@ -2935,21 +3028,35 @@ ERROR(invalid_objc_decl_context,none,
       "@objc can only be used with members of classes, @objc protocols, and "
       "concrete extensions of classes", ())
 ERROR(invalid_objc_decl,none,
-      "only classes, protocols, methods, initializers, properties, and "
-      "subscript declarations can be declared @objc", ())
+      "only classes (and their extensions), protocols, methods, initializers, "
+      "properties, and subscript declarations can be declared @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
 ERROR(invalid_nonobjc_decl,none,
-      "only methods, initializers, properties and subscript declarations can "
-      "be declared @nonobjc", ())
+      "only class members and extensions of classes can be declared @nonobjc", ())
+ERROR(invalid_nonobjc_extension,none,
+      "only extensions of classes can be declared @nonobjc", ())
+
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "@objc is not supported within extensions of generic classes", ())
+      "@objc is not supported within extensions of generic classes or classes that inherit from generic classes", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
       "@objc protocols may not have operator requirements", ())
+WARNING(objc_inference_swift3_dynamic,none,
+        "inference of '@objc' for 'dynamic' members is deprecated", ())
+WARNING(objc_inference_swift3_objc_derived,none,
+        "inference of '@objc' for members of Objective-C-derived classes is "
+        "deprecated", ())
+
+NOTE(objc_inference_swift3_addobjc,none,
+     "add `@objc` to continue exposing an Objective-C entry point (Swift 3 "
+     "behavior)", ())
+NOTE(objc_inference_swift3_addnonobjc,none,
+     "add `@nonobjc` to suppress the Objective-C entry point (Swift 4 "
+     "behavior)", ())
 
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
@@ -2962,6 +3069,11 @@ ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
+WARNING(accessor_swift3_objc_inference,none,
+        "%select{%0 %1|%1}2 with '@objc' %select{getter|setter}3 depends on "
+        "deprecated inference of '@objc'",
+        (DescriptiveDeclKind, DeclName, bool, bool))
+
 ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,
@@ -2985,8 +3097,15 @@ ERROR(objc_enum_case_req_objc_enum,none,
 ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
+ERROR(objc_extension_not_class,none,
+      "'@objc' can only be applied to an extension of a class", ())
+
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
+
+WARNING(attribute_meaningless_when_nonobjc,none,
+        "'@%0' attribute is meaningless on a property that cannot be "
+        "represented in Objective-C", (StringRef))
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -3008,9 +3127,13 @@ ERROR(function_type_no_parens,none,
 NOTE(not_objc_empty_protocol_composition,none,
      "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
-     "protocol %0 is not '@objc'", (Type))
+     "protocol-constrained type containing protocol %0 cannot be represented "
+     "in Objective-C", (Type))
+NOTE(not_objc_class_constraint,none,
+     "protocol-constrained type containing class %0 cannot be represented "
+     "in Objective-C", (Type))
 NOTE(not_objc_error_protocol_composition,none,
-     "protocol composition involving 'Error' cannot be represented "
+     "protocol-constrained type containing 'Error' cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())
@@ -3192,6 +3315,12 @@ ERROR(dynamic_not_in_class,none,
 ERROR(dynamic_with_final,none,
       "a declaration cannot be both 'final' and 'dynamic'",
       ())
+ERROR(dynamic_with_nonobjc,none,
+      "a declaration cannot be both '@nonobjc' and 'dynamic'",
+      ())
+ERROR(dynamic_requires_objc,none,
+      "'dynamic' %0 %1 must also be '@objc'",
+      (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
 // @available
@@ -3427,6 +3556,10 @@ WARNING(variable_never_used, none,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
+WARNING(immutable_value_never_used_but_assigned, none,
+        "immutable value %0 was never used; "
+        "consider removing it",
+        (Identifier))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
         "consider changing to 'let' constant",

@@ -16,12 +16,14 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
@@ -321,7 +323,9 @@ public:
       if (!protocol->is<ProtocolType>())
         return Type();
     }
-    return ProtocolCompositionType::get(Ctx, protocols);
+    return ProtocolCompositionType::get(Ctx, protocols,
+                                        // FIXME
+                                        /*HasExplicitAnyObject=*/false);
   }
 
   Type createExistentialMetatypeType(Type instance) {
@@ -483,7 +487,7 @@ RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
   if (!DC) {
     return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
-                              Demangle::mangleNode(node, useNewMangling(node)));
+                                  Demangle::mangleNode(node));
   }
 
   auto decl = dyn_cast<NominalTypeDecl>(DC);
@@ -518,7 +522,8 @@ bool RemoteASTTypeBuilder::isForeignModule(const Demangle::NodePointer &node) {
   if (node->getKind() != Demangle::Node::Kind::Module)
     return false;
 
-  return (node->getText() == "__ObjC");
+  return (node->getText() == MANGLING_MODULE_OBJC ||
+          node->getText() == MANGLING_MODULE_CLANG_IMPORTER);
 }
 
 DeclContext *
@@ -547,7 +552,7 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       if (!module) return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangledName = Demangle::mangleNode(node, useNewMangling(node));
+      auto mangledName = Demangle::mangleNode(node);
       auto decl = module->lookupLocalType(mangledName);
       if (!decl) return nullptr;
 

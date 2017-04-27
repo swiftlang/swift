@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // -- Class-bound archetypes and existentials are *not* address-only and can
 //    be manipulated using normal reference type value semantics.
@@ -32,7 +32,8 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   return x
-  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
+  // CHECK:   [[X1:%.*]] = load [copy] [[READ]]
   // CHECK:   destroy_value [[X_ADDR]]
   // CHECK:   destroy_value [[X]]
   // CHECK:   return [[X1]]
@@ -49,7 +50,8 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   // CHECK:   end_borrow [[BORROWED_X]] from [[X]]
   return x
-  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
+  // CHECK:   [[X1:%.*]] = load [copy] [[READ]]
   // CHECK:   return [[X1]]
 }
 
@@ -64,7 +66,8 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   // CHECK:   end_borrow [[BORROWED_X]] from [[X]]
   return x
-  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*ClassBound
+  // CHECK:   [[X1:%.*]] = load [copy] [[READ]]
   // CHECK:   return [[X1]]
 }
 
@@ -80,7 +83,8 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK:   store [[X_COPY]] to [init] [[PB]]
   // CHECK:   end_borrow [[BORROWED_X]] from [[X]]
   return x
-  // CHECK:   [[X1:%.*]] = load [copy] [[PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*ClassBound & NotClassBound
+  // CHECK:   [[X1:%.*]] = load [copy] [[READ]]
   // CHECK:   return [[X1]]
 }
 
@@ -131,7 +135,8 @@ func class_bound_method(x: ClassBound) {
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[XBOX_PB]]
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK: [[X:%.*]] = load [copy] [[XBOX_PB]] : $*ClassBound
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[XBOX_PB]] : $*ClassBound
+  // CHECK: [[X:%.*]] = load [copy] [[READ]] : $*ClassBound
   // CHECK: [[PROJ:%.*]] = open_existential_ref [[X]] : $ClassBound to $[[OPENED:@opened(.*) ClassBound]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #ClassBound.classBoundMethod!1
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[PROJ]])

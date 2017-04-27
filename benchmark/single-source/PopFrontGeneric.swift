@@ -17,6 +17,7 @@ let arrayCount = 1024
 
 // This test case exposes rdar://17440222 which caused rdar://17974483 (popFront
 // being really slow).
+@_versioned
 protocol MyArrayBufferProtocol : MutableCollection, RandomAccessCollection {
   associatedtype Element
 

@@ -53,6 +53,7 @@ class GuardMallocBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             stdout=open('/dev/null', 'w'))
         return GuardMallocResult(test_name, status)
 
+
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == "__main__":

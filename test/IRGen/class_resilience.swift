@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -I %t -emit-ir -enable-resilience -enable-class-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience %s | %FileCheck %s
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
@@ -115,22 +115,6 @@ public class MyResilientChild : MyResilientParent {
 }
 
 
-// ClassWithResilientProperty metadata accessor
-
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T016class_resilience26ClassWithResilientPropertyCMa()
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience26ClassWithResilientPropertyCML
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK:    cacheIsNull:
-// CHECK-NEXT: call void @swift_once([[INT]]* @_T016class_resilience26ClassWithResilientPropertyCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientProperty to i8*))
-// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience26ClassWithResilientPropertyCML
-// CHECK-NEXT: br label %cont
-
-// CHECK:    cont:
-// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: ret %swift.type* [[RESULT]]
-
 // ClassWithResilientProperty.color getter
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_T016class_resilience26ClassWithResilientPropertyC5colors5Int32Vfg(%T16class_resilience26ClassWithResilientPropertyC* swiftself)
@@ -142,23 +126,21 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
 
+// ClassWithResilientProperty metadata accessor
 
-// ClassWithResilientlySizedProperty metadata accessor
-
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T016class_resilience33ClassWithResilientlySizedPropertyCMa()
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience33ClassWithResilientlySizedPropertyCML
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T016class_resilience26ClassWithResilientPropertyCMa()
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience26ClassWithResilientPropertyCML
 // CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:    cacheIsNull:
-// CHECK-NEXT: call void @swift_once([[INT]]* @_T016class_resilience33ClassWithResilientlySizedPropertyCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientlySizedProperty to i8*))
-// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience33ClassWithResilientlySizedPropertyCML
+// CHECK-NEXT: call void @swift_once([[INT]]* @_T016class_resilience26ClassWithResilientPropertyCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientProperty to i8*), i8* undef)
+// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience26ClassWithResilientPropertyCML
 // CHECK-NEXT: br label %cont
 
 // CHECK:    cont:
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
-
 
 // ClassWithResilientlySizedProperty.color getter
 
@@ -170,6 +152,22 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: ret i32 [[FIELD_VALUE]]
+
+// ClassWithResilientlySizedProperty metadata accessor
+
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_T016class_resilience33ClassWithResilientlySizedPropertyCMa()
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience33ClassWithResilientlySizedPropertyCML
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK:    cacheIsNull:
+// CHECK-NEXT: call void @swift_once([[INT]]* @_T016class_resilience33ClassWithResilientlySizedPropertyCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_ClassWithResilientlySizedProperty to i8*), i8* undef)
+// CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T016class_resilience33ClassWithResilientlySizedPropertyCML
+// CHECK-NEXT: br label %cont
+
+// CHECK:    cont:
+// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: ret %swift.type* [[RESULT]]
 
 
 // ClassWithIndirectResilientEnum.color getter

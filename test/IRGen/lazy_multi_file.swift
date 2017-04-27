@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/lazy_multi_file_helper.swift -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 

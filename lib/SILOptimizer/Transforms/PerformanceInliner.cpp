@@ -97,15 +97,18 @@ class SILPerformanceInliner {
     DevirtualizedCallBenefit = RemovedCallBenefit + 300,
 
     /// The benefit of being able to produce a generic
-    /// specializatio for a call.
+    /// specialization for a call.
     GenericSpecializationBenefit = RemovedCallBenefit + 300,
 
     /// Approximately up to this cost level a function can be inlined without
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
 
-    /// Configuration for the caller block limit.
-    BlockLimitDenominator = 10000,
+    /// Configuration for the "soft" caller block limit.
+    BlockLimitDenominator = 3000,
+
+    /// No inlining is done if the caller has more than this number of blocks.
+    OverallCallerBlockLimit = 400,
 
     /// The assumed execution length of a function call.
     DefaultApplyLength = 10
@@ -191,7 +194,8 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (HasNoOpenedExistentials)
     return false;
 
-  auto SubsMap = Callee->getGenericEnvironment()->getSubstitutionMap(Subs);
+  auto SubsMap = Callee->getLoweredFunctionType()
+    ->getGenericSignature()->getSubstitutionMap(Subs);
 
   for (auto &BB : *Callee) {
     for (auto &I : BB) {
@@ -199,16 +203,14 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
         auto PAISubs = PAI->getSubstitutions();
         if (PAISubs.empty())
           continue;
+
         // Check if any of substitutions would contain open existentials
         // after inlining.
-        for (auto PAISub : PAISubs) {
-          if (!PAISub.getReplacement()->hasArchetype())
-            continue;
-          auto NewPAISub =
-              PAISub.subst(AI.getModule().getSwiftModule(), SubsMap);
-          if (NewPAISub.getReplacement()->hasOpenedExistential())
-            return true;
-        }
+        auto PAISubMap = PAI->getOrigCalleeType()
+          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        PAISubMap = PAISubMap.subst(SubsMap);
+        if (PAISubMap.hasOpenedExistential())
+          return true;
       }
     }
   }
@@ -229,7 +231,9 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      return nullptr;
+      ArraySemanticsCall ASC(AI.getInstruction());
+      if (!ASC.canInlineEarly())
+        return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
     if (Callee->hasSemanticsAttrs() &&
@@ -280,7 +284,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   }
 
   // A non-fragile function may not be inlined into a fragile function.
-  if (Caller->isFragile() &&
+  if (Caller->isSerialized() &&
       !Callee->hasValidLinkageForFragileInline()) {
     if (!Callee->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
@@ -351,6 +355,12 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   int BaseBenefit = RemovedCallBenefit;
 
   SubstitutionMap CalleeSubstMap;
+  if (IsGeneric) {
+    CalleeSubstMap = Callee->getLoweredFunctionType()
+      ->getGenericSignature()
+      ->getSubstitutionMap(AI.getSubstitutions());
+  }
+
   const SILOptions &Opts = Callee->getModule().getOptions();
 
   // For some reason -Ounchecked can accept a higher base benefit without
@@ -395,30 +405,18 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
             !isa<WitnessMethodInst>(def))
           continue;
 
-        SmallVector<Substitution, 32> NewSubs;
-        SubstitutionMap SubstMap;
-
         // It is a generic call inside the callee. Check if after inlining
         // it will be possible to perform a generic specialization or
         // devirtualization of this call.
 
         // Create the list of substitutions as they will be after
         // inlining.
-        for (auto Sub : Subs) {
-          if (!Sub.getReplacement()->hasArchetype()) {
-            // This substitution is a concrete type.
-            NewSubs.push_back(Sub);
-            continue;
-          }
-          // This substitution is not a concrete type.
-          if (IsGeneric && CalleeSubstMap.empty()) {
-            CalleeSubstMap =
-                Callee->getGenericEnvironment()->getSubstitutionMap(
-                    AI.getSubstitutions());
-          }
-          auto NewSub = Sub.subst(AI.getModule().getSwiftModule(), CalleeSubstMap);
-          NewSubs.push_back(NewSub);
-        }
+        auto Sig = FAI.getOrigCalleeType()->getGenericSignature();
+        auto SubMap = Sig->getSubstitutionMap(Subs);
+        SubMap = SubMap.subst(CalleeSubstMap);
+
+        SmallVector<Substitution, 4> NewSubs;
+        Sig->getSubstitutions(SubMap, NewSubs);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
@@ -573,8 +571,13 @@ decideInWarmBlock(FullApplySite AI,
 
   SILFunction *Callee = AI.getReferencedFunction();
 
-  if (Callee->getInlineStrategy() == AlwaysInline)
+  if (Callee->getInlineStrategy() == AlwaysInline) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    always-inline decision " <<Callee->getName() << '\n';
+    );
     return true;
+  }
 
   return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks);
 }
@@ -705,6 +708,9 @@ void SILPerformanceInliner::collectAppliesToInline(
           InitialCandidates.push_back(AI);
       }
     }
+    if (NumCallerBlocks > OverallCallerBlockLimit)
+      break;
+
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (CBI.isSlowPath(block, child)) {
         // Handle cold blocks separately.
@@ -857,7 +863,6 @@ public:
     }
   }
 
-  StringRef getName() override { return PassName; }
 };
 } // end anonymous namespace
 

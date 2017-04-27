@@ -78,7 +78,7 @@ public func pdfOperations(_ context: CGContext) {
 public func testColorRenames(color: CGColor,
                              intent: CGColorRenderingIntent) {
   let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-// CHECK:   %{{.*}} = load {{.*}}%struct.__CFString** @kCGColorSpaceSRGB {{.*}}, align 8
+// CHECK:   %{{.*}} = load {{.*}}%struct.__CFString** @kCGColorSpaceSRGB{{.*}}, align 8
 // CHECK:   %{{.*}} = {{.*}} call %struct.CGColorSpace* @CGColorSpaceCreateWithName(%struct.__CFString* %{{.*}})
 
   let _ = color.converted(to: colorSpace, intent: intent, options: nil)

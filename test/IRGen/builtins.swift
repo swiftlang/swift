@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
 
 // REQUIRES: CPU=x86_64
@@ -378,7 +378,7 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
 // CHECK-objc:  [[NOT_DONE]]:
-// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1)
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
 // CHECK-objc:    br label %[[DONE]]
 // CHECK-objc:  [[DONE]]:
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
@@ -387,6 +387,22 @@ func testCondFail(_ b: Bool, c: Bool) {
 
 func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(thin) () -> ()) {
   Builtin.once(p, f)
+}
+
+// CHECK-LABEL: define hidden {{.*}}void @_T08builtins19testOnceWithContext{{[_0-9a-zA-Z]*}}F(i8*, i8*, i8*) {{.*}} {
+// CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
+// CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
+// CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
+// CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
+// CHECK-objc:  [[NOT_DONE]]:
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* %2)
+// CHECK-objc:    br label %[[DONE]]
+// CHECK-objc:  [[DONE]]:
+// CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
+// CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
+// CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
+func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(thin) (Builtin.RawPointer) -> (), k: Builtin.RawPointer) {
+  Builtin.onceWithContext(p, f, k)
 }
 
 class C {}

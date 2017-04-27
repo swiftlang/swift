@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.Class -always-argument-labels > %t.printed.Class.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.Class -always-argument-labels -skip-unavailable > %t.printed.Class.txt
 
 // RUN: %FileCheck %s -check-prefix=PRINT-CLASS -strict-whitespace < %t.printed.Class.txt
 
@@ -11,6 +11,8 @@
 // PRINT-CLASS-NEXT:   struct Options : OptionSet {
 // PRINT-CLASS-NEXT:     init(rawValue rawValue: Int)
 // PRINT-CLASS-NEXT:     let rawValue: Int
+// PRINT-CLASS-NEXT:     typealias RawValue = Int
+// PRINT-CLASS-NEXT:     typealias Element = SomeClass
 // PRINT-CLASS-NEXT:     static var fuzzyDice: SomeClass.Options { get }
 // PRINT-CLASS-NEXT:     static var spoiler: SomeClass.Options { get }
 // PRINT-CLASS-NEXT:   }

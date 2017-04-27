@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(Linux)
+import Glibc
+#else
 import Darwin
+#endif
 
 // Linear function shift register.
 //
@@ -45,12 +49,11 @@ public func Random() -> Int64 {
   return lfsrRandomGenerator.randInt()
 }
 
-public func CheckResults(_ res: Bool, _ message: String = "") {
-  if res {
-    return
+public func CheckResults(_ resultsMatch: Bool, _ message: @autoclosure () -> String) {
+  guard resultsMatch else {
+    print(message())
+    abort()
   }
-  print(message)
-  abort()
 }
 
 public func False() -> Bool { return false }

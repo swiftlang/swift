@@ -129,10 +129,14 @@ internal protocol _ArrayBufferProtocol
 
 extension _ArrayBufferProtocol {
 
+  @_inlineable
+  @_versioned
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
+  @_inlineable
+  @_versioned
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,

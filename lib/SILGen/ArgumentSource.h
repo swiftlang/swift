@@ -178,6 +178,8 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  SILType getSILSubstType(SILGenFunction &SGF) const &;
+
   CanType getSubstRValueType() const & {
     switch (StoredKind) {
     case Kind::RValue:
@@ -189,6 +191,8 @@ public:
     }
     llvm_unreachable("bad kind");
   }
+
+  SILType getSILSubstRValueType(SILGenFunction &SGF) const &;
 
   bool hasLValueType() const & {
     switch (StoredKind) {
@@ -211,6 +215,7 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  bool isExpr() const & { return StoredKind == Kind::Expr; }
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
 
@@ -247,31 +252,31 @@ public:
 
   /// Force this source to become an r-value, then return an unmoved
   /// handle to that r-value.
-  RValue &forceAndPeekRValue(SILGenFunction &gen) &;
+  RValue &forceAndPeekRValue(SILGenFunction &SGF) &;
 
   /// Return an unowned handle to the r-value stored in this source. Undefined
   /// if this ArgumentSource is not an rvalue.
   RValue &peekRValue() &;
 
-  RValue getAsRValue(SILGenFunction &gen, SGFContext C = SGFContext()) &&;
-  ManagedValue getAsSingleValue(SILGenFunction &gen,
+  RValue getAsRValue(SILGenFunction &SGF, SGFContext C = SGFContext()) &&;
+  ManagedValue getAsSingleValue(SILGenFunction &SGF,
                                 SGFContext C = SGFContext()) &&;
-  ManagedValue getAsSingleValue(SILGenFunction &gen,
+  ManagedValue getAsSingleValue(SILGenFunction &SGF,
                                 AbstractionPattern origFormalType,
                                 SGFContext C = SGFContext()) &&;
 
-  void forwardInto(SILGenFunction &gen, Initialization *dest) &&;
-  void forwardInto(SILGenFunction &gen, AbstractionPattern origFormalType,
+  void forwardInto(SILGenFunction &SGF, Initialization *dest) &&;
+  void forwardInto(SILGenFunction &SGF, AbstractionPattern origFormalType,
                    Initialization *dest, const TypeLowering &destTL) &&;
 
-  ManagedValue materialize(SILGenFunction &gen) &&;
+  ManagedValue materialize(SILGenFunction &SGF) &&;
 
   /// Emit this value to memory so that it follows the abstraction
   /// patterns of the original formal type.
   ///
   /// \param expectedType - the lowering of getSubstType() under the
   ///   abstractions of origFormalType
-  ManagedValue materialize(SILGenFunction &gen,
+  ManagedValue materialize(SILGenFunction &SGF,
                            AbstractionPattern origFormalType,
                            SILType expectedType = SILType()) &&;
 

@@ -44,7 +44,6 @@ class Devirtualizer : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
-  StringRef getName() override { return "Devirtualizer"; }
 };
 
 } // end anonymous namespace
@@ -115,7 +114,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
-      notifyPassManagerOfFunction(CalleeFn, nullptr);
+      notifyAddFunction(CalleeFn, nullptr);
   }
 
   return Changed;

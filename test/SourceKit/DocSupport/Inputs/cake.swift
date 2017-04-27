@@ -17,7 +17,7 @@ public class C1 : Prot {
 public func genfoo<T1 : Prot, T2 : C1>(x ix: T1, y iy: T2) where T1.Element == Int, T2.Element == T1.Element {}
 
 public extension Prot where Self.Element == Int {
-  final func extfoo() {}
+  func extfoo() {}
 }
 
 public enum MyEnum : Int {

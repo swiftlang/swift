@@ -100,9 +100,6 @@ private:
   /// A map from local DeclContexts to their serialized IDs.
   llvm::DenseMap<const DeclContext*, DeclContextID> LocalDeclContextIDs;
 
-  /// A map from generic parameter lists to the decls they come from.
-  llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
-
   /// A map from generic environments to their serialized IDs.
   llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
     GenericEnvironmentIDs;
@@ -120,11 +117,8 @@ public:
   /// table.
   using DeclTable = llvm::MapVector<Identifier, DeclTableData>;
 
-  /// Returns the declaration the given generic parameter list is associated
-  /// with.
-  const Decl *getGenericContext(const GenericParamList *paramList);
-
-  using ObjCMethodTableData = SmallVector<std::tuple<TypeID, bool, DeclID>, 4>;
+  using ObjCMethodTableData =
+    SmallVector<std::tuple<std::string, bool, DeclID>, 4>;
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of all defined Objective-C methods.
@@ -411,7 +405,8 @@ public:
   /// The Decl will be scheduled for serialization if necessary.
   ///
   /// \returns The ID for the given Decl in this module.
-  DeclID addDeclRef(const Decl *D, bool forceSerialization = false);
+  DeclID addDeclRef(const Decl *D, bool forceSerialization = false,
+                    bool allowTypeAliasXRef = false);
 
   /// Records the use of the given DeclContext.
   ///

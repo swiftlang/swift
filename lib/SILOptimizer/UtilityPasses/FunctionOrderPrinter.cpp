@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -57,7 +57,6 @@ class FunctionOrderPrinterPass : public SILModuleTransform {
     llvm::outs() << "\n";
   }
 
-  StringRef getName() override { return "Function Order Printer"; }
 };
 
 } // end anonymous namespace

@@ -16,12 +16,15 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
 #include "ImageInspection.h"
 #include "Private.h"
+
+#include <vector>
 
 using namespace swift;
 

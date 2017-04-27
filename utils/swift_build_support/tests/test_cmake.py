@@ -37,6 +37,7 @@ class CMakeTestCase(unittest.TestCase):
                          distcc=False,
                          cmake_generator="Ninja",
                          clang_compiler_version=None,
+                         clang_user_visible_version=None,
                          build_jobs=8,
                          build_args=[],
                          verbose_build=False,
@@ -187,17 +188,33 @@ class CMakeTestCase(unittest.TestCase):
     def test_common_options_clang_compiler_version(self):
         args = self.default_args()
         args.clang_compiler_version = CompilerVersion(
-            string_representation="3.8.0",
-            components=("3", "8", "0", None))
+            string_representation="999.0.999",
+            components=("999", "0", "999", None))
         cmake = self.cmake(args)
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
-             "-DLLVM_VERSION_MAJOR:STRING=3",
-             "-DLLVM_VERSION_MINOR:STRING=8",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_clang_user_visible_version(self):
+        args = self.default_args()
+        args.clang_user_visible_version = CompilerVersion(
+            string_representation="9.0.0",
+            components=("9", "0", "0", None))
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DLLVM_VERSION_MAJOR:STRING=9",
+             "-DLLVM_VERSION_MINOR:STRING=0",
              "-DLLVM_VERSION_PATCH:STRING=0",
+             "-DCLANG_VERSION_MAJOR:STRING=9",
+             "-DCLANG_VERSION_MINOR:STRING=0",
+             "-DCLANG_VERSION_PATCH:STRING=0",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_build_ninja(self):
@@ -218,9 +235,12 @@ class CMakeTestCase(unittest.TestCase):
         args.export_compile_commands = True
         args.distcc = True
         args.cmake_generator = 'Xcode'
+        args.clang_user_visible_version = CompilerVersion(
+            string_representation="9.0.0",
+            components=("9", "0", "0", None))
         args.clang_compiler_version = CompilerVersion(
-            string_representation="3.8.0",
-            components=("3", "8", "0", None))
+            string_representation="999.0.900",
+            components=("999", "0", "900", None))
         args.build_ninja = True
         cmake = self.cmake(args)
         self.assertEqual(
@@ -234,9 +254,12 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo",
-             "-DLLVM_VERSION_MAJOR:STRING=3",
-             "-DLLVM_VERSION_MINOR:STRING=8",
-             "-DLLVM_VERSION_PATCH:STRING=0"])
+             "-DLLVM_VERSION_MAJOR:STRING=9",
+             "-DLLVM_VERSION_MINOR:STRING=0",
+             "-DLLVM_VERSION_PATCH:STRING=0",
+             "-DCLANG_VERSION_MAJOR:STRING=9",
+             "-DCLANG_VERSION_MINOR:STRING=0",
+             "-DCLANG_VERSION_PATCH:STRING=0"])
         # NOTE: No "-DCMAKE_MAKE_PROGRAM=/path/to/built/ninja" because
         #       cmake_generator is 'Xcode'
 

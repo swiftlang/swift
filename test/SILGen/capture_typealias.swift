@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 typealias Int = Builtin.Int64
 
@@ -19,4 +19,4 @@ func foo() {
   }
 }
 
-// CHECK: sil shared @_T017capture_typealias3fooyyFBi64_ycfU_ : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: sil private @_T017capture_typealias3fooyyFBi64_ycfU_ : $@convention(thin) () -> Builtin.Int64 {

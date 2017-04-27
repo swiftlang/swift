@@ -20,6 +20,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -36,7 +39,11 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
   if (!enumDecl)
     return false;
-  
+
+  // The enum must have cases.
+  if (!enumDecl->hasCases())
+    return false;
+
   // The enum must not have associated values.
   // TODO: Enums with Equatable/Hashable/Comparable payloads
   if (!enumDecl->hasOnlyCasesWithoutAssociatedValues())
@@ -189,7 +196,9 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   //   case A, B, C
   //
   //   @derived
-  //   func ==(a: SomeEnum<T...>, b: SomeEnum<T...>) -> Bool {
+  //   @_implements(Equatable, ==(_:_:))
+  //   func __derived_enum_equals(a: SomeEnum<T...>,
+  //                              b: SomeEnum<T...>) -> Bool {
   //     var index_a: Int
   //     switch a {
   //     case .A: index_a = 0
@@ -232,7 +241,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
 
   auto boolTy = C.getBoolDecl()->getDeclaredType();
 
-  DeclName name(C, C.Id_EqualsOperator, params[1]);
+  DeclName name(C, C.Id_derived_enum_equals, params[1]);
   auto eqDecl =
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::KeywordStatic,
@@ -244,19 +253,27 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
                      TypeLoc::withoutLoc(boolTy),
                      parentDC);
   eqDecl->setImplicit();
+  eqDecl->setUserAccessible(false);
   eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
-  auto op = C.getStdlibModule()->lookupInfixOperator(C.Id_EqualsOperator);
-  if (!op) {
-    tc.diagnose(parentDecl->getLoc(),
-                diag::broken_equatable_eq_operator);
-    return nullptr;
-  }
+
+  // Add the @_implements(Equatable, ==(_:_:)) attribute
+  auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
+  auto equatableTy = equatableProto->getDeclaredType();
+  auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+  SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
+  auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
+                                 argumentLabels);
+  eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
+                                                SourceRange(),
+                                                equatableTypeLoc,
+                                                equalsDeclName,
+                                                DeclNameLoc()));
+
   if (!C.getEqualIntDecl()) {
     tc.diagnose(parentDecl->getLoc(), diag::no_equal_overload_for_int);
     return nullptr;
   }
 
-  eqDecl->setOperatorDecl(op);
   eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
 
   // Compute the type.

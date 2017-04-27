@@ -118,15 +118,15 @@
                 "clang": "swift-4.0-branch",
                 "swift": "swift-4.0-branch",
                 "lldb": "swift-4.0-branch",
-                "cmark": "swift-3.1-branch",
-                "llbuild": "swift-3.1-branch",
-                "swiftpm": "swift-3.1-branch",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
                 "compiler-rt": "swift-4.0-branch",
-                "swift-corelibs-xctest": "swift-3.1-branch",
-                "swift-corelibs-foundation": "swift-3.1-branch",
-                "swift-corelibs-libdispatch": "swift-3.1-branch",
-                "swift-integration-tests": "swift-3.1-branch",
-                "swift-xcode-playground-support": "swift-3.1-branch",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
                 "ninja": "release"
             }
         }

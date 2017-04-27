@@ -11,14 +11,9 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public func run_StringWithCString(_ N: Int) {
-  let str = String(repeating: "x", count: 100 * (1 << 16))
-  for _ in 0 ..< N {
-    str.withCString { _ in }
-  }
-}
-
+// FIXME(string)
 public func run_StringHasPrefix(_ N: Int) {
+#if _runtime(_ObjC)
   let prefix = "prefix"
   let testString = "prefixedString"
   for _ in 0 ..< N {
@@ -28,9 +23,12 @@ public func run_StringHasPrefix(_ N: Int) {
       }
     }
   }
+#endif
 }
 
+// FIXME(string)
 public func run_StringHasSuffix(_ N: Int) {
+#if _runtime(_ObjC)
   let suffix = "Suffixed"
   let testString = "StringSuffixed"
   for _ in 0 ..< N {
@@ -40,9 +38,12 @@ public func run_StringHasSuffix(_ N: Int) {
       }
     }
   }
+#endif
 }
 
+// FIXME(string)
 public func run_StringHasPrefixUnicode(_ N: Int) {
+#if _runtime(_ObjC)
   let prefix = "❄️prefix"
   let testString = "❄️prefixedString"
   for _ in 0 ..< N {
@@ -52,9 +53,12 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
       }
     }
   }
+#endif
 }
 
+// FIXME(string)
 public func run_StringHasSuffixUnicode(_ N: Int) {
+#if _runtime(_ObjC)
   let suffix = "❄️Suffixed"
   let testString = "String❄️Suffixed"
   for _ in 0 ..< N {
@@ -64,6 +68,7 @@ public func run_StringHasSuffixUnicode(_ N: Int) {
       }
     }
   }
+#endif
 }
 
 @inline(never)

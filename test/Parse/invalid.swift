@@ -51,7 +51,7 @@ func testNotCoveredCase(x: Int) {
     break
   }
 
-  switch x {
+  switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
 #if true // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
   case 1:
     break
@@ -60,7 +60,7 @@ func testNotCoveredCase(x: Int) {
   default:
     break
 #endif
-  } // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
+  }
 }
 
 // rdar://18926814

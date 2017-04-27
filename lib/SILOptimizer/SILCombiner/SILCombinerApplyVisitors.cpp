@@ -640,16 +640,14 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
     if (!IE)
       return nullptr;
 
-    OpenedArchetype = Open->getType().getSwiftRValueType()
-        ->castTo<ArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
     OpenedArchetypeDef = Open;
     return IE;
   }
 
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(Self)) {
     if (auto *IE = dyn_cast<InitExistentialRefInst>(Open->getOperand())) {
-      OpenedArchetype = Open->getType().getSwiftRValueType()
-          ->castTo<ArchetypeType>();
+      OpenedArchetype = Open->getType().castTo<ArchetypeType>();
       OpenedArchetypeDef = Open;
       return IE;
     }
@@ -662,7 +660,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
       auto Ty = Open->getType().getSwiftRValueType();
       while (auto Metatype = dyn_cast<MetatypeType>(Ty))
         Ty = Metatype.getInstanceType();
-      OpenedArchetype = Ty->castTo<ArchetypeType>();
+      OpenedArchetype = cast<ArchetypeType>(Ty);
       OpenedArchetypeDef = Open;
       return IE;
     }
@@ -860,7 +858,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     // Prepare a mini-mapping for opened archetypes.
     // SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
     OpenedArchetypesTracker.addOpenedArchetypeDef(
-        ConcreteType->castTo<ArchetypeType>(), ConcreteTypeDef);
+        cast<ArchetypeType>(ConcreteType), ConcreteTypeDef);
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 

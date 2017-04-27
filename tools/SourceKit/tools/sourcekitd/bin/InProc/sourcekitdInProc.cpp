@@ -95,7 +95,7 @@ std::string sourcekitd::getRuntimeLibPath() {
 }
 
 void sourcekitd::set_interrupted_connection_handler(
-                          sourcekitd_interrupted_connection_handler_t handler) {
+                          llvm::function_ref<void()> handler) {
 }
 
 //===----------------------------------------------------------------------===//
