@@ -23,10 +23,12 @@ protocol LetterKind {
 struct Letter : LetterKind {
   let value: String
 
-  var a: Int = 27
-  var b: Int = 27
-  var c: Int = 27
-  var d: Int = 27
+  // Make this struct a large struct which does not fit into the 3-word
+  // existential inline buffer. Also provide an answer to ...
+  var a: Int = 42
+  var b: Int = 42
+  var c: Int = 42
+  var d: Int = 42
 
   init(_ value: String) {
     self.value = value
