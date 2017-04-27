@@ -441,71 +441,71 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
                                             DeclNameLoc(), /*Implicit=*/true,
                                             AccessSemantics::DirectToStorage);
 
-  auto enumElements = codingKeysEnum->getAllElements();
-  if (!enumElements.empty()) {
-    // Need to generate
-    //   `let container = encoder.container(keyedBy: CodingKeys.self)`
-    // `let container` (containerExpr) is generated above.
+  // Need to generate
+  //   `let container = encoder.container(keyedBy: CodingKeys.self)`
+  // This is unconditional because a type with no properties should encode as an
+  // empty container.
+  //
+  // `let container` (containerExpr) is generated above.
 
-    // encoder
-    auto encoderParam = encodeDecl->getParameterList(1)->get(0);
-    auto *encoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(encoderParam),
-                                            DeclNameLoc(), /*Implicit=*/true);
+  // encoder
+  auto encoderParam = encodeDecl->getParameterList(1)->get(0);
+  auto *encoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(encoderParam),
+                                          DeclNameLoc(), /*Implicit=*/true);
 
-    // Bound encoder.container(keyedBy: CodingKeys.self) call
-    auto containerType = containerDecl->getInterfaceType();
-    auto *callExpr = createContainerKeyedByCall(C, funcDC, encoderExpr,
-                                                containerType, codingKeysEnum);
+  // Bound encoder.container(keyedBy: CodingKeys.self) call
+  auto containerType = containerDecl->getInterfaceType();
+  auto *callExpr = createContainerKeyedByCall(C, funcDC, encoderExpr,
+                                              containerType, codingKeysEnum);
 
-    // Full `let container = encoder.container(keyedBy: CodingKeys.self)`
-    // binding.
-    auto *containerPattern = new (C) NamedPattern(containerDecl,
-                                                  /*implicit=*/true);
-    auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                   StaticSpellingKind::None,
-                                                   SourceLoc(),
-                                                   containerPattern, callExpr,
-                                                   funcDC);
-    statements.push_back(bindingDecl);
-    statements.push_back(containerDecl);
+  // Full `let container = encoder.container(keyedBy: CodingKeys.self)`
+  // binding.
+  auto *containerPattern = new (C) NamedPattern(containerDecl,
+                                                /*implicit=*/true);
+  auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
+                                                 StaticSpellingKind::None,
+                                                 SourceLoc(),
+                                                 containerPattern, callExpr,
+                                                 funcDC);
+  statements.push_back(bindingDecl);
+  statements.push_back(containerDecl);
 
-    // Now need to generate `try container.encode(x, forKey: .x)` for all
-    // existing properties.
-    for (auto *elt : enumElements) {
-      // Only ill-formed code would produce multiple results for this lookup.
-      // This would get diagnosed later anyway, so we're free to only look at
-      // the first result here.
-      auto matchingVars = typeDecl->lookupDirect(DeclName(elt->getName()));
+  // Now need to generate `try container.encode(x, forKey: .x)` for all
+  // existing properties.
+  for (auto *elt : codingKeysEnum->getAllElements()) {
+    // Only ill-formed code would produce multiple results for this lookup.
+    // This would get diagnosed later anyway, so we're free to only look at
+    // the first result here.
+    auto matchingVars = typeDecl->lookupDirect(DeclName(elt->getName()));
 
-      // self.x
-      auto *selfRef = createSelfDeclRef(encodeDecl);
-      auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
-                                            ConcreteDeclRef(matchingVars[0]),
-                                            DeclNameLoc(), /*Implicit=*/true);
+    // self.x
+    auto *selfRef = createSelfDeclRef(encodeDecl);
+    auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                          ConcreteDeclRef(matchingVars[0]),
+                                          DeclNameLoc(), /*Implicit=*/true);
 
-      // CodingKeys.x
-      auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit=*/true);
-      auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-      auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    // CodingKeys.x
+    auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit=*/true);
+    auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
+    auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
 
-      // encode(_:forKey:)
-      SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-      DeclName name(C, C.Id_encode, argNames);
-      auto *encodeCall = new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
-                                                   name, DeclNameLoc(),
-                                                   /*Implicit=*/true);
+    // encode(_:forKey:)
+    SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
+    DeclName name(C, C.Id_encode, argNames);
+    auto *encodeCall = new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
+                                                 name, DeclNameLoc(),
+                                                 /*Implicit=*/true);
 
-      // container.encode(self.x, forKey: CodingKeys.x)
-      Expr *args[2] = {varExpr, keyExpr};
-      auto *callExpr = CallExpr::createImplicit(C, encodeCall,
-                                                C.AllocateCopy(args),
-                                                C.AllocateCopy(argNames));
+    // container.encode(self.x, forKey: CodingKeys.x)
+    Expr *args[2] = {varExpr, keyExpr};
+    auto *callExpr = CallExpr::createImplicit(C, encodeCall,
+                                              C.AllocateCopy(args),
+                                              C.AllocateCopy(argNames));
 
-      // try container.encode(self.x, forKey: CodingKeys.x)
-      auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                      /*Implicit=*/true);
-      statements.push_back(tryExpr);
-    }
+    // try container.encode(self.x, forKey: CodingKeys.x)
+    auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
+                                    /*Implicit=*/true);
+    statements.push_back(tryExpr);
   }
 
   // Classes which inherit from something Codable should encode super as well.
