@@ -21,9 +21,6 @@ internal protocol _ArrayBufferProtocol
   : RandomAccessCollection 
     = CountableRange<Int>
 
-  /// The type of elements stored in the buffer.
-  associatedtype Element
-
   /// Create an empty buffer.
   init()
 
