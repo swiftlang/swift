@@ -613,7 +613,7 @@ ProtocolDecl *RequirementSource::getProtocolDecl() const {
     return nullptr;
 
   case StorageKind::StoredType:
-    if (kind == ProtocolRequirement)
+    if (isProtocolRequirement())
       return getTrailingObjects<ProtocolDecl *>()[0];
     return nullptr;
 
@@ -637,7 +637,7 @@ SourceLoc RequirementSource::getLoc() const {
   // for a particular requirement, rather than turning on/off location info.
   // Locations that fall into this category should be advisory, emitted via
   // notes rather than as the normal location.
-  if (kind == ProtocolRequirement && parent &&
+  if (isProtocolRequirement() && parent &&
       parent->kind != RequirementSignatureSelf)
     return parent->getLoc();
 
@@ -668,8 +668,7 @@ SourceLoc RequirementSource::getLoc() const {
 static unsigned sourcePathLength(const RequirementSource *source) {
   unsigned count = 0;
   for (; source; source = source->parent) {
-    if (source->kind == RequirementSource::ProtocolRequirement ||
-        source->kind == RequirementSource::InferredProtocolRequirement)
+    if (source->isProtocolRequirement())
       ++count;
   }
   return count;
@@ -942,7 +941,7 @@ bool FloatingRequirementSource::isRecursive(
   llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 4> visitedAssocReqs;
   for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
        storedSource; storedSource = storedSource->parent) {
-    if (storedSource->kind != RequirementSource::ProtocolRequirement)
+    if (!storedSource->isProtocolRequirement())
       continue;
 
     if (!visitedAssocReqs.insert(
