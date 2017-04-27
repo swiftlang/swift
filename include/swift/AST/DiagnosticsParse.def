@@ -107,7 +107,9 @@ ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
 ERROR(lex_invalid_curly_quote,none,
       "unicode curly quote found, replace with '\"'", ())
-
+NOTE(lex_confusable_character,none,
+      "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
+      (StringRef, StringRef))
 
 ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())

@@ -29,6 +29,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
@@ -454,9 +455,39 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
       .highlight(UDRE->getSourceRange());
 
-    // Note all the correction candidates.
-    for (auto &result : Lookup) {
-      noteTypoCorrection(Name, nameLoc, result);
+    const char *buffer = Name.getBaseName().get();
+    llvm::SmallString<64> expectedIdentifier;
+    bool isConfused = false;
+    uint32_t codepoint;
+    int offset = 0;
+    while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
+                                                        buffer +
+                                                        strlen(buffer)))
+           != ~0U) {
+      int length = (buffer - Name.getBaseName().get()) - offset;
+      char expectedCodepoint;
+      if ((expectedCodepoint =
+           confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
+        isConfused = true;
+        expectedIdentifier += expectedCodepoint;
+      } else {
+        expectedIdentifier += (char)codepoint;
+      }
+
+      offset += length;
+    }
+
+    if (isConfused) {
+      diagnose(Loc, diag::confusable_character,
+               UDRE->getName().isOperator(),
+               Name.getBaseName().str(), expectedIdentifier)
+        .fixItReplaceChars(Loc, Loc.getAdvancedLoc(Name.getBaseName().getLength()),
+                           expectedIdentifier);
+    } else {
+      // Note all the correction candidates.
+      for (auto &result : Lookup) {
+        noteTypoCorrection(Name, nameLoc, result);
+      }
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
