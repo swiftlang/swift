@@ -23,6 +23,22 @@ if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
     "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
 endif()
 
+if(SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING=1")
+else()
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING=0")
+endif()
+
+if(SWIFT_RUNTIME_DLADDR_ALLOWED)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_DLADDR_ALLOW=1")
+else()
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_DLADDR_ALLOW=0")
+endif()
+
 set(section_magic_compile_flags ${swift_runtime_compile_flags})
 
 list(APPEND swift_runtime_compile_flags
@@ -92,13 +108,18 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_library(swiftImageInspectionStatic STATIC
-              ImageInspectionStatic.cpp
-              StaticBinaryELF.cpp)
+  add_swift_library(swiftImageInspectionStatic STATIC
+    ImageInspectionStatic.cpp
+    StaticBinaryELF.cpp
+    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
+    LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionStatic PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
 
-  add_library(swiftImageInspectionShared STATIC ImageInspectionELF.cpp)
+  add_swift_library(swiftImageInspectionShared STATIC
+    ImageInspectionELF.cpp
+    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
+    LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionShared PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
 
