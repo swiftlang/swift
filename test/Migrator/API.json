@@ -49,5 +49,16 @@
     "RightUsr": "",
     "RightComment": "init(newlabel1:)",
     "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "ModernizeEnum",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@barGlobalVariableOldEnumElement",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "NewEnum.enumElement",
+    "ModuleName": "bar"
   }
 ]
