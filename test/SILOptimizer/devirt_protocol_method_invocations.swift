@@ -75,8 +75,8 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 }
 
 // CHECK: sil @_T034devirt_protocol_method_invocations12test24114020SiyF
-// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int64, 1
-// CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int64)
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int{{.*}}, 1
+// CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int{{.*}})
 // CHECK:   return [[T1]]
 
 // CHECK: sil @_T034devirt_protocol_method_invocations14testExMetatypeSiyF
