@@ -1247,7 +1247,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     return !OpenDelimiters.empty() &&
            (OpenDelimiters.back() == '"' || OpenDelimiters.back() == '\'');
   };
-  while (CurPtr < EndPtr) {
+  while (true) {
     // This is a simple scanner, capable of recognizing nested parentheses and
     // string literals but not much else.  The implications of this include not
     // being able to break an expression over multiple lines in an interpolated
@@ -1332,9 +1332,6 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       continue;
     }
   }
-
-  // Out of buffer.
-  return CurPtr-1;
 }
 
 /// getStringLiteralContent:
@@ -1492,7 +1489,8 @@ void Lexer::lexStringLiteral() {
         if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr + 2) != '"') {
           CurPtr += 2;
           formToken(tok::string_literal, TokStart, MultilineString);
-          validateMultilineIndents(NextToken, Diags);
+          if (Diags)
+            validateMultilineIndents(NextToken, Diags);
           return;
         }
         else
