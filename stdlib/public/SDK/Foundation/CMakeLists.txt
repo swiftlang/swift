@@ -6,6 +6,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Boxing.swift
   Calendar.swift
   CharacterSet.swift
+  Codable.swift
   Data.swift
   DataThunks.m
   Date.swift
@@ -17,6 +18,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Foundation.swift
   IndexPath.swift
   IndexSet.swift
+  JSONEncoder.swift
   Locale.swift
   Measurement.swift
   Notification.swift
@@ -41,6 +43,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSURL.swift
   NSValue.swift.gyb
   PersonNameComponents.swift
+  PlistEncoder.swift
   ReferenceConvertible.swift
   String.swift
   TimeZone.swift
