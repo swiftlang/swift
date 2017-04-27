@@ -94,8 +94,30 @@ Migrator::performAFixItMigration() {
 
   CompilerInvocation Invocation { StartInvocation };
   Invocation.clearInputs();
-  Invocation.addInputBuffer(InputBuffer.get());
   Invocation.getLangOptions().EffectiveLanguageVersion = { 4, 0, 0 };
+
+  const auto OrigPrimaryInput =
+    StartInvocation.getFrontendOptions().PrimaryInput.getValue();
+  const auto &OrigFrontendOpts = StartInvocation.getFrontendOptions();
+
+  auto InputBuffers = OrigFrontendOpts.InputBuffers;
+  auto InputFilenames = OrigFrontendOpts.InputFilenames;
+
+  for (const auto &Buffer : InputBuffers) {
+    Invocation.addInputBuffer(Buffer);
+  }
+
+  for (const auto &Filename : InputFilenames) {
+    Invocation.addInputFilename(Filename);
+  }
+
+  const unsigned PrimaryIndex =
+    Invocation.getFrontendOptions().InputBuffers.size();
+
+  Invocation.addInputBuffer(InputBuffer.get());
+  Invocation.getFrontendOptions().PrimaryInput = {
+    PrimaryIndex, SelectedInput::InputKind::Buffer
+  };
 
   CompilerInstance Instance;
   if (Instance.setup(Invocation)) {
