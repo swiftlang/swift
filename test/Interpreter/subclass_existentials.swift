@@ -9,6 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out -Xfrontend -enable-experimental-subclass-existentials
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -16,7 +19,8 @@
 
 import StdlibUnittest
 
-protocol P {
+// FIXME: Various Sema and SILGen crashes if this is not ': class'
+protocol P : class {
   init(protocolInit: ())
 
   func protocolMethodReturnsSelf() -> Self
