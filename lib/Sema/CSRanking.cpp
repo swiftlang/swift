@@ -567,6 +567,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       // Construct a constraint system to compare the two declarations.
       ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
+      bool knownNonSubtype = false;
 
       auto locator = cs.getConstraintLocator(nullptr);
       // FIXME: Locator when anchored on a declaration.
@@ -683,6 +684,35 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         unsigned numParams2 = params2.size();
         if (numParams1 > numParams2) return false;
 
+        // If they both have trailing closures, compare those separately.
+        bool compareTrailingClosureParamsSeparately = false;
+        if (!tc.getLangOpts().isSwiftVersion3()) {
+          if (numParams1 > 0 && numParams2 > 0 &&
+              params1.back().Ty->is<AnyFunctionType>() &&
+              params2.back().Ty->is<AnyFunctionType>()) {
+            compareTrailingClosureParamsSeparately = true;
+            --numParams1;
+            --numParams2;
+          }
+        }
+
+        auto maybeAddSubtypeConstraint =
+            [&](const CallArgParam &param1, const CallArgParam &param2) -> bool{
+          // If one parameter is variadic and the other is not...
+          if (param1.isVariadic() != param2.isVariadic()) {
+            // If the first parameter is the variadic one, it's not
+            // more specialized.
+            if (param1.isVariadic()) return false;
+
+            fewerEffectiveParameters = true;
+          }
+
+          // Check whether the first parameter is a subtype of the second.
+          cs.addConstraint(ConstraintKind::Subtype, param1.Ty, param2.Ty,
+                           locator);
+          return true;
+        };
+
         for (unsigned i = 0; i != numParams2; ++i) {
           // If there is no corresponding argument in the first
           // parameter list...
@@ -698,30 +728,26 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             continue;
           }
 
-          // If one parameter is variadic and the other is not...
-          if (params1[i].isVariadic() != params2[i].isVariadic()) {
-            // If the first parameter is the variadic one, it's not
-            // more specialized.
-            if (params1[i].isVariadic()) return false;
-
-            fewerEffectiveParameters = true;
-          }
-
-          // Check whether the first parameter is a subtype of the second.
-          cs.addConstraint(ConstraintKind::Subtype,
-                           params1[i].Ty, params2[i].Ty, locator);
+          if (!maybeAddSubtypeConstraint(params1[i], params2[i]))
+            return false;
         }
+
+        if (compareTrailingClosureParamsSeparately)
+          if (!maybeAddSubtypeConstraint(params1.back(), params2.back()))
+            knownNonSubtype = true;
 
         break;
       }
       }
 
-      // Solve the system.
-      auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
+      if (!knownNonSubtype) {
+        // Solve the system.
+        auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-      // Ban value-to-optional conversions.
-      if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
-        return true;
+        // Ban value-to-optional conversions.
+        if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
+          return true;
+      }
 
       // If the first function has fewer effective parameters than the
       // second, it is more specialized.
