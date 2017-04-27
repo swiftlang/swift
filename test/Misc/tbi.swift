@@ -6,8 +6,7 @@
 // RUN:     -O -S %s -parse-as-library -parse-stdlib -module-name Swift | \
 // RUN:   %FileCheck --check-prefix=NO_TBI %s
 
-// REQUIRES: CPU=arm64
-// REQUIRES: OS=ios
+// REQUIRES: CODEGENERATOR=AArch64
 
 // Verify that TBI is on by default in Swift on targets that support it. For our
 // purposes this means iOS8.0 or later.
