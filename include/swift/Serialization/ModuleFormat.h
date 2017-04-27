@@ -635,11 +635,6 @@ namespace decls_block {
     MetatypeRepresentationField        // representation
   >;
 
-  using LValueTypeLayout = BCRecordLayout<
-    LVALUE_TYPE,
-    TypeIDField // object type
-  >;
-
   using InOutTypeLayout = BCRecordLayout<
     INOUT_TYPE,
     TypeIDField // object type

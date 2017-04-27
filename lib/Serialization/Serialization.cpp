@@ -3449,14 +3449,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::LValue: {
-    auto lValueTy = cast<LValueType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[LValueTypeLayout::Code];
-    LValueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(lValueTy->getObjectType()));
-    break;
-  }
   case TypeKind::InOut: {
     auto iotTy = cast<InOutType>(ty.getPointer());
 
@@ -3506,6 +3498,8 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::LValue:
+    llvm_unreachable("lvalue types are only used in function bodies");
   case TypeKind::TypeVariable:
     llvm_unreachable("type variables should not escape the type checker");
   }
@@ -3524,7 +3518,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<FunctionTypeLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-  registerDeclTypeAbbr<LValueTypeLayout>();
   registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
