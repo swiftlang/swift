@@ -73,6 +73,25 @@ void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+TypeRepr* TypeRepr::getBase() const {
+  switch(getKind()) {
+  case TypeReprKind::Array:
+    return static_cast<const ArrayTypeRepr*>(this)->Base;
+  case TypeReprKind::ImplicitlyUnwrappedOptional:
+    return static_cast<const ImplicitlyUnwrappedOptionalTypeRepr*>(this)->Base;
+  case TypeReprKind::Optional:
+    return static_cast<const OptionalTypeRepr*>(this)->Base;
+  case TypeReprKind::Metatype:
+    return static_cast<const MetatypeTypeRepr*>(this)->Base;
+  case TypeReprKind::Protocol:
+    return static_cast<const ProtocolTypeRepr*>(this)->Base;
+  case TypeReprKind::InOut:
+    return static_cast<const InOutTypeRepr*>(this)->Base;
+  default:
+    llvm_unreachable("baseless type repr kind!");
+  }
+}
+
 Identifier ComponentIdentTypeRepr::getIdentifier() const {
   if (IdOrDecl.is<Identifier>())
     return IdOrDecl.get<Identifier>();
