@@ -123,6 +123,149 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
     "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
@@ -328,17 +471,6 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "QuartzCore"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(pl)RPScreenRecorderDelegate(im)screenRecorder:didStopRecordingWithError:previewViewController:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "ReplayKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -1536,7 +1668,7 @@
     "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:scheme:options:usingBlock:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "NSLinguisticTag",
+    "RightComment": "NSLinguisticTag?",
     "ModuleName": "Foundation"
   },
   {
@@ -1778,7 +1910,7 @@
     "LeftUsr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "NSLinguisticTag",
+    "RightComment": "NSLinguisticTag?",
     "ModuleName": "Foundation"
   },
   {
@@ -1868,6 +2000,17 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "AudioToolbox"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCUIElement(im)_waitForExistenceWithTimeout:",
+    "LeftComment": "_waitForExistence(withTimeout:)",
+    "RightUsr": "",
+    "RightComment": "waitForExistence(timeout:)",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -2033,6 +2176,17 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@MTLAttributeFormat@MTLAttributeFormatUInt1010102Normalized",
+    "LeftComment": "uInt1010102Normalized",
+    "RightUsr": "",
+    "RightComment": "uint1010102Normalized",
+    "ModuleName": "Metal"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -2235,6 +2389,325 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBytes:length:atIndex:",
+    "LeftComment": "setBytes(_:length:at:)",
+    "RightUsr": "",
+    "RightComment": "setBytes(_:length:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffer:offset:atIndex:",
+    "LeftComment": "setBuffer(_:offset:at:)",
+    "RightUsr": "",
+    "RightComment": "setBuffer(_:offset:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBufferOffset:atIndex:",
+    "LeftComment": "setBufferOffset(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setBufferOffset(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setTexture:atIndex:",
+    "LeftComment": "setTexture(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setTexture(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:atIndex:",
+    "LeftComment": "setSamplerState(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setSamplerState(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
+    "LeftComment": "setSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
+    "RightUsr": "",
+    "RightComment": "setSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setThreadgroupMemoryLength:atIndex:",
+    "LeftComment": "setThreadgroupMemoryLength(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setThreadgroupMemoryLength(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newDefaultLibrary",
+    "LeftComment": "newDefaultLibrary()",
+    "RightUsr": "",
+    "RightComment": "makeDefaultLibrary()",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MTLFunctionConstantValues(im)setConstantValue:type:atIndex:",
+    "LeftComment": "setConstantValue(_:type:at:)",
+    "RightUsr": "",
+    "RightComment": "setConstantValue(_:type:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLParallelRenderCommandEncoder(im)setColorStoreAction:atIndex:",
+    "LeftComment": "setColorStoreAction(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setColorStoreAction(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBytes:length:atIndex:",
+    "LeftComment": "setVertexBytes(_:length:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexBytes(_:length:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffer:offset:atIndex:",
+    "LeftComment": "setVertexBuffer(_:offset:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexBuffer(_:offset:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBufferOffset:atIndex:",
+    "LeftComment": "setVertexBufferOffset(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexBufferOffset(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexTexture:atIndex:",
+    "LeftComment": "setVertexTexture(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexTexture(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:atIndex:",
+    "LeftComment": "setVertexSamplerState(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexSamplerState(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
+    "LeftComment": "setVertexSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBytes:length:atIndex:",
+    "LeftComment": "setFragmentBytes(_:length:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentBytes(_:length:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffer:offset:atIndex:",
+    "LeftComment": "setFragmentBuffer(_:offset:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentBuffer(_:offset:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBufferOffset:atIndex:",
+    "LeftComment": "setFragmentBufferOffset(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentBufferOffset(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentTexture:atIndex:",
+    "LeftComment": "setFragmentTexture(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentTexture(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:",
+    "LeftComment": "setFragmentSamplerState(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentSamplerState(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
+    "LeftComment": "setFragmentSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setColorStoreAction:atIndex:",
+    "LeftComment": "setColorStoreAction(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setColorStoreAction(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
     "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
@@ -2242,6 +2715,118 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "Photos"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKModelErrorDomain",
+    "OldPrintedName": "MTKModelErrorDomain",
+    "NewPrintedName": "domain",
+    "NewTypeName": "MTKModelError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKModelErrorKey",
+    "OldPrintedName": "MTKModelErrorKey",
+    "NewPrintedName": "key",
+    "NewTypeName": "MTKModelError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderCubeLayoutVertical",
+    "OldPrintedName": "MTKTextureLoaderCubeLayoutVertical",
+    "NewPrintedName": "vertical",
+    "NewTypeName": "MTKTextureLoaderCubeLayout"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderErrorDomain",
+    "OldPrintedName": "MTKTextureLoaderErrorDomain",
+    "NewPrintedName": "domain",
+    "NewTypeName": "MTKTextureLoaderError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderErrorKey",
+    "OldPrintedName": "MTKTextureLoaderErrorKey",
+    "NewPrintedName": "key",
+    "NewTypeName": "MTKTextureLoaderError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionAllocateMipmaps",
+    "OldPrintedName": "MTKTextureLoaderOptionAllocateMipmaps",
+    "NewPrintedName": "allocateMipmaps",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionGenerateMipmaps",
+    "OldPrintedName": "MTKTextureLoaderOptionGenerateMipmaps",
+    "NewPrintedName": "generateMipmaps",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionSRGB",
+    "OldPrintedName": "MTKTextureLoaderOptionSRGB",
+    "NewPrintedName": "SRGB",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionTextureUsage",
+    "OldPrintedName": "MTKTextureLoaderOptionTextureUsage",
+    "NewPrintedName": "textureUsage",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionTextureCPUCacheMode",
+    "OldPrintedName": "MTKTextureLoaderOptionTextureCPUCacheMode",
+    "NewPrintedName": "textureCPUCacheMode",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionTextureStorageMode",
+    "OldPrintedName": "MTKTextureLoaderOptionTextureStorageMode",
+    "NewPrintedName": "textureStorageMode",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionCubeLayout",
+    "OldPrintedName": "MTKTextureLoaderOptionCubeLayout",
+    "NewPrintedName": "cubeLayout",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionOrigin",
+    "OldPrintedName": "MTKTextureLoaderOptionOrigin",
+    "NewPrintedName": "origin",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOriginTopLeft",
+    "OldPrintedName": "MTKTextureLoaderOriginTopLeft",
+    "NewPrintedName": "topLeft",
+    "NewTypeName": "MTKTextureLoaderOrigin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOriginBottomLeft",
+    "OldPrintedName": "MTKTextureLoaderOriginBottomLeft",
+    "NewPrintedName": "bottomLeft",
+    "NewTypeName": "MTKTextureLoaderOrigin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOriginFlippedVertically",
+    "OldPrintedName": "MTKTextureLoaderOriginFlippedVertically",
+    "NewPrintedName": "flippedVertically",
+    "NewTypeName": "MTKTextureLoaderOrigin"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -6536,6 +7121,20 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@HMSignificantEventSunrise",
+    "OldPrintedName": "HMSignificantEventSunrise",
+    "NewPrintedName": "sunrise",
+    "NewTypeName": "HMSignificantEvent"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@HMSignificantEventSunset",
+    "OldPrintedName": "HMSignificantEventSunset",
+    "NewPrintedName": "sunset",
+    "NewTypeName": "HMSignificantEvent"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagWord",
     "OldPrintedName": "NSLinguisticTagWord",
     "NewPrintedName": "word",
@@ -6831,6 +7430,31 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateReadingItemAtURL:options:error:byAccessor:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateWritingItemAtURL:options:error:byAccessor:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateReadingItemAtURL:options:writingItemAtURL:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateWritingItemAtURL:options:writingItemAtURL:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)prepareForReadingItemsAtURLs:options:writingItemsAtURLs:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:unit:scheme:options:usingBlock:",
     "Index": 5
   },
@@ -6856,11 +7480,6 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)XCTContext(cm)_runActivityNamed:block:",
-    "Index": 2
-  },
-  {
-    "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)XCTestCase(im)runActivityNamed:inScope:",
     "Index": 2
   },
@@ -6871,6 +7490,30 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)UIAccessibilityContainerDataTable(im)accessibilityHeaderElementsForColumn:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:maximumPointSize:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:compatibleWithTraitCollection:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:maximumPointSize:compatibleWithTraitCollection:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledValueForValue:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledValueForValue:compatibleWithTraitCollection:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -6907,6 +7550,54 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "s:8Dispatch0A4DataV9copyBytesys29UnsafeMutableRawBufferPointerV2to_s14CountableRangeVySiG4fromtF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -7062,6 +7753,22 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)setValue:atTime:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)valueAtTime:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)setValue:atTime:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)valueAtTime:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MDLAnimatedFloat4x4Property(im)setValue:atTime:"
   },
   {
@@ -7166,6 +7873,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringBeforeSignificantEvent:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringAfterSignificantEvent:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)SCNAnimatable(im)removeAnimationForKey:"
   },
   {
@@ -7183,6 +7898,34 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)SCNNode(im)convertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertPosition:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertPosition:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertVector:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertTransform:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertTransform:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdLookAt:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -7246,19 +7989,7 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useResource:usage:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useResources:count:usage:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useHeap:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useHeaps:count:"
+    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:atIndex:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -7270,18 +8001,58 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useResource:usage:"
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:atIndex:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useResources:count:usage:"
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useHeap:"
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useHeaps:count:"
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCGImage:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCGImage:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCIImage:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCIImage:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageURL:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageURL:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageData:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageData:orientation:error:"
   }
 ]

@@ -23,6 +23,39 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSFileProviderExtension(cm)writePlaceholderAtURL:withMetadata:error:",
+    "LeftComment": "AnyHashable",
+    "RightUsr": "",
+    "RightComment": "URLResourceKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSFileProviderExtension(im)URLForItemWithPersistentIdentifier:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFileProviderItemIdentifier",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSFileProviderExtension(im)persistentIdentifierForItemAtURL:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFileProviderItemIdentifier",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2:0:0",
@@ -133,6 +166,28 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NEHotspotHelper(cm)supportedNetworkInterfaces",
+    "LeftComment": "Any",
+    "RightUsr": "",
+    "RightComment": "[Any]",
+    "ModuleName": "NetworkExtension"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NEHotspotHelper(cm)supportedNetworkInterfaces",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "NetworkExtension"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Var",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
@@ -174,6 +229,149 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "Dispatch"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:0",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "MTKTextureLoaderOption",
+    "ModuleName": "MetalKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -394,28 +592,6 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "QuartzCore"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)QLPreviewControllerDataSource(im)previewController:previewItemAtIndex:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "QuickLook"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(pl)RPScreenRecorderDelegate(im)screenRecorder:didStopRecordingWithError:previewViewController:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "ReplayKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -970,10 +1146,43 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureAudioDataOutput(im)setSampleBufferDelegate:queue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureAudioDataOutput(im)setSampleBufferDelegate:queue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)AVCaptureAudioDataOutput(im)recommendedAudioSettingsForAssetWriterWithOutputFileType:",
-    "LeftComment": "String",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureAudioDataOutput(im)recommendedAudioSettingsForAssetWriterWithOutputFileType:",
+    "LeftComment": "String!",
     "RightUsr": "",
     "RightComment": "AVFileType",
     "ModuleName": "AVFoundation"
@@ -981,87 +1190,252 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)devicesWithMediaType:",
-    "LeftComment": "String",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureAudioDataOutput(im)recommendedAudioSettingsForAssetWriterWithOutputFileType:",
+    "LeftComment": "recommendedAudioSettingsForAssetWriter(withOutputFileType:)",
     "RightUsr": "",
-    "RightComment": "AVMediaType",
+    "RightComment": "recommendedAudioSettingsForAssetWriter(writingTo:)",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithMediaType:",
-    "LeftComment": "String",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)AVCaptureAudioDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "AVMediaType",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)hasMediaType:",
-    "LeftComment": "String",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)AVCaptureAudioDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "AVMediaType",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)supportsAVCaptureSessionPreset:",
-    "LeftComment": "String",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)AVCaptureAudioDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "AVCaptureSessionPreset",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithDeviceType:mediaType:position:",
-    "LeftComment": "String",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCaptureAudioDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "captureOutput(_:didOutputSampleBuffer:from:)",
     "RightUsr": "",
-    "RightComment": "AVMediaType",
+    "RightComment": "captureOutput(_:didOutput:from:)",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)authorizationStatusForMediaType:",
-    "LeftComment": "String",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureAutoExposureBracketedStillImageSettings(cm)autoExposureSettingsWithExposureTargetBias:",
+    "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "AVMediaType",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)requestAccessForMediaType:completionHandler:",
-    "LeftComment": "String",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureAutoExposureBracketedStillImageSettings(cm)autoExposureSettingsWithExposureTargetBias:",
+    "LeftComment": "autoExposureSettings(withExposureTargetBias:)",
     "RightUsr": "",
-    "RightComment": "AVMediaType",
+    "RightComment": "autoExposureSettings(exposureTargetBias:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureConnection(im)initWithInputPorts:output:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2:0",
-    "LeftUsr": "c:objc(cs)AVCaptureDeviceDiscoverySession(cm)discoverySessionWithDeviceTypes:mediaType:position:",
-    "LeftComment": "String",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureConnection(im)initWithInputPorts:output:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureInput.Port]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureConnection(im)initWithInputPorts:output:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureConnection(im)initWithInputPort:videoPreviewLayer:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureConnection(im)initWithInputPort:videoPreviewLayer:",
+    "LeftComment": "AVCaptureInputPort!",
+    "RightUsr": "",
+    "RightComment": "AVCaptureInput.Port",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureConnection(im)initWithInputPort:videoPreviewLayer:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)devices",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureDevice]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)devicesWithMediaType:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureDevice]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)devicesWithMediaType:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVMediaType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)devicesWithMediaType:",
+    "LeftComment": "devices(withMediaType:)",
+    "RightUsr": "",
+    "RightComment": "devices(for:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithMediaType:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithMediaType:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVMediaType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithMediaType:",
+    "LeftComment": "defaultDevice(withMediaType:)",
+    "RightUsr": "",
+    "RightComment": "default(for:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)deviceWithUniqueID:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)deviceWithUniqueID:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)hasMediaType:",
+    "LeftComment": "String!",
     "RightUsr": "",
     "RightComment": "AVMediaType",
     "ModuleName": "AVFoundation"
@@ -1070,9 +1444,768 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)supportsAVCaptureSessionPreset:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVCaptureSession.Preset",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)supportsAVCaptureSessionPreset:",
+    "LeftComment": "supportsAVCaptureSessionPreset(_:)",
+    "RightUsr": "",
+    "RightComment": "supportsSessionPreset(_:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithDeviceType:mediaType:position:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithDeviceType:mediaType:position:",
+    "LeftComment": "AVCaptureDeviceType!",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.DeviceType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithDeviceType:mediaType:position:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVMediaType?",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithDeviceType:mediaType:position:",
+    "LeftComment": "AVCaptureDevicePosition",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.Position",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithDeviceType:mediaType:position:",
+    "LeftComment": "defaultDevice(withDeviceType:mediaType:position:)",
+    "RightUsr": "",
+    "RightComment": "default(_:for:position:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)isFlashModeSupported:",
+    "LeftComment": "AVCaptureFlashMode",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.FlashMode",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)isTorchModeSupported:",
+    "LeftComment": "AVCaptureTorchMode",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.TorchMode",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setTorchModeOnWithLevel:error:",
+    "LeftComment": "setTorchModeOnWithLevel(_:)",
+    "RightUsr": "",
+    "RightComment": "setTorchModeOn(level:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)isFocusModeSupported:",
+    "LeftComment": "AVCaptureFocusMode",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.FocusMode",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setFocusModeLockedWithLensPosition:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setFocusModeLockedWithLensPosition:completionHandler:",
+    "LeftComment": "setFocusModeLockedWithLensPosition(_:completionHandler:)",
+    "RightUsr": "",
+    "RightComment": "setFocusModeLocked(lensPosition:completionHandler:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)isExposureModeSupported:",
+    "LeftComment": "AVCaptureExposureMode",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.ExposureMode",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setExposureModeCustomWithDuration:ISO:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setExposureModeCustomWithDuration:ISO:completionHandler:",
+    "LeftComment": "setExposureModeCustomWithDuration(_:iso:completionHandler:)",
+    "RightUsr": "",
+    "RightComment": "setExposureModeCustom(duration:iso:completionHandler:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setExposureTargetBias:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)isWhiteBalanceModeSupported:",
+    "LeftComment": "AVCaptureWhiteBalanceMode",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceMode",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setWhiteBalanceModeLockedWithDeviceWhiteBalanceGains:completionHandler:",
+    "LeftComment": "AVCaptureWhiteBalanceGains",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceGains",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setWhiteBalanceModeLockedWithDeviceWhiteBalanceGains:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)setWhiteBalanceModeLockedWithDeviceWhiteBalanceGains:completionHandler:",
+    "LeftComment": "setWhiteBalanceModeLockedWithDeviceWhiteBalanceGains(_:completionHandler:)",
+    "RightUsr": "",
+    "RightComment": "setWhiteBalanceModeLocked(with:completionHandler:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)chromaticityValuesForDeviceWhiteBalanceGains:",
+    "LeftComment": "AVCaptureWhiteBalanceChromaticityValues",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceChromaticityValues",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)chromaticityValuesForDeviceWhiteBalanceGains:",
+    "LeftComment": "AVCaptureWhiteBalanceGains",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceGains",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)chromaticityValuesForDeviceWhiteBalanceGains:",
+    "LeftComment": "chromaticityValues(forDeviceWhiteBalanceGains:)",
+    "RightUsr": "",
+    "RightComment": "chromaticityValues(for:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)deviceWhiteBalanceGainsForChromaticityValues:",
+    "LeftComment": "AVCaptureWhiteBalanceGains",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceGains",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)deviceWhiteBalanceGainsForChromaticityValues:",
+    "LeftComment": "AVCaptureWhiteBalanceChromaticityValues",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceChromaticityValues",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)temperatureAndTintValuesForDeviceWhiteBalanceGains:",
+    "LeftComment": "AVCaptureWhiteBalanceTemperatureAndTintValues",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceTemperatureAndTintValues",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)temperatureAndTintValuesForDeviceWhiteBalanceGains:",
+    "LeftComment": "AVCaptureWhiteBalanceGains",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceGains",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)temperatureAndTintValuesForDeviceWhiteBalanceGains:",
+    "LeftComment": "temperatureAndTintValues(forDeviceWhiteBalanceGains:)",
+    "RightUsr": "",
+    "RightComment": "temperatureAndTintValues(for:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)deviceWhiteBalanceGainsForTemperatureAndTintValues:",
+    "LeftComment": "AVCaptureWhiteBalanceGains",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceGains",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(im)deviceWhiteBalanceGainsForTemperatureAndTintValues:",
+    "LeftComment": "AVCaptureWhiteBalanceTemperatureAndTintValues",
+    "RightUsr": "",
+    "RightComment": "AVCaptureDevice.WhiteBalanceTemperatureAndTintValues",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)authorizationStatusForMediaType:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVMediaType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)authorizationStatusForMediaType:",
+    "LeftComment": "authorizationStatus(forMediaType:)",
+    "RightUsr": "",
+    "RightComment": "authorizationStatus(for:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)requestAccessForMediaType:completionHandler:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVMediaType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)requestAccessForMediaType:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureDevice(cm)requestAccessForMediaType:completionHandler:",
+    "LeftComment": "requestAccess(forMediaType:completionHandler:)",
+    "RightUsr": "",
+    "RightComment": "requestAccess(for:completionHandler:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureDeviceInput(im)initWithDevice:error:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureFileOutput(im)startRecordingToOutputFileURL:recordingDelegate:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureFileOutput(im)startRecordingToOutputFileURL:recordingDelegate:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureFileOutput(im)startRecordingToOutputFileURL:recordingDelegate:",
+    "LeftComment": "startRecording(toOutputFileURL:recordingDelegate:)",
+    "RightUsr": "",
+    "RightComment": "startRecording(to:recordingDelegate:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didStartRecordingToOutputFileAtURL:fromConnections:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didStartRecordingToOutputFileAtURL:fromConnections:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didStartRecordingToOutputFileAtURL:fromConnections:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureConnection]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didStartRecordingToOutputFileAtURL:fromConnections:",
+    "LeftComment": "capture(_:didStartRecordingToOutputFileAt:fromConnections:)",
+    "RightUsr": "",
+    "RightComment": "fileOutput(_:didStartRecordingTo:from:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureConnection]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "4",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCaptureFileOutputRecordingDelegate(im)captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:",
+    "LeftComment": "capture(_:didFinishRecordingToOutputFileAt:fromConnections:error:)",
+    "RightUsr": "",
+    "RightComment": "fileOutput(_:didFinishRecordingTo:from:error:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureManualExposureBracketedStillImageSettings(cm)manualExposureSettingsWithExposureDuration:ISO:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureManualExposureBracketedStillImageSettings(cm)manualExposureSettingsWithExposureDuration:ISO:",
+    "LeftComment": "manualExposureSettings(withExposureDuration:iso:)",
+    "RightUsr": "",
+    "RightComment": "manualExposureSettings(exposureDuration:iso:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureMetadataInput(im)initWithFormatDescription:clock:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureMetadataInput(im)initWithFormatDescription:clock:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureMetadataInput(im)initWithFormatDescription:clock:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureMetadataInput(im)appendTimedMetadataGroup:error:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureMetadataOutput(im)setMetadataObjectsDelegate:queue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureMetadataOutput(im)setMetadataObjectsDelegate:queue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)AVCaptureMetadataOutputObjectsDelegate(im)captureOutput:didOutputMetadataObjects:fromConnection:",
+    "LeftComment": "AVCaptureOutput!",
+    "RightUsr": "",
+    "RightComment": "AVCaptureMetadataOutput",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)AVCaptureMetadataOutputObjectsDelegate(im)captureOutput:didOutputMetadataObjects:fromConnection:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVMetadataObject]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)AVCaptureMetadataOutputObjectsDelegate(im)captureOutput:didOutputMetadataObjects:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCaptureMetadataOutputObjectsDelegate(im)captureOutput:didOutputMetadataObjects:fromConnection:",
+    "LeftComment": "captureOutput(_:didOutputMetadataObjects:from:)",
+    "RightUsr": "",
+    "RightComment": "metadataOutput(_:didOutput:from:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)outputSettingsForConnection:",
+    "LeftComment": "[AnyHashable : Any]!",
+    "RightUsr": "",
+    "RightComment": "[String : Any]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)outputSettingsForConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)setOutputSettings:forConnection:",
+    "LeftComment": "[AnyHashable : Any]!",
+    "RightUsr": "",
+    "RightComment": "[String : Any]?",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)setOutputSettings:forConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)recordsVideoOrientationAndMirroringChangesAsMetadataTrackForConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)setRecordsVideoOrientationAndMirroringChanges:asMetadataTrackForConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureMovieFileOutput(im)setRecordsVideoOrientationAndMirroringChanges:asMetadataTrackForConnection:",
+    "LeftComment": "setRecordsVideoOrientationAndMirroringChanges(_:asMetadataTrackFor:)",
+    "RightUsr": "",
+    "RightComment": "setRecordsVideoOrientationAndMirroringChangesAsMetadataTrack(_:for:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)AVCaptureOutput(im)connectionWithMediaType:",
-    "LeftComment": "String",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)connectionWithMediaType:",
+    "LeftComment": "String!",
     "RightUsr": "",
     "RightComment": "AVMediaType",
     "ModuleName": "AVFoundation"
@@ -1080,23 +2213,650 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
-    "LeftUsr": "c:objc(cs)AVCaptureSession(im)canSetSessionPreset:",
-    "LeftComment": "String",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)connectionWithMediaType:",
+    "LeftComment": "connection(withMediaType:)",
     "RightUsr": "",
-    "RightComment": "AVCaptureSessionPreset",
+    "RightComment": "connection(with:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)transformedMetadataObjectForMetadataObject:connection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)transformedMetadataObjectForMetadataObject:connection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)transformedMetadataObjectForMetadataObject:connection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)metadataOutputRectOfInterestForRect:",
+    "LeftComment": "metadataOutputRectOfInterest(for:)",
+    "RightUsr": "",
+    "RightComment": "metadataOutputRectConverted(fromOutputRect:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureOutput(im)rectForMetadataOutputRectOfInterest:",
+    "LeftComment": "rectForMetadataOutputRect(ofInterest:)",
+    "RightUsr": "",
+    "RightComment": "outputRectConverted(fromMetadataOutputRect:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:willBeginCaptureForResolvedSettings:",
+    "LeftComment": "capture(_:willBeginCaptureForResolvedSettings:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:willBeginCaptureFor:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:willCapturePhotoForResolvedSettings:",
+    "LeftComment": "capture(_:willCapturePhotoForResolvedSettings:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:willCapturePhotoFor:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didCapturePhotoForResolvedSettings:",
+    "LeftComment": "capture(_:didCapturePhotoForResolvedSettings:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:didCapturePhotoFor:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didFinishProcessingPhotoSampleBuffer:previewPhotoSampleBuffer:resolvedSettings:bracketSettings:error:",
+    "LeftComment": "capture(_:didFinishProcessingPhotoSampleBuffer:previewPhotoSampleBuffer:resolvedSettings:bracketSettings:error:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:didFinishProcessingPhoto:previewPhoto:resolvedSettings:bracketSettings:error:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didFinishProcessingRawPhotoSampleBuffer:previewPhotoSampleBuffer:resolvedSettings:bracketSettings:error:",
+    "LeftComment": "capture(_:didFinishProcessingRawPhotoSampleBuffer:previewPhotoSampleBuffer:resolvedSettings:bracketSettings:error:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:didFinishProcessingRawPhoto:previewPhoto:resolvedSettings:bracketSettings:error:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didFinishRecordingLivePhotoMovieForEventualFileAtURL:resolvedSettings:",
+    "LeftComment": "capture(_:didFinishRecordingLivePhotoMovieForEventualFileAt:resolvedSettings:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:didFinishRecordingLivePhotoMovieForEventualFileAt:resolvedSettings:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didFinishProcessingLivePhotoToMovieFileAtURL:duration:photoDisplayTime:resolvedSettings:error:",
+    "LeftComment": "capture(_:didFinishProcessingLivePhotoToMovieFileAt:duration:photoDisplay:resolvedSettings:error:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:didFinishProcessingLivePhotoToMovieFileAt:duration:photoDisplayTime:resolvedSettings:error:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didFinishCaptureForResolvedSettings:error:",
+    "LeftComment": "capture(_:didFinishCaptureForResolvedSettings:error:)",
+    "RightUsr": "",
+    "RightComment": "photoOutput(_:didFinishCaptureFor:error:)",
     "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1:0",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)canSetSessionPreset:",
+    "LeftComment": "String!",
+    "RightUsr": "",
+    "RightComment": "AVCaptureSession.Preset",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)canAddInput:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)addInput:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)removeInput:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)canAddOutput:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)addOutput:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)removeOutput:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)addInputWithNoConnections:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)addOutputWithNoConnections:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)canAddConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)addConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureSession(im)removeConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)captureStillImageAsynchronouslyFromConnection:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)captureStillImageAsynchronouslyFromConnection:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(cm)jpegStillImageNSDataRepresentation:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(cm)jpegStillImageNSDataRepresentation:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)prepareToCaptureStillImageBracketFromConnection:withSettingsArray:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)prepareToCaptureStillImageBracketFromConnection:withSettingsArray:completionHandler:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureBracketedStillImageSettings]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)prepareToCaptureStillImageBracketFromConnection:withSettingsArray:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)captureStillImageBracketAsynchronouslyFromConnection:withSettingsArray:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)captureStillImageBracketAsynchronouslyFromConnection:withSettingsArray:completionHandler:",
+    "LeftComment": "[Any]!",
+    "RightUsr": "",
+    "RightComment": "[AVCaptureBracketedStillImageSettings]",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)AVCaptureStillImageOutput(im)captureStillImageBracketAsynchronouslyFromConnection:withSettingsArray:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoDataOutput(im)setSampleBufferDelegate:queue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoDataOutput(im)setSampleBufferDelegate:queue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)AVCaptureVideoDataOutput(im)recommendedVideoSettingsForAssetWriterWithOutputFileType:",
-    "LeftComment": "String",
+    "LeftComment": "[AnyHashable : Any]!",
+    "RightUsr": "",
+    "RightComment": "[String : Any]?",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoDataOutput(im)recommendedVideoSettingsForAssetWriterWithOutputFileType:",
+    "LeftComment": "String!",
     "RightUsr": "",
     "RightComment": "AVFileType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoDataOutput(im)recommendedVideoSettingsForAssetWriterWithOutputFileType:",
+    "LeftComment": "recommendedVideoSettingsForAssetWriter(withOutputFileType:)",
+    "RightUsr": "",
+    "RightComment": "recommendedVideoSettingsForAssetWriter(writingTo:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didOutputSampleBuffer:fromConnection:",
+    "LeftComment": "captureOutput(_:didOutputSampleBuffer:from:)",
+    "RightUsr": "",
+    "RightComment": "captureOutput(_:didOutput:from:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didDropSampleBuffer:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didDropSampleBuffer:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)AVCaptureVideoDataOutputSampleBufferDelegate(im)captureOutput:didDropSampleBuffer:fromConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)initWithSession:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)initWithSession:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)initWithSessionWithNoConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)initWithSessionWithNoConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)setSessionWithNoConnection:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)captureDevicePointOfInterestForPoint:",
+    "LeftComment": "captureDevicePointOfInterest(for:)",
+    "RightUsr": "",
+    "RightComment": "captureDevicePointConverted(fromLayerPoint:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)pointForCaptureDevicePointOfInterest:",
+    "LeftComment": "pointForCaptureDevicePoint(ofInterest:)",
+    "RightUsr": "",
+    "RightComment": "layerPointConverted(fromCaptureDevicePoint:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)metadataOutputRectOfInterestForRect:",
+    "LeftComment": "metadataOutputRectOfInterest(for:)",
+    "RightUsr": "",
+    "RightComment": "metadataOutputRectConverted(fromLayerRect:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)rectForMetadataOutputRectOfInterest:",
+    "LeftComment": "rectForMetadataOutputRect(ofInterest:)",
+    "RightUsr": "",
+    "RightComment": "layerRectConverted(fromMetadataOutputRect:)",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)transformedMetadataObjectForMetadataObject:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVCaptureVideoPreviewLayer(im)transformedMetadataObjectForMetadataObject:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
@@ -1844,7 +3604,7 @@
     "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:scheme:options:usingBlock:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "NSLinguisticTag",
+    "RightComment": "NSLinguisticTag?",
     "ModuleName": "Foundation"
   },
   {
@@ -2086,7 +3846,7 @@
     "LeftUsr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "NSLinguisticTag",
+    "RightComment": "NSLinguisticTag?",
     "ModuleName": "Foundation"
   },
   {
@@ -2176,6 +3936,17 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "AudioToolbox"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCUIElement(im)_waitForExistenceWithTimeout:",
+    "LeftComment": "_waitForExistence(withTimeout:)",
+    "RightUsr": "",
+    "RightComment": "waitForExistence(timeout:)",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -2622,6 +4393,17 @@
     "NodeKind": "Var",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
+    "LeftUsr": "c:@E@MTLAttributeFormat@MTLAttributeFormatUInt1010102Normalized",
+    "LeftComment": "uInt1010102Normalized",
+    "RightUsr": "",
+    "RightComment": "uint1010102Normalized",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
     "LeftUsr": "c:@E@MTLCommandBufferError@MTLCommandBufferErrorNone",
     "LeftComment": "none",
     "RightUsr": "",
@@ -2818,6 +4600,325 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBytes:length:atIndex:",
+    "LeftComment": "setBytes(_:length:at:)",
+    "RightUsr": "",
+    "RightComment": "setBytes(_:length:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffer:offset:atIndex:",
+    "LeftComment": "setBuffer(_:offset:at:)",
+    "RightUsr": "",
+    "RightComment": "setBuffer(_:offset:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBufferOffset:atIndex:",
+    "LeftComment": "setBufferOffset(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setBufferOffset(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setTexture:atIndex:",
+    "LeftComment": "setTexture(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setTexture(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:atIndex:",
+    "LeftComment": "setSamplerState(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setSamplerState(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
+    "LeftComment": "setSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
+    "RightUsr": "",
+    "RightComment": "setSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setThreadgroupMemoryLength:atIndex:",
+    "LeftComment": "setThreadgroupMemoryLength(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setThreadgroupMemoryLength(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newDefaultLibrary",
+    "LeftComment": "newDefaultLibrary()",
+    "RightUsr": "",
+    "RightComment": "makeDefaultLibrary()",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MTLFunctionConstantValues(im)setConstantValue:type:atIndex:",
+    "LeftComment": "setConstantValue(_:type:at:)",
+    "RightUsr": "",
+    "RightComment": "setConstantValue(_:type:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLParallelRenderCommandEncoder(im)setColorStoreAction:atIndex:",
+    "LeftComment": "setColorStoreAction(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setColorStoreAction(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBytes:length:atIndex:",
+    "LeftComment": "setVertexBytes(_:length:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexBytes(_:length:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffer:offset:atIndex:",
+    "LeftComment": "setVertexBuffer(_:offset:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexBuffer(_:offset:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBufferOffset:atIndex:",
+    "LeftComment": "setVertexBufferOffset(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexBufferOffset(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexTexture:atIndex:",
+    "LeftComment": "setVertexTexture(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexTexture(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:atIndex:",
+    "LeftComment": "setVertexSamplerState(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexSamplerState(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
+    "LeftComment": "setVertexSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
+    "RightUsr": "",
+    "RightComment": "setVertexSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBytes:length:atIndex:",
+    "LeftComment": "setFragmentBytes(_:length:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentBytes(_:length:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffer:offset:atIndex:",
+    "LeftComment": "setFragmentBuffer(_:offset:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentBuffer(_:offset:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBufferOffset:atIndex:",
+    "LeftComment": "setFragmentBufferOffset(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentBufferOffset(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentBuffers:offsets:withRange:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentTexture:atIndex:",
+    "LeftComment": "setFragmentTexture(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentTexture(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:",
+    "LeftComment": "setFragmentSamplerState(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentSamplerState(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:lodMinClamp:lodMaxClamp:atIndex:",
+    "LeftComment": "setFragmentSamplerState(_:lodMinClamp:lodMaxClamp:at:)",
+    "RightUsr": "",
+    "RightComment": "setFragmentSamplerState(_:lodMinClamp:lodMaxClamp:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLRenderCommandEncoder(im)setColorStoreAction:atIndex:",
+    "LeftComment": "setColorStoreAction(_:at:)",
+    "RightUsr": "",
+    "RightComment": "setColorStoreAction(_:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "WrapOptional",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MSStickerBrowserViewDataSource(im)stickerBrowserView:stickerAtIndex:",
@@ -2897,6 +4998,20 @@
     "OldPrintedName": "SSReadingListErrorCode",
     "NewPrintedName": "_ErrorType",
     "NewTypeName": "SSReadingListError.Code"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@HMSignificantEventSunrise",
+    "OldPrintedName": "HMSignificantEventSunrise",
+    "NewPrintedName": "sunrise",
+    "NewTypeName": "HMSignificantEvent"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@HMSignificantEventSunset",
+    "OldPrintedName": "HMSignificantEventSunset",
+    "NewPrintedName": "sunset",
+    "NewTypeName": "HMSignificantEvent"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -3180,6 +5295,118 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKModelErrorDomain",
+    "OldPrintedName": "MTKModelErrorDomain",
+    "NewPrintedName": "domain",
+    "NewTypeName": "MTKModelError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKModelErrorKey",
+    "OldPrintedName": "MTKModelErrorKey",
+    "NewPrintedName": "key",
+    "NewTypeName": "MTKModelError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderCubeLayoutVertical",
+    "OldPrintedName": "MTKTextureLoaderCubeLayoutVertical",
+    "NewPrintedName": "vertical",
+    "NewTypeName": "MTKTextureLoaderCubeLayout"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderErrorDomain",
+    "OldPrintedName": "MTKTextureLoaderErrorDomain",
+    "NewPrintedName": "domain",
+    "NewTypeName": "MTKTextureLoaderError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderErrorKey",
+    "OldPrintedName": "MTKTextureLoaderErrorKey",
+    "NewPrintedName": "key",
+    "NewTypeName": "MTKTextureLoaderError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionAllocateMipmaps",
+    "OldPrintedName": "MTKTextureLoaderOptionAllocateMipmaps",
+    "NewPrintedName": "allocateMipmaps",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionGenerateMipmaps",
+    "OldPrintedName": "MTKTextureLoaderOptionGenerateMipmaps",
+    "NewPrintedName": "generateMipmaps",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionSRGB",
+    "OldPrintedName": "MTKTextureLoaderOptionSRGB",
+    "NewPrintedName": "SRGB",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionTextureUsage",
+    "OldPrintedName": "MTKTextureLoaderOptionTextureUsage",
+    "NewPrintedName": "textureUsage",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionTextureCPUCacheMode",
+    "OldPrintedName": "MTKTextureLoaderOptionTextureCPUCacheMode",
+    "NewPrintedName": "textureCPUCacheMode",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionTextureStorageMode",
+    "OldPrintedName": "MTKTextureLoaderOptionTextureStorageMode",
+    "NewPrintedName": "textureStorageMode",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionCubeLayout",
+    "OldPrintedName": "MTKTextureLoaderOptionCubeLayout",
+    "NewPrintedName": "cubeLayout",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOptionOrigin",
+    "OldPrintedName": "MTKTextureLoaderOptionOrigin",
+    "NewPrintedName": "origin",
+    "NewTypeName": "MTKTextureLoaderOption"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOriginTopLeft",
+    "OldPrintedName": "MTKTextureLoaderOriginTopLeft",
+    "NewPrintedName": "topLeft",
+    "NewTypeName": "MTKTextureLoaderOrigin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOriginBottomLeft",
+    "OldPrintedName": "MTKTextureLoaderOriginBottomLeft",
+    "NewPrintedName": "bottomLeft",
+    "NewTypeName": "MTKTextureLoaderOrigin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderOriginFlippedVertically",
+    "OldPrintedName": "MTKTextureLoaderOriginFlippedVertically",
+    "NewPrintedName": "flippedVertically",
+    "NewTypeName": "MTKTextureLoaderOrigin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVAssetImageGeneratorApertureModeCleanAperture",
     "OldPrintedName": "AVAssetImageGeneratorApertureModeCleanAperture",
     "NewPrintedName": "cleanAperture",
@@ -3271,87 +5498,241 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureDevicePosition",
+    "OldPrintedName": "AVCaptureDevicePosition",
+    "NewPrintedName": "Position",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@T@AVCaptureDeviceType",
+    "OldPrintedName": "AVCaptureDeviceType",
+    "NewPrintedName": "DeviceType",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureFlashMode",
+    "OldPrintedName": "AVCaptureFlashMode",
+    "NewPrintedName": "FlashMode",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureTorchMode",
+    "OldPrintedName": "AVCaptureTorchMode",
+    "NewPrintedName": "TorchMode",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVCaptureMaxAvailableTorchLevel",
+    "OldPrintedName": "AVCaptureMaxAvailableTorchLevel",
+    "NewPrintedName": "maxAvailableTorchLevel",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureFocusMode",
+    "OldPrintedName": "AVCaptureFocusMode",
+    "NewPrintedName": "FocusMode",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureAutoFocusRangeRestriction",
+    "OldPrintedName": "AVCaptureAutoFocusRangeRestriction",
+    "NewPrintedName": "AutoFocusRangeRestriction",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVCaptureLensPositionCurrent",
+    "OldPrintedName": "AVCaptureLensPositionCurrent",
+    "NewPrintedName": "currentLensPosition",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureExposureMode",
+    "OldPrintedName": "AVCaptureExposureMode",
+    "NewPrintedName": "ExposureMode",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVCaptureExposureDurationCurrent",
+    "OldPrintedName": "AVCaptureExposureDurationCurrent",
+    "NewPrintedName": "currentExposureDuration",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVCaptureISOCurrent",
+    "OldPrintedName": "AVCaptureISOCurrent",
+    "NewPrintedName": "currentISO",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVCaptureExposureTargetBiasCurrent",
+    "OldPrintedName": "AVCaptureExposureTargetBiasCurrent",
+    "NewPrintedName": "currentExposureTargetBias",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureWhiteBalanceMode",
+    "OldPrintedName": "AVCaptureWhiteBalanceMode",
+    "NewPrintedName": "WhiteBalanceMode",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@SA@AVCaptureWhiteBalanceGains",
+    "OldPrintedName": "AVCaptureWhiteBalanceGains",
+    "NewPrintedName": "WhiteBalanceGains",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@SA@AVCaptureWhiteBalanceChromaticityValues",
+    "OldPrintedName": "AVCaptureWhiteBalanceChromaticityValues",
+    "NewPrintedName": "WhiteBalanceChromaticityValues",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@SA@AVCaptureWhiteBalanceTemperatureAndTintValues",
+    "OldPrintedName": "AVCaptureWhiteBalanceTemperatureAndTintValues",
+    "NewPrintedName": "WhiteBalanceTemperatureAndTintValues",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVCaptureWhiteBalanceGainsCurrent",
+    "OldPrintedName": "AVCaptureWhiteBalanceGainsCurrent",
+    "NewPrintedName": "currentWhiteBalanceGains",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(cs)AVCaptureDeviceDiscoverySession",
+    "OldPrintedName": "AVCaptureDeviceDiscoverySession",
+    "NewPrintedName": "DiscoverySession",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(cs)AVCaptureDeviceFormat",
+    "OldPrintedName": "AVCaptureDeviceFormat",
+    "NewPrintedName": "Format",
+    "NewTypeName": "AVCaptureDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(cs)AVFrameRateRange",
+    "OldPrintedName": "AVFrameRateRange",
+    "NewPrintedName": "FrameRateRange",
+    "NewTypeName": "AVCaptureDevice.Format"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureAutoFocusSystem",
+    "OldPrintedName": "AVCaptureAutoFocusSystem",
+    "NewPrintedName": "AutoFocusSystem",
+    "NewTypeName": "AVCaptureDevice.Format"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@AVCaptureSessionInterruptionReason",
+    "OldPrintedName": "AVCaptureSessionInterruptionReason",
+    "NewPrintedName": "InterruptionReason",
+    "NewTypeName": "AVCaptureSession"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetPhoto",
     "OldPrintedName": "AVCaptureSessionPresetPhoto",
     "NewPrintedName": "photo",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetHigh",
     "OldPrintedName": "AVCaptureSessionPresetHigh",
     "NewPrintedName": "high",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetMedium",
     "OldPrintedName": "AVCaptureSessionPresetMedium",
     "NewPrintedName": "medium",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetLow",
     "OldPrintedName": "AVCaptureSessionPresetLow",
     "NewPrintedName": "low",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPreset352x288",
     "OldPrintedName": "AVCaptureSessionPreset352x288",
     "NewPrintedName": "cif352x288",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPreset640x480",
     "OldPrintedName": "AVCaptureSessionPreset640x480",
     "NewPrintedName": "vga640x480",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPreset1280x720",
     "OldPrintedName": "AVCaptureSessionPreset1280x720",
     "NewPrintedName": "hd1280x720",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPreset1920x1080",
     "OldPrintedName": "AVCaptureSessionPreset1920x1080",
     "NewPrintedName": "hd1920x1080",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPreset3840x2160",
     "OldPrintedName": "AVCaptureSessionPreset3840x2160",
     "NewPrintedName": "hd4K3840x2160",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetiFrame960x540",
     "OldPrintedName": "AVCaptureSessionPresetiFrame960x540",
     "NewPrintedName": "iFrame960x540",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetiFrame1280x720",
     "OldPrintedName": "AVCaptureSessionPresetiFrame1280x720",
     "NewPrintedName": "iFrame1280x720",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVCaptureSessionPresetInputPriority",
     "OldPrintedName": "AVCaptureSessionPresetInputPriority",
     "NewPrintedName": "inputPriority",
-    "NewTypeName": "AVCaptureSessionPreset"
+    "NewTypeName": "AVCaptureSession.Preset"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -7485,6 +9866,104 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeFace",
+    "OldPrintedName": "AVMetadataObjectTypeFace",
+    "NewPrintedName": "face",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeUPCECode",
+    "OldPrintedName": "AVMetadataObjectTypeUPCECode",
+    "NewPrintedName": "upce",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeCode39Code",
+    "OldPrintedName": "AVMetadataObjectTypeCode39Code",
+    "NewPrintedName": "code39",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeCode39Mod43Code",
+    "OldPrintedName": "AVMetadataObjectTypeCode39Mod43Code",
+    "NewPrintedName": "code39Mod43",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeEAN13Code",
+    "OldPrintedName": "AVMetadataObjectTypeEAN13Code",
+    "NewPrintedName": "ean13",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeEAN8Code",
+    "OldPrintedName": "AVMetadataObjectTypeEAN8Code",
+    "NewPrintedName": "ean8",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeCode93Code",
+    "OldPrintedName": "AVMetadataObjectTypeCode93Code",
+    "NewPrintedName": "code93",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeCode128Code",
+    "OldPrintedName": "AVMetadataObjectTypeCode128Code",
+    "NewPrintedName": "code128",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypePDF417Code",
+    "OldPrintedName": "AVMetadataObjectTypePDF417Code",
+    "NewPrintedName": "pdf417",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeQRCode",
+    "OldPrintedName": "AVMetadataObjectTypeQRCode",
+    "NewPrintedName": "qr",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeAztecCode",
+    "OldPrintedName": "AVMetadataObjectTypeAztecCode",
+    "NewPrintedName": "aztec",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeInterleaved2of5Code",
+    "OldPrintedName": "AVMetadataObjectTypeInterleaved2of5Code",
+    "NewPrintedName": "interleaved2of5",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeITF14Code",
+    "OldPrintedName": "AVMetadataObjectTypeITF14Code",
+    "NewPrintedName": "itf14",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@AVMetadataObjectTypeDataMatrixCode",
+    "OldPrintedName": "AVMetadataObjectTypeDataMatrixCode",
+    "NewPrintedName": "dataMatrix",
+    "NewTypeName": "AVMetadataObject.ObjectType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@AVOutputSettingsPreset640x480",
     "OldPrintedName": "AVOutputSettingsPreset640x480",
     "NewPrintedName": "preset640x480",
@@ -7565,6 +10044,31 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateReadingItemAtURL:options:error:byAccessor:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateWritingItemAtURL:options:error:byAccessor:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateReadingItemAtURL:options:writingItemAtURL:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)coordinateWritingItemAtURL:options:writingItemAtURL:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSFileCoordinator(im)prepareForReadingItemsAtURLs:options:writingItemsAtURLs:options:error:byAccessor:",
+    "Index": 6
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:unit:scheme:options:usingBlock:",
     "Index": 5
   },
@@ -7592,11 +10096,6 @@
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:@F@CGPathApplyWithBlock",
     "Index": 1
-  },
-  {
-    "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)XCTContext(cm)_runActivityNamed:block:",
-    "Index": 2
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
@@ -7777,6 +10276,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringBeforeSignificantEvent:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)HMEventTrigger(cm)predicateForEvaluatingTriggerOccurringAfterSignificantEvent:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:"
   },
   {
@@ -7813,19 +10320,7 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useResource:usage:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useResources:count:usage:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useHeap:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)useHeaps:count:"
+    "Usr": "c:objc(pl)MTLComputeCommandEncoder(im)setSamplerState:atIndex:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -7853,27 +10348,19 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setVertexSamplerState:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setTileSamplerState:atIndex:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setTileSamplerStates:withRange:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useResource:usage:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useResources:count:usage:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useHeap:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)useHeaps:count:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -7909,6 +10396,30 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:maximumPointSize:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:compatibleWithTraitCollection:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:maximumPointSize:compatibleWithTraitCollection:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledValueForValue:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)UIFontMetrics(im)scaledValueForValue:compatibleWithTraitCollection:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)UIPickerViewAccessibilityDelegate(im)pickerView:accessibilityAttributedLabelForComponent:"
   },
   {
@@ -7925,11 +10436,75 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MLMultiDimDoubleArray(im)fill:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MLMultiDimDoubleArray(im)fillWithValueArray:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)NSFileProviderChangeObserver(im)finishEnumeratingChangesUpToSyncAnchor:moreComing:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)NSFileProviderChangeObserver(im)finishEnumeratingChangesUpToSyncAnchor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIContext(im)startTaskToRender:toDestination:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CIContext(im)startTaskToClear:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8045,6 +10620,22 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)setValue:atTime:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)valueAtTime:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)setValue:atTime:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)valueAtTime:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MDLAnimatedFloat4x4Property(im)setValue:atTime:"
   },
   {
@@ -8105,14 +10696,6 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CIContext(im)startTaskToRender:toDestination:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CIContext(im)startTaskToClear:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)AVAsset(im)tracksWithMediaType:"
   },
   {
@@ -8122,6 +10705,30 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)AVCaptureDevice(cm)defaultDeviceWithMediaType:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVCaptureDevice(im)deviceWhiteBalanceGainsForChromaticityValues:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVCaptureDevice(im)deviceWhiteBalanceGainsForTemperatureAndTintValues:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:willBeginCaptureForResolvedSettings:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:willCapturePhotoForResolvedSettings:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didCapturePhotoForResolvedSettings:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVCapturePhotoCaptureDelegate(im)captureOutput:didFinishProcessingPhoto:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8173,15 +10780,35 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertPosition:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertPosition:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertVector:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertTransform:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdConvertTransform:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)simdLookAt:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)SCNNode(im)lookAt:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)ARFrame(im)hitTest:types:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)ARFrame(im)hitTest:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8189,7 +10816,23 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)ARSCNViewDelegate(im)renderer:session:didFailWithError:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)ARSCNViewDelegate(im)renderer:session:cameraDidChangeTrackingState:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)ARSKViewDelegate(im)view:nodeForAnchor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)ARSKViewDelegate(im)view:session:didFailWithError:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)ARSKViewDelegate(im)view:session:cameraDidChangeTrackingState:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8198,6 +10841,10 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)ARSessionDelegate(im)session:didFailWithError:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)ARSessionDelegate(im)session:cameraDidChangeTrackingState:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8221,11 +10868,51 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)PGContext(im)addCompletionEvent:error:"
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)PGContext(im)addProgressPercentageEvent:error:"
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCGImage:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCGImage:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCIImage:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCIImage:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageURL:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageURL:orientation:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageData:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onImageData:orientation:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
