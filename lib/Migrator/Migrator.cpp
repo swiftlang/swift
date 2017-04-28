@@ -125,15 +125,15 @@ Migrator::performAFixItMigration() {
   }
 
   FixitApplyDiagnosticConsumer FixitApplyConsumer {
-    InputState->getInputText(),
+    InputState->getOutputText(),
     getInputFilename(),
   };
   Instance.addDiagnosticConsumer(&FixitApplyConsumer);
 
   Instance.performSema();
 
-  StringRef ResultText = InputState->getInputText();
-  unsigned ResultBufferID = InputState->getInputBufferID();
+  StringRef ResultText = InputState->getOutputText();
+  unsigned ResultBufferID = InputState->getOutputBufferID();
 
   if (FixitApplyConsumer.getNumFixitsApplied() > 0) {
     SmallString<4096> Scratch;
@@ -145,7 +145,7 @@ Migrator::performAFixItMigration() {
   }
 
   return MigrationState::make(MigrationKind::CompilerFixits,
-                              SrcMgr, InputState->getInputBufferID(),
+                              SrcMgr, InputState->getOutputBufferID(),
                               ResultBufferID);
 }
 
