@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2883,25 +2884,31 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
-  ProtocolDeclBits.RequiresClass =
-    walkInheritedProtocols([&](ProtocolDecl *proto) {
-      // If the 'requires class' bit is valid, we don't need to search any
-      // further.
-      if (proto->ProtocolDeclBits.RequiresClassValid) {
-        // If this protocol has a class requirement, we're done.
-        if (proto->ProtocolDeclBits.RequiresClass)
-          return TypeWalker::Action::Stop;
+  // Set this first to catch (invalid) circular inheritance.
+  ProtocolDeclBits.RequiresClassValid = true;
 
-        return TypeWalker::Action::SkipChildren;
+  // Quick check: @objc protocols require a class.
+  if (isObjC()) {
+    ProtocolDeclBits.RequiresClass = true;
+    return true;
+  }
+
+  // Otherwise, check if the inheritance clause contains a
+  // class-constrained existential.
+  //
+  // FIXME: Use the requirement signature if available.
+  ProtocolDeclBits.RequiresClass = false;
+  for (auto inherited : getInherited()) {
+    auto type = inherited.getType();
+    assert(type && "Should have type checked inheritance clause by now");
+    if (type->isExistentialType()) {
+      auto layout = type->getExistentialLayout();
+      if (layout.requiresClass()) {
+        ProtocolDeclBits.RequiresClass = true;
+        return true;
       }
-
-      // Quick check: @objc indicates that it requires a class.
-      if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC())
-        return TypeWalker::Action::Stop;
-
-      // Keep looking.
-      return TypeWalker::Action::Continue;
-    });
+    }
+  }
 
   return ProtocolDeclBits.RequiresClass;
 }
