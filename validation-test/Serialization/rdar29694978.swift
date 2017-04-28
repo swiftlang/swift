@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %s -swift-version 3 -import-objc-header %S/Inputs/rdar29694978.h -emit-module -o %t/Library.swiftmodule
-// RUN: %target-swift-ide-test -swift-version 3 -print-module -module-to-print=Library -source-filename=x -I %S/Inputs/ -I %t | %FileCheck %s
+// RUN: %target-build-swift %s -import-objc-header %S/Inputs/rdar29694978.h -emit-module -o %t/Library.swiftmodule
+// RUN: %target-swift-ide-test -print-module -module-to-print=Library -source-filename=x -I %S/Inputs/ -I %t | %FileCheck %s
 
 // REQUIRES: objc_interop
 
