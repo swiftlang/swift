@@ -1240,7 +1240,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
 /// outstanding delimiters as it scans the string.
 static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      const char *EndPtr,
-                                                     DiagnosticEngine *Diags) {
+                                                     DiagnosticEngine *Diags,
+                                                     bool MultilineString) {
   llvm::SmallVector<char, 4> OpenDelimiters;
   auto inStringLiteral = [&]() {
     return !OpenDelimiters.empty() &&
@@ -1257,9 +1258,11 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // issues with malformed tokens or other problems.
     switch (*CurPtr++) {
     // String literals in general cannot be split across multiple lines;
-    // interpolated ones are no exception.
+    // interpolated ones are no exception - unless multiline literals.
     case '\n':
     case '\r':
+      if (MultilineString)
+        continue;
       // Will be diagnosed as an unterminated string literal.
       return CurPtr-1;
 
@@ -1272,11 +1275,11 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         }
         // Otherwise it's an ordinary character; treat it normally.
       } else {
-        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
-          Diags->diagnose(Lexer::getSourceLoc(CurPtr-1),
-                          diag::lex_multiline_inside_interpolation);
-        }
         OpenDelimiters.push_back(CurPtr[-1]);
+      }
+      if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr - 1) == '"') {
+        MultilineString = true;
+        CurPtr += 2;
       }
       continue;
     case '\\':
@@ -1373,7 +1376,8 @@ static StringRef getMultilineTrailingIndent(const Token &Str,
 
 /// validateMultilineIndents:
 /// Diagnose contents of string literal that have inconsistent indentation.
-void Lexer::validateMultilineIndents(const Token &Str) {
+static void validateMultilineIndents(const Token &Str,
+                                     DiagnosticEngine *Diags) {
   StringRef Indent = getMultilineTrailingIndent(Str, Diags);
   if (Indent.empty())
     return;
@@ -1385,7 +1389,8 @@ void Lexer::validateMultilineIndents(const Token &Str) {
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
       if (Bytes.substr(nextpos, Indent.size()) != Indent)
-        diagnose(BytesPtr + nextpos, diag::lex_ambiguous_string_indent);
+        Diags->diagnose(Lexer::getSourceLoc(BytesPtr + nextpos),
+                        diag::lex_ambiguous_string_indent);
     }
     pos = nextpos;
   }
@@ -1415,7 +1420,8 @@ void Lexer::lexStringLiteral() {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr += 2;
       const char *EndPtr =
-          skipToEndOfInterpolatedExpression(CurPtr, BufferEnd, Diags);
+          skipToEndOfInterpolatedExpression(CurPtr, BufferEnd,
+                                            Diags, MultilineString);
       
       if (*EndPtr == ')') {
         // Successfully scanned the body of the expression literal.
@@ -1483,7 +1489,8 @@ void Lexer::lexStringLiteral() {
         if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr + 2) != '"') {
           CurPtr += 2;
           formToken(tok::string_literal, TokStart, MultilineString);
-          validateMultilineIndents(NextToken);
+          if (Diags)
+            validateMultilineIndents(NextToken, Diags);
           return;
         }
         else
@@ -1778,7 +1785,7 @@ void Lexer::getStringLiteralSegments(
     // Find the closing ')'.
     const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
                                                         Str.getText().end(),
-                                                        Diags);
+                                                        Diags, MultilineString);
     assert(*End == ')' && "invalid string literal interpolations should"
            " not be returned as string literals");
     ++End;
