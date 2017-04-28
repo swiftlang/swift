@@ -157,19 +157,38 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   return NewBB;
 }
 
+static bool setAccessToDeinit(BeginAccessInst *beginAccess) {
+  // It's possible that AllocBoxToStack could catch some cases that
+  // AccessEnforcementSelection does not promote to [static]. Ultimately, this
+  // should be an assert, but only after we the two passes can be fixes to share
+  // a common analysis.
+  if (beginAccess->getEnforcement() == SILAccessEnforcement::Dynamic)
+    return false;
+
+  beginAccess->setAccessKind(SILAccessKind::Deinit);
+  return true;
+}
+
 PointerUnion<CopyAddrInst *, DestroyAddrInst *>
 SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
   // Check to see if the instruction immediately before the insertion point is a
   // copy_addr from the specified operand.  If so, we can fold this into the
   // copy_addr as a take.
+  BeginAccessInst *beginAccess = nullptr;
   auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
   while (I != BBStart) {
     auto *Inst = &*--I;
 
     if (auto CA = dyn_cast<CopyAddrInst>(Inst)) {
-      if (CA->getSrc() == Operand && !CA->isTakeOfSrc()) {
-        CA->setIsTakeOfSrc(IsTake);
-        return CA;
+      if (!CA->isTakeOfSrc()) {
+        if (CA->getSrc() == Operand && !CA->isTakeOfSrc()) {
+          CA->setIsTakeOfSrc(IsTake);
+          return CA;
+        }
+        if (CA->getSrc() == beginAccess && setAccessToDeinit(beginAccess)) {
+          CA->setIsTakeOfSrc(IsTake);
+          return CA;
+        }
       }
     }
 
@@ -177,6 +196,15 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
     // affect take-ability.
     if (isa<DeallocStackInst>(Inst))
       continue;
+
+    // An end_access of the same address may be able to be rewritten as a
+    // [deinit] access.
+    if (auto endAccess = dyn_cast<EndAccessInst>(Inst)) {
+      if (endAccess->getSource() == Operand) {
+        beginAccess = endAccess->getBeginAccess();
+        continue;
+      }
+    }
 
     // This code doesn't try to prove tricky validity constraints about whether
     // it is safe to push the destroy_addr past interesting instructions.
