@@ -256,8 +256,11 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
   DeclName name;
   std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
-  explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason)
-      : name(name), underlyingReason(std::move(reason)) {}
+  explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
+                     Kind kind = Normal)
+      : name(name), underlyingReason(std::move(reason)) {
+    this->kind = kind;
+  }
 
   void log(raw_ostream &OS) const override {
     OS << "could not deserialize type for '" << name << "'";

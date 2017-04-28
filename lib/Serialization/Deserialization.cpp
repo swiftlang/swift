@@ -2525,13 +2525,20 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     Optional<swift::CtorInitializerKind> initKind =
         getActualCtorInitializerKind(storedInitKind);
 
+    auto errorKind = DeclDeserializationError::Normal;
+    if (initKind == CtorInitializerKind::Designated)
+      errorKind = DeclDeserializationError::DesignatedInitializer;
+
     auto overridden = getDeclChecked(overriddenID);
     if (!overridden) {
       llvm::consumeError(overridden.takeError());
-      auto kind = OverrideError::Normal;
-      if (initKind == CtorInitializerKind::Designated)
-        kind = OverrideError::DesignatedInitializer;
-      return llvm::make_error<OverrideError>(name, kind);
+      return llvm::make_error<OverrideError>(name, errorKind);
+    }
+
+    auto canonicalType = getTypeChecked(canonicalTypeID);
+    if (!canonicalType) {
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(canonicalType.takeError()), errorKind);
     }
 
     auto parent = getDeclContext(contextID);
@@ -2629,8 +2636,10 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     auto canonicalType = getTypeChecked(canonicalTypeID);
-    if (!canonicalType)
-      return llvm::make_error<TypeError>(name, takeErrorInfo(canonicalType.takeError()));
+    if (!canonicalType) {
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(canonicalType.takeError()));
+    }
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2757,12 +2766,20 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     auto canonicalType = getTypeChecked(canonicalTypeID);
-    if (!canonicalType)
-      return llvm::make_error<TypeError>(name, takeErrorInfo(canonicalType.takeError()));
+    if (!canonicalType) {
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(canonicalType.takeError()));
+    }
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
+
+    // If we are an accessor on a var or subscript, make sure it is deserialized
+    // first.
+    auto accessor = getDeclChecked(accessorStorageDeclID);
+    if (!accessor)
+      return accessor.takeError();
 
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
@@ -2844,10 +2861,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setImplicit();
     fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
-
-    // If we are an accessor on a var or subscript, make sure it is deserialized
-    // too.
-    getDecl(accessorStorageDeclID);
     break;
   }
 
@@ -3287,6 +3300,12 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!overridden) {
       llvm::consumeError(overridden.takeError());
       return llvm::make_error<OverrideError>(name);
+    }
+
+    auto canonicalType = getTypeChecked(canonicalTypeID);
+    if (!canonicalType) {
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(canonicalType.takeError()));
     }
 
     auto parent = getDeclContext(contextID);
@@ -4342,6 +4361,9 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
         fatal(next.takeError());
 
       // Drop the member if it had a problem.
+      // FIXME: If this was a non-final, non-dynamic, non-@objc-overriding
+      // member, it's going to affect the vtable layout, and /every single call/
+      // will be wrong.
       if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
         auto handleMissingDesignatedInit =
             [containingClass](const DeclDeserializationError &error) {

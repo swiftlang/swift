@@ -39,11 +39,77 @@ let _ = unwrapped // okay
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
 _ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
 
+public class UserSub: User {
+  override init() {}
+}
+// FIXME: Bad error message; really it's that the convenience init hasn't been
+// inherited.
+_ = UserSub(conveniently: 0) // expected-error {{argument passed to call that takes no arguments}}
+
+public class UserConvenienceSub: UserConvenience {
+  override init() {}
+}
+_ = UserConvenienceSub(conveniently: 0)
+
 #endif // VERIFY
 
 #else // TEST
 
 import Typedefs
+
+// CHECK-LABEL: class User {
+// CHECK-RECOVERY-LABEL: class User {
+open class User {
+  // CHECK: var unwrappedProp: UnwrappedInt?
+  // CHECK-RECOVERY: var unwrappedProp: Int32?
+  public var unwrappedProp: UnwrappedInt?
+  // CHECK: var wrappedProp: WrappedInt?
+  // CHECK-RECOVERY-NEGATIVE-NOT: var wrappedProp:
+  public var wrappedProp: WrappedInt?
+
+  // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
+  // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
+  public func returnsUnwrappedMethod() -> UnwrappedInt { fatalError() }
+  // CHECK: func returnsWrappedMethod() -> WrappedInt
+  // CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedMethod(
+  public func returnsWrappedMethod() -> WrappedInt { fatalError() }
+
+  // CHECK: subscript(_: WrappedInt) -> () { get }
+  // CHECK-RECOVERY-NEGATIVE-NOT: subscript(
+  public subscript(_: WrappedInt) -> () { return () }
+
+  // CHECK: init()
+  // CHECK-RECOVERY: init()
+  public init() {}
+
+  // CHECK: init(wrapped: WrappedInt)
+  // CHECK-RECOVERY-NEGATIVE-NOT: init(wrapped:
+  public init(wrapped: WrappedInt) {}
+
+  // CHECK: convenience init(conveniently: Int)
+  // CHECK-RECOVERY: convenience init(conveniently: Int)
+  public convenience init(conveniently: Int) { self.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
+// CHECK-LABEL: class UserConvenience
+// CHECK-RECOVERY-LABEL: class UserConvenience
+open class UserConvenience {
+  // CHECK: init()
+  // CHECK-RECOVERY: init()
+  public init() {}
+
+  // CHECK: convenience init(wrapped: WrappedInt)
+  // CHECK-RECOVERY-NEGATIVE-NOT: init(wrapped:
+  public convenience init(wrapped: WrappedInt) { self.init() }
+
+  // CHECK: convenience init(conveniently: Int)
+  // CHECK-RECOVERY: convenience init(conveniently: Int)
+  public convenience init(conveniently: Int) { self.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
 
 // CHECK-DAG: let x: MysteryTypedef
 // CHECK-RECOVERY-DAG: let x: Int32
@@ -139,7 +205,7 @@ public func usesUnwrapped(_ unwrapped: UnwrappedInt) {}
 public func returnsWrapped() -> WrappedInt { fatalError() }
 
 // CHECK-DAG: func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt
-// CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedGeneric
+// CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedGeneric<
 public func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt { fatalError() }
 
 #endif // TEST
