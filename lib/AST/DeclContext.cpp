@@ -970,13 +970,13 @@ Accessibility AccessScope::accessibilityForDiagnostics() const {
   return Accessibility::Private;
 }
 
-/// Return the DeclContext to compare when checking shared private access in
-/// Swift 4 mode. The shared scope is the type declaration if the context
+/// Return the DeclContext to compare when checking private access in
+/// Swift 4 mode. The context returned is the type declaration if the context
 /// and the type declaration are in the same file, otherwise it is the types
 /// last extension in the source file. If the context does not refer to a
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
-getSharedPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return DC;
@@ -996,8 +996,12 @@ getSharedPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
-bool AccessScope::checkSharedPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
-  // Shared private scope is not performed in Swift 3 mode.
+bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
+  // Check the lexical scope.
+  if (useDC->isChildContextOf(sourceDC))
+    return true;
+
+  // Only check lexical scope in Swift 3 mode
   if (useDC->getASTContext().isSwiftVersion3())
     return false;
 
@@ -1008,10 +1012,10 @@ bool AccessScope::checkSharedPrivateAccess(const DeclContext *useDC, const DeclC
   if (useSF != sourceDC->getParentSourceFile() || !sourceNTD)
     return false;
 
-  // Compare the shared private scopes and iterate over the parent types.
-  sourceDC = getSharedPrivateDeclContext(sourceDC, useSF);
+  // Compare the private scopes and iterate over the parent types.
+  sourceDC = getPrivateDeclContext(sourceDC, useSF);
   while (!useDC->isModuleContext()) {
-    useDC = getSharedPrivateDeclContext(useDC, useSF);
+    useDC = getPrivateDeclContext(useDC, useSF);
     if (useDC == sourceDC)
       return true;
 
