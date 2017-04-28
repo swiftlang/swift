@@ -813,7 +813,7 @@ ProtocolConformance::subst(Type substType,
              && "substitution mapped to different nominal?!");
 
       SubstitutionMap subMap;
-      if (auto *genericSig = getGenericSignature()) {
+      if (getGenericSignature()) {
         auto *genericEnv = getGenericEnvironment();
         subMap = genericEnv->getSubstitutionMap(subs, conformances);
       }

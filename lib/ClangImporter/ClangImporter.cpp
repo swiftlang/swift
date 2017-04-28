@@ -2953,7 +2953,7 @@ void ClangImporter::Implementation::lookupValue(
           auto alternateNamedDecl =
               cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
                                                      nameVersion));
-          if (!alternateNamedDecl)
+          if (!alternateNamedDecl || alternateNamedDecl == decl)
             return;
           assert(alternateNamedDecl->getFullName().matchesRef(name) &&
                  "importFullName behaved differently from importDecl");

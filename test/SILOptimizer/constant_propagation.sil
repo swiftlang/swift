@@ -307,7 +307,7 @@ bb0:
 
 // For any x of the same size as Int.max and n>=1 , (x>>n) is always <= Int.max,
 // that is (x>>n) <= Int.max and Int.max >= (x>>n) are true.
-// At the same time (x>>n) > Int.max and  Int.max < (x>>n) is always false.
+// At the same time (x>>n) > Int.max and Int.max < (x>>n) is always false.
 sil @fold_cmp_lshr_with_IntMax : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 9223372036854775807 

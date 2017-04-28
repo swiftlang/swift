@@ -249,20 +249,18 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 
   DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
 
-  static std::string getGraphName(const SILFunction *F) {
+  static std::string getGraphName(SILFunction *F) {
     return "CFG for '" + F->getName().str() + "' function";
   }
 
-  static std::string getSimpleNodeLabel(const SILBasicBlock *Node,
-                                        const SILFunction *F) {
+  static std::string getSimpleNodeLabel(SILBasicBlock *Node, SILFunction *F) {
     std::string OutStr;
     raw_string_ostream OSS(OutStr);
     const_cast<SILBasicBlock *>(Node)->printAsOperand(OSS, false);
     return OSS.str();
   }
 
-  static std::string getCompleteNodeLabel(const SILBasicBlock *Node,
-                                          const SILFunction *F) {
+  static std::string getCompleteNodeLabel(SILBasicBlock *Node, SILFunction *F) {
     std::string Str;
     raw_string_ostream OS(Str);
 
@@ -310,17 +308,16 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return OutStr;
   }
 
-  std::string getNodeLabel(const SILBasicBlock *Node,
-                           const SILFunction *Graph) {
+  std::string getNodeLabel(SILBasicBlock *Node, SILFunction *Graph) {
     if (isSimple())
       return getSimpleNodeLabel(Node, Graph);
     else
       return getCompleteNodeLabel(Node, Graph);
   }
 
-  static std::string getEdgeSourceLabel(const SILBasicBlock *Node,
-                                        SILBasicBlock::const_succ_iterator I) {
-    SILBasicBlock *Succ = I->getBB();
+  static std::string getEdgeSourceLabel(SILBasicBlock *Node,
+                                        SILBasicBlock::succblock_iterator I) {
+    const SILBasicBlock *Succ = *I;
     const TermInst *Term = Node->getTerminator();
 
     // Label source of conditional branches with "T" or "F"

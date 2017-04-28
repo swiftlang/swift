@@ -2553,7 +2553,7 @@ public:
   }
 
   bool walkToDeclPost(Decl *D) override {
-    if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (isa<ValueDecl>(D))
       NestedDCs.pop_back();
     return true;
   }
@@ -2622,8 +2622,6 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  // This is temporary
-  Invocation.getLangOptions().EnableExperimentalSubclassExistentials = true;
 
   CompilerInstance CI;
 

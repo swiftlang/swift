@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: substitution_map_not_broken
 //
 
 import StdlibUnittest

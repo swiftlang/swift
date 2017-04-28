@@ -1257,7 +1257,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   if (!BridgedFunc)
     return nullptr;
 
-  CanType CanBridgedTy(BridgedTargetTy);
+  CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
   SILType SILBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
   SILBuilderWithScope Builder(Inst);
@@ -1735,8 +1735,8 @@ optimizeBridgedCasts(SILInstruction *Inst,
   if (!BridgedSourceTy)
     return nullptr;
 
-  CanType CanBridgedTargetTy(BridgedTargetTy);
-  CanType CanBridgedSourceTy(BridgedSourceTy);
+  CanType CanBridgedTargetTy = BridgedTargetTy->getCanonicalType();
+  CanType CanBridgedSourceTy = BridgedSourceTy->getCanonicalType();
 
   if (CanBridgedSourceTy == source && CanBridgedTargetTy == target) {
     // Both source and target type are ObjC types.

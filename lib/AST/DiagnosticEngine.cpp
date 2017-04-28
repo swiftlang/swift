@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -313,6 +314,44 @@ static void formatSelectionArgument(StringRef ModifierArguments,
   
 }
 
+static bool isInterestingTypealias(Type type) {
+  auto aliasTy = dyn_cast<NameAliasType>(type.getPointer());
+  if (!aliasTy)
+    return false;
+  if (aliasTy->getDecl() == type->getASTContext().getVoidDecl())
+    return false;
+  if (type->is<BuiltinType>())
+    return false;
+  if (aliasTy->getDecl()->isCompatibilityAlias())
+    return isInterestingTypealias(aliasTy->getSinglyDesugaredType());
+  return true;
+}
+
+/// Decide whether to show the desugared type or not.  We filter out some
+/// cases to avoid too much noise.
+static bool shouldShowAKA(Type type, StringRef typeName) {
+  // Canonical types are already desugared.
+  if (type->isCanonical())
+    return false;
+
+  // Don't show generic type parameters.
+  if (type->hasTypeParameter())
+    return false;
+
+  // Only show 'aka' if there's a typealias involved; other kinds of sugar
+  // are easy enough for people to read on their own.
+  if (!type.findIf(isInterestingTypealias))
+    return false;
+
+  // If they are textually the same, don't show them.  This can happen when
+  // they are actually different types, because they exist in different scopes
+  // (e.g. everyone names their type parameters 'T').
+  if (typeName == type->getCanonicalType()->getString())
+    return false;
+
+  return true;
+}
+
 /// \brief Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
@@ -381,33 +420,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
     auto type = Arg.getAsType()->getWithoutParens();
     std::string typeName = type->getString();
 
-    // Decide whether to show the desugared type or not.  We filter out some
-    // cases to avoid too much noise.
-    bool showAKA = !type->isCanonical();
-
-    // If we're complaining about a function type, don't "aka" just because of
-    // differences in the argument or result types.
-    if (showAKA && type->is<AnyFunctionType>() &&
-        isa<AnyFunctionType>(type.getPointer()))
-      showAKA = false;
-
-    // Don't unwrap intentional sugar types like T? or [T].
-    if (showAKA && (isa<SyntaxSugarType>(type.getPointer()) ||
-                    isa<DictionaryType>(type.getPointer()) ||
-                    type->is<BuiltinType>()))
-      showAKA = false;
-
-    // If they are textually the same, don't show them.  This can happen when
-    // they are actually different types, because they exist in different scopes
-    // (e.g. everyone names their type parameters 'T').
-    if (showAKA && typeName == type->getCanonicalType()->getString())
-      showAKA = false;
-
-    // Don't show generic type parameters.
-    if (showAKA && type->hasTypeParameter())
-      showAKA = false;
-
-    if (showAKA) {
+    if (shouldShowAKA(type, typeName)) {
       llvm::SmallString<256> AkaText;
       llvm::raw_svector_ostream OutAka(AkaText);
       OutAka << type->getCanonicalType();

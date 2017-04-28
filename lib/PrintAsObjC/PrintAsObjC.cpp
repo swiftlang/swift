@@ -558,8 +558,8 @@ private:
     auto paramLists = AFD->getParameterLists();
     assert(paramLists.size() == 2 && "not an ObjC-compatible method");
 
-    ArrayRef<Identifier> selectorPieces
-      = AFD->getObjCSelector().getSelectorPieces();
+    auto selector = AFD->getObjCSelector();
+    ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
     
     const auto &params = paramLists[1]->getArray();
     unsigned paramIndex = 0;

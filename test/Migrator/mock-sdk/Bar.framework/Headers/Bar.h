@@ -6,6 +6,8 @@ int barGlobalFunc(int a);
 
 int barGlobalVariable = 1;
 
+int barGlobalVariableOldEnumElement = 1;
+
 int barGlobalFuncOldName(int a);
 
 @interface BarForwardDeclaredClass
@@ -17,6 +19,11 @@ int barGlobalFuncOldName(int a);
 enum BarForwardDeclaredEnum {
   BarForwardDeclaredEnumValue = 42
 };
+
+@interface PropertyUserInterface
+- (int) field;
+- (void) setField:(int)info;
+@end
 
 #define BAR_MACRO_1 0
 

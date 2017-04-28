@@ -1352,10 +1352,8 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
   llvm::Optional<int64_t> Offset;
-  unsigned Length = 0;
   if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL) {
     Offset = sourcekitd_variant_int64_get_value(OffsetObj);
-    Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
   }
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *Typename = sourcekitd_variant_dictionary_get_string(Info,

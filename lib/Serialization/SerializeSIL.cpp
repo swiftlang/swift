@@ -1381,7 +1381,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *BAI = cast<BeginAccessInst>(&SI);
     unsigned attr =
          unsigned(BAI->getAccessKind())
-       + (unsigned(BAI->getEnforcement()) << 3);
+       + (unsigned(BAI->getEnforcement()) << 2);
     SILValue operand = BAI->getOperand();
 
     SILOneOperandLayout::emitRecord(
@@ -1411,7 +1411,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *BAI = cast<BeginUnpairedAccessInst>(&SI);
     unsigned attr =
          unsigned(BAI->getAccessKind())
-       + (unsigned(BAI->getEnforcement()) << 3);
+       + (unsigned(BAI->getEnforcement()) << 2);
     SILValue source = BAI->getSource();
     SILValue buffer = BAI->getBuffer();
 

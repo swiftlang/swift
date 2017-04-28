@@ -1477,8 +1477,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::BeginAccessInst: {
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
-    auto accessKind = SILAccessKind(Attr & 0x7);
-    auto enforcement = SILAccessEnforcement(Attr >> 3);
+    auto accessKind = SILAccessKind(Attr & 0x3);
+    auto enforcement = SILAccessEnforcement(Attr >> 2);
     ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
     break;
   }
@@ -1494,8 +1494,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     SILValue buffer = getLocalValue(
         ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
-    auto accessKind = SILAccessKind(Attr & 0x7);
-    auto enforcement = SILAccessEnforcement(Attr >> 3);
+    auto accessKind = SILAccessKind(Attr & 0x3);
+    auto enforcement = SILAccessEnforcement(Attr >> 2);
     ResultVal = Builder.createBeginUnpairedAccess(Loc, source, buffer,
                                                   accessKind, enforcement);
     break;

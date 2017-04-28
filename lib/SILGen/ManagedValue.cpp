@@ -145,6 +145,26 @@ ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &SGF,
   return SGF.emitFormalEvaluationManagedBeginBorrow(loc, getValue());
 }
 
+ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
+                                       SILLocation loc) const {
+  auto temporary = SGF.emitTemporaryAllocation(loc, getType());
+  bool hadCleanup = hasCleanup();
+
+  // The temporary memory is +0 if the value was.
+  if (hadCleanup) {
+    SGF.B.emitStoreValueOperation(loc, forward(SGF), temporary,
+                                  StoreOwnershipQualifier::Init);
+
+    // SEMANTIC SIL TODO: This should really be called a temporary LValue.
+    return ManagedValue::forOwnedAddressRValue(temporary,
+                                          SGF.enterDestroyCleanup(temporary));
+  } else {
+    auto object = SGF.emitManagedBeginBorrow(loc, getValue());
+    SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
+    return ManagedValue::forBorrowedAddressRValue(temporary);
+  }
+}
+
 void ManagedValue::print(raw_ostream &os) const {
   if (SILValue v = getValue()) {
     v->print(os);

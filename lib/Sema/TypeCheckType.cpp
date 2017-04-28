@@ -3100,8 +3100,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     if (!ty || ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();
-    if (TC.Context.LangOpts.EnableExperimentalSubclassExistentials &&
-        nominalDecl && isa<ClassDecl>(nominalDecl)) {
+    if (nominalDecl && isa<ClassDecl>(nominalDecl)) {
       if (checkSuperclass(tyR->getStartLoc(), ty))
         continue;
 

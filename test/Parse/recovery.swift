@@ -714,7 +714,7 @@ func test23086402(a: A23086402) {
 // and `ss + s` becomes ambiguous. Diambiguation is provided with the unavailable overload
 // in order to produce a meaningful diagnostics. (Related: <rdar://problem/31763930>)
 func test23550816(ss: [String], s: String) {
-  print(ss + s)  // expected-error {{'+' is unavailable: Operator '+' cannot be used to append a String to a seqeunce of strings}}
+  print(ss + s)  // expected-error {{'+' is unavailable: Operator '+' cannot be used to append a String to a sequence of strings}}
 }
 
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)

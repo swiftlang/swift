@@ -21,11 +21,9 @@ using namespace swift;
 using namespace swift::migrator;
 
 FixitApplyDiagnosticConsumer::
-FixitApplyDiagnosticConsumer(const MigratorOptions &MigratorOpts,
-                             const StringRef Text,
+FixitApplyDiagnosticConsumer(const StringRef Text,
                              const StringRef BufferName)
-  : MigratorOpts(MigratorOpts),
-    Text(Text), BufferName(BufferName), NumFixitsApplied(0) {
+  : Text(Text), BufferName(BufferName), NumFixitsApplied(0) {
   RewriteBuf.Initialize(Text);
 }
 

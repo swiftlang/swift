@@ -973,6 +973,10 @@ void IRGenModule::emitVTableStubs() {
     // For each eliminated method symbol create an alias to the stub.
     auto *alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
                                             F.getName(), stub);
+
+    if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
+      alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
+
     if (useDllStorage())
       alias->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }

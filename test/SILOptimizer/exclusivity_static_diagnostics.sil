@@ -339,7 +339,7 @@ bb0(%0 : $Int):
 // Multiple errors accessing the same location
 
 // If we have a sequence of begin read - begin write - begin read accesses make
-// sure the the second read doesn't report a confusing read-read conflict.
+// sure the second read doesn't report a confusing read-read conflict.
 // CHECK-LABEL: sil hidden @readWriteReadConflictingThirdAccess
 sil hidden @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):

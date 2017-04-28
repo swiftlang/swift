@@ -21,6 +21,111 @@ CHANGELOG
 Swift 4.0
 ---------
 
+* [SE-0156][]
+
+  Protocol composition types can now contain one or more class type terms,
+  forming a class-constrained protocol composition.
+
+  For example:
+
+  ```swift
+  protocol Paintable {
+    func paint()
+  }
+
+  class Canvas {
+    var origin: CGPoint
+  }
+
+  class Wall : Canvas, Paintable {
+    func paint() { ... }
+  }```
+
+  func render(_: Canvas & Paintable) { ... }
+
+  render(Wall())
+  ```
+
+  Note that class-constrained protocol compositions can be written and
+  used in both Swift 3 and Swift 4 mode.
+
+  Generated headers for Swift APIs will map class-constrained protocol
+  compositions to Objective-C protocol-qualified class types in both
+  Swift 3 and Swift 4 mode (for instance, `NSSomeClass & SomeProto &
+  OtherProto` in Swift becomes `NSSomeClass <SomeProto, OtherProto>`
+  in Objective-C).
+
+  Objective-C APIs which use protocol-qualified class types differ in
+  behavior when imported by a module compiled in Swift 3 mode and
+  Swift 4 mode. In Swift 3 mode, these APIs will continue to import as
+  protocol compositions without a class constraint
+  (eg, `SomeProto & OtherProto`).
+
+  In Swift 4 mode, protocol-qualified class types import as
+  class-constrained protocol compositions, for a more faithful mapping
+  of APIs from Objective-C to Swift.
+
+  Note that the current implementation of class-constrained protocol
+  compositions lacks three features outlined in the Swift evolution proposal:
+
+  - In the evolution proposal, a class-constrained is permitted to contain
+    two different classes as long as one is a superclass of the other.
+    The current implementation only allows multiple classes to appear in
+    the composition if they are identical.
+
+  - In the evolution proposal, associated type and class inheritance clauses
+    are generalized to allow class-constrained protocol compositions. The
+    current implementation does not allow this.
+
+  - In the evolution proposal, protocol inheritance clauses are allowed to
+    contain a class, placing a requirement that all conforming types are
+    a subclass of the given class. The current implementation does not
+    allow this.
+
+  These missing aspects of the proposal can be introduced in a future
+  release without breaking source compatibility with existing code.
+
+* [SE-0142][]
+
+  Protocols and associated types can now contain `where` clauses that
+  provide additional restrictions on associated types. For example:
+
+    ```swift
+    protocol StringRepresentable: RawRepresentable
+    where RawValue == String { }
+
+    protocol RawStringWrapper {
+      associatedtype Wrapped: RawRepresentable
+        where Wrapper.RawValue == String
+    }
+    ```
+
+* [SE-0160][]
+
+  In Swift 4 mode, a declaration is inferred to be `@objc` where it is required for semantic consistency of the programming model. Specifically, it is inferred when:
+
+    * The declaration is an override of an `@objc` declaration
+    * The declaration satisfies a requirement in an `@objc` protocol
+    * The declaration has one of the following attributes: `@IBAction`, `@IBOutlet`, `@IBInspectable`, `@GKInspectable`, or `@NSManaged`
+
+  Additionally, in Swift 4 mode, `dynamic` declarations that don't
+  have `@objc` inferred based on the rules above will need to be
+  explicitly marked `@objc`.
+
+  Swift 3 compatibility mode retains the more-permissive Swift 3
+  rules for inference of `@objc` within subclasses of
+  `NSObject`. However, the compiler will emit warnings about places
+  where the Objective-C entry points for these inference cases are
+  used, e.g., in a `#selector` or `#keyPath` expression, via
+  messaging through `AnyObject`, or direct uses in Objective-C code
+  within a mixed project. The warnings can be silenced by adding an
+  explicit `@objc`. Uses of these entrypoints that are not
+  statically visible to the compiler can be diagnosed at runtime by
+  setting the environment variable
+  `SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT` to a value between 1 and 3
+  and testing the application. See the [migration discussion in
+  SE-0160](https://github.com/apple/swift-evolution/blob/master/proposals/0160-objc-inference.md#minimal-migration-workflow).
+
 * [SE-0138](https://github.com/apple/swift-evolution/blob/master/proposals/0138-unsaferawbufferpointer.md#amendment-to-normalize-the-slice-type):
 
   Slicing a raw buffer no longer results in the same raw buffer

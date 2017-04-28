@@ -249,7 +249,7 @@ emitInvocation(SILBuilder &Builder,
                                 Builder.getModule());
 
   bool isNonThrowing = false;
-  // It it a function whose type claims it is throwing, but
+  // It is a function whose type claims it is throwing, but
   // it actually never throws inside its body?
   if (CanSILFuncTy->hasErrorResult() &&
       CalleeFunc->findThrowBB() == CalleeFunc->end()) {

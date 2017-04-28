@@ -918,7 +918,7 @@ getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CharSourceRange> Ranges;
   if (TupleExpr *TE = dyn_cast<TupleExpr>(Arg)) {
     size_t ElemIndex = 0;
-    for(Expr *Elem: TE->getElements()) {
+    for (Expr *Elem : TE->getElements()) {
       SourceLoc LabelStart(Elem->getStartLoc());
       SourceLoc LabelEnd(LabelStart);
 

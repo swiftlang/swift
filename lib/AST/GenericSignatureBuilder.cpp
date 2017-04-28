@@ -674,7 +674,31 @@ static unsigned sourcePathLength(const RequirementSource *source) {
   return count;
 }
 
+/// Check whether we have a NestedTypeNameMatch/ProtocolRequirement requirement
+/// pair, in which case we prefer the RequirementSignature.
+///
+/// This is part of staging out NestedTypeNameMatch requirement sources in
+/// favor of something more principled.
+static int isNestedTypeNameMatchAndRequirementSignaturePair(
+                                              const RequirementSource *lhs,
+                                              const RequirementSource *rhs) {
+  if (lhs->getRoot()->kind == RequirementSource::NestedTypeNameMatch &&
+      rhs->isProtocolRequirement())
+    return +1;
+
+  if (rhs->getRoot()->kind == RequirementSource::NestedTypeNameMatch &&
+      lhs->isProtocolRequirement())
+    return -1;
+
+  return 0;
+}
+
 int RequirementSource::compare(const RequirementSource *other) const {
+  // FIXME: Egregious hack while we phase out NestedTypeNameMatch
+  if (int compare =
+        isNestedTypeNameMatchAndRequirementSignaturePair(this, other))
+    return compare;
+
   // Prefer the derived option, if there is one.
   bool thisIsDerived = this->isDerivedRequirement();
   bool otherIsDerived = other->isDerivedRequirement();
@@ -2459,7 +2483,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 
   // Collect all of the inherited associated types and typealiases in the
   // inherited protocols (recursively).
-  DenseMap<DeclName, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
+  llvm::MapVector<DeclName, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
   {
     Proto->walkInheritedProtocols(
         [&](ProtocolDecl *inheritedProto) -> TypeWalker::Action {
@@ -2523,17 +2547,58 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
     return result;
   };
 
+  // Form an unsubstituted type referring to the given type declaration,
+  // for use in an inferred same-type requirement.
+  auto formUnsubstitutedType = [&](TypeDecl *typeDecl) -> Type {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+      return DependentMemberType::get(
+                               assocType->getProtocol()->getSelfInterfaceType(),
+                               assocType);
+    }
+
+    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      // Resolve the underlying type, if we haven't done so yet.
+      if (!typealias->hasInterfaceType()) {
+        getLazyResolver()->resolveDeclSignature(typealias);
+      }
+
+      return typealias->getUnderlyingTypeLoc().getType();
+    }
+
+    return Type();
+  };
+
+  // An an inferred same-type requirement between the two type declarations
+  // within this protocol or a protocol it inherits.
+  auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
+    Type firstType = formUnsubstitutedType(first);
+    if (!firstType) return;
+
+    Type secondType = formUnsubstitutedType(second);
+    if (!secondType) return;
+
+    auto inferredSameTypeSource =
+      FloatingRequirementSource::viaProtocolRequirement(
+                    Source, Proto, WrittenRequirementLoc(), /*inferred=*/true);
+
+    addRequirement(
+      Requirement(RequirementKind::SameType, firstType, secondType),
+      inferredSameTypeSource, Proto->getParentModule(),
+      &protocolSubMap);
+  };
+
   // Add requirements for each of the associated types.
   for (auto Member : getProtocolMembers(Proto)) {
-    if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
+    if (auto assocTypeDecl = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      Type assocType = DependentMemberType::get(concreteSelf, AssocType);
+      Type assocType = DependentMemberType::get(concreteSelf, assocTypeDecl);
       auto assocResult =
-        addInheritedRequirements(AssocType, assocType, Source, protoModule);
+        addInheritedRequirements(assocTypeDecl, assocType, Source, protoModule);
       if (isErrorResult(assocResult))
         return assocResult;
 
-      if (auto WhereClause = AssocType->getTrailingWhereClause()) {
+      // Add requirements from this associated type's where clause.
+      if (auto WhereClause = assocTypeDecl->getTrailingWhereClause()) {
         for (auto &req : WhereClause->getRequirements()) {
           auto innerSource =
             FloatingRequirementSource::viaProtocolRequirement(
@@ -2543,30 +2608,33 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       }
 
       // Check whether we inherited any types with the same name.
-      auto knownInherited = inheritedTypeDecls.find(AssocType->getFullName());
+      auto knownInherited =
+        inheritedTypeDecls.find(assocTypeDecl->getFullName());
       if (knownInherited == inheritedTypeDecls.end()) continue;
 
       bool shouldWarnAboutRedeclaration =
         Source->kind == RequirementSource::RequirementSignatureSelf &&
-        AssocType->getDefaultDefinitionLoc().isNull();
-      for (auto inheritedType : knownInherited->getSecond()) {
+        assocTypeDecl->getDefaultDefinitionLoc().isNull();
+      for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =
               dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-          // FIXME: Wire up same-type constraint.
+          // Infer a same-type requirement among the same-named associated
+          // types.
+          addInferredSameTypeReq(assocTypeDecl, inheritedAssocTypeDecl);
 
           // Complain about the first redeclaration.
           if (shouldWarnAboutRedeclaration) {
             auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
             auto fixItWhere = getProtocolWhereLoc();
-            Diags.diagnose(AssocType,
+            Diags.diagnose(assocTypeDecl,
                            diag::inherited_associated_type_redecl,
-                           AssocType->getFullName(),
+                           assocTypeDecl->getFullName(),
                            inheritedFromProto->getDeclaredInterfaceType())
               .fixItInsertAfter(
-                         fixItWhere.first,
-                         getAssociatedTypeReqs(AssocType, fixItWhere.second))
-              .fixItRemove(AssocType->getSourceRange());
+                       fixItWhere.first,
+                       getAssociatedTypeReqs(assocTypeDecl, fixItWhere.second))
+              .fixItRemove(assocTypeDecl->getSourceRange());
 
             Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
                            inheritedAssocTypeDecl->getFullName());
@@ -2592,11 +2660,13 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       bool shouldWarnAboutRedeclaration =
         Source->kind == RequirementSource::RequirementSignatureSelf;
 
-      for (auto inheritedType : knownInherited->getSecond()) {
+      for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =
               dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-          // FIXME: Wire up same-type constraint.
+          // Infer a same-type requirement between the typealias' underlying
+          // type and the inherited associated type.
+          addInferredSameTypeReq(inheritedAssocTypeDecl, typealias);
 
           // Warn that one should use where clauses for this.
           if (shouldWarnAboutRedeclaration) {
@@ -2623,6 +2693,16 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 
       inheritedTypeDecls.erase(knownInherited);
       continue;
+    }
+  }
+
+  // Infer same-type requirements among inherited type declarations.
+  for (auto &entry : inheritedTypeDecls) {
+    if (entry.second.size() < 2) continue;
+
+    auto firstDecl = entry.second.front();
+    for (auto otherDecl : ArrayRef<TypeDecl *>(entry.second).slice(1)) {
+      addInferredSameTypeReq(firstDecl, otherDecl);
     }
   }
 

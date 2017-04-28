@@ -17,21 +17,217 @@
 // The BASELINE timings come from the existing standard library Codecs
 
 /* 
-  for x in BASELINE FORWARD REVERSE ; do 
+  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION REVERSE_COLLECTION ; do 
     echo $x
     swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x 
     for i in {1..3}; do
-      time nice -19 /tmp/u3-$x
+      (time nice -19 /tmp/u3-$x) 2>&1 | grep user
     done
   done
 */
 
 //===----------------------------------------------------------------------===//
-// Hack providing an efficient API that is available to the standard library
 extension UnicodeScalar {
+  // Hack providing an efficient API that is available to the standard library
   @_versioned
   @inline(__always)
   init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: UnicodeScalar.self) }
+
+  static var replacementCharacter: UnicodeScalar {
+    return UnicodeScalar(_unchecked: 0xfffd)
+  }
+}
+//===----------------------------------------------------------------------===//
+@_fixed_layout
+public struct _UIntBuffer<
+  Storage: UnsignedInteger & FixedWidthInteger, 
+  Element: UnsignedInteger & FixedWidthInteger
+> {
+  @_versioned
+  var _storage: Storage
+  @_versioned
+  var _bitCount: UInt8
+
+  @inline(__always)
+  @_versioned
+  internal init(_storage: Storage, _bitCount: UInt8) {
+    self._storage = _storage
+    self._bitCount = _bitCount
+  }
+  
+  @inline(__always)
+  public init(containing e: Element) {
+    _storage = Storage(extendingOrTruncating: e)
+    _bitCount = UInt8(extendingOrTruncating: Element.bitWidth)
+  }
+}
+
+extension _UIntBuffer : Sequence {
+  @_fixed_layout
+  public struct Iterator : IteratorProtocol, Sequence {
+    @inline(__always)
+    public init(_ x: _UIntBuffer) { _impl = x }
+    
+    @inline(__always)
+    public mutating func next() -> Element? {
+      if _impl._bitCount == 0 { return nil }
+      defer {
+        _impl._storage = _impl._storage &>> Element.bitWidth
+        _impl._bitCount = _impl._bitCount &- _impl._elementWidth
+      }
+      return Element(extendingOrTruncating: _impl._storage)
+    }
+    @_versioned
+    var _impl: _UIntBuffer
+  }
+  
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+}
+
+extension _UIntBuffer : Collection {
+  public typealias _Element = Element
+  
+  public struct Index : Comparable {
+    @_versioned
+    var bitOffset: UInt8
+    
+    @_versioned
+    init(bitOffset: UInt8) { self.bitOffset = bitOffset }
+    
+    public static func == (lhs: Index, rhs: Index) -> Bool {
+      return lhs.bitOffset == rhs.bitOffset
+    }
+    public static func < (lhs: Index, rhs: Index) -> Bool {
+      return lhs.bitOffset < rhs.bitOffset
+    }
+  }
+
+  public var startIndex : Index {
+    @inline(__always)
+    get { return Index(bitOffset: 0) }
+  }
+  
+  public var endIndex : Index {
+    @inline(__always)
+    get { return Index(bitOffset: _bitCount) }
+  }
+  
+  @inline(__always)
+  public func index(after i: Index) -> Index {
+    return Index(bitOffset: i.bitOffset &+ _elementWidth)
+  }
+
+  @_versioned
+  internal var _elementWidth : UInt8 {
+    return UInt8(extendingOrTruncating: Element.bitWidth)
+  }
+  
+  public subscript(i: Index) -> Element {
+    @inline(__always)
+    get {
+      return Element(extendingOrTruncating: _storage &>> i.bitOffset)
+    }
+  }
+}
+
+extension _UIntBuffer : BidirectionalCollection {
+  @inline(__always)
+  public func index(before i: Index) -> Index {
+    return Index(bitOffset: i.bitOffset &- _elementWidth)
+  }
+}
+
+extension _UIntBuffer : RandomAccessCollection {
+  public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
+  public typealias IndexDistance = Int
+  
+  @inline(__always)
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    let x = IndexDistance(i.bitOffset) &+ n &* Element.bitWidth
+    return Index(bitOffset: UInt8(extendingOrTruncating: x))
+  }
+
+  @inline(__always)
+  public func distance(from i: Index, to j: Index) -> IndexDistance {
+    return (Int(j.bitOffset) &- Int(i.bitOffset)) / Element.bitWidth
+  }
+}
+
+extension FixedWidthInteger {
+  @inline(__always)
+  @_versioned
+  func _fullShiftLeft<N: FixedWidthInteger>(_ n: N) -> Self {
+    return (self &<< ((n &+ 1) &>> 1)) &<< (n &>> 1)
+  }
+  @inline(__always)
+  @_versioned
+  func _fullShiftRight<N: FixedWidthInteger>(_ n: N) -> Self {
+    return (self &>> ((n &+ 1) &>> 1)) &>> (n &>> 1)
+  }
+  @inline(__always)
+  @_versioned
+  static func _lowBits<N: FixedWidthInteger>(_ n: N) -> Self {
+    return ~((~0 as Self)._fullShiftLeft(n))
+  }
+}
+
+extension Range {
+  @inline(__always)
+  @_versioned
+  func _contains_(_ other: Range) -> Bool {
+    return other.clamped(to: self) == other
+  }
+}
+
+extension _UIntBuffer : RangeReplaceableCollection {
+  @inline(__always)
+  public init() {
+    _storage = 0
+    _bitCount = 0
+  }
+
+  public var capacity: Int {
+    return Storage.bitWidth / Element.bitWidth
+  }
+
+  @inline(__always)
+  public mutating func append(_ newElement: Element) {
+    _debugPrecondition(count < capacity)
+    _storage |= Storage(newElement) &<< _bitCount
+    _bitCount = _bitCount &+ _elementWidth
+  }
+  
+  @inline(__always)
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C._Element == Element {
+    _debugPrecondition(
+      (0..<_bitCount)._contains_(
+        target.lowerBound.bitOffset..<target.upperBound.bitOffset))
+    
+    let replacement1 = _UIntBuffer(replacement)
+
+    let targetCount = distance(
+      from: target.lowerBound, to: target.upperBound)
+    let growth = replacement1.count &- targetCount
+    _debugPrecondition(count + growth <= capacity)
+
+    let headCount = distance(from: startIndex, to: target.lowerBound)
+    let tailOffset = distance(from: startIndex, to: target.upperBound)
+
+    let w = Element.bitWidth
+    let headBits = _storage & ._lowBits(headCount &* w)
+    let tailBits = _storage._fullShiftRight(tailOffset &* w)
+
+    _storage = headBits
+    _storage |= replacement1._storage &<< (headCount &* w)
+    _storage |= tailBits &<< ((tailOffset &+ growth) &* w)
+    _bitCount = UInt8(
+      extendingOrTruncating: IndexDistance(_bitCount) &+ growth &* w)
+  }
 }
 //===----------------------------------------------------------------------===//
 
@@ -43,7 +239,7 @@ public enum Unicode {
 
 extension Unicode {
   public enum ParseResult<T> {
-  case valid(T, length: Int)
+  case valid(T)
   case emptyInput
   case invalid(length: Int)
 
@@ -57,18 +253,24 @@ extension Unicode {
 }
 
 public protocol UnicodeDecoder {
-  associatedtype BufferLength : BinaryInteger
   associatedtype CodeUnit : UnsignedInteger, FixedWidthInteger
+  associatedtype Buffer : Collection
+  
+  where Buffer.Iterator.Element == CodeUnit
+  
+  associatedtype EncodedScalar : Collection 
+    where EncodedScalar.Iterator.Element == CodeUnit
+  static var replacement: EncodedScalar { get }
+  
   init()
 
-  /// How many code units are buffered in the decoder
-  var bufferLength: BufferLength { get }
-  
+  var buffer: Buffer { get }
+
   mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
-  ) -> Unicode.ParseResult<UInt32> where I.Element == CodeUnit
+  ) -> Unicode.ParseResult<EncodedScalar> where I.Element == CodeUnit
 
-  static func scalar(buffer: UInt32, length: Int) -> UnicodeScalar
+  static func decodeOne(_ content: EncodedScalar) -> UnicodeScalar
 }
 
 extension UnicodeDecoder {
@@ -85,8 +287,8 @@ extension UnicodeDecoder {
     var d = Self()
     while true {
       switch d.parseOne(&input) {
-      case let .valid(buffer, length: length):
-        output(scalar(buffer: buffer, length: length))
+      case let .valid(scalarContent):
+        output(decodeOne(scalarContent))
       case .invalid:
         if !makeRepairs { return 1 }
         errors += 1
@@ -94,6 +296,199 @@ extension UnicodeDecoder {
       case .emptyInput:
         return errors
       }
+    }
+  }
+}
+
+
+extension Unicode {
+  struct ParsingIterator<
+    CodeUnits : IteratorProtocol, 
+    Decoder: UnicodeDecoder
+  > where Decoder.CodeUnit == CodeUnits.Element {
+    var codeUnits: CodeUnits
+    var decoder: Decoder
+  }
+}
+extension Unicode.ParsingIterator : IteratorProtocol, Sequence {
+  mutating func next() -> Decoder.EncodedScalar? {
+    switch decoder.parseOne(&codeUnits) {
+    case let .valid(scalarContent): return scalarContent
+    case .invalid: return Decoder.replacement
+    case .emptyInput: return nil
+    }
+  }
+}
+
+extension Unicode {
+  struct DefaultScalarView<
+    CodeUnits: BidirectionalCollection,
+    Encoding: UnicodeEncoding
+  > where CodeUnits.Iterator.Element == Encoding.CodeUnit {
+    var codeUnits: CodeUnits
+    init(
+      _ codeUnits: CodeUnits,
+      fromEncoding _: Encoding.Type = Encoding.self) {
+      self.codeUnits = codeUnits
+    }
+  }
+}
+
+extension Unicode.DefaultScalarView : Sequence {
+  struct Iterator {
+    var parsing: Unicode.ParsingIterator<
+      CodeUnits.Iterator, Encoding.ForwardDecoder
+    >
+  }
+  
+  func makeIterator() -> Iterator {
+    return Iterator(
+      parsing: Unicode.ParsingIterator(
+        codeUnits: codeUnits.makeIterator(),
+        decoder: Encoding.ForwardDecoder()
+      ))
+  }
+}
+
+extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
+  mutating func next() -> UnicodeScalar? {
+    return parsing.next().map {
+      Encoding.ForwardDecoder.decodeOne($0)
+    }
+  }
+}
+
+extension Unicode.DefaultScalarView {
+  struct Index {
+    var codeUnitIndex: CodeUnits.Index
+    var scalar: UnicodeScalar
+    var stride: UInt8
+  }
+}
+
+extension Unicode.DefaultScalarView.Index : Comparable {
+  @inline(__always)
+  public static func < (
+    lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
+    rhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
+  ) -> Bool {
+    return lhs.codeUnitIndex < rhs.codeUnitIndex
+  }
+  
+  @inline(__always)
+  public static func == (
+    lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
+    rhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
+  ) -> Bool {
+    return lhs.codeUnitIndex == rhs.codeUnitIndex
+  }
+}
+
+extension Unicode.DefaultScalarView : Collection {
+  public var startIndex: Index {
+    @inline(__always)
+    get {
+      return index(
+        after: Index(
+          codeUnitIndex: codeUnits.startIndex,
+          scalar: UnicodeScalar(_unchecked: 0),
+          stride: 0)
+      )
+    }
+  }
+
+  public var endIndex: Index {
+    @inline(__always)
+    get {
+      return Index(
+        codeUnitIndex: codeUnits.endIndex,
+        scalar: UnicodeScalar(_unchecked: 0),
+        stride: 0)
+    }
+  }
+
+  public subscript(i: Index) -> UnicodeScalar {
+    @inline(__always) get { return i.scalar }
+  }
+
+  @inline(__always)
+  public func index(after i: Index) -> Index {
+    let nextPosition = codeUnits.index(
+      i.codeUnitIndex, offsetBy: numericCast(i.stride))
+    var i = IndexingIterator(
+      _elements: codeUnits, _position: nextPosition
+    )
+    var d = Encoding.ForwardDecoder()
+    switch d.parseOne(&i) {
+    case .valid(let scalarContent):
+      return Index(
+        codeUnitIndex: nextPosition,
+        scalar: Encoding.ForwardDecoder.decodeOne(scalarContent),
+        stride: numericCast(scalarContent.count))
+    case .invalid(let stride):
+      return Index(
+        codeUnitIndex: nextPosition,
+        scalar: UnicodeScalar(_unchecked: 0xfffd),
+        stride: numericCast(stride))
+    case .emptyInput:
+      return endIndex
+    }
+  }
+}
+
+// This should go in the standard library; see
+// https://github.com/apple/swift/pull/9074 and
+// https://bugs.swift.org/browse/SR-4721
+@_fixed_layout
+public struct ReverseIndexingIterator<
+  Elements : BidirectionalCollection
+> : IteratorProtocol, Sequence {
+
+  @_inlineable
+  @inline(__always)
+  /// Creates an iterator over the given collection.
+  public /// @testable
+  init(_elements: Elements, _position: Elements.Index) {
+    self._elements = _elements
+    self._position = _position
+  }
+  
+  @_inlineable
+  @inline(__always)
+  public mutating func next() -> Elements._Element? {
+    guard _fastPath(_position != _elements.startIndex) else { return nil }
+    _position = _elements.index(before: _position)
+    return _elements[_position]
+  }
+  
+  @_versioned
+  internal let _elements: Elements
+  @_versioned
+  internal var _position: Elements.Index
+}
+
+extension Unicode.DefaultScalarView : BidirectionalCollection {
+  @inline(__always)
+  public func index(before i: Index) -> Index {
+    var d = Encoding.ReverseDecoder()
+    
+    var more = ReverseIndexingIterator(
+      _elements: codeUnits, _position: i.codeUnitIndex)
+    
+    switch d.parseOne(&more) {
+    case .valid(let scalarContent):
+      let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
+      return Index(
+        codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d),
+        scalar: Encoding.ReverseDecoder.decodeOne(scalarContent),
+        stride: numericCast(scalarContent.count))
+    case .invalid(let stride):
+      let d: CodeUnits.IndexDistance = -numericCast(stride)
+      return Index(
+        codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d) ,
+        scalar: UnicodeScalar(_unchecked: 0xfffd),
+        stride: numericCast(stride))
+    case .emptyInput: fatalError("index out of bounds.")
     }
   }
 }
@@ -109,181 +504,167 @@ public protocol UnicodeEncoding {
 }
 
 
-internal protocol _UTF8Decoder : UnicodeDecoder {
-  init()
-  var _buffer: UInt32 { get set }
-  var _bitsInBuffer: UInt8 { get set }
-  
-  func _validateBuffer() -> (valid: Bool, length: UInt8)
+public protocol _UTF8Decoder : UnicodeDecoder where Buffer == EncodedScalar {
+  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8)
+  var buffer: Buffer { get set }
 }
 
-extension _UTF8Decoder {
-  public var bufferLength: UInt8 { return _bitsInBuffer / 8 }
-}
-
-extension _UTF8Decoder {
+extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
   public mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
-  ) -> Unicode.ParseResult<UInt32> where I.Element == Unicode.UTF8.CodeUnit {
+  ) -> Unicode.ParseResult<EncodedScalar>
+    where I.Element == Unicode.UTF8.CodeUnit {
 
     // Bufferless ASCII fastpath.
-    if _fastPath(_bitsInBuffer == 0) {
+    if _fastPath(buffer.isEmpty) {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
       if codeUnit & 0x80 == 0 {
-        return .valid(UInt32(codeUnit), length: 1)
+        return .valid(EncodedScalar(containing: codeUnit))
       }
       // Non-ASCII, proceed to buffering mode.
-      _buffer = UInt32(extendingOrTruncating: codeUnit)
-      _bitsInBuffer = 8
-    } else if _buffer & 0x80 == 0 {
+      buffer.append(codeUnit)
+    } else if buffer._storage & 0x80 == 0 {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
-      let codeUnit = _buffer & 0xff
-      _buffer &>>= 8
-      _bitsInBuffer = _bitsInBuffer &- 8
-      return .valid(codeUnit, length: 1)
+      let codeUnit = UInt8(extendingOrTruncating: buffer._storage)
+      buffer.remove(at: buffer.startIndex)
+      return .valid(EncodedScalar(containing: codeUnit))
     }
     // Buffering mode.
     // Fill buffer back to 4 bytes (or as many as are left in the iterator).
-    _sanityCheck(_bitsInBuffer < 32)
+    _sanityCheck(buffer._bitCount < 32)
     repeat {
       if let codeUnit = input.next() {
-        _buffer |= UInt32(codeUnit) &<< _bitsInBuffer
-        _bitsInBuffer = _bitsInBuffer &+ 8
+        buffer.append(codeUnit)
       } else {
-        if _bitsInBuffer == 0 { return .emptyInput }
+        if buffer.isEmpty { return .emptyInput }
         break // We still have some bytes left in our buffer.
       }
-    } while _bitsInBuffer < 32
+    } while buffer._bitCount < 32
 
     // Find one unicode scalar.
-    // Note our empty bytes are always 0x00, which is required for this call.
-    let (valid, length) = _validateBuffer()
-
-    // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
-    let bitsConsumed = 8 &* length
-    _sanityCheck(1...4 ~= length && bitsConsumed <= _bitsInBuffer)
-    let savedBuffer = _buffer
+    let (isValid, scalarBitCount) = _parseNonASCII()
+    _sanityCheck(scalarBitCount % 8 == 0 && 1...4 ~= scalarBitCount / 8)
+    _sanityCheck(scalarBitCount <= buffer._bitCount)
     
-    _buffer = UInt32(
+    // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
+    var encodedScalar = buffer
+    encodedScalar._bitCount = scalarBitCount
+    
+    buffer._storage = UInt32(
       // widen to 64 bits so that we can empty the buffer in the 4-byte case
-      extendingOrTruncating: UInt64(_buffer) &>> bitsConsumed)
+      extendingOrTruncating: UInt64(buffer._storage) &>> scalarBitCount)
       
-    _bitsInBuffer = _bitsInBuffer &- bitsConsumed
+    buffer._bitCount = buffer._bitCount &- scalarBitCount
 
-    guard _fastPath(valid) else {
-      return .invalid(length: Int(length))
-    }
-    /*let mask = ~0 as UInt32 >> (32 - bitsConsumed)*/
-    return .valid(savedBuffer /*& mask*/, length: Int(length))
+    if _fastPath(isValid) { return .valid(encodedScalar) }
+    return .invalid(length: Int(scalarBitCount &>> 3))
   }
 }
 
 extension Unicode.UTF8 : UnicodeEncoding {
   public struct ForwardDecoder {
-    public init() { _buffer = 0; _bitsInBuffer = 0 }
-    var _buffer: UInt32
-    var _bitsInBuffer: UInt8
+    public typealias Buffer = _UIntBuffer<UInt32, UInt8>
+    public init() { buffer = Buffer() }
+    public var buffer: Buffer
   }
-
+  
   public struct ReverseDecoder {
-    public init() { _buffer = 0; _bitsInBuffer = 0 }
-    public init(_ other: ForwardDecoder) {
-      _bitsInBuffer = other._bitsInBuffer
-      _buffer = other._buffer.byteSwapped &>> (32 - _bitsInBuffer)
-    }
-    var _buffer: UInt32
-    var _bitsInBuffer: UInt8
+    public typealias Buffer = _UIntBuffer<UInt32, UInt8>
+    public init() { buffer = Buffer() }
+    public var buffer: Buffer
   }
 }
 
 extension UTF8.ReverseDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
+  public typealias EncodedScalar = Buffer
 
-  public static func scalar(buffer: UInt32, length: Int) -> UnicodeScalar {
-    switch length {
-    case 1:
-      return UnicodeScalar(_unchecked: buffer & 0xff)
-    case 2:
-      var value = buffer       & 0b0______________________11_1111
-      value    |= buffer &>> 2 & 0b0______________0111__1100_0000
+  public static var replacement : EncodedScalar {
+    return EncodedScalar(_storage: 0xefbfbd, _bitCount: 24)
+  }
+  
+  public static func decodeOne(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    switch source._bitCount {
+    case 8: return UnicodeScalar(_unchecked: bits)
+    case 16:
+      var value = bits       & 0b0______________________11_1111
+      value    |= bits &>> 2 & 0b0______________0111__1100_0000
       return UnicodeScalar(_unchecked: value)
-    case 3:
-      var value = buffer       & 0b0______________________11_1111
-      value    |= buffer &>> 2 & 0b0______________1111__1100_0000
-      value    |= buffer &>> 4 & 0b0_________1111_0000__0000_0000
+    case 24:
+      var value = bits       & 0b0______________________11_1111
+      value    |= bits &>> 2 & 0b0______________1111__1100_0000
+      value    |= bits &>> 4 & 0b0_________1111_0000__0000_0000
       return UnicodeScalar(_unchecked: value)
     default:
-      _sanityCheck(length == 4)
-      var value = buffer       & 0b0______________________11_1111
-      value    |= buffer &>> 2 & 0b0______________1111__1100_0000
-      value    |= buffer &>> 4 & 0b0_____11__1111_0000__0000_0000
-      value    |= buffer &>> 6 & 0b0_1_1100__0000_0000__0000_0000
+      _sanityCheck(source._bitCount == 32)
+      var value = bits       & 0b0______________________11_1111
+      value    |= bits &>> 2 & 0b0______________1111__1100_0000
+      value    |= bits &>> 4 & 0b0_____11__1111_0000__0000_0000
+      value    |= bits &>> 6 & 0b0_1_1100__0000_0000__0000_0000
       return UnicodeScalar(_unchecked: value)
     }
   }
   
   public // @testable
-  func _validateBuffer() -> (valid: Bool, length: UInt8) {
-    // FIXME: is this check eliminated when inlined into parseOne?
-    if _buffer & 0x80 == 0 {
-      return (true, 1)
-    }
-
-    if _buffer                & 0b0__1110_0000__1100_0000
-                             == 0b0__1100_0000__1000_0000 {
+  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
+    _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
+    if buffer._storage                & 0b0__1110_0000__1100_0000
+                                     == 0b0__1100_0000__1000_0000 {
       // 2-byte sequence.  Top 4 bits of decoded result must be nonzero
-      let top4Bits =  _buffer & 0b0__0001_1110__0000_0000
-      if _fastPath(top4Bits != 0) { return (true, 2) }
+      let top4Bits =  buffer._storage & 0b0__0001_1110__0000_0000
+      if _fastPath(top4Bits != 0) { return (true, 2*8) }
     }
-    else if _buffer           & 0b0__1111_0000__1100_0000__1100_0000
-                             == 0b0__1110_0000__1000_0000__1000_0000 {
+    else if buffer._storage     & 0b0__1111_0000__1100_0000__1100_0000
+                               == 0b0__1110_0000__1000_0000__1000_0000 {
       // 3-byte sequence. The top 5 bits of the decoded result must be nonzero
       // and not a surrogate
-      let top5Bits = _buffer &       0b0__1111__0010_0000__0000_0000
+      let top5Bits = buffer._storage & 0b0__1111__0010_0000__0000_0000
       if _fastPath(
-        top5Bits != 0 && top5Bits != 0b0__1101__0010_0000__0000_0000) {
-        return (true, 3)
+        top5Bits != 0 &&   top5Bits != 0b0__1101__0010_0000__0000_0000) {
+        return (true, 3*8)
       }
     }
-    else if _buffer          & 0b0__1111_1000__1100_0000__1100_0000__1100_0000
+    else if buffer._storage  & 0b0__1111_1000__1100_0000__1100_0000__1100_0000
                             == 0b0__1111_0000__1000_0000__1000_0000__1000_0000 {
       // Make sure the top 5 bits of the decoded result would be in range
-      let top5bits =      _buffer & 0b0__0111__0011_0000__0000_0000__0000_0000
+      let top5bits = buffer._storage
+                                  & 0b0__0111__0011_0000__0000_0000__0000_0000
       if _fastPath(
         top5bits != 0
         && top5bits <=              0b0__0100__0000_0000__0000_0000__0000_0000
-      ) { return (true, 4) }
+      ) { return (true, 4*8) }
     }
-    return (false, _invalidLength())
+    return (false, _invalidLength() &* 8)
   }
 
   /// Returns the length of the invalid sequence that ends with the LSB of
   /// buffer.
   @inline(never)
   func _invalidLength() -> UInt8 {
-    if _buffer & 0b0__1111_0000__1100_0000
-              == 0b0__1110_0000__1000_0000 {
+    if buffer._storage                 & 0b0__1111_0000__1100_0000
+                                      == 0b0__1110_0000__1000_0000 {
       // 2-byte prefix of 3-byte sequence. The top 5 bits of the decoded result
       // must be nonzero and not a surrogate
-      let top5Bits = _buffer        & 0b0__1111__0010_0000
-      if top5Bits != 0 && top5Bits != 0b0__1101__0010_0000 { return 2 }
+      let top5Bits = buffer._storage        & 0b0__1111__0010_0000
+      if top5Bits != 0 &&         top5Bits != 0b0__1101__0010_0000 { return 2 }
     }
-    else if _buffer & 0b1111_1000__1100_0000
-                   == 0b1111_0000__1000_0000
+    else if buffer._storage               & 0b1111_1000__1100_0000
+                                         == 0b1111_0000__1000_0000
     {
       // 2-byte prefix of 4-byte sequence
       // Make sure the top 5 bits of the decoded result would be in range
-      let top5bits =        _buffer & 0b0__0111__0011_0000
-      if top5bits != 0 && top5bits <= 0b0__0100__0000_0000 { return 2 }
+      let top5bits =        buffer._storage & 0b0__0111__0011_0000
+      if top5bits != 0 &&         top5bits <= 0b0__0100__0000_0000 { return 2 }
     }
-    else if _buffer & 0b0__1111_1000__1100_0000__1100_0000
-                   == 0b0__1111_0000__1000_0000__1000_0000 {
+    else if buffer._storage & 0b0__1111_1000__1100_0000__1100_0000
+                           == 0b0__1111_0000__1000_0000__1000_0000 {
       // 3-byte prefix of 4-byte sequence
       // Make sure the top 5 bits of the decoded result would be in range
-      let top5bits =        _buffer & 0b0__0111__0011_0000__0000_0000
-      if top5bits != 0 && top5bits <= 0b0__0100__0000_0000__0000_0000 {
+      let top5bits =        buffer._storage & 0b0__0111__0011_0000__0000_0000
+      if top5bits != 0 &&         top5bits <= 0b0__0100__0000_0000__0000_0000 {
         return 3
       }
     }
@@ -293,87 +674,89 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
 
 extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
+  public typealias EncodedScalar = Buffer
+  
+  public static var replacement : EncodedScalar {
+    return EncodedScalar(_storage: 0xbdbfef, _bitCount: 24)
+  }
   
   public // @testable
-  func _validateBuffer() -> (valid: Bool, length: UInt8) {
-    // This seems like it should be equivalent, but it isn't.  Figure out why.
-    // return Unicode.UTF8.ReverseDecoder(self)._validateBuffer()
-    if _buffer & 0x80 == 0 { // 1-byte sequence (ASCII), buffer: [ ... ... ... CU0 ].
-      return (true, 1)
-    }
-
-    if _buffer & 0b0__1100_0000__1110_0000
-              == 0b0__1000_0000__1100_0000 {
+  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
+    _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
+    
+    if buffer._storage & 0b0__1100_0000__1110_0000
+                      == 0b0__1000_0000__1100_0000 {
       // 2-byte sequence. At least one of the top 4 bits of the decoded result
       // must be nonzero.
-      if _fastPath(_buffer & 0b0_0001_1110 != 0) { return (true, 2) }
+      if _fastPath(buffer._storage & 0b0_0001_1110 != 0) { return (true, 2*8) }
     }
-    else if _buffer & 0b0__1100_0000__1100_0000__1111_0000
-                   == 0b0__1000_0000__1000_0000__1110_0000 {
+    else if buffer._storage         & 0b0__1100_0000__1100_0000__1111_0000
+                                   == 0b0__1000_0000__1000_0000__1110_0000 {
       // 3-byte sequence. The top 5 bits of the decoded result must be nonzero
       // and not a surrogate
-      let top5Bits =                  _buffer & 0b0___0010_0000__0000_1111
+      let top5Bits =          buffer._storage & 0b0___0010_0000__0000_1111
       if _fastPath(top5Bits != 0 && top5Bits != 0b0___0010_0000__0000_1101) {
-        return (true, 3)
+        return (true, 3*8)
       }
     }
-    else if _buffer & 0b0__1100_0000__1100_0000__1100_0000__1111_1000
-                   == 0b0__1000_0000__1000_0000__1000_0000__1111_0000 {
+    else if buffer._storage & 0b0__1100_0000__1100_0000__1100_0000__1111_1000
+                           == 0b0__1000_0000__1000_0000__1000_0000__1111_0000 {
       // 4-byte sequence.  The top 5 bits of the decoded result must be nonzero
       // and no greater than 0b0__0100_0000
-      let top5bits = UInt16(_buffer       & 0b0__0011_0000__0000_0111)
+      let top5bits = UInt16(buffer._storage       & 0b0__0011_0000__0000_0111)
       if _fastPath(
         top5bits != 0
-        && top5bits.byteSwapped <=          0b0__0000_0100__0000_0000
-      ) { return (true, 4) }
+        && top5bits.byteSwapped                  <= 0b0__0000_0100__0000_0000
+      ) { return (true, 4*8) }
     }
-    return (false, _invalidLength())
+    return (false, _invalidLength() &* 8)
   }
 
   /// Returns the length of the invalid sequence that starts with the LSB of
   /// buffer.
   @inline(never)
   func _invalidLength() -> UInt8 {
-    if _buffer & 0b0__1100_0000__1111_0000
-              == 0b0__1000_0000__1110_0000 {
+    if buffer._storage               & 0b0__1100_0000__1111_0000
+                                    == 0b0__1000_0000__1110_0000 {
       // 2-byte prefix of 3-byte sequence. The top 5 bits of the decoded result
       // must be nonzero and not a surrogate
-      let top5Bits = _buffer        & 0b0__0010_0000__0000_1111
-      if top5Bits != 0 && top5Bits != 0b0__0010_0000__0000_1101 { return 2 }
+      let top5Bits = buffer._storage & 0b0__0010_0000__0000_1111
+      if top5Bits != 0 && top5Bits  != 0b0__0010_0000__0000_1101 { return 2 }
     }
-    else if _buffer & 0b0__1100_0000__1111_1000
-                   == 0b0__1000_0000__1111_0000
+    else if buffer._storage                & 0b0__1100_0000__1111_1000
+                                          == 0b0__1000_0000__1111_0000
     {
       // Prefix of 4-byte sequence. The top 5 bits of the decoded result
       // must be nonzero and no greater than 0b0__0100_0000
-      let top5bits = UInt16(_buffer & 0b0__0011_0000__0000_0111).byteSwapped
-      if top5bits != 0 && top5bits <= 0b0__0000_0100__0000_0000 {
-        return _buffer & 0b0__1100_0000__0000_0000__0000_0000
-                     ==  0b0__1000_0000__0000_0000__0000_0000 ? 3 : 2
+      let top5bits = UInt16(buffer._storage & 0b0__0011_0000__0000_0111).byteSwapped
+      if top5bits != 0 && top5bits         <= 0b0__0000_0100__0000_0000 {
+        return buffer._storage   & 0b0__1100_0000__0000_0000__0000_0000
+                                == 0b0__1000_0000__0000_0000__0000_0000 ? 3 : 2
       }
     }
     return 1
   }
   
-  public static func scalar(buffer: UInt32, length: Int) -> UnicodeScalar {
-    switch length {
-    case 1:
-      return UnicodeScalar(_unchecked: buffer & 0xff)
-    case 2:
-      var value = (buffer & 0b0_______________________11_1111__0000_0000) &>> 8
-      value    |= (buffer & 0b0________________________________0001_1111) &<< 6
+  public static func decodeOne(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    switch source._bitCount {
+    case 8:
+      return UnicodeScalar(_unchecked: bits)
+    case 16:
+      var value = (bits & 0b0_______________________11_1111__0000_0000) &>> 8
+      value    |= (bits & 0b0________________________________0001_1111) &<< 6
       return UnicodeScalar(_unchecked: value)
-    case 3:
-      var value = (buffer & 0b0____________11_1111__0000_0000__0000_0000) &>> 16
-      value    |= (buffer & 0b0_______________________11_1111__0000_0000) &>> 2
-      value    |= (buffer & 0b0________________________________0000_1111) &<< 12
+    case 24:
+      var value = (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 16
+      value    |= (bits & 0b0_______________________11_1111__0000_0000) &>> 2
+      value    |= (bits & 0b0________________________________0000_1111) &<< 12
       return UnicodeScalar(_unchecked: value)
     default:
-      _sanityCheck(length == 4)
-      var value = (buffer & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
-      value    |= (buffer & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
-      value    |= (buffer & 0b0_______________________11_1111__0000_0000) &<< 4
-      value    |= (buffer & 0b0________________________________0000_0111) &<< 18
+      _sanityCheck(source.count == 4)
+      var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
+      value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
+      value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
+      value    |= (bits & 0b0________________________________0000_0111) &<< 18
       return UnicodeScalar(_unchecked: value)
     }
   }
@@ -474,6 +857,27 @@ func checkDecodeUTF8(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
 ) -> AssertionResult {
+  var expected: [UnicodeScalar] = []
+  do {
+    var i = utf8Str.makeIterator()
+    UTF8.ForwardDecoder.decode(&i, repairingIllFormedSequences: true) {
+      expected.append($0)
+    }
+  }
+  
+  let scalars = Unicode.DefaultScalarView(utf8Str, fromEncoding: UTF8.self)
+  expectEqualSequence(expected, scalars)
+  expectEqualSequence(expected.reversed(), scalars.reversed())
+  
+  do {
+    var x = scalars.makeIterator()
+    var j = scalars.startIndex
+    while (j != scalars.endIndex) {
+      expectEqual(x.next()!, scalars[j])
+      j = scalars.index(after: j)
+    }
+    expectNil(x.next())
+  }
   return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 }
 
@@ -2098,13 +2502,32 @@ public func run_UTF8Decode(_ N: Int) {
   #if FORWARD
       var it = string.makeIterator()
       typealias D = UTF8.ForwardDecoder
+      D.decode(&it, repairingIllFormedSequences: true) { total = total &+ $0.value }
   #elseif REVERSE
       var it = string.reversed().makeIterator()
       typealias D = UTF8.ReverseDecoder
+      D.decode(&it, repairingIllFormedSequences: true) { total = total &+ $0.value }
+  #elseif SEQUENCE
+      for s in Unicode.DefaultScalarView(string, fromEncoding: UTF8.self) {
+        total = total &+ s.value
+      }
+  #elseif COLLECTION
+      let scalars = Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
+      var i = scalars.startIndex
+      while i != scalars.endIndex {
+        total = total &+ scalars[i].value
+        i = scalars.index(after: i)
+      }
+#elseif REVERSE_COLLECTION
+      let scalars = Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
+      var i = scalars.endIndex
+      while i != scalars.startIndex {
+        i = scalars.index(before: i)
+        total = total &+ scalars[i].value
+      }
   #else
       Error_Unknown_Benchmark()
   #endif
-      D.decode(&it, repairingIllFormedSequences: true) { total = total &+ $0.value }
 #endif
     }
   }

@@ -1194,6 +1194,32 @@ namespace importer {
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
+    if (!alias->isCompatibilityAlias())
+      return nullptr;
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  }
+  return dyn_cast_or_null<T>(D);
+}
+
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *castIgnoringCompatibilityAlias(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
+    assert(alias->isCompatibilityAlias() &&
+           "non-compatible typealias found where nominal was expected");
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  }
+  return cast_or_null<T>(D);
+}
+
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;

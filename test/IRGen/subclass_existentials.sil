@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-subclass-existentials | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK
 
 sil_stage canonical
 
@@ -93,7 +93,7 @@ sil @checkExistentialDowncast : $@convention(thin) (@owned C, @owned C & P) -> (
 bb0(%0 : $C, %1 : $C & P):
 
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
-// CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align 8
+// CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %0 to i8*
 // CHECK-NEXT:  [[SUPERCLASS:%.*]] = call %swift.type* @_T021subclass_existentials1DCMa()
 // CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.type* [[SUPERCLASS]], %swift.protocol* @_T021subclass_existentials1RMp)
@@ -144,7 +144,7 @@ sil @checkExistentialSameClassDowncast : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
 
 // CHECK:       [[METATYPE_PTR:%.*]] = bitcast %T21subclass_existentials1CC* %0 to %swift.type**
-// CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align 8
+// CHECK-NEXT:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_PTR]], align {{4|8}}
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %0 to i8*
 // CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[VALUE]], %swift.type* [[METATYPE]], %swift.protocol* @_T021subclass_existentials1PMp)
 // CHECK-NEXT:  [[VALUE_ADDR:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0

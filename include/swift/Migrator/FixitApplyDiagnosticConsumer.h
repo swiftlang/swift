@@ -34,10 +34,6 @@ class FixitApplyDiagnosticConsumer final
   : public DiagnosticConsumer, public FixitFilter {
   clang::RewriteBuffer RewriteBuf;
 
-  /// The Migrator options collected by the Swift CompilerInvocation,
-  /// used to drive decisions about which fix-its to apply.
-  const MigratorOptions &MigratorOpts;
-
   /// The entire text of the input file.
   const StringRef Text;
 
@@ -50,8 +46,7 @@ class FixitApplyDiagnosticConsumer final
   unsigned NumFixitsApplied;
 
 public:
-  FixitApplyDiagnosticConsumer(const MigratorOptions &MigratorOpts,
-                               const StringRef Text,
+  FixitApplyDiagnosticConsumer(const StringRef Text,
                                const StringRef BufferName);
 
   /// Print the resulting text, applying the caught fix-its to the given

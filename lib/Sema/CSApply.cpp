@@ -897,18 +897,19 @@ namespace {
 
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
-        auto selfParamTy = selfTy;
+        auto selfParamTy = isDynamic ? selfTy : containerTy;
 
         if (selfTy->isEqual(baseTy))
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
+
         base = coerceObjectArgumentToType(
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(selfTy),
+                            MetatypeType::get(isDynamic ? selfTy : containerTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -1347,8 +1348,6 @@ namespace {
       }
 
       // Figure out the index and result types.
-      auto containerTy
-        = subscript->getDeclContext()->getDeclaredTypeOfContext();
       auto subscriptTy = simplifyType(selected->openedType);
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
@@ -1362,7 +1361,6 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
-        containerTy = baseTy;
       }
 
       // Coerce the index argument.
@@ -1407,7 +1405,7 @@ namespace {
       // Convert the base.
       auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
       auto openedBaseType = openedFullFnType->getInput();
-      containerTy = solution.simplifyType(openedBaseType);
+      auto containerTy = solution.simplifyType(openedBaseType);
       base = coerceObjectArgumentToType(
         base, containerTy, subscript, AccessSemantics::Ordinary,
         locator.withPathElement(ConstraintLocator::MemberRefBase));
@@ -5064,6 +5062,41 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   return cs.cacheType(new (ctx) ErasureExpr(expr, toType, conformances));
 }
 
+/// Given that the given expression is an implicit conversion added
+/// to the target by coerceToType, find out how many OptionalEvaluationExprs
+/// it includes and the target.
+static unsigned getOptionalEvaluationDepth(Expr *expr, Expr *target) {
+  unsigned depth = 0;
+  while (true) {
+    // Look through sugar expressions.
+    expr = expr->getSemanticsProvidingExpr();
+
+    // If we find the target expression, we're done.
+    if (expr == target) return depth;
+
+    // If we see an optional evaluation, the depth goes up.
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
+      depth++;
+      expr = optEval->getSubExpr();
+
+    // We have to handle any other expressions that can be introduced by
+    // coerceToType.
+    } else if (auto bind = dyn_cast<BindOptionalExpr>(expr)) {
+      expr = bind->getSubExpr();
+    } else if (auto force = dyn_cast<ForceValueExpr>(expr)) {
+      expr = force->getSubExpr();
+    } else if (auto open = dyn_cast<OpenExistentialExpr>(expr)) {
+      depth += getOptionalEvaluationDepth(open->getSubExpr(),
+                                          open->getOpaqueValue());
+      expr = open->getExistentialValue();
+
+    // Otherwise, look through implicit conversions.
+    } else {
+      expr = cast<ImplicitConversionExpr>(expr)->getSubExpr();
+    }
+  }
+}
+
 Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
                                              ConstraintLocatorBuilder locator,
                                           Optional<Pattern*> typeFromPattern) {
@@ -5101,13 +5134,18 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   Type fromValueType = fromType->getAnyOptionalObjectType();
   Type toValueType = toType->getAnyOptionalObjectType();
 
-  expr =
-    cs.cacheType(new (tc.Context) BindOptionalExpr(expr,
-                                                   expr->getSourceRange().End,
-                                                   /*depth*/ 0, fromValueType));
+  // The depth we use here will get patched after we apply the coercion.
+  auto bindOptional =
+    new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
+                                      /*depth*/ 0, fromValueType);
+
+  expr = cs.cacheType(bindOptional);
   expr->setImplicit(true);
   expr = coerceToType(expr, toValueType, locator, typeFromPattern);
   if (!expr) return nullptr;
+
+  unsigned depth = getOptionalEvaluationDepth(expr, bindOptional);
+  bindOptional->setDepth(depth);
       
   expr = cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(expr, toType));
       

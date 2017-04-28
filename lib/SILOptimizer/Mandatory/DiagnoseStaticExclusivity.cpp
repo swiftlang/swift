@@ -95,7 +95,7 @@ private:
 ///
 /// The key invariant that this class must maintain is that if it says
 /// two storage locations are the same then they must be the same at run time.
-/// It is  allowed to err on the other side: it may imprecisely fail to
+/// It is allowed to err on the other side: it may imprecisely fail to
 /// recognize that two storage locations that represent the same run-time
 /// location are in fact the same.
 class AccessedStorage {
@@ -138,7 +138,7 @@ public:
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
-  /// determined. Otherwise returns null. For diagonostic purposes.
+  /// determined. Otherwise returns null. For diagnostic purposes.
   const ValueDecl *getStorageDecl() const {
     switch(Kind) {
     case AccessedStorageKind::GlobalVar:
