@@ -253,8 +253,9 @@ void printReplacement(const StringRef Filename,
   OS.write_escaped(Filename);
   OS << "\",\n";
 
-  OS << "    \"offset\": " << Rep.Offset << ",\n";
+  OS << "    \"offset\": " << Rep.Offset;
   if (Rep.Remove > 0) {
+    OS << ",\n";
     OS << "    \"remove\": " << Rep.Remove;
   }
   if (!Rep.Text.empty()) {
@@ -284,7 +285,7 @@ void printRemap(const StringRef OriginalFilename,
   diff_match_patch<std::string> DMP;
   const auto Diffs = DMP.diff_main(InputText, OutputText);
 
-  OS << "[\n";
+  OS << "[";
 
   size_t Offset = 0;
 
@@ -299,12 +300,14 @@ void printRemap(const StringRef OriginalFilename,
       case decltype(DMP)::INSERT:
         if (!Replacements.empty()) {
           auto &Prev = Replacements.back();
-          if (Prev.isRemove() && Prev.endOffset() == Offset) {
-            Prev.Text = Diff.text;
-            break;
-          } else if (Prev.isInsert()) {
-            Prev.Text += Diff.text;
-            break;
+          if (Prev.endOffset() == Offset) {
+            if (Prev.isRemove()) {
+              Prev.Text = Diff.text;
+              break;
+            } else if (Prev.isInsert()) {
+              Prev.Text += Diff.text;
+              break;
+            }
           }
         }
         Replacements.push_back({ Offset, 0, Diff.text });
@@ -312,12 +315,14 @@ void printRemap(const StringRef OriginalFilename,
       case decltype(DMP)::DELETE:
         if (!Replacements.empty()) {
           auto &Prev = Replacements.back();
-          if (Prev.isInsert() && Prev.endOffset() == Offset) {
-            Prev.Remove = Diff.text.size();
-            break;
-          } else if (Prev.isRemove()) {
-            Prev.Remove += Diff.text.size();
-            break;
+          if (Prev.endOffset() == Offset) {
+            if (Prev.isInsert()) {
+              Prev.Remove = Diff.text.size();
+              break;
+            } else if (Prev.isRemove()) {
+              Prev.Remove += Diff.text.size();
+              break;
+            }
           }
         }
         Replacements.push_back({ Offset, Diff.text.size(), "" });
