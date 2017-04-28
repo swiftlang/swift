@@ -125,16 +125,22 @@ class TypeDecoder {
     case NodeKind::ProtocolList: {
       std::vector<BuiltType> protocols;
       auto TypeList = Node->getChild(0);
+      bool hasExplicitAnyObject = false;
       for (auto componentType : *TypeList) {
         if (auto protocol = decodeMangledType(componentType))
           protocols.push_back(protocol);
         else
           return BuiltType();
       }
-      if (protocols.size() == 1)
+      if (protocols.size() == 1 && !hasExplicitAnyObject)
         return protocols.front();
       else
-        return Builder.createProtocolCompositionType(protocols);
+        return Builder.createProtocolCompositionType(protocols,
+                                                     hasExplicitAnyObject);
+    }
+    case NodeKind::ProtocolListWithClass: {
+      // FIXME
+      abort();
     }
     case NodeKind::Protocol: {
       auto moduleName = Node->getChild(0)->getText();
@@ -725,6 +731,10 @@ public:
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta);
       std::vector<BuiltType> Protocols;
+      bool HasExplicitAnyObject = false;
+
+      // FIXME: Handle HasExplicitAnyObject
+
       for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
         auto ProtocolAddress = Exist->Protocols[i];
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
@@ -743,7 +753,8 @@ public:
 
         Protocols.push_back(Protocol);
       }
-      auto BuiltExist = Builder.createProtocolCompositionType(Protocols);
+      auto BuiltExist = Builder.createProtocolCompositionType(
+        Protocols, HasExplicitAnyObject);
       TypeCache[MetadataAddress] = BuiltExist;
       return BuiltExist;
     }

@@ -4283,9 +4283,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByStringLiteral,
                               expr) ||
-    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::AnyObject,
-                              expr) ||
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
     addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
     break;

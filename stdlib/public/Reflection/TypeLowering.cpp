@@ -213,6 +213,11 @@ class ExistentialTypeInfoBuilder {
   bool Invalid;
 
   bool isSingleError() const {
+    // If we changed representation, it means we added a
+    // superclass constraint or an AnyObject member.
+    if (Representation != ExistentialTypeRepresentation::Opaque)
+      return false;
+
     if (Protocols.size() != 1)
       return false;
 
@@ -231,13 +236,6 @@ class ExistentialTypeInfoBuilder {
     }
 
     for (auto *P : Protocols) {
-      // FIXME: AnyObject should go away
-      if (P->isAnyObject()) {
-        Representation = ExistentialTypeRepresentation::Class;
-        // No extra witness table for AnyObject
-        continue;
-      }
-
       const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(P);
       if (FD == nullptr) {
         DEBUG(std::cerr << "No field descriptor: "; P->dump())
@@ -273,13 +271,65 @@ public:
     : TC(TC), Representation(ExistentialTypeRepresentation::Opaque),
       ObjC(false), WitnessTableCount(0), Invalid(false) {}
 
-  void addProtocol(const TypeRef *TR) {
-    if (auto *P = dyn_cast<const ProtocolTypeRef>(TR)) {
-      Protocols.push_back(P);
-    } else {
-      DEBUG(std::cerr << "Not a protocol: "; TR->dump())
-      Invalid = true;
+  void addProtocol(const ProtocolTypeRef *P) {
+    // FIXME: AnyObject should go away
+    if (P->isAnyObject()) {
+      Representation = ExistentialTypeRepresentation::Class;
+      // No extra witness table for AnyObject
+      return;
     }
+
+    Protocols.push_back(P);
+  }
+
+  void addProtocolComposition(const ProtocolCompositionTypeRef *PC) {
+    for (auto *T : PC->getMembers()) {
+      if (auto *P = dyn_cast<ProtocolTypeRef>(T)) {
+        addProtocol(P);
+        continue;
+      }
+
+      if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(T)) {
+        addProtocolComposition(PC);
+        continue;
+      }
+
+      // Anything else should either be a superclass constraint, or
+      // we have an invalid typeref.
+      if (!isa<NominalTypeRef>(T) &&
+          !isa<BoundGenericTypeRef>(T)) {
+        DEBUG(std::cerr << "Bad existential member: "; T->dump())
+        Invalid = true;
+        continue;
+      }
+      auto *FD = TC.getBuilder().getFieldTypeInfo(T);
+      if (FD == nullptr) {
+        DEBUG(std::cerr << "No field descriptor: "; T->dump())
+        Invalid = true;
+        continue;
+      }
+      if (FD->Kind != FieldDescriptorKind::ObjCClass &&
+          FD->Kind != FieldDescriptorKind::Class) {
+        DEBUG(std::cerr << "Bad existential member: "; T->dump())
+        Invalid = true;
+        continue;
+      }
+
+      // We have a valid superclass constraint. It only affects
+      // lowering by class-constraining the entire existential.
+      addAnyObject();
+    }
+
+    if (PC->hasExplicitAnyObject())
+      addAnyObject();
+  }
+
+  void addAnyObject() {
+    Representation = ExistentialTypeRepresentation::Class;
+  }
+
+  void markInvalid() {
+    Invalid = true;
   }
 
   const TypeInfo *build() {
@@ -1086,8 +1136,7 @@ public:
   const TypeInfo *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     ExistentialTypeInfoBuilder builder(TC);
-    for (auto *P : PC->getProtocols())
-      builder.addProtocol(P);
+    builder.addProtocolComposition(PC);
     return builder.build();
   }
 
@@ -1113,8 +1162,7 @@ public:
     if (auto *P = dyn_cast<ProtocolTypeRef>(TR)) {
       builder.addProtocol(P);
     } else if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
-      for (auto *P : PC->getProtocols())
-        builder.addProtocol(P);
+      builder.addProtocolComposition(PC);
     } else {
       DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());
       return nullptr;

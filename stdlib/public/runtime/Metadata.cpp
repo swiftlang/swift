@@ -2282,7 +2282,6 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
 #endif
       
   // Other existentials use standard representation.
-  case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
   }
@@ -2305,7 +2304,6 @@ ExistentialTypeMetadata::getRepresentation() const {
   switch (Flags.getSpecialProtocol()) {
   case SpecialProtocol::Error:
     return ExistentialTypeRepresentation::Error;
-  case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
   }

@@ -500,6 +500,9 @@ Type TypeChecker::resolveTypeInContext(
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    if (genericParam->getDepth() == GenericTypeParamDecl::InvalidDepth)
+      return ErrorType::get(Context);
+
     return resolver->resolveGenericTypeParamType(
         genericParam->getDeclaredInterfaceType()
             ->castTo<GenericTypeParamType>());
@@ -1268,7 +1271,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (options & TR_NonEnumInheritanceClauseOuterLayer) {
       auto protocolOrClass =
           hasError ? (isa<ProtocolDecl>(typeDecl) || isa<ClassDecl>(typeDecl))
-                   : (type->is<ProtocolType>() || type->is<ClassType>());
+                   : (type->isExistentialType() || type->is<ClassType>());
       if (!protocolOrClass) {
         auto diagnosedType = hasError ? typeDecl->getDeclaredInterfaceType() : type;
         if (diagnosedType && /*FIXME:*/!hasError) {
@@ -1530,7 +1533,7 @@ static Type resolveNestedIdentTypeComponent(
 
   if (options & TR_NonEnumInheritanceClauseOuterLayer) {
     auto protocolOrClass =
-        memberType->is<ProtocolType>() || memberType->is<ClassType>();
+        memberType->isExistentialType() || memberType->is<ClassType>();
     if (!protocolOrClass) {
       TC.diagnose(comp->getIdLoc(),
                   diag::inheritance_from_non_protocol_or_class, memberType);

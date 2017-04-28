@@ -848,6 +848,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       result.InvolvesTypeVariables = true;
       continue;
 
+    case ConstraintKind::Layout:
+      continue;
+
     case ConstraintKind::ConformsTo:
     case ConstraintKind::SelfObjectOfProtocol:
       // Swift 3 allowed the use of default types for normal conformances

@@ -2842,25 +2842,33 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
+  if (!isRequirementSignatureComputed()) {
+    ProtocolDeclBits.RequiresClass =
+      walkInheritedProtocols([&](ProtocolDecl *proto) {
+          // If the 'requires class' bit is valid, we don't need to search any
+          // further.
+          if (proto->ProtocolDeclBits.RequiresClassValid) {
+            // If this protocol has a class requirement, we're done.
+            if (proto->ProtocolDeclBits.RequiresClass)
+              return TypeWalker::Action::Stop;
+
+            return TypeWalker::Action::SkipChildren;
+          }
+
+          // Quick check: @objc indicates that it requires a class.
+          if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC())
+            return TypeWalker::Action::Stop;
+
+          // Keep looking.
+          return TypeWalker::Action::Continue;
+        });
+    return ProtocolDeclBits.RequiresClass;
+  }
+
+  auto selfType = getProtocolSelfType();
   ProtocolDeclBits.RequiresClass =
-    walkInheritedProtocols([&](ProtocolDecl *proto) {
-      // If the 'requires class' bit is valid, we don't need to search any
-      // further.
-      if (proto->ProtocolDeclBits.RequiresClassValid) {
-        // If this protocol has a class requirement, we're done.
-        if (proto->ProtocolDeclBits.RequiresClass)
-          return TypeWalker::Action::Stop;
-
-        return TypeWalker::Action::SkipChildren;
-      }
-
-      // Quick check: @objc indicates that it requires a class.
-      if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC())
-        return TypeWalker::Action::Stop;
-
-      // Keep looking.
-      return TypeWalker::Action::Continue;
-    });
+    getRequirementSignature()->requiresClass(selfType, *getParentModule());
+  ProtocolDeclBits.RequiresClassValid = true;
 
   return ProtocolDeclBits.RequiresClass;
 }
@@ -2870,9 +2878,6 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   // prevents circularity issues.
   ProtocolDeclBits.ExistentialConformsToSelfValid = true;
   ProtocolDeclBits.ExistentialConformsToSelf = true;
-
-  if (isSpecificProtocol(KnownProtocolKind::AnyObject))
-    return true;
 
   if (!isObjC()) {
     ProtocolDeclBits.ExistentialConformsToSelf = false;
