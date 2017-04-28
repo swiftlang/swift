@@ -163,12 +163,10 @@ SubclassExistentialsTestSuite.test("Metadata instantiation") {
 
 // FIXME: Not implemented yet
 
-/*
 SubclassExistentialsTestSuite.test("Metadata to string") {
   expectEqual("Base<Int> & P", String(describing: ((Base<Int>) & P).self))
   expectEqual("Base<Int> & P & Q", String(describing: ((Base<Int>) & P & Q).self))
 }
-*/
 
 SubclassExistentialsTestSuite.test("Call instance methods") {
   do {
