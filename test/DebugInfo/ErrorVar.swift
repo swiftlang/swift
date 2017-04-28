@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // REQUIRES: CPU=i386
-// REQUIRES: rdar_31886890
 class Obj {}
 
 enum MyError : Error {
@@ -15,9 +14,10 @@ func simple(_ placeholder: Int64) throws -> () {
   // CHECK: define {{.*}}void @_T08ErrorVar6simpleys5Int64VKF(i64, %swift.refcounted* swiftself, %swift.error**)
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[ERROR:[0-9]+]], metadata ![[DEREF:[0-9]+]])
+  // CHECK: ![[ERRTY:.*]] = !DICompositeType({{.*}}identifier: "_T0s5Error_pD"
   // CHECK: ![[ERROR]] = !DILocalVariable(name: "$error", arg: 2,
-  // CHECK-SAME:              type: ![[ERRTY:.*]], flags: DIFlagArtificial)
-  // CHECK: ![[ERRTY]] = !DICompositeType({{.*}}identifier: "_T0s5Error_pD"
+  // CHECK-SAME:                          type: ![[ERRTY]],
+  // CHECK-SAME:                          flags: DIFlagArtificial)
   // CHECK: ![[DEREF]] = !DIExpression(DW_OP_deref)
   throw MyError.Simple
 }
