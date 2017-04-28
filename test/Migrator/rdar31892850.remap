@@ -1,0 +1,12 @@
+[
+  {
+    "file": "/Users/nhawes/workspace/swift-workspace/swift/test/Migrator/rdar31892850.swift",
+    "offset": 309,
+    "text": "SomeStringEnum(rawValue: "
+  },
+  {
+    "file": "/Users/nhawes/workspace/swift-workspace/swift/test/Migrator/rdar31892850.swift",
+    "offset": 313,
+    "text": ")!"
+  }
+]
