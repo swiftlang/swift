@@ -14,7 +14,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Index/Index.h"
+#include "swift/Index/Utils.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"

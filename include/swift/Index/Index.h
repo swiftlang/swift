@@ -20,14 +20,6 @@ class ModuleDecl;
 class SourceFile;
 class DeclContext;
 
-// Get decls that the given decl overrides, protocol requirements that it
-// serves as a default implementation of, and optionally (as it is more
-// expensive) protocol requirements it satisfies in a conforming class
-std::vector<ValueDecl*>
-getOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements = true,
-                   bool Transitive = false);
-
-
 namespace index {
 
 void indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer);
