@@ -1436,6 +1436,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     return false;
 
   SWIFT_FUNC_STAT;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)

@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -888,6 +889,11 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ++NumLazyIterableDeclContexts;
   ++NumUnloadedLazyIterableDeclContexts;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (ctx.Stats) {
+    ++ctx.Stats->getFrontendCounters().NumLazyIterableDeclContexts;
+    ++ctx.Stats->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
+  }
 }
 
 void IterableDeclContext::loadAllMembers() const {
@@ -915,6 +921,9 @@ void IterableDeclContext::loadAllMembers() const {
                                       contextInfo->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
+  // FIXME: (transitional) decrement the redundant "always-on" counter.
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumUnloadedLazyIterableDeclContexts--;
 }
 
 bool IterableDeclContext::classof(const Decl *D) {

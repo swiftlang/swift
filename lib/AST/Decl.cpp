@@ -43,6 +43,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Statistic.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -672,6 +673,9 @@ GenericContext::getLazyGenericEnvironmentSlow() const {
 
   const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
   ++NumLazyGenericEnvironmentsLoaded;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironmentsLoaded++;
   return genericEnv;
 }
 
@@ -686,6 +690,10 @@ void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
   contextData->genericEnvData = genericEnvData;
 
   ++NumLazyGenericEnvironments;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironments++;
+
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
