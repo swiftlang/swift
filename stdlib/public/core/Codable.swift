@@ -1833,6 +1833,14 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
         self.rawValue = rawValue
     }
 
+    /// Returns whether the given keys are equal.
+    ///
+    /// - parameter lhs: The key to compare against.
+    /// - parameter rhs: The key to compare with.
+    public static func ==(_ lhs: CodingUserInfoKey, _ rhs: CodingUserInfoKey) -> Bool {
+        return lhs.rawValue == rhs.rawValue
+    }
+
     /// The key's hash value.
     public var hashValue: Int {
         return self.rawValue.hashValue
@@ -2441,23 +2449,14 @@ extension String : Codable {
     }
 }
 
-public extension RawRepresentable where RawValue == Bool, Self : Codable {
-    public init(from decoder: Decoder) throws {
-      let decoded = try decoder.singleValueContainer().decode(RawValue.self)
-      guard let value = Self(rawValue: decoded) else {
-          throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot initialize \(Self.self) from invalid \(RawValue.self) value \(decoded)"))
-      }
-
-      self = value
-    }
-
+public extension RawRepresentable where RawValue == Bool, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Int, Self : Codable {
+public extension RawRepresentable where RawValue == Bool, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2466,14 +2465,16 @@ public extension RawRepresentable where RawValue == Int, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Int, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Int8, Self : Codable {
+public extension RawRepresentable where RawValue == Int, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2482,14 +2483,16 @@ public extension RawRepresentable where RawValue == Int8, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Int8, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Int16, Self : Codable {
+public extension RawRepresentable where RawValue == Int8, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2498,14 +2501,16 @@ public extension RawRepresentable where RawValue == Int16, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Int16, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Int32, Self : Codable {
+public extension RawRepresentable where RawValue == Int16, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2514,14 +2519,16 @@ public extension RawRepresentable where RawValue == Int32, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Int32, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Int64, Self : Codable {
+public extension RawRepresentable where RawValue == Int32, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2530,14 +2537,16 @@ public extension RawRepresentable where RawValue == Int64, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Int64, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == UInt, Self : Codable {
+public extension RawRepresentable where RawValue == Int64, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2546,14 +2555,16 @@ public extension RawRepresentable where RawValue == UInt, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == UInt, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == UInt8, Self : Codable {
+public extension RawRepresentable where RawValue == UInt, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2562,14 +2573,16 @@ public extension RawRepresentable where RawValue == UInt8, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == UInt8, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == UInt16, Self : Codable {
+public extension RawRepresentable where RawValue == UInt8, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2578,14 +2591,16 @@ public extension RawRepresentable where RawValue == UInt16, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == UInt16, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == UInt32, Self : Codable {
+public extension RawRepresentable where RawValue == UInt16, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2594,14 +2609,16 @@ public extension RawRepresentable where RawValue == UInt32, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == UInt32, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == UInt64, Self : Codable {
+public extension RawRepresentable where RawValue == UInt32, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2610,14 +2627,16 @@ public extension RawRepresentable where RawValue == UInt64, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == UInt64, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Float, Self : Codable {
+public extension RawRepresentable where RawValue == UInt64, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2626,14 +2645,16 @@ public extension RawRepresentable where RawValue == Float, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Float, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == Double, Self : Codable {
+public extension RawRepresentable where RawValue == Float, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2642,14 +2663,16 @@ public extension RawRepresentable where RawValue == Double, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == Double, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
     }
 }
 
-public extension RawRepresentable where RawValue == String, Self : Codable {
+public extension RawRepresentable where RawValue == Double, Self : Decodable {
     public init(from decoder: Decoder) throws {
       let decoded = try decoder.singleValueContainer().decode(RawValue.self)
       guard let value = Self(rawValue: decoded) else {
@@ -2658,10 +2681,23 @@ public extension RawRepresentable where RawValue == String, Self : Codable {
 
       self = value
     }
+}
 
+public extension RawRepresentable where RawValue == String, Self : Encodable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.rawValue)
+    }
+}
+
+public extension RawRepresentable where RawValue == String, Self : Decodable {
+    public init(from decoder: Decoder) throws {
+      let decoded = try decoder.singleValueContainer().decode(RawValue.self)
+      guard let value = Self(rawValue: decoded) else {
+          throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot initialize \(Self.self) from invalid \(RawValue.self) value \(decoded)"))
+      }
+
+      self = value
     }
 }
 
