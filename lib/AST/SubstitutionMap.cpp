@@ -33,9 +33,6 @@
 
 using namespace swift;
 
-SubstitutionMap::SubstitutionMap(GenericEnvironment *genericEnv)
-  : SubstitutionMap(genericEnv->getGenericSignature()) { }
-
 bool SubstitutionMap::hasArchetypes() const {
   for (auto &entry : subMap)
     if (entry.second->hasArchetype())

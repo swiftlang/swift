@@ -67,8 +67,6 @@ public:
   SubstitutionMap(GenericSignature *genericSig)
     : genericSig(genericSig) { }
 
-  SubstitutionMap(GenericEnvironment *genericEnv);
-
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.
   GenericSignature *getGenericSignature() const { return genericSig; }

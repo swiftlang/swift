@@ -357,7 +357,7 @@ SubstitutionMap
 GenericEnvironment::
 getSubstitutionMap(TypeSubstitutionFn subs,
                    LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap(const_cast<GenericEnvironment *>(this));
+  SubstitutionMap subMap(getGenericSignature());
 
   getGenericSignature()->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
