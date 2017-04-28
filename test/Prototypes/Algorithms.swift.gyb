@@ -70,7 +70,7 @@ extension MutableCollectionAlgorithms {
     var p = lhs.lowerBound
     var q = rhs.lowerBound
     repeat {
-      swap(&self[p], &self[q])
+      swapAt(p, q)
       formIndex(after: &p)
       formIndex(after: &q)
     }
@@ -195,7 +195,7 @@ extension MutableCollection where Self: BidirectionalCollection {
     var f = bounds.lowerBound
     var l = index(before: bounds.upperBound)
     while f < l {
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
       formIndex(before: &l)
     }
@@ -208,7 +208,7 @@ extension MutableCollection where Self: BidirectionalCollection {
     var l = endIndex
     while f != limit && l != limit {
       formIndex(before: &l)
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
     }
     return (f, l)

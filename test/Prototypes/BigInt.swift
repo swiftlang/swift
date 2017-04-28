@@ -888,7 +888,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     while !x.isZero {
       // Swap values to ensure that `x >= y`.
       if x._compareMagnitude(to: y) == .lessThan {
-        swap(&x, &y)
+        (x, y) = (y, x)
       }
 
       // Subtract smaller and remove any factors of two
