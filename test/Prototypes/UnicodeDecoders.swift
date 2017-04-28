@@ -503,31 +503,39 @@ public protocol UnicodeEncoding {
     where ReverseDecoder.CodeUnit == CodeUnit
 }
 
+public protocol _UTFDecoderBase : UnicodeDecoder
+where Buffer == EncodedScalar {
+  associatedtype BufferStorage = UInt32
+}
 
-public protocol _UTF8Decoder : UnicodeDecoder where Buffer == EncodedScalar {
-  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8)
+public protocol _UTFDecoder : _UTFDecoderBase
+where Buffer == _UIntBuffer<BufferStorage, CodeUnit>,
+  BufferStorage == UInt32
+{
+  static func _isScalar(_: CodeUnit) -> Bool
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   var buffer: Buffer { get set }
 }
 
-extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
+extension _UTFDecoder {
   public mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> Unicode.ParseResult<EncodedScalar>
-    where I.Element == Unicode.UTF8.CodeUnit {
+    where I.Element == CodeUnit {
 
-    // Bufferless ASCII fastpath.
+    // Bufferless single-scalar fastpath.
     if _fastPath(buffer.isEmpty) {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
-      if codeUnit & 0x80 == 0 {
+      if Self._isScalar(codeUnit) {
         return .valid(EncodedScalar(containing: codeUnit))
       }
       // Non-ASCII, proceed to buffering mode.
       buffer.append(codeUnit)
-    } else if buffer._storage & 0x80 == 0 {
+    } else if Self._isScalar(CodeUnit(extendingOrTruncating: buffer._storage)) {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
-      let codeUnit = UInt8(extendingOrTruncating: buffer._storage)
+      let codeUnit = CodeUnit(extendingOrTruncating: buffer._storage)
       buffer.remove(at: buffer.startIndex)
       return .valid(EncodedScalar(containing: codeUnit))
     }
@@ -544,8 +552,9 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     } while buffer._bitCount < 32
 
     // Find one unicode scalar.
-    let (isValid, scalarBitCount) = _parseNonASCII()
-    _sanityCheck(scalarBitCount % 8 == 0 && 1...4 ~= scalarBitCount / 8)
+    let (isValid, scalarBitCount) = _parseMultipleCodeUnits()
+    _sanityCheck(scalarBitCount % numericCast(CodeUnit.bitWidth) == 0)
+    _sanityCheck(1...4 ~= scalarBitCount / 8)
     _sanityCheck(scalarBitCount <= buffer._bitCount)
     
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
@@ -559,8 +568,21 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     buffer._bitCount = buffer._bitCount &- scalarBitCount
 
     if _fastPath(isValid) { return .valid(encodedScalar) }
-    return .invalid(length: Int(scalarBitCount &>> 3))
+    return .invalid(
+      length: Int(scalarBitCount / numericCast(CodeUnit.bitWidth)))
   }
+}
+
+//===----------------------------------------------------------------------===//
+//===--- UTF8 Decoders ----------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+public protocol _UTF8Decoder : _UTFDecoder {
+  var buffer: Buffer { get set }
+}
+
+extension _UTF8Decoder {
+  public static func _isScalar(_ x: CodeUnit) -> Bool { return x & 0x80 == 0 }
 }
 
 extension Unicode.UTF8 : UnicodeEncoding {
@@ -609,7 +631,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     if buffer._storage                & 0b0__1110_0000__1100_0000
                                      == 0b0__1100_0000__1000_0000 {
@@ -681,7 +703,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     
     if buffer._storage & 0b0__1100_0000__1110_0000
@@ -760,6 +782,82 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
       return UnicodeScalar(_unchecked: value)
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+//===--- UTF-16 Decoders --------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+public protocol _UTF16Decoder : _UTFDecoder where CodeUnit == UTF16.CodeUnit {
+  var buffer: Buffer { get set }
+  static var _surrogatePattern : UInt32 { get }
+}
+
+extension _UTF16Decoder {
+  public static var replacement : EncodedScalar {
+    return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
+  }
+  public static func _isScalar(_ x: CodeUnit) -> Bool {
+    return x & 0xf800 != 0xd800
+  }
+  public // @testable
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
+    _sanityCheck(  // this case handled elsewhere
+      !Self._isScalar(UInt16(extendingOrTruncating: buffer._storage)))
+    
+    if _fastPath(buffer._storage & 0xFC00_FC00 == Self._surrogatePattern) {
+      return (true, 2*16)
+    }
+    return (false, 1*16)
+  }
+}
+
+extension Unicode.UTF16 : UnicodeEncoding {
+  public struct ForwardDecoder {
+    public typealias Buffer = _UIntBuffer<UInt32, UInt16>
+    public init() { buffer = Buffer() }
+    public var buffer: Buffer
+  }
+  
+  public struct ReverseDecoder {
+    public typealias Buffer = _UIntBuffer<UInt32, UInt16>
+    public init() { buffer = Buffer() }
+    public var buffer: Buffer
+  }
+}
+
+extension UTF16.ReverseDecoder : _UTF16Decoder {
+  public typealias CodeUnit = UInt16
+  public typealias EncodedScalar = Buffer
+
+  public static var _surrogatePattern : UInt32 { return 0xD800_DC00 }
+  
+  public static func decodeOne(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    if _fastPath(source._bitCount == 16) {
+      return UnicodeScalar(_unchecked: bits & 0xffff)
+    }
+    _sanityCheck(source._bitCount == 32)
+    let value = 0x10000 + ((bits & 0x03ff0000) &>> 6 | (bits & 0x03ff))
+    return UnicodeScalar(_unchecked: value)
+  }  
+}
+
+extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
+  public typealias CodeUnit = UInt16
+  public typealias EncodedScalar = Buffer
+  
+  public static var _surrogatePattern : UInt32 { return 0xDC00_D800 }
+  
+  public static func decodeOne(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    if _fastPath(source._bitCount == 16) {
+      return UnicodeScalar(_unchecked: bits & 0xffff)
+    }
+    _sanityCheck(source._bitCount == 32)
+    let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
+    return UnicodeScalar(_unchecked: value)
+  }  
 }
 
 #if !BENCHMARK
@@ -850,25 +948,13 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
     else { expectNotEqual(0, errorCount) }
   }
   check(expected.reversed(), "reverse, repairing: true")
-  return result
-}
 
-func checkDecodeUTF8(
-    _ expectedHead: [UInt32],
-    _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
-) -> AssertionResult {
-  var expected: [UnicodeScalar] = []
-  do {
-    var i = utf8Str.makeIterator()
-    UTF8.ForwardDecoder.decode(&i, repairingIllFormedSequences: true) {
-      expected.append($0)
-    }
-  }
-  
-  let scalars = Unicode.DefaultScalarView(utf8Str, fromEncoding: UTF8.self)
-  expectEqualSequence(expected, scalars)
-  expectEqualSequence(expected.reversed(), scalars.reversed())
-  
+  let scalars = Unicode.DefaultScalarView(utfStr, fromEncoding: Codec.self)
+  expectEqualSequence(expected, scalars.map { $0.value })
+  expectEqualSequence(
+    expected.reversed(),
+    scalars.reversed().map { $0.value })
+
   do {
     var x = scalars.makeIterator()
     var j = scalars.startIndex
@@ -878,10 +964,16 @@ func checkDecodeUTF8(
     }
     expectNil(x.next())
   }
+  return result
+}
+
+func checkDecodeUTF8(
+    _ expectedHead: [UInt32],
+    _ expectedRepairedTail: [UInt32], _ utf8Str: [UInt8]
+) -> AssertionResult {
   return checkDecodeUTF(UTF8.self, expectedHead, expectedRepairedTail, utf8Str)
 }
 
-/*
 func checkDecodeUTF16(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf16Str: [UInt16]
@@ -890,6 +982,7 @@ func checkDecodeUTF16(
       utf16Str)
 }
 
+/*
 func checkDecodeUTF32(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf32Str: [UInt32]
@@ -2457,6 +2550,308 @@ UTF8Decoder.test("Noncharacters") {
   // U+FDFF
   expectTrue(checkDecodeUTF8([ 0xfdff ], [], [ 0xef, 0xb7, 0xbf ]))
 }
+
+var UTF16Decoder = TestSuite("UTF16Decoder")
+
+UTF16Decoder.test("UTF16.transcodedLength") {
+  do {
+    let u8: [UTF8.CodeUnit] = [ 0, 1, 2, 3, 4, 5 ]
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u8.makeIterator(),
+      decodedAs: UTF8.self,
+      repairingIllFormedSequences: false)!
+    expectEqual(6, count)
+    expectTrue(isASCII)
+  }
+
+  do {
+    // "€" == U+20AC.
+    let u8: [UTF8.CodeUnit] = [ 0xF0, 0xA4, 0xAD, 0xA2 ]
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u8.makeIterator(),
+      decodedAs: UTF8.self,
+      repairingIllFormedSequences: false)!
+    expectEqual(2, count)
+    expectFalse(isASCII)
+  }
+
+  do {
+    let u16: [UTF16.CodeUnit] = [ 6, 7, 8, 9, 10, 11 ]
+    let (count, isASCII) = UTF16.transcodedLength(
+      of: u16.makeIterator(),
+      decodedAs: UTF16.self,
+      repairingIllFormedSequences: false)!
+    expectEqual(6, count)
+    expectTrue(isASCII)
+  }
+}
+
+UTF16Decoder.test("Decoding1").forEach(in: utfTests) {
+  test in
+
+  expectTrue(
+    checkDecodeUTF16(
+      test.utf32, test.utf32RepairedTail, test.utf16),
+    stackTrace: test.loc.withCurrentLoc())
+  return ()
+}
+
+UTF16Decoder.test("Decoding2") {
+  for (name, batch) in utf16Tests {
+    print("Batch: \(name)")
+    for test in batch {
+      expectTrue(checkDecodeUTF16(test.scalarsHead, test.scalarsRepairedTail,
+          test.encoded), stackTrace: test.loc.withCurrentLoc())
+    }
+  }
+}
+
+public struct UTF16Test {
+  public let scalarsHead: [UInt32]
+  public let scalarsRepairedTail: [UInt32]
+  public let encoded: [UInt16]
+  public let loc: SourceLoc
+
+  public init(
+    _ scalarsHead: [UInt32], _ scalarsRepairedTail: [UInt32],
+    _ encoded: [UInt16],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.scalarsHead = scalarsHead
+    self.scalarsRepairedTail = scalarsRepairedTail
+    self.encoded = encoded
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public let utf16Tests = [
+  "Incomplete": [
+    //
+    // Incomplete sequences that end right before EOF.
+    //
+
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xFFFD ], [ 0xD800 ]),
+
+    // U+D800 (high-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xD800, 0xD800 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    UTF16Test([ 0x0041 ], [ 0xFFFD ], [ 0x0041, 0xD800 ]),
+
+    // U+10000 LINEAR B SYLLABLE B008 A
+    // U+D800 (high-surrogate)
+    UTF16Test(
+        [ 0x0001_0000 ], [ 0xFFFD ],
+        [ 0xD800, 0xDC00, 0xD800 ]),
+
+    //
+    // Incomplete sequences with more code units following them.
+    //
+
+    // U+D800 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test([], [ 0xFFFD, 0x0041 ], [ 0xD800, 0x0041 ]),
+
+    // U+D800 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [], [ 0xFFFD, 0x0001_0000 ],
+        [ 0xD800, 0xD800, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0x0041 ],
+        [ 0x0041, 0xD800, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0x0001_0000 ],
+        [ 0x0041, 0xD800, 0xD800, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0x0041 ],
+        [ 0x0041, 0xD800, 0xDB40, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0x0001_0000 ],
+        [ 0x0041, 0xD800, 0xDB40, 0xD800, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+DBFF (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0xFFFD, 0x0041 ],
+        [ 0x0041, 0xD800, 0xDB40, 0xDBFF, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+D800 (high-surrogate)
+    // U+DB40 (high-surrogate)
+    // U+DBFF (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0xFFFD, 0x0001_0000 ],
+        [ 0x0041, 0xD800, 0xDB40, 0xDBFF, 0xD800, 0xDC00 ]),
+  ],
+
+  "IllFormed": [
+    //
+    // Low-surrogate right before EOF.
+    //
+
+    // U+DC00 (low-surrogate)
+    UTF16Test([], [ 0xFFFD ], [ 0xDC00 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+DC00 (low-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDC00, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    UTF16Test([ 0x0041 ], [ 0xFFFD ], [ 0x0041, 0xDC00 ]),
+
+    // U+10000 LINEAR B SYLLABLE B008 A
+    // U+DC00 (low-surrogate)
+    UTF16Test(
+        [ 0x0001_0000 ], [ 0xFFFD ],
+        [ 0xD800, 0xDC00, 0xDC00 ]),
+
+    //
+    // Low-surrogate with more code units following it.
+    //
+
+    // U+DC00 (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test([], [ 0xFFFD, 0x0041 ], [ 0xDC00, 0x0041 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [], [ 0xFFFD, 0x0001_0000 ],
+        [ 0xDC00, 0xD800, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0x0041 ],
+        [ 0x0041, 0xDC00, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0x0001_0000 ],
+        [ 0x0041, 0xDC00, 0xD800, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0x0041 ],
+        [ 0x0041, 0xDC00, 0xDD00, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0x0001_0000 ],
+        [ 0x0041, 0xDC00, 0xDD00, 0xD800, 0xDC00 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+DFFF (low-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0xFFFD, 0x0041 ],
+        [ 0x0041, 0xDC00, 0xDD00, 0xDFFF, 0x0041 ]),
+
+    // U+0041 LATIN CAPITAL LETTER A
+    // U+DC00 (low-surrogate)
+    // U+DD00 (low-surrogate)
+    // U+DFFF (low-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [ 0x0041 ], [ 0xFFFD, 0xFFFD, 0xFFFD, 0x0001_0000 ],
+        [ 0x0041, 0xDC00, 0xDD00, 0xDFFF, 0xD800, 0xDC00 ]),
+
+    //
+    // Low-surrogate followed by high-surrogate.
+    //
+
+    // U+DC00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDC00, 0xD800 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+DB40 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDC00, 0xDB40 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+DBFF (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDC00, 0xDBFF ]),
+
+
+    // U+DD00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDD00, 0xD800 ]),
+
+    // U+DD00 (low-surrogate)
+    // U+DB40 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDD00, 0xDB40 ]),
+
+    // U+DD00 (low-surrogate)
+    // U+DBFF (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDD00, 0xDBFF ]),
+
+
+    // U+DFFF (low-surrogate)
+    // U+D800 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDFFF, 0xD800 ]),
+
+    // U+DFFF (low-surrogate)
+    // U+DB40 (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDFFF, 0xDB40 ]),
+
+    // U+DFFF (low-surrogate)
+    // U+DBFF (high-surrogate)
+    UTF16Test([], [ 0xFFFD, 0xFFFD ], [ 0xDFFF, 0xDBFF ]),
+
+
+    // U+DC00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    // U+0041 LATIN CAPITAL LETTER A
+    UTF16Test(
+        [], [ 0xFFFD, 0xFFFD, 0x0041 ],
+        [ 0xDC00, 0xD800, 0x0041 ]),
+
+    // U+DC00 (low-surrogate)
+    // U+D800 (high-surrogate)
+    // U+10000 LINEAR B SYLLABLE B008 A
+    UTF16Test(
+        [], [ 0xFFFD, 0xFFFD, 0x10000 ],
+        [ 0xDC00, 0xD800, 0xD800, 0xDC00 ]),
+  ],
+]
 
 runAllTests()
 
