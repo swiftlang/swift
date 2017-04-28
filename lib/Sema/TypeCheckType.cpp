@@ -1267,24 +1267,21 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (!type)
       return type;
 
-    auto hasError = type->hasError();
+    if (type->is<ErrorType>())
+      return type;
+
     if (options & TR_NonEnumInheritanceClauseOuterLayer) {
       auto protocolOrClass =
-          hasError ? (isa<ProtocolDecl>(typeDecl) || isa<ClassDecl>(typeDecl))
-                   : (type->is<ProtocolType>() || type->is<ClassType>());
+        (type->is<ProtocolType>() ||
+         type->is<ClassType>() ||
+         type->isAnyObject());
       if (!protocolOrClass) {
-        auto diagnosedType = hasError ? typeDecl->getDeclaredInterfaceType() : type;
-        if (diagnosedType && /*FIXME:*/!hasError) {
-          TC.diagnose(comp->getIdLoc(),
-                      diag::inheritance_from_non_protocol_or_class,
-                      diagnosedType);
-          return ErrorType::get(diagnosedType);
-        }
+        TC.diagnose(comp->getIdLoc(),
+                    diag::inheritance_from_non_protocol_or_class,
+                    type);
+        return ErrorType::get(type);
       }
     }
-
-    if (hasError)
-      return type;
 
     // If this is the first result we found, record it.
     if (current.isNull()) {
@@ -1533,7 +1530,9 @@ static Type resolveNestedIdentTypeComponent(
 
   if (options & TR_NonEnumInheritanceClauseOuterLayer) {
     auto protocolOrClass =
-        memberType->is<ProtocolType>() || memberType->is<ClassType>();
+        memberType->is<ProtocolType>() ||
+        memberType->is<ClassType>() ||
+        memberType->isAnyObject();
     if (!protocolOrClass) {
       TC.diagnose(comp->getIdLoc(),
                   diag::inheritance_from_non_protocol_or_class, memberType);
