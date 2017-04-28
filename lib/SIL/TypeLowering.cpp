@@ -2518,17 +2518,17 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
                                SILField(loweredInterfaceType, isMutable));
   
   // Instantiate the layout with identity substitutions.
-  SmallVector<Substitution, 4> genericArgs;
-  signature->getSubstitutions(
-    [&](SubstitutableType* type) -> Type {
+  auto subMap = signature->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
       return signature->getCanonicalTypeInContext(type,
                                                   *M.getSwiftModule());
     },
     [](Type depTy, Type replacementTy, ProtocolType *conformedTy)
     -> ProtocolConformanceRef {
       return ProtocolConformanceRef(conformedTy->getDecl());
-    },
-    genericArgs);
+    });
+  SmallVector<Substitution, 4> genericArgs;
+  signature->getSubstitutions(subMap, genericArgs);
 
   auto boxTy = SILBoxType::get(C, layout, genericArgs);
 #ifndef NDEBUG
