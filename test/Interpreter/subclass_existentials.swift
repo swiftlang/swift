@@ -163,8 +163,6 @@ SubclassExistentialsTestSuite.test("Metadata instantiation") {
   expectFalse(((Base<Int>) & Q).self == (Q & (Base<Int>) & AnyObject).self)
 }
 
-// FIXME: Not implemented yet
-
 SubclassExistentialsTestSuite.test("Metadata to string") {
   expectEqual("Base<Int> & P", String(describing: ((Base<Int>) & P).self))
   expectEqual("Base<Int> & P & Q", String(describing: ((Base<Int>) & P & Q).self))
