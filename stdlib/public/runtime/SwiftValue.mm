@@ -213,8 +213,14 @@ _SwiftValue *swift::getAsSwiftValue(id object) {
 }
 
 bool
-swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
+swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType,
                                   const WitnessTable **tablesBuffer) {
+  // _SwiftValue never satisfies a superclass constraint.
+  if (existentialType->getSuperclassConstraint() != nullptr)
+    return false;
+
+  auto &protocols = existentialType->Protocols;
+
   Class cls = nullptr;
 
   // Note that currently we never modify tablesBuffer because

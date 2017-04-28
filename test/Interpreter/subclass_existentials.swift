@@ -12,10 +12,12 @@
 //
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -Xfrontend -enable-experimental-subclass-existentials
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 //
+// XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_unchecked
 
 import StdlibUnittest
 
@@ -163,12 +165,10 @@ SubclassExistentialsTestSuite.test("Metadata instantiation") {
 
 // FIXME: Not implemented yet
 
-/*
 SubclassExistentialsTestSuite.test("Metadata to string") {
   expectEqual("Base<Int> & P", String(describing: ((Base<Int>) & P).self))
   expectEqual("Base<Int> & P & Q", String(describing: ((Base<Int>) & P & Q).self))
 }
-*/
 
 SubclassExistentialsTestSuite.test("Call instance methods") {
   do {
@@ -446,25 +446,23 @@ SubclassExistentialsTestSuite.test("Failing scalar downcast to subclass existent
   }
 }
 
-// FIXME
-
 SubclassExistentialsTestSuite.test("Failing dynamic downcast to subclass existential") {
   do {
     let baseInt: Base<Int> = Base<Int>(x: 123, y: 321)
 
-    //expectNil(cast(baseInt, to: ((Base<Int>) & P).self))
+    expectNil(cast(baseInt, to: ((Base<Int>) & P).self))
   }
 
   do {
     let r: R = Base<Int>(x: 123, y: 321)
 
-    //expectNil(cast(r, to: ((Base<Int>) & P).self))
+    expectNil(cast(r, to: ((Base<Int>) & P).self))
   }
 
   do {
     let conformsToP = ConformsToP(protocolInit: ())
 
-    //expectNil(cast(conformsToP, to: ((Base<Int>) & P).self))
+    expectNil(cast(conformsToP, to: ((Base<Int>) & P).self))
   }
 }
 
