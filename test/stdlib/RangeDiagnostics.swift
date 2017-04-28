@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-typecheck-verify-swift
+// XFAIL: linux
 
 import StdlibUnittest
 
