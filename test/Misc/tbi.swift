@@ -7,6 +7,7 @@
 // RUN:   %FileCheck --check-prefix=NO_TBI %s
 
 // REQUIRES: CODEGENERATOR=AArch64
+// REQUIRES: rdar_31887302
 
 // Verify that TBI is on by default in Swift on targets that support it. For our
 // purposes this means iOS8.0 or later.
