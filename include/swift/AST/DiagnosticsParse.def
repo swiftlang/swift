@@ -134,8 +134,6 @@ ERROR(lex_illegal_multiline_string_end,none,
       "invalid end of multi-line string literal", ())
 ERROR(lex_ambiguous_string_indent,none,
       "invalid mix of multi-line string literal indentation", ())
-ERROR(lex_multiline_inside_interpolation,none,
-      "multi-line string literals are not allowed inside an interpolation", ())
 
 
 ERROR(lex_invalid_character,none,

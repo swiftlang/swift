@@ -135,3 +135,28 @@ _ = """
 _ = """
     """
 // CHECK: ""
+
+_ = "\("""
+  \("a" + """
+   valid
+  """)
+  """) literal"
+// CHECK: "a"
+// CHECK: " valid"
+// CHECK: " literal"
+
+_ = "hello\("""
+  world
+  """)"
+// CHECK: "hello"
+// CHECK: "world"
+
+_ = """
+  hello\("""
+     world
+     """)
+  abc
+  """
+// CHECK: "hello"
+// CHECK: "world"
+// CHECK: "\nabc"

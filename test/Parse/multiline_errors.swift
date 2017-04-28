@@ -49,10 +49,3 @@ _ = """""" // expected-error@-0{{invalid start of multi-line string literal}}
 
 _ = """ """ // expected-error@-0{{invalid start of multi-line string literal}}
 // newline currently required after opening """
-
-_ = "\("""
-  not valid
-  """)" // expected-error@-2{{multi-line string literals are not allowed inside an interpolation}}
-// expected-error@-3{{unterminated string literal}}
-// expected-error@-2{{invalid start of multi-line string literal}}
-// expected-error@-3{{unterminated string literal}}
