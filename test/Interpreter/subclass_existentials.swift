@@ -12,7 +12,7 @@
 //
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -Xfrontend -enable-experimental-subclass-existentials
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 //

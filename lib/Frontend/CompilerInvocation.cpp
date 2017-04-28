@@ -910,9 +910,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalKeyPaths |=
     Args.hasArg(OPT_enable_experimental_keypaths);
 
-  Opts.EnableExperimentalSubclassExistentials |=
-    Args.hasArg(OPT_enable_experimental_subclass_existentials);
-
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
 

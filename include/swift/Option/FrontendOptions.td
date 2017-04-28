@@ -274,10 +274,6 @@ def enable_experimental_deserialization_recovery :
   Flag<["-"], "enable-experimental-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
 
-def enable_experimental_subclass_existentials : Flag<["-"],
-  "enable-experimental-subclass-existentials">,
-  HelpText<"Enable classes to appear in protocol composition types">;
-
 def enable_cow_existentials : Flag<["-"], "enable-cow-existentials">,
   HelpText<"Enable the copy-on-write existential implementation">;
 

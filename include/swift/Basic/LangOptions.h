@@ -165,9 +165,6 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// \brief Enable classes to appear in protocol composition types.
-    bool EnableExperimentalSubclassExistentials = false;
-
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 

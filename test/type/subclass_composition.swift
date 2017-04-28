@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-subclass-existentials
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 {
   typealias DependentInConcreteConformance = Self
