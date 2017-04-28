@@ -79,13 +79,17 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   }
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
+
+  // Select access kind after capture promotion and before stack promotion.
+  // This guarantees that stack-promotable boxes have [static] enforcement.
+  P.addAccessEnforcementSelection();
+  P.addInactiveAccessMarkerElimination();
+
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   P.addOwnershipModelEliminator();
   P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
-  P.addAccessEnforcementSelection();
-  P.addInactiveAccessMarkerElimination();
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
   P.addDiagnosticConstantPropagation();

@@ -12,7 +12,9 @@
 ///
 /// This pass eliminates 'unknown' access enforcement by selecting either
 /// static or dynamic enforcement.
-/// 
+///
+/// FIXME: handle boxes used by copy_value when neither copy is captured.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-selection"
@@ -110,6 +112,8 @@ void SelectEnforcement::run() {
   updateAccesses();
 }
 
+// FIXME: This should cover a superset of AllocBoxToStack's findUnexpectedBoxUse
+// to avoid perturbing codegen. They should be sharing the same analysis.
 void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
   // Collect accesses rooted off of projections.
   for (auto use : source->getUses()) {
@@ -137,7 +141,7 @@ void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
     // Add it to the escapes set.
     Escapes.insert(user);
 
-    // 
+    // Record this point as escaping.
     auto userBB = user->getParent();
     auto &state = StateMap[userBB];
     if (!state.IsInWorklist) {
