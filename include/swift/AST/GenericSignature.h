@@ -201,17 +201,6 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
-  using GenericFunction = auto(CanType canType, Type conformingReplacementType,
-    ProtocolType *conformedProtocol)
-    ->Optional<ProtocolConformanceRef>;
-  using LookupConformanceFn = llvm::function_ref<GenericFunction>;
-
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(TypeSubstitutionFn substitution,
-                        LookupConformanceFn lookupConformance,
-                        SmallVectorImpl<Substitution> &result) const;
-
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
   void getSubstitutions(const SubstitutionMap &subMap,
