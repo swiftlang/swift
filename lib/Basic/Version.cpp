@@ -312,19 +312,23 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
     return None;
   }
 
-  // FIXME: When we switch to Swift 4 by default, the "3" case should return
-  // a version newer than any released 3.x compiler (probably "3.2"), and the
-  // "4" case should start returning getCurrentLanguageVersion. We should
+  // FIXME: When we switch to Swift 5 by default, the "4" case should return
+  // a version newer than any released 4.x compiler, and the
+  // "5" case should start returning getCurrentLanguageVersion. We should
   // also check for the presence of SWIFT_VERSION_PATCHLEVEL, and if that's
   // set apply it to the "3" case, so that Swift 4.0.1 will automatically
   // have a compatibility mode of 3.2.1.
   switch (Components[0]) {
   case 3:
-    static_assert(SWIFT_VERSION_MAJOR == 3,
+#ifdef SWIFT_VERSION_PATCHLEVEL
+    return Version{3, 2, SWIFT_VERSION_PATCHLEVEL};
+#else
+    return Version{3, 2};
+#endif
+  case 4:
+    static_assert(SWIFT_VERSION_MAJOR == 4,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
-  case 4:
-    return Version{4, 0};
   default:
     return None;
   }
