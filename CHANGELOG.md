@@ -39,7 +39,7 @@ Swift 4.0
 
   class Wall : Canvas, Paintable {
     func paint() { ... }
-  }```
+  }
 
   func render(_: Canvas & Paintable) { ... }
 
