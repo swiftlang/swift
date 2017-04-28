@@ -207,6 +207,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // We won't actually emit the block until we finish with the destructor body.
   prepareEpilog(Type(), false, CleanupLocation::get(loc));
 
+  emitProfilerIncrement(dd->getBody());
   // Emit the destructor body.
   emitStmt(dd->getBody());
 
