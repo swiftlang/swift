@@ -274,6 +274,9 @@ namespace {
     /// The witness is a constructor which is more failable than the
     /// requirement.
     ConstructorFailability,
+
+    /// The witness itself is inaccessible.
+    WitnessUnavailable,
   };
 
   /// Describes an optional adjustment made to a witness.
@@ -1537,6 +1540,11 @@ checkWitness(AccessScope requiredAccessScope,
         return CheckKind::ConstructorFailability;
       }
     }
+  }
+
+  if (match.Witness->getAttrs().isUnavailable(TC.Context) &&
+      !requirement->getAttrs().isUnavailable(TC.Context)) {
+    return CheckKind::WitnessUnavailable;
   }
 
   return CheckKind::Success;
@@ -2905,7 +2913,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto ctor = cast<ConstructorDecl>(requirement);
           auto witnessCtor = cast<ConstructorDecl>(witness);
           auto &diags = witness->getASTContext().Diags;
-          diags.diagnose(witness->getLoc(),
+          diags.diagnose(witness,
                          diag::witness_initializer_failability,
                          ctor->getFullName(),
                          witnessCtor->getFailability()
@@ -2913,6 +2921,19 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             .highlight(witnessCtor->getFailabilityLoc());
         });
 
+      break;
+
+    case CheckKind::WitnessUnavailable:
+      diagnoseOrDefer(requirement, /*isError=*/false,
+        [witness, requirement](NormalProtocolConformance *conformance) {
+          auto &diags = witness->getASTContext().Diags;
+          diags.diagnose(witness, diag::witness_unavailable,
+                         witness->getDescriptiveKind(),
+                         witness->getFullName(),
+                         conformance->getProtocol()->getFullName());
+          diags.diagnose(requirement, diag::protocol_requirement_here,
+                         requirement->getFullName());
+        });
       break;
     }
 
