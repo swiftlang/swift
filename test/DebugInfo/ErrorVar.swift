@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // REQUIRES: CPU=i386
+// REQUIRES: rdar_31886890
 class Obj {}
 
 enum MyError : Error {
