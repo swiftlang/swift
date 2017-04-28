@@ -18,46 +18,6 @@
 
 using namespace swift;
 
-static Type getContextFreeInterfaceType(ValueDecl *VD) {
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return AFD->getMethodInterfaceType();
-  }
-  return VD->getInterfaceType();
-}
-
-ArrayRef<ValueDecl*> swift::
-canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                llvm::SmallVectorImpl<ValueDecl*> &Scratch) {
-
-  // Skip decls that don't have valid names.
-  if (!VD->getFullName())
-    return {};
-
-  // Check if VD is from a protocol extension.
-  auto P = VD->getDeclContext()->getAsProtocolExtensionContext();
-  if (!P)
-    return {};
-
-  // Look up all decls in the protocol's inheritance chain for the ones with
-  // the same name with VD.
-  ResolvedMemberResult LookupResult =
-    resolveValueMember(*P->getInnermostDeclContext(),
-                       P->getDeclaredInterfaceType(), VD->getFullName());
-
-  auto VDType = getContextFreeInterfaceType(VD);
-  for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
-    if (isa<ProtocolDecl>(Mem->getDeclContext())) {
-      if (Mem->isProtocolRequirement() &&
-          getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
-        // We find a protocol requirement VD can provide default
-        // implementation for.
-        Scratch.push_back(Mem);
-      }
-    }
-  }
-  return Scratch;
-}
-
 void swift::
 collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
