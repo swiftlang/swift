@@ -73,7 +73,6 @@ extension D {
 // TYPE4-DAG: public func min() -> Int?
 // TYPE4-DAG: public mutating func insert<C>(contentsOf newElements: C, at i: Int)
 // TYPE4-DAG: public mutating func removeFirst(_ n: Int)
-// TYPE4-DAG: public mutating func replaceSubrange<C>(_ subrange: CountableRange<Int>, with newElements: C)
 // TYPE4-DAG: public func makeIterator() -> IndexingIterator<Array<Int>>
 // TYPE4-NOT: public func joined
 
