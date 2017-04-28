@@ -67,8 +67,6 @@ public:
   SubstitutionMap(GenericSignature *genericSig)
     : genericSig(genericSig) { }
 
-  SubstitutionMap(GenericEnvironment *genericEnv);
-
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.
   GenericSignature *getGenericSignature() const { return genericSig; }
@@ -98,6 +96,9 @@ public:
   /// change keys.
   SubstitutionMap subst(TypeSubstitutionFn subs,
                         LookupConformanceFn conformances) const;
+
+  /// Build an array of substitutions from a substitution map.
+  void toList(SmallVectorImpl<Substitution> &subs) const;
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap

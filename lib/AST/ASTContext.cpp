@@ -1616,9 +1616,7 @@ ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       const SubstitutionMap &subMap) {
   SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = generic->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
-
+  subMap.toList(subs);
   return getSpecializedConformance(type, generic, subs);
 }
 

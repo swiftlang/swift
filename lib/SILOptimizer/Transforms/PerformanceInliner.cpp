@@ -416,7 +416,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         SubMap = SubMap.subst(CalleeSubstMap);
 
         SmallVector<Substitution, 4> NewSubs;
-        Sig->getSubstitutions(SubMap, NewSubs);
+        SubMap.toList(NewSubs);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||

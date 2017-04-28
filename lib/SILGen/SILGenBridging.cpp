@@ -69,7 +69,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
 
@@ -93,8 +92,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   }
 
   SmallVector<Substitution, 4> subs;
-  if (genericSig)
-    genericSig->getSubstitutions(typeSubMap, subs);
+  typeSubMap.toList(subs);
 
   // Call the witness.
   SILType resultTy = SGF.getLoweredType(objcType);
@@ -157,8 +155,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   CanType formalResultTy = witnessCI.LoweredInterfaceType.getResult();
 
   SmallVector<Substitution, 4> subs;
-  if (genericSig)
-    genericSig->getSubstitutions(typeSubMap, subs);
+  typeSubMap.toList(subs);
 
   // Set up the generic signature, since formalResultTy is an interface type.
   CanGenericSignature canGenericSig;
@@ -671,14 +668,11 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
     buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
   }
 
-  CanSILFunctionType substFnTy = thunkTy;
+  auto substFnTy = thunkTy->substGenericArgs(F.getModule(),
+                                             interfaceSubs);
 
   SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkTy->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
-    substFnTy = thunkTy->substGenericArgs(F.getModule(),
-                                          interfaceSubs);
-  }
+  interfaceSubs.toList(subs);
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);

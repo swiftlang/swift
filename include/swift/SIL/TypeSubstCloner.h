@@ -149,19 +149,9 @@ protected:
     if (!Inlining) {
       FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
       if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
-        auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
-        auto GenSig = LoweredFnTy->getGenericSignature();
-        if (GenSig) {
-          GenSig->getSubstitutions(
-              Inst->getFunction()
-                  ->getLoweredFunctionType()
-                  ->getGenericSignature()
-                  ->getSubstitutionMap(Inst->getSubstitutions()),
-              TempSubstList);
-        }
-        for (auto &Sub : TempSubstList) {
-          Sub = asImpl().getOpSubstitution(Sub);
-        }
+        for (auto Sub : Inst->getSubstitutions())
+          TempSubstList.push_back(asImpl().getOpSubstitution(Sub));
+
         SubstitutionList Subs = TempSubstList;
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                         &Builder.getFunction());

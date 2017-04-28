@@ -710,13 +710,14 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
           }
           return ProtocolConformanceRef(proto->getDecl());
         });
-    FnTy->getGenericSignature()->getSubstitutions(FinalSubsMap, Substitutions);
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
                                         AI.getModule(),
-                                        Substitutions);
+                                        FinalSubsMap);
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
+
+    FinalSubsMap.toList(Substitutions);
   } else {
     NewSubstCalleeType =
       SubstCalleeType.subst(AI.getModule(),

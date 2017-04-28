@@ -1008,8 +1008,7 @@ public:
 
   void computeClonerParamSubs(SubstitutionList &ClonerParamSubs);
 
-  void computeCallerParamSubs(GenericSignature *SpecializedGenericSig,
-                              SubstitutionList &CallerParamSubs);
+  void computeCallerParamSubs(SubstitutionList &CallerParamSubs);
 
   void computeCallerInterfaceSubs(SubstitutionMap &CallerInterfaceSubs);
 };
@@ -1299,9 +1298,7 @@ FunctionSignaturePartialSpecializer::
 
 void FunctionSignaturePartialSpecializer::computeClonerParamSubs(
     SubstitutionList &ClonerParamSubs) {
-  SmallVector<Substitution, 4> List;
-
-  CalleeGenericSig->getSubstitutions(
+  auto SubMap = CalleeGenericSig->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type {
         DEBUG(llvm::dbgs() << "\ngetSubstitution for ClonerParamSubs:\n"
                            << Type(type) << "\n"
@@ -1312,20 +1309,18 @@ void FunctionSignaturePartialSpecializer::computeClonerParamSubs(
         return SpecializedGenericEnv->mapTypeIntoContext(
             SpecializedInterfaceTy);
       },
-      LookUpConformanceInSignature(*SpecializedGenericSig), List);
+      LookUpConformanceInSignature(*SpecializedGenericSig));
 
+  SmallVector<Substitution, 4> List;
+  SubMap.toList(List);
   ClonerParamSubs = Ctx.AllocateCopy(List);
   verifySubstitutionList(ClonerParamSubs, "ClonerParamSubs");
 }
 
 void FunctionSignaturePartialSpecializer::computeCallerParamSubs(
-    GenericSignature *SpecializedGenericSig,
     SubstitutionList &CallerParamSubs) {
   SmallVector<Substitution, 4> List;
-
-  SpecializedGenericSig->getSubstitutions(
-      SpecializedInterfaceToCallerArchetypeMap, List);
-
+  SpecializedInterfaceToCallerArchetypeMap.toList(List);
   CallerParamSubs = Ctx.AllocateCopy(List);
   verifySubstitutionList(CallerParamSubs, "CallerParamSubs");
 }
@@ -1496,7 +1491,7 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 
   // Create substitution lists for the caller and cloner.
   FSPS.computeClonerParamSubs(ClonerParamSubs);
-  FSPS.computeCallerParamSubs(SpecializedGenericSig, CallerParamSubs);
+  FSPS.computeCallerParamSubs(CallerParamSubs);
   // Create a substitution map for the caller interface substitutions.
   FSPS.computeCallerInterfaceSubs(CallerInterfaceSubs);
 

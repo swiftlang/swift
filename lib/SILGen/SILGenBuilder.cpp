@@ -84,14 +84,13 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
       if (!decl)
         return false;
 
-      auto *genericSig = decl->getGenericSignature();
-      if (!genericSig)
+      if (!decl->isGeneric())
         return false;
 
       auto subMap = t->getContextSubstitutionMap(getSILGenModule().SwiftModule,
                                                  decl);
       SmallVector<Substitution, 4> subs;
-      genericSig->getSubstitutions(subMap, subs);
+      subMap.toList(subs);
       getSILGenModule().useConformancesFromSubstitutions(subs);
       return false;
     });

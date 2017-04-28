@@ -68,8 +68,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subMap);
 
     SmallVector<Substitution, 4> subs;
-    if (auto *genericSig = superclass->getGenericSignature())
-      genericSig->getSubstitutions(subMap, subs);
+    subMap.toList(subs);
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this),
                                     dtorTy, objectPtrTy, subs, baseSelf);
   } else {
@@ -126,8 +125,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
     = emitSiblingMethodRef(loc, initialSelfValue, dtorConstant, subMap);
 
   SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = classDecl->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
+  subMap.toList(subs);
 
   // Call the destroying destructor.
   SILValue selfForDealloc;
@@ -249,8 +247,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
                                   SGM.M);
 
   SmallVector<Substitution, 4> subs;
-    if (auto *genericSig = superclass->getGenericSignature())
-      genericSig->getSubstitutions(subMap, subs);
+  subMap.toList(subs);
 
   B.createApply(cleanupLoc, superclassDtorValue, substDtorType,
                 dtorConv.getSILResultType(), subs, superSelf);

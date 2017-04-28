@@ -1393,7 +1393,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   Args.push_back(MetaTyVal);
 
   SmallVector<Substitution, 4> Subs;
-  Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
+  SubMap.toList(Subs);
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
                                  false);
@@ -1638,8 +1638,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
 
   SmallVector<Substitution, 4> Subs;
-  if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
-    Sig->getSubstitutions(SubMap, Subs);
+  SubMap.toList(Subs);
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,

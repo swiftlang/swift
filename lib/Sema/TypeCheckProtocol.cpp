@@ -445,9 +445,7 @@ namespace {
                               RequirementEnvironment &&reqEnvironment) const {
       SmallVector<Substitution, 2> syntheticSubs;
       auto syntheticEnv = reqEnvironment.getSyntheticEnvironment();
-      reqEnvironment.getRequirementSignature()->getSubstitutions(
-          reqEnvironment.getRequirementToSyntheticMap(),
-          syntheticSubs);
+      reqEnvironment.getRequirementToSyntheticMap().toList(syntheticSubs);
       return swift::Witness(this->Witness, WitnessSubstitutions,
                             syntheticEnv, syntheticSubs);
     }

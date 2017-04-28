@@ -4786,8 +4786,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
   SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = fn->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
+  subMap.toList(subs);
 
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), subs, loc);
 

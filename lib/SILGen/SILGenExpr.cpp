@@ -2523,8 +2523,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
                property->getInnermostDeclContext()->getInnermostTypeContext());
   SmallVector<Substitution, 4> subsList;
-  if (subs.getGenericSignature())
-    subs.getGenericSignature()->getSubstitutions(subs, subsList);
+  subs.toList(subsList);
   auto resultSubst = subSGF.emitRValueForPropertyLoad(loc, paramSubstValue,
                                    baseType, /*super*/false, property,
                                    subsList, AccessSemantics::Ordinary,
@@ -2665,9 +2664,8 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
                property->getInnermostDeclContext()->getInnermostTypeContext());
   SmallVector<Substitution, 4> subsList;
-  if (subs.getGenericSignature())
-    subs.getGenericSignature()->getSubstitutions(subs, subsList);
-  
+  subs.toList(subsList);
+
   lv.addMemberVarComponent(subSGF, loc, property, subsList, /*super*/ false,
                            AccessKind::Write, AccessSemantics::Ordinary,
                            strategy, propertyType);

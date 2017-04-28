@@ -50,7 +50,7 @@ ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx) const {
       derivedSubMap = derivedSig->getSubstitutionMap(getSubstitutions());
     auto subMap = SubstitutionMap::getOverrideSubstitutions(
         baseDecl, derivedDecl, derivedSubMap);
-    baseSig->getSubstitutions(subMap, subs);
+    subMap.toList(subs);
   }
   return ConcreteDeclRef(ctx, baseDecl, subs);
 }

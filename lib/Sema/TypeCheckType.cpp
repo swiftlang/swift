@@ -2479,7 +2479,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     bool ok = true;
-    genericSig->getSubstitutions(
+    auto subMap = genericSig->getSubstitutionMap(
       QueryTypeSubstitutionMap{genericArgMap},
       [&](CanType depTy, Type replacement, ProtocolType *proto)
       -> ProtocolConformanceRef {
@@ -2492,17 +2492,11 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
         }
         
         return *result;
-      },
-      genericArgs);
+      });
+    subMap.toList(genericArgs);
 
     if (!ok)
       return ErrorType::get(Context);
-    
-    // Canonicalize the replacement types.
-    for (auto &arg : genericArgs) {
-      arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                         arg.getConformances());
-    }
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);

@@ -95,8 +95,10 @@ void Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
-                        lookupConformanceFn, result);
+  auto subMap = sig->getSubstitutionMap(
+    QueryTypeSubstitutionMap{subs},
+    lookupConformanceFn);
+  subMap.toList(result);
 }
 
 void Solution::computeSubstitutions(
@@ -1675,7 +1677,7 @@ namespace {
         });
 
       SmallVector<Substitution, 1> subs;
-      genericSig->getSubstitutions(subMap, subs);
+      subMap.toList(subs);
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, subs);
       auto fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,

@@ -3015,12 +3015,7 @@ static Type substType(Type derivedType,
       subMap = subMap.subst(substitutions, lookupConformances);
 
       SmallVector<Substitution, 4> newSubs;
-      boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutions(subMap, newSubs);
-      for (auto &arg : newSubs) {
-        arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                           arg.getConformances());
-      }
+      subMap.toList(newSubs);
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
                              newSubs);

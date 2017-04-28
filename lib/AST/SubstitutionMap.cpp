@@ -33,9 +33,6 @@
 
 using namespace swift;
 
-SubstitutionMap::SubstitutionMap(GenericEnvironment *genericEnv)
-  : SubstitutionMap(genericEnv->getGenericSignature()) { }
-
 bool SubstitutionMap::hasArchetypes() const {
   for (auto &entry : subMap)
     if (entry.second->hasArchetype())
@@ -224,6 +221,46 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   result.verify();
 
   return result;
+}
+
+void SubstitutionMap::toList(SmallVectorImpl<Substitution> &result) const {
+  auto *genericSig = getGenericSignature();
+  if (genericSig == nullptr)
+    return;
+
+  auto &ctx = genericSig->getASTContext();
+
+  // Enumerate all of the requirements that require substitution.
+  genericSig->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqs) {
+      // Compute the replacement type.
+      Type currentReplacement = depTy.subst(*this);
+      if (!currentReplacement)
+        currentReplacement = ErrorType::get(depTy);
+
+      // Collect the conformances.
+      SmallVector<ProtocolConformanceRef, 4> currentConformances;
+      for (auto req: reqs) {
+        assert(req.getKind() == RequirementKind::Conformance);
+        auto protoDecl = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+        if (auto conformance = lookupConformance(depTy->getCanonicalType(),
+                                                 protoDecl)) {
+          currentConformances.push_back(*conformance);
+        } else {
+          if (!currentReplacement->hasError())
+            currentReplacement = ErrorType::get(currentReplacement);
+          currentConformances.push_back(ProtocolConformanceRef(protoDecl));
+        }
+      }
+
+      // Add it to the final substitution list.
+      result.push_back({
+          currentReplacement,
+            ctx.AllocateCopy(currentConformances)
+            });
+
+      return false;
+    });
 }
 
 SubstitutionMap
