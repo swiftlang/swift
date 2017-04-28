@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -parse-as-library -enable-experimental-subclass-existentials -primary-file %s -verify | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -enable-experimental-subclass-existentials -primary-file %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -parse-as-library -primary-file %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -primary-file %s
 
 // Note: we pass -verify above to ensure there are no spurious
 // compiler warnings relating to casts.

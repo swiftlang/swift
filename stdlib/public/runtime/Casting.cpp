@@ -411,8 +411,19 @@ static bool _conformsToProtocol(const OpaqueValue *value,
 /// list of conformances.
 static bool _conformsToProtocols(const OpaqueValue *value,
                                  const Metadata *type,
-                                 const ProtocolDescriptorList &protocols,
+                                 const ExistentialTypeMetadata *existentialType,
                                  const WitnessTable **conformances) {
+  if (auto *superclass = existentialType->getSuperclassConstraint()) {
+    if (!swift_dynamicCastMetatype(type, superclass))
+      return false;
+  }
+
+  if (existentialType->isClassBounded()) {
+    if (!Metadata::isAnyKindOfClass(type->getKind()))
+      return false;
+  }
+
+  auto &protocols = existentialType->Protocols;
   for (unsigned i = 0, n = protocols.NumProtocols; i != n; ++i) {
     const ProtocolDescriptor *protocol = protocols[i];
     if (!_conformsToProtocol(value, type, protocol, conformances))
@@ -876,7 +887,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
       // If the destination type is a set of protocols that SwiftValue
       // implements, we're fine.
-      if (findSwiftValueConformances(targetType->Protocols,
+      if (findSwiftValueConformances(targetType,
                                      destExistential->getWitnessTables())) {
         bool consumeValue = dynamicFlags & DynamicCastFlags::TakeOnSuccess;
         destExistential->Value =
@@ -963,7 +974,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     // container with a class instance to AnyObject. In this case no check is
     // necessary.
     if (srcDynamicType && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
-                              targetType->Protocols,
+                              targetType,
                               destExistential->getWitnessTables()))
       return fallbackForNonDirectConformance();
 
@@ -981,7 +992,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     // Check for protocol conformances and fill in the witness tables.
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
-                              targetType->Protocols,
+                              targetType,
                               destExistential->getWitnessTables()))
       return fallbackForNonDirectConformance();
 
@@ -1015,7 +1026,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     assert(targetType->Protocols.NumProtocols == 1);
     const WitnessTable *errorWitness;
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
-                              targetType->Protocols,
+                              targetType,
                               &errorWitness))
       return fallbackForNonDirectConformance();
 
@@ -1052,6 +1063,8 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 static const void *
 _dynamicCastUnknownClassToExistential(const void *object,
                                     const ExistentialTypeMetadata *targetType) {
+  // FIXME: check superclass constraint here.
+
   for (unsigned i = 0, e = targetType->Protocols.NumProtocols; i < e; ++i) {
     const ProtocolDescriptor *protocol = targetType->Protocols[i];
 
@@ -1848,18 +1861,14 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
         dyn_cast<ExistentialTypeMetadata>(targetInstanceType)) {
     // Check for conformance to all the protocols.
     // TODO: collect the witness tables.
-    auto &protocols = targetInstanceTypeAsExistential->Protocols;
     const WitnessTable **conformance
       = writeDestMetatype ? destMetatype->getWitnessTables() : nullptr;
-    for (unsigned i = 0, n = protocols.NumProtocols; i != n; ++i) {
-      const ProtocolDescriptor *protocol = protocols[i];
-      if (!_conformsToProtocol(nullptr, srcMetatype, protocol, conformance)) {
-        if (flags & DynamicCastFlags::Unconditional)
-          swift_dynamicCastFailure(srcMetatype, targetType);
-        return false;
-      }
-      if (conformance && protocol->Flags.needsWitnessTable())
-        ++conformance;
+    if (!_conformsToProtocols(nullptr, srcMetatype,
+                              targetInstanceTypeAsExistential,
+                              conformance)) {
+      if (flags & DynamicCastFlags::Unconditional)
+        swift_dynamicCastFailure(srcMetatype, targetType);
+      return false;
     }
 
     if (writeDestMetatype)

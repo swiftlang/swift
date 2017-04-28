@@ -882,10 +882,8 @@ namespace {
             } else {
               SmallVector<Type, 4> memberTypes;
 
-              if (Impl.SwiftContext.LangOpts.EnableExperimentalSubclassExistentials) {
-                if (auto superclassType = typeParam->getSuperclass())
-                  memberTypes.push_back(superclassType);
-              }
+              if (auto superclassType = typeParam->getSuperclass())
+                memberTypes.push_back(superclassType);
 
               for (auto protocolDecl : typeParam->getConformingProtocols())
                 memberTypes.push_back(protocolDecl->getDeclaredType());
@@ -1028,9 +1026,7 @@ namespace {
       // Swift 3 compatibility -- don't import subclass existentials
       if (!type->qual_empty() &&
           (importedType->isAnyObject() ||
-           (!Impl.SwiftContext.isSwiftVersion3() &&
-            Impl.SwiftContext.LangOpts.EnableExperimentalSubclassExistentials))) {
-
+           !Impl.SwiftContext.isSwiftVersion3())) {
         SmallVector<Type, 4> members;
         if (!importedType->isAnyObject())
           members.push_back(importedType);
