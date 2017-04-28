@@ -95,8 +95,11 @@ void Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
-                        lookupConformanceFn, result);
+  auto subMap = sig->getSubstitutionMap(
+    QueryTypeSubstitutionMap{subs},
+    lookupConformanceFn);
+
+  sig->getSubstitutions(subMap, result);
 }
 
 void Solution::computeSubstitutions(
