@@ -752,8 +752,8 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
     {
       // Prefix of 4-byte sequence. The top 5 bits of the decoded result
       // must be nonzero and no greater than 0b0__0100_0000
-      let top5bits = UInt16(buffer._storage & 0b0__0011_0000__0000_0111).byteSwapped
-      if top5bits != 0 && top5bits         <= 0b0__0000_0100__0000_0000 {
+      let top5bits = UInt16(buffer._storage & 0b0__0011_0000__0000_0111)
+      if top5bits != 0 && top5bits.byteSwapped <= 0b0__0000_0100__0000_0000 {
         return buffer._storage   & 0b0__1100_0000__0000_0000__0000_0000
                                 == 0b0__1000_0000__0000_0000__0000_0000 ? 3 : 2
       }
