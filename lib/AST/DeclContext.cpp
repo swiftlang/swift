@@ -993,7 +993,7 @@ getSharedPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
       lastExtension = ED;
 
   // If there's no last extension, return the supplied context.
-  return lastExtension ?: DC;
+  return lastExtension ? lastExtension : DC;
 }
 
 bool AccessScope::checkSharedPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
