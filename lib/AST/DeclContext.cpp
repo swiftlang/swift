@@ -947,29 +947,6 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
-AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
-    : Value(DC, isPrivate) {
-  if (!DC || isa<ModuleDecl>(DC))
-    assert(!isPrivate && "public or internal scope can't be private");
-}
-
-bool AccessScope::isFileScope() const {
-  auto DC = getDeclContext();
-  return DC && isa<FileUnit>(DC);
-}
-
-Accessibility AccessScope::accessibilityForDiagnostics() const {
-  if (isPublic())
-    return Accessibility::Public;
-  if (isa<ModuleDecl>(getDeclContext()))
-    return Accessibility::Internal;
-  if (getDeclContext()->isModuleScopeContext()) {
-    return isPrivate() ? Accessibility::Private : Accessibility::FilePrivate;
-  }
-
-  return Accessibility::Private;
-}
-
 /// Return the DeclContext to compare when checking private access in
 /// Swift 4 mode. The context returned is the type declaration if the context
 /// and the type declaration are in the same file, otherwise it is the types
@@ -996,6 +973,33 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
   return lastExtension ? lastExtension : DC;
 }
 
+AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
+    : Value(DC, isPrivate) {
+  if (isPrivate) {
+    DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
+    Value.setPointer(DC);
+  }
+  if (!DC || isa<ModuleDecl>(DC))
+    assert(!isPrivate && "public or internal scope can't be private");
+}
+
+bool AccessScope::isFileScope() const {
+  auto DC = getDeclContext();
+  return DC && isa<FileUnit>(DC);
+}
+
+Accessibility AccessScope::accessibilityForDiagnostics() const {
+  if (isPublic())
+    return Accessibility::Public;
+  if (isa<ModuleDecl>(getDeclContext()))
+    return Accessibility::Internal;
+  if (getDeclContext()->isModuleScopeContext()) {
+    return isPrivate() ? Accessibility::Private : Accessibility::FilePrivate;
+  }
+
+  return Accessibility::Private;
+}
+
 bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
   // Check the lexical scope.
   if (useDC->isChildContextOf(sourceDC))
@@ -1005,11 +1009,14 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   if (useDC->getASTContext().isSwiftVersion3())
     return false;
 
-  // Do not allow access if the sourceDC is in a different file, or if the
-  // sourceDC does not represent a type.
-  auto sourceNTD = sourceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  // Do not allow access if the sourceDC is in a different file
   auto useSF = useDC->getParentSourceFile();
-  if (useSF != sourceDC->getParentSourceFile() || !sourceNTD)
+  if (useSF != sourceDC->getParentSourceFile())
+    return false;
+
+  // Do not allow access if the sourceDC does not represent a type.
+  auto sourceNTD = sourceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!sourceNTD)
     return false;
 
   // Compare the private scopes and iterate over the parent types.
