@@ -12,9 +12,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// Disabled for now
-// REQUIRES: rdar://problem/31780356
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
