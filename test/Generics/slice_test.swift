@@ -25,6 +25,9 @@ func testslice(_ s: Array<Int>) {
   for i in s { print(i+1) }
   _ = s[0..<2]
   _ = s[0...1]
+  _ = s[...1]
+  _ = s[1...]
+  _ = s[..<2]
 }
 
 @_silgen_name("malloc") func c_malloc(_ size: Int) -> UnsafeMutableRawPointer
