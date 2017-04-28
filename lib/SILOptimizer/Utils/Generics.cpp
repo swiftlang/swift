@@ -1008,8 +1008,7 @@ public:
 
   void computeClonerParamSubs(SubstitutionList &ClonerParamSubs);
 
-  void computeCallerParamSubs(GenericSignature *SpecializedGenericSig,
-                              SubstitutionList &CallerParamSubs);
+  void computeCallerParamSubs(SubstitutionList &CallerParamSubs);
 
   void computeCallerInterfaceSubs(SubstitutionMap &CallerInterfaceSubs);
 };
@@ -1313,19 +1312,15 @@ void FunctionSignaturePartialSpecializer::computeClonerParamSubs(
       LookUpConformanceInSignature(*SpecializedGenericSig));
 
   SmallVector<Substitution, 4> List;
-  CalleeGenericSig->getSubstitutions(SubMap, List);
+  SubMap.toList(List);
   ClonerParamSubs = Ctx.AllocateCopy(List);
   verifySubstitutionList(ClonerParamSubs, "ClonerParamSubs");
 }
 
 void FunctionSignaturePartialSpecializer::computeCallerParamSubs(
-    GenericSignature *SpecializedGenericSig,
     SubstitutionList &CallerParamSubs) {
   SmallVector<Substitution, 4> List;
-
-  SpecializedGenericSig->getSubstitutions(
-      SpecializedInterfaceToCallerArchetypeMap, List);
-
+  SpecializedInterfaceToCallerArchetypeMap.toList(List);
   CallerParamSubs = Ctx.AllocateCopy(List);
   verifySubstitutionList(CallerParamSubs, "CallerParamSubs");
 }
@@ -1496,7 +1491,7 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 
   // Create substitution lists for the caller and cloner.
   FSPS.computeClonerParamSubs(ClonerParamSubs);
-  FSPS.computeCallerParamSubs(SpecializedGenericSig, CallerParamSubs);
+  FSPS.computeCallerParamSubs(CallerParamSubs);
   // Create a substitution map for the caller interface substitutions.
   FSPS.computeCallerInterfaceSubs(CallerInterfaceSubs);
 

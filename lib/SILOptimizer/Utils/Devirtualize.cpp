@@ -478,7 +478,7 @@ getSubstitutionsForCallee(SILModule &M,
                                              baseCalleeSig);
 
   // Build the new substitutions using the base method signature.
-  baseCalleeSig->getSubstitutions(subMap, newSubs);
+  subMap.toList(newSubs);
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,
@@ -572,9 +572,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   getSubstitutionsForCallee(Mod, GenCalleeType,
                             ClassOrMetatypeType.getSwiftRValueType(),
                             AI, Subs);
-  CanSILFunctionType SubstCalleeType = GenCalleeType;
-  if (GenCalleeType->isPolymorphic())
-    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
+  auto SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
   SILFunctionConventions substConv(SubstCalleeType, Mod);
 
   SILBuilderWithScope B(AI.getInstruction());
@@ -887,8 +885,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   ApplySite SAI;
 
   SmallVector<Substitution, 4> NewSubs;
-  if (auto GenericSig = CalleeCanType->getGenericSignature())
-    GenericSig->getSubstitutions(SubMap, NewSubs);
+  SubMap.toList(NewSubs);
 
   SILValue ResultValue;
   if (auto *A = dyn_cast<ApplyInst>(AI)) {

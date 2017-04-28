@@ -349,7 +349,7 @@ GenericEnvironment::getForwardingSubstitutions() const {
     MakeAbstractConformanceForGenericType());
 
   SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(subMap, result);
+  subMap.toList(result);
   return genericSig->getASTContext().AllocateCopy(result);
 }
 

@@ -201,11 +201,6 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(const SubstitutionMap &subMap,
-                        SmallVectorImpl<Substitution> &result) const;
-
   /// Enumerate all of the dependent types in the type signature that will
   /// occur in substitution lists (in order), along with the set of
   /// conformance requirements placed on that dependent type.

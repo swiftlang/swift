@@ -499,7 +499,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Call the initializer.
   SubstitutionMap subMap;
   SmallVector<Substitution, 4> subs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
+  if (auto *genericEnv = ctor->getGenericEnvironment()) {
     auto *genericSig = genericEnv->getGenericSignature();
     subMap = genericSig->getSubstitutionMap(
       [&](SubstitutableType *t) -> Type {
@@ -507,7 +507,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
           t->castTo<GenericTypeParamType>());
       },
       MakeAbstractConformanceForGenericType());
-    genericSig->getSubstitutions(subMap, subs);
+    subMap.toList(subs);
   }
 
   std::tie(initVal, initTy)
@@ -941,7 +941,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                   conformedProtocol->getDecl());
                        });
           SmallVector<Substitution, 4> subsVec;
-          typeGenericSig->getSubstitutions(subMap, subsVec);
+          subMap.toList(subsVec);
           subs = SGM.getASTContext().AllocateCopy(subsVec);
         }
 

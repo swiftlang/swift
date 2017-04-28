@@ -99,6 +99,9 @@ public:
   SubstitutionMap subst(TypeSubstitutionFn subs,
                         LookupConformanceFn conformances) const;
 
+  /// Build an array of substitutions from a substitution map.
+  void toList(SmallVectorImpl<Substitution> &subs) const;
+
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,

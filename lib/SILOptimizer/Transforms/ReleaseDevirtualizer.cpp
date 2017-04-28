@@ -166,8 +166,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
 
   SmallVector<Substitution, 4> AllocSubsts;
-  if (auto *Sig = NTD->getGenericSignature())
-    Sig->getSubstitutions(AllocSubMap, AllocSubsts);
+  AllocSubMap.toList(AllocSubsts);
 
   B.createApply(ReleaseInst->getLoc(), MI, DeallocSILType, ReturnType,
                 AllocSubsts, { object }, false);

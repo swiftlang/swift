@@ -2528,7 +2528,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       return ProtocolConformanceRef(conformedTy->getDecl());
     });
   SmallVector<Substitution, 4> genericArgs;
-  signature->getSubstitutions(subMap, genericArgs);
+  subMap.toList(genericArgs);
 
   auto boxTy = SILBoxType::get(C, layout, genericArgs);
 #ifndef NDEBUG

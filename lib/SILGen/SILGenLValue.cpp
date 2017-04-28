@@ -2302,8 +2302,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
       SGM.M.getSwiftModule(), ivar->getDeclContext());
 
   SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = ivar->getDeclContext()->getGenericSignatureOfContext())
-    genericSig->getSubstitutions(subMap, subs);
+  subMap.toList(subs);
 
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
                                                  base.getValue());

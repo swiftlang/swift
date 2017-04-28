@@ -2493,7 +2493,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
         
         return *result;
       });
-    genericSig->getSubstitutions(subMap, genericArgs);
+    subMap.toList(genericArgs);
 
     if (!ok)
       return ErrorType::get(Context);

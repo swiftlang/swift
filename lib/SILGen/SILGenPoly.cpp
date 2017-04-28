@@ -2887,14 +2887,10 @@ static ManagedValue createThunk(SILGenFunction &gen,
                    outputSubstType);
   }
 
-  CanSILFunctionType substFnType = thunkType;
-
   SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkType->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
-    substFnType = thunkType->substGenericArgs(gen.F.getModule(),
-                                              interfaceSubs);
-  }
+  interfaceSubs.toList(subs);
+  auto substFnType = thunkType->substGenericArgs(gen.F.getModule(),
+                                                 interfaceSubs);
 
   // Create it in our current function.
   auto thunkValue = gen.B.createFunctionRef(loc, thunk);
