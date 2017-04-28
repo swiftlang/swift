@@ -677,8 +677,8 @@ public:
 
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-    return insert(new (F.getModule())
-                      ConvertFunctionInst(getSILDebugLocation(Loc), Op, Ty));
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              F, OpenedArchetypes));
   }
 
   ThinFunctionToPointerInst *
@@ -689,13 +689,13 @@ public:
 
   PointerToThinFunctionInst *
   createPointerToThinFunction(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule()) PointerToThinFunctionInst(
-        getSILDebugLocation(Loc), Op, Ty));
+    return insert(PointerToThinFunctionInst::create(
+        getSILDebugLocation(Loc), Op, Ty, F, OpenedArchetypes));
   }
 
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                      UpcastInst(getSILDebugLocation(Loc), Op, Ty));
+    return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty, F,
+                                     OpenedArchetypes));
   }
 
   AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
@@ -782,8 +782,8 @@ public:
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
-    return insert(new (F.getModule()) ThinToThickFunctionInst(
-        getSILDebugLocation(Loc), Op, Ty));
+    return insert(ThinToThickFunctionInst::create(getSILDebugLocation(Loc), Op,
+                                                  Ty, F, OpenedArchetypes));
   }
 
   ThickToObjCMetatypeInst *createThickToObjCMetatype(SILLocation Loc,

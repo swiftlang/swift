@@ -1906,6 +1906,65 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
   return ::new (Buffer) MetatypeInst(Loc, Ty, TypeDependentOperands);
 }
 
+UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                               SILType Ty, SILFunction &F,
+                               SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getSwiftRValueType());
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(UpcastInst));
+  return ::new (Buffer) UpcastInst(DebugLoc, Operand,
+                                   TypeDependentOperands, Ty);
+}
+
+ThinToThickFunctionInst *
+ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                                SILType Ty, SILFunction &F,
+                                SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getSwiftRValueType());
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(ThinToThickFunctionInst));
+  return ::new (Buffer) ThinToThickFunctionInst(DebugLoc, Operand,
+                                                TypeDependentOperands, Ty);
+}
+
+PointerToThinFunctionInst *
+PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                                  SILType Ty, SILFunction &F,
+                                  SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getSwiftRValueType());
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(PointerToThinFunctionInst));
+  return ::new (Buffer) PointerToThinFunctionInst(DebugLoc, Operand,
+                                                  TypeDependentOperands, Ty);
+}
+
+ConvertFunctionInst *
+ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILFunction &F,
+                            SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getSwiftRValueType());
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
+  return ::new (Buffer) ConvertFunctionInst(DebugLoc, Operand,
+                                            TypeDependentOperands, Ty);
+}
+
 bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   switch (getKind()) {
   case Kind::StoredProperty:
