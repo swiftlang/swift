@@ -44,7 +44,7 @@ namespace {
       Type            = 1 << 1,
       Constructor     = 1 << 2,
       Disjunct        = 1 << 3,
-      BooleanConstant = 1 << 5,
+      BooleanConstant = 1 << 4,
     };
 
     /// A data structure for conveniently pattern-matching on the kinds of
@@ -75,27 +75,26 @@ namespace {
     class Space final {
     private:
       SpaceKind Kind;
-      Type Ty;
+      llvm::PointerIntPair<Type, 1, bool> TypeAndVal;
       Identifier Head;
       std::forward_list<Space> Spaces;
-      bool Val;
 
     public:
       explicit Space(Type T)
-        : Kind(SpaceKind::Type), Ty(T), Head(Identifier()),
-          Spaces({}), Val(false) {}
+        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(Identifier()),
+          Spaces({}){}
       explicit Space(Type T, Identifier H, SmallVectorImpl<Space> &SP)
-        : Kind(SpaceKind::Constructor), Ty(T), Head(H),
-          Spaces(SP.begin(), SP.end()), Val(false) {}
+        : Kind(SpaceKind::Constructor), TypeAndVal(T, false), Head(H),
+          Spaces(SP.begin(), SP.end()) {}
       explicit Space(SmallVectorImpl<Space> &SP)
-        : Kind(SpaceKind::Disjunct), Ty(Type()), Head(Identifier()),
-          Spaces(SP.begin(), SP.end()), Val(false) {}
+        : Kind(SpaceKind::Disjunct), TypeAndVal(Type(), false),
+          Head(Identifier()), Spaces(SP.begin(), SP.end()) {}
       explicit Space()
-        : Kind(SpaceKind::Empty), Ty(Type()), Head(Identifier()),
-          Spaces({}), Val(false) {}
+        : Kind(SpaceKind::Empty), TypeAndVal(Type(), false), Head(Identifier()),
+          Spaces({}) {}
       explicit Space(bool C)
-        : Kind(SpaceKind::BooleanConstant), Ty(Type()), Head(Identifier()),
-          Spaces({}), Val(C) {}
+        : Kind(SpaceKind::BooleanConstant), TypeAndVal(Type(), C),
+          Head(Identifier()), Spaces({}) {}
 
       SpaceKind getKind() const { return Kind; }
 
@@ -107,7 +106,7 @@ namespace {
         assert((getKind() == SpaceKind::Type
                 || getKind() == SpaceKind::Constructor)
                && "Wrong kind of space tried to access space type");
-        return Ty;
+        return TypeAndVal.getPointer();
       }
 
       Identifier getHead() const {
@@ -126,7 +125,7 @@ namespace {
       bool getBoolValue() const {
         assert(getKind() == SpaceKind::BooleanConstant
                 && "Wrong kind of space tried to access bool value");
-        return Val;
+        return TypeAndVal.getInt();
       }
 
       // An optimization that computes if the difference of this space and
@@ -237,11 +236,8 @@ namespace {
           return true;
         }
         PAIRCASE(SpaceKind::Constructor, SpaceKind::Disjunct):
-          /// H(p1, ..., pn) <= (S1 | ... | Sn) iff (this - other) == [EMPTY]
-          return this->minus(other).simplify().isEmpty();
-
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct): {
-          // Bool <= (S1 | ... | Sn) iff Bool <= S1 || ... || Bool <= Sn
+          // S <= (S1 | ... | Sn) <= S iff (S <= S1) || ... || (S <= Sn)
           for (auto &param : other.getSpaces()) {
             if (this->isSubspace(param)) {
               return true;
@@ -617,7 +613,7 @@ namespace {
         }
           break;
         case SpaceKind::BooleanConstant:
-          buffer << ((Val) ? "true" : "false");
+          buffer << ((getBoolValue()) ? "true" : "false");
           break;
         case SpaceKind::Constructor: {
           if (!Head.empty()) {
@@ -649,7 +645,7 @@ namespace {
           break;
         case SpaceKind::Type:
           if (!normalize) {
-            Ty->print(buffer);
+            getType()->print(buffer);
           }
           buffer << "_";
           break;
@@ -680,13 +676,13 @@ namespace {
               return Space();
             }
           }
-          return Space(Ty, Head, simplifiedSpaces);
+          return Space(getType(), Head, simplifiedSpaces);
         }
         case SpaceKind::Type: {
           // If the decomposition of a space is empty, the space is empty.
-          if (canDecompose(Ty)) {
+          if (canDecompose(this->getType())) {
             SmallVector<Space, 4> ss;
-            decompose(Ty, ss);
+            decompose(this->getType(), ss);
             if (ss.empty()) {
               return Space();
             }
@@ -811,11 +807,11 @@ namespace {
             continue;
 
           auto projection = projectPattern(Ctx, caseItem.getPattern());
-          spaces.push_back(projection);
 
           // Space is trivially covered with a default clause.
           if (caseItem.isDefault())
             return;
+          spaces.push_back(projection);
         }
       }
 
@@ -1027,12 +1023,14 @@ namespace {
         }
         case PatternKind::Paren: {
           auto *PP = dyn_cast<ParenPattern>(SP);
-          auto *SP = PP->getSubPattern();
+          auto *SP = PP->getSemanticsProvidingPattern();
+
           // Special Case: A constructor pattern may have all of its payload
           // matched by a single var pattern.  Project it like the tuple it
           // really is.
-          if (SP->getKind() == PatternKind::Var
-              || SP->getKind() == PatternKind::Any) {
+          if (SP->getKind() == PatternKind::Named
+              || SP->getKind() == PatternKind::Any
+              || SP->getKind() == PatternKind::Tuple) {
             if (auto *TTy = SP->getType()->getAs<TupleType>()) {
               for (auto ty : TTy->getElements()) {
                 conArgSpace.push_back(Space(ty.getType()));
