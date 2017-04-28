@@ -1472,6 +1472,10 @@ ERROR(avail_query_unrecognized_platform_name,
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
 
+ERROR(avail_query_argument_and_shorthand_mix_not_allowed, PointsToFirstBadToken,
+      "'%0' can't be combined with shorthand specification '%1'",
+      (StringRef, StringRef))
+
 ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())
 

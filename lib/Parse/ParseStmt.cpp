@@ -1103,7 +1103,31 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
       consumeToken();
       Status.setIsParseError();
     } else if (consumeIf(tok::comma)) {
-      // keep going.
+      // There is more to parse in this list.
+
+      // Before continuing to parse the next specification, we check that it's
+      // also in the shorthand syntax and try to and provide a more specific
+      // diagnostic if that's not the case.
+      if (Tok.isIdentifierOrUnderscore() &&
+          !peekToken().isAny(tok::integer_literal, tok::floating_literal)) {
+        auto Text = Tok.getText();
+        if (Text == "deprecated" || Text == "renamed" || Text == "introduced" ||
+            Text == "message" || Text == "obsoleted" || Text == "unavailable") {
+          auto &SourceManager = Context.SourceMgr;
+          auto PreviousSpecText =
+              SourceManager.extractText(L->getCharSourceRangeFromSourceRange(
+                  SourceManager, Specs.back()->getSourceRange()));
+
+          diagnose(Tok,
+                   diag::avail_query_argument_and_shorthand_mix_not_allowed,
+                   Text, PreviousSpecText);
+
+          Status.setIsParseError();
+          break;
+        }
+      }
+
+      // Otherwise, keep going.
     } else {
       break;
     }
