@@ -390,9 +390,15 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
       if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
         result.addSubstitution(paramTy,
                                sub.getReplacement());
-      assert(reqts.size() == sub.getConformances().size());
-      for (auto conformance : sub.getConformances())
-        result.addConformance(canTy, conformance);
+
+      auto conformances = sub.getConformances();
+      assert(reqts.size() == conformances.size());
+
+      for (unsigned i = 0, e = conformances.size(); i < e; i++) {
+        assert(reqts[i].getSecondType()->getAnyNominal() ==
+               conformances[i].getRequirement());
+        result.addConformance(canTy, conformances[i]);
+      }
 
       return false;
     });
