@@ -74,6 +74,11 @@ public class A_Sub: Base {
   public override var disappearingProperty: Int { return 0 }
 }
 
+public class A_Sub2: A_Sub {
+  public override func disappearingMethod() {}
+}
+
+
 // CHECK-LABEL: class A_Sub : Base {
 // CHECK-NEXT: func disappearingMethod()
 // CHECK-NEXT: func nullabilityChangeMethod() -> Any?
@@ -83,7 +88,16 @@ public class A_Sub: Base {
 // CHECK-NEXT: init()
 // CHECK-NEXT: {{^}$}}
 
+// CHECK-LABEL: class A_Sub2 : A_Sub {
+// CHECK-NEXT: func disappearingMethod()
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
 // CHECK-RECOVERY-LABEL: class A_Sub : Base {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class A_Sub2 : A_Sub {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Serialization/ModuleFile.h"
+#include "DeserializationErrors.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -31,6 +32,7 @@
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
+using llvm::Expected;
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
   for (unsigned char byte : MODULE_SIGNATURE)
@@ -1310,17 +1312,17 @@ void ModuleFile::lookupValue(DeclName name,
     // serialized.
     auto iter = TopLevelDecls->find(name.getBaseName());
     if (iter != TopLevelDecls->end()) {
-      if (name.isSimpleName()) {
-        for (auto item : *iter) {
-          auto VD = cast<ValueDecl>(getDecl(item.second));
+      for (auto item : *iter) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        auto VD = cast<ValueDecl>(declOrError.get());
+        if (name.isSimpleName() || VD->getFullName().matchesRef(name))
           results.push_back(VD);
-        }
-      } else {
-        for (auto item : *iter) {
-          auto VD = cast<ValueDecl>(getDecl(item.second));
-          if (VD->getFullName().matchesRef(name))
-            results.push_back(VD);
-        }
       }
     }
   }
@@ -1503,21 +1505,32 @@ void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
   if (!TopLevelDecls)
     return;
 
+  auto tryImport = [this, &consumer](DeclID ID) {
+    Expected<Decl *> declOrError = getDeclChecked(ID);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      llvm::consumeError(declOrError.takeError());
+      return;
+    }
+    consumer.foundDecl(cast<ValueDecl>(declOrError.get()),
+                       DeclVisibilityKind::VisibleAtTopLevel);
+  };
+
   if (!accessPath.empty()) {
     auto iter = TopLevelDecls->find(accessPath.front().first);
     if (iter == TopLevelDecls->end())
       return;
 
     for (auto item : *iter)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::VisibleAtTopLevel);
+      tryImport(item.second);
+
     return;
   }
 
   for (auto entry : TopLevelDecls->data()) {
     for (auto item : entry)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::VisibleAtTopLevel);
+      tryImport(item.second);
   }
 }
 
@@ -1711,8 +1724,16 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
 
   if (TopLevelDecls) {
     for (auto entry : TopLevelDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        results.push_back(declOrError.get());
+      }
     }
   }
 
