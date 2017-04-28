@@ -8,6 +8,7 @@
 // Tests for traps at run time when enforcing exclusive access.
 
 import StdlibUnittest
+import SwiftPrivatePthreadExtras
 
 struct X {
   var i = 7
@@ -108,6 +109,18 @@ ExclusiveAccessTestSuite.test("ClosureCaptureModifyModify") {
   }
 }
 
+// Test for per-thread enforcement. Don't trap when two different threads
+// have overlapping accesses
+ExclusiveAccessTestSuite.test("PerThreadEnforcement") {
+  modifyAndPerform(&globalX) {
+    var (_, otherThread) = _stdlib_pthread_create_block(nil, { (_ : Void) -> () in
+      globalX.i = 12 // no-trap
+      return ()
+    }, ())
+
+    _ = _stdlib_pthread_join(otherThread!, Void.self)
+  }
+}
 
 
 
