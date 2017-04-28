@@ -70,9 +70,22 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
       genericEnv->mapTypeOutOfContext(archetype)->getCanonicalType());
   }
 
-  auto known = subMap.find(cast<GenericTypeParamType>(type));
+  auto genericParam = cast<GenericTypeParamType>(type);
+  auto known = subMap.find(genericParam);
   if (known != subMap.end() && known->second)
     return known->second;
+
+  // The generic parameter may have been made concrete by the generic signature,
+  // substitute into the concrete type.
+  ModuleDecl &anyModule = *genericParam->getASTContext().getStdlibModule();
+  auto genericSig = getGenericSignature();
+  if (auto concreteType = genericSig->getConcreteType(genericParam, anyModule)){
+    auto mutableThis = const_cast<SubstitutionMap *>(this);
+    mutableThis->subMap[genericParam] = ErrorType::get(concreteType);
+    Type result = concreteType.subst(*this);
+    mutableThis->subMap[genericParam] = result;
+    return result;
+  }
 
   // Not known.
   return Type();
