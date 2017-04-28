@@ -503,23 +503,39 @@ public protocol UnicodeEncoding {
     where ReverseDecoder.CodeUnit == CodeUnit
 }
 
+public protocol _UTFDecoderBase : UnicodeDecoder
+where Buffer == EncodedScalar {
+  associatedtype BufferStorage = UInt32
+}
 
-public protocol _UTF8Decoder : UnicodeDecoder where Buffer == EncodedScalar {
-  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8)
+public protocol _UTFDecoder : _UTFDecoderBase
+where Buffer == _UIntBuffer<BufferStorage, CodeUnit>,
+  BufferStorage == UInt32
+{
+  static func _isScalar(_: CodeUnit) -> Bool
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   var buffer: Buffer { get set }
 }
 
-extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
+public protocol _UTF8Decoder : _UTFDecoder {
+  var buffer: Buffer { get set }
+}
+
+extension _UTF8Decoder {
+  public static func _isScalar(_ x: CodeUnit) -> Bool { return x & 0x80 == 0 }
+}
+
+extension _UTFDecoder {
   public mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> Unicode.ParseResult<EncodedScalar>
-    where I.Element == Unicode.UTF8.CodeUnit {
+    where I.Element == CodeUnit {
 
     // Bufferless ASCII fastpath.
     if _fastPath(buffer.isEmpty) {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
-      if codeUnit & 0x80 == 0 {
+      if Self._isScalar(codeUnit) {
         return .valid(EncodedScalar(containing: codeUnit))
       }
       // Non-ASCII, proceed to buffering mode.
@@ -527,7 +543,7 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     } else if buffer._storage & 0x80 == 0 {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
-      let codeUnit = UInt8(extendingOrTruncating: buffer._storage)
+      let codeUnit = CodeUnit(extendingOrTruncating: buffer._storage)
       buffer.remove(at: buffer.startIndex)
       return .valid(EncodedScalar(containing: codeUnit))
     }
@@ -544,8 +560,9 @@ extension _UTF8Decoder where Buffer == _UIntBuffer<UInt32, UInt8> {
     } while buffer._bitCount < 32
 
     // Find one unicode scalar.
-    let (isValid, scalarBitCount) = _parseNonASCII()
-    _sanityCheck(scalarBitCount % 8 == 0 && 1...4 ~= scalarBitCount / 8)
+    let (isValid, scalarBitCount) = _parseMultipleCodeUnits()
+    _sanityCheck(scalarBitCount % numericCast(CodeUnit.bitWidth) == 0)
+    _sanityCheck(1...4 ~= scalarBitCount / 8)
     _sanityCheck(scalarBitCount <= buffer._bitCount)
     
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
@@ -609,7 +626,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     if buffer._storage                & 0b0__1110_0000__1100_0000
                                      == 0b0__1100_0000__1000_0000 {
@@ -681,7 +698,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   }
   
   public // @testable
-  func _parseNonASCII() -> (isValid: Bool, bitCount: UInt8) {
+  func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
     
     if buffer._storage & 0b0__1100_0000__1110_0000
