@@ -1374,6 +1374,40 @@ static StringRef getMultilineTrailingIndent(const Token &Str,
   return "";
 }
 
+static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags, 
+                                            StringRef ExpectedIndentation,
+                                            const char * LinePtr) {
+  size_t mistakeOffset;
+  
+  // Find the first mismatched character. BytesPtr must at least include a delimiter,
+  // and that delimiter is guaranteed not to match, so we don't need to 
+  // bounds-check it. 
+  for(mistakeOffset = 0; LinePtr[mistakeOffset] == ExpectedIndentation[mistakeOffset]; mistakeOffset++)
+    // If this is the last character of the expected indentation, there was no error  
+    // to diagnose!
+    assert(mistakeOffset < ExpectedIndentation.size() - 1);
+  
+  Diag<> error;
+  switch(LinePtr[mistakeOffset]) {
+  case ' ':
+    assert(ExpectedIndentation[mistakeOffset] == '\t');
+    error = diag::lex_unexpected_space_in_string_indent;
+    break;
+
+  case '\t':
+    assert(ExpectedIndentation[mistakeOffset] == ' ');
+    error = diag::lex_unexpected_tab_in_string_indent;
+    break;
+
+  default:
+    // Expected space or tab, got something else.
+    error = diag::lex_insufficient_string_indent;
+    break;
+  }
+  
+  Diags->diagnose(Lexer::getSourceLoc(LinePtr), error);
+}
+
 /// validateMultilineIndents:
 /// Diagnose contents of string literal that have inconsistent indentation.
 static void validateMultilineIndents(const Token &Str,
@@ -1389,8 +1423,7 @@ static void validateMultilineIndents(const Token &Str,
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
       if (Bytes.substr(nextpos, Indent.size()) != Indent)
-        Diags->diagnose(Lexer::getSourceLoc(BytesPtr + nextpos),
-                        diag::lex_ambiguous_string_indent);
+        diagnoseInvalidMultilineIndents(Diags, Indent, BytesPtr + nextpos);
     }
     pos = nextpos;
   }

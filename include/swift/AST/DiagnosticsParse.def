@@ -134,7 +134,12 @@ ERROR(lex_illegal_multiline_string_end,none,
       "invalid end of multi-line string literal", ())
 ERROR(lex_ambiguous_string_indent,none,
       "invalid mix of multi-line string literal indentation", ())
-
+ERROR(lex_insufficient_string_indent,none,
+      "string literal content is insufficiently indented", ())
+ERROR(lex_unexpected_tab_in_string_indent,none,
+      "string literal content is indented with a tab where a space is expected", ())
+ERROR(lex_unexpected_space_in_string_indent,none,
+      "string literal content is indented with a space where a tab is expected", ())
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
