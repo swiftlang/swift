@@ -86,6 +86,8 @@ case .bySameValue:
   break
 case .differentValue:
   break
+default:
+  break
 }
 switch aliasOriginal {
 case .bySameValue:
@@ -99,6 +101,8 @@ case NSAliasesEnum.bySameValue:
   break
 case NSAliasesEnum.differentValue:
   break
+default:
+  break
 }
 
 extension NSAliasesEnum {
@@ -107,6 +111,8 @@ extension NSAliasesEnum {
     case .bySameValue:
       break
     case .differentValue:
+      break
+    default:
       break
     }
   }

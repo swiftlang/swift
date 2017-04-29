@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-new.h -verify
+// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-new.h -verify
 // REQUIRES: OS=macosx
 
 _ = .Red as Color

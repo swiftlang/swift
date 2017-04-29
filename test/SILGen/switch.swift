@@ -692,43 +692,6 @@ func test_union_1(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @_T06switch12test_union_2yAA9MaybePairO1u_tF
-func test_union_2(u: MaybePair) {
-  switch u {
-  // CHECK: switch_enum {{%.*}} : $MaybePair,
-  // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   default [[DEFAULT:bb[0-9]+]]
-
-  // CHECK: [[IS_NEITHER]]:
-  case .Neither:
-  // CHECK:   function_ref @_T06switch1ayyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
-    a()
-
-  // CHECK: [[IS_LEFT]]({{%.*}}):
-  case .Left:
-  // CHECK:   function_ref @_T06switch1byyF
-  // CHECK:   br [[CONT]]
-    b()
-
-  // CHECK: [[IS_RIGHT]]({{%.*}}):
-  case .Right:
-  // CHECK:   function_ref @_T06switch1cyyF
-  // CHECK:   br [[CONT]]
-    c()
-
-  // -- missing .Both case
-  // CHECK: [[DEFAULT]]:
-  // CHECK:   unreachable
-  }
-
-  // CHECK: [[CONT]]:
-  // CHECK:   function_ref @_T06switch1dyyF
-  d()
-}
-
 // CHECK-LABEL: sil hidden @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {
 func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : $MaybePair):
