@@ -582,7 +582,7 @@ internal func += <Element, C : Collection>(
     newLHS.firstElementAddress.moveInitialize(
       from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
-    swap(&lhs, &newLHS)
+    (lhs, newLHS) = (newLHS, lhs)
     buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
   }
 
@@ -746,7 +746,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       newResult.firstElementAddress.moveInitialize(
         from: result.firstElementAddress, count: result.capacity)
       result.count = 0
-      swap(&result, &newResult)
+      (result, newResult) = (newResult, result)
     }
     addWithExistingCapacity(element)
   }
@@ -789,7 +789,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
     var finalResult = _ContiguousArrayBuffer<Element>()
-    swap(&finalResult, &result)
+    (finalResult, result) = (result, finalResult)
     remainingCapacity = 0
     return ContiguousArray(_buffer: finalResult)
   }

@@ -642,7 +642,7 @@ extension Sequence {
     var result = Array(self)
     let count = result.count
     for i in 0..<count/2 {
-      swap(&result[i], &result[count - ((i + 1) as Int)])
+      result.swapAt(i, count - ((i + 1) as Int))
     }
     return result
   }
