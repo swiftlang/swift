@@ -2754,14 +2754,6 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
-ERROR(empty_switch_stmt,none,
-      "%select{'switch' statement body must have at least one 'case' or 'default' block; |}0"
-      "do you want to add "
-      "%select{missing cases?|a default case?}1",(bool, bool))
-ERROR(non_exhaustive_switch,none,
-      "%select{switch must be exhaustive, consider adding |do you want to add }0"
-      "%select{missing cases|a default clause}1"
-      "%select{|?}0", (bool, bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -3594,6 +3586,21 @@ WARNING(debug_long_function_body, none,
 WARNING(debug_long_closure_body, none,
         "closure took %0ms to type-check (limit: %1ms)",
         (unsigned, unsigned))
+
+//------------------------------------------------------------------------------
+// Pattern match diagnostics
+//------------------------------------------------------------------------------
+
+
+ERROR(empty_switch_stmt,none,
+      "'switch' statement body must have at least one 'case' or 'default' "
+      "block; do you want to add a default case?",())
+ERROR(non_exhaustive_switch,none,
+      "%select{switch must be exhaustive, consider adding |do you want to add }0"
+      "%select{missing cases|a default clause}1"
+      "%select{:|?}0 %2", (bool, bool, StringRef))
+NOTE(missing_particular_case,none,
+     "missing case: '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

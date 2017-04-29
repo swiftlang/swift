@@ -126,6 +126,8 @@ let optionalSel: Selector? = nil
 switch optionalSel {
 case #selector(C1.method1)?:
   break
+default:
+  break
 }
 
 @objc class SR1827 {
