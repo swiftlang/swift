@@ -148,8 +148,18 @@ Protocol Integer has been renamed to Protocol BinaryInteger
 Func FloatingPoint.adding(_:) has been renamed to Func FloatingPoint.addingProduct(_:_:)
 Var BidirectionalCollection.indices has declared type change from DefaultBidirectionalIndices<Self> to Self.Indices
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+
+/* Added new type */
+Var Dictionary.keys has declared type change from LazyMapCollection<Dictionary<Key, Value>, Key> to Dictionary<Key, Value>.Keys
+
+/* FIXME: Bogus */
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var RandomAccessCollection.indices has declared type change from DefaultRandomAccessIndices<Self> to Self.Indices
+
+/* Added new type */
+Var Dictionary.values has declared type change from LazyMapCollection<Dictionary<Key, Value>, Value> to Dictionary<Key, Value>.Values
+
+/* FIXME: Bogus */
 Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
 Var Set.first has declared type change from Element? to (Element)?
 Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
