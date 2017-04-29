@@ -17,12 +17,12 @@
 extension Date : Codable {
     public init(from decoder: Decoder) throws {
         let timestamp = try decoder.singleValueContainer().decode(Double.self)
-        self.init(timeIntervalSince1970: timestamp)
+        self.init(timeIntervalSinceReferenceDate: timestamp)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(self.timeIntervalSince1970)
+        try container.encode(self.timeIntervalSinceReferenceDate)
     }
 }
 
