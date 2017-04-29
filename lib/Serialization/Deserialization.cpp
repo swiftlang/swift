@@ -25,6 +25,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
@@ -482,6 +483,9 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   auto next = Cursor.advance(AF_DontPopBlockAtEnd);
   assert(next.Kind == llvm::BitstreamEntry::Record);
+
+  if (getContext().Stats)
+    getContext().Stats->getFrontendCounters().NumConformancesDeserialized++;
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
@@ -2022,6 +2026,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   ASTContext &ctx = getContext();
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumDeclsDeserialized++;
 
   // Read the attributes (if any).
   DeclAttribute *DAttrs = nullptr;
@@ -3620,6 +3627,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
   case decls_block::NAME_ALIAS_TYPE: {

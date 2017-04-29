@@ -103,6 +103,7 @@ namespace swift {
   class SILBoxType;
   class TypeAliasDecl;
   class VarDecl;
+  class UnifiedStatsReporter;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -240,6 +241,9 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
+
+  /// Optional table of counters to report, nullptr when not collecting.
+  UnifiedStatsReporter *Stats = nullptr;
 
 private:
   /// \brief The current generation number, which reflects the number of

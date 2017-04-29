@@ -63,6 +63,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
@@ -347,6 +348,58 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
+static void countStatsPostSema(UnifiedStatsReporter &Stats,
+                               CompilerInstance& Instance) {
+  auto &C = Stats.getFrontendCounters();
+  C.NumSourceBuffers = Instance.getSourceMgr().getLLVMSourceMgr().getNumBuffers();
+  C.NumLinkLibraries = Instance.getLinkLibraries().size();
+
+  auto const &AST = Instance.getASTContext();
+  C.NumLoadedModules = AST.LoadedModules.size();
+  C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
+  C.NumASTBytesAllocated = AST.getAllocator().getBytesAllocated();
+
+  if (auto *D = Instance.getDependencyTracker()) {
+    C.NumDependencies = D->getDependencies().size();
+  }
+
+  if (auto *R = Instance.getReferencedNameTracker()) {
+    C.NumReferencedTopLevelNames = R->getTopLevelNames().size();
+    C.NumReferencedDynamicNames = R->getDynamicLookupNames().size();
+    C.NumReferencedMemberNames = R->getUsedMembers().size();
+  }
+
+  if (auto *SF = Instance.getPrimarySourceFile()) {
+    C.NumDecls = SF->Decls.size();
+    C.NumLocalTypeDecls = SF->LocalTypeDecls.size();
+    C.NumObjCMethods = SF->ObjCMethods.size();
+    C.NumInfixOperators = SF->InfixOperators.size();
+    C.NumPostfixOperators = SF->PostfixOperators.size();
+    C.NumPrefixOperators = SF->PrefixOperators.size();
+    C.NumPrecedenceGroups = SF->PrecedenceGroups.size();
+    C.NumUsedConformances = SF->getUsedConformances().size();
+  }
+}
+
+static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
+                                const llvm::Module& Module) {
+  auto &C = Stats.getFrontendCounters();
+  // FIXME: calculate these in constant time if possible.
+  C.NumIRGlobals = Module.getGlobalList().size();
+  C.NumIRFunctions = Module.getFunctionList().size();
+  C.NumIRAliases = Module.getAliasList().size();
+  C.NumIRIFuncs = Module.getIFuncList().size();
+  C.NumIRNamedMetaData = Module.getNamedMDList().size();
+  C.NumIRValueSymbols = Module.getValueSymbolTable().size();
+  C.NumIRComdatSymbols = Module.getComdatSymbolTable().size();
+  for (auto const &Func : Module) {
+    for (auto const &BB : Func) {
+      C.NumIRBasicBlocks++;
+      C.NumIRInsts += BB.size();
+    }
+  }
+}
+
 static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
                                  const SILModule& Module) {
   auto &C = Stats.getFrontendCounters();
@@ -450,6 +503,10 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
 
   if (observer) {
     observer->performedSemanticAnalysis(*Instance);
+  }
+
+  if (Stats) {
+    countStatsPostSema(*Stats, *Instance);
   }
 
   FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
@@ -829,6 +886,10 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     return HadError;
   }
 
+  if (Stats) {
+    countStatsPostIRGen(*Stats, *IRModule);
+  }
+
   if (opts.ValidateTBDAgainstIR) {
     auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
     bool error;
@@ -1113,6 +1174,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Instance->setup(Invocation)) {
     return 1;
+  }
+
+  if (StatsReporter) {
+    // Install stats-reporter somewhere visible for subsystems that
+    // need to bump counters as they work, rather than measure
+    // accumulated work on completion (mostly: TypeChecker).
+    Instance->getASTContext().Stats = StatsReporter.get();
   }
 
   // The compiler instance has been configured; notify our observer.
