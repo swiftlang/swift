@@ -59,9 +59,7 @@ extension Data : Codable {
         var caughtError: Error? = nil
         self.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, byteIndex: Data.Index, stop: inout Bool) in
             do {
-                for byte in buffer {
-                    try bytesContainer.encode(byte)
-                }
+                try bytesContainer.encode(contentsOf: buffer)
             } catch {
                 caughtError = error
                 stop = true
