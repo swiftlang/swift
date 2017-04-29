@@ -17,7 +17,7 @@ extension String {
   }
 }
 
-public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
+public struct Substring : StringProtocol {
   public typealias Index = String.Index
   public typealias IndexDistance = String.IndexDistance
   public typealias SubSequence = Substring
