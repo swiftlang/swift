@@ -1113,14 +1113,30 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
         auto Text = Tok.getText();
         if (Text == "deprecated" || Text == "renamed" || Text == "introduced" ||
             Text == "message" || Text == "obsoleted" || Text == "unavailable") {
+          auto *Previous = Specs.back();
           auto &SourceManager = Context.SourceMgr;
           auto PreviousSpecText =
               SourceManager.extractText(L->getCharSourceRangeFromSourceRange(
-                  SourceManager, Specs.back()->getSourceRange()));
+                  SourceManager, Previous->getSourceRange()));
 
-          diagnose(Tok,
+          auto diag = diagnose(Tok,
                    diag::avail_query_argument_and_shorthand_mix_not_allowed,
                    Text, PreviousSpecText);
+
+          // If this was preceded by a single platform version constraint, we
+          // can guess that the intention was to treat it as 'introduced' and
+          // suggest a fix-it to combine them.
+          if (Specs.size() == 1 &&
+              PlatformVersionConstraintAvailabilitySpec::classof(Previous) &&
+              Text != "introduced") {
+            auto *PlatformSpec =
+            cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
+
+            auto PlatformName = platformString(PlatformSpec->getPlatform());
+            auto PlatformNameEndLoc =
+            PlatformSpec->getPlatformLoc().getAdvancedLoc(PlatformName.size());
+            diag.fixItInsert(PlatformNameEndLoc, ", introduced:");
+          }
 
           Status.setIsParseError();
           break;
