@@ -1374,18 +1374,28 @@ static StringRef getMultilineTrailingIndent(const Token &Str,
   return "";
 }
 
+static size_t commonPrefixLength(StringRef shorter, const char * longer) {
+  size_t offset = 0;
+  while(offset < shorter.size() && shorter[offset] == longer[offset]) {
+    offset++;
+  }
+  
+  return offset;
+}
+
+// FIXME: StringRef has a method like this; we should probably make LinePtr a 
+// StringRef so we can use it.
+static size_t firstNotOf(const char * haystack, const char * needles, size_t offset = 0) {
+  return strpbrk(haystack + offset, needles) - haystack;
+}
+
 static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags, 
                                             StringRef ExpectedIndentation,
                                             const char * LinePtr) {
-  size_t mistakeOffset;
-  
   // Find the first mismatched character. BytesPtr must at least include a delimiter,
   // and that delimiter is guaranteed not to match, so we don't need to 
   // bounds-check it. 
-  for(mistakeOffset = 0; LinePtr[mistakeOffset] == ExpectedIndentation[mistakeOffset]; mistakeOffset++)
-    // If this is the last character of the expected indentation, there was no error  
-    // to diagnose!
-    assert(mistakeOffset < ExpectedIndentation.size() - 1);
+  size_t mistakeOffset = commonPrefixLength(ExpectedIndentation, LinePtr);
   
   Diag<> error;
   switch(LinePtr[mistakeOffset]) {
@@ -1407,13 +1417,11 @@ static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags,
   
   Diags->diagnose(Lexer::getSourceLoc(LinePtr), error);
   
-  size_t allIndentationOffset;
   // Scan past any remaining indentation in the line, which we will assume is 
   // incorrect.
   // FIXME: It'd be better to examine surrounding lines to see how they're indented, 
   // and then leave enough whitespace on this line to match them.
-  for(allIndentationOffset = mistakeOffset; LinePtr[allIndentationOffset] == ' ' || LinePtr[allIndentationOffset] == '\t'; allIndentationOffset++)
-  /* do nothing */;
+  size_t allIndentationOffset = firstNotOf(LinePtr, " \t", mistakeOffset);
   
   // Suggest fixing this by replacing with the expected whitespace.
   Diags->diagnose(Lexer::getSourceLoc(LinePtr), diag::note_change_current_line_indentation)
