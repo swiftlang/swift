@@ -6,12 +6,12 @@
 func availableSince10_6() {}
 
 @available(OSX, introduced: 10.0, deprecated: 10.12) // no error
-func introducedFollowedByDepreaction() {}
+func introducedFollowedByDeprecated() {}
 
 @available(OSX 10.0, deprecated: 10.12)
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'OSX 10.0'}} {{15-15=, introduced:}}
 // expected-error@-2 {{expected declaration}} 
-func shorthandFollowedByDepreaction() {}
+func shorthandFollowedByDeprecated() {}
 
 @available(OSX 10.0, introduced: 10.12)
 // expected-error@-1 {{'introduced' can't be combined with shorthand specification 'OSX 10.0'}}
@@ -24,4 +24,4 @@ func availableOnMultiplePlatforms() {}
 @available(iOS 6.0, OSX 10.0, deprecated: 10.12)
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'OSX 10.0'}}
 // expected-error@-2 {{expected declaration}}
-func twoShorthandsFollowedByDepreaction() {}
+func twoShorthandsFollowedByDeprecated() {}

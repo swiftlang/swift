@@ -1106,8 +1106,8 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
       // There is more to parse in this list.
 
       // Before continuing to parse the next specification, we check that it's
-      // also in the shorthand syntax and try to and provide a more specific
-      // diagnostic if that's not the case.
+      // also in the shorthand syntax and provide a more specific diagnostic if
+      // that's not the case.
       if (Tok.isIdentifierOrUnderscore() &&
           !peekToken().isAny(tok::integer_literal, tok::floating_literal)) {
         auto Text = Tok.getText();
