@@ -390,6 +390,8 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
   }
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    if (D->isImplicit())
+      return true;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       for (auto *Item: getRelatedDiffItems(AFD)) {
         if (auto *DiffItem = dyn_cast<CommonDiffItem>(Item)) {

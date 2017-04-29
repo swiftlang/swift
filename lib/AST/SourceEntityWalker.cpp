@@ -94,7 +94,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool IsExtension = false;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->hasName())
+    if (VD->hasName() && !VD->isImplicit())
       NameLen = VD->getName().getLength();
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -495,7 +495,9 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
 }
 
 bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
-  if (D->isImplicit() && !isa<PatternBindingDecl>(D)) {
+  if (D->isImplicit() &&
+      !isa<PatternBindingDecl>(D) &&
+      !isa<ConstructorDecl>(D)) {
     ShouldVisitChildren = false;
     return true;
   }

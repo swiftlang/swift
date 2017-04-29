@@ -464,7 +464,7 @@ private:
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
-    if (D->isImplicit())
+    if (D->isImplicit() && !isa<ConstructorDecl>(D))
       return false;
     if (!IdxConsumer.indexLocals() && isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
       return false;
@@ -1004,6 +1004,8 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
       addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
+    if (D->isImplicit())
+      Info.roles |= (unsigned)SymbolRole::Implicit;
   }
 
   if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
