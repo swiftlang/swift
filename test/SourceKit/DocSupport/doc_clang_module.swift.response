@@ -5263,6 +5263,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
             key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
+          },
+          {
+            key.kind: source.lang.swift.ref.function.constructor,
+            key.name: "init(rawValue:)",
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -5283,6 +5288,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.var.instance,
+            key.name: "rawValue",
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+          },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
@@ -5376,6 +5386,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
             key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
+          },
+          {
+            key.kind: source.lang.swift.ref.function.constructor,
+            key.name: "init(rawValue:)",
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -5396,6 +5411,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.var.instance,
+            key.name: "rawValue",
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+          },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
@@ -5496,6 +5516,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
             key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
+          },
+          {
+            key.kind: source.lang.swift.ref.function.constructor,
+            key.name: "init(rawValue:)",
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -5516,6 +5541,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.var.instance,
+            key.name: "rawValue",
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+          },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
@@ -8021,6 +8051,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
             key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
+          },
+          {
+            key.kind: source.lang.swift.ref.function.constructor,
+            key.name: "init(rawValue:)",
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -8041,6 +8076,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.var.instance,
+            key.name: "rawValue",
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
+          },
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
