@@ -399,6 +399,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(LoadedModuleTracePath.c_str());
   }
 
+  if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
+    Arguments.push_back("-migrate-keep-objc-visibility");
+  }
+
   const std::string &FixitsPath =
     context.Output.getAdditionalOutputForType(types::TY_Remapping);
   if (!FixitsPath.empty()) {

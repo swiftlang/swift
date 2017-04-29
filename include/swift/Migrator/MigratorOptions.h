@@ -22,7 +22,7 @@ namespace swift {
 struct MigratorOptions {
   /// Add `@objc` to declarations that would've been implicitly
   /// visible to the Objective-C runtime in Swift 3.
-  bool AddObjC = false;
+  bool KeepObjcVisibility = false;
 
   /// Skip the migration phase that repeatedly asks for fix-its from the
   /// compiler and applies them. This is generally for debugging.

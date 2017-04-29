@@ -1570,7 +1570,7 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
                        DiagnosticEngine &Diags) {
   using namespace options;
 
-  Opts.AddObjC |= Args.hasArg(OPT_warn_swift3_objc_inference);
+  Opts.KeepObjcVisibility |= Args.hasArg(OPT_migrate_keep_objc_visibility);
   Opts.DumpUsr = Args.hasArg(OPT_dump_usr);
 
   if (Args.hasArg(OPT_disable_migrator_fixits)) {
