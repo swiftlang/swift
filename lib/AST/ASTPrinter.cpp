@@ -203,7 +203,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   unsigned countInherits(ExtensionDecl *ED) {
     unsigned Count = 0;
     for (auto TL : ED->getInherited()) {
-      if (shouldPrint(TL.getType()->getAnyNominal(), Options))
+      auto *nominal = TL.getType()->getAnyNominal();
+      if (nominal && shouldPrint(nominal, Options))
         Count ++;
     }
     return Count;

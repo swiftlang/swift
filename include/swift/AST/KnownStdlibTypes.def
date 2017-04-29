@@ -71,4 +71,9 @@ KNOWN_STDLIB_TYPE_DECL(Unmanaged, NominalTypeDecl, 1)
 
 KNOWN_STDLIB_TYPE_DECL(Never, NominalTypeDecl, 0)
 
+KNOWN_STDLIB_TYPE_DECL(Encoder, ProtocolDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(Decoder, ProtocolDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(KeyedEncodingContainer, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(KeyedDecodingContainer, NominalTypeDecl, 1)
+
 #undef KNOWN_STDLIB_TYPE_DECL
