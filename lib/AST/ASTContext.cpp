@@ -1359,6 +1359,11 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
   // Create a new generic signature builder with the given signature.
   auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+
+  // Store this generic signature builder (no generic environment yet).
+  Impl.GenericSignatureBuilders[{sig, mod}] =
+    std::unique_ptr<GenericSignatureBuilder>(builder);
+
   builder->addGenericSignature(sig);
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
@@ -1416,10 +1421,6 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     llvm_unreachable("idempotency problem with a generic signature");
   }
 #endif
-
-  // Store this generic signature builder (no generic environment yet).
-  Impl.GenericSignatureBuilders[{sig, mod}] =
-    std::unique_ptr<GenericSignatureBuilder>(builder);
 
   return builder;
 }
