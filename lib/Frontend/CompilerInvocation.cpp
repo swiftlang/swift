@@ -1228,6 +1228,12 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
+  if (Opts.Optimization > SILOptions::SILOptMode::None
+      && Opts.EnforceExclusivityDynamic) {
+    Diags.diagnose(SourceLoc(),
+                   diag::warning_argument_not_supported_with_optimization,
+                   A->getOption().getPrefixedName() + A->getValue());
+  }
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,

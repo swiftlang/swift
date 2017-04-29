@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -emit-sil -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
 
 public struct S {
   var i: Int
@@ -58,4 +58,28 @@ public func modifyAndReadS(o: AnyObject) {
   var s = initS(3, o)
   s.i = 42
   takeS(s)
+}
+
+// Test capture promotion followed by stack promotion.
+// Access enforcement selection must run after capture promotion
+// so that we never stack promote something with dynamic access.
+// Otherwise, we may try to convert the access to [deinit] which
+// doesn't make sense dynamically.
+//
+// CHECK-LABEL: sil hidden @_T023access_marker_mandatory19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_owned () -> Int {
+// CHECK-LABEL: bb0:
+// CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*Int
+// CHECK: store %{{.*}} to [[WRITE]] : $*Int
+// CHECK: end_access [[WRITE]] : $*Int
+// CHECK: [[F:%.*]] = function_ref @_T023access_marker_mandatory19captureStackPromoteSiycyFSiycfU_Tf2i_n : $@convention(thin) (Int) -> Int
+// CHECK: [[C:%.*]] = partial_apply [[F]](%{{.*}}) : $@convention(thin) (Int) -> Int
+// CHECK: dealloc_stack [[STK]] : $*Int
+// CHECK: return [[C]] : $@callee_owned () -> Int
+// CHECK-LABEL: } // end sil function '_T023access_marker_mandatory19captureStackPromoteSiycyF'
+func captureStackPromote() -> () -> Int {
+  var x = 1
+  x = 2
+  let f = { x }
+  return f
 }
