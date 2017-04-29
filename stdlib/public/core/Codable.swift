@@ -2702,6 +2702,45 @@ public extension RawRepresentable where RawValue == String, Self : Decodable {
 }
 
 //===----------------------------------------------------------------------===//
+// Collection Extensions
+//===----------------------------------------------------------------------===//
+
+// FIXME: Uncomment when conditional conformance is available.
+extension Array : Codable /* where Element : Codable */ {
+    public init(from decoder: Decoder) throws {
+        guard Element.self is Decodable.Type else {
+            preconditionFailure("Array<\(Element.self)> does not conform to Decodable because \(Element.self) does not conform to Decodable.")
+        }
+
+        self.init()
+
+        let metaType = (Element.self as! Decodable.Type)
+        var container = try decoder.unkeyedContainer()
+        while !container.isAtEnd {
+            // superDecoder fetches the next element as a container and wraps a Decoder around it.
+            // This is normally appropriate for decoding super, but this is really what we want to do.
+            let subdecoder = try container.superDecoder()
+            let element = try metaType.init(from: subdecoder)
+            self.append(element as! Element)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard Element.self is Encodable.Type else {
+            preconditionFailure("Array<\(Element.self)> does not conform to Encodable because \(Element.self) does not conform to Encodable.")
+        }
+
+        var container = encoder.unkeyedContainer()
+        for element in self {
+            // superEncoder appends an empty element and wraps an Encoder around it.
+            // This is normally appropriate for encoding super, but this is really what we want to do.
+            let subencoder = container.superEncoder()
+            try (element as! Encodable).encode(to: subencoder)
+        }
+    }
+}
+
+//===----------------------------------------------------------------------===//
 // Convenience Default Implementations
 //===----------------------------------------------------------------------===//
 
