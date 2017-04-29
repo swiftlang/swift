@@ -30,34 +30,6 @@ extension Data : Codable {
     private enum CodingKeys : Int, CodingKey {
         case length
         case bytes
-
-        // TODO: Remove these when derived conformance is merged.
-        var stringValue: String {
-            switch self {
-            case .length: return "length"
-            case .bytes: return "bytes"
-            }
-        }
-
-        init?(stringValue: String) {
-            switch stringValue {
-            case "length": self = .length
-            case "bytes": self = .bytes
-            default: return nil
-            }
-        }
-
-        var intValue: Int? {
-            return self.rawValue
-        }
-
-        init?(intValue: Int) {
-            switch intValue {
-            case 0: self = .length
-            case 1: self = .bytes
-            default: return nil
-            }
-        }
     }
 
     public init(from decoder: Decoder) throws {
