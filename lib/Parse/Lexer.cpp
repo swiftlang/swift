@@ -1349,8 +1349,8 @@ static StringRef getStringLiteralContent(const Token &Str) {
 
 /// getMultilineTrailingIndent:
 /// Determine trailing indent to be used for multiline literal indent stripping.
-static StringRef getMultilineTrailingIndent(const Token &Str,
-                                            DiagnosticEngine *Diags) {
+static std::tuple<StringRef, CharSourceRange>
+getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
 
@@ -1361,17 +1361,23 @@ static StringRef getMultilineTrailingIndent(const Token &Str,
     case '\t':
       continue;
     case '\n':
-    case '\r':
-      return StringRef(start+1, end-(start+1));
+    case '\r': {
+      auto bytes = start + 1;
+      auto length = end-(start+1);
+      
+      auto range = CharSourceRange(Lexer::getSourceLoc(bytes), length);
+      auto string = StringRef(bytes, length);
+      return std::make_tuple(string, range);
+    }
     default:
       if (Diags)
         Diags->diagnose(Lexer::getSourceLoc(start),
                         diag::lex_illegal_multiline_string_end);
-      return "";
+      return std::make_tuple("", CharSourceRange(Lexer::getSourceLoc(end - 1), 0));
     }
   }
 
-  return "";
+  return std::make_tuple("", CharSourceRange(Lexer::getSourceLoc(end - 1), 0));
 }
 
 static size_t commonPrefixLength(StringRef shorter, const char * longer) {
@@ -1432,7 +1438,9 @@ static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags,
 /// Diagnose contents of string literal that have inconsistent indentation.
 static void validateMultilineIndents(const Token &Str,
                                      DiagnosticEngine *Diags) {
-  StringRef Indent = getMultilineTrailingIndent(Str, Diags);
+  StringRef Indent;
+  CharSourceRange IndentRange;
+  std::tie(Indent, IndentRange) = getMultilineTrailingIndent(Str, Diags);
   if (Indent.empty())
     return;
 
@@ -1810,7 +1818,8 @@ void Lexer::getStringLiteralSegments(
   bool MultilineString = Str.IsMultilineString(), IsFirstSegment = true;
   unsigned IndentToStrip = 0;
   if (MultilineString)
-      IndentToStrip = getMultilineTrailingIndent(Str, /*Diags=*/nullptr).size();
+    IndentToStrip = 
+      std::get<0>(getMultilineTrailingIndent(Str, /*Diags=*/nullptr)).size();
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
