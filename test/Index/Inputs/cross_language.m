@@ -12,7 +12,7 @@
 void test1() {
   MyCls1 *o = [[MyCls1 alloc] init];
   // CHECK: [[@LINE-1]]:3 | class/Swift | MyCls1 | [[MyCls1_USR]] |
-  // CHECK: [[@LINE-2]]:31 | instance-method/Swift | init | c:@M@cross_language@objc(cs)MyCls1(im)init |
+  // CHECK: [[@LINE-2]]:31 | instance-method/Swift | init | [[MyCls1_init_USR]] |
   // CHECK: [[@LINE-3]]:17 | class/Swift | MyCls1 | [[MyCls1_USR]] |
   [o someMeth];
   // CHECK: [[@LINE-1]]:6 | instance-method/Swift | someMeth | [[MyCls1_someMeth_USR]] |
