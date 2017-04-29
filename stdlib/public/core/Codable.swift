@@ -291,19 +291,20 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     public typealias Key = K
 
     /// The container for the concrete encoder. The type is _*Base so that it's generic on the key type.
-    private var box: _KeyedEncodingContainerBase<Key>
+    @_versioned
+    internal var _box: _KeyedEncodingContainerBase<Key>
 
     /// Initializes `self` with the given container.
     ///
     /// - parameter container: The container to hold.
     public init<Container : KeyedEncodingContainerProtocol>(_ container: Container) where Container.Key == Key {
-        box = _KeyedEncodingContainerBox(container)
+        _box = _KeyedEncodingContainerBox(container)
     }
 
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
     public var codingPath: [CodingKey?] {
-        return box.codingPath
+        return _box.codingPath
     }
 
     /// Encodes the given value for the given key.
@@ -312,7 +313,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Bool?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -321,7 +322,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Int?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -330,7 +331,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Int8?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -339,7 +340,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Int16?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -348,7 +349,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Int32?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -357,7 +358,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Int64?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -366,7 +367,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: UInt?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -375,7 +376,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: UInt8?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -384,7 +385,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: UInt16?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -393,7 +394,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: UInt32?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -402,7 +403,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: UInt64?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -411,7 +412,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Float?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -420,7 +421,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: Double?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -429,7 +430,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode(_ value: String?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given value for the given key.
@@ -438,7 +439,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
-        try box.encode(value, forKey: key)
+        try _box.encode(value, forKey: key)
     }
 
     /// Encodes the given object weakly for the given key.
@@ -449,7 +450,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to associate the object with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
-        try box.encodeWeak(object, forKey: key)
+        try _box.encodeWeak(object, forKey: key)
     }
 
     /// Stores a keyed encoding container for the given key and returns it.
@@ -458,7 +459,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to encode the container for.
     /// - returns: A new keyed encoding container.
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
-        return box.nestedContainer(keyedBy: NestedKey.self, forKey: key)
+        return _box.nestedContainer(keyedBy: NestedKey.self, forKey: key)
     }
 
     /// Stores an unkeyed encoding container for the given key and returns it.
@@ -466,7 +467,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to encode the container for.
     /// - returns: A new unkeyed encoding container.
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        return box.nestedUnkeyedContainer(forKey: key)
+        return _box.nestedUnkeyedContainer(forKey: key)
     }
 
     /// Stores a new nested container for the default `super` key and returns a new `Encoder` instance for encoding `super` into that container.
@@ -475,7 +476,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     ///
     /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
     public mutating func superEncoder() -> Encoder {
-        return box.superEncoder()
+        return _box.superEncoder()
     }
 
     /// Stores a new nested container for the given key and returns a new `Encoder` instance for encoding `super` into that container.
@@ -483,7 +484,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter key: The key to encode `super` for.
     /// - returns: A new `Encoder` to pass to `super.encode(to:)`.
     public mutating func superEncoder(forKey key: Key) -> Encoder {
-        return box.superEncoder(forKey: key)
+        return _box.superEncoder(forKey: key)
     }
 }
 
@@ -849,26 +850,27 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     public typealias Key = K
 
     /// The container for the concrete decoder. The type is _*Base so that it's generic on the key type.
-    private var box: _KeyedDecodingContainerBase<Key>
+    @_versioned
+    internal var _box: _KeyedDecodingContainerBase<Key>
 
     /// Initializes `self` with the given container.
     ///
     /// - parameter container: The container to hold.
     public init<Container : KeyedDecodingContainerProtocol>(_ container: Container) where Container.Key == Key {
-        box = _KeyedDecodingContainerBox(container)
+        _box = _KeyedDecodingContainerBox(container)
     }
 
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
     public var codingPath: [CodingKey?] {
-        return box.codingPath
+        return _box.codingPath
     }
 
     /// All the keys the `Decoder` has for this container.
     ///
     /// Different keyed containers from the same `Decoder` may return different keys here; it is possible to encode with multiple key types which are not convertible to one another. This should report all keys present which are convertible to the requested type.
     public var allKeys: [Key] {
-        return box.allKeys
+        return _box.allKeys
     }
 
     /// Returns whether the `Decoder` contains a value associated with the given key.
@@ -878,7 +880,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - parameter key: The key to search for.
     /// - returns: Whether the `Decoder` has an entry for the given key.
     public func contains(_ key: Key) -> Bool {
-        return box.contains(key)
+        return _box.contains(key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -890,7 +892,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
-        return try box.decodeIfPresent(Bool.self, forKey: key)
+        return try _box.decodeIfPresent(Bool.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -902,7 +904,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
-        return try box.decodeIfPresent(Int.self, forKey: key)
+        return try _box.decodeIfPresent(Int.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -914,7 +916,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
-        return try box.decodeIfPresent(Int8.self, forKey: key)
+        return try _box.decodeIfPresent(Int8.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -926,7 +928,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
-        return try box.decodeIfPresent(Int16.self, forKey: key)
+        return try _box.decodeIfPresent(Int16.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -938,7 +940,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
-        return try box.decodeIfPresent(Int32.self, forKey: key)
+        return try _box.decodeIfPresent(Int32.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -950,7 +952,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
-        return try box.decodeIfPresent(Int64.self, forKey: key)
+        return try _box.decodeIfPresent(Int64.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -962,7 +964,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
-        return try box.decodeIfPresent(UInt.self, forKey: key)
+        return try _box.decodeIfPresent(UInt.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -974,7 +976,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
-        return try box.decodeIfPresent(UInt8.self, forKey: key)
+        return try _box.decodeIfPresent(UInt8.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -986,7 +988,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
-        return try box.decodeIfPresent(UInt16.self, forKey: key)
+        return try _box.decodeIfPresent(UInt16.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -998,7 +1000,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
-        return try box.decodeIfPresent(UInt32.self, forKey: key)
+        return try _box.decodeIfPresent(UInt32.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -1010,7 +1012,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
-        return try box.decodeIfPresent(UInt64.self, forKey: key)
+        return try _box.decodeIfPresent(UInt64.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -1022,7 +1024,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
-        return try box.decodeIfPresent(Float.self, forKey: key)
+        return try _box.decodeIfPresent(Float.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -1034,7 +1036,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
-        return try box.decodeIfPresent(Double.self, forKey: key)
+        return try _box.decodeIfPresent(Double.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -1046,7 +1048,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
-        return try box.decodeIfPresent(String.self, forKey: key)
+        return try _box.decodeIfPresent(String.self, forKey: key)
     }
 
     /// Decodes a value of the given type for the given key, if present.
@@ -1058,7 +1060,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A decoded value of the requested type, or `nil` if the `Decoder` does not have an entry associated with the given key, or if the value is a null value.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value is not convertible to the requested type.
     public func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
-        return try box.decodeIfPresent(T.self, forKey: key)
+        return try _box.decodeIfPresent(T.self, forKey: key)
     }
 
     /// Returns the data stored for the given key as represented in a container keyed by the given key type.
@@ -1068,7 +1070,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: A keyed decoding container view into `self`.
     /// - throws: `DecodingError.typeMismatch` if the encountered stored value is not a keyed container.
     public func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
-        return try box.nestedContainer(keyedBy: NestedKey.self, forKey: key)
+        return try _box.nestedContainer(keyedBy: NestedKey.self, forKey: key)
     }
 
     /// Returns the data stored for the given key as represented in an unkeyed container.
@@ -1077,7 +1079,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - returns: An unkeyed decoding container view into `self`.
     /// - throws: `DecodingError.typeMismatch` if the encountered stored value is not an unkeyed container.
     public func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
-        return try box.nestedUnkeyedContainer(forKey: key)
+        return try _box.nestedUnkeyedContainer(forKey: key)
     }
 
     /// Returns a `Decoder` instance for decoding `super` from the container associated with the default `super` key.
@@ -1087,7 +1089,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry for the default `super` key.
     /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for the default `super` key.
     public func superDecoder() throws -> Decoder {
-        return try box.superDecoder()
+        return try _box.superDecoder()
     }
 
     /// Returns a `Decoder` instance for decoding `super` from the container associated with the given key.
@@ -1097,7 +1099,7 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
     /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry for the given key.
     /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for the given key.
     public func superDecoder(forKey key: Key) throws -> Decoder {
-        return try box.superDecoder(forKey: key)
+        return try _box.superDecoder(forKey: key)
     }
 }
 
@@ -1922,371 +1924,557 @@ public enum DecodingError : Error {
 // Keyed Encoding Container Implementations
 //===----------------------------------------------------------------------===//
 
-fileprivate class _KeyedEncodingContainerBase<Key : CodingKey> {
+@_fixed_layout
+@_versioned
+internal class _KeyedEncodingContainerBase<Key : CodingKey> {
     // These must all be given a concrete implementation in _*Box.
-    var codingPath: [CodingKey?] {
+    @_inlineable
+    @_versioned
+    internal var codingPath: [CodingKey?] {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Bool?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Bool?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Int?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Int?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Int8?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Int8?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Int16?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Int16?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Int32?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Int32?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Int64?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Int64?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: UInt?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: UInt?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: UInt8?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: UInt8?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: UInt16?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: UInt16?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: UInt32?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: UInt32?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: UInt64?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: UInt64?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Float?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Float?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: Double?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: Double?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode(_ value: String?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode(_ value: String?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    internal func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
+    @_inlineable
+    @_versioned
+    internal func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+    @_inlineable
+    @_versioned
+    internal func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func superEncoder() -> Encoder {
+    @_inlineable
+    @_versioned
+    internal func superEncoder() -> Encoder {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
-    func superEncoder(forKey key: Key) -> Encoder {
+    @_inlineable
+    @_versioned
+    internal func superEncoder(forKey key: Key) -> Encoder {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 }
 
-fileprivate final class _KeyedEncodingContainerBox<Concrete : KeyedEncodingContainerProtocol> : _KeyedEncodingContainerBase<Concrete.Key> {
+@_fixed_layout
+@_versioned
+internal final class _KeyedEncodingContainerBox<Concrete : KeyedEncodingContainerProtocol> : _KeyedEncodingContainerBase<Concrete.Key> {
     typealias Key = Concrete.Key
 
-    var concrete: Concrete
+    @_versioned
+    internal var concrete: Concrete
 
-    init(_ container: Concrete) {
+    @_inlineable
+    @_versioned
+    internal init(_ container: Concrete) {
         concrete = container
     }
 
-    override var codingPath: [CodingKey?] {
+    @_inlineable
+    @_versioned
+    override internal var codingPath: [CodingKey?] {
         return concrete.codingPath
     }
 
-    override func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Bool?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Bool?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Int?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Int?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Int8?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Int8?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Int16?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Int16?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Int32?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Int32?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Int64?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Int64?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: UInt?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: UInt?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: UInt8?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: UInt8?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: UInt16?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: UInt16?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: UInt32?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: UInt32?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: UInt64?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: UInt64?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Float?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Float?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: Double?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: Double?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encode(_ value: String?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encode(_ value: String?, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
-    override func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
+    @_inlineable
+    @_versioned
+    override internal func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
         try concrete.encodeWeak(object, forKey: key)
     }
 
-    override func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
+    @_inlineable
+    @_versioned
+    override internal func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         return concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
     }
 
-    override func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+    @_inlineable
+    @_versioned
+    override internal func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
         return concrete.nestedUnkeyedContainer(forKey: key)
     }
 
-    override func superEncoder() -> Encoder {
+    @_inlineable
+    @_versioned
+    override internal func superEncoder() -> Encoder {
         return concrete.superEncoder()
     }
 
-    override func superEncoder(forKey key: Key) -> Encoder {
+    @_inlineable
+    @_versioned
+    override internal func superEncoder(forKey key: Key) -> Encoder {
         return concrete.superEncoder(forKey: key)
     }
 }
 
-fileprivate class _KeyedDecodingContainerBase<Key : CodingKey> {
-    var codingPath: [CodingKey?] {
+@_fixed_layout
+@_versioned
+internal class _KeyedDecodingContainerBase<Key : CodingKey> {
+    @_inlineable
+    @_versioned
+    internal var codingPath: [CodingKey?] {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    var allKeys: [Key] {
+    @_inlineable
+    @_versioned
+    internal var allKeys: [Key] {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func contains(_ key: Key) -> Bool {
+    @_inlineable
+    @_versioned
+    internal func contains(_ key: Key) -> Bool {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
+    @_inlineable
+    @_versioned
+    internal func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
+    @_inlineable
+    @_versioned
+    internal func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
+    @_inlineable
+    @_versioned
+    internal func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func superDecoder() throws -> Decoder {
+    @_inlineable
+    @_versioned
+    internal func superDecoder() throws -> Decoder {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 
-    func superDecoder(forKey key: Key) throws -> Decoder {
+    @_inlineable
+    @_versioned
+    internal func superDecoder(forKey key: Key) throws -> Decoder {
         fatalError("_KeyedDecodingContainerBase cannot be used directly.")
     }
 }
 
-fileprivate final class _KeyedDecodingContainerBox<Concrete : KeyedDecodingContainerProtocol> : _KeyedDecodingContainerBase<Concrete.Key> {
+@_fixed_layout
+@_versioned
+internal final class _KeyedDecodingContainerBox<Concrete : KeyedDecodingContainerProtocol> : _KeyedDecodingContainerBase<Concrete.Key> {
     typealias Key = Concrete.Key
 
-    var concrete: Concrete
+    @_versioned
+    internal var concrete: Concrete
 
-    init(_ container: Concrete) {
+    @_inlineable
+    @_versioned
+    internal init(_ container: Concrete) {
         concrete = container
     }
 
+    @_inlineable
+    @_versioned
     override var codingPath: [CodingKey?] {
         return concrete.codingPath
     }
 
+    @_inlineable
+    @_versioned
     override var allKeys: [Key] {
         return concrete.allKeys
     }
 
-    override func contains(_ key: Key) -> Bool {
+    @_inlineable
+    @_versioned
+    override internal func contains(_ key: Key) -> Bool {
         return concrete.contains(key)
     }
 
-    override func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
         return try concrete.decodeIfPresent(Bool.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
         return try concrete.decodeIfPresent(Int.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
         return try concrete.decodeIfPresent(Int8.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
         return try concrete.decodeIfPresent(Int16.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
         return try concrete.decodeIfPresent(Int32.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
         return try concrete.decodeIfPresent(Int64.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
         return try concrete.decodeIfPresent(UInt.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
         return try concrete.decodeIfPresent(UInt8.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
         return try concrete.decodeIfPresent(UInt16.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
         return try concrete.decodeIfPresent(UInt32.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
         return try concrete.decodeIfPresent(UInt64.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
         return try concrete.decodeIfPresent(Float.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
         return try concrete.decodeIfPresent(Double.self, forKey: key)
     }
 
-    override func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
         return try concrete.decodeIfPresent(String.self, forKey: key)
     }
 
-    override func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
+    @_inlineable
+    @_versioned
+    override internal func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
         return try concrete.decodeIfPresent(T.self, forKey: key)
     }
 
-    override func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
+    @_inlineable
+    @_versioned
+    override internal func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
         return try concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
     }
 
-    override func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
+    @_inlineable
+    @_versioned
+    override internal func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
         return try concrete.nestedUnkeyedContainer(forKey: key)
     }
 
-    override func superDecoder() throws -> Decoder {
+    @_inlineable
+    @_versioned
+    override internal func superDecoder() throws -> Decoder {
         return try concrete.superDecoder()
     }
 
-    override func superDecoder(forKey key: Key) throws -> Decoder {
+    @_inlineable
+    @_versioned
+    override internal func superDecoder(forKey key: Key) throws -> Decoder {
         return try concrete.superDecoder(forKey: key)
     }
 }
@@ -2698,6 +2886,45 @@ public extension RawRepresentable where RawValue == String, Self : Decodable {
       }
 
       self = value
+    }
+}
+
+//===----------------------------------------------------------------------===//
+// Collection Extensions
+//===----------------------------------------------------------------------===//
+
+// FIXME: Uncomment when conditional conformance is available.
+extension Array : Codable /* where Element : Codable */ {
+    public init(from decoder: Decoder) throws {
+        guard Element.self is Decodable.Type else {
+            preconditionFailure("Array<\(Element.self)> does not conform to Decodable because \(Element.self) does not conform to Decodable.")
+        }
+
+        self.init()
+
+        let metaType = (Element.self as! Decodable.Type)
+        var container = try decoder.unkeyedContainer()
+        while !container.isAtEnd {
+            // superDecoder fetches the next element as a container and wraps a Decoder around it.
+            // This is normally appropriate for decoding super, but this is really what we want to do.
+            let subdecoder = try container.superDecoder()
+            let element = try metaType.init(from: subdecoder)
+            self.append(element as! Element)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        guard Element.self is Encodable.Type else {
+            preconditionFailure("Array<\(Element.self)> does not conform to Encodable because \(Element.self) does not conform to Encodable.")
+        }
+
+        var container = encoder.unkeyedContainer()
+        for element in self {
+            // superEncoder appends an empty element and wraps an Encoder around it.
+            // This is normally appropriate for encoding super, but this is really what we want to do.
+            let subencoder = container.superEncoder()
+            try (element as! Encodable).encode(to: subencoder)
+        }
     }
 }
 
