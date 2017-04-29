@@ -309,6 +309,11 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   mutating func partition(
     by belongsInSecondPartition: (Iterator.Element) throws -> Bool
   ) rethrows -> Index
+
+  /// Exchange the values at indices `i` and `j`.
+  ///
+  /// Has no effect when `i` and `j` are equal.
+  mutating func swapAt(_ i: Index, _ j: Index)  
   
   /// Call `body(p)`, where `p` is a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
@@ -371,6 +376,17 @@ extension MutableCollection {
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
+  }
+
+  /// Exchange the values at indices `i` and `j`.
+  ///
+  /// Has no effect when `i` and `j` are equal.
+  @_inlineable
+  public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else { return }
+    let tmp = self[i]
+    self[i] = self[j]
+    self[j] = tmp
   }
 }
 

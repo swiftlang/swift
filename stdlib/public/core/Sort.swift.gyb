@@ -144,28 +144,28 @@ func _sort3<C>(
   case (true, true):
     // 1 swap: 321
     // swap(a, c): 312->123
-    swap(&elements[a], &elements[c])
+    elements.swapAt(a, c)
 
   case (true, false):
     // 1 swap: 213, 212 --- 2 swaps: 312, 211
     // swap(a, b): 213->123, 212->122, 312->132, 211->121
-    swap(&elements[a], &elements[b])
+    elements.swapAt(a, b)
 
     if ${cmp("elements[c]", "elements[b]", p)} {
       // 132 (started as 312), 121 (started as 211)
       // swap(b, c): 132->123, 121->112
-      swap(&elements[b], &elements[c])
+      elements.swapAt(b, c)
     }
 
   case (false, true):
     // 1 swap: 132, 121 --- 2 swaps: 231, 221
     // swap(b, c): 132->123, 121->112, 231->213, 221->212
-    swap(&elements[b], &elements[c])
+    elements.swapAt(b, c)
 
     if ${cmp("elements[b]", "elements[a]", p)} {
       // 213 (started as 231), 212 (started as 221)
       // swap(a, b): 213->123, 212->122
-      swap(&elements[a], &elements[b])
+      elements.swapAt(a, b)
     }
   }
 }
@@ -221,7 +221,7 @@ func _partition<C>(
       break Loop
     }
 
-    swap(&elements[lo], &elements[hi])
+    elements.swapAt(lo, hi)
   }
 
   return lo
@@ -334,7 +334,7 @@ func _siftDown<C>(
   // If a child is bigger than the current node, swap them and continue sifting
   // down.
   if largest != index {
-    swap(&elements[index], &elements[largest])
+    elements.swapAt(index, largest)
     ${try_} _siftDown(
       &elements,
       index: largest,
@@ -393,7 +393,7 @@ func _heapSort<C>(
     ${", by: areInIncreasingOrder" if p else ""})
   elements.formIndex(before: &hi)
   while hi != lo {
-    swap(&elements[lo], &elements[hi])
+    elements.swapAt(lo, hi)
     ${try_} _siftDown(
       &elements,
       index: lo,
