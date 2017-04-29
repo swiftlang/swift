@@ -420,6 +420,10 @@ def update_code : Flag<["-"], "update-code">,
   HelpText<"Update Swift code">,
   Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
+def migrate_keep_objc_visibility: Flag<["-"], "migrate-keep-objc-visibility">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When migrating, add '@objc' to declarations that would've been implicitly visible in Swift 3">;
+
 def disable_migrator_fixits: Flag<["-"], "disable-migrator-fixits">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Disable the Migrator phase which automatically applies fix-its">;

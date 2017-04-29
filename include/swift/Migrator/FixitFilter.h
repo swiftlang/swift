@@ -102,7 +102,10 @@ struct FixitFilter {
         Info.ID == diag::deprecated_any_composition.ID ||
         Info.ID == diag::deprecated_operator_body.ID ||
         Info.ID == diag::unbound_generic_parameter_explicit_fix.ID ||
-        Info.ID == diag::objc_inference_swift3_addobjc.ID)
+        Info.ID == diag::objc_inference_swift3_addobjc.ID ||
+        Info.ID == diag::objc_inference_swift3_dynamic.ID ||
+        Info.ID == diag::override_swift3_objc_inference.ID ||
+        Info.ID == diag::objc_inference_swift3_objc_derived.ID)
       return true;
 
     return false;
