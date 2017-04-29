@@ -1119,9 +1119,9 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
               SourceManager.extractText(L->getCharSourceRangeFromSourceRange(
                   SourceManager, Previous->getSourceRange()));
 
-          auto diag = diagnose(Tok,
-                   diag::avail_query_argument_and_shorthand_mix_not_allowed,
-                   Text, PreviousSpecText);
+          auto diag = diagnose(
+              Tok, diag::avail_query_argument_and_shorthand_mix_not_allowed,
+              Text, PreviousSpecText);
 
           // If this was preceded by a single platform version constraint, we
           // can guess that the intention was to treat it as 'introduced' and
@@ -1130,11 +1130,13 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
               PlatformVersionConstraintAvailabilitySpec::classof(Previous) &&
               Text != "introduced") {
             auto *PlatformSpec =
-            cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
+                cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
 
             auto PlatformName = platformString(PlatformSpec->getPlatform());
             auto PlatformNameEndLoc =
-            PlatformSpec->getPlatformLoc().getAdvancedLoc(PlatformName.size());
+                PlatformSpec->getPlatformLoc().getAdvancedLoc(
+                    PlatformName.size());
+
             diag.fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
 
