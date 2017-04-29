@@ -1406,6 +1406,18 @@ static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags,
   }
   
   Diags->diagnose(Lexer::getSourceLoc(LinePtr), error);
+  
+  size_t allIndentationOffset;
+  // Scan past any remaining indentation in the line, which we will assume is 
+  // incorrect.
+  // FIXME: It'd be better to examine surrounding lines to see how they're indented, 
+  // and then leave enough whitespace on this line to match them.
+  for(allIndentationOffset = mistakeOffset; LinePtr[allIndentationOffset] == ' ' || LinePtr[allIndentationOffset] == '\t'; allIndentationOffset++)
+  /* do nothing */;
+  
+  // Suggest fixing this by replacing with the expected whitespace.
+  Diags->diagnose(Lexer::getSourceLoc(LinePtr), diag::note_change_current_line_indentation)
+    .fixItReplaceChars(Lexer::getSourceLoc(LinePtr), Lexer::getSourceLoc(LinePtr + allIndentationOffset), ExpectedIndentation);
 }
 
 /// validateMultilineIndents:

@@ -140,6 +140,8 @@ ERROR(lex_unexpected_tab_in_string_indent,none,
       "string literal content is indented with a tab where a space is expected", ())
 ERROR(lex_unexpected_space_in_string_indent,none,
       "string literal content is indented with a space where a tab is expected", ())
+NOTE(note_change_current_line_indentation,none,
+      "change indentation to match last line", ())
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())

@@ -49,7 +49,7 @@ _ = """
 	Thirteen 2
   Xi 2
 	""" // expected-error@-1{{string literal content is indented with a space where a tab is expected}}
-      // expected-note@-2{{change indentation to match last line}} {{1-2=	}}
+      // expected-note@-2{{change indentation to match last line}} {{1-3=	}}
       // expected-note@-2{{change last line's indentation to match this line}} {{1-3=  }}
 
 // multiple spaces are not the same as a tab for de-indentation
