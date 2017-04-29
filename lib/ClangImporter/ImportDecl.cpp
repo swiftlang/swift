@@ -4922,7 +4922,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // implementation in the standard library.
   transferKnown(KnownProtocolKind::Equatable);
   transferKnown(KnownProtocolKind::Hashable);
-  transferKnown(KnownProtocolKind::Comparable);
   bool transferredObjCBridgeable =
     transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
 
