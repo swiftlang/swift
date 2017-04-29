@@ -96,8 +96,20 @@ Migrator::performAFixItMigration() {
   Invocation.clearInputs();
   Invocation.getLangOptions().EffectiveLanguageVersion = { 4, 0, 0 };
 
-  const auto OrigPrimaryInput =
-    StartInvocation.getFrontendOptions().PrimaryInput.getValue();
+  // The default subset of @objc fix-its, referred to as "minimal" migration
+  // in SE-0160, adds @objc to things that clearly must be visible to the
+  // Objective-C runtime. These are compiler error fix-its.
+  Invocation.getLangOptions().WarnSwift3ObjCInference = true;
+  Invocation.getLangOptions().EnableSwift3ObjCInference = false;
+
+  // However, if the user selects the workflow to keep the behavior of Swift 3's
+  // implicit Objective-C visibility, force Swift 3 @objc inference to be on.
+  // Coupled with the -warn-swift3-objc-inference flag above, we'll get warning
+  // fix-its from the compiler.
+  if (getMigratorOptions().KeepObjcVisibility) {
+    Invocation.getLangOptions().EnableSwift3ObjCInference = true;
+  }
+
   const auto &OrigFrontendOpts = StartInvocation.getFrontendOptions();
 
   auto InputBuffers = OrigFrontendOpts.InputBuffers;
