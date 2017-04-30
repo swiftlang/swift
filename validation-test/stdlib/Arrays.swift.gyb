@@ -60,7 +60,7 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
     expectEqual(0, wrapped.timesStartIndexCalled.value)
     let copy = s._copyToContiguousArray()
-    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
     expectNotEqual(0, wrapped.timesStartIndexCalled.value)
 
     expectEqualSequence(
