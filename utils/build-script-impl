@@ -3207,7 +3207,6 @@ for host in "${ALL_HOSTS[@]}"; do
             # Exclude shell scripts.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
-               grep -v swift-stdlib-tool | \
                grep -v crashlog.py | \
                grep -v symbolication.py | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
