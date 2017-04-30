@@ -414,6 +414,29 @@ extension MutableCollection where Self: RandomAccessCollection {
   }
 }
 
+extension MutableCollection {
+  /// Exchange the values at indices `i` and `j`.
+  ///
+  /// Has no effect when `i` and `j` are equal.
+  @_inlineable
+  public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else { return }
+    
+    // Semantically equivalent to (i, j) = (j, i).
+    // Microoptimized to avoid retain/release traffic.
+    let p1 = Builtin.addressof(&self[i])
+    let p2 = Builtin.addressof(&self[j])
+    _sanityCheck(p1 != p2)
+
+    // Take from P1.
+    let tmp: Iterator.Element = Builtin.take(p1)
+    // Transfer P2 into P1.
+    Builtin.initialize(Builtin.take(p2) as Iterator.Element, p1)
+    // Initialize P2.
+    Builtin.initialize(tmp, p2)
+  }  
+}
+
 @available(*, unavailable, renamed: "MutableCollection")
 public typealias MutableCollectionType = MutableCollection
 
