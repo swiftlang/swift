@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
