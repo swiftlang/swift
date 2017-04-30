@@ -60,18 +60,18 @@ _ = """
         // expected-note@-2{{change indentation to match last line}} {{1-4=		}}
         // expected-note@-2{{change last line's indentation to match this line}} {{1-3=	  }}
 
+// newline currently required after opening """
 _ = """Fourteen
     Pi
     """ // expected-error@-2{{invalid start of multi-line string literal}}
-// newline currently required after opening """
 
+// newline currently required before closing """
 _ = """
     Fourteen
     Pi""" // expected-error@-0{{invalid end of multi-line string literal}}
-// newline currently required before closing """
 
+// newline currently required after opening """
 _ = """""" // expected-error@-0{{invalid start of multi-line string literal}}
-// newline currently required after opening """
 
-_ = """ """ // expected-error@-0{{invalid start of multi-line string literal}}
 // newline currently required after opening """
+_ = """ """ // expected-error@-0{{invalid start of multi-line string literal}}
