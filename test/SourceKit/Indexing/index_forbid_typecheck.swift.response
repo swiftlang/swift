@@ -68,6 +68,13 @@
           key.column: 11
         },
         {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.name: "init()",
+          key.usr: "s:18forbid_typecheck_26ClsSecCACycfc",
+          key.line: 5,
+          key.column: 11
+        },
+        {
           key.kind: source.lang.swift.ref.var.instance,
           key.name: "member",
           key.usr: "s:18forbid_typecheck_26ClsSecC6memberSiv",

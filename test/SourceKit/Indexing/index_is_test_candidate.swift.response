@@ -30,6 +30,12 @@
           key.usr: "s:23index_is_test_candidate8MyStructV0C63_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStructyyF",
           key.line: 13,
           key.column: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:23index_is_test_candidate8MyStructVACycfc",
+          key.line: 12,
+          key.column: 8
         }
       ]
     },
@@ -38,7 +44,15 @@
       key.name: "XCTestCase",
       key.usr: "s:23index_is_test_candidate10XCTestCaseC",
       key.line: 15,
-      key.column: 7
+      key.column: 7,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:23index_is_test_candidate10XCTestCaseCACycfc",
+          key.line: 15,
+          key.column: 7
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -70,6 +84,24 @@
           key.line: 17,
           key.column: 8,
           key.is_dynamic: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:23index_is_test_candidate14MyPrivateClass33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLCADycfc",
+          key.line: 16,
+          key.column: 43,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.constructor,
+              key.name: "init()",
+              key.usr: "s:23index_is_test_candidate10XCTestCaseCACycfc"
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
+          ]
         }
       ],
       key.is_test_candidate: 1
@@ -164,6 +196,24 @@
           key.column: 8,
           key.is_dynamic: 1,
           key.is_test_candidate: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:23index_is_test_candidate7MyClassCACycfc",
+          key.line: 20,
+          key.column: 35,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.constructor,
+              key.name: "init()",
+              key.usr: "s:23index_is_test_candidate10XCTestCaseCACycfc"
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
+          ]
         }
       ],
       key.is_test_candidate: 1
