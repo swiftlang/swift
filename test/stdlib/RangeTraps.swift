@@ -59,5 +59,20 @@ RangeTraps.test("OutOfRange")
   expectTrue((0...Int.max).contains(Int.max))
 }
 
+RangeTraps.test("CountablePartialRangeFrom")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+    
+    let range = (Int.max - 1)...
+    var it = range.makeIterator()
+    _ = it.next()
+    expectCrashLater()
+    _ = it.next()
+}
+
+
+
 runAllTests()
 

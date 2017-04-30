@@ -32,8 +32,8 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
     _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
   }
 
-  internal init(_base base: String, _ bounds: ClosedRange<Index>) {
-    self.init(_base: base, base._makeHalfOpen(bounds))
+  internal init<R: RangeExpression>(_base base: String, _ bounds: R) where R.Bound == Index {
+    self.init(_base: base, bounds.relative(to: base))
   }
 
   public var startIndex: Index { return _slice.startIndex }
