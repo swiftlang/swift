@@ -2320,6 +2320,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                                 attrs.getLoc(TAK_escaping)));
         // Specialize the diagnostic for Optionals.
         if (ty->getOptionalObjectType()) {
+          diag.flush();
           TC.diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
         }
       }
