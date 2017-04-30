@@ -1204,7 +1204,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::IK_ObjC));
+      clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
@@ -1251,7 +1251,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::IK_ObjC));
+      clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
