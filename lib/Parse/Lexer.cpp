@@ -1353,9 +1353,10 @@ static std::tuple<StringRef, CharSourceRange>
 getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
+  bool sawNonWhitespace = false;
 
   // Work back from the end to find whitespace to strip.
-  while (start > begin) {
+  while (!sawNonWhitespace && start > begin) {
     switch (*--start) {
     case ' ':
     case '\t':
@@ -1367,17 +1368,19 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       
       auto range = CharSourceRange(Lexer::getSourceLoc(bytes), length);
       auto string = StringRef(bytes, length);
+      
       return std::make_tuple(string, range);
     }
     default:
-        if (Diags) {
-          auto loc = Lexer::getSourceLoc(start + 1);
-          Diags->diagnose(loc, diag::lex_illegal_multiline_string_end)
-            // FIXME: Should try to suggest indentation.
-            .fixItInsert(loc, "\n");
-        }
-      return std::make_tuple("", CharSourceRange(Lexer::getSourceLoc(end - 1), 0));
+      sawNonWhitespace = true;
     }
+  }
+  
+  if (sawNonWhitespace && Diags) {
+    auto loc = Lexer::getSourceLoc(start + 1);
+    Diags->diagnose(loc, diag::lex_illegal_multiline_string_end)
+    // FIXME: Should try to suggest indentation.
+      .fixItInsert(loc, "\n");
   }
 
   return std::make_tuple("", CharSourceRange(Lexer::getSourceLoc(end - 1), 0));
@@ -1394,17 +1397,19 @@ static size_t commonPrefixLength(StringRef shorter, const char * longer) {
 
 // FIXME: StringRef has a method like this; we should probably make LinePtr a 
 // StringRef so we can use it.
-static size_t firstNotOf(const char * haystack, const char * needles, size_t offset = 0) {
+static size_t firstNotOf(const char * haystack, const char * needles, 
+                         size_t offset = 0) {
   return strspn(haystack + offset, needles) + offset;
 }
 
-static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags, 
-                                            StringRef ExpectedIndentation,
-                                            CharSourceRange ExpectedIndentationRange,
-                                            const char * LinePtr) {
-  // Find the first mismatched character. BytesPtr must at least include a delimiter,
-  // and that delimiter is guaranteed not to match, so we don't need to 
-  // bounds-check it. 
+static void diagnoseInvalidMultilineIndents(
+                                      DiagnosticEngine *Diags, 
+                                      StringRef ExpectedIndentation,
+                                      CharSourceRange ExpectedIndentationRange,
+                                      const char * LinePtr) {
+  // Find the first mismatched character. LinePtr must eventually include a 
+  // newline, and ExpectedIndentation never includes newlines, so we don't need 
+  // to bounds-check access to LinePtr.
   size_t mistakeOffset = commonPrefixLength(ExpectedIndentation, LinePtr);
   
   Diag<> error;
@@ -1425,21 +1430,27 @@ static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags,
     break;
   }
   
-  Diags->diagnose(Lexer::getSourceLoc(LinePtr), error);
+  auto lineLoc = Lexer::getSourceLoc(LinePtr);
+  
+  Diags->diagnose(lineLoc, error);
   
   // Scan past any remaining indentation in the line, which we will assume is 
   // incorrect.
-  // FIXME: It'd be better to examine surrounding lines to see how they're indented, 
-  // and then leave enough whitespace on this line to match them.
+  // FIXME: It'd be better to examine surrounding lines to see how they're 
+  // indented, and then leave enough whitespace on this line to match them.
   size_t allIndentationOffset = firstNotOf(LinePtr, " \t", mistakeOffset);
   
   // Suggest fixing this by replacing with the expected whitespace.
-  Diags->diagnose(Lexer::getSourceLoc(LinePtr), diag::note_change_current_line_indentation)
-    .fixItReplaceChars(Lexer::getSourceLoc(LinePtr), Lexer::getSourceLoc(LinePtr + allIndentationOffset), ExpectedIndentation);
+  Diags->diagnose(lineLoc, diag::note_change_current_line_indentation)
+    .fixItReplaceChars(lineLoc, lineLoc.getAdvancedLoc(allIndentationOffset), 
+                       ExpectedIndentation);
   
   // Also suggest adjusting the literal's indentation to match this line.
-  Diags->diagnose(ExpectedIndentationRange.getStart(), diag::note_change_last_line_indentation)
-    .fixItReplaceChars(ExpectedIndentationRange.getStart(), ExpectedIndentationRange.getEnd(), StringRef(LinePtr, allIndentationOffset));
+  Diags->diagnose(ExpectedIndentationRange.getStart(), 
+                  diag::note_change_last_line_indentation)
+    .fixItReplaceChars(ExpectedIndentationRange.getStart(), 
+                       ExpectedIndentationRange.getEnd(), 
+                       StringRef(LinePtr, allIndentationOffset));
 }
 
 /// validateMultilineIndents:
@@ -1459,7 +1470,8 @@ static void validateMultilineIndents(const Token &Str,
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
       if (Bytes.substr(nextpos, Indent.size()) != Indent) {
-        diagnoseInvalidMultilineIndents(Diags, Indent, IndentRange, BytesPtr + nextpos);
+        diagnoseInvalidMultilineIndents(Diags, Indent, IndentRange, 
+                                        BytesPtr + nextpos);
       }
     }
     pos = nextpos;
