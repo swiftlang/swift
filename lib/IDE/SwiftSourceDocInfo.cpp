@@ -550,6 +550,8 @@ public:
   class CompleteWalker : public SourceEntityWalker {
     Implementation *Impl;
     bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      if (D->isImplicit())
+        return false;
       Impl->analyzeDecl(D);
       return true;
     }
@@ -801,6 +803,8 @@ bool RangeResolver::walkToStmtPre(Stmt *S) {
 };
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  if (D->isImplicit())
+    return false;
   if (!Impl->shouldEnter(D))
     return false;
   Impl->analyze(D);

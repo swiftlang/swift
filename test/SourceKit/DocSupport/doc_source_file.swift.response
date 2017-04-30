@@ -2353,15 +2353,7 @@
         key.usr: "s:8__main__3CC2C9subscriptS2icfg",
         key.offset: 1162,
         key.length: 25,
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.name: "i",
-            key.offset: 1144,
-            key.length: 3
-          }
-        ]
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -2374,12 +2366,6 @@
             key.kind: source.lang.swift.decl.var.local,
             key.name: "vvv",
             key.offset: 1152,
-            key.length: 3
-          },
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.name: "i",
-            key.offset: 1144,
             key.length: 3
           }
         ]

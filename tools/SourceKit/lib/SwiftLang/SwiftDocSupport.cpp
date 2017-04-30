@@ -299,6 +299,8 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
                               bool IsRef, bool IsSynthesizedExtension,
                               DocEntityInfo &Info,
                               StringRef Arg = StringRef()) {
+  if (!IsRef && D->isImplicit())
+    return true;
   if (!D || isa<ParamDecl>(D) ||
       (isa<VarDecl>(D) && D->getDeclContext()->isLocalContext())) {
     Info.Kind = SwiftLangSupport::getUIDForLocalVar(IsRef);

@@ -13,7 +13,13 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "C2",
-      key.usr: "s:11test_module2C2C"
+      key.usr: "s:11test_module2C2C",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:11test_module2C2CACycfc"
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -38,6 +44,10 @@
               key.is_dynamic: 1
             }
           ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:11test_module16ComputedPropertyCACycfc"
         }
       ]
     },
@@ -117,7 +127,13 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "Empty",
-      key.usr: "s:11test_module5EmptyC"
+      key.usr: "s:11test_module5EmptyC",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:11test_module5EmptyCACycfc"
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.extension.class,

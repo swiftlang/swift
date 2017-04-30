@@ -67,6 +67,10 @@
               key.is_dynamic: 1
             }
           ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:1AAACABycfc"
         }
       ]
     }
