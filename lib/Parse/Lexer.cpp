@@ -1397,6 +1397,7 @@ static size_t firstNotOf(const char * haystack, const char * needles, size_t off
 
 static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags, 
                                             StringRef ExpectedIndentation,
+                                            CharSourceRange ExpectedIndentationRange,
                                             const char * LinePtr) {
   // Find the first mismatched character. BytesPtr must at least include a delimiter,
   // and that delimiter is guaranteed not to match, so we don't need to 
@@ -1432,6 +1433,10 @@ static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags,
   // Suggest fixing this by replacing with the expected whitespace.
   Diags->diagnose(Lexer::getSourceLoc(LinePtr), diag::note_change_current_line_indentation)
     .fixItReplaceChars(Lexer::getSourceLoc(LinePtr), Lexer::getSourceLoc(LinePtr + allIndentationOffset), ExpectedIndentation);
+  
+  // Also suggest adjusting the literal's indentation to match this line.
+  Diags->diagnose(ExpectedIndentationRange.getStart(), diag::note_change_last_line_indentation)
+    .fixItReplaceChars(ExpectedIndentationRange.getStart(), ExpectedIndentationRange.getEnd(), StringRef(LinePtr, allIndentationOffset));
 }
 
 /// validateMultilineIndents:
@@ -1450,8 +1455,9 @@ static void validateMultilineIndents(const Token &Str,
   while ((pos = Bytes.find('\n', pos)) != StringRef::npos) {
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
-      if (Bytes.substr(nextpos, Indent.size()) != Indent)
-        diagnoseInvalidMultilineIndents(Diags, Indent, BytesPtr + nextpos);
+      if (Bytes.substr(nextpos, Indent.size()) != Indent) {
+        diagnoseInvalidMultilineIndents(Diags, Indent, IndentRange, BytesPtr + nextpos);
+      }
     }
     pos = nextpos;
   }
