@@ -5279,15 +5279,25 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                Expr *fnExpr, Expr *argExpr,
                                                ArrayRef<Identifier> argLabels) {
-  // If we are invoking a constructor and there are absolutely no candidates,
-  // then they must all be private.
   if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
-    if (!MTT->getInstanceType()->is<TupleType>() &&
-        (CCI.size() == 0 ||
-         (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
-          isa<ProtocolDecl>(CCI.candidates[0].getDecl())))) {
-      CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
-                      MTT->getInstanceType());
+    auto instTy = MTT->getInstanceType();
+    if (instTy->getAnyNominal()) {
+      // If we are invoking a constructor on a nominal type and there are
+      // absolutely no candidates, then they must all be private.
+      if (CCI.size() == 0 || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
+                              isa<ProtocolDecl>(CCI.candidates[0].getDecl()))) {
+        CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
+                        instTy);
+        return true;
+      }
+      // continue below
+    } else if (!instTy->is<TupleType>()) {
+      // If we are invoking a constructor on a non-nominal type, the expression
+      // is malformed.
+      SourceRange initExprRange(fnExpr->getSourceRange().Start,
+                                argExpr->getSourceRange().End);
+      CS->TC.diagnose(fnExpr->getLoc(), diag::non_nominal_no_initializers,
+                      instTy).highlight(initExprRange);
       return true;
     }
   }
