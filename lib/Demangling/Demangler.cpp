@@ -942,6 +942,9 @@ NodePointer Demangler::demangleImplParamConvention() {
   const char *attr = nullptr;
   switch (nextChar()) {
     case 'i': attr = "@in"; break;
+    case 'c':
+      attr = "@in_constant";
+      break;
     case 'l': attr = "@inout"; break;
     case 'b': attr = "@inout_aliasable"; break;
     case 'n': attr = "@in_guaranteed"; break;

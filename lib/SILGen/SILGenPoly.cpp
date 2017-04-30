@@ -795,6 +795,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     return gen.emitManagedRValueWithCleanup(paramValue);
 
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
     if (gen.silConv.useLoweredAddresses())
       return gen.emitManagedBufferWithCleanup(paramValue);
     return gen.emitManagedRValueWithCleanup(paramValue);
@@ -1338,6 +1339,7 @@ namespace {
         abort();
       }
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
         if (SGF.silConv.useLoweredAddresses()) {
           // We need to translate into a temporary.

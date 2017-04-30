@@ -479,6 +479,9 @@ number of ways:
     initialized object; both the caller and callee promise not to mutate the
     pointee, allowing the callee to read it.
 
+  - An ``@in_constant`` parameter is indirect.  The address must be of an
+    initialized object; the function will treat the value held there as read-only.
+
   - Otherwise, the parameter is an unowned direct parameter.
 
 - A SIL function type declares the conventions for its results.

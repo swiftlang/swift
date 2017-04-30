@@ -1619,6 +1619,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Indirect_In_Guaranteed:
       // Source as-is, we don't need to copy it due to guarantee
       break;
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In: {
       assert(substConv.isSILIndirect(ParamTypes[0])
              && "unsupported convention for bridging conversion");

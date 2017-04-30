@@ -269,6 +269,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
         break;
         
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -292,6 +293,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
 
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("indirect arguments to blocks not supported");
@@ -1295,6 +1297,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = ManagedValue::forLValue(paramValue);
           break;
         case ParameterConvention::Indirect_In:
+        case ParameterConvention::Indirect_In_Constant:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
         case ParameterConvention::Indirect_In_Guaranteed:

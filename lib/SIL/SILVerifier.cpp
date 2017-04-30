@@ -1543,7 +1543,7 @@ public:
     require(F.hasUnqualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
-  
+
   void checkAutoreleaseValueInst(AutoreleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -2316,6 +2316,7 @@ public:
 
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_In_Constant:
       case SILArgumentConvention::Indirect_Inout:
       case SILArgumentConvention::Indirect_InoutAliasable:
         return true;
@@ -3807,6 +3808,7 @@ public:
                          default:
                            return false;
                          case ParameterConvention::Indirect_In:
+                         case ParameterConvention::Indirect_In_Constant:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:
