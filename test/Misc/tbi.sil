@@ -1,0 +1,43 @@
+// *NOTE* This is an end to end test. Specifically, we are ensuring that the
+// driver is properly generated -enable-aarch64-tbi and also that the frontend
+// respects this option and that we get the proper tbi behavior.
+
+// RUN: %swiftc_driver -parse-sil -target arm64-apple-ios8.0 -target-cpu cyclone \
+// RUN:   -O -S %s -parse-as-library -parse-stdlib -module-name Swift \
+// RUN:   -Xfrontend -enable-sil-ownership | \
+// RUN:   %FileCheck --check-prefix=TBI %s
+
+// RUN: %swiftc_driver -parse-sil -target arm64-apple-ios7.0 -target-cpu cyclone \
+// RUN:     -O -S %s -parse-as-library -parse-stdlib -module-name Swift \
+// RUN:     -Xfrontend -enable-sil-ownership | \
+// RUN:   %FileCheck --check-prefix=NO_TBI %s
+
+// REQUIRES: CODEGENERATOR=AArch64
+
+// Verify that TBI is on by default in Swift on targets that support it. For our
+// purposes this means iOS8.0 or later.
+
+// NO_TBI-LABEL: .globl  _testTBI
+// NO_TBI: _testTBI
+// NO_TBI-NEXT: and
+// NO_TBI-NEXT: ldr
+// NO_TBI-NEXT: ret
+
+// TBI-LABEL: .globl  _testTBI
+// TBI: _testTBI:
+// TBI-NEXT: ldr
+// TBI-NEXT: ret
+
+sil_stage canonical
+
+import Builtin
+
+sil @testTBI : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : @trivial $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0x00FFFFFFFFFFFFFF
+  %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %3 = builtin "inttoptr_Int64"(%2 : $Builtin.Int64) : $Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  %5 = load [trivial] %4 : $*Builtin.Int64
+  return %5 : $Builtin.Int64
+}
