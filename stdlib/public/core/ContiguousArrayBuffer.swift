@@ -690,9 +690,10 @@ internal func _copyCollectionToContiguousArray<
 
   let p = result.firstElementAddress
   let buffer = UnsafeMutableBufferPointer(start: p, count: count)
-  let (_, writtenUpTo) = source._copyContents(initializing: buffer)
+  var (it, writtenUpTo) = source._copyContents(initializing: buffer)
   
-  _expectEnd(of: buffer, is: writtenUpTo)
+  _precondition(writtenUpTo == buffer.endIndex && it.next() == nil,
+    "invalid Collection: count differed in successive traversals")
   return ContiguousArray(_buffer: result)
 }
 
