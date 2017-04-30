@@ -310,6 +310,6 @@ extension Substring {
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(self[bounds])
+    return String(self[bounds] as Substring)
   }
 }
