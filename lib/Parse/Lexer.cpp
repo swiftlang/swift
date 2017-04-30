@@ -1370,9 +1370,12 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       return std::make_tuple(string, range);
     }
     default:
-      if (Diags)
-        Diags->diagnose(Lexer::getSourceLoc(start),
-                        diag::lex_illegal_multiline_string_end);
+        if (Diags) {
+          auto loc = Lexer::getSourceLoc(start + 1);
+          Diags->diagnose(loc, diag::lex_illegal_multiline_string_end)
+            // FIXME: Should try to suggest indentation.
+            .fixItInsert(loc, "\n");
+        }
       return std::make_tuple("", CharSourceRange(Lexer::getSourceLoc(end - 1), 0));
     }
   }
