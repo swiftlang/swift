@@ -864,11 +864,26 @@ public:
                                                       operand, atomicity));
   }
 
+  RetainValueAddrInst *createRetainValueAddr(SILLocation Loc, SILValue operand,
+                                             Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
+    return insert(new (F.getModule()) RetainValueAddrInst(
+        getSILDebugLocation(Loc), operand, atomicity));
+  }
+
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
     assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
+  }
+
+  ReleaseValueAddrInst *createReleaseValueAddr(SILLocation Loc,
+                                               SILValue operand,
+                                               Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
+    return insert(new (F.getModule()) ReleaseValueAddrInst(
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,

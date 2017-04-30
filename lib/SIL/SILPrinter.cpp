@@ -1357,6 +1357,14 @@ public:
 
   void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
 
+  void visitRetainValueAddrInst(RetainValueAddrInst *I) {
+    visitRefCountingInst(I);
+  }
+
+  void visitReleaseValueAddrInst(ReleaseValueAddrInst *I) {
+    visitRefCountingInst(I);
+  }
+
   void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
     visitRefCountingInst(I);
   }

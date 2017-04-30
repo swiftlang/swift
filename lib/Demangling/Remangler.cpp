@@ -1702,6 +1702,16 @@ void Remangler::mangleOutlinedConsume(Node *node) {
   Buffer << "We";
 }
 
+void Remangler::mangleOutlinedRetain(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wr";
+}
+
+void Remangler::mangleOutlinedRelease(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Ws";
+}
+
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {
   assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
   assert(node->getChild(0)->getKind() == Node::Kind::SILBoxLayout);

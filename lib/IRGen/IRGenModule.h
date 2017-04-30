@@ -681,6 +681,12 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline = false);
 
+  llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, Type t,
+                                            llvm::Type *llvmType);
+
+  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
+                                             llvm::Type *llvmType);
+
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);

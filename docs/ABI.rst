@@ -794,6 +794,8 @@ Globals
 
   global ::= type 'Wy' // Outlined Copy Function Type
   global ::= type 'We' // Outlined Consume Function Type
+  global ::= type 'Wr' // Outlined Retain Function Type
+  global ::= type 'Ws' // Outlined Release Function Type
 
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect

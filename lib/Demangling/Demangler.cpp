@@ -1541,6 +1541,14 @@ NodePointer Demangler::demangleWitness() {
       return createWithChild(Node::Kind::OutlinedConsume,
                              popNode(Node::Kind::Type));
     }
+    case 'r': {
+      return createWithChild(Node::Kind::OutlinedRetain,
+                             popNode(Node::Kind::Type));
+    }
+    case 's': {
+      return createWithChild(Node::Kind::OutlinedRelease,
+                             popNode(Node::Kind::Type));
+    }
     default:
       return nullptr;
   }
