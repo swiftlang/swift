@@ -129,7 +129,7 @@ ERROR(lex_invalid_unicode_scalar,none,
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
 ERROR(lex_illegal_multiline_string_start,none,
-      "invalid start of multi-line string literal", ())
+      "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,
       "invalid end of multi-line string literal", ())
 ERROR(lex_ambiguous_string_indent,none,

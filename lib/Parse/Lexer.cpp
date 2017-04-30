@@ -1479,7 +1479,8 @@ void Lexer::lexStringLiteral() {
     MultilineString = true;
     CurPtr += 2;
     if (*CurPtr != '\n' && *CurPtr != '\r')
-      diagnose(CurPtr, diag::lex_illegal_multiline_string_start);
+      diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
+        .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
   }
 
   while (true) {

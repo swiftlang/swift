@@ -63,7 +63,7 @@ _ = """
 // newline currently required after opening """
 _ = """Fourteen
     Pi
-    """ // expected-error@-2{{invalid start of multi-line string literal}}
+    """ // expected-error@-2{{multi-line string literal content must begin on a new line}} {{8-8=\n}}
 
 // newline currently required before closing """
 _ = """
@@ -71,7 +71,7 @@ _ = """
     Pi""" // expected-error@-0{{invalid end of multi-line string literal}}
 
 // newline currently required after opening """
-_ = """""" // expected-error@-0{{invalid start of multi-line string literal}}
+_ = """""" // expected-error@-0{{multi-line string literal content must begin on a new line}} {{8-8=\n}}
 
 // newline currently required after opening """
-_ = """ """ // expected-error@-0{{invalid start of multi-line string literal}}
+_ = """ """ // expected-error@-0{{multi-line string literal content must begin on a new line}} {{8-8=\n}}
