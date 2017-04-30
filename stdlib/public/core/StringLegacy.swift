@@ -414,44 +414,6 @@ extension String {
 }
 
 extension String {
-  /// Split the given string at the given delimiter character, returning the
-  /// strings before and after that character (neither includes the character
-  /// found) and a boolean value indicating whether the delimiter was found.
-  public func _splitFirst(separator delim: UnicodeScalar)
-    -> (before: String, after: String, wasFound : Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
-                String(rng[rng.index(after: i)..<rng.endIndex]),
-                true)
-      }
-    }
-    return (self, "", false)
-  }
-
-  /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
-  /// character that matches, the string after that character,
-  /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(_ predicate: (UnicodeScalar) -> Bool)
-    -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if predicate(rng[i]) {
-        return (String(rng[rng.startIndex..<i]),
-                rng[i], 
-                String(rng[rng.index(after: i)..<rng.endIndex]),
-                true)
-      }
-    }
-    return (self, "🎃", String(), false)
-  }
-}
-
-extension String {
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: Character) {
     Builtin.unreachable()
