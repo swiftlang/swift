@@ -1392,7 +1392,7 @@ static size_t commonPrefixLength(StringRef shorter, const char * longer) {
 // FIXME: StringRef has a method like this; we should probably make LinePtr a 
 // StringRef so we can use it.
 static size_t firstNotOf(const char * haystack, const char * needles, size_t offset = 0) {
-  return strpbrk(haystack + offset, needles) - haystack;
+  return strspn(haystack + offset, needles) + offset;
 }
 
 static void diagnoseInvalidMultilineIndents(DiagnosticEngine *Diags, 
