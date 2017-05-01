@@ -132,8 +132,6 @@ ERROR(lex_illegal_multiline_string_start,none,
       "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,
       "multi-line string literal content must not be on the delimiter's line", ())
-ERROR(lex_ambiguous_string_indent,none,
-      "invalid mix of multi-line string literal indentation", ())
 ERROR(lex_insufficient_string_indent,none,
       "string literal content is insufficiently indented", ())
 ERROR(lex_unexpected_tab_in_string_indent,none,
