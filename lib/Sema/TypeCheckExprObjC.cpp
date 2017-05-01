@@ -333,7 +333,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         // If this attribute was inferred based on deprecated Swift 3 rules,
         // complain.
         if (attr->isSwift3Inferred() &&
-            !Context.LangOpts.WarnSwift3ObjCInference) {
+            Context.LangOpts.WarnSwift3ObjCInference ==
+              Swift3ObjCInferenceWarnings::Minimal) {
           diagnose(componentNameLoc, diag::expr_keypath_swift3_objc_inference,
                    var->getFullName(),
                    var->getDeclContext()

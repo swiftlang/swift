@@ -46,6 +46,19 @@ namespace swift {
   };
   enum { NumPlatformConditionKind = 4 };
 
+  /// Describes which Swift 3 Objective-C inference warnings should be
+  /// emitted.
+  enum class Swift3ObjCInferenceWarnings {
+    /// No warnings; this is the default.
+    None,
+    /// "Minimal" warnings driven by uses of declarations that make use of
+    /// the Objective-C entry point directly.
+    Minimal,
+    /// "Complete" warnings that add "@objc" for every entry point that
+    /// Swift 3 would have inferred as "@objc" but Swift 4 will not.
+    Complete,
+  };
+
   /// \brief A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
@@ -212,7 +225,8 @@ namespace swift {
 
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
-    bool WarnSwift3ObjCInference = false;
+    Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
+      Swift3ObjCInferenceWarnings::None;
     
     /// Enable keypaths.
     bool EnableExperimentalKeyPaths = false;

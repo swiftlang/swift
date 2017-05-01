@@ -949,7 +949,8 @@ namespace {
         // complain.
         if (auto attr = member->getAttrs().getAttribute<ObjCAttr>()) {
           if (attr->isSwift3Inferred() &&
-              !tc.Context.LangOpts.WarnSwift3ObjCInference) {
+              tc.Context.LangOpts.WarnSwift3ObjCInference
+                == Swift3ObjCInferenceWarnings::Minimal) {
             tc.diagnose(memberLoc,
                         diag::expr_dynamic_lookup_swift3_objc_inference,
                         member->getDescriptiveKind(),
@@ -3954,7 +3955,8 @@ namespace {
         // If this attribute was inferred based on deprecated Swift 3 rules,
         // complain.
         if (attr->isSwift3Inferred() &&
-            !tc.Context.LangOpts.WarnSwift3ObjCInference) {
+            tc.Context.LangOpts.WarnSwift3ObjCInference
+              == Swift3ObjCInferenceWarnings::Minimal) {
           tc.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
                       foundDecl->getDescriptiveKind(), foundDecl->getFullName(),
                       foundDecl->getDeclContext()
