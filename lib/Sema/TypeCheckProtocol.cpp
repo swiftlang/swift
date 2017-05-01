@@ -5884,10 +5884,56 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (!existingDecl)
       existingDecl = cast<ExtensionDecl>(diag.ExistingDC);
 
-    // Complain about redundant conformances.
-    diagnose(diag.Loc, diag::redundant_conformance,
-             dc->getDeclaredInterfaceType(),
-             diag.Protocol->getName());
+    // Complain about the redundant conformance.
+
+    // If we've redundantly stated a conformance for which the original
+    // conformance came from the module of the type or the module of the
+    // protocol, just warn; we'll pick up the original conformance.
+    auto existingModule = diag.ExistingDC->getParentModule();
+    auto extendedNominal =
+      diag.ExistingDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (existingModule != dc->getParentModule() &&
+        (existingModule == extendedNominal->getParentModule() ||
+         existingModule == diag.Protocol->getParentModule())) {
+      // Warn about the conformance.
+      diagnose(diag.Loc, diag::redundant_conformance_adhoc,
+               dc->getDeclaredInterfaceType(),
+               diag.Protocol->getName(),
+               existingModule == extendedNominal->getParentModule(),
+               existingModule->getName());
+
+      // Complain about any declarations in this extension whose names match
+      // a requirement in that protocol.
+      SmallPtrSet<DeclName, 4> diagnosedNames;
+      for (auto decl : idc->getMembers()) {
+        if (decl->isImplicit())
+          continue;
+
+        auto value = dyn_cast<ValueDecl>(decl);
+        if (!value) continue;
+
+        if (!diagnosedNames.insert(value->getFullName()).second)
+          continue;
+
+        bool valueIsType = isa<TypeDecl>(value);
+        for (auto requirement
+              : diag.Protocol->lookupDirect(value->getFullName(),
+                                            /*ignoreNewExtensions=*/true)) {
+          auto requirementIsType = isa<TypeDecl>(requirement);
+          if (valueIsType != requirementIsType)
+            continue;
+
+          diagnose(value, diag::redundant_conformance_witness_ignored,
+                   value->getDescriptiveKind(), value->getFullName(),
+                   diag.Protocol->getFullName());
+          break;
+        }
+      }
+    } else {
+      diagnose(diag.Loc, diag::redundant_conformance,
+               dc->getDeclaredInterfaceType(),
+               diag.Protocol->getName());
+    }
 
     // Special case: explain that 'RawRepresentable' conformance
     // is implied for enums which already declare a raw type.
