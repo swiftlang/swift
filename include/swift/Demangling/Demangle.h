@@ -409,6 +409,12 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names and should be removed as soon as
+/// we switch to the new mangling for those names as well.
+std::string mangleNodeOld(const NodePointer &root);
+
 /// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
