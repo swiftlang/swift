@@ -520,7 +520,6 @@ where Encoding.EncodedScalar == _UIntBuffer<_UInt32, Encoding.CodeUnit>,
   _UInt32 == UInt32
 {
   associatedtype _UInt32 = UInt32
-  static func _isScalar(_: Encoding.CodeUnit) -> Bool
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   var buffer: Encoding.EncodedScalar { get set }
   func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
@@ -536,12 +535,12 @@ extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encodi
     if _fastPath(buffer.isEmpty) {
       guard let codeUnit = input.next() else { return .emptyInput }
       // ASCII, return immediately.
-      if Self._isScalar(codeUnit) {
+      if Encoding._isScalar(codeUnit) {
         return .valid(Encoding.EncodedScalar(containing: codeUnit))
       }
       // Non-ASCII, proceed to buffering mode.
       buffer.append(codeUnit)
-    } else if Self._isScalar(Encoding.CodeUnit(extendingOrTruncating: buffer._storage)) {
+    } else if Encoding._isScalar(Encoding.CodeUnit(extendingOrTruncating: buffer._storage)) {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
       let codeUnit = Encoding.CodeUnit(extendingOrTruncating: buffer._storage)
@@ -586,13 +585,6 @@ extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encodi
 //===----------------------------------------------------------------------===//
 //===--- UTF8 Decoders ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-
-public protocol _UTF8Decoder : _UTFDecoder {
-}
-
-extension _UTF8Decoder {
-  public static func _isScalar(_ x: Encoding.CodeUnit) -> Bool { return x & 0x80 == 0 }
-}
 
 extension Unicode.UTF8 : UnicodeEncoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt8>
@@ -640,7 +632,7 @@ extension Unicode.UTF8 : UnicodeEncoding {
   }
 }
 
-extension UTF8.ReverseDecoder : _UTF8Decoder {
+extension UTF8.ReverseDecoder : _UTFDecoder {
   public typealias Encoding = Unicode.UTF8
 
   public // @testable
@@ -715,7 +707,7 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
 }
 
 extension
- Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
+ Unicode.UTF8.ForwardDecoder : _UTFDecoder {
   public typealias Encoding = Unicode.UTF8
   
   public // @testable
@@ -786,15 +778,6 @@ extension
 //===--- UTF-16 Decoders --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol _UTF16Decoder : _UTFDecoder where Encoding.CodeUnit == UTF16.CodeUnit {
-}
-
-extension _UTF16Decoder {
-  public static func _isScalar(_ x: Encoding.CodeUnit) -> Bool {
-    return x & 0xf800 != 0xd800
-  }
-}
-
 extension Unicode.UTF16 : UnicodeEncoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
@@ -829,7 +812,7 @@ extension Unicode.UTF16 : UnicodeEncoding {
   }
 }
 
-extension UTF16.ReverseDecoder : _UTF16Decoder {
+extension UTF16.ReverseDecoder : _UTFDecoder {
   public typealias Encoding = Unicode.UTF16
 
   public // @testable
@@ -851,7 +834,7 @@ extension UTF16.ReverseDecoder : _UTF16Decoder {
   }
 }
 
-extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
+extension Unicode.UTF16.ForwardDecoder : _UTFDecoder {
   public typealias Encoding = Unicode.UTF16
   
   public // @testable
