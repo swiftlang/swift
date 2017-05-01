@@ -269,11 +269,14 @@ public protocol _UnicodeEncodingBase {
   static func decode(_ content: Self.EncodedScalar) -> UnicodeScalar
 }
 
+/// Types that separate streams of code units into encoded unicode scalar values
 public protocol UnicodeParser {
+  /// The encoding with which this parser is associated
   associatedtype Encoding : _UnicodeEncodingBase
-  
+
   init()
 
+  /// Parses a single Unicode scalar value from `input`.
   mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
@@ -281,7 +284,6 @@ public protocol UnicodeParser {
 }
 
 public protocol _UnicodeEncoding : _UnicodeEncodingBase {
-
   associatedtype ForwardParser : UnicodeParser
   // where ForwardParser.Encoding == Self
   
