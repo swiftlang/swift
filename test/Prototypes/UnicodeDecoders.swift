@@ -39,7 +39,7 @@ extension _Unicode {
   struct DefaultScalarView<
     CodeUnits: BidirectionalCollection,
     Encoding: UnicodeEncoding
-  > where CodeUnits.Iterator.Element == Encoding.CodeUnit {
+  > where CodeUnits.Element == Encoding.CodeUnit, CodeUnits._Element == CodeUnits.Element {
     var codeUnits: CodeUnits
     init(
       _ codeUnits: CodeUnits,
@@ -166,7 +166,7 @@ public struct _ReverseIndexingIterator<
   
   @_inlineable
   @inline(__always)
-  public mutating func next() -> Elements._Element? {
+  public mutating func next() -> Elements.Element? {
     guard _fastPath(_position != _elements.startIndex) else { return nil }
     _position = _elements.index(before: _position)
     return _elements[_position]
@@ -232,7 +232,7 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
   var result = assertionSuccess()
   
   func check<C: Collection>(_ expected: C, _ description: String)
-  where C.Iterator.Element == UInt32
+  where C.Element == UInt32
   {
     if !expected.elementsEqual(decoded) {
       if result.description == "" { result = assertionFailure()  }
