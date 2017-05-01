@@ -322,8 +322,19 @@ static bool isInterestingTypealias(Type type) {
     return false;
   if (type->is<BuiltinType>())
     return false;
+
+  auto underlyingTy = aliasTy->getDecl()->getUnderlyingTypeLoc().getType();
+
+  // A typealias that directly points at Builtin.AnyObject is not
+  // 'interesting', since it is in fact the AnyObject typealias in
+  // the standard library.
+  if (underlyingTy->isAnyObject() &&
+      isa<ProtocolCompositionType>(underlyingTy.getPointer()))
+    return false;
+
   if (aliasTy->getDecl()->isCompatibilityAlias())
-    return isInterestingTypealias(aliasTy->getSinglyDesugaredType());
+    return isInterestingTypealias(underlyingTy);
+
   return true;
 }
 
