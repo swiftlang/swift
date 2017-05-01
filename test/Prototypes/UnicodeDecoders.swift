@@ -524,6 +524,7 @@ where Encoding.EncodedScalar == _UIntBuffer<_UInt32, Encoding.CodeUnit>,
   static func _isScalar(_: Encoding.CodeUnit) -> Bool
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   var buffer: Encoding.EncodedScalar { get set }
+  func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
 }
 
 extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
@@ -567,8 +568,7 @@ extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encodi
     _sanityCheck(scalarBitCount <= buffer._bitCount)
     
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
-    var encodedScalar = buffer
-    encodedScalar._bitCount = scalarBitCount
+    let encodedScalar = _bufferedScalar(bitCount: scalarBitCount)
     
     buffer._storage = UInt32(
       // widen to 64 bits so that we can empty the buffer in the 4-byte case
@@ -629,28 +629,9 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
   }
   
   public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
-    let bits = source._storage
-    switch source._bitCount {
-    case 8: return UnicodeScalar(_unchecked: bits)
-    case 16:
-      var value = bits       & 0b0______________________11_1111
-      value    |= bits &>> 2 & 0b0______________0111__1100_0000
-      return UnicodeScalar(_unchecked: value)
-    case 24:
-      var value = bits       & 0b0______________________11_1111
-      value    |= bits &>> 2 & 0b0______________1111__1100_0000
-      value    |= bits &>> 4 & 0b0_________1111_0000__0000_0000
-      return UnicodeScalar(_unchecked: value)
-    default:
-      _sanityCheck(source._bitCount == 32)
-      var value = bits       & 0b0______________________11_1111
-      value    |= bits &>> 2 & 0b0______________1111__1100_0000
-      value    |= bits &>> 4 & 0b0_____11__1111_0000__0000_0000
-      value    |= bits &>> 6 & 0b0_1_1100__0000_0000__0000_0000
-      return UnicodeScalar(_unchecked: value)
-    }
+    return UTF8.ForwardDecoder.decodeOne(source)
   }
-  
+
   public // @testable
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(buffer._storage & 0x80 != 0) // this case handled elsewhere
@@ -713,9 +694,17 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
     }
     return 1
   }
+  
+  public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    return Encoding.EncodedScalar(
+      _storage: buffer._storage.byteSwapped &>> (32 - bitCount),
+      _bitCount: bitCount
+    )
+  }
 }
 
-extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
+extension
+ Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias Encoding = Unicode.UTF8
   
   public static var replacement : Encoding.EncodedScalar {
@@ -802,6 +791,12 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
       return UnicodeScalar(_unchecked: value)
     }
   }
+
+  public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    var r = buffer
+    r._bitCount = bitCount
+    return r
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -865,14 +860,16 @@ extension UTF16.ReverseDecoder : _UTF16Decoder {
   }
   
   public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
-    let bits = source._storage
-    if _fastPath(source._bitCount == 16) {
-      return UnicodeScalar(_unchecked: bits & 0xffff)
-    }
-    _sanityCheck(source._bitCount == 32)
-    let value = 0x10000 + ((bits & 0x03ff0000) &>> 6 | (bits & 0x03ff))
-    return UnicodeScalar(_unchecked: value)
-  }  
+    return UTF16.ForwardDecoder.decodeOne(source)
+  }
+  
+  public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    return Encoding.EncodedScalar(
+      _storage:
+        (buffer._storage << 16 | buffer._storage >> 16) &>> (32 - bitCount),
+      _bitCount: bitCount
+    )
+  }
 }
 
 extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
@@ -897,6 +894,12 @@ extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
     let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
     return UnicodeScalar(_unchecked: value)
   }  
+
+  public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    var r = buffer
+    r._bitCount = bitCount
+    return r
+  }
 }
 
 #if !BENCHMARK
