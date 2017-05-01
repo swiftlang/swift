@@ -148,3 +148,8 @@ bool EditorAdapter::replaceWithInner(SourceRange TokenRange,
   auto CharInnerRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr, TokenInnerRange);
   return replaceWithInner(CharRange, CharInnerRange);
 }
+
+bool EditorAdapter::replaceToken(SourceLoc TokenLoc, StringRef Text) {
+  return replace(Lexer::getTokenAtLocation(SwiftSrcMgr, TokenLoc).getRange(),
+    Text);
+}
