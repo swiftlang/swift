@@ -293,23 +293,23 @@ extension Substring : _RangeSubscriptableString {
 extension String {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
+    return String(self._subscript(bounds))
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
+    return String(self._subscript(bounds))
   }
 }
 
 extension Substring {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(self[bounds])
+    return String(self._subscript(bounds))
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(self[bounds] as Substring)
+    return String(self._subscript(bounds))
   }
 }
