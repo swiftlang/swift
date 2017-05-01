@@ -766,17 +766,22 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     }
     decl->getTypeLoc().setType(Ty);
   }
-  // If the param is not a 'let' and it is not an 'inout'.
-  // It must be a 'var'. Provide helpful diagnostics like a shadow copy
-  // in the function body to fix the 'var' attribute.
-  if (!decl->isLet() &&
-      !decl->isImplicit() &&
-      (Ty.isNull() || !Ty->is<InOutType>()) &&
-      !hadError) {
-    auto func = dyn_cast_or_null<AbstractFunctionDecl>(DC);
-    diagnoseAndMigrateVarParameterToBody(decl, func, TC);
-    decl->setInvalid();
-    hadError = true;
+
+  // If the user did not explicitly write 'let', 'var', or 'inout', we'll let
+  // type inference figure out what went wrong in detail.
+  if (decl->getLetVarInOutLoc().isValid()) {
+    // If the param is not a 'let' and it is not an 'inout'.
+    // It must be a 'var'. Provide helpful diagnostics like a shadow copy
+    // in the function body to fix the 'var' attribute.
+    if (!decl->isLet() &&
+        !decl->isImplicit() &&
+        (Ty.isNull() || !Ty->is<InOutType>()) &&
+        !hadError) {
+      auto func = dyn_cast_or_null<AbstractFunctionDecl>(DC);
+      diagnoseAndMigrateVarParameterToBody(decl, func, TC);
+      decl->setInvalid();
+      hadError = true;
+    }
   }
 
   if (hadError)

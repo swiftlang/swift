@@ -4184,7 +4184,7 @@ public:
                                      TypeResolutionOptions(),
                                      &resolver);
     isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
-                                           TypeResolutionOptions(),
+                                           TR_SubscriptParameters,
                                            resolver);
 
     if (isInvalid || SD->isInvalid()) {

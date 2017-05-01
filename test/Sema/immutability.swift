@@ -573,3 +573,38 @@ func f(a : FooClass, b : LetStructMembers) {
   a.baz = 1 // expected-error {{cannot assign to property: 'baz' is a method}}
   b.f = 42     // expected-error {{cannot assign to property: 'f' is a method}}
 }
+
+// SR-2354: Reject subscript declarations with mutable parameters.
+class MutableSubscripts {
+  var x : Int = 0
+
+  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' may not be used on subscript parameters}}
+  subscript<T>(x: inout T) -> () { // expected-error {{'inout' may not be used on subscript parameters}}
+    fatalError()
+  }
+
+  static func initialize(from state: inout MutableSubscripts) -> MutableSubscripts {
+    return state
+  }
+}
+
+
+// SR-4214: Misleading location-less diagnostic when closure parameter type
+// is inferred to be inout.
+func sr4214() {
+  func sequence<T>(_ x : T, _ f : (T) -> T) -> T {
+    return f(x)
+  }
+
+  // expected-error@+1 {{expression type '(inout MutableSubscripts) -> ()' is ambiguous without more context}}
+  let closure = { val in val.x = 7 } as (inout MutableSubscripts) -> ()
+  var v = MutableSubscripts()
+  closure(&v)
+  // FIXME: This diagnostic isn't really all that much better
+  // expected-error@+1 {{cannot convert value of type '(inout MutableSubscripts) -> ()' to expected argument type '(_) -> _'}}
+  sequence(v) { (state : inout MutableSubscripts) -> () in
+    _ = MutableSubscripts.initialize(from: &state)
+    return ()
+  }
+}
+
