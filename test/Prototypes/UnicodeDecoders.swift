@@ -278,9 +278,10 @@ public protocol UnicodeDecoder {
   
   init()
 
-  mutating func parseOne<I : IteratorProtocol>(
-    _ input: inout I
-  ) -> Unicode.ParseResult<Encoding.EncodedScalar> where I.Element == Encoding.CodeUnit
+  mutating func parseScalar<I : IteratorProtocol>(
+    from input: inout I
+  ) -> Unicode.ParseResult<Encoding.EncodedScalar>
+  where I.Element == Encoding.CodeUnit
 }
 
 public protocol _UnicodeEncoding : _UnicodeEncodingBase {
@@ -305,18 +306,18 @@ extension UnicodeDecoder {
   ) -> Int
   where I.Element == Encoding.CodeUnit
   {
-    var errors = 0
+    var errorCount = 0
     var d = Self()
     while true {
-      switch d.parseOne(&input) {
+      switch d.parseScalar(from: &input) {
       case let .valid(scalarContent):
         output(Encoding.decode(scalarContent))
       case .invalid:
         if !makeRepairs { return 1 }
-        errors += 1
+        errorCount += 1
         output(UnicodeScalar(_unchecked: 0xFFFD))
       case .emptyInput:
-        return errors
+        return errorCount
       }
     }
   }
@@ -325,16 +326,17 @@ extension UnicodeDecoder {
 
 extension Unicode {
   struct ParsingIterator<
-    CodeUnits : IteratorProtocol, 
+    CodeUnitIterator : IteratorProtocol, 
     Decoder: UnicodeDecoder
-  > where Decoder.Encoding.CodeUnit == CodeUnits.Element {
-    var codeUnits: CodeUnits
+  > where Decoder.Encoding.CodeUnit == CodeUnitIterator.Element {
+    var codeUnits: CodeUnitIterator
     var decoder: Decoder
   }
 }
+
 extension Unicode.ParsingIterator : IteratorProtocol, Sequence {
   mutating func next() -> Decoder.Encoding.EncodedScalar? {
-    switch decoder.parseOne(&codeUnits) {
+    switch decoder.parseScalar(from: &codeUnits) {
     case let .valid(scalarContent): return scalarContent
     case .invalid: return Decoder.Encoding.encodedReplacementCharacter
     case .emptyInput: return nil
@@ -439,7 +441,7 @@ extension Unicode.DefaultScalarView : Collection {
       _elements: codeUnits, _position: nextPosition
     )
     var d = Encoding.ForwardDecoder()
-    switch d.parseOne(&i) {
+    switch d.parseScalar(from: &i) {
     case .valid(let scalarContent):
       return Index(
         codeUnitIndex: nextPosition,
@@ -490,12 +492,12 @@ public struct ReverseIndexingIterator<
 extension Unicode.DefaultScalarView : BidirectionalCollection {
   @inline(__always)
   public func index(before i: Index) -> Index {
-    var d = Encoding.ReverseDecoder()
+    var decoder = Encoding.ReverseDecoder()
     
     var more = ReverseIndexingIterator(
       _elements: codeUnits, _position: i.codeUnitIndex)
     
-    switch d.parseOne(&more) {
+    switch decoder.parseScalar(from: &more) {
     case .valid(let scalarContent):
       let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
       return Index(
@@ -525,8 +527,8 @@ where Encoding.EncodedScalar == _UIntBuffer<_UInt32, Encoding.CodeUnit>,
 }
 
 extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
-  public mutating func parseOne<I : IteratorProtocol>(
-    _ input: inout I
+  public mutating func parseScalar<I : IteratorProtocol>(
+    from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
     where I.Element == Encoding.CodeUnit {
 
@@ -548,7 +550,7 @@ extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encodi
     }
     // Buffering mode.
     // Fill buffer back to 4 bytes (or as many as are left in the iterator).
-    _sanityCheck(buffer._bitCount < 32)
+    _sanityCheck(buffer._bitCount < _UInt32.bitWidth)
     repeat {
       if let codeUnit = input.next() {
         buffer.append(codeUnit)
@@ -556,7 +558,7 @@ extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encodi
         if buffer.isEmpty { return .emptyInput }
         break // We still have some bytes left in our buffer.
       }
-    } while buffer._bitCount < 32
+    } while buffer._bitCount < _UInt32.bitWidth
 
     // Find one unicode scalar.
     let (isValid, scalarBitCount) = _parseMultipleCodeUnits()
