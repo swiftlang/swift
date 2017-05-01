@@ -10,6 +10,33 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A type which can be used to slice a collection. A `RangeExpression` can
+/// convert itself to a `Range<Bound>` of indices within a given collection;
+/// the collection can then slice itself with that `Range`.
+public protocol RangeExpression {
+  associatedtype Bound: Comparable
+  /// Returns `self` expressed as a range of indices within `collection`.
+  ///
+  /// -Parameter collection: The collection `self` should be
+  ///                        relative to.
+  ///
+  /// -Returns: A `Range<Bound>` suitable for slicing `collection`.
+  ///           The return value is *not* guaranteed to be inside
+  ///           its bounds. Callers should apply the same preconditions
+  ///           to the return value as they would to a range provided
+  ///           directly by the user.
+  func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound
+  
+  func contains(_ element: Bound) -> Bool
+}
+
+extension RangeExpression {
+  @_inlineable
+  public static func ~= (pattern: Self, value: Bound) -> Bool {
+    return pattern.contains(value)
+  }  
+}
+
 // FIXME(ABI)#55 (Statically Unavailable/Dynamically Available): remove this type, it creates an ABI burden
 // on the library.
 //
@@ -513,6 +540,18 @@ extension ${Self} {
   }
 }
 
+extension ${Self}: RangeExpression {
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+    %   if 'Closed' in Self:
+      return Range(uncheckedBounds: 
+        (lower: lowerBound, upper: collection.index(after: self.upperBound))
+    %   else:
+      return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound)
+    %   end
+    )
+  }
+}
+
 extension ${Self} : CustomStringConvertible {
   /// A textual representation of the range.
   public var description: String {
@@ -695,6 +734,201 @@ public func ..< <Bound>(
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")
   return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
+}
+
+@_fixed_layout
+public struct PartialRangeUpTo<Bound: Comparable>: RangeExpression {
+  public init(_ upperBound: Bound) { self.upperBound = upperBound }
+  public let upperBound: Bound
+  @_transparent
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+    return collection.startIndex..<self.upperBound
+  }
+  @_transparent
+  public func contains(_ element: Bound) -> Bool {
+    return element < upperBound
+  }
+}
+
+@_fixed_layout
+public struct PartialRangeThrough<Bound: Comparable>: RangeExpression {
+  public init(_ upperBound: Bound) { self.upperBound = upperBound }
+  public let upperBound: Bound
+  @_transparent
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+    return collection.startIndex..<collection.index(after: self.upperBound)
+  }
+  @_transparent
+  public func contains(_ element: Bound) -> Bool {
+    return element <= upperBound
+  }
+}
+
+@_fixed_layout
+public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
+  public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
+  public let lowerBound: Bound
+  @_transparent
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+    return self.lowerBound..<collection.endIndex
+  }
+  @_transparent
+  public func contains(_ element: Bound) -> Bool {
+    return lowerBound <= element
+  }
+}
+
+@_fixed_layout
+public struct CountablePartialRangeFrom<
+  Bound: Strideable
+>: RangeExpression where Bound.Stride : SignedInteger  {
+  public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
+  public let lowerBound: Bound
+  @_transparent
+  public func relative<C: _Indexable>(
+    to collection: C
+  ) -> Range<Bound> where C.Index == Bound {
+    return self.lowerBound..<collection.endIndex
+  }
+  public func contains(_ element: Bound) -> Bool {
+    return lowerBound <= element
+  }
+}
+
+extension CountablePartialRangeFrom: Sequence {
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @_inlineable
+    public init(_current: Bound) { self._current = _current }
+    @_inlineable
+    public mutating func next() -> Bound? {
+      defer { _current = _current.advanced(by: 1) }
+      return _current
+    }
+    @_versioned
+    var _current: Bound
+  }
+  @_inlineable
+  public func makeIterator() -> Iterator { 
+    return Iterator(_current: lowerBound) 
+  }
+}
+
+extension Comparable {
+  /// Returns a partial range up to but not including its maximum.
+  ///
+  /// Use the partial range up to operator (`..<`) to create a partial range of
+  /// any type that conforms to the `Comparable` protocol. This example creates
+  /// a `PartialRangeUpTo<Double>` up to, but not including, 5.0.
+  ///
+  ///     let lessThanFive = ..<5.0
+  ///     print(lessThanFive.contains(3.14))  // Prints "true"
+  ///     print(lessThanFive.contains(5.0))   // Prints "false"
+  ///
+  /// Partial ranges can be used to slice types conforming to `Collection`
+  /// from the start of the collection up to, but not including, the maximum.
+  ///
+  /// let array = Array(0..<5)
+  /// print(array[..<3])      // prints [0, 1, 2]
+  ///
+  /// - Parameters:
+  ///   - maximum: The upper bound for the range.
+  @_transparent
+  public static prefix func ..<(maximum: Self) -> PartialRangeUpTo<Self> {
+    return PartialRangeUpTo(maximum)
+  }
+
+  /// Returns a partial range up to and including its maximum.
+  ///
+  /// Use the partial range up to operator (`...`) to create a partial range of
+  /// any type that conforms to the `Comparable` protocol. This example creates
+  /// a `PartialRangeThrough<Double>` up to 5.
+  ///
+  ///     let upToFive = ..<5.0
+  ///     print(upToFive.contains(4))   // Prints "true"
+  ///     print(upToFive.contains(5))   // Prints "true"
+  ///     print(upToFive.contains(6))  // Prints "false"
+  ///
+  /// Partial ranges can be used to slice types conforming to `Collection`
+  /// from the start of the collection up to the maximum.
+  ///
+  /// let array = Array(0..<5)
+  /// print(array[...3])      // prints [0, 1, 2, 3]
+  ///
+  /// - Parameters:
+  ///   - maximum: The upper bound for the range.
+  @_transparent
+  public static prefix func ...(maximum: Self) -> PartialRangeThrough<Self> {
+    return PartialRangeThrough(maximum)
+  }
+
+  /// Returns a countable partial range from a lower bound.
+  ///
+  /// Use the partial range up to operator (`...`) to create a range of any type
+  /// that conforms to the `Strideable` protocol with an associated integer
+  /// `Stride` type, such as any of the standard library's integer types. This
+  /// example creates a `CountablePartialRangeFrom<Int>` from 5 up.
+  ///
+  ///     let fiveOrMore = 5...
+  ///     print(fiveOrMore.contains(3))         // Prints "false"
+  ///     print(fiveOrMore.contains(5))         // Prints "true"
+  ///
+  /// - Parameters:
+  ///   - minimum: The lower bound for the range.
+  @_transparent
+  public static postfix func ...(minimum: Self) -> PartialRangeFrom<Self> {
+    return PartialRangeFrom(minimum)
+  }
+}
+
+extension Strideable where Stride: SignedInteger {
+  /// Returns a countable partial range from a lower bound.
+  ///
+  /// Use the partial range up to operator (`...`) to create a range of any type
+  /// that conforms to the `Strideable` protocol with an associated integer
+  /// `Stride` type, such as any of the standard library's integer types. This
+  /// example creates a `CountablePartialRangeFrom<Int>` from 5 up.
+  ///
+  ///     let fiveOrMore = 5...
+  ///     print(fiveOrMore.contains(3))         // Prints "false"
+  ///     print(fiveOrMore.contains(5))         // Prints "true"
+  ///
+  /// You can use sequence methods on these partial ranges.
+  ///
+  /// let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  /// let asciiTable = zip(0x41..., alphabet)
+  /// for (code, letter) in asciiTable { print(code, letter) }
+  ///
+  /// Note that these sequences count up indefinitely. You should not use them
+  /// with algorithms such as `map` or `filter` that will try to read the entire
+  /// sequence eagerly. The upper limit for the sequence is determined by the
+  /// type of `Bound`. For example, `CountablePartialRangeFrom<Int>` will trap
+  /// when the sequences' next value would be above `Int.max`.
+  ///
+  /// - Parameters:
+  ///   - minimum: The lower bound for the range.
+  @_transparent
+  public static postfix func ...(minimum: Self) -> CountablePartialRangeFrom<Self> {
+      return CountablePartialRangeFrom(minimum)
+  }
+}
+
+extension _Indexable {
+  @_inlineable
+  public subscript<R: RangeExpression>(r: R) -> SubSequence where R.Bound == Index {
+    return self[r.relative(to: self)]
+  }
+}
+extension _MutableIndexable {
+  @_inlineable
+  public subscript<R: RangeExpression>(r: R) -> SubSequence where R.Bound == Index {
+    get {
+      return self[r.relative(to: self)]
+    }
+    set {
+      self[r.relative(to: self)] = newValue
+    }
+  }
 }
 
 // swift-3-indexing-model: this is not really a proper rename

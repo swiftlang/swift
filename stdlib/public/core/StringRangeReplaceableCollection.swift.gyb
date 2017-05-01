@@ -247,7 +247,6 @@ extension String {
     }
   }
 
-% for Range in ['Range', 'ClosedRange']:
   /// Replaces the text within the specified bounds with the given characters.
   ///
   /// Calling this method invalidates any existing indices for use with this
@@ -263,7 +262,7 @@ extension String {
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
   public mutating func replaceSubrange<C>(
-    _ bounds: ${Range}<Index>,
+    _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
     withMutableCharacters {
@@ -271,27 +270,6 @@ extension String {
       in v.replaceSubrange(bounds, with: newElements)
     }
   }
-
-  /// Replaces the text within the specified bounds with the given string.
-  ///
-  /// Calling this method invalidates any existing indices for use with this
-  /// string.
-  ///
-  /// - Parameters:
-  ///   - bounds: The range of text to replace. The bounds of the range must be
-  ///     valid indices of the string.
-  ///   - newElements: The new text to add to the string.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the string and
-  ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
-  ///   removes text at the end of the string, the complexity is O(*n*), where
-  ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange(
-    _ bounds: ${Range}<Index>, with newElements: String
-  ) {
-    replaceSubrange(bounds, with: newElements.characters)
-  }
-% end
 
   /// Inserts a new character at the specified position.
   ///
@@ -357,26 +335,21 @@ extension String {
     }
   }
 
-% for Range in ['Range', 'ClosedRange']:
   /// Removes the characters in the given range.
   ///
   /// Calling this method invalidates any existing indices for use with this
   /// string.
   ///
-% if Range == 'ClosedRange':
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string and not
   ///   equal to the string's end index.
-% else:
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string.
-% end
-  public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
+  public mutating func removeSubrange(_ bounds: Range<Index>) {
     withMutableCharacters {
       (v: inout CharacterView) in v.removeSubrange(bounds)
     }
   }
-% end
 
   /// Replaces this string with the empty string.
   ///
