@@ -158,8 +158,8 @@ case let x???: print(x, terminator: "")
 case let x??: print(x as Any, terminator: "")
 case let x?: print(x as Any, terminator: "")
 case 4???: break
-case nil??: break
-case nil?: break
+case nil??: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+case nil?: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
 default: break
 }
 
