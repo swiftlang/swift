@@ -130,8 +130,11 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF8.swift
   Substring.swift.gyb
   SwiftNativeNSArray.swift
+  UIntBuffer.swift
   UnavailableStringAPIs.swift.gyb
   Unicode.swift
+  UnicodeEncoding.swift
+  UnicodeParser.swift
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
@@ -140,6 +143,9 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
   UnsafeRawPointer.swift.gyb
+  UTFEncoding.swift
+  UTF8.swift
+  UTF16.swift
   WriteBackMutableSlice.swift
   )
 
