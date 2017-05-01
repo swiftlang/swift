@@ -285,9 +285,19 @@ def continue_building_after_errors : Flag<["-"], "continue-building-after-errors
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Continue building, even after errors are encountered">;
 
-def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+def warn_swift3_objc_inference_complete :
+  Flag<["-"], "warn-swift3-objc-inference-complete">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Warn about deprecated @objc inference in Swift 3">;
+  HelpText<"Warn about deprecated @objc inference in Swift 3 for every declaration that will no longer be inferred as @objc in Swift 4">;
+
+def warn_swift3_objc_inference_minimal :
+  Flag<["-"], "warn-swift3-objc-inference-minimal">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+  Alias<warn_swift3_objc_inference_complete>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
