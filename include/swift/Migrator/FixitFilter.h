@@ -77,6 +77,19 @@ struct FixitFilter {
       return false;
     }
 
+    // With SE-110, the migrator may get a recommendation to add a Void
+    // placeholder in the call to f in:
+    // func foo(f: (Void) -> ()) {
+    //   f()
+    // }
+    // Here, f was () -> () in Swift 3 but now (()) -> () in Swift 4. Adding a
+    // type placeholder in the f() call isn't helpful for migration, although
+    // this particular fix-it should be to fix the f parameter's type.
+    if (Info.ID == diag::missing_argument_named.ID ||
+        Info.ID == diag::missing_argument_positional.ID) {
+      return false;
+    }
+
     if (Kind == DiagnosticKind::Error)
       return true;
 
