@@ -278,8 +278,10 @@ private:
     case Node::Kind::ProtocolList:
       return Node->getChild(0)->getNumChildren() <= 1;
 
-    case Node::Kind::ProtocolListWithClass:
     case Node::Kind::ProtocolListWithAnyObject:
+      return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
+
+    case Node::Kind::ProtocolListWithClass:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedTypeMetadataAccessor:
@@ -628,7 +630,8 @@ private:
 static bool isExistentialType(NodePointer node) {
   return (node->getKind() == Node::Kind::ExistentialMetatype ||
           node->getKind() == Node::Kind::ProtocolList ||
-          node->getKind() == Node::Kind::ProtocolListWithClass);
+          node->getKind() == Node::Kind::ProtocolListWithClass ||
+          node->getKind() == Node::Kind::ProtocolListWithAnyObject);
 }
 
 /// Print the relevant parameters and return the new index.
@@ -1362,7 +1365,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     NodePointer superclass = Node->getChild(1);
     print(superclass);
     Printer << " & ";
-    printChildren(protocols, " & ");
+    if (protocols->getNumChildren() < 1)
+      return nullptr;
+    NodePointer type_list = protocols->getChild(0);
+    printChildren(type_list, " & ");
     return nullptr;
   }
   case Node::Kind::ProtocolListWithAnyObject: {
@@ -1371,12 +1377,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     NodePointer protocols = Node->getChild(0);
     if (protocols->getNumChildren() < 1)
       return nullptr;
-    if (protocols->getChild(0)->getNumChildren() == 0) {
-      Printer << "AnyObject";
-    } else {
-      printChildren(protocols->getChild(0), " & ");
-      Printer << " & AnyObject";
+    NodePointer type_list = protocols->getChild(0);
+    if (type_list->getNumChildren() > 0) {
+      printChildren(type_list, " & ");
+      Printer << " & ";
     }
+    if (Options.QualifyEntities)
+      Printer << "Swift.";
+    Printer << "AnyObject";
     return nullptr;
   }
   case Node::Kind::AssociatedType:
