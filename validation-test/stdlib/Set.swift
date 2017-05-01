@@ -3491,6 +3491,28 @@ SetTestSuite.test("first") {
   expectNil(emptySet.first)
 }
 
+SetTestSuite.test("capacity/reserveCapacity(_:)") {
+  var s1: Set = [10, 20, 30]
+  expectEqual(3, s1.capacity)
+  s1.insert(40)
+  expectEqual(6, s1.capacity)
+
+  // Reserving new capacity jumps up to next limit.
+  s1.reserveCapacity(7)
+  expectEqual(12, s1.capacity)
+
+  // Can reserve right up to a limit.
+  s1.reserveCapacity(24)
+  expectEqual(24, s1.capacity)
+
+  // Fill up to the limit, no reallocation.
+  s1.formUnion(stride(from: 50, through: 240, by: 10))
+  expectEqual(24, s1.count)
+  expectEqual(24, s1.capacity)
+  s1.insert(250)
+  expectEqual(48, s1.capacity)
+}
+
 SetTestSuite.test("isEmpty") {
   let s1 = Set([1010, 2020, 3030])
   expectFalse(s1.isEmpty)
