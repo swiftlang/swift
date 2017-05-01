@@ -13,7 +13,7 @@
 // RUN: %target-run %T/UnicodeDecoders
 // REQUIRES: executable_test
 
-// Benchmarking: use the following script with your swift-4-enabbled swiftc.
+// Benchmarking: use the following script with your swift-4-enabled swiftc.
 // The BASELINE timings come from the existing standard library Codecs
 
 /* 
