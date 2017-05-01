@@ -3,9 +3,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=bb %s | %FileCheck %s -check-prefix=SANCOV
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge %s | %FileCheck %s -check-prefix=SANCOV
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,trace-cmp %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_CMP
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,trace-bb %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_BB
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,indirect-calls %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_INDIRECT_CALLS
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,8bit-counters %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_8BIT_COUNTERS
 
 import Darwin
 
@@ -28,6 +25,3 @@ test()
 // SANCOV: call void @__sanitizer_cov
 
 // SANCOV_TRACE_CMP: call void @__sanitizer_cov_trace_cmp
-// SANCOV_TRACE_BB: call void @__sanitizer_cov_trace_basic_block
-// SANCOV_INDIRECT_CALLS: call void @__sanitizer_cov_indir_call16
-// SANCOV_8BIT_COUNTERS: @__sancov_gen_cov_counter
