@@ -946,6 +946,11 @@ namespace {
       if (auto *simplified = simplifyTypeExpr(expr))
         return simplified;
 
+      if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
+        resolveKeyPathExpr(KPE);
+        return KPE;
+      }
+
       return expr;
     }
 
@@ -958,6 +963,9 @@ namespace {
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
     TypeExpr *simplifyTypeExpr(Expr *E);
+
+    /// Simplify a key path expression into a canonical form.
+    void resolveKeyPathExpr(KeyPathExpr *KPE);
   };
 } // end anonymous namespace
 
@@ -1302,6 +1310,103 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   return nullptr;
 }
 
+void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
+  if (KPE->isObjC())
+    return;
+
+  TypeRepr *rootType = nullptr;
+  SmallVector<KeyPathExpr::Component, 4> components;
+
+  // Pre-order visit of a sequence foo.bar[0]?.baz, which means that the
+  // components are pushed in reverse order.
+
+  auto traversePath = [&](Expr *expr, bool isInParsedPath,
+                          bool emitErrors = true) {
+    Expr *outermostExpr = expr;
+    while (1) {
+      // Base cases: we've reached the top.
+      if (auto TE = dyn_cast<TypeExpr>(expr)) {
+        assert(!isInParsedPath);
+        rootType = TE->getTypeRepr();
+        return;
+      } else if (isa<KeyPathDotExpr>(expr)) {
+        assert(isInParsedPath);
+        // Nothing here: the type is either the root, or is inferred.
+        return;
+      }
+
+      // Recurring cases:
+      if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+        // .foo
+        components.push_back(KeyPathExpr::Component::forUnresolvedProperty(
+            UDE->getName(), UDE->getLoc()));
+
+        expr = UDE->getBase();
+      } else if (auto SE = dyn_cast<SubscriptExpr>(expr)) {
+        // .[0] or just plain [0]
+        components.push_back(
+            KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
+                SE->getIndex(), SE->getLoc()));
+
+        expr = SE->getBase();
+      } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
+        // .? or ?
+        components.push_back(KeyPathExpr::Component::forUnresolvedOptionalChain(
+            BOE->getQuestionLoc()));
+
+        expr = BOE->getSubExpr();
+      } else if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
+        // .! or !
+        components.push_back(KeyPathExpr::Component::forUnresolvedOptionalForce(
+            FVE->getExclaimLoc()));
+
+        expr = FVE->getSubExpr();
+      } else if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
+        // Do nothing: this is implied to exist as the last expression, by the
+        // BindOptionalExprs, but is irrelevant to the components.
+        assert(OEE == outermostExpr);
+        expr = OEE->getSubExpr();
+      } else {
+        if (emitErrors)
+          TC.diagnose(expr->getLoc(),
+                      diag::expr_swift_keypath_invalid_component);
+        return;
+      }
+    }
+  };
+
+  auto root = KPE->getParsedRoot();
+  auto path = KPE->getParsedPath();
+
+  if (path) {
+    traversePath(path, /*isInParsedPath=*/true);
+
+    // This path looks like \Foo.Bar.[0].baz, which means Foo.Bar has to be a
+    // type.
+    if (root) {
+      if (auto TE = dyn_cast<TypeExpr>(root)) {
+        rootType = TE->getTypeRepr();
+      } else {
+        // FIXME: Probably better to catch this case earlier and force-eval as
+        // TypeExpr.
+        TC.diagnose(root->getLoc(),
+                    diag::expr_swift_keypath_not_starting_with_type);
+
+        // Traverse this path for recovery purposes: it may be a typo like
+        // \Foo.property.[0].
+        traversePath(root, /*isInParsedPath=*/false,
+                     /*emitErrors=*/false);
+      }
+    }
+  } else {
+    traversePath(root, /*isInParsedPath=*/false);
+  }
+
+  std::reverse(components.begin(), components.end());
+
+  KPE->setRootType(rootType);
+  KPE->resolveComponents(TC.Context, components);
+}
 
 /// \brief Clean up the given ill-formed expression, removing any references
 /// to type variables and setting error types on erroneous expression nodes.

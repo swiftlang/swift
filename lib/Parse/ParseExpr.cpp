@@ -454,7 +454,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
   case tok::pound_keyPath:
     return parseExprKeyPathObjC();
-  case tok::pound_keyPath2:
+  case tok::backslash:
     if (!Context.LangOpts.EnableExperimentalKeyPaths)
       return parseExprPostfix(Message, isExprBasic);
     return parseExprKeyPath();
@@ -504,134 +504,64 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
       new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
 }
 
-///   expr-keypath-swift:
-///     '#keyPath2' '(' (type ',')? keypath-component+ ')'
-///   keypath-component:
-///     '.' unqualified-name
-///     '[' expr ']'
-///     '?'
-///     '!'
+/// expr-keypath-swift:
+///   \ type? . initial-key-path-component key-path-components
+///
+/// key-path-components:
+//    key-path-component*
+///   <empty>
+///
+/// key-path-component:
+///   .identifier
+///   ?
+///   !
+///   [ expression ]
+///
+/// initial-key-path-component:
+///   identifier
+///   ?
+///   !
+///   [ expression ]
 ParserResult<Expr> Parser::parseExprKeyPath() {
-  // Consume '#keyPath2'.
-  // TODO: Finalize syntax.
-  SourceLoc keywordLoc = consumeToken(tok::pound_keyPath2);
-  // Parse the leading '('.
-  if (!Tok.is(tok::l_paren)) {
-    diagnose(Tok, diag::expr_keypath_expected_lparen);
-    return makeParserError();
-  }
-  SourceLoc lParenLoc = consumeToken(tok::l_paren);
-  
-  TypeRepr *root = nullptr;
+  // Consume '\'.
+  SourceLoc backslashLoc = consumeToken(tok::backslash);
 
-  // Can we parse a root type followed by a comma?
-  // We need to look ahead here since `[` could either start a sugar type or
-  // subscript component.
-  bool hasRoot;
-  {
-    BacktrackingScope backtrack(*this);
-    hasRoot = canParseType() && Tok.is(tok::comma);
-  }
-  
-  // Read in the root type, if present.
-  SourceLoc commaLoc;
-  if (hasRoot) {
-    root = parseType().get();
-    commaLoc = consumeToken(tok::comma);
-  }
-  
-  SmallVector<KeyPathExpr::Component, 4> components;
-  // Read in components.
-  ParserStatus status;
-  SourceLoc rParenLoc;
-  while (true) {
-    // A property component.
-    if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
-      DeclNameLoc nameLoc;
-      auto name = parseUnqualifiedDeclName(/*afterDot*/ true, nameLoc,
-                                  diag::expr_keypath_expected_property_or_type);
-      if (!name) {
-        status.setIsParseError();
-        break;
-      }
-      
-      auto component =
-        KeyPathExpr::Component::forUnresolvedProperty(name,
-                                                      nameLoc.getBaseNameLoc());
-      components.push_back(component);
-      continue;
-    }
-    
-    // A subscript component.
-    if (Tok.is(tok::l_square)) {
-      SourceLoc lSquareLoc, rSquareLoc;
-      SmallVector<Expr *, 2> indexArgs;
-      SmallVector<Identifier, 2> indexArgLabels;
-      SmallVector<SourceLoc, 2> indexArgLabelLocs;
-      Expr *trailingClosure;
-      status = parseExprList(tok::l_square, tok::r_square,
-                             /*isPostfix=*/true,
-                             /*isExprBasic*/ true,
-                             lSquareLoc, indexArgs, indexArgLabels,
-                             indexArgLabelLocs,
-                             rSquareLoc,
-                             trailingClosure);
-      if (status.hasCodeCompletion() || status.isError())
-        break;
-      
-      auto component = KeyPathExpr::Component::forUnresolvedSubscript(Context,
-          lSquareLoc, indexArgs, indexArgLabels, indexArgLabelLocs, rSquareLoc,
-          trailingClosure);
-      components.push_back(component);
-      continue;
-    }
-    
-    // An optional forcing or chaining component.
-    if (Tok.is(tok::question_postfix)) {
-      auto loc = consumeToken(tok::question_postfix);
-      auto component = KeyPathExpr::Component::forUnresolvedOptionalChain(loc);
-      components.push_back(component);
-      continue;
-    }
-    if (Tok.is(tok::exclaim_postfix)) {
-      auto loc = consumeToken(tok::exclaim_postfix);
-      auto component = KeyPathExpr::Component::forUnresolvedOptionalForce(loc);
-      components.push_back(component);
-      continue;
-    }
-    
-    // A closing paren ends the expression.
-    if (Tok.is(tok::r_paren)) {
-      rParenLoc = consumeToken(tok::r_paren);
-      break;
-    }
-    
-    // TODO: code completion
-    
-    // Anything else is an error.
-    diagnose(Tok, diag::expr_keypath_invalid_component);
-    status.setIsParseError();
-    break;
-  }
-  
-  if (status.hasCodeCompletion()) {
-    return makeParserCodeCompletionResult<Expr>();
+  // FIXME: diagnostics
+  ParserResult<Expr> rootResult, pathResult;
+  if (!startsWithSymbol(Tok, '.')) {
+    llvm::SaveAndRestore<bool> S(InSwiftKeyPath, true);
+    rootResult = parseExprPostfix(diag::expr_keypath_expected_expr,
+                                  /*isBasic=*/true);
+
+    if (rootResult.isParseError() || rootResult.hasCodeCompletion())
+      return rootResult;
   }
 
-  // Create an ErrorExpr if we encountered an invalid component, but were able
-  // to parse the closing paren.
-  if (status.isError()) {
-    if (rParenLoc.isValid()) {
-      return makeParserResult<Expr>(
-                  new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
-    } else {
-      return makeParserErrorResult<Expr>();
-    }
+  if (startsWithSymbol(Tok, '.')) {
+    // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
+    // make sure the . is there, but parsing the ? in \.? as .? doesn't make
+    // sense. This is all made more complicated by .?. being considered an
+    // operator token, and a single one at that (which means
+    // peekToken().is(tok::identifier) is incorrect: it is true for .?.foo).
+    auto position = getParserPosition();
+    auto dotLoc = consumeStartingCharacterOfCurrentToken();
+    if (Tok.is(tok::identifier))
+      backtrackToPosition(position);
+
+    auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
+    bool unusedHasBindOptional = false;
+
+    // Inside a keypath's path, the period always behaves normally: the key path
+    // behaviour is only the separation between type and path.
+    pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
+                                        /*periodHasKeyPathBehaviour=*/false,
+                                        unusedHasBindOptional);
+    if (pathResult.isParseError() || pathResult.hasCodeCompletion())
+      return pathResult;
   }
-  
-  auto keypath = new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
-                                           root, components, rParenLoc,
-                                           /*isObjC*/ false);
+
+  auto keypath = new (Context) KeyPathExpr(
+      backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
   return makeParserResult(keypath);
 }
 
@@ -654,9 +584,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
     KeyPathExpr *expr = nullptr;
     if (!components.empty()) {
-      expr = new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
-                                       nullptr, components, Tok.getLoc(),
-                                       /*isObjC*/ true);
+      expr = new (Context)
+          KeyPathExpr(Context, keywordLoc, lParenLoc, components, Tok.getLoc());
     }
 
     if (CodeCompletion)
@@ -722,10 +651,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   }
 
   // We're done: create the key-path expression.
-  return makeParserResult<Expr>(
-    new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
-                              nullptr, components,
-                              rParenLoc, /*isObjC*/ true));
+  return makeParserResult<Expr>(new (Context) KeyPathExpr(
+      Context, keywordLoc, lParenLoc, components, rParenLoc));
 }
 
 /// parseExprSelector
@@ -1133,9 +1060,10 @@ static bool canParseTypeOf(Parser &P) {
   return true;
 }
 
-ParserResult<Expr> Parser::parseExprPostfixSuffix(ParserResult<Expr> Result,
-                                                  bool isExprBasic,
-                                                  bool &hasBindOptional) {
+ParserResult<Expr>
+Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
+                               bool periodHasKeyPathBehaviour,
+                               bool &hasBindOptional) {
   hasBindOptional = false;
 
   // Handle suffix expressions.
@@ -1146,7 +1074,15 @@ ParserResult<Expr> Parser::parseExprPostfixSuffix(ParserResult<Expr> Result,
 
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
-    if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
+    if (Tok.is(tok::period) || Tok.is(tok::period_prefix)) {
+      // A key path is special, because it allows .[, unlike anywhere else. The
+      // period itself should be left in the token stream. (.? and .! end up
+      // being operators, and so aren't handled here.)
+      if (periodHasKeyPathBehaviour && peekToken().is(tok::l_square)) {
+        break;
+      }
+
+      consumeToken();
 
       // Handle "x.42" - a tuple index.
       if (Tok.is(tok::integer_literal)) {
@@ -1321,6 +1257,11 @@ ParserResult<Expr> Parser::parseExprPostfixSuffix(ParserResult<Expr> Result,
 
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
+      // KeyPaths are more restricted in what can go after a ., and so we treat
+      // them specially.
+      if (periodHasKeyPathBehaviour && startsWithSymbol(Tok, '.'))
+        break;
+
       Expr *oper = parseExprOperator();
       Result =
           makeParserResult(new (Context) PostfixUnaryExpr(oper, Result.get()));
@@ -1796,7 +1737,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     return Result;
 
   bool hasBindOptional = false;
-  Result = parseExprPostfixSuffix(Result, isExprBasic, hasBindOptional);
+  Result = parseExprPostfixSuffix(Result, isExprBasic,
+                                  /*periodHasKeyPathBehaviour=*/InSwiftKeyPath,
+                                  hasBindOptional);
   if (Result.isParseError() || Result.hasCodeCompletion())
     return Result;
 

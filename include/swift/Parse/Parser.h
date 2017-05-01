@@ -130,6 +130,7 @@ public:
 
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
+  bool InSwiftKeyPath = false;
 
   LocalContext *CurLocalContext = nullptr;
 
@@ -1143,6 +1144,7 @@ public:
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
                                             bool isExprBasic,
+                                            bool periodHasKeyPathBehaviour,
                                             bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
