@@ -1141,6 +1141,9 @@ public:
                                        bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
+  ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
+                                            bool isExprBasic,
+                                            bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprKeyPathObjC();
