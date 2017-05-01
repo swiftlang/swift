@@ -312,7 +312,7 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
 
   SILFunction *Caller = nullptr;
   if (Apply)
-    Caller = Apply.getCalleeFunction();
+    Caller = Apply.getFunction();
 
   if (!EnablePartialSpecialization || !HasUnboundGenericParams) {
     // Fast path for full specializations.

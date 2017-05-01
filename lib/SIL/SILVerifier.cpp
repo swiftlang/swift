@@ -60,7 +60,7 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
-static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
+static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   if (!A->getOpenedExistentialType().isNull())
     return true;
 
@@ -824,6 +824,19 @@ public:
     }
     require(fnTy->isPolymorphic(),
             "callee of apply with substitutions must be polymorphic");
+
+    // Each archetype occurring in the substitutions list should belong to the
+    // current function.
+    for (auto sub : subs) {
+      sub.getReplacement()->getCanonicalType().visit([&](CanType t) {
+        auto A = dyn_cast<ArchetypeType>(t);
+        if (!A)
+          return;
+        require(isArchetypeValidInFunction(A, &F),
+                "Replacment type of a substitution contains an ArchetypeType "
+                "that does not exist in the Caller's generic param list.");
+      });
+    }
 
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs);
