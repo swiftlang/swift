@@ -39,7 +39,7 @@ extension Unicode {
   struct DefaultScalarView<
     CodeUnits: BidirectionalCollection,
     Encoding: Unicode.Encoding
-  > where CodeUnits.Iterator.Element == Encoding.CodeUnit {
+  > where CodeUnits.Element == Encoding.CodeUnit {
     var codeUnits: CodeUnits
     init(
       _ codeUnits: CodeUnits,
@@ -240,7 +240,7 @@ func checkDecodeUTF<Codec : UnicodeCodec & Unicode.Encoding>(
   var result = assertionSuccess()
   
   func check<C: Collection>(_ expected: C, _ description: String)
-  where C.Iterator.Element == UInt32
+  where C.Element == UInt32
   {
     if !expected.elementsEqual(decoded) {
       if result.description == "" { result = assertionFailure()  }
