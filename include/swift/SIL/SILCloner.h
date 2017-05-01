@@ -1233,6 +1233,15 @@ void SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitRetainValueAddrInst(RetainValueAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createRetainValueAddr(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand()),
+                                               Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1266,6 +1275,16 @@ void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
     getBuilder().createReleaseValue(getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
                                     Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReleaseValueAddrInst(
+    ReleaseValueAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createReleaseValueAddr(getOpLocation(Inst->getLoc()),
+                                                getOpValue(Inst->getOperand()),
+                                                Inst->getAtomicity()));
 }
 
 template <typename ImplClass>

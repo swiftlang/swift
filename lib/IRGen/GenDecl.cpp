@@ -57,7 +57,9 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
+#include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "LoadableTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -3463,3 +3465,46 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   return fn;
 }
 
+llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
+                                                       Type t,
+                                                       llvm::Type *llvmType) {
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
+  assert(loadableTI && "Should only be called on Loadable types");
+  IRGenMangler mangler;
+  std::string funcName = mangler.mangleOutlinedRetainFunction(t);
+  llvm::Type *argTys[] = {llvmType};
+  return getOrCreateHelperFunction(
+      funcName, llvmType, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address addr(&*it++, loadableTI->getFixedAlignment());
+        Explosion loaded;
+        loadableTI->loadAsTake(IGF, addr, loaded);
+        Explosion out;
+        loadableTI->copy(IGF, loaded, out, irgen::Atomicity::Atomic);
+        (void)out.claimAll();
+        IGF.Builder.CreateRet(addr.getAddress());
+      },
+      true /*setIsNoInline*/);
+}
+
+llvm::Constant *
+IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
+                                        llvm::Type *llvmType) {
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
+  assert(loadableTI && "Should only be called on Loadable types");
+  IRGenMangler mangler;
+  std::string funcName = mangler.mangleOutlinedReleaseFunction(t);
+  llvm::Type *argTys[] = {llvmType};
+  return getOrCreateHelperFunction(
+      funcName, llvmType, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address addr(&*it++, loadableTI->getFixedAlignment());
+        Explosion loaded;
+        loadableTI->loadAsTake(IGF, addr, loaded);
+        loadableTI->consume(IGF, loaded, irgen::Atomicity::Atomic);
+        IGF.Builder.CreateRet(addr.getAddress());
+      },
+      true /*setIsNoInline*/);
+}

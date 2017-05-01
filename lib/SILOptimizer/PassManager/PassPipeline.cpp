@@ -437,6 +437,7 @@ static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
+  P.addLoadableByAddress();
 }
 
 SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {

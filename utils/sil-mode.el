@@ -108,7 +108,8 @@
                     "existential_metatype" "init_existential_metatype")
                   'words) . font-lock-keyword-face)
    ;; Aggregate Types
-   `(,(regexp-opt '("retain_value" "release_value" "tuple" "tuple_extract"
+   `(,(regexp-opt '("retain_value" "release_value_addr" "retain_value"
+                    "release_value_addr" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr"
                     "autorelease_value" "copy_value" "destroy_value"

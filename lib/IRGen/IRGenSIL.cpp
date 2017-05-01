@@ -890,11 +890,13 @@ public:
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
+  void visitRetainValueAddrInst(RetainValueAddrInst *i);
   void visitCopyValueInst(CopyValueInst *i);
   void visitCopyUnownedValueInst(CopyUnownedValueInst *i) {
     llvm_unreachable("unimplemented");
   }
   void visitReleaseValueInst(ReleaseValueInst *i);
+  void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitSetDeallocatingInst(SetDeallocatingInst *i);
@@ -3085,6 +3087,25 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   (void)out.claimAll();
 }
 
+void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
+  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
+         "Non atomic retains are not supported");
+  SILValue operandValue = i->getOperand();
+  Address addr = getLoweredAddress(operandValue);
+  SILType addrTy = operandValue->getType();
+  SILType objectT = addrTy.getObjectType();
+  llvm::Type *llvmType = addr.getAddress()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto *outlinedF = IGM.getOrCreateRetainFunction(
+      addrTI, i->getFunction()
+                  ->mapTypeOutOfContext(objectT.getSwiftRValueType())
+                  ->getCanonicalType(),
+      llvmType);
+  llvm::Value *args[] = {addr.getAddress()};
+  llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
+  call->setCallingConv(IGM.DefaultCC);
+}
+
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
@@ -3142,6 +3163,26 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
       .consume(*this, in, i->isAtomic() ? irgen::Atomicity::Atomic
                                         : irgen::Atomicity::NonAtomic);
+}
+
+void IRGenSILFunction::visitReleaseValueAddrInst(
+    swift::ReleaseValueAddrInst *i) {
+  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
+         "Non atomic retains are not supported");
+  SILValue operandValue = i->getOperand();
+  Address addr = getLoweredAddress(operandValue);
+  SILType addrTy = operandValue->getType();
+  SILType objectT = addrTy.getObjectType();
+  llvm::Type *llvmType = addr.getAddress()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto *outlinedF = IGM.getOrCreateReleaseFunction(
+      addrTI, i->getFunction()
+                  ->mapTypeOutOfContext(objectT.getSwiftRValueType())
+                  ->getCanonicalType(),
+      llvmType);
+  llvm::Value *args[] = {addr.getAddress()};
+  llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
+  call->setCallingConv(IGM.DefaultCC);
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {

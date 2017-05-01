@@ -207,7 +207,15 @@ namespace {
       return true;
     }
 
+    bool visitReleaseValueAddrInst(const ReleaseValueAddrInst *RHS) {
+      return true;
+    }
+
     bool visitRetainValueInst(const RetainValueInst *RHS) {
+      return true;
+    }
+
+    bool visitRetainValueAddrInst(const RetainValueAddrInst *RHS) {
       return true;
     }
 
@@ -886,6 +894,7 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::StrongReleaseInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::ReleaseValueAddrInst:
     return true;
 
   case ValueKind::DestroyValueInst:

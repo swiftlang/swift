@@ -794,6 +794,8 @@ Globals
 
   global ::= type 'Wy' // Outlined Copy Function Type
   global ::= type 'We' // Outlined Consume Function Type
+  global ::= type 'Wr' // Outlined Retain Function Type
+  global ::= type 'Ws' // Outlined Release Function Type
 
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect
@@ -1101,6 +1103,7 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
+  PARAM-CONVENTION ::= 'c'                   // indirect in constant
   PARAM-CONVENTION ::= 'l'                   // indirect inout
   PARAM-CONVENTION ::= 'b'                   // indirect inout aliasable
   PARAM-CONVENTION ::= 'n'                   // indirect in guaranteed
