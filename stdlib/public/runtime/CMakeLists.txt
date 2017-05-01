@@ -49,6 +49,7 @@ set(swift_runtime_objc_sources
     SwiftObject.mm
     SwiftValue.mm
     Reflection.mm
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 set(swift_runtime_sources
