@@ -1477,7 +1477,7 @@ ERROR(avail_query_argument_and_shorthand_mix_not_allowed, PointsToFirstBadToken,
       (StringRef, StringRef))
 
 NOTE(avail_query_meant_introduced,PointsToFirstBadToken,
-     "did you mean to use '%0, introduced: %1'?", (StringRef, StringRef))
+     "did you mean to specify an introduction version?", ())
 
 ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())
