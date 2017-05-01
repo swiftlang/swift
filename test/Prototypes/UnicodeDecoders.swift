@@ -525,7 +525,8 @@ where Encoding.EncodedScalar == _UIntBuffer<_UInt32, Encoding.CodeUnit>,
   func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
 }
 
-extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
+extension _UTFDecoder
+where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
@@ -540,7 +541,9 @@ extension _UTFDecoder where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encodi
       }
       // Non-ASCII, proceed to buffering mode.
       buffer.append(codeUnit)
-    } else if Encoding._isScalar(Encoding.CodeUnit(extendingOrTruncating: buffer._storage)) {
+    } else if Encoding._isScalar(
+      Encoding.CodeUnit(extendingOrTruncating: buffer._storage)
+    ) {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
       let codeUnit = Encoding.CodeUnit(extendingOrTruncating: buffer._storage)
@@ -706,8 +709,7 @@ extension UTF8.ReverseDecoder : _UTFDecoder {
   }
 }
 
-extension
- Unicode.UTF8.ForwardDecoder : _UTFDecoder {
+extension Unicode.UTF8.ForwardDecoder : _UTFDecoder {
   public typealias Encoding = Unicode.UTF8
   
   public // @testable
