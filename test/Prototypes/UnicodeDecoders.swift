@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift %s -Xfrontend -disable-access-control -swift-version 4 -g -Onone -o %T/UnicodeDecoders
+// RUN: %target-build-swift %s -swift-version 4 -g -Onone -o %T/UnicodeDecoders
 // RUN: %target-run %T/UnicodeDecoders
 // REQUIRES: executable_test
 
