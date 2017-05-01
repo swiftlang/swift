@@ -29,8 +29,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -54,18 +57,56 @@ enum class AccessedStorageKind : unsigned {
   Value,
 
   /// The access is to a global variable.
-  GlobalVar
+  GlobalVar,
+
+  /// The access is to a stored class property.
+  ClassProperty
+};
+
+/// Represents the identity of a stored class property as a combination
+/// of a base and a single projection. Eventually the goal is to make this
+/// more precise and consider, casts, etc.
+class ObjectProjection {
+public:
+  ObjectProjection(SILValue Object, const Projection &Proj)
+      : Object(Object), Proj(Proj) {
+    assert(Object->getType().isObject());
+  }
+
+  SILValue getObject() const { return Object; }
+  const Projection &getProjection() const { return Proj; }
+
+  bool operator==(const ObjectProjection &Other) const {
+    return Object == Other.Object && Proj == Other.Proj;
+  }
+
+  bool operator!=(const ObjectProjection &Other) const {
+    return Object != Other.Object || Proj != Other.Proj;
+  }
+
+private:
+  SILValue Object;
+  Projection Proj;
 };
 
 /// Represents the identity of a storage location being accessed.
 /// This is used to determine when two 'begin_access' instructions
 /// definitely access the same underlying location.
+///
+/// The key invariant that this class must maintain is that if it says
+/// two storage locations are the same then they must be the same at run time.
+/// It is  allowed to err on the other side: it may imprecisely fail to
+/// recognize that two storage locations that represent the same run-time
+/// location are in fact the same.
 class AccessedStorage {
+
+private:
   AccessedStorageKind Kind;
 
   union {
     SILValue Value;
     SILGlobalVariable *Global;
+    ObjectProjection ObjProj;
   };
 
 public:
@@ -74,6 +115,10 @@ public:
 
   AccessedStorage(SILGlobalVariable *Global)
       : Kind(AccessedStorageKind::GlobalVar), Global(Global) {}
+
+  AccessedStorage(AccessedStorageKind Kind,
+                  const ObjectProjection &ObjProj)
+      : Kind(Kind), ObjProj(ObjProj) {}
 
   AccessedStorageKind getKind() const { return Kind; }
 
@@ -85,6 +130,34 @@ public:
   SILGlobalVariable *getGlobal() const {
     assert(Kind == AccessedStorageKind::GlobalVar);
     return Global;
+  }
+
+  const ObjectProjection &getObjectProjection() const {
+    assert(Kind == AccessedStorageKind::ClassProperty);
+    return ObjProj;
+  }
+
+  /// Returns the ValueDecl for the underlying storage, if it can be
+  /// determined. Otherwise returns null. For diagonostic purposes.
+  const ValueDecl *getStorageDecl() const {
+    switch(Kind) {
+    case AccessedStorageKind::GlobalVar:
+      return getGlobal()->getDecl();
+    case AccessedStorageKind::Value:
+      if (auto *Box = dyn_cast<AllocBoxInst>(getValue())) {
+        return Box->getLoc().getAsASTNode<VarDecl>();
+      }
+      if (auto *Arg = dyn_cast<SILFunctionArgument>(getValue())) {
+        return Arg->getDecl();
+      }
+      break;
+    case AccessedStorageKind::ClassProperty: {
+      const ObjectProjection &OP = getObjectProjection();
+      const Projection &P = OP.getProjection();
+      return P.getVarDecl(OP.getObject()->getType());
+    }
+    }
+    return nullptr;
   }
 };
 
@@ -169,6 +242,7 @@ using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
 /// A pair of 'begin_access' instructions that conflict.
 struct ConflictingAccess {
+  AccessedStorage Storage;
   const BeginAccessInst *FirstAccess;
   const BeginAccessInst *SecondAccess;
 };
@@ -194,6 +268,10 @@ template <> struct DenseMapInfo<AccessedStorage> {
       return DenseMapInfo<swift::SILValue>::getHashValue(Storage.getValue());
     case AccessedStorageKind::GlobalVar:
       return DenseMapInfo<void *>::getHashValue(Storage.getGlobal());
+    case AccessedStorageKind::ClassProperty: {
+      const ObjectProjection &P = Storage.getObjectProjection();
+      return llvm::hash_combine(P.getObject(), P.getProjection());
+    }
     }
     llvm_unreachable("Unhandled AccessedStorageKind");
   }
@@ -207,6 +285,8 @@ template <> struct DenseMapInfo<AccessedStorage> {
       return LHS.getValue() == RHS.getValue();
     case AccessedStorageKind::GlobalVar:
       return LHS.getGlobal() == RHS.getGlobal();
+    case AccessedStorageKind::ClassProperty:
+        return LHS.getObjectProjection() == RHS.getObjectProjection();
     }
     llvm_unreachable("Unhandled AccessedStorageKind");
   }
@@ -279,7 +359,8 @@ isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
 /// Emits a diagnostic if beginning an access with the given in-progress
 /// accesses violates the law of exclusivity. Returns true when a
 /// diagnostic was emitted.
-static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
+static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
+                                         const BeginAccessInst *PriorAccess,
                                          const BeginAccessInst *NewAccess,
                                          ASTContext &Ctx) {
 
@@ -287,23 +368,62 @@ static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
   assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
            NewAccess->getAccessKind() == SILAccessKind::Read));
 
-  ExclusiveOrShared_t NewRequires = getRequiredAccess(NewAccess);
   ExclusiveOrShared_t PriorRequires = getRequiredAccess(PriorAccess);
 
-  diagnose(Ctx, NewAccess->getLoc().getSourceLoc(),
-           diag::exclusivity_access_required,
-           static_cast<unsigned>(NewAccess->getAccessKind()),
-           static_cast<unsigned>(NewRequires));
-  diagnose(Ctx, PriorAccess->getLoc().getSourceLoc(),
-           diag::exclusivity_conflicting_access,
-           static_cast<unsigned>(PriorAccess->getAccessKind()),
-           static_cast<unsigned>(PriorRequires));
+  // Diagnose on the first access that requires exclusivity.
+  const BeginAccessInst *AccessForMainDiagnostic = PriorAccess;
+  const BeginAccessInst *AccessForNote = NewAccess;
+  if (PriorRequires != ExclusiveOrShared_t::ExclusiveAccess) {
+    AccessForMainDiagnostic = NewAccess;
+    AccessForNote = PriorAccess;
+  }
+
+  SourceRange rangeForMain =
+    AccessForMainDiagnostic->getLoc().getSourceRange();
+
+  if (const ValueDecl *VD = Storage.getStorageDecl()) {
+    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
+             diag::exclusivity_access_required,
+             VD->getDescriptiveKind(),
+             VD->getName(),
+             static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
+        .highlight(rangeForMain);
+  } else {
+    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
+             diag::exclusivity_access_required_unknown_decl,
+             static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
+        .highlight(rangeForMain);
+  }
+  diagnose(Ctx, AccessForNote->getLoc().getSourceLoc(),
+           diag::exclusivity_conflicting_access)
+      .highlight(AccessForNote->getLoc().getSourceRange());
+}
+
+/// Make a best effort to find the underlying object for the purpose
+/// of identifying the base of a 'ref_element_addr'.
+static SILValue findUnderlyingObject(SILValue Value) {
+  assert(Value->getType().isObject());
+  SILValue Iter = Value;
+
+  while (true) {
+    // For now just look through begin_borrow instructions; we can likely
+    // make this more precise in the future.
+    if (auto *BBI = dyn_cast<BeginBorrowInst>(Iter)) {
+      Iter = BBI->getOperand();
+      continue;
+    }
+    break;
+  }
+
+  assert(Iter->getType().isObject());
+  return Iter;
 }
 
 /// Look through a value to find the underlying storage accessed.
 static AccessedStorage findAccessedStorage(SILValue Source) {
   SILValue Iter = Source;
   while (true) {
+    // Inductive cases: look through operand to find ultimate source.
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Iter)) {
       Iter = PBI->getOperand();
       continue;
@@ -314,10 +434,37 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
       continue;
     }
 
+    if (auto *MII = dyn_cast<MarkUninitializedInst>(Iter)) {
+      Iter = MII->getOperand();
+      continue;
+    }
+
+    // Base cases: make sure ultimate source is recognized.
     if (auto *GAI = dyn_cast<GlobalAddrInst>(Iter)) {
       return AccessedStorage(GAI->getReferencedGlobal());
     }
 
+    if (auto *REA = dyn_cast<RefElementAddrInst>(Iter)) {
+      // Do a best-effort to find the identity of the object being projected
+      // from. It is OK to unsound here (i.e., miss when two ref_element_addrs
+      // actually refer the same address) because these will be dynamically
+      // checked.
+      SILValue Object = findUnderlyingObject(REA->getOperand());
+      const ObjectProjection &OP = ObjectProjection(Object,
+                                                    Projection(REA));
+      return AccessedStorage(AccessedStorageKind::ClassProperty, OP);
+    }
+
+    if (isa<AllocBoxInst>(Iter) || isa<BeginAccessInst>(Iter) ||
+        isa<SILFunctionArgument>(Iter)) {
+      // Treat the instruction itself as the identity of the storage being
+      // being accessed.
+      return AccessedStorage(Iter);
+    }
+
+    // For now we're still allowing arbitrary addresses here. Once
+    // we start doing a best-effort static check for dynamically-enforced
+    // accesses we should lock this down to only recognized sources.
     assert(Iter->getType().isAddress() || Iter->getType().is<SILBoxType>());
     return AccessedStorage(Iter);
   }
@@ -405,11 +552,12 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
       // Ending onr decrements the count.
       if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
         SILAccessKind Kind = BAI->getAccessKind();
-        AccessInfo &Info = Accesses[findAccessedStorage(BAI->getSource())];
+        const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
+        AccessInfo &Info = Accesses[Storage];
         if (Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict()) {
           const BeginAccessInst *Conflict = Info.getFirstAccess();
           assert(Conflict && "Must already have had access to conflict!");
-          ConflictingAccesses.push_back({ Conflict, BAI });
+          ConflictingAccesses.push_back({ Storage, Conflict, BAI });
         }
 
         Info.beginAccess(BAI);
@@ -431,7 +579,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
       if (auto *AI = dyn_cast<ApplyInst>(&I)) {
         // Suppress for the arguments to the Standard Library's swap()
         // function until we can recommend a safe alternative.
-        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
+        if (Fn.getModule().getOptions().SuppressStaticExclusivitySwap &&
+            isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
           CallsToSuppress.push_back(AI);
       }
 
@@ -450,7 +599,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
                                                CallsToSuppress))
       continue;
 
-    diagnoseExclusivityViolation(PriorAccess, NewAccess, Fn.getASTContext());
+    diagnoseExclusivityViolation(Violation.Storage, PriorAccess, NewAccess,
+                                 Fn.getASTContext());
   }
 }
 

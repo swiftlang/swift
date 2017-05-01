@@ -38,8 +38,8 @@ bb0(%0 : $Int):
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
-  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
   %7 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %6 : $*Int
   end_access %5: $*Int
@@ -55,9 +55,9 @@ bb0(%0 : $Int):
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
-  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
   %6 = begin_access [modify] [unknown] %5 : $*Int
-  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
   end_access %6 : $*Int
@@ -147,8 +147,8 @@ bb0(%0 : $Int, %1 : $Builtin.Int1):
   br bb1
 bb1:
   // Make sure we don't diagnose twice.
-  %4 = begin_access [modify] [unknown] %3 : $*Int // expected-note {{conflicting modification requires exclusive access}}
-  %5 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{modification requires exclusive access}}
+  %4 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %5 = begin_access [modify] [unknown] %3 : $*Int // expected-note {{conflicting access is here}}
   end_access %5: $*Int
   end_access %4: $*Int
   cond_br %1, bb1, bb2
@@ -198,8 +198,8 @@ bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %2 : $*Int
-  %4 = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting read requires shared access}}
-  %5 = begin_access [modify] [unknown] %2 : $*Int // expected-warning {{modification requires exclusive access}}
+  %4 = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
+  %5 = begin_access [modify] [unknown] %2 : $*Int // expected-warning {{simultaneous accesses; modification requires exclusive access}}
   end_access %5 : $*Int
   end_access %4: $*Int
   destroy_value %1 : ${ var Int }
@@ -213,8 +213,8 @@ bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %2 : $*Int
-  %4 = begin_access [modify] [unknown] %2 : $*Int // expected-note {{conflicting modification requires exclusive access}}
-  %5 = begin_access [read] [unknown] %2 : $*Int // expected-warning {{read requires shared access}}
+  %4 = begin_access [modify] [unknown] %2 : $*Int // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %5 = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
   end_access %5 : $*Int
   end_access %4: $*Int
   destroy_value %1 : ${ var Int }
@@ -222,6 +222,50 @@ bb0(%0 : $Int):
   return %6 : $()
 }
 
+
+class ClassWithStoredProperty {
+  @sil_stored var f: Int
+  init()
+}
+// CHECK-LABEL: sil hidden @classStoredProperty
+sil hidden @classStoredProperty : $@convention(thin) (ClassWithStoredProperty) -> () {
+bb0(%0 : $ClassWithStoredProperty):
+  %1 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-warning@+1{{simultaneous accesses to var 'f'; modification requires exclusive access}}
+  %2 = begin_access [modify] [dynamic] %1 : $*Int
+  %3 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-note@+1{{conflicting access is here}}
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  end_access %4 : $*Int
+  end_access %2 : $*Int
+  destroy_value %0 : $ClassWithStoredProperty
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden @lookThroughBeginBorrow
+sil hidden @lookThroughBeginBorrow : $@convention(thin) (ClassWithStoredProperty) -> () {
+bb0(%0 : $ClassWithStoredProperty):
+  %1 = begin_borrow %0 : $ClassWithStoredProperty
+  %2 = begin_borrow %0 : $ClassWithStoredProperty
+  %3 = ref_element_addr %1 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-warning@+1{{simultaneous accesses to var 'f'; modification requires exclusive access}}
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  %5 = ref_element_addr %2 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-note@+1{{conflicting access is here}}
+  %6 = begin_access [modify] [dynamic] %5 : $*Int
+  end_access %6 : $*Int
+  end_access %4 : $*Int
+  end_borrow %2 from %0 : $ClassWithStoredProperty, $ClassWithStoredProperty
+  end_borrow %1 from %0 : $ClassWithStoredProperty, $ClassWithStoredProperty
+  destroy_value %0 : $ClassWithStoredProperty
+  %7 = tuple ()
+  return %7 : $()
+}
 
 // Tests for address identity
 
@@ -235,8 +279,8 @@ bb0(%0 : $Int):
   store %0 to [trivial] %3 : $*Int
   %4 = copy_value %2 : ${ var Int }
   %5 = project_box %4 : ${ var Int }, 0
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %7 = begin_access [modify] [unknown] %5 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %7 = begin_access [modify] [unknown] %5 : $*Int  // expected-note {{conflicting access is here}}
   end_access %7 : $*Int
   end_access %6: $*Int
   destroy_value %2 : ${ var Int }
@@ -245,6 +289,22 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
+// CHECK-LABEL: sil hidden @lookThroughMarkUninitialized
+sil hidden @lookThroughMarkUninitialized : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = mark_uninitialized [rootself] %1 : ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = project_box %2 : ${ var Int }, 0
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %4 : $*Int  // expected-note {{conflicting access is here}}
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %7 = tuple ()
+  return %7 : $()
+}
 
 // Treat global as identity for global_addr instruction-
 sil_global hidden @global1 : $Int
@@ -255,8 +315,8 @@ sil hidden @modifySameGlobal : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = global_addr @global1 :$*Int
   %2 = global_addr @global1 :$*Int
-  %3 = begin_access [modify] [unknown] %1 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %4 = begin_access [modify] [unknown] %2 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %3 = begin_access [modify] [unknown] %1 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %4 = begin_access [modify] [unknown] %2 : $*Int  // expected-note {{conflicting access is here}}
   end_access %4 : $*Int
   end_access %3: $*Int
   %5 = tuple ()
@@ -279,7 +339,7 @@ bb0(%0 : $Int):
 // Multiple errors accessing the same location
 
 // If we have a sequence of begin read - begin write - begin read accesses make
-// sure the second read doesn't report a confusing read-read conflict.
+// sure the the second read doesn't report a confusing read-read conflict.
 // CHECK-LABEL: sil hidden @readWriteReadConflictingThirdAccess
 sil hidden @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -287,8 +347,8 @@ bb0(%0 : $Int):
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
-  %5 = begin_access [read] [unknown] %3 : $*Int  // expected-note {{conflicting read requires shared access}}
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %5 = begin_access [read] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
   %7 = begin_access [read] [unknown] %3 : $*Int // no-error
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
@@ -308,8 +368,8 @@ bb0(%0 : $Int):
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
-  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
   %7 = begin_access [modify] [unknown] %3 : $*Int  // no-error
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
@@ -332,8 +392,8 @@ bb0(%0 : $Int):
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
   %5 = begin_access [modify] [unknown] %3 : $*Int  // no-note
   end_access %5 : $*Int
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{simultaneous accesses; modification requires exclusive access}}
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
   end_access %6: $*Int
