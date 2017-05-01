@@ -265,8 +265,11 @@ public protocol _UnicodeEncodingBase {
   /// The replacement character U+FFFD as represented in this encoding
   static var encodedReplacementCharacter : EncodedScalar { get }
 
-  /// Convert from encoded to encoding-independent representation
-  static func decode(_ content: Self.EncodedScalar) -> UnicodeScalar
+  /// Converts from encoded to encoding-independent representation
+  static func decode(_ content: EncodedScalar) -> UnicodeScalar
+
+  /// Converts from encoding-independent to encoded representation
+  static func encode(_ content: UnicodeScalar) -> EncodedScalar
 }
 
 /// Types that separate streams of code units into encoded unicode scalar values
@@ -628,6 +631,34 @@ extension Unicode.UTF8 : _UTFEncoding {
     }
   }
   
+  public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
+    let x = source.value
+    if _fastPath(x < (1 << 7)) {
+      return EncodedScalar(_storage: x, _bitCount: 8)
+    }
+    else if _fastPath(x < (1 << 11)) {
+      var r = x &>> 6
+      r |= (x & 0b11_1111) &<< 8
+      r |= 0b1000_0000__1100_0000
+      return EncodedScalar(_storage: r, _bitCount: 2*8)
+    }
+    else if _fastPath(x < (1 << 16)) {
+      var r = x &>> 12
+      r |= (x & 0b1111__1100_0000) &<< 2
+      r |= (x & 0b11_1111) &<< 16
+      r |= 0b1000_0000__1000_0000__1110_0000
+      return EncodedScalar(_storage:  r, _bitCount: 3*8)
+    }
+    else {
+      var r = x &>> 18
+      r |= (x & 0b11__1111_0000__0000_0000) &>> 4
+      r |= (x & 0b1111__1100_0000) &<< 10
+      r |= (x & 0b11_1111) << 24
+      r |= 0b1000_0000__1000_0000__1000_0000__1111_0000
+      return EncodedScalar(_storage: r, _bitCount: 4*8)
+    }
+  }
+  
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
     public init() { _buffer = _Buffer() }
@@ -804,6 +835,18 @@ extension Unicode.UTF16 : _UTFEncoding {
     let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
     return UnicodeScalar(_unchecked: value)
   }
+
+  public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
+    let x = source.value
+    if _fastPath(x < (1 << 16)) {
+      return EncodedScalar(_storage: x, _bitCount: 16)
+    }
+    let x1 = x - (1 << 16)
+    var r = (0xdc00 + (x1 & 0x3ff))
+    r <<= 16
+    r |= (0xd800 + (x1 >> 10 & 0x3ff))
+    return EncodedScalar(_storage: r, _bitCount: 32)
+  }
   
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
@@ -869,8 +912,18 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
 ) -> AssertionResult {
   var decoded = [UInt32]()
   var expected = expectedHead
-  func output(_ scalar: UInt32) { decoded.append(scalar) }
-  func output1(_ scalar: UnicodeScalar) { decoded.append(scalar.value) }
+  
+  func output(_ scalar: UInt32) {
+    decoded.append(scalar)
+    expectEqual(
+      UnicodeScalar(scalar),
+      Codec.decode(Codec.encode(UnicodeScalar(scalar)!)))
+  }
+  
+  func output1(_ scalar: UnicodeScalar) {
+    decoded.append(scalar.value)
+    expectEqual(scalar, Codec.decode(Codec.encode(scalar)))
+  }
   
   var result = assertionSuccess()
   
