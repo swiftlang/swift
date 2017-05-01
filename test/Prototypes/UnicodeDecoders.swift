@@ -63,6 +63,8 @@ public struct _UIntBuffer<
 }
 
 extension _UIntBuffer : Sequence {
+  public typealias SubSequence = RangeReplaceableRandomAccessSlice<_UIntBuffer>
+  
   @_fixed_layout
   public struct Iterator : IteratorProtocol, Sequence {
     @inline(__always)
