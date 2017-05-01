@@ -232,29 +232,27 @@ func f(a: X, b: X) {
   }
 }
 
-// FIXME: Duplicate case warning is not caught by dataflow diagnostics.
-//func f2(a: X, b: X) {
-//  switch (a, b) {
-//
-//  case (.A, .A): ()
-//  case (.B, .B): ()
-//
-//  case (.A, .B): ()
-//  case (.B, .A): ()
-//
-//  case (_, .Empty): ()
-//  case (.Empty, _): ()
-//
-//  // duplicate cases, but no warning? (comment out the line above and warnings appear!?)
-//  case (.A, .A): ()
-//  case (.B, .B): ()
-//
-//  case (.A, .B): ()
-//  case (.B, .A): ()
-//
-//  default: ()
-//  }
-//}
+func f2(a: X, b: X) {
+  switch (a, b) {
+
+  case (.A, .A): ()
+  case (.B, .B): ()
+
+  case (.A, .B): ()
+  case (.B, .A): ()
+
+  case (_, .Empty): ()
+  case (.Empty, _): ()
+
+  case (.A, .A): () // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  case (.B, .B): () // expected-warning {{case is already handled by previous patterns; consider removing it}}
+
+  case (.A, .B): () // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  case (.B, .A): () // expected-warning {{case is already handled by previous patterns; consider removing it}}
+
+  default: ()
+  }
+}
 
 enum XX : Int {
   case A

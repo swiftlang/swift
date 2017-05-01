@@ -1476,7 +1476,8 @@ namespace {
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, EnumDecl *theEnum) {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(theEnum);
+      std::string name = Mangler.mangleOutlinedCopyFunction(
+          theEnum->getAsNominalTypeOrNominalTypeExtensionContext());
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);

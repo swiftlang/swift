@@ -1542,6 +1542,13 @@ WARNING(witness_unavailable,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+WARNING(redundant_conformance_adhoc,none,
+        "conformance of %0 to protocol %1 was already stated in "
+        "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+NOTE(redundant_conformance_witness_ignored,none,
+     "%0 %1 will not be used to satisfy the conformance to %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 // "Near matches"
 WARNING(optional_req_near_match,none,
@@ -3610,6 +3617,8 @@ ERROR(non_exhaustive_switch,none,
       "%select{:|?}0 %2", (bool, bool, StringRef))
 NOTE(missing_particular_case,none,
      "missing case: '%0'", (StringRef))
+WARNING(redundant_particular_case,none,
+        "case is already handled by previous patterns; consider removing it",())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

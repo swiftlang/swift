@@ -1166,16 +1166,18 @@ void Remangler::mangleImplFunctionType(Node *node) {
         break;
       }
       case Node::Kind::ImplParameter: {
-        char ConvCh = llvm::StringSwitch<char>(Child->getFirstChild()->getText())
-                        .Case("@in", 'i')
-                        .Case("@inout", 'l')
-                        .Case("@inout_aliasable", 'b')
-                        .Case("@in_guaranteed", 'n')
-                        .Case("@owned", 'x')
-                        .Case("@guaranteed", 'g')
-                        .Case("@deallocating", 'e')
-                        .Case("@unowned", 'y')
-                        .Default(0);
+        char ConvCh =
+            llvm::StringSwitch<char>(Child->getFirstChild()->getText())
+                .Case("@in", 'i')
+                .Case("@inout", 'l')
+                .Case("@inout_aliasable", 'b')
+                .Case("@in_guaranteed", 'n')
+                .Case("@in_constant", 'c')
+                .Case("@owned", 'x')
+                .Case("@guaranteed", 'g')
+                .Case("@deallocating", 'e')
+                .Case("@unowned", 'y')
+                .Default(0);
         assert(ConvCh && "invalid impl parameter convention");
         Buffer << ConvCh;
         break;
@@ -1698,6 +1700,16 @@ void Remangler::mangleOutlinedCopy(Node *node) {
 void Remangler::mangleOutlinedConsume(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "We";
+}
+
+void Remangler::mangleOutlinedRetain(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wr";
+}
+
+void Remangler::mangleOutlinedRelease(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Ws";
 }
 
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {

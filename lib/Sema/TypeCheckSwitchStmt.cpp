@@ -128,6 +128,37 @@ namespace {
         return TypeAndVal.getInt();
       }
 
+      // Defines a "usefulness" metric that returns whether the given space
+      // contributes meaningfully to the exhaustiveness of a pattern.
+      bool isUseful() const {
+        auto subspacesUseful = [](const Space &space) {
+          for (auto &subspace : space.getSpaces()) {
+            if (!subspace.isUseful()) {
+              return false;
+            }
+          }
+          return true;
+        };
+
+        switch (getKind()) {
+        case SpaceKind::Empty:
+          return false;
+        case SpaceKind::Type:
+        case SpaceKind::BooleanConstant:
+          return true;
+        case SpaceKind::Disjunct:
+          if (getSpaces().empty()) {
+            return false;
+          }
+          return subspacesUseful(*this);
+        case SpaceKind::Constructor:
+          if (getSpaces().empty()) {
+            return true;
+          }
+          return subspacesUseful(*this);
+        }
+      }
+
       // An optimization that computes if the difference of this space and
       // another space is empty.
       bool isSubspace(const Space &other) const {
@@ -235,7 +266,7 @@ namespace {
           }
           return true;
         }
-        PAIRCASE(SpaceKind::Constructor, SpaceKind::Disjunct):
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct): {
           // S <= (S1 | ... | Sn) <= S iff (S <= S1) || ... || (S <= Sn)
           for (auto &param : other.getSpaces()) {
@@ -402,7 +433,6 @@ namespace {
             return Space();
 
           PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-            // if (isSubType(tp2, tp1)) b
             if (canDecompose(this->getType())) {
               SmallVector<Space, 4> spaces;
               decompose(this->getType(), spaces);
@@ -613,7 +643,7 @@ namespace {
         }
           break;
         case SpaceKind::BooleanConstant:
-          buffer << ((getBoolValue()) ? "true" : "false");
+          buffer << (getBoolValue() ? "true" : "false");
           break;
         case SpaceKind::Constructor: {
           if (!Head.empty()) {
@@ -806,11 +836,17 @@ namespace {
           if (caseItem.getGuardExpr())
             continue;
 
-          auto projection = projectPattern(Ctx, caseItem.getPattern());
-
           // Space is trivially covered with a default clause.
           if (caseItem.isDefault())
             return;
+
+          auto projection = projectPattern(Ctx, caseItem.getPattern());
+          if (projection.isUseful() && projection.isSubspace(Space(spaces))) {
+            Ctx.Diags
+                .diagnose(caseItem.getStartLoc(),
+                          diag::redundant_particular_case)
+                .highlight(caseItem.getSourceRange());
+          }
           spaces.push_back(projection);
         }
       }
@@ -895,17 +931,17 @@ namespace {
           if (flats.empty()) {
             flats.append({ uncoveredSpace });
           }
-          for (size_t i = 0; i < flats.size(); ++i) {
-            auto &FlatSpace = flats[i];
+          for (auto &flat : flats) {
             OS << tok::kw_case << " ";
-            FlatSpace.show(OS);
+            flat.show(OS);
             OS << ": " << Placeholder << "\n";
           }
         }
 
-        auto Diag = Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch,
-                                       InEditor, false, Buffer.str());
-        Diag.fixItInsert(EndLoc, Buffer.str());
+        Ctx.Diags
+            .diagnose(StartLoc, diag::non_exhaustive_switch, InEditor, false,
+                      Buffer.str())
+            .fixItInsert(EndLoc, Buffer.str());
       } else {
         Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch,
                            InEditor, false, Buffer.str());
@@ -916,10 +952,9 @@ namespace {
           if (flats.empty()) {
             flats.append({ uncoveredSpace });
           }
-          for (size_t i = 0; i < flats.size(); ++i) {
+          for (auto &flat : flats) {
             Buffer.clear();
-            auto &FlatSpace = flats[i];
-            FlatSpace.show(OS);
+            flat.show(OS);
             Ctx.Diags.diagnose(StartLoc, diag::missing_particular_case,
                                Buffer.str());
           }

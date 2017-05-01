@@ -617,6 +617,16 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::visitReleaseValueAddrInst(ReleaseValueAddrInst *RVI) {
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::visitRetainValueAddrInst(RetainValueAddrInst *RVI) {
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   // Remove runtime asserts such as overflow checks and bounds checks.
   if (RemoveCondFails)

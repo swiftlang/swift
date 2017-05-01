@@ -2035,6 +2035,14 @@ Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
 Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          TypeRepr *repr,
                                          TypeResolutionOptions options) {
+  // Convenience to grab the source range of a type attribute.
+  auto getTypeAttrRangeWithAt = [](TypeChecker &TC, SourceLoc attrLoc) {
+    return SourceRange(attrLoc.getAdvancedLoc(-1),
+                       Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                  attrLoc));
+
+  };
+
   // Remember whether this is a function parameter.
   bool isFunctionParam =
     options.contains(TR_FunctionInput) ||
@@ -2230,12 +2238,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // @noreturn has been replaced with a 'Never' return type.
     if (fnRepr && attrs.has(TAK_noreturn)) {
-      auto &SM = TC.Context.SourceMgr;
       auto loc = attrs.getLoc(TAK_noreturn);
-      auto attrRange = SourceRange(
-        loc.getAdvancedLoc(-1),
-        Lexer::getLocForEndOfToken(SM, loc));
-
+      auto attrRange = getTypeAttrRangeWithAt(TC, loc);
       auto resultRange = fnRepr->getResultTypeRepr()->getSourceRange();
 
       TC.diagnose(loc, diag::noreturn_not_supported)
@@ -2276,11 +2280,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // The attribute is meaningless except on parameter types.
       bool shouldDiagnose = !isFunctionParam && !skipDiagnostic;
       if (shouldDiagnose) {
-        auto &SM = TC.Context.SourceMgr;
         auto loc = attrs.getLoc(TAK_escaping);
-        auto attrRange = SourceRange(
-          loc.getAdvancedLoc(-1),
-          Lexer::getLocForEndOfToken(SM, loc));
+        auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
         TC.diagnose(loc, diag::escaping_non_function_parameter)
             .fixItRemove(attrRange);
@@ -2305,11 +2306,25 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_noescape);
 
     for (auto i : FunctionAttrs) {
-      if (attrs.has(i)) {
-        TC.diagnose(attrs.getLoc(i), diag::attribute_requires_function_type,
-                    TypeAttributes::getAttrName(i));
-        attrs.clearAttribute(i);
+      if (!attrs.has(i))
+        continue;
+
+      auto diag = TC.diagnose(attrs.getLoc(i),
+                              diag::attribute_requires_function_type,
+                              TypeAttributes::getAttrName(i));
+
+      // If we see @escaping among the attributes on this type, because it isn't
+      // a function type, we'll remove it.
+      if (i == TAK_escaping) {
+        diag.fixItRemove(getTypeAttrRangeWithAt(TC,
+                                                attrs.getLoc(TAK_escaping)));
+        // Specialize the diagnostic for Optionals.
+        if (ty->getOptionalObjectType()) {
+          diag.flush();
+          TC.diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+        }
       }
+      attrs.clearAttribute(i);
     }
   } else if (hasFunctionAttr && fnRepr) {
     // Remove the function attributes from the set so that we don't diagnose.
@@ -2642,6 +2657,8 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_in_guaranteed,
              ParameterConvention::Indirect_In_Guaranteed);
     checkFor(TypeAttrKind::TAK_in, ParameterConvention::Indirect_In);
+    checkFor(TypeAttrKind::TAK_in_constant,
+             ParameterConvention::Indirect_In_Constant);
     checkFor(TypeAttrKind::TAK_inout, ParameterConvention::Indirect_Inout);
     checkFor(TypeAttrKind::TAK_inout_aliasable,
              ParameterConvention::Indirect_InoutAliasable);

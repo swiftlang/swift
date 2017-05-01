@@ -20,9 +20,10 @@ public func g(_ s : String?)
 {
   // CHECK2: define {{.*}}@_T04main1gySSSgF
   // The shadow copy store should not have a location.
-  // CHECK2: getelementptr inbounds {{.*}} %s.debug, {{.*}}, !dbg ![[DBG0:.*]]
+  // CHECK2-64: getelementptr inbounds {{.*}} %s.debug, {{.*}}, !dbg ![[DBG0:.*]]
   // CHECK2: ![[G:.*]] = distinct !DISubprogram(name: "g",
-  // CHECK2: ![[DBG0]] = !DILocation(line: 0, scope: ![[G]])
+  // CHECK2-63: ![[DBG0]] = !DILocation(line: 0, scope: ![[G]])
+  // CHECK2-32: ![[DBG0]] = !DILocation(line: 0, scope: !
   guard let val = s else { return }
   use(val)
 }

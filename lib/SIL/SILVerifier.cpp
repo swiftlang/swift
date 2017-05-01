@@ -60,7 +60,7 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
-static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
+static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   if (!A->getOpenedExistentialType().isNull())
     return true;
 
@@ -825,6 +825,19 @@ public:
     require(fnTy->isPolymorphic(),
             "callee of apply with substitutions must be polymorphic");
 
+    // Each archetype occurring in the substitutions list should belong to the
+    // current function.
+    for (auto sub : subs) {
+      sub.getReplacement()->getCanonicalType().visit([&](CanType t) {
+        auto A = dyn_cast<ArchetypeType>(t);
+        if (!A)
+          return;
+        require(isArchetypeValidInFunction(A, &F),
+                "Replacment type of a substitution contains an ArchetypeType "
+                "that does not exist in the Caller's generic param list.");
+      });
+    }
+
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs);
   }
@@ -1511,6 +1524,13 @@ public:
             "retain_value is only in functions with unqualified ownership");
   }
 
+  void checkRetainValueAddrInst(RetainValueAddrInst *I) {
+    require(I->getOperand()->getType().isAddress(),
+            "Source value should be an address value");
+    require(F.hasUnqualifiedOwnership(),
+            "retain_value is only in functions with unqualified ownership");
+  }
+
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -1543,7 +1563,14 @@ public:
     require(F.hasUnqualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
-  
+
+  void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
+    require(I->getOperand()->getType().isAddress(),
+            "Source value should be an address value");
+    require(F.hasUnqualifiedOwnership(),
+            "release_value is only in functions with unqualified ownership");
+  }
+
   void checkAutoreleaseValueInst(AutoreleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -2316,6 +2343,7 @@ public:
 
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_In_Constant:
       case SILArgumentConvention::Indirect_Inout:
       case SILArgumentConvention::Indirect_InoutAliasable:
         return true;
@@ -3807,6 +3835,7 @@ public:
                          default:
                            return false;
                          case ParameterConvention::Indirect_In:
+                         case ParameterConvention::Indirect_In_Constant:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:

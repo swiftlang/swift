@@ -89,9 +89,6 @@ var zcurriedFull = z.curried(0)(1)
 // Module
 Swift.print(3, terminator: "")
 
-var format : String
-_ = format._splitFirstIf({ $0.isASCII })
-
 ////
 // Unqualified references
 ////

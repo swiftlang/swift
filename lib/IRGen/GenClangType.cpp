@@ -561,6 +561,7 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     case ParameterConvention::Direct_Owned:
       llvm_unreachable("block takes owned parameter");
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:

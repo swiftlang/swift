@@ -3667,6 +3667,19 @@ class RetainValueInst : public UnaryInstructionBase<ValueKind::RetainValueInst,
   }
 };
 
+/// RetainValueAddrInst - Copies a loadable value by address.
+class RetainValueAddrInst
+    : public UnaryInstructionBase<ValueKind::RetainValueAddrInst,
+                                  RefCountingInst, /*HasValue*/ false> {
+  friend SILBuilder;
+
+  RetainValueAddrInst(SILDebugLocation DebugLoc, SILValue operand,
+                      Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
+};
+
 /// ReleaseValueInst - Destroys a loadable value.
 class ReleaseValueInst : public UnaryInstructionBase<ValueKind::ReleaseValueInst,
                                                      RefCountingInst,
@@ -3675,6 +3688,19 @@ class ReleaseValueInst : public UnaryInstructionBase<ValueKind::ReleaseValueInst
 
   ReleaseValueInst(SILDebugLocation DebugLoc, SILValue operand,
                    Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
+};
+
+/// ReleaseValueInst - Destroys a loadable value by address.
+class ReleaseValueAddrInst
+    : public UnaryInstructionBase<ValueKind::ReleaseValueAddrInst,
+                                  RefCountingInst, /*HasValue*/ false> {
+  friend SILBuilder;
+
+  ReleaseValueAddrInst(SILDebugLocation DebugLoc, SILValue operand,
+                       Atomicity atomicity)
       : UnaryInstructionBase(DebugLoc, operand) {
     setAtomicity(atomicity);
   }

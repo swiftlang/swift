@@ -687,6 +687,7 @@ static CanType getArgumentLoweringType(CanType type,
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     return type;
 
@@ -854,6 +855,7 @@ static llvm::Function *emitPartialApplicationForwarder(
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     llvm_unreachable("indirect callables not supported");
   }
@@ -927,6 +929,7 @@ static llvm::Function *emitPartialApplicationForwarder(
     auto argConvention = conventions[nextCapturedField++];
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Direct_Owned:
       if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
       break;
@@ -1011,7 +1014,8 @@ static llvm::Function *emitPartialApplicationForwarder(
       
       Explosion param;
       switch (fieldConvention) {
-      case ParameterConvention::Indirect_In: {
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant: {
         // The +1 argument is passed indirectly, so we need to copy into a
         // temporary.
         needsAllocas = true;
@@ -1471,6 +1475,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       switch (argConventions[i]) {
       // Take indirect value arguments out of memory.
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
         auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
         fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy);
