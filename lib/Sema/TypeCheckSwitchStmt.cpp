@@ -902,7 +902,7 @@ namespace {
              .fixItInsert(EndLoc, Buffer.str());
         } else {
           Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch,
-                             InEditor, uncovered.isEmpty(), "")
+                             InEditor, uncovered.isEmpty())
              .fixItInsert(EndLoc, Buffer.str());
         }
         return;
@@ -938,13 +938,11 @@ namespace {
           }
         }
 
-        Ctx.Diags
-            .diagnose(StartLoc, diag::non_exhaustive_switch, InEditor, false,
-                      Buffer.str())
-            .fixItInsert(EndLoc, Buffer.str());
+        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch, InEditor,
+                           false).fixItInsert(EndLoc, Buffer.str());
       } else {
         Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch,
-                           InEditor, false, Buffer.str());
+                           InEditor, false);
 
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
