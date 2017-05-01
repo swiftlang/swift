@@ -5,7 +5,7 @@
 // REQUIRES: PTRSIZE=64
 
 // Disabled for now
-// REQUIRES: rdar://problem/31776015
+// REQUIRES: rdar31776015
 
 
 import StdlibUnittest

@@ -2,6 +2,6 @@
 
 // CHECK-NOT: Unknown
 
-// REQUIRES: rdar://problem/31683781
+// REQUIRES: rdar31683781
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
