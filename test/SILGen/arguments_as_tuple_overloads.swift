@@ -28,7 +28,7 @@ public func test(_ a: Int, _ b: Int) {
 public func test(_ t: (Int, Int)) {
 }
 
-// CHECK: sil @_T04test3fooyt_tyF :
+// CHECK: sil @_T04test3fooyyt_tF :
 public func foo(_: ()) {
 }
 

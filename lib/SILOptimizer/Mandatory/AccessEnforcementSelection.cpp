@@ -12,7 +12,9 @@
 ///
 /// This pass eliminates 'unknown' access enforcement by selecting either
 /// static or dynamic enforcement.
-/// 
+///
+/// FIXME: handle boxes used by copy_value when neither copy is captured.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-selection"
@@ -80,7 +82,7 @@ public:
   void run();
 
 private:
-  void analyzeUsesOfBox();
+  void analyzeUsesOfBox(SILInstruction *source);
   void analyzeProjection(ProjectBoxInst *projection);
 
   void propagateEscapes();
@@ -101,7 +103,7 @@ private:
 
 void SelectEnforcement::run() {
   // Set up the data-flow problem.
-  analyzeUsesOfBox();
+  analyzeUsesOfBox(Box);
 
   // Run the data-flow problem.
   propagateEscapes();
@@ -110,10 +112,17 @@ void SelectEnforcement::run() {
   updateAccesses();
 }
 
-void SelectEnforcement::analyzeUsesOfBox() {
+// FIXME: This should cover a superset of AllocBoxToStack's findUnexpectedBoxUse
+// to avoid perturbing codegen. They should be sharing the same analysis.
+void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
   // Collect accesses rooted off of projections.
-  for (auto use : Box->getUses()) {
+  for (auto use : source->getUses()) {
     auto user = use->getUser();
+
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(user)) {
+      analyzeUsesOfBox(MUI);
+      continue;
+    }
 
     if (auto projection = dyn_cast<ProjectBoxInst>(user)) {
       analyzeProjection(projection);
@@ -132,7 +141,7 @@ void SelectEnforcement::analyzeUsesOfBox() {
     // Add it to the escapes set.
     Escapes.insert(user);
 
-    // 
+    // Record this point as escaping.
     auto userBB = user->getParent();
     auto &state = StateMap[userBB];
     if (!state.IsInWorklist) {
@@ -389,10 +398,14 @@ struct AccessEnforcementSelection : SILFunctionTransform {
   }
 
   void handleAccessToBox(BeginAccessInst *access, ProjectBoxInst *projection) {
+    SILValue source = projection->getOperand();
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(source))
+      source = MUI->getOperand();
+
     // If we didn't allocate the box, assume that we need to use
     // dynamic enforcement.
     // TODO: use static enforcement in certain provable cases.
-    auto box = dyn_cast<AllocBoxInst>(projection->getOperand());
+    auto box = dyn_cast<AllocBoxInst>(source);
     if (!box) {
       setDynamicEnforcement(access);
       return;

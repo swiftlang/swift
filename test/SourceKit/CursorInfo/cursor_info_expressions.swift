@@ -6,6 +6,8 @@ func test(_ o: P1?) {
   switch o {
   case let s as S1:
     test(s)
+  default:
+    test(o)
   }
 }
 

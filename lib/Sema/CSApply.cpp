@@ -95,8 +95,11 @@ void Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
-                        lookupConformanceFn, result);
+  auto subMap = sig->getSubstitutionMap(
+    QueryTypeSubstitutionMap{subs},
+    lookupConformanceFn);
+
+  sig->getSubstitutions(subMap, result);
 }
 
 void Solution::computeSubstitutions(
@@ -897,18 +900,19 @@ namespace {
 
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
-        auto selfParamTy = selfTy;
+        auto selfParamTy = isDynamic ? selfTy : containerTy;
 
         if (selfTy->isEqual(baseTy))
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
+
         base = coerceObjectArgumentToType(
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(selfTy),
+                            MetatypeType::get(isDynamic ? selfTy : containerTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -1347,8 +1351,6 @@ namespace {
       }
 
       // Figure out the index and result types.
-      auto containerTy
-        = subscript->getDeclContext()->getDeclaredTypeOfContext();
       auto subscriptTy = simplifyType(selected->openedType);
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
@@ -1362,7 +1364,6 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
-        containerTy = baseTy;
       }
 
       // Coerce the index argument.
@@ -1407,7 +1408,7 @@ namespace {
       // Convert the base.
       auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
       auto openedBaseType = openedFullFnType->getInput();
-      containerTy = solution.simplifyType(openedBaseType);
+      auto containerTy = solution.simplifyType(openedBaseType);
       base = coerceObjectArgumentToType(
         base, containerTy, subscript, AccessSemantics::Ordinary,
         locator.withPathElement(ConstraintLocator::MemberRefBase));

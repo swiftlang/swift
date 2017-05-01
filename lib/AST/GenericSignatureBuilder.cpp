@@ -29,6 +29,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -2237,6 +2238,8 @@ GenericSignatureBuilder::GenericSignatureBuilder(
                                std::function<GenericFunction> lookupConformance)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
   Impl->LookupConformance = std::move(lookupConformance);
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumGenericSignatureBuilders++;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = default;

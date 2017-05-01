@@ -140,8 +140,6 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   auto aParam = args->get(0);
   auto bParam = args->get(1);
 
-  auto boolTy = C.getBoolDecl()->getDeclaredType();
-
   auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
 
   // Generate the conversion from the enums to integer indices.
@@ -175,14 +173,12 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                       fnType);
   }
 
-  auto tType = fnType.getInput();
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true, tType);
+                                         /*Implicit*/ true);
 
-  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true,
-                                     boolTy);
+  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());

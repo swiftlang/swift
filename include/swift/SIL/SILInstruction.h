@@ -2972,13 +2972,20 @@ public:
 
 /// ConvertFunctionInst - Change the type of a function value without
 /// affecting how it will codegen.
-class ConvertFunctionInst
-  : public UnaryInstructionBase<ValueKind::ConvertFunctionInst, ConversionInst>
-{
+class ConvertFunctionInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          ValueKind::ConvertFunctionInst, ConvertFunctionInst, ConversionInst,
+          /* HAS_RESULT */ true> {
   friend SILBuilder;
 
-  ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
+                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty) {}
+
+  static ConvertFunctionInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a
@@ -2996,25 +3003,39 @@ class ThinFunctionToPointerInst
 
 /// PointerToThinFunctionInst - Convert a Builtin.RawPointer to a thin
 /// function pointer.
-class PointerToThinFunctionInst
-  : public UnaryInstructionBase<ValueKind::PointerToThinFunctionInst,
-                                ConversionInst>
-{
+class PointerToThinFunctionInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          ValueKind::PointerToThinFunctionInst, PointerToThinFunctionInst,
+          ConversionInst, /* HAS_RESULT */ true> {
   friend SILBuilder;
 
   PointerToThinFunctionInst(SILDebugLocation DebugLoc, SILValue operand,
+                            ArrayRef<SILValue> TypeDependentOperands,
                             SILType ty)
-      : UnaryInstructionBase(DebugLoc, operand, ty) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, operand, TypeDependentOperands, ty) {}
+
+  static PointerToThinFunctionInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
-class UpcastInst
-  : public UnaryInstructionBase<ValueKind::UpcastInst, ConversionInst>
+class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
+                             ValueKind::UpcastInst, UpcastInst, ConversionInst,
+                             /* HAS_RESULT */ true>
+
 {
   friend SILBuilder;
 
-  UpcastInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  UpcastInst(SILDebugLocation DebugLoc, SILValue Operand,
+             ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty) {}
+
+  static UpcastInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// AddressToPointerInst - Convert a SIL address to a Builtin.RawPointer value.
@@ -3294,15 +3315,20 @@ class UnmanagedToRefInst
 
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
-class ThinToThickFunctionInst
-  : public UnaryInstructionBase<ValueKind::ThinToThickFunctionInst,
-                                ConversionInst>
-{
+class ThinToThickFunctionInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          ValueKind::ThinToThickFunctionInst, ThinToThickFunctionInst,
+          ConversionInst, /* HAS_RESULT */ true> {
   friend SILBuilder;
 
   ThinToThickFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
-                          SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+                          ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty) {}
+
+  static ThinToThickFunctionInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
   /// Return the callee of the thin_to_thick_function.

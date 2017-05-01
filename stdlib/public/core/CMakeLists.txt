@@ -35,6 +35,7 @@ set(SWIFTLIB_ESSENTIAL
   BuiltinMath.swift.gyb
   Character.swift
   CocoaArray.swift
+  Codable.swift
   Collection.swift
   CollectionAlgorithms.swift.gyb
   Comparable.swift
@@ -110,7 +111,7 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift.gyb
-  Sort.swift.gyb
+  Sort.swift
   StaticString.swift
   Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift

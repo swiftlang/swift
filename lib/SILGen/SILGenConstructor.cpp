@@ -926,8 +926,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           // Generate a set of substitutions for the initialization function,
           // whose generic signature is that of the type context, and whose
           // replacement types are the archetypes of the initializer itself.
-          SmallVector<Substitution, 4> subsVec;
-          typeGenericSig->getSubstitutions(
+          auto subMap = typeGenericSig->getSubstitutionMap(
                        [&](SubstitutableType *type) {
                          if (auto gp = type->getAs<GenericTypeParamType>()) {
                            return genericEnv->mapTypeIntoContext(gp);
@@ -940,8 +939,9 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                            ProtocolType *conformedProtocol) {
                          return ProtocolConformanceRef(
                                   conformedProtocol->getDecl());
-                       },
-                       subsVec);
+                       });
+          SmallVector<Substitution, 4> subsVec;
+          typeGenericSig->getSubstitutions(subMap, subsVec);
           subs = SGM.getASTContext().AllocateCopy(subsVec);
         }
 

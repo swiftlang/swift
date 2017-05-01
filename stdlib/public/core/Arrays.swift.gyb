@@ -1710,7 +1710,7 @@ extension ${Self} {
   ///     var numbers = [1, 2, 3, 4, 5]
   ///     numbers.withUnsafeMutableBufferPointer { buffer in
   ///         for i in stride(from: buffer.startIndex, to: buffer.endIndex - 1, by: 2) {
-  ///             swap(&buffer[i], &buffer[i + 1])
+  ///             buffer.swapAt(i, i + 1)
   ///         }
   ///     }
   ///     print(numbers)
@@ -1756,7 +1756,7 @@ extension ${Self} {
     // empty array.
 
     var work = ${Self}()
-    swap(&work, &self)
+    (work, self) = (self, work)
 
     // Create an UnsafeBufferPointer over work that we can pass to body
     let pointer = work._buffer.firstElementAddress
@@ -1770,7 +1770,7 @@ extension ${Self} {
         inoutBufferPointer.count == count,
         "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
 
-      swap(&work, &self)
+      (work, self) = (self, work)
     }
 
     // Invoke the body.

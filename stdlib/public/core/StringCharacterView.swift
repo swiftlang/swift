@@ -124,9 +124,9 @@ extension String {
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
     var tmp = CharacterView("")
-    swap(&_core, &tmp._core)
+    (_core, tmp._core) = (tmp._core, _core)
     let r = body(&tmp)
-    swap(&_core, &tmp._core)
+    (_core, tmp._core) = (tmp._core, _core)
     return r
   }
 

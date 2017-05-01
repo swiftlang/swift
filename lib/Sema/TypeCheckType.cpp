@@ -100,6 +100,9 @@ static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
 Type TypeChecker::getStringType(DeclContext *dc) {
   return ::getStdlibType(*this, StringType, dc, "String");
 }
+Type TypeChecker::getIntType(DeclContext *dc) {
+  return ::getStdlibType(*this, IntType, dc, "Int");
+}
 Type TypeChecker::getInt8Type(DeclContext *dc) {
   return ::getStdlibType(*this, Int8Type, dc, "Int8");
 }
@@ -1780,6 +1783,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   SWIFT_FUNC_STAT;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumTypesValidated++;
 
   if (Loc.getType().isNull()) {
     // Raise error if we parse an IUO type in an illegal position.
@@ -2029,6 +2035,14 @@ Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
 Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          TypeRepr *repr,
                                          TypeResolutionOptions options) {
+  // Convenience to grab the source range of a type attribute.
+  auto getTypeAttrRangeWithAt = [](TypeChecker &TC, SourceLoc attrLoc) {
+    return SourceRange(attrLoc.getAdvancedLoc(-1),
+                       Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                  attrLoc));
+
+  };
+
   // Remember whether this is a function parameter.
   bool isFunctionParam =
     options.contains(TR_FunctionInput) ||
@@ -2224,12 +2238,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // @noreturn has been replaced with a 'Never' return type.
     if (fnRepr && attrs.has(TAK_noreturn)) {
-      auto &SM = TC.Context.SourceMgr;
       auto loc = attrs.getLoc(TAK_noreturn);
-      auto attrRange = SourceRange(
-        loc.getAdvancedLoc(-1),
-        Lexer::getLocForEndOfToken(SM, loc));
-
+      auto attrRange = getTypeAttrRangeWithAt(TC, loc);
       auto resultRange = fnRepr->getResultTypeRepr()->getSourceRange();
 
       TC.diagnose(loc, diag::noreturn_not_supported)
@@ -2270,11 +2280,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // The attribute is meaningless except on parameter types.
       bool shouldDiagnose = !isFunctionParam && !skipDiagnostic;
       if (shouldDiagnose) {
-        auto &SM = TC.Context.SourceMgr;
         auto loc = attrs.getLoc(TAK_escaping);
-        auto attrRange = SourceRange(
-          loc.getAdvancedLoc(-1),
-          Lexer::getLocForEndOfToken(SM, loc));
+        auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
         TC.diagnose(loc, diag::escaping_non_function_parameter)
             .fixItRemove(attrRange);
@@ -2299,11 +2306,25 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_noescape);
 
     for (auto i : FunctionAttrs) {
-      if (attrs.has(i)) {
-        TC.diagnose(attrs.getLoc(i), diag::attribute_requires_function_type,
-                    TypeAttributes::getAttrName(i));
-        attrs.clearAttribute(i);
+      if (!attrs.has(i))
+        continue;
+
+      auto diag = TC.diagnose(attrs.getLoc(i),
+                              diag::attribute_requires_function_type,
+                              TypeAttributes::getAttrName(i));
+
+      // If we see @escaping among the attributes on this type, because it isn't
+      // a function type, we'll remove it.
+      if (i == TAK_escaping) {
+        diag.fixItRemove(getTypeAttrRangeWithAt(TC,
+                                                attrs.getLoc(TAK_escaping)));
+        // Specialize the diagnostic for Optionals.
+        if (ty->getOptionalObjectType()) {
+          diag.flush();
+          TC.diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+        }
       }
+      attrs.clearAttribute(i);
     }
   } else if (hasFunctionAttr && fnRepr) {
     // Remove the function attributes from the set so that we don't diagnose.
@@ -2479,7 +2500,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     bool ok = true;
-    genericSig->getSubstitutions(
+    auto subMap = genericSig->getSubstitutionMap(
       QueryTypeSubstitutionMap{genericArgMap},
       [&](CanType depTy, Type replacement, ProtocolType *proto)
       -> ProtocolConformanceRef {
@@ -2492,17 +2513,11 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
         }
         
         return *result;
-      },
-      genericArgs);
+      });
+    genericSig->getSubstitutions(subMap, genericArgs);
 
     if (!ok)
       return ErrorType::get(Context);
-    
-    // Canonicalize the replacement types.
-    for (auto &arg : genericArgs) {
-      arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                         arg.getConformances());
-    }
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);
@@ -3100,8 +3115,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     if (!ty || ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();
-    if (TC.Context.LangOpts.EnableExperimentalSubclassExistentials &&
-        nominalDecl && isa<ClassDecl>(nominalDecl)) {
+    if (nominalDecl && isa<ClassDecl>(nominalDecl)) {
       if (checkSuperclass(tyR->getStartLoc(), ty))
         continue;
 

@@ -58,6 +58,9 @@ ERROR(error_unsupported_opt_for_target, none,
 ERROR(error_argument_not_allowed_with, none,
   "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
 
+WARNING(warning_argument_not_supported_with_optimization, none,
+  "argument '%0' is not supported with optimization", (StringRef))
+
 ERROR(error_option_requires_sanitizer, none,
   "option '%0' requires a sanitizer to be enabled. Use -sanitize= to enable a"
   " sanitizer", (StringRef))

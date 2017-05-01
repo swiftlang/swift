@@ -1351,11 +1351,13 @@ void ASTMangler::appendParams(Type ParamsTy, bool forceSingleParam) {
     if (Tuple->getNumElements() == 0) {
       if (forceSingleParam) {
         // A tuple containing a single empty tuple.
+        appendOperator("y");
         appendOperator("t");
         appendListSeparator();
         appendOperator("t");
+      } else {
+        appendOperator("y");
       }
-      appendOperator("y");
       return;
     }
     if (forceSingleParam && Tuple->getNumElements() > 1) {

@@ -890,28 +890,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   }
 }
 
-% for Range in ['CountableRange', 'ClosedRange', 'CountableClosedRange']:
-extension RangeReplaceableCollection
-%   if 'Countable' in Range:
-  where
-  Index : Strideable, Index.Stride : SignedInteger
-%   end
-{
-  /// Returns a half-open range denoting the same positions as `r`.
-  @_versioned
-  @_inlineable
-  internal func _makeHalfOpen(_ r: ${Range}<Index>) -> Range<Index> {
-    // The upperBound of the result depends on whether `r` is a closed
-    // range.
-%   if 'Closed' in Range:
-    return Range(uncheckedBounds: (
-      lower: r.lowerBound,
-      upper: index(after: r.upperBound)))
-%   else:
-    return Range(r)
-%   end
-  }
-
+extension RangeReplaceableCollection {
   /// Replaces the specified subrange of elements with the given collection.
   ///
   /// This method has the effect of removing the specified range of elements
@@ -949,11 +928,11 @@ extension RangeReplaceableCollection
   ///   contents of `newElements` to the collection, the complexity is O(*n*),
   ///   where *n* is the length of `newElements`.
   @_inlineable
-  public mutating func replaceSubrange<C>(
-    _ subrange: ${Range}<Index>,
+  public mutating func replaceSubrange<C: Collection, R: RangeExpression>(
+    _ subrange: R,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Iterator.Element {
-    self.replaceSubrange(_makeHalfOpen(subrange), with: newElements)
+  ) where C.Iterator.Element == Iterator.Element, R.Bound == Index {
+    self.replaceSubrange(subrange.relative(to: self), with: newElements)
   }
 
   /// Removes the elements in the specified subrange from the collection.
@@ -975,11 +954,12 @@ extension RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
-    removeSubrange(_makeHalfOpen(bounds))
+  public mutating func removeSubrange<R: RangeExpression>(
+    _ bounds: R
+  ) where R.Bound == Index  {
+    removeSubrange(bounds.relative(to: self))
   }
 }
-% end
 
 extension RangeReplaceableCollection {
   @_inlineable

@@ -245,7 +245,7 @@ SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
 static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"), llvm::cl::cat(Category));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
 SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
              llvm::cl::cat(Category));
 
@@ -2622,8 +2622,6 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  // This is temporary
-  Invocation.getLangOptions().EnableExperimentalSubclassExistentials = true;
 
   CompilerInstance CI;
 
@@ -2981,8 +2979,11 @@ int main(int argc, char *argv[]) {
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
+    // Honor the *last* -swift-version specified.
+    const auto &LastSwiftVersion =
+      options::SwiftVersion[options::SwiftVersion.size()-1];
     if (auto swiftVersion =
-          version::Version::parseVersionString(options::SwiftVersion,
+          version::Version::parseVersionString(LastSwiftVersion,
                                                SourceLoc(), nullptr)) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();

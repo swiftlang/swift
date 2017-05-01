@@ -5538,6 +5538,9 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ErrorCodeProtocol:
   case KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral:
+  case KnownProtocolKind::CodingKey:
+  case KnownProtocolKind::Encodable:
+  case KnownProtocolKind::Decodable:
     return SpecialProtocol::None;
   }
 

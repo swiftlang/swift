@@ -196,7 +196,7 @@ _ = -+n  // expected-error {{unary operators may not be juxtaposed; parenthesize
 _ = -++n // expected-error {{unary operators may not be juxtaposed; parenthesize inner expression}}
 
 // <rdar://problem/16230507> Cannot use a negative constant as the second operator of ... operator
-_ = 3...-5  // expected-error {{missing whitespace between '...' and '-' operators}}
+_ = 3...-5  // expected-error {{ambiguous missing whitespace between unary and binary operators}} expected-note {{could be postfix '...' and binary '-'}} expected-note {{could be binary '...' and prefix '-'}}
 
 
 protocol P0 {

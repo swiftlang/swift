@@ -21,6 +21,70 @@ CHANGELOG
 Swift 4.0
 ---------
 
+* [SE-0156][]
+
+  Protocol composition types can now contain one or more class type terms,
+  forming a class-constrained protocol composition.
+
+  For example:
+
+  ```swift
+  protocol Paintable {
+    func paint()
+  }
+
+  class Canvas {
+    var origin: CGPoint
+  }
+
+  class Wall : Canvas, Paintable {
+    func paint() { ... }
+  }
+
+  func render(_: Canvas & Paintable) { ... }
+
+  render(Wall())
+  ```
+
+  Note that class-constrained protocol compositions can be written and
+  used in both Swift 3 and Swift 4 mode.
+
+  Generated headers for Swift APIs will map class-constrained protocol
+  compositions to Objective-C protocol-qualified class types in both
+  Swift 3 and Swift 4 mode (for instance, `NSSomeClass & SomeProto &
+  OtherProto` in Swift becomes `NSSomeClass <SomeProto, OtherProto>`
+  in Objective-C).
+
+  Objective-C APIs which use protocol-qualified class types differ in
+  behavior when imported by a module compiled in Swift 3 mode and
+  Swift 4 mode. In Swift 3 mode, these APIs will continue to import as
+  protocol compositions without a class constraint
+  (eg, `SomeProto & OtherProto`).
+
+  In Swift 4 mode, protocol-qualified class types import as
+  class-constrained protocol compositions, for a more faithful mapping
+  of APIs from Objective-C to Swift.
+
+  Note that the current implementation of class-constrained protocol
+  compositions lacks three features outlined in the Swift evolution proposal:
+
+  - In the evolution proposal, a class-constrained is permitted to contain
+    two different classes as long as one is a superclass of the other.
+    The current implementation only allows multiple classes to appear in
+    the composition if they are identical.
+
+  - In the evolution proposal, associated type and class inheritance clauses
+    are generalized to allow class-constrained protocol compositions. The
+    current implementation does not allow this.
+
+  - In the evolution proposal, protocol inheritance clauses are allowed to
+    contain a class, placing a requirement that all conforming types are
+    a subclass of the given class. The current implementation does not
+    allow this.
+
+  These missing aspects of the proposal can be introduced in a future
+  release without breaking source compatibility with existing code.
+
 * [SE-0142][]
 
   Protocols and associated types can now contain `where` clauses that

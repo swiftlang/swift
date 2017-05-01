@@ -43,6 +43,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Statistic.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -672,6 +673,9 @@ GenericContext::getLazyGenericEnvironmentSlow() const {
 
   const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
   ++NumLazyGenericEnvironmentsLoaded;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironmentsLoaded++;
   return genericEnv;
 }
 
@@ -686,6 +690,10 @@ void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
   contextData->genericEnvData = genericEnvData;
 
   ++NumLazyGenericEnvironments;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironments++;
+
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
@@ -2098,8 +2106,41 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
       return isObjC() && enumDecl->hasCases()
           && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
+    // Enums without associated values and enums with a raw type of String
+    // or Int can explicitly derive CodingKey conformance.
+    case KnownProtocolKind::CodingKey: {
+      Type rawType = enumDecl->getRawType();
+      if (rawType) {
+        auto parentDC = enumDecl->getDeclContext();
+        ASTContext &C = parentDC->getASTContext();
+
+        auto nominal = rawType->getAnyNominal();
+        return nominal == C.getStringDecl() || nominal == C.getIntDecl();
+      }
+
+      // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
+      // empty enumas are allowed to conform as well.
+      return enumDecl->hasOnlyCasesWithoutAssociatedValues();
+    }
+
     default:
       return false;
+    }
+  } else if (isa<StructDecl>(this) || isa<ClassDecl>(this)) {
+    // Structs and classes can explicitly derive Encodable and Decodable
+    // conformance (explicitly meaning we can synthesize an implementation if
+    // a type conforms manually).
+    if (*knownProtocol == KnownProtocolKind::Encodable ||
+        *knownProtocol == KnownProtocolKind::Decodable) {
+      // FIXME: This is not actually correct. We cannot promise to always
+      // provide a witness here for all structs and classes. Unfortunately,
+      // figuring out whether this is actually possible requires much more
+      // context -- a TypeChecker and the parent decl context at least -- and is
+      // tightly coupled to the logic within DerivedConformance.
+      // This unfortunately means that we expect a witness even if one will not
+      // be produced, which requires DerivedConformance::deriveCodable to output
+      // its own diagnostics.
+      return true;
     }
   }
   return false;

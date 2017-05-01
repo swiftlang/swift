@@ -95,6 +95,20 @@ public:
     return DiffKind == NodeAnnotation::Rename ||
       DiffKind == NodeAnnotation::ModernizeEnum;
   }
+
+  bool isTypeChange() const {
+    switch (DiffKind) {
+    case NodeAnnotation::WrapOptional:
+    case NodeAnnotation::UnwrapOptional:
+    case NodeAnnotation::ImplicitOptionalToOptional:
+    case NodeAnnotation::OptionalToImplicitOptional:
+    case NodeAnnotation::WrapImplicitOptional:
+    case NodeAnnotation::TypeRewritten:
+      return true;
+    default:
+      return false;
+    }
+  }
   StringRef getNewName() const { assert(isRename()); return RightComment; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;

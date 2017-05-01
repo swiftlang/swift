@@ -231,11 +231,15 @@ func lookUpManyTopLevelNames() {
   switch value {
   case is OtherFileEnumWrapper.Enum:
     break
+  default:
+    break
   }
 
   // CHECK-DAG: !private "~="
   switch 42 {
   case 50:
+    break
+  default:
     break
   }
   

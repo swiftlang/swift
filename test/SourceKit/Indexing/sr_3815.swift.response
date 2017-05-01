@@ -95,6 +95,12 @@
               key.usr: "s:7sr_38151PP1fyyF"
             }
           ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:7sr_38151SVACycfc",
+          key.line: 9,
+          key.column: 8
         }
       ]
     }

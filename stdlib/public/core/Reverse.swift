@@ -27,7 +27,7 @@ extension MutableCollection where Self : BidirectionalCollection {
     var f = startIndex
     var l = index(before: endIndex)
     while f < l {
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
       formIndex(before: &l)
     }
@@ -156,9 +156,35 @@ public struct ReversedCollection<
 
   public typealias IndexDistance = Base.IndexDistance
 
-  /// A type that provides the sequence's iteration interface and
-  /// encapsulates its iteration state.
-  public typealias Iterator = IndexingIterator<ReversedCollection>
+  @_fixed_layout
+  public struct Iterator : IteratorProtocol, Sequence {
+    @_inlineable
+    @inline(__always)
+    public /// @testable
+    init(elements: Base, endPosition: Base.Index) {
+      self._elements = elements
+      self._position = endPosition
+    }
+    
+    @_inlineable
+    @inline(__always)
+    public mutating func next() -> Base.Iterator.Element? {
+      guard _fastPath(_position != _elements.startIndex) else { return nil }
+      _position = _elements.index(before: _position)
+      return _elements[_position]
+    }
+    
+    @_versioned
+    internal let _elements: Base
+    @_versioned
+    internal var _position: Base.Index
+  }
+
+  @_inlineable
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(elements: _base, endPosition: _base.endIndex)
+  }
 
   @_inlineable
   public var startIndex: Index {

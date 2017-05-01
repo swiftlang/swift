@@ -908,6 +908,9 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
+ERROR(non_nominal_no_initializers,none,
+      "non-nominal type %0 does not support explicit initialization",
+      (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
 ERROR(unbound_generic_parameter_cast,none,
@@ -1533,6 +1536,10 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
+WARNING(witness_unavailable,none,
+        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
+        (DescriptiveDeclKind, DeclName, DeclName))
+
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
 
@@ -1962,6 +1969,12 @@ ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
+ERROR(broken_coding_key_requirement,none,
+      "CodingKey protocol is broken: unexpected requirement", ())
+ERROR(broken_encodable_requirement,none,
+      "Encodable protocol is broken: unexpected requirement", ())
+ERROR(broken_decodable_requirement,none,
+      "Decodable protocol is broken: unexpected requirement", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
@@ -2750,14 +2763,6 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
-ERROR(empty_switch_stmt,none,
-      "%select{'switch' statement body must have at least one 'case' or 'default' block; |}0"
-      "do you want to add "
-      "%select{missing cases?|a default case?}1",(bool, bool))
-ERROR(non_exhaustive_switch,none,
-      "%select{switch must be exhaustive, consider adding |do you want to add }0"
-      "%select{missing cases|a default clause}1"
-      "%select{|?}0", (bool, bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -3590,6 +3595,21 @@ WARNING(debug_long_function_body, none,
 WARNING(debug_long_closure_body, none,
         "closure took %0ms to type-check (limit: %1ms)",
         (unsigned, unsigned))
+
+//------------------------------------------------------------------------------
+// Pattern match diagnostics
+//------------------------------------------------------------------------------
+
+
+ERROR(empty_switch_stmt,none,
+      "'switch' statement body must have at least one 'case' or 'default' "
+      "block; do you want to add a default case?",())
+ERROR(non_exhaustive_switch,none,
+      "%select{switch must be exhaustive, consider adding |do you want to add }0"
+      "%select{missing cases|a default clause}1"
+      "%select{:|?}0 %2", (bool, bool, StringRef))
+NOTE(missing_particular_case,none,
+     "missing case: '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

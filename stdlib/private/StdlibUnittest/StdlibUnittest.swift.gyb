@@ -629,7 +629,7 @@ func _childProcess() {
 
 #if _runtime(_ObjC)
   objc_setUncaughtExceptionHandler {
-    let exception = $0! as AnyObject
+    let exception = ($0 as Optional)! as AnyObject
     var stderr = _Stderr()
     let maybeNSException =
         unsafeBitCast(exception, to: _StdlibUnittestNSException.self)

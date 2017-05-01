@@ -55,19 +55,39 @@ class SubstitutionMap {
   /// The generic signature for which we are performing substitutions.
   GenericSignature *genericSig;
 
-  // FIXME: Switch to a more efficient representation.
-  llvm::DenseMap<GenericTypeParamType *, Type> subMap;
+  /// The replacement types for the generic type parameters.
+  std::unique_ptr<Type[]> replacementTypes;
+
+  // FIXME: Switch to a more efficient representation that corresponds to
+  // the conformance requirements in the GenericSignature.
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
+
+  /// Retrieve the array of replacement types, which line up with the
+  /// generic parameters.
+  ///
+  /// Note that the types may be null, for cases where the generic parameter
+  /// is concrete but hasn't been queried yet.
+  ArrayRef<Type> getReplacementTypes() const;
+
+  MutableArrayRef<Type> getReplacementTypes();
 
 public:
   SubstitutionMap()
     : SubstitutionMap(static_cast<GenericSignature *>(nullptr)) { }
 
-  SubstitutionMap(GenericSignature *genericSig)
-    : genericSig(genericSig) { }
+  SubstitutionMap(GenericSignature *genericSig);
 
   SubstitutionMap(GenericEnvironment *genericEnv);
+
+  SubstitutionMap(SubstitutionMap &&other) = default;
+  SubstitutionMap &operator=(SubstitutionMap &&other) = default;
+
+  SubstitutionMap(const SubstitutionMap &other);
+
+  SubstitutionMap &operator=(const SubstitutionMap &other);
+
+  ~SubstitutionMap();
 
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.
@@ -76,9 +96,8 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType type, ProtocolDecl *proto) const;
 
-  bool empty() const {
-    return subMap.empty();
-  }
+  /// Whether the substitution map is empty.
+  bool empty() const { return getGenericSignature() == nullptr; }
 
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;

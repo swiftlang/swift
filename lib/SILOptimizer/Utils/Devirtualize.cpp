@@ -778,23 +778,21 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
 /// \param origSubs The substitutions from the call instruction
-/// \param newSubs New substitutions are stored here
-static void getWitnessMethodSubstitutions(
-    SILModule &M,
+static SubstitutionMap
+getWitnessMethodSubstitutions(
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
     SubstitutionList origSubs,
-    bool isDefaultWitness,
-    SmallVectorImpl<Substitution> &newSubs) {
+    bool isDefaultWitness) {
 
   if (witnessThunkSig == nullptr)
-    return;
+    return SubstitutionMap();
 
-  if (isDefaultWitness) {
-    newSubs.append(origSubs.begin(), origSubs.end());
-    return;
-  }
+  auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
+
+  if (isDefaultWitness)
+    return origSubMap;
 
   assert(!conformanceRef.isAbstract());
   auto conformance = conformanceRef.getConcrete();
@@ -809,24 +807,19 @@ static void getWitnessMethodSubstitutions(
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
 
   auto origDepth = 1;
-  auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
 
-  auto subMap =
-    SubstitutionMap::combineSubstitutionMaps(baseSubMap,
-                                             origSubMap, 
-                                             CombineSubstitutionMaps::AtDepth,
-                                             baseDepth,
-                                             origDepth,
-                                             witnessThunkSig);
-
-  witnessThunkSig->getSubstitutions(subMap, newSubs);
+  return SubstitutionMap::combineSubstitutionMaps(
+      baseSubMap,
+      origSubMap,
+      CombineSubstitutionMaps::AtDepth,
+      baseDepth,
+      origDepth,
+      witnessThunkSig);
 }
 
-static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
-                                          ProtocolConformanceRef CRef,
-                                          SmallVectorImpl<Substitution> &NewSubs) {
-  auto &Module = AI.getModule();
-
+static SubstitutionMap
+getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
+                              ProtocolConformanceRef CRef) {
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
   auto witnessThunkSig = F->getLoweredFunctionType()->getGenericSignature();
 
@@ -839,8 +832,9 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
                                                      *Module.getSwiftModule())
       == CRef.getRequirement();
 
-  getWitnessMethodSubstitutions(Module, CRef, requirementSig, witnessThunkSig,
-                                origSubs, isDefaultWitness, NewSubs);
+  return getWitnessMethodSubstitutions(
+      CRef, requirementSig, witnessThunkSig,
+      origSubs, isDefaultWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
@@ -858,14 +852,12 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // The complete set of substitutions may be different, e.g. because the found
   // witness thunk F may have been created by a specialization pass and have
   // additional generic parameters.
-  SmallVector<Substitution, 4> NewSubs;
-
-  getWitnessMethodSubstitutions(AI, F, C, NewSubs);
+  auto SubMap = getWitnessMethodSubstitutions(Module, AI, F, C);
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
   auto CalleeCanType = F->getLoweredFunctionType();
-  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(Module, NewSubs);
+  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(Module, SubMap);
 
   // Collect arguments from the apply instruction.
   auto Arguments = SmallVector<SILValue, 4>();
@@ -893,6 +885,10 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
   auto ResultSILType = substConv.getSILResultType();
   ApplySite SAI;
+
+  SmallVector<Substitution, 4> NewSubs;
+  if (auto GenericSig = CalleeCanType->getGenericSignature())
+    GenericSig->getSubstitutions(SubMap, NewSubs);
 
   SILValue ResultValue;
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
