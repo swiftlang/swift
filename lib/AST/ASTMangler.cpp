@@ -680,7 +680,7 @@ void ASTMangler::appendType(Type type) {
       if (layout.superclass) {
         appendType(layout.superclass);
         return appendOperator("Xc");
-      } else if (layout.requiresClass & !layout.requiresClassImplied) {
+      } else if (layout.hasExplicitAnyObject) {
         return appendOperator("Xl");
       }
       return appendOperator("p");

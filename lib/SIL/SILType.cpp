@@ -506,7 +506,7 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
 
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
-  if (layout.requiresClass)
+  if (layout.requiresClass())
     return ExistentialRepresentation::Class;
   
   // Otherwise, we need to use a fixed-sized buffer.
@@ -539,7 +539,7 @@ SILType::canUseExistentialRepresentation(SILModule &M,
     
     // A class-constrained composition uses ClassReference representation;
     // otherwise, we use a fixed-sized buffer.
-    if (layout.requiresClass)
+    if (layout.requiresClass())
       return repr == ExistentialRepresentation::Class;
 
     return repr == ExistentialRepresentation::Opaque;
