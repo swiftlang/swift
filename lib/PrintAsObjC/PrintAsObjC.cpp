@@ -53,8 +53,7 @@ static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
   if (auto nomDecl = type->getAnyNominal()) {
-    return nomDecl->getName() == ctx.getIdentifier("AnyHashable") &&
-      nomDecl->getModuleContext() == ctx.getStdlibModule();
+    return nomDecl == ctx.getAnyHashableDecl();
   }
 
   return false;
@@ -1996,7 +1995,8 @@ public:
 
     if (otherModule == &M)
       return false;
-    if (otherModule->isStdlibModule())
+    if (otherModule->isStdlibModule() ||
+        otherModule->isBuiltinModule())
       return true;
     // Don't need a module for SIMD types in C.
     if (otherModule->getName() == M.getASTContext().Id_simd)
