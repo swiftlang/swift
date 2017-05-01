@@ -1128,6 +1128,11 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 
   auto newEnd = std::remove_if(values.begin(), values.end(),
                                [=](ValueDecl *value) {
+    // Ignore anything that was parsed (vs. deserialized), because a serialized
+    // module cannot refer to it.
+    if (value->getDeclContext()->getParentSourceFile())
+      return true;
+
     if (isType != isa<TypeDecl>(value))
       return true;
     if (!value->hasInterfaceType())
