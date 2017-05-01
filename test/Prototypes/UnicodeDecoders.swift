@@ -273,17 +273,14 @@ public protocol _UnicodeEncodingBase {
   static func decode(_ content: Self.EncodedScalar) -> UnicodeScalar
 }
 
-
 public protocol UnicodeDecoder {
   associatedtype Encoding : _UnicodeEncodingBase
   
-  associatedtype CodeUnit : UnsignedInteger, FixedWidthInteger
-  associatedtype Buffer : Collection
-  
-  where Buffer.Iterator.Element == CodeUnit
+  associatedtype Buffer : Collection  
+    where Buffer.Iterator.Element == Encoding.CodeUnit
   
   associatedtype EncodedScalar : Collection 
-    where EncodedScalar.Iterator.Element == CodeUnit
+    where EncodedScalar.Iterator.Element == Encoding.CodeUnit
   static var replacement: EncodedScalar { get }
   
   init()
@@ -292,7 +289,7 @@ public protocol UnicodeDecoder {
 
   mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
-  ) -> Unicode.ParseResult<EncodedScalar> where I.Element == CodeUnit
+  ) -> Unicode.ParseResult<EncodedScalar> where I.Element == Encoding.CodeUnit
 
   static func decodeOne(_ content: EncodedScalar) -> UnicodeScalar
 }
@@ -305,7 +302,7 @@ extension UnicodeDecoder {
     repairingIllFormedSequences makeRepairs: Bool,
     into output: (UnicodeScalar)->Void
   ) -> Int
-  where I.Element == CodeUnit
+  where I.Element == Encoding.CodeUnit
   {
     var errors = 0
     var d = Self()
@@ -329,7 +326,7 @@ extension Unicode {
   struct ParsingIterator<
     CodeUnits : IteratorProtocol, 
     Decoder: UnicodeDecoder
-  > where Decoder.CodeUnit == CodeUnits.Element {
+  > where Decoder.Encoding.CodeUnit == CodeUnits.Element {
     var codeUnits: CodeUnits
     var decoder: Decoder
   }
@@ -520,31 +517,28 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
 public protocol UnicodeEncoding : _UnicodeEncodingBase {
   
   associatedtype ForwardDecoder : UnicodeDecoder
-    where ForwardDecoder.CodeUnit == CodeUnit
+    where ForwardDecoder.Encoding.CodeUnit == CodeUnit
 
   associatedtype ReverseDecoder : UnicodeDecoder
-    where ReverseDecoder.CodeUnit == CodeUnit
+    where ReverseDecoder.Encoding.CodeUnit == CodeUnit
 }
 
-public protocol _UTFDecoderBase : UnicodeDecoder
-where Buffer == EncodedScalar {
-  associatedtype BufferStorage = UInt32
-}
-
-public protocol _UTFDecoder : _UTFDecoderBase
-where Buffer == _UIntBuffer<BufferStorage, CodeUnit>,
-  BufferStorage == UInt32
+public protocol _UTFDecoder : UnicodeDecoder
+where Buffer == _UIntBuffer<BufferStorage, Encoding.CodeUnit>,
+  BufferStorage == UInt32,
+  EncodedScalar == Buffer
 {
-  static func _isScalar(_: CodeUnit) -> Bool
+  associatedtype BufferStorage = UInt32
+  static func _isScalar(_: Encoding.CodeUnit) -> Bool
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
-  var buffer: Buffer { get set }
+  var buffer: _UIntBuffer<UInt32, Encoding.CodeUnit> { get set }
 }
 
-extension _UTFDecoder {
+extension _UTFDecoder where EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
   public mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> Unicode.ParseResult<EncodedScalar>
-    where I.Element == CodeUnit {
+    where I.Element == Encoding.CodeUnit {
 
     // Bufferless single-scalar fastpath.
     if _fastPath(buffer.isEmpty) {
@@ -555,10 +549,10 @@ extension _UTFDecoder {
       }
       // Non-ASCII, proceed to buffering mode.
       buffer.append(codeUnit)
-    } else if Self._isScalar(CodeUnit(extendingOrTruncating: buffer._storage)) {
+    } else if Self._isScalar(Encoding.CodeUnit(extendingOrTruncating: buffer._storage)) {
       // ASCII in buffer.  We don't refill the buffer so we can return
       // to bufferless mode once we've exhausted it.
-      let codeUnit = CodeUnit(extendingOrTruncating: buffer._storage)
+      let codeUnit = Encoding.CodeUnit(extendingOrTruncating: buffer._storage)
       buffer.remove(at: buffer.startIndex)
       return .valid(EncodedScalar(containing: codeUnit))
     }
@@ -576,7 +570,7 @@ extension _UTFDecoder {
 
     // Find one unicode scalar.
     let (isValid, scalarBitCount) = _parseMultipleCodeUnits()
-    _sanityCheck(scalarBitCount % numericCast(CodeUnit.bitWidth) == 0)
+    _sanityCheck(scalarBitCount % numericCast(Encoding.CodeUnit.bitWidth) == 0)
     _sanityCheck(1...4 ~= scalarBitCount / 8)
     _sanityCheck(scalarBitCount <= buffer._bitCount)
     
@@ -590,9 +584,11 @@ extension _UTFDecoder {
       
     buffer._bitCount = buffer._bitCount &- scalarBitCount
 
-    if _fastPath(isValid) { return .valid(encodedScalar) }
+    if _fastPath(isValid) {
+      return .valid(encodedScalar)
+    }
     return .invalid(
-      length: Int(scalarBitCount / numericCast(CodeUnit.bitWidth)))
+      length: Int(scalarBitCount / numericCast(Encoding.CodeUnit.bitWidth)))
   }
 }
 
@@ -605,7 +601,7 @@ public protocol _UTF8Decoder : _UTFDecoder {
 }
 
 extension _UTF8Decoder {
-  public static func _isScalar(_ x: CodeUnit) -> Bool { return x & 0x80 == 0 }
+  public static func _isScalar(_ x: Encoding.CodeUnit) -> Bool { return x & 0x80 == 0 }
 }
 
 extension Unicode.UTF8 : UnicodeEncoding {
@@ -635,8 +631,7 @@ extension Unicode.UTF8 : UnicodeEncoding {
 }
 
 extension UTF8.ReverseDecoder : _UTF8Decoder {
-    public typealias Encoding = Unicode.UTF8
-  public typealias CodeUnit = UInt8
+  public typealias Encoding = Unicode.UTF8
   public typealias EncodedScalar = Buffer
 
   public static var replacement : EncodedScalar {
@@ -732,7 +727,6 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
 
 extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias Encoding = Unicode.UTF8
-  public typealias CodeUnit = UInt8
   public typealias EncodedScalar = Buffer
   
   public static var replacement : EncodedScalar {
@@ -825,16 +819,13 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
 //===--- UTF-16 Decoders --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol _UTF16Decoder : _UTFDecoder where CodeUnit == UTF16.CodeUnit {
+public protocol _UTF16Decoder : _UTFDecoder where Encoding.CodeUnit == UTF16.CodeUnit {
   var buffer: Buffer { get set }
   static var _surrogatePattern : UInt32 { get }
 }
 
 extension _UTF16Decoder {
-  public static var replacement : EncodedScalar {
-    return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
-  }
-  public static func _isScalar(_ x: CodeUnit) -> Bool {
+  public static func _isScalar(_ x: Encoding.CodeUnit) -> Bool {
     return x & 0xf800 != 0xd800
   }
   public // @testable
@@ -866,12 +857,18 @@ extension Unicode.UTF16 : UnicodeEncoding {
   
   public struct ForwardDecoder {
     public typealias Buffer = _UIntBuffer<UInt32, UInt16>
+    public static var replacement : EncodedScalar {
+      return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
+    }
     public init() { buffer = Buffer() }
     public var buffer: Buffer
   }
   
   public struct ReverseDecoder {
     public typealias Buffer = _UIntBuffer<UInt32, UInt16>
+    public static var replacement : EncodedScalar {
+      return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
+    }
     public init() { buffer = Buffer() }
     public var buffer: Buffer
   }
@@ -879,7 +876,6 @@ extension Unicode.UTF16 : UnicodeEncoding {
 
 extension UTF16.ReverseDecoder : _UTF16Decoder {
   public typealias Encoding = Unicode.UTF16
-  public typealias CodeUnit = UInt16
   public typealias EncodedScalar = Buffer
 
   public static var _surrogatePattern : UInt32 { return 0xD800_DC00 }
@@ -897,7 +893,6 @@ extension UTF16.ReverseDecoder : _UTF16Decoder {
 
 extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
   public typealias Encoding = Unicode.UTF16
-  public typealias CodeUnit = UInt16
   public typealias EncodedScalar = Buffer
   
   public static var _surrogatePattern : UInt32 { return 0xDC00_D800 }
