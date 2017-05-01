@@ -346,6 +346,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
       // we don't bother, for no good reason. But if this is 'self',
       // consider passing an extra metatype.
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:

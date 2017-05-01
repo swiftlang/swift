@@ -18,13 +18,15 @@
 #ifndef SWIFT_IRGEN_GENRECORD_H
 #define SWIFT_IRGEN_GENRECORD_H
 
-#include "IRGenFunction.h"
-#include "IRGenModule.h"
 #include "Explosion.h"
 #include "GenEnum.h"
+#include "IRGenFunction.h"
+#include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
-#include "TypeInfo.h"
+#include "NativeConventionSchema.h"
 #include "StructLayout.h"
+#include "TypeInfo.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -187,9 +189,9 @@ public:
                           SILType T) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                 asImpl().Impl::getSize(IGF, T),
-                 std::min(dest.getAlignment(), src.getAlignment()).getValue());
+      IGF.Builder.CreateMemCpy(
+          dest.getAddress(), src.getAddress(), asImpl().Impl::getSize(IGF, T),
+          std::min(dest.getAlignment(), src.getAlignment()).getValue());
       return;
     }
     

@@ -433,8 +433,7 @@ void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
 }
 
 PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
-                                   SILType SubstCalleeTy,
-                                   SubstitutionList Subs,
+                                   SILType SubstCalleeTy, SubstitutionList Subs,
                                    ArrayRef<SILValue> Args,
                                    ArrayRef<SILValue> TypeDependentOperands,
                                    SILType ClosureType)

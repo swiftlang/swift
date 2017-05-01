@@ -181,5 +181,7 @@ NODE(FirstElementMarker)
 NODE(VariadicMarker)
 NODE(OutlinedCopy)
 NODE(OutlinedConsume)
+NODE(OutlinedRetain)
+NODE(OutlinedRelease)
 #undef CONTEXT_NODE
 #undef NODE

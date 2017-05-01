@@ -406,6 +406,8 @@ private:
     case Node::Kind::VariadicMarker:
     case Node::Kind::OutlinedCopy:
     case Node::Kind::OutlinedConsume:
+    case Node::Kind::OutlinedRetain:
+    case Node::Kind::OutlinedRelease:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -777,6 +779,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::OutlinedConsume:
     Printer << "outlined consume of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedRetain:
+    Printer << "outlined retain of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedRelease:
+    Printer << "outlined release of ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::Directness:

@@ -853,6 +853,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
