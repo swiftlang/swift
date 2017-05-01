@@ -203,7 +203,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   unsigned countInherits(ExtensionDecl *ED) {
     unsigned Count = 0;
     for (auto TL : ED->getInherited()) {
-      if (shouldPrint(TL.getType()->getAnyNominal(), Options))
+      auto *nominal = TL.getType()->getAnyNominal();
+      if (nominal && shouldPrint(nominal, Options))
         Count ++;
     }
     return Count;
@@ -611,60 +612,6 @@ uint8_t swift::getKeywordLen(tok keyword) {
 
 StringRef swift::getCodePlaceholder() { return "<#code#>"; }
 
-void swift::
-printEnumElmentsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
-                        llvm::raw_ostream &OS) {
-  // Sort the missing elements to a vector because set does not guarantee orders.
-  SmallVector<EnumElementDecl*, 4> SortedElements;
-  SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),
-                        UnhandledElements.end());
-  std::sort(SortedElements.begin(),SortedElements.end(),
-            [](EnumElementDecl *LHS, EnumElementDecl *RHS) {
-              return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
-            });
-
-  auto printPayloads = [](EnumElementDecl *EE, llvm::raw_ostream &OS) {
-    // If the enum element has no payloads, return.
-    auto TL = EE->getArgumentTypeLoc();
-    if (TL.isNull())
-      return;
-    TypeRepr* TR = EE->getArgumentTypeLoc().getTypeRepr();
-    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
-      SmallVector<Identifier, 4> NameBuffer;
-      ArrayRef<Identifier> Names;
-      if (TTR->hasElementNames()) {
-        // Get the name from the tuple repr, if exist.
-        Names = TTR->getElementNames();
-      } else {
-        // Create same amount of empty names to the elements.
-        NameBuffer.resize(TTR->getNumElements());
-        Names = llvm::makeArrayRef(NameBuffer);
-      }
-      OS << "(";
-      // Print each element in the pattern match.
-      for (unsigned I = 0, N = Names.size(); I < N; I ++) {
-        auto Id = Names[I];
-        if (Id.empty())
-          OS << "_";
-        else
-          OS << tok::kw_let << " " << Id.str();
-        if (I + 1 != N) {
-          OS << ", ";
-        }
-      }
-      OS << ")";
-    }
-  };
-
-  // Print each enum element name.
-  std::for_each(SortedElements.begin(), SortedElements.end(),
-                [&](EnumElementDecl *EE) {
-                  OS << tok::kw_case << " ." << EE->getNameStr();
-                  printPayloads(EE, OS);
-                  OS <<": " << getCodePlaceholder() << "\n";
-                });
-}
-
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   SmallString<16> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
@@ -976,6 +923,28 @@ class PrintAST : public ASTVisitor<PrintAST> {
     TL.getType().print(Printer, Options);
   }
 
+  void printContextIfNeeded(const Decl *decl) {
+    if (IndentLevel > 0)
+      return;
+
+    switch (Options.ShouldQualifyNestedDeclarations) {
+    case PrintOptions::QualifyNestedDeclarations::Never:
+      return;
+    case PrintOptions::QualifyNestedDeclarations::TypesOnly:
+      if (!isa<TypeDecl>(decl))
+        return;
+      break;
+    case PrintOptions::QualifyNestedDeclarations::Always:
+      break;
+    }
+
+    auto *container = dyn_cast<NominalTypeDecl>(decl->getDeclContext());
+    if (!container)
+      return;
+    printType(container->getDeclaredInterfaceType());
+    Printer << ".";
+  }
+
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
 
@@ -1239,23 +1208,38 @@ void PrintAST::printPattern(const Pattern *pattern) {
 }
 
 /// If we can't find the depth of a type, return ErrorDepth.
-const unsigned ErrorDepth = ~0U;
+static const unsigned ErrorDepth = ~0U;
 /// A helper function to return the depth of a type.
 static unsigned getDepthOfType(Type ty) {
-  if (auto paramTy = ty->getAs<GenericTypeParamType>())
-    return paramTy->getDepth();
+  unsigned depth = ErrorDepth;
+  
+  auto combineDepth = [&depth](unsigned newDepth) -> bool {
+    // If there is no current depth (depth == ErrorDepth), then assign to
+    // newDepth; otherwise, choose the deeper of the current and new depth.
+    
+    // Since ErrorDepth == ~0U, ErrorDepth + 1 == 0, which is smaller than any
+    // valid depth + 1.
+    depth = std::max(depth+1U, newDepth+1U) - 1U;
+    return false;
+  };
+  
+  ty.findIf([combineDepth](Type t) -> bool {
+    if (auto paramTy = t->getAs<GenericTypeParamType>())
+      return combineDepth(paramTy->getDepth());
 
-  if (auto depMemTy = dyn_cast<DependentMemberType>(ty->getCanonicalType())) {
-    CanType rootTy;
-    do {
-      rootTy = depMemTy.getBase();
-    } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
-    if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
-      return rootParamTy->getDepth();
-    return ErrorDepth;
-  }
+    if (auto depMemTy = dyn_cast<DependentMemberType>(t->getCanonicalType())) {
+      CanType rootTy;
+      do {
+        rootTy = depMemTy.getBase();
+      } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
+      if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
+        return combineDepth(rootParamTy->getDepth());
+    }
 
-  return ErrorDepth;
+    return false;
+  });
+  
+  return depth;
 }
 
 namespace {
@@ -1266,7 +1250,7 @@ struct RequirementPrintLocation {
   /// Whether the requirement needs to be in a where clause.
   bool InWhereClause;
 };
-};
+} // end anonymous namespace
 
 /// Heuristically work out a good place for \c req to be printed inside \c
 /// proto.
@@ -1406,9 +1390,9 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::Conformance:
   case RequirementKind::Layout:
-  case RequirementKind::Superclass:
     return getDepthOfType(req.getFirstType());
 
+  case RequirementKind::Superclass:
   case RequirementKind::SameType: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
@@ -2389,6 +2373,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAccessibility(decl);
   if (!Options.SkipIntroducerKeywords)
     Printer << tok::kw_typealias << " ";
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2459,6 +2444,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_enum << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2486,6 +2472,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_struct << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2513,6 +2500,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_class << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2542,6 +2530,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   } else {
     if (!Options.SkipIntroducerKeywords)
       Printer << tok::kw_protocol << " ";
+    printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
@@ -2613,6 +2602,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << (decl->isLet() ? tok::kw_let : tok::kw_var) << " ";
   }
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer.printName(decl->getName());
@@ -2917,6 +2907,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
         Printer << tok::kw_func << " ";
       }
+      printContextIfNeeded(decl);
       recordDeclLoc(decl,
         [&]{ // Name
           if (!decl->hasName())
@@ -3039,6 +3030,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccessibility(decl);
+  printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
@@ -3072,6 +3064,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       Printer << "/*not inherited*/ ";
   }
 
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer << "init";
@@ -3120,6 +3113,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+  printContextIfNeeded(decl);
   recordDeclLoc(decl,
     [&]{
       Printer << "deinit";
@@ -4066,6 +4060,7 @@ public:
       Printer << "@callee_guaranteed ";
       return;
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -4413,6 +4408,8 @@ std::string GenericSignature::getAsString() const {
 static StringRef getStringForParameterConvention(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In: return "@in ";
+  case ParameterConvention::Indirect_In_Constant:
+    return "@in_constant ";
   case ParameterConvention::Indirect_In_Guaranteed:  return "@in_guaranteed ";
   case ParameterConvention::Indirect_Inout: return "@inout ";
   case ParameterConvention::Indirect_InoutAliasable: return "@inout_aliasable ";

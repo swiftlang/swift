@@ -25,8 +25,10 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/CommandLine.h"
 
 #ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOR_H
 #error "Included non ownership header?!"
@@ -35,11 +37,19 @@
 using namespace swift;
 using namespace ownership;
 
+llvm::cl::opt<bool> TriggerUnreachableOnFailure(
+    "sil-di-assert-on-failure", llvm::cl::init(false),
+    llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
+                   "Meant for debugging ONLY!"),
+    llvm::cl::Hidden);
+
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
 template<typename ...ArgTypes>
 static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
   M.getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
+  if (TriggerUnreachableOnFailure)
+    llvm_unreachable("Triggering standard assertion failure routine");
 }
 
 enum class PartialInitializationKind {
@@ -2598,11 +2608,6 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 
   return true;
 }
-
-
-
-
-
 
 //===----------------------------------------------------------------------===//
 //                           Top Level Driver

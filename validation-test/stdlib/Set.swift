@@ -203,7 +203,10 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by native storage
 func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
-  let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
+  // SR-4724: Should not need to be split out but if it is not it
+  // is considered ambiguous.
+  let temp = members.map({ TestObjCKeyTy($0) })
+  let result: Set<NSObject> = Set(temp)
   expectTrue(isNativeSet(result))
   return result
 }

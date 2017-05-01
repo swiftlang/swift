@@ -7,13 +7,12 @@ func test() {
 
 }
 
-// XFAIL: broken_std_regex
+// XFAIL: broken_std_regex, linux
 // RUN: %sourcekitd-test -req=complete -req-opts=hidelowpriority=0 -pos=7:1 %s -- %s > %t.orig
 // RUN: %FileCheck -check-prefix=NAME %s < %t.orig
 // Make sure the order is as below, foo(Int) should come before foo(String).
 
 // NAME: key.description: "#column"
-// NAME: key.description: "AbsoluteValuable"
 // NAME: key.description: "foo(a: Int)"
 // NAME-NOT: key.description
 // NAME: key.description: "foo(a: String)"
@@ -42,7 +41,6 @@ func test() {
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
 // CONTEXT: key.name: "#column"
-// CONTEXT: key.name: "AbsoluteValuable"
 
 // RUN: %complete-test -tok=STMT_0 %s | %FileCheck %s -check-prefix=STMT
 func test1() {

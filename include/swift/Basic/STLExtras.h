@@ -29,6 +29,45 @@
 
 namespace swift {
 
+//===----------------------------------------------------------------------===//
+//                              Function Traits
+//===----------------------------------------------------------------------===//
+
+template <class T>
+struct function_traits : function_traits<decltype(&T::operator())> {};
+
+// function
+template <class R, class... Args> struct function_traits<R(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// function pointer
+template <class R, class... Args> struct function_traits<R (*)(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// std::function
+template <class R, class... Args>
+struct function_traits<std::function<R(Args...)>> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+// pointer-to-member-function (i.e., operator()'s)
+template <class T, class R, class... Args>
+struct function_traits<R (T::*)(Args...)> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
+template <class T, class R, class... Args>
+struct function_traits<R (T::*)(Args...) const> {
+  using result_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
 /// @{
 
 /// An STL-style algorithm similar to std::for_each that applies a second
@@ -369,17 +408,15 @@ class TransformIterator {
 
   /// The underlying reference type, which will be passed to the
   /// operation.
-  typedef typename std::iterator_traits<Iterator>::reference
-    UnderlyingReference;
- 
+  using OpTraits = function_traits<Operation>;
+
 public:
-  typedef std::forward_iterator_tag iterator_category;
-  typedef typename std::result_of<Operation(UnderlyingReference)>::type
-    value_type;
-  typedef value_type reference;
-  typedef void pointer; // FIXME: Should provide a pointer proxy.
-  typedef typename std::iterator_traits<Iterator>::difference_type 
-    difference_type;
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = typename OpTraits::result_type;
+  using reference = value_type;
+  using pointer = void; // FIXME: Should provide a pointer proxy.
+  using difference_type =
+      typename std::iterator_traits<Iterator>::difference_type;
 
   /// Construct a new transforming iterator for the given iterator 
   /// and operation.
@@ -711,47 +748,16 @@ inline void copy(const Container &C, OutputIterator iter) {
   std::copy(C.begin(), C.end(), iter);
 }
 
-//===----------------------------------------------------------------------===//
-//                              Function Traits
-//===----------------------------------------------------------------------===//
+template <typename Container, typename OutputIterator, typename Predicate>
+inline void copy_if(const Container &C, OutputIterator result, Predicate pred) {
+  std::copy_if(C.begin(), C.end(), result, pred);
+}
 
-template<class T>
-struct function_traits : function_traits<decltype(&T::operator())> {
-};
-
-// function
-template<class R, class... Args>
-struct function_traits<R(Args...)> {
-  using result_type = R;
-  using argument_types = std::tuple<Args...>;
-};
-
-// function pointer
-template<class R, class... Args>
-struct function_traits<R (*)(Args...)> {
-  using result_type = R;
-  using argument_types = std::tuple<Args...>;
-};
-
-// std::function
-template<class R, class... Args>
-struct function_traits<std::function<R(Args...)>> {
-  using result_type = R;
-  using argument_types = std::tuple<Args...>;
-};
-
-// pointer-to-member-function (i.e., operator()'s)
-template<class T, class R, class... Args>
-struct function_traits<R (T::*)(Args...)> {
-  using result_type = R;
-  using argument_types = std::tuple<Args...>;
-};
-
-template<class T, class R, class... Args>
-struct function_traits<R (T::*)(Args...) const> {
-  using result_type = R;
-  using argument_types = std::tuple<Args...>;
-};
+template <typename Container, typename OutputIterator, typename UnaryOperation>
+inline OutputIterator transform(const Container &C, OutputIterator result,
+                                UnaryOperation op) {
+  return std::transform(C.begin(), C.end(), result, op);
+}
 
 } // end namespace swift
 

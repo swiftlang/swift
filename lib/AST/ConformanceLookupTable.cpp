@@ -801,16 +801,15 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
 
     // Find the superclass type that matches where the conformance was
     // declared.
-    Type superclassTy = type->getSuperclass(resolver);
+    Type superclassTy = type->getSuperclass();
     while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass(resolver);
+      superclassTy = superclassTy->getSuperclass();
 
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
                                                           protocol,
-                                                          resolver)
-                                  .getPointer();
+                                                          resolver);
 
     // Form the inherited conformance.
     conformance = ctx.getInheritedConformance(
@@ -1103,7 +1102,8 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      conf->forEachValueWitness(resolver, [&](ValueDecl *req,
+      auto normal = conf->getRootNormalConformance();
+      normal->forEachValueWitness(resolver, [&](ValueDecl *req,
                                               ConcreteDeclRef witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);

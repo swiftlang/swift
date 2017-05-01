@@ -57,7 +57,9 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
+#include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "LoadableTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -332,22 +334,22 @@ public:
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
     
     // Add the parent protocols.
-    //
-    // FIXME: Look at the requirement signature instead.
-    for (auto inherited : proto->getInherited()) {
-      SmallVector<ProtocolDecl*, 4> protocols;
-      inherited.getType()->getExistentialTypeProtocols(protocols);
-      for (auto parentProto : protocols) {
-        if (!parentProto->isObjC())
-          continue;
-        llvm::Value *parentRef
-          = IGM.getAddrOfObjCProtocolRef(parentProto, NotForDefinition);
-        parentRef = IGF.Builder.CreateBitCast(parentRef,
-                                   IGM.ProtocolDescriptorPtrTy->getPointerTo());
-        auto parent = Builder.CreateLoad(parentRef,
-                                             IGM.getPointerAlignment());
-        Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
-      }
+    auto *requirementSig = proto->getRequirementSignature();
+    auto conformsTo =
+      requirementSig->getConformsTo(proto->getSelfInterfaceType(),
+                                    *IGF.IGM.getSwiftModule());
+
+    for (auto parentProto : conformsTo) {
+      if (!parentProto->isObjC())
+        continue;
+      llvm::Value *parentRef = IGM.getAddrOfObjCProtocolRef(parentProto,
+                                                            NotForDefinition);
+      parentRef = IGF.Builder.CreateBitCast(parentRef,
+                                            IGM.ProtocolDescriptorPtrTy
+                                              ->getPointerTo());
+      auto parent = Builder.CreateLoad(parentRef,
+                                       IGM.getPointerAlignment());
+      Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
     }
     
     // Add the members.
@@ -616,16 +618,17 @@ void IRGenModule::emitRuntimeRegistration() {
       
       llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
 
-      // FIXME: Use the requirement signature instead.
       std::function<void(ProtocolDecl*)> orderProtocol
         = [&](ProtocolDecl *proto) {
+          auto *requirementSig = proto->getRequirementSignature();
+          auto conformsTo = requirementSig->getConformsTo(
+              proto->getSelfInterfaceType(),
+              *getSwiftModule());
+
           // Recursively put parents first.
-          for (auto &inherited : proto->getInherited()) {
-            SmallVector<ProtocolDecl*, 4> parents;
-            inherited.getType()->getExistentialTypeProtocols(parents);
-            for (auto parent : parents)
-              orderProtocol(parent);
-          }
+          for (auto parent : conformsTo)
+            orderProtocol(parent);
+
           // Skip if we don't need to reify this protocol.
           auto found = protos.find(proto);
           if (found == protos.end())
@@ -972,6 +975,10 @@ void IRGenModule::emitVTableStubs() {
     // For each eliminated method symbol create an alias to the stub.
     auto *alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
                                             F.getName(), stub);
+
+    if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
+      alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
+
     if (useDllStorage())
       alias->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
@@ -2142,7 +2149,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
     }
   } else {
     // Metadata for Clang types should be uniqued like foreign classes.
-    if (nom->hasClangNode()) {
+    if (isa<ClangModuleUnit>(nom->getModuleScopeContext())) {
       typeKind = TypeMetadataRecordKind::NonuniqueDirectType;
       entity = LinkEntity::forForeignTypeMetadataCandidate(conformingType);
       defaultTy = IGM.TypeMetadataStructTy;
@@ -2411,46 +2418,25 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
   return addr;
 }
 
-/// Fetch a global reference to the given Objective-C metaclass.
-/// The result is always a GlobalValue of ObjCClassPtrTy.
-llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
-                                                ForDefinition_t forDefinition) {
-  assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
-  assert(!theClass->isForeign());
-  LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
+/// Fetch the declaration of a metaclass object. The result is always a
+/// GlobalValue of ObjCClassPtrTy, and is either the Objective-C metaclass or
+/// the Swift metaclass stub, depending on whether the class is published as an
+/// ObjC class.
+llvm::Constant *
+IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
+                                      ForDefinition_t forDefinition) {
+  assert((!decl->isGenericContext() || decl->hasClangNode()) &&
+         "generic classes do not have a static metaclass object");
+
+  auto entity = decl->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC
+                    ? LinkEntity::forObjCMetaclass(decl)
+                    : LinkEntity::forSwiftMetaclassStub(decl);
+
   auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+      decl, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
                                     forDefinition, ObjCClassStructTy, DbgTy);
   return addr;
-}
-
-/// Fetch the declaration of the metaclass stub for the given class type.
-/// The result is always a GlobalValue of ObjCClassPtrTy.
-llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass,
-                                                ForDefinition_t forDefinition) {
-  assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
-  LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
-  auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
-  auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
-                                    forDefinition, ObjCClassStructTy, DbgTy);
-  return addr;
-}
-
-/// Fetch the declaration of a metaclass object.  This performs either
-/// getAddrOfSwiftMetaclassStub or getAddrOfObjCMetaclass, depending
-/// on whether the class is published as an ObjC class.
-llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
-                                                ForDefinition_t forDefinition) {
-  assert((!decl->isGenericContext() || decl->hasClangNode())
-         && "generic classes do not have a static metaclass object");
-  if (decl->checkObjCAncestry() != ObjCClassKind::NonObjC ||
-      decl->hasClangNode()) {
-    return getAddrOfObjCMetaclass(decl, forDefinition);
-  } else {
-    return getAddrOfSwiftMetaclassStub(decl, forDefinition);
-  }
 }
 
 /// Fetch the type metadata access function for a non-generic type.
@@ -2682,9 +2668,8 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
               "foreign candidate");
     defaultVarTy = TypeMetadataStructTy;
     adjustmentIndex = 0;
-  } else if (concreteType->getAnyNominal()) {
-    auto nom = concreteType->getNominalOrBoundGenericNominal();
-    assert((!nom || !nom->hasClangNode())
+  } else if (auto nom = concreteType->getAnyNominal()) {
+    assert(!isa<ClangModuleUnit>(nom->getModuleScopeContext())
            && "metadata for foreign type should be emitted as "
               "foreign candidate");
     (void)nom;
@@ -3113,7 +3098,7 @@ IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
   auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
 
   auto *count = llvm::ConstantInt::get(Int32Ty, utf8.size());
-  // Capacitity is length plus one because of the implicitly added '\0'
+  // Capacity is length plus one because of the implicitly added '\0'
   // character.
   auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
   auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
@@ -3480,3 +3465,46 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   return fn;
 }
 
+llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
+                                                       Type t,
+                                                       llvm::Type *llvmType) {
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
+  assert(loadableTI && "Should only be called on Loadable types");
+  IRGenMangler mangler;
+  std::string funcName = mangler.mangleOutlinedRetainFunction(t);
+  llvm::Type *argTys[] = {llvmType};
+  return getOrCreateHelperFunction(
+      funcName, llvmType, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address addr(&*it++, loadableTI->getFixedAlignment());
+        Explosion loaded;
+        loadableTI->loadAsTake(IGF, addr, loaded);
+        Explosion out;
+        loadableTI->copy(IGF, loaded, out, irgen::Atomicity::Atomic);
+        (void)out.claimAll();
+        IGF.Builder.CreateRet(addr.getAddress());
+      },
+      true /*setIsNoInline*/);
+}
+
+llvm::Constant *
+IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
+                                        llvm::Type *llvmType) {
+  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
+  assert(loadableTI && "Should only be called on Loadable types");
+  IRGenMangler mangler;
+  std::string funcName = mangler.mangleOutlinedReleaseFunction(t);
+  llvm::Type *argTys[] = {llvmType};
+  return getOrCreateHelperFunction(
+      funcName, llvmType, argTys,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address addr(&*it++, loadableTI->getFixedAlignment());
+        Explosion loaded;
+        loadableTI->loadAsTake(IGF, addr, loaded);
+        loadableTI->consume(IGF, loaded, irgen::Atomicity::Atomic);
+        IGF.Builder.CreateRet(addr.getAddress());
+      },
+      true /*setIsNoInline*/);
+}

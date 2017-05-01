@@ -103,6 +103,7 @@ namespace swift {
   class SILBoxType;
   class TypeAliasDecl;
   class VarDecl;
+  class UnifiedStatsReporter;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -240,6 +241,9 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
+
+  /// Optional table of counters to report, nullptr when not collecting.
+  UnifiedStatsReporter *Stats = nullptr;
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -457,6 +461,10 @@ public:
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;
 
+  /// Retrieve the declaration of
+  /// Array.reserveCapacityForAppend(newElementsCount: Int)
+  FuncDecl *getArrayReserveCapacityDecl() const;
+
   /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
 
@@ -662,7 +670,6 @@ public:
   /// Produce a new normal conformance for a property behavior.
   NormalProtocolConformance *
   getBehaviorConformance(Type conformingType,
-                         Type conformingInterfaceType,
                          ProtocolDecl *protocol,
                          SourceLoc loc,
                          AbstractStorageDecl *storage,

@@ -68,3 +68,50 @@
 // - (nonnull Element)objectAtIndexedSubscript:(nonnull id)key;
 #endif
 @end
+
+
+@interface DesignatedInitDisappearsBase : Object
+- (nonnull instancetype)init __attribute__((objc_designated_initializer));
+- (nonnull instancetype)initConvenience:(long)value;
+#if !BAD
+- (nonnull instancetype)initWithValue:(long)value __attribute__((objc_designated_initializer));
+#else
+//- (nonnull instancetype)initWithValue:(long)value __attribute__((objc_designated_initializer));
+#endif
+@end
+
+@interface OnlyDesignatedInitDisappearsBase : Object
+- (nonnull instancetype)initConvenience:(long)value;
+#if !BAD
+- (nonnull instancetype)initWithValue:(long)value __attribute__((objc_designated_initializer));
+#else
+//- (nonnull instancetype)initWithValue:(long)value __attribute__((objc_designated_initializer));
+#endif
+@end
+
+@interface ConvenienceInitDisappearsBase : Object
+- (nonnull instancetype)init __attribute__((objc_designated_initializer));
+- (nonnull instancetype)initConvenience:(long)value;
+#if !BAD
+- (nonnull instancetype)initWithValue:(long)value;
+#else
+//- (nonnull instancetype)initWithValue:(long)value;
+#endif
+@end
+
+@interface UnknownInitDisappearsBase : Object
+- (nonnull instancetype)init;
+#if !BAD
+- (nonnull instancetype)initWithValue:(long)value;
+#else
+//- (nonnull instancetype)initWithValue:(long)value;
+#endif
+@end
+
+@interface OnlyUnknownInitDisappearsBase : Object
+#if !BAD
+- (nonnull instancetype)initWithValue:(long)value;
+#else
+//- (nonnull instancetype)initWithValue:(long)value;
+#endif
+@end

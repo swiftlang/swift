@@ -586,10 +586,6 @@ public:
   /// bound.
   bool isClassExistentialType();
 
-  /// Given that this type is an existential type, produce
-  /// its list of protocols.
-  void getExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
-
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
@@ -660,18 +656,13 @@ public:
 
   /// \brief Retrieve the superclass of this type.
   ///
-  /// \param resolver The resolver for lazy type checking, or null if the
-  ///                 AST is already type-checked.
-  ///
   /// \returns The superclass of this type, or a null type if it has no
   ///          superclass.
-  Type getSuperclass(LazyResolver *resolver);
+  Type getSuperclass();
   
   /// \brief True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
-  /// \param resolver The resolver for lazy type checking, or null if the
-  ///                 AST is already type-checked.
   ///
   /// \returns True if this type is \c ty or a superclass of \c ty.
   ///
@@ -682,7 +673,7 @@ public:
   /// will return false. `isBindableToSuperclassOf` should be used
   /// for queries that care whether a generic class type can be substituted into
   /// a type's subclass.
-  bool isExactSuperclassOf(Type ty, LazyResolver *resolver);
+  bool isExactSuperclassOf(Type ty);
 
   /// \brief Get the substituted base class type, starting from a base class
   /// declaration and a substituted derived class type.
@@ -695,23 +686,21 @@ public:
   ///
   /// Calling `C<String, NSObject>`->getSuperclassForDecl(`A`) will return
   /// `A<Int, NSObject>`.
-  Type getSuperclassForDecl(const ClassDecl *classDecl, LazyResolver *resolver);
+  Type getSuperclassForDecl(const ClassDecl *classDecl);
 
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///
   /// \param ty       The potential subclass.
-  /// \param resolver The resolver for lazy type checking, or null if the
-  ///                 AST is already type-checked.
   ///
   /// \returns True if this type is \c ty, a superclass of \c ty, or an
   ///          archetype-parameterized type that can be bound to a superclass
   ///          of \c ty.
-  bool isBindableToSuperclassOf(Type ty, LazyResolver *resolver);
+  bool isBindableToSuperclassOf(Type ty);
 
   /// True if this type contains archetypes that could be substituted with
   /// concrete types to form the argument type.
-  bool isBindableTo(Type ty, LazyResolver *resolver);
+  bool isBindableTo(Type ty);
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
@@ -920,8 +909,7 @@ public:
   /// 'self' argument type as appropriate.
   Type adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                       const ValueDecl *derivedDecl,
-                                      Type memberType,
-                                      LazyResolver *resolver);
+                                      Type memberType);
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
@@ -2676,6 +2664,11 @@ enum class ParameterConvention {
   Indirect_In,
 
   /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory.  The callee must treat the object as read-only
+  /// The callee may assume that the address does not alias any valid object.
+  Indirect_In_Constant,
+
+  /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee may not modify and does not destroy
   /// the object.
   Indirect_In_Guaranteed,
@@ -2687,7 +2680,7 @@ enum class ParameterConvention {
   /// single-threaded aliasing may produce inconsistent results, but should
   /// remain memory safe.
   Indirect_Inout,
-  
+
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory. The object is allowed to be aliased by other
   /// well-typed references, but is not allowed to be escaped. This is the
@@ -2717,6 +2710,7 @@ static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
 inline bool isIndirectFormalParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In_Guaranteed:
@@ -2732,6 +2726,7 @@ inline bool isIndirectFormalParameter(ParameterConvention conv) {
 inline bool isConsumedParameter(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Owned:
     return true;
 
@@ -2757,6 +2752,7 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Owned:
     return false;

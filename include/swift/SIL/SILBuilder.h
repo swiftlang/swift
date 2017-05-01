@@ -153,8 +153,7 @@ public:
     if (InsertPt == BB->end())
       return;
     // Set the opened archetype context from the instruction.
-    this->getOpenedArchetypes().addOpenedArchetypeOperands(
-        InsertPt->getTypeDependentOperands());
+    addOpenedArchetypeOperands(&*InsertPt);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -200,10 +199,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Opened archetypes handling
   //===--------------------------------------------------------------------===//
-  void addOpenedArchetypeOperands(SILInstruction *I) {
-    getOpenedArchetypes().addOpenedArchetypeOperands(
-        I->getTypeDependentOperands());
-  }
+  void addOpenedArchetypeOperands(SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
   // Type remapping
@@ -489,6 +485,14 @@ public:
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
+  
+  KeyPathInst *createKeyPath(SILLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
+                             SILType Ty) {
+    return insert(KeyPathInst::create(getSILDebugLocation(Loc),
+                                      Pattern, Subs, Ty, F));
+  }
 
   /// Convenience function for calling emitLoad on the type lowering for
   /// non-address values.
@@ -555,6 +559,22 @@ public:
                                  bool aborted) {
     return insert(new (F.getModule()) EndAccessInst(
         getSILDebugLocation(loc), address, aborted));
+  }
+
+  BeginUnpairedAccessInst *
+  createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
+                            SILAccessKind accessKind,
+                            SILAccessEnforcement enforcement) {
+    return insert(new (F.getModule()) BeginUnpairedAccessInst(
+        getSILDebugLocation(loc), address, buffer, accessKind, enforcement));
+  }
+
+  EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
+                                                 SILValue buffer,
+                                              SILAccessEnforcement enforcement,
+                                                 bool aborted) {
+    return insert(new (F.getModule()) EndUnpairedAccessInst(
+        getSILDebugLocation(loc), buffer, enforcement, aborted));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
@@ -657,8 +677,8 @@ public:
 
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-    return insert(new (F.getModule())
-                      ConvertFunctionInst(getSILDebugLocation(Loc), Op, Ty));
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              F, OpenedArchetypes));
   }
 
   ThinFunctionToPointerInst *
@@ -669,13 +689,13 @@ public:
 
   PointerToThinFunctionInst *
   createPointerToThinFunction(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule()) PointerToThinFunctionInst(
-        getSILDebugLocation(Loc), Op, Ty));
+    return insert(PointerToThinFunctionInst::create(
+        getSILDebugLocation(Loc), Op, Ty, F, OpenedArchetypes));
   }
 
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                      UpcastInst(getSILDebugLocation(Loc), Op, Ty));
+    return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty, F,
+                                     OpenedArchetypes));
   }
 
   AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
@@ -762,8 +782,8 @@ public:
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
-    return insert(new (F.getModule()) ThinToThickFunctionInst(
-        getSILDebugLocation(Loc), Op, Ty));
+    return insert(ThinToThickFunctionInst::create(getSILDebugLocation(Loc), Op,
+                                                  Ty, F, OpenedArchetypes));
   }
 
   ThickToObjCMetatypeInst *createThickToObjCMetatype(SILLocation Loc,
@@ -844,11 +864,26 @@ public:
                                                       operand, atomicity));
   }
 
+  RetainValueAddrInst *createRetainValueAddr(SILLocation Loc, SILValue operand,
+                                             Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
+    return insert(new (F.getModule()) RetainValueAddrInst(
+        getSILDebugLocation(Loc), operand, atomicity));
+  }
+
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
     assert(isParsing || F.hasUnqualifiedOwnership());
     return insert(new (F.getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
+  }
+
+  ReleaseValueAddrInst *createReleaseValueAddr(SILLocation Loc,
+                                               SILValue operand,
+                                               Atomicity atomicity) {
+    assert(isParsing || F.hasUnqualifiedOwnership());
+    return insert(new (F.getModule()) ReleaseValueAddrInst(
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,

@@ -475,7 +475,7 @@ ManagedValue Transform::transform(ManagedValue v,
                            v.getCleanup());
     }
 
-    if (outputSubstType->isExactSuperclassOf(inputSubstType, nullptr)) {
+    if (outputSubstType->isExactSuperclassOf(inputSubstType)) {
       // Upcast to a superclass.
       return ManagedValue(SGF.B.createUpcast(Loc,
                                              v.getValue(),
@@ -483,7 +483,7 @@ ManagedValue Transform::transform(ManagedValue v,
                           v.getCleanup());
     } else {
       // Unchecked-downcast to a covariant return type.
-      assert(inputSubstType->isExactSuperclassOf(outputSubstType, nullptr)
+      assert(inputSubstType->isExactSuperclassOf(outputSubstType)
              && "should be inheritance relationship between input and output");
       return SGF.emitManagedRValueWithCleanup(
         SGF.B.createUncheckedRefCast(Loc, v.forward(SGF), loweredResultTy));      
@@ -795,6 +795,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     return gen.emitManagedRValueWithCleanup(paramValue);
 
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
     if (gen.silConv.useLoweredAddresses())
       return gen.emitManagedBufferWithCleanup(paramValue);
     return gen.emitManagedRValueWithCleanup(paramValue);
@@ -1146,7 +1147,7 @@ namespace {
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
       SILValue loadedOpaque = SGF.B.createInitExistentialOpaque(
           Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
-          /*conformances=*/{});
+          /*Conformances=*/{});
       return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 
@@ -1338,6 +1339,7 @@ namespace {
         abort();
       }
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
         if (SGF.silConv.useLoweredAddresses()) {
           // We need to translate into a temporary.
@@ -2646,7 +2648,7 @@ buildThunkSignature(SILGenFunction &gen,
     genericEnv = gen.F.getGenericEnvironment();
     auto subsArray = gen.F.getForwardingSubstitutions();
     interfaceSubs = genericSig->getSubstitutionMap(subsArray);
-    contextSubs = genericEnv->getSubstitutionMap(subsArray);
+    contextSubs = interfaceSubs;
     return genericSig;
   }
 
@@ -2681,11 +2683,11 @@ buildThunkSignature(SILGenFunction &gen,
 
   // Calculate substitutions to map the caller's archetypes to the thunk's
   // archetypes.
-  if (auto *calleeGenericEnv = gen.F.getGenericEnvironment()) {
-    contextSubs = calleeGenericEnv->getSubstitutionMap(
+  if (auto calleeGenericSig = gen.F.getLoweredFunctionType()
+          ->getGenericSignature()) {
+    contextSubs = calleeGenericSig->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type {
-        auto depTy = calleeGenericEnv->mapTypeOutOfContext(type);
-        return genericEnv->mapTypeIntoContext(depTy);
+        return genericEnv->mapTypeIntoContext(type);
       },
       MakeAbstractConformanceForGenericType());
   }

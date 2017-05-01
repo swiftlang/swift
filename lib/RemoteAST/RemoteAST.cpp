@@ -16,12 +16,14 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
@@ -323,7 +325,7 @@ public:
     }
     return ProtocolCompositionType::get(Ctx, protocols,
                                         // FIXME
-                                        /*hasExplicitAnyObject=*/false);
+                                        /*HasExplicitAnyObject=*/false);
   }
 
   Type createExistentialMetatypeType(Type instance) {
@@ -520,7 +522,8 @@ bool RemoteASTTypeBuilder::isForeignModule(const Demangle::NodePointer &node) {
   if (node->getKind() != Demangle::Node::Kind::Module)
     return false;
 
-  return (node->getText() == "__ObjC");
+  return (node->getText() == MANGLING_MODULE_OBJC ||
+          node->getText() == MANGLING_MODULE_CLANG_IMPORTER);
 }
 
 DeclContext *

@@ -110,6 +110,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(EndBorrowArgumentInst, SILInstruction, end_borrow_argument, MayHaveSideEffects, DoesNotRelease)
   INST(BeginAccessInst, SILInstruction, begin_access, MayHaveSideEffects, DoesNotRelease)
   INST(EndAccessInst, SILInstruction, end_access, MayHaveSideEffects, DoesNotRelease)
+  INST(BeginUnpairedAccessInst, SILInstruction, begin_unpaired_access, MayHaveSideEffects, DoesNotRelease)
+  INST(EndUnpairedAccessInst, SILInstruction, end_unpaired_access, MayHaveSideEffects, DoesNotRelease)
   INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
@@ -150,7 +152,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(UnownedReleaseInst, RefCountingInst, unowned_release, MayHaveSideEffects,
          MayRelease)
     INST(RetainValueInst, RefCountingInst, retain_value, MayHaveSideEffects, DoesNotRelease)
+    INST(RetainValueAddrInst, RefCountingInst, retain_value_addr, MayHaveSideEffects, DoesNotRelease)
     INST(ReleaseValueInst, RefCountingInst, release_value, MayHaveSideEffects, MayRelease)
+    INST(ReleaseValueAddrInst, RefCountingInst, release_value_addr, MayHaveSideEffects, MayRelease)
     INST(SetDeallocatingInst, RefCountingInst, set_deallocating, MayHaveSideEffects,
          DoesNotRelease)
     INST(AutoreleaseValueInst, RefCountingInst, autorelease_value, MayHaveSideEffects,
@@ -245,6 +249,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)
   INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
+
+  // Key paths
+  INST(KeyPathInst, SILInstruction, keypath, None, DoesNotRelease)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)

@@ -43,6 +43,9 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::incrementScopeCounter() {
   SWIFT_FUNC_STAT;
   CountScopes++;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (TC.Context.Stats)
+    TC.Context.Stats->getFrontendCounters().NumConstraintScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -1494,6 +1497,36 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       refType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
     }
     break;
+    
+  case OverloadChoiceKind::KeyPathApplication: {
+    // Key path application looks like a subscript(keyPath: KeyPath<Base, T>).
+    // The element type is T or @lvalue T based on the key path subtype and
+    // the mutability of the base.
+    auto keyPathIndexTy = createTypeVariable(
+      getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    auto elementTy = createTypeVariable(
+            getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+            TVO_CanBindToLValue);
+    auto elementObjTy = createTypeVariable(
+        getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+    addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
+    
+    // The element result is an lvalue or rvalue based on the key path class.
+    addKeyPathApplicationConstraint(
+                  keyPathIndexTy, choice.getBaseType(), elementTy, locator);
+    
+    TupleTypeElt indexTupleElts[] = {
+      TupleTypeElt(keyPathIndexTy, getASTContext().Id_keyPath),
+    };
+    auto indexTuple = TupleType::get(indexTupleElts, getASTContext());
+    auto subscriptTy = FunctionType::get(indexTuple, elementTy);
+    auto fullTy = FunctionType::get(choice.getBaseType(), subscriptTy);
+    openedFullType = fullTy;
+    refType = subscriptTy;
+
+    // Increase the score so that actual subscripts get preference.
+    increaseScore(SK_KeyPathSubscript);
+  }
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
@@ -1693,3 +1726,27 @@ size_t Solution::getTotalMemory() const {
     (DefaultedConstraints.size() * sizeof(void*));
 }
 
+DeclName OverloadChoice::getName() const {
+  switch (getKind()) {
+    case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaDynamic:
+    case OverloadChoiceKind::TypeDecl:
+    case OverloadChoiceKind::DeclViaBridge:
+    case OverloadChoiceKind::DeclViaUnwrappedOptional:
+      return getDecl()->getFullName();
+      
+    case OverloadChoiceKind::KeyPathApplication: {
+      // TODO: This should probably produce subscript(keyPath:), but we
+      // don't currently pre-filter subscript overload sets by argument
+      // keywords, so "subscript" is still the name that keypath subscripts
+      // are looked up by.
+      auto &C = getBaseType()->getASTContext();
+      return DeclName(C.Id_subscript);
+    }
+    case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::TupleIndex:
+      llvm_unreachable("no name!");
+  }
+  
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}

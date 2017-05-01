@@ -384,6 +384,10 @@ SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
                                   SILInstruction *Cloned) {
   assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
          "cloned function dropped debug scope");
+  // Remove any previous mappings for the Orig instruction.
+  // If this is not done and there is a mapping for Orig in the map already,
+  // then this new mapping will be silently ignored.
+  InstructionMap.erase(Orig);
   InstructionMap.insert(std::make_pair(Orig, Cloned));
 }
 
@@ -752,6 +756,29 @@ void SILCloner<ImplClass>::visitEndAccessInst(EndAccessInst *Inst) {
       Inst, getBuilder().createEndAccess(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getOperand()),
                                          Inst->isAborting()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitBeginUnpairedAccessInst(
+                                           BeginUnpairedAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createBeginUnpairedAccess(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getSource()),
+                                           getOpValue(Inst->getBuffer()),
+                                           Inst->getAccessKind(),
+                                           Inst->getEnforcement()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndUnpairedAccessInst(
+                                             EndUnpairedAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createEndUnpairedAccess(getOpLocation(Inst->getLoc()),
+                                                 getOpValue(Inst->getOperand()),
+                                                 Inst->getEnforcement(),
+                                                 Inst->isAborting()));
 }
 
 template <typename ImplClass>
@@ -1206,6 +1233,15 @@ void SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitRetainValueAddrInst(RetainValueAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createRetainValueAddr(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand()),
+                                               Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1239,6 +1275,16 @@ void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
     getBuilder().createReleaseValue(getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
                                     Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReleaseValueAddrInst(
+    ReleaseValueAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createReleaseValueAddr(getOpLocation(Inst->getLoc()),
+                                                getOpValue(Inst->getOperand()),
+                                                Inst->getAtomicity()));
 }
 
 template <typename ImplClass>
@@ -1494,7 +1540,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
     if (Ty != newLookupType) {
-      assert(Ty->isExactSuperclassOf(newLookupType, nullptr) &&
+      assert(Ty->isExactSuperclassOf(newLookupType) &&
              "Should only create upcasts for sub class.");
 
       // We use the super class as the new look up type.
@@ -2250,6 +2296,16 @@ void SILCloner<ImplClass>::visitObjCProtocolInst(ObjCProtocolInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createObjCProtocol(
                           getOpLocation(Inst->getLoc()), Inst->getProtocol(),
+                          getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createKeyPath(
+                          getOpLocation(Inst->getLoc()),
+                          Inst->getPattern(),
+                          getOpSubstitutions(Inst->getSubstitutions()),
                           getOpType(Inst->getType())));
 }
 

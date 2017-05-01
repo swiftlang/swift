@@ -170,7 +170,43 @@ SILInstruction *SILCombiner::visitSelectValueInst(SelectValueInst *SVI) {
 }
 
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
-  return nullptr;
+  SILValue Cond = SVI->getOperand();
+  BuiltinIntegerType *CondTy = Cond->getType().getAs<BuiltinIntegerType>();
+  if (!CondTy || !CondTy->isFixedWidth(1))
+    return nullptr;
+
+  SILBasicBlock *FalseBB = nullptr;
+  SILBasicBlock *TrueBB = nullptr;
+  for (unsigned Idx = 0, Num = SVI->getNumCases(); Idx < Num; ++Idx) {
+    auto Case = SVI->getCase(Idx);
+    IntegerLiteralInst *CaseVal = dyn_cast<IntegerLiteralInst>(Case.first);
+    if (!CaseVal)
+      return nullptr;
+    SILBasicBlock *DestBB = Case.second;
+    assert(DestBB->args_empty() &&
+           "switch_value case destination cannot take arguments");
+    if (CaseVal->getValue() == 0) {
+      assert(!FalseBB && "double case value 0 in switch_value");
+      FalseBB = DestBB;
+    } else {
+      assert(!TrueBB && "double case value 1 in switch_value");
+      TrueBB = DestBB;
+    }
+  }
+  if (SVI->hasDefault()) {
+    assert(SVI->getDefaultBB()->args_empty() &&
+           "switch_value default destination cannot take arguments");
+    if (!FalseBB) {
+      FalseBB = SVI->getDefaultBB();
+    } else if (!TrueBB) {
+      TrueBB = SVI->getDefaultBB();
+    }
+  }
+  if (!FalseBB || !TrueBB)
+    return nullptr;
+
+  Builder.setCurrentDebugScope(SVI->getDebugScope());
+  return Builder.createCondBranch(SVI->getLoc(), Cond, TrueBB, FalseBB);
 }
 
 namespace {
@@ -578,6 +614,16 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
       }
   }
 
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::visitReleaseValueAddrInst(ReleaseValueAddrInst *RVI) {
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::visitRetainValueAddrInst(RetainValueAddrInst *RVI) {
   return nullptr;
 }
 
@@ -1075,9 +1121,22 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
 
 SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
   // cond_br(xor(x, 1)), t_label, f_label -> cond_br x, f_label, t_label
+  // cond_br(x == 0), t_label, f_label -> cond_br x, f_label, t_label
+  // cond_br(x != 1), t_label, f_label -> cond_br x, f_label, t_label
   SILValue X;
-  if (match(CBI->getCondition(), m_ApplyInst(BuiltinValueKind::Xor,
-                                             m_SILValue(X), m_One()))) {
+  if (match(CBI->getCondition(),
+            m_CombineOr(
+                // xor(x, 1)
+                m_ApplyInst(BuiltinValueKind::Xor, m_SILValue(X), m_One()),
+                // xor(1,x)
+                m_ApplyInst(BuiltinValueKind::Xor, m_One(), m_SILValue(X)),
+                // x == 0
+                m_ApplyInst(BuiltinValueKind::ICMP_EQ, m_SILValue(X), m_Zero()),
+                // x != 1
+                m_ApplyInst(BuiltinValueKind::ICMP_NE, m_SILValue(X),
+                            m_One()))) &&
+      X->getType() ==
+          SILType::getBuiltinIntegerType(1, CBI->getModule().getASTContext())) {
     SmallVector<SILValue, 4> OrigTrueArgs, OrigFalseArgs;
     for (const auto &Op : CBI->getTrueArgs())
       OrigTrueArgs.push_back(Op);

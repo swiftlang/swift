@@ -124,6 +124,7 @@ namespace irgen {
   class IRGenFunction;
   class LinkEntity;
   class LoadableTypeInfo;
+  class NecessaryBindings;
   class ProtocolInfo;
   class TypeConverter;
   class TypeInfo;
@@ -295,7 +296,7 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
-  /// Checks if the metadata of \p Nominal can be emitted lazyly.
+  /// Checks if the metadata of \p Nominal can be emitted lazily.
   ///
   /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
   bool tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal);
@@ -318,7 +319,7 @@ public:
     }
   }
 
-  /// Return true if \p wt can be emitted lazyly.
+  /// Return true if \p wt can be emitted lazily.
   bool canEmitWitnessTableLazily(SILWitnessTable *wt);
 
   /// Adds \p Conf to LazyWitnessTables if it has not been added yet.
@@ -660,6 +661,9 @@ public:
                                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfObjCProtocolRef(ProtocolDecl *proto,
                                            ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
+                                          SILLocation diagLoc);
+
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
@@ -676,6 +680,12 @@ public:
                                             ArrayRef<llvm::Type*> paramTypes,
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline = false);
+
+  llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, Type t,
+                                            llvm::Type *llvmType);
+
+  llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
+                                             llvm::Type *llvmType);
 
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
@@ -746,6 +756,7 @@ private:
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
+  llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {
@@ -955,10 +966,6 @@ public:
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
-  llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D,
-                                         ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D,
-                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,

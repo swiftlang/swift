@@ -77,6 +77,14 @@ module Newtype {
   header "Newtype.h"
 }
 
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *
@@ -136,6 +144,10 @@ module TestProtocols { header "Protocols.h" }
 module TypeAndValue {
   header "TypeAndValue.h"
   export *
+}
+
+module UnimportableMembers {
+  header "UnimportableMembers.h"
 }
 
 module UsesSubmodule {

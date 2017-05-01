@@ -713,6 +713,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::KeyPath:
+  case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -838,6 +840,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::KeyPath:
+  case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -953,6 +957,8 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::KeyPath:
+  case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1021,6 +1027,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::KeyPath:
+  case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1583,6 +1591,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
+    case ConstraintKind::KeyPath:
+    case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::SelfObjectOfProtocol:
@@ -2364,7 +2374,12 @@ ConstraintSystem::simplifyConstructionConstraint(
   NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
   if (isa<AbstractFunctionDecl>(useDC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto ctors = TC.lookupConstructors(useDC, valueType, lookupOptions);
+
+  auto instanceType = valueType;
+  if (auto *selfType = instanceType->getAs<DynamicSelfType>())
+    instanceType = selfType->getSelfType();
+
+  auto ctors = TC.lookupConstructors(useDC, instanceType, lookupOptions);
   if (!ctors)
     return SolutionKind::Error;
 
@@ -2795,6 +2810,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
   
+  // If we're looking for a subscript, consider key path operations.
+  if (memberName.isSimpleName(getASTContext().Id_subscript)
+      && getASTContext().LangOpts.EnableExperimentalKeyPaths) {
+    result.ViableCandidates.push_back(
+        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+  }
+
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
@@ -3211,7 +3233,6 @@ retry_after_fail:
   
   return result;
 }
-
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
@@ -3714,6 +3735,235 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     return SolutionKind::Solved;
   }
   return SolutionKind::Unsolved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
+                                            Type rootTy,
+                                            Type valueTy,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator) {
+  auto subflags = getDefaultDecompositionOptions(flags);
+  // The constraint ought to have been anchored on a KeyPathExpr.
+  auto keyPath = cast<KeyPathExpr>(locator.getBaseLocator()->getAnchor());
+  
+  // Gather overload choices for any key path components associated with this
+  // key path.
+  SmallVector<OverloadChoice, 4> choices;
+  choices.resize(keyPath->getComponents().size());
+  for (auto resolvedItem = resolvedOverloadSets; resolvedItem;
+       resolvedItem = resolvedItem->Previous) {
+    auto locator = resolvedItem->Locator;
+    if (locator->getAnchor() == keyPath
+        && locator->getPath().size() == 1
+        && locator->getPath()[0].getKind() == ConstraintLocator::KeyPathComponent) {
+      choices[locator->getPath()[0].getValue()] = resolvedItem->Choice;
+    }
+  }
+  
+  keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
+  auto tryMatchRootAndValueFromKeyPathType =
+    [&](BoundGenericType *bgt) -> SolutionKind {
+      Type boundRoot, boundValue;
+      
+      // We can get root and value from a concrete key path type.
+      if (bgt->getDecl() == getASTContext().getKeyPathDecl()
+          || bgt->getDecl() == getASTContext().getWritableKeyPathDecl()
+          || bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+        boundRoot = bgt->getGenericArgs()[0];
+        boundValue = bgt->getGenericArgs()[1];
+      } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+        // We can still get the root from a PartialKeyPath.
+        boundRoot = bgt->getGenericArgs()[0];
+        boundValue = Type();
+      } else {
+        // We can't bind anything from this type.
+        return SolutionKind::Solved;
+      }
+      if (matchTypes(boundRoot, rootTy,
+                ConstraintKind::Bind, subflags, locator) == SolutionKind::Error)
+        return SolutionKind::Error;
+
+      if (boundValue
+          && matchTypes(boundValue, valueTy,
+                ConstraintKind::Bind, subflags, locator) == SolutionKind::Error)
+        return SolutionKind::Error;
+      
+      return SolutionKind::Solved;
+    };
+  
+  // If the key path type is bound from context, feed that into the root and
+  // value types.
+  if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
+    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT) == SolutionKind::Error)
+      return SolutionKind::Error;
+  }
+
+  // See if we resolved overloads for all the components involved.
+  enum {
+    ReadOnly,
+    Writable,
+    ReferenceWritable
+  } capability = Writable;
+
+  for (unsigned i : indices(keyPath->getComponents())) {
+    auto &component = keyPath->getComponents()[i];
+    
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+      // If no choice was made, leave the constraint unsolved.
+      if (choices[i].isInvalid()) {
+        if (flags.contains(TMF_GenerateConstraints)) {
+          addUnsolvedConstraint(Constraint::create(*this,
+                                                   ConstraintKind::KeyPath,
+                                                   keyPathTy, rootTy, valueTy,
+                                                   locator.getBaseLocator()));
+          return SolutionKind::Solved;
+        }
+        return SolutionKind::Unsolved;
+      }
+      
+      auto storage = cast<AbstractStorageDecl>(choices[i].getDecl());
+      if (!storage->isSettable(DC)) {
+        // A non-settable component makes the key path read-only, unless
+        // a reference-writable component shows up later.
+        capability = ReadOnly;
+        continue;
+      }
+      // A nonmutating setter indicates a reference-writable base.
+      if (storage->isSetterNonMutating()) {
+        capability = ReferenceWritable;
+        continue;
+      }
+      // Otherwise, the key path maintains its current capability.
+      break;
+    }
+    
+    case KeyPathExpr::Component::Kind::OptionalChain:
+      // Optional chains force the entire key path to be read-only.
+      capability = ReadOnly;
+      goto done;
+    
+    case KeyPathExpr::Component::Kind::OptionalForce:
+      // Forcing an optional preserves its lvalue-ness.
+      break;
+    
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      llvm_unreachable("already resolved");
+    }
+  }
+done:
+
+  // Resolve the type.
+  NominalTypeDecl *kpDecl;
+  switch (capability) {
+  case ReadOnly:
+    kpDecl = getASTContext().getKeyPathDecl();
+    break;
+
+  case Writable:
+    kpDecl = getASTContext().getWritableKeyPathDecl();
+    break;
+
+  case ReferenceWritable:
+    kpDecl = getASTContext().getReferenceWritableKeyPathDecl();
+    break;
+  }
+  
+  auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
+                                            {rootTy, valueTy});
+  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Subtype,
+                    subflags, locator);
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyKeyPathApplicationConstraint(
+                                        Type keyPathTy,
+                                        Type rootTy,
+                                        Type valueTy,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+  keyPathTy = getFixedTypeRecursive(keyPathTy, flags, /*wantRValue=*/true);
+  
+  auto unsolved = [&]() -> SolutionKind {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(*this,
+                    ConstraintKind::KeyPathApplication,
+                    keyPathTy, rootTy, valueTy, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+  
+  if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
+    if (bgt->getGenericArgs().size() < 2)
+      return SolutionKind::Error;
+
+    // We have the key path type. Match it to the other ends of the constraint.
+    auto kpRootTy = bgt->getGenericArgs()[0];
+    auto kpValueTy = bgt->getGenericArgs()[1];
+    
+    // Try to match the root type.
+    rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
+    auto rootMatches = matchTypes(kpRootTy, rootTy,
+                                  ConstraintKind::Equal,
+                                  subflags, locator);
+    switch (rootMatches) {
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+    case SolutionKind::Solved:
+      break;
+    case SolutionKind::Unsolved:
+      llvm_unreachable("should have generated constraints");
+    }
+    
+    /// Solve for an rvalue base.
+    auto solveRValue = [&]() -> ConstraintSystem::SolutionKind {
+      return matchTypes(kpValueTy, valueTy,
+                        ConstraintKind::Bind, subflags, locator);
+    };
+    /// Solve for a base whose lvalueness is to be determined.
+    auto solveUnknown = [&]() -> ConstraintSystem::SolutionKind {
+      if (matchTypes(kpValueTy, valueTy,
+                     ConstraintKind::Equal, subflags, locator)
+           == SolutionKind::Error)
+        return SolutionKind::Error;
+      return unsolved();
+    };
+    /// Solve for an lvalue base.
+    auto solveLValue = [&]() -> ConstraintSystem::SolutionKind {
+      return matchTypes(LValueType::get(kpValueTy), valueTy,
+                        ConstraintKind::Bind, subflags, locator);
+    };
+  
+    if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
+      // Read-only keypath.
+      return solveRValue();
+    }
+    if (bgt->getDecl() == getASTContext().getWritableKeyPathDecl()) {
+      // Writable keypath. The result can be an lvalue if the root was.
+      if (rootTy->is<LValueType>())
+        return solveLValue();
+      if (rootTy->isTypeVariableOrMember())
+        // We don't know whether the value is an lvalue yet.
+        return solveUnknown();
+      return solveRValue();
+    }
+    if (bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+      // Reference-writable keypath. The result can always be an lvalue.
+      return solveLValue();
+    }
+    // Otherwise, we don't have a key path type at all.
+    return SolutionKind::Error;
+  }
+  if (!keyPathTy->isTypeVariableOrMember())
+    return SolutionKind::Error;
+  
+  return unsolved();
 }
 
 ConstraintSystem::SolutionKind
@@ -4419,11 +4669,66 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::KeyPath:
+  case ConstraintKind::KeyPathApplication:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
+
+void
+ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
+                                              Type root, Type value,
+                                              ConstraintLocatorBuilder locator,
+                                              bool isFavored) {
+  switch (simplifyKeyPathApplicationConstraint(keypath, root, value,
+                                               TMF_GenerateConstraints,
+                                               locator)) {
+  case SolutionKind::Error:
+    if (shouldAddNewFailingConstraint()) {
+      auto c = Constraint::create(*this, ConstraintKind::KeyPathApplication,
+                                  keypath, root, value,
+                                  getConstraintLocator(locator));
+      if (isFavored) c->setFavored();
+      addNewFailingConstraint(c);
+    }
+    return;
+  
+  case SolutionKind::Solved:
+    return;
+    
+  case SolutionKind::Unsolved:
+    llvm_unreachable("should have generated constraints");
+  }
+}
+
+void
+ConstraintSystem::addKeyPathConstraint(Type keypath,
+                                       Type root, Type value,
+                                       ConstraintLocatorBuilder locator,
+                                       bool isFavored) {
+  switch (simplifyKeyPathConstraint(keypath, root, value,
+                                    TMF_GenerateConstraints,
+                                    locator)) {
+  case SolutionKind::Error:
+    if (shouldAddNewFailingConstraint()) {
+      auto c = Constraint::create(*this, ConstraintKind::KeyPath,
+                                  keypath, root, value,
+                                  getConstraintLocator(locator));
+      if (isFavored) c->setFavored();
+      addNewFailingConstraint(c);
+    }
+    return;
+  
+  case SolutionKind::Solved:
+    return;
+    
+  case SolutionKind::Unsolved:
+    llvm_unreachable("should have generated constraints");
+  }
+}
+
 
 void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      Type second,
@@ -4549,6 +4854,18 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                                  constraint.getSecondType(),
                                                  None,
                                                  constraint.getLocator());
+
+  case ConstraintKind::KeyPath:
+    return simplifyKeyPathConstraint(
+      constraint.getFirstType(), constraint.getSecondType(),
+      constraint.getThirdType(),
+      None, constraint.getLocator());
+
+  case ConstraintKind::KeyPathApplication:
+    return simplifyKeyPathApplicationConstraint(
+      constraint.getFirstType(), constraint.getSecondType(),
+      constraint.getThirdType(),
+      None, constraint.getLocator());
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),

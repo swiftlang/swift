@@ -488,6 +488,9 @@ enum TypeResolutionFlags : unsigned {
   /// clause on something other than an enum (i.e. V, but not U or W, in class
   /// T: U.V<W>)
   TR_NonEnumInheritanceClauseOuterLayer = 0x2000000,
+
+  /// Whether we are checking the underlying type of a typealias.
+  TR_TypeAliasUnderlyingType = 0x4000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -787,6 +790,7 @@ private:
   Type ImageLiteralType;
   Type FileReferenceLiteralType;
   Type StringType;
+  Type IntType;
   Type Int8Type;
   Type UInt8Type;
   Type NSObjectType;
@@ -877,6 +881,7 @@ public:
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
   Type getStringType(DeclContext *dc);
+  Type getIntType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
@@ -1129,6 +1134,10 @@ public:
   ///
   /// \param t2 The second type of the constraint.
   ///
+  /// \param openArchetypes If true, archetypes are replaced with type
+  /// variables, and the result can be interpreted as whether or not the
+  /// two types can possibly equal at runtime.
+  ///
   /// \param dc The context of the conversion.
   ///
   /// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
@@ -1136,6 +1145,7 @@ public:
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
   bool typesSatisfyConstraint(Type t1, Type t2,
+                              bool openArchetypes,
                               constraints::ConstraintKind kind,
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);
@@ -1534,7 +1544,7 @@ public:
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
-  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, ObjCKeyPathExpr *expr,
+  Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
                                       bool requireResultType = false);
 
   /// \brief Type check whether the given type declaration includes members of
@@ -1543,6 +1553,16 @@ public:
   /// \param decl The declaration to be type-checked. This process will not
   /// modify the declaration.
   void checkDeclCircularity(NominalTypeDecl *decl);
+
+  /// \brief Type check whether the given switch statement exhaustively covers
+  /// its domain.
+  ///
+  /// \param stmt The switch statement to be type-checked.  No modification of
+  /// the statement occurs.
+  /// \param limitChecking The checking process relies on the switch statement
+  /// being well-formed.  If it is not, pass true to this flag to run a limited
+  /// form of analysis.
+  void checkSwitchExhaustiveness(SwitchStmt *stmt, bool limitChecking);
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
@@ -1814,6 +1834,23 @@ public:
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance through a particular declaration context using the given
+  /// type checker.
+  class LookUpConformance {
+    TypeChecker &tc;
+    DeclContext *dc;
+
+  public:
+    explicit LookUpConformance(TypeChecker &tc, DeclContext *dc)
+      : tc(tc), dc(dc) { }
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const;
+  };
+
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
 
@@ -1914,6 +1951,11 @@ public:
   LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
                             NameLookupOptions options
                               = defaultMemberLookupOptions);
+
+  /// \brief Check whether the given declaration can be written as a
+  /// member of the given base type.
+  bool isUnsupportedMemberTypeAccess(Type type,
+                                     TypeDecl *typeDecl);
 
   /// \brief Look up a member type within the given type.
   ///

@@ -153,6 +153,7 @@ KNOWN_SETTINGS=(
     long-test                   "0"              "set to run the long test suite"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
+    skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
@@ -1891,6 +1892,13 @@ for host in "${ALL_HOSTS[@]}"; do
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 
+    if [[ "${SKIP_TEST_SOURCEKIT}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=FALSE
+        )
+    fi
+
     for product in "${PRODUCTS[@]}"; do
         # Check if we should perform this action.
         if ! [[ $(should_execute_action "${host}-${product}-build") ]]; then
@@ -3199,7 +3207,6 @@ for host in "${ALL_HOSTS[@]}"; do
             # Exclude shell scripts.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
-               grep -v swift-stdlib-tool | \
                grep -v crashlog.py | \
                grep -v symbolication.py | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))

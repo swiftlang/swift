@@ -404,7 +404,8 @@ class ExistentialTypeFlags {
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
     ClassConstraintMask   = 0x80000000U,
-    SpecialProtocolMask   = 0x7F000000U,
+    HasSuperclassMask     = 0x40000000U,
+    SpecialProtocolMask   = 0x3F000000U,
     SpecialProtocolShift  = 24U,
   };
   int_type Data;
@@ -421,6 +422,11 @@ public:
                                   | (bool(c) ? ClassConstraintMask : 0));
   }
   constexpr ExistentialTypeFlags
+  withHasSuperclass(bool hasSuperclass) const {
+    return ExistentialTypeFlags((Data & ~HasSuperclassMask)
+                                  | (hasSuperclass ? HasSuperclassMask : 0));
+  }
+  constexpr ExistentialTypeFlags
   withSpecialProtocol(SpecialProtocol sp) const {
     return ExistentialTypeFlags((Data & ~SpecialProtocolMask)
                                   | (int_type(sp) << SpecialProtocolShift));
@@ -433,7 +439,11 @@ public:
   ProtocolClassConstraint getClassConstraint() const {
     return ProtocolClassConstraint(bool(Data & ClassConstraintMask));
   }
-  
+
+  bool hasSuperclassConstraint() const {
+    return bool(Data & HasSuperclassMask);
+  }
+
   /// Return whether this existential type represents an uncomposed special
   /// protocol.
   SpecialProtocol getSpecialProtocol() const {
@@ -563,6 +573,17 @@ public:
   }
 };
 
+/// Flags for exclusivity-checking operations.
+enum class ExclusivityFlags : uintptr_t {
+  Read             = 0x0,
+  Modify           = 0x1,
+  ActionMask       = 0x1
+};
+static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
+  return ExclusivityFlags(uintptr_t(flags)
+                        & uintptr_t(ExclusivityFlags::ActionMask));
 }
+
+} // end namespace swift
 
 #endif /* SWIFT_ABI_METADATAVALUES_H */

@@ -694,7 +694,7 @@
   {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "CCAlias",
-    key.usr: "s:8__main__7CCAlias",
+    key.usr: "s:8__main__7CCAliasa",
     key.offset: 689,
     key.length: 7
   },
@@ -1083,7 +1083,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+(_:_:)",
-    key.usr: "s:s1poiS2i_SitF",
+    key.usr: "s:Si1poiS2i_SitFZ",
     key.offset: 1217,
     key.length: 1
   },
@@ -1218,7 +1218,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+=(_:_:)",
-    key.usr: "s:s2peoiySiz_SitF",
+    key.usr: "s:Si2peoiySiz_SitFZ",
     key.offset: 1343,
     key.length: 2
   },
@@ -1317,7 +1317,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+=(_:_:)",
-    key.usr: "s:s2peoiySiz_SitF",
+    key.usr: "s:Si2peoiySiz_SitFZ",
     key.offset: 1383,
     key.length: 2
   },
@@ -2091,7 +2091,7 @@
   {
     key.kind: source.lang.swift.decl.typealias,
     key.name: "CCAlias",
-    key.usr: "s:8__main__7CCAlias",
+    key.usr: "s:8__main__7CCAliasa",
     key.offset: 625,
     key.length: 20,
     key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>CCAlias</decl.name> = <ref.class usr=\"s:8__main__2CCC\">CC</ref.class></decl.typealias>"
@@ -2119,7 +2119,7 @@
         key.usr: "s:8__main__2CCC5meth2yACF",
         key.offset: 673,
         key.length: 26,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>meth2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"s:8__main__7CCAlias\">CCAlias</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>meth2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"s:8__main__7CCAliasa\">CCAlias</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -2353,15 +2353,7 @@
         key.usr: "s:8__main__3CC2C9subscriptS2icfg",
         key.offset: 1162,
         key.length: 25,
-        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.name: "i",
-            key.offset: 1144,
-            key.length: 3
-          }
-        ]
+        key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>"
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.setter,
@@ -2374,12 +2366,6 @@
             key.kind: source.lang.swift.decl.var.local,
             key.name: "vvv",
             key.offset: 1152,
-            key.length: 3
-          },
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.name: "i",
-            key.offset: 1144,
             key.length: 3
           }
         ]
@@ -2595,11 +2581,16 @@
       {
         key.kind: source.lang.swift.decl.typealias,
         key.name: "Element",
-        key.usr: "s:8__main__2S1V7Element",
+        key.usr: "s:8__main__2S1V7Elementa",
         key.offset: 1835,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Element</decl.name> = <ref.struct usr=\"s:Si\">Int</ref.struct></decl.typealias>",
+        key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <ref.struct usr=\"s:8__main__2S1V\">S1</ref.struct>.<decl.name>Element</decl.name> = <ref.struct usr=\"s:Si\">Int</ref.struct></decl.typealias>",
         key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "FixedWidthInteger",
+            key.usr: "s:s17FixedWidthIntegerP"
+          },
           {
             key.kind: source.lang.swift.ref.protocol,
             key.name: "SignedInteger",
@@ -2607,13 +2598,8 @@
           },
           {
             key.kind: source.lang.swift.ref.protocol,
-            key.name: "Comparable",
-            key.usr: "s:s10ComparableP"
-          },
-          {
-            key.kind: source.lang.swift.ref.protocol,
-            key.name: "Equatable",
-            key.usr: "s:s9EquatableP"
+            key.name: "_ExpressibleByBuiltinIntegerLiteral",
+            key.usr: "s:s35_ExpressibleByBuiltinIntegerLiteralP"
           }
         ]
       },

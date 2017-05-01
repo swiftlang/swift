@@ -670,6 +670,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_objc_header,
                           OPT_emit_objc_header_path,
                           "h", false);
+  determineOutputFilename(Opts.LoadedModuleTracePath,
+                          OPT_emit_loaded_module_trace,
+                          OPT_emit_loaded_module_trace_path,
+                          "trace.json", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
@@ -743,6 +747,38 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitSIBGen:
+    case FrontendOptions::EmitSIB:
+    case FrontendOptions::EmitIR:
+    case FrontendOptions::EmitBC:
+    case FrontendOptions::EmitAssembly:
+    case FrontendOptions::EmitObject:
+    case FrontendOptions::EmitImportedModules:
+    case FrontendOptions::EmitTBD:
+      break;
+    }
+  }
+
+  if (!Opts.LoadedModuleTracePath.empty()) {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
+    case FrontendOptions::Parse:
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
+    case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+      Diags.diagnose(SourceLoc(),
+                     diag::error_mode_cannot_emit_loaded_module_trace);
+      return true;
+    case FrontendOptions::Typecheck:
+    case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
     case FrontendOptions::EmitSIBGen:
@@ -871,8 +907,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
-  Opts.EnableExperimentalSubclassExistentials |=
-    Args.hasArg(OPT_enable_experimental_subclass_existentials);
+  Opts.EnableExperimentalKeyPaths |=
+    Args.hasArg(OPT_enable_experimental_keypaths);
 
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
@@ -1201,6 +1237,12 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
+  if (Opts.Optimization > SILOptions::SILOptMode::None
+      && Opts.EnforceExclusivityDynamic) {
+    Diags.diagnose(SourceLoc(),
+                   diag::warning_argument_not_supported_with_optimization,
+                   A->getOption().getPrefixedName() + A->getValue());
+  }
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
@@ -1315,6 +1357,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
+  Opts.SuppressStaticExclusivitySwap |=
+      Args.hasArg(OPT_suppress_static_exclusivity_swap);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
@@ -1535,6 +1579,53 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
+bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
+                       StringRef ResourcePath, ArgList &Args,
+                       DiagnosticEngine &Diags) {
+  using namespace options;
+
+  Opts.KeepObjcVisibility |= Args.hasArg(OPT_migrate_keep_objc_visibility);
+  Opts.DumpUsr = Args.hasArg(OPT_dump_usr);
+
+  if (Args.hasArg(OPT_disable_migrator_fixits)) {
+    Opts.EnableMigratorFixits = false;
+  }
+
+  if (auto RemapFilePath = Args.getLastArg(OPT_emit_remap_file_path)) {
+    Opts.EmitRemapFilePath = RemapFilePath->getValue();
+  }
+
+  if (auto MigratedFilePath = Args.getLastArg(OPT_emit_migrated_file_path)) {
+    Opts.EmitMigratedFilePath = MigratedFilePath->getValue();
+  }
+
+  if (auto Dumpster = Args.getLastArg(OPT_dump_migration_states_dir)) {
+    Opts.DumpMigrationStatesDir = Dumpster->getValue();
+  }
+
+  if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
+    Opts.APIDigesterDataStorePath = DataPath->getValue();
+  } else {
+    bool Supported = true;
+    llvm::SmallString<128> dataPath(ResourcePath);
+    llvm::sys::path::append(dataPath, "migrator");
+    if (Triple.isMacOSX())
+      llvm::sys::path::append(dataPath, "macos.json");
+    else if (Triple.isiOS())
+      llvm::sys::path::append(dataPath, "ios.json");
+    else if (Triple.isTvOS())
+      llvm::sys::path::append(dataPath, "tvos.json");
+    else if (Triple.isWatchOS())
+      llvm::sys::path::append(dataPath, "watchos.json");
+    else
+      Supported = false;
+    if (Supported)
+      Opts.APIDigesterDataStorePath = dataPath.str();
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory) {
@@ -1594,6 +1685,11 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
+    return true;
+  }
+
+  if (ParseMigratorArgs(MigratorOpts, LangOpts.Target,
+                        SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
 

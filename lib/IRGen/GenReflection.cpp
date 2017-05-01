@@ -283,7 +283,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     // If the conforming type is generic, we just want to emit the
     // unbound generic type here.
-    auto *Nominal = Conformance->getInterfaceType()->getAnyNominal();
+    auto *Nominal = Conformance->getType()->getAnyNominal();
     assert(Nominal && "Structural conformance?");
 
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
@@ -388,7 +388,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto kind = FieldDescriptorKind::Struct;
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
-      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+      auto type = CD->getDeclaredType()->getCanonicalType();
+      auto RC = getReferenceCountingForType(IGM, type);
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else
@@ -600,6 +601,7 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   CanSILFunctionType SubstCalleeType;
   SubstitutionList Subs;
   const HeapLayout &Layout;
+
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            SILFunction &Caller,
@@ -627,6 +629,35 @@ public:
       auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
       B.addRelativeAddress(EncodedSource);
     }
+  }
+
+  /// Give up if we captured an opened existential type. Eventually we
+  /// should figure out how to represent this.
+  static bool hasOpenedExistential(CanSILFunctionType OrigCalleeType,
+                                   const HeapLayout &Layout) {
+    if (!OrigCalleeType->isPolymorphic() ||
+        OrigCalleeType->isPseudogeneric())
+      return false;
+
+    auto &Bindings = Layout.getBindings();
+    for (unsigned i = 0; i < Bindings.size(); ++i) {
+      // Skip protocol requirements (FIXME: for now?)
+      if (Bindings[i].Protocol != nullptr)
+        continue;
+
+      if (Bindings[i].TypeParameter->hasOpenedExistential())
+        return true;
+    }
+
+    auto ElementTypes = Layout.getElementTypes().slice(
+        Layout.hasBindings() ? 1 : 0);
+    for (auto ElementType : ElementTypes) {
+      auto SwiftType = ElementType.getSwiftRValueType();
+      if (SwiftType->hasOpenedExistential())
+        return true;
+    }
+
+    return false;
   }
 
   /// Slice off the NecessaryBindings struct at the beginning, if it's there.
@@ -659,8 +690,9 @@ public:
         continue;
 
       auto Source = SourceBuilder.createClosureBinding(i);
-      auto BindingType = Caller.mapTypeOutOfContext(Bindings[i].TypeParameter);
-      SourceMap.push_back({BindingType->getCanonicalType(), Source});
+      auto BindingType = Bindings[i].TypeParameter;
+      auto InterfaceType = Caller.mapTypeOutOfContext(BindingType);
+      SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
     }
 
     // Check if any requirements were fulfilled by metadata stored inside a
@@ -700,10 +732,9 @@ public:
       // parameters.
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
-      auto SubstType =
-        Caller.mapTypeOutOfContext(
-            GenericParam.subst(SubstMap, None));
-      SourceMap.push_back({SubstType->getCanonicalType(), Src});
+      auto SubstType = GenericParam.subst(SubstMap);
+      auto InterfaceType = Caller.mapTypeOutOfContext(SubstType);
+      SourceMap.push_back({InterfaceType->getCanonicalType(), Src});
     });
 
     return SourceMap;
@@ -871,11 +902,13 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
+  if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
+    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
+
   CaptureDescriptorBuilder builder(*this, Caller,
                                    OrigCalleeType, SubstCalleeType, Subs,
                                    Layout);
   auto var = builder.emit();
-
   return llvm::ConstantExpr::getBitCast(var, CaptureDescriptorPtrTy);
 }
 
@@ -969,7 +1002,7 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   // superclass as a special associated type named 'super' on the
   // 'AnyObject' protocol.
   if (auto Superclass = Decl->getDeclaredInterfaceType()
-                            ->getSuperclass(nullptr)) {
+                            ->getSuperclass()) {
     SuperclassMetadataBuilder builder(*this, cast<ClassDecl>(Decl),
                                       Superclass->getCanonicalType());
     builder.emit();

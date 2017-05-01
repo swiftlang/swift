@@ -2844,7 +2844,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   if (*isObjC == ObjCReason::MemberOfObjCSubclass) {
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
-    // accessors---just the main storage dclarations.
+    // accessors---just the main storage declarations.
     if (TC.Context.LangOpts.WarnSwift3ObjCInference &&
         !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
       TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
@@ -3151,7 +3151,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   auto dc = decl->getDeclContext();
   auto behaviorSelf = conformance->getType();
-  auto behaviorInterfaceSelf = conformance->getInterfaceType();
+  auto behaviorInterfaceSelf =
+    conformance->getDeclContext()->mapTypeOutOfContext(behaviorSelf);
   auto behaviorProto = conformance->getProtocol();
   auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
@@ -4093,8 +4094,10 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType())
+    if (SD->hasInterfaceType() || SD->isBeingValidated())
       return;
+
+    SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
     assert(dc->isTypeContext() &&
@@ -4138,6 +4141,8 @@ public:
       if (!SD->getGenericSignatureOfContext())
         TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    SD->setIsBeingValidated(false);
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
@@ -4820,6 +4825,11 @@ public:
     if (!typeRepr)
       return false;
 
+    // 'Self' on a free function is not dynamic 'Self'.
+    if (!func->getDeclContext()->getAsClassOrClassExtensionContext() &&
+        !isa<ProtocolDecl>(func->getDeclContext()))
+      return false;
+
     // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
     // property. We could implement it as such in the future.
     if (func->isAccessor())
@@ -4862,45 +4872,6 @@ public:
     // Check whether it is 'Self'.
     if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
       return false;
-
-    // 'Self' in protocol extensions is not dynamic 'Self'.
-    DeclContext *dc = func->getDeclContext();
-    for (auto parentDC = dc; !parentDC->isModuleScopeContext();
-         parentDC = parentDC->getParent()) {
-      if (parentDC->getAsProtocolExtensionContext()) {
-        return false;
-      }
-    }
-
-    // Dynamic 'Self' is only permitted on methods.
-    if (!dc->isTypeContext()) {
-      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
-                  dc->isLocalContext());
-      simpleRepr->setInvalid();
-      return true;
-    }
-
-    // 'Self' is only a dynamic self on class methods and
-    // protocol requirements.
-    auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->hasError())
-      return false;
-
-    auto nominal = declaredType->getAnyNominal();
-    if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
-      int which;
-      if (isa<StructDecl>(nominal))
-        which = 0;
-      else if (isa<EnumDecl>(nominal))
-        which = 1;
-      else
-        llvm_unreachable("Unknown nominal type");
-      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
-                  which, nominal->getName())
-        .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
-      simpleRepr->setInvalid();
-      return true;
-    }
 
     // Note that the function has a dynamic Self return type and set
     // the return type component to the dynamic self type.
@@ -5249,7 +5220,7 @@ public:
                               bool treatIUOResultAsError) {
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
-        parentMember, member, parentMember->getInterfaceType(), &TC);
+        parentMember, member, parentMember->getInterfaceType());
     const auto *parentTy = plainParentTy->castTo<FunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
       parentTy = parentTy->getResult()->castTo<FunctionType>();
@@ -5695,7 +5666,7 @@ public:
 
         // Check whether the types are identical.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
-            parentDecl, decl, parentDecl->getInterfaceType(), &TC);
+            parentDecl, decl, parentDecl->getInterfaceType());
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           // For methods, strip off the 'Self' type.
@@ -5966,7 +5937,7 @@ public:
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();
         auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
-            matchDecl, decl, matchDecl->getInterfaceType(), &TC);
+            matchDecl, decl, matchDecl->getInterfaceType());
         
         if (!propertyTy->canOverride(parentPropertyTy,
                                      OverrideMatchMode::Strict,
@@ -6094,6 +6065,7 @@ public:
     UNINTERESTING_ATTR(DiscardableResult)
 
     UNINTERESTING_ATTR(ObjCMembers)
+    UNINTERESTING_ATTR(Implements)
 
 #undef UNINTERESTING_ATTR
 
@@ -7028,6 +7000,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   SWIFT_FUNC_STAT;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumDeclsValidated++;
 
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -7097,7 +7072,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateGenericTypeSignature(typeAlias);
 
-    TypeResolutionOptions options;
+    TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
     if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
       options |= TR_KnownNonCascadingDependency;
 
@@ -7149,7 +7124,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (auto superclass = CD->getSuperclassDecl()) {
         if (superclass->getAttrs().hasAttribute<ObjCMembersAttr>() &&
             !CD->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*implicit=*/true));
+          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*IsImplicit=*/true));
         }
       }
     }
@@ -7420,6 +7395,40 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     assocType->computeType();
     validateAccessibility(assocType);
     break;
+  }
+  case DeclKind::TypeAlias: {
+    auto typealias = cast<TypeAliasDecl>(D);
+    if (typealias->getUnderlyingTypeLoc().getType())
+      return;
+
+    // Perform earlier validation of typealiases in protocols.
+    if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+      if (!typealias->getGenericParams()) {
+        ProtocolRequirementTypeResolver resolver(proto);
+        TypeResolutionOptions options;
+
+        if (typealias->isBeingValidated()) return;
+
+        typealias->setIsBeingValidated();
+        SWIFT_DEFER { typealias->setIsBeingValidated(false); };
+
+        validateAccessibility(typealias);
+        if (typealias->getFormalAccess() <= Accessibility::FilePrivate)
+          options |= TR_KnownNonCascadingDependency;
+
+        if (validateType(typealias->getUnderlyingTypeLoc(),
+                         typealias, options, &resolver)) {
+          typealias->setInvalid();
+          typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+        }
+
+        typealias->setUnderlyingType(
+                                typealias->getUnderlyingTypeLoc().getType());
+
+        return;
+      }
+    }
+    LLVM_FALLTHROUGH;
   }
 
   default:

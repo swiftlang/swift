@@ -18,6 +18,10 @@
 // FIXME(ABI)#70 : The character string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
+/// CR and LF are common special cases in grapheme breaking logic
+internal let _CR: UInt8 = 0x0d
+internal let _LF: UInt8 = 0x0a
+
 extension String {
   /// A view of a string's contents as a collection of characters.
   ///
@@ -120,9 +124,9 @@ extension String {
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
     var tmp = CharacterView("")
-    swap(&_core, &tmp._core)
+    (_core, tmp._core) = (tmp._core, _core)
     let r = body(&tmp)
-    swap(&_core, &tmp._core)
+    (_core, tmp._core) = (tmp._core, _core)
     return r
   }
 
@@ -246,6 +250,22 @@ extension String.CharacterView : BidirectionalCollection {
     )
   }
 
+  /// Fast check for a (stable) grapheme break between two UInt16 code units
+  @inline(__always)
+  internal static func _quickCheckGraphemeBreakBetween(
+    _ lhs: UInt16, _ rhs: UInt16
+  ) -> Bool {
+    // With the exception of CR-LF, there is always a grapheme break between two
+    // sub-0x300 code units
+    if lhs < 0x300 && rhs < 0x300 {
+      return lhs != UInt16(_CR) && rhs != UInt16(_LF)
+    }
+
+    // TODO: Other large ranges, such as CJK? Note that any such addition must
+    // be highly probable to never change in future Unicode versions.
+    return false
+  }
+
   // NOTE: don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   //
@@ -260,8 +280,44 @@ extension String.CharacterView : BidirectionalCollection {
     if start == end {
       return 0
     }
+
+    // Grapheme breaking is much simpler if known ASCII
+    if _core.isASCII {
+      _onFastPath() // Please aggressively inline
+      let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      let pos = start._position - _coreOffset
+
+      // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
+      // for that one exception.
+      if _slowPath(
+        asciiBuffer[pos] == _CR &&
+        pos+1 < asciiBuffer.endIndex &&
+        asciiBuffer[pos+1] == _LF
+      ) {
+        return 2
+      }
+
+      return 1
+    }
     
     let startIndexUTF16 = start._position
+
+    // Last scalar is its own grapheme
+    if (startIndexUTF16+1 == end._position) {
+      return 1
+    }
+
+    // Perform a quick single-code-unit grapheme check
+    if _core._baseAddress != nil {
+      let pos = start._position - _coreOffset
+      if String.CharacterView._quickCheckGraphemeBreakBetween(
+        _core._nthContiguous(pos),
+        _core._nthContiguous(pos+1)
+      ) {
+        return 1
+      }
+    }
+
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
@@ -302,8 +358,47 @@ extension String.CharacterView : BidirectionalCollection {
     if start == end {
       return 0
     }
+
+    // Grapheme breaking is much simpler if known ASCII
+    if _core.isASCII {
+      _onFastPath() // Please aggressively inline
+      let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      let pos = end._position - _coreOffset - 1
+      _sanityCheck(
+        pos >= asciiBuffer.startIndex,
+        "should of been caught in earlier start-of-scalars check")
+
+      // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
+      // for that one exception.
+      if _slowPath(
+        asciiBuffer[pos] == _LF &&
+        pos-1 >= asciiBuffer.startIndex &&
+        asciiBuffer[pos-1] == _CR
+      ) {
+        return 2
+      }
+
+      return 1
+    }
     
     let endIndexUTF16 = end._position
+
+    // First scalar is its own grapheme
+    if (endIndexUTF16-1 == start._position) {
+      return 1
+    }
+
+    // Perform a quick single-code-unit grapheme check
+    if _core._baseAddress != nil {
+      let pos = end._position - _coreOffset - 1
+      if String.CharacterView._quickCheckGraphemeBreakBetween(
+        _core._nthContiguous(pos-1),
+        _core._nthContiguous(pos)
+      ) {
+        return 1
+      }
+    }
+
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()

@@ -1,4 +1,4 @@
-//===- SILFunctionConventions.h - Defines SILFunctioConventions -*- C++ -*-===//
+//===- SILFunctionConventions.h - Defines SIL func. conventions -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -352,6 +352,7 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
     return false;
 
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     return (loweredAddresses ||
             param.getType()->isOpenedExistentialWithError());

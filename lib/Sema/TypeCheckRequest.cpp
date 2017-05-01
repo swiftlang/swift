@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/TypeCheckRequest.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/TypeRepr.h"
 
 using namespace swift;
 

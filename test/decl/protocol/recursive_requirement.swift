@@ -41,7 +41,7 @@ struct Y2 : P2 {
 }
 
 func f<T : P2>(_ z: T) {
- _ = X2<T.A>()
+ _ = X2<T.A>() // expected-error{{type 'T.A' does not conform to protocol 'P2'}}
 }
 
 // -----
@@ -69,11 +69,11 @@ f2(Y3())
 // -----
 
 protocol Alpha {
-  associatedtype Beta: Gamma // expected-error{{type may not reference itself as a requirement}}
+  associatedtype Beta: Gamma
 }
 
 protocol Gamma {
-  associatedtype Delta: Alpha // expected-error{{type may not reference itself as a requirement}}
+  associatedtype Delta: Alpha
 }
 
 // FIXME: Redundancy diagnostics are odd here.
@@ -111,7 +111,7 @@ protocol AsExistentialAssocTypeAgainB {
 
 // SR-547
 protocol A {
-    associatedtype B1: B // expected-error{{type may not reference itself as a requirement}}
+    associatedtype B1: B
     associatedtype C1: C
     
     mutating func addObserver(_ observer: B1, forProperty: C1)
@@ -122,7 +122,7 @@ protocol C {
 }
 
 protocol B {
-    associatedtype BA: A // expected-error{{type may not reference itself as a requirement}}
+    associatedtype BA: A
     associatedtype BC: C
     
     func observeChangeOfProperty(_ property: BC, observable: BA)

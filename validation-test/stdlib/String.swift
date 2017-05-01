@@ -314,13 +314,6 @@ StringTests.test("ForeignIndexes/removeSubrange/OutOfBoundsTrap/2") {
   acceptor.removeSubrange(r)
 }
 
-StringTests.test("_splitFirst") {
-  var (before, after, found) = "foo.bar"._splitFirst(separator: ".")
-  expectTrue(found)
-  expectEqual("foo", before)
-  expectEqual("bar", after)
-}
-
 StringTests.test("hasPrefix")
   .skip(.nativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
   .code {
@@ -1251,9 +1244,9 @@ internal func decodeCString<
   C : UnicodeCodec
 >(_ s: String, as codec: C.Type)
 -> (result: String, repairsMade: Bool)?
-where C.CodeUnit : UnsignedInteger {
+where C.CodeUnit : FixedWidthInteger {
   let units = s.unicodeScalars.map({ $0.value }) + [0]
-  return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
+  return units.map({ C.CodeUnit($0) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
   }
 }

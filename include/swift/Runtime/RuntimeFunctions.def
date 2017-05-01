@@ -1069,10 +1069,11 @@ FUNCTION(IsOptionalType,
          ATTRS(NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
-//                 void (*function_code)(RefCounted*));
+//                 void (*function_code)(RefCounted*),
+//                 void *context);
 FUNCTION(Once, swift_once, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(OnceTy->getPointerTo(), Int8PtrTy),
+         ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
          ATTRS())
 
 // void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
@@ -1086,6 +1087,18 @@ FUNCTION(RegisterTypeMetadataRecords,
          swift_registerTypeMetadataRecords, DefaultCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
+FUNCTION(BeginAccess, swift_beginAccess, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_endAccess(ValueBuffer *scratch);
+FUNCTION(EndAccess, swift_endAccess, DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(getFixedBufferTy()->getPointerTo()),
          ATTRS(NoUnwind))
 
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, DefaultCC,
@@ -1197,6 +1210,11 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
 FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)

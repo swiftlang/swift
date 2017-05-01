@@ -141,7 +141,7 @@ CharacterTests.test("sizeof") {
   let size1 = MemoryLayout<Character>.size
   expectTrue(size1 == 8 || size1 == 9)
 
-  var a: Character = "a"
+  let a: Character = "a"
   let size2 = MemoryLayout.size(ofValue: a)
   expectTrue(size2 == 8 || size2 == 9)
 
@@ -156,6 +156,47 @@ CharacterTests.test("Hashable") {
   ] {
     checkHashable(characters, equalityOracle: { $0 == $1 })
   }
+}
+
+CharacterTests.test("CR-LF") {
+  let asciiString = "qwerty\r\n"
+  let asciiString_rev = "\r\nytrewq"
+  expectEqual(asciiString.characters.count, asciiString_rev.characters.count)
+  expectEqualSequence(asciiString.characters.reversed(), asciiString_rev.characters)
+
+  // Mixed form
+  let utf16String = "a\u{03B2}c\r\nd\u{03B5}f"
+  let utf16String_rev = "f\u{03B5}d\r\nc\u{03B2}a"
+  expectEqual(utf16String.characters.count, utf16String_rev.characters.count)
+  expectEqualSequence(utf16String.characters.reversed(), utf16String_rev.characters)
+
+  // Substrings
+  let asciiString_sub = asciiString[asciiString.index(after: asciiString.startIndex)..<asciiString.endIndex]
+  let asciiString_rev_sub = asciiString_rev[asciiString_rev.startIndex..<asciiString_rev.index(before:asciiString_rev.endIndex)]
+  expectEqual(asciiString_sub.characters.count, asciiString_rev_sub.characters.count)
+  expectEqual(asciiString_sub.characters.count, asciiString.characters.count-1)
+  expectEqualSequence(asciiString_sub.characters.reversed(), asciiString_rev_sub.characters)
+
+  let utf16String_sub = utf16String[utf16String.index(after: utf16String.startIndex)..<utf16String.endIndex]
+  let utf16String_rev_sub = utf16String_rev[utf16String_rev.startIndex..<utf16String_rev.index(before: utf16String_rev.endIndex)]
+  expectEqual(utf16String_sub.characters.count, utf16String_rev_sub.characters.count)
+  expectEqual(utf16String_sub.characters.count, utf16String.characters.count-1)
+  expectEqualSequence(utf16String_sub.characters.reversed(), utf16String_rev_sub.characters)
+
+  // Character view slices where the indices are invalid as subsequence-relative offsets
+  let asciiString_final = "ty\r\n"
+  let asciiString_final_rev = "\r\nyt"
+  let finalASCIICharacters = asciiString.characters[asciiString.characters.index(asciiString.characters.endIndex, offsetBy: -3)..<asciiString.characters.endIndex]
+  expectEqualSequence(finalASCIICharacters, asciiString_final.characters)
+  expectEqualSequence(finalASCIICharacters.reversed(), asciiString_final_rev.characters)
+
+  let unicodeAlphabetString = "abcdefgあいうえおαβγ\r\n"
+  let unicodeAlphabetString_final = "βγ\r\n"
+  let unicodeAlphabetString_final_rev = "\r\nγβ"
+  let finalAlphaCharacters = unicodeAlphabetString.characters[unicodeAlphabetString.characters.index(unicodeAlphabetString.characters.endIndex, offsetBy: -3)..<unicodeAlphabetString.characters.endIndex]
+  expectEqualSequence(finalAlphaCharacters, unicodeAlphabetString_final.characters)
+  expectEqualSequence(finalAlphaCharacters.reversed(), unicodeAlphabetString_final_rev.characters)
+
 }
 
 /// Test that a given `String` can be transformed into a `Character` and back

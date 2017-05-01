@@ -37,6 +37,7 @@ enum class InoutAliasingAssumption {
 struct SILArgumentConvention {
   enum ConventionType : uint8_t {
     Indirect_In,
+    Indirect_In_Constant,
     Indirect_In_Guaranteed,
     Indirect_Inout,
     Indirect_InoutAliasable,
@@ -54,6 +55,9 @@ struct SILArgumentConvention {
     switch (Conv) {
     case ParameterConvention::Indirect_In:
       Value = SILArgumentConvention::Indirect_In;
+      return;
+    case ParameterConvention::Indirect_In_Constant:
+      Value = SILArgumentConvention::Indirect_In_Constant;
       return;
     case ParameterConvention::Indirect_Inout:
       Value = SILArgumentConvention::Indirect_Inout;
@@ -90,6 +94,7 @@ struct SILArgumentConvention {
   bool isNotAliasedIndirectParameter(InoutAliasingAssumption isInoutAliasing) {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Indirect_In_Guaranteed:
       return true;

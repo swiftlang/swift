@@ -165,7 +165,7 @@ extension MutableCollection {
     var i = index(after: pivot)
     while i < endIndex {
       if try !belongsInSecondPartition(self[i]) {
-        swap(&self[i], &self[pivot])
+        swapAt(i, pivot)
         formIndex(after: &pivot)
       }
       formIndex(after: &i)
@@ -217,7 +217,7 @@ extension MutableCollection where Self : BidirectionalCollection {
         break Loop
       } while false
 
-      swap(&self[lo], &self[hi])
+      swapAt(lo, hi)
       formIndex(after: &lo)
     }
 
@@ -389,7 +389,7 @@ extension MutableCollection
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: startIndex..<endIndex)
+      _introSort(&self, subRange: startIndex..<endIndex, by: <)
     }
   }
 }

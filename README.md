@@ -54,7 +54,7 @@ discussed below.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
-For macOS, you need [Xcode 8.3](https://developer.apple.com/xcode/downloads/).
+For macOS, you need [Xcode 8.3.2](https://developer.apple.com/xcode/downloads/).
 
 For Ubuntu, you'll need the following development dependencies:
 
@@ -90,7 +90,7 @@ uploading SSH keys to GitHub):
     ./swift/utils/update-checkout --clone-with-ssh
 
 #### CMake
-[CMake](http://cmake.org) is the core infrastructure used to configure builds of
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of
 Swift and its companion projects; at least version 3.4.3 is required. Your
 favorite Linux distribution likely already has a CMake package you can install.
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
@@ -120,7 +120,7 @@ it next to the other projects and it will be bootstrapped automatically:
 
 #### Install via third-party packaging tool (macOS only)
 
-**[Homebrew](http://brew.sh/)**
+**[Homebrew](https://brew.sh/)**
 
     brew install cmake ninja
 

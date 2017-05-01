@@ -165,9 +165,6 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// \brief Enable classes to appear in protocol composition types.
-    bool EnableExperimentalSubclassExistentials = false;
-
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
@@ -216,6 +213,9 @@ namespace swift {
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
     bool WarnSwift3ObjCInference = false;
+    
+    /// Enable keypaths.
+    bool EnableExperimentalKeyPaths = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

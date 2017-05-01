@@ -67,6 +67,7 @@ namespace  {
     DumpSwiftModules,
     CompareSDKs,
     DiagnoseSDKs,
+    DeserializeDiffItems,
   };
 } // end anonymous namespace
 
@@ -128,7 +129,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Compare SDK content in JSON file"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
-                     "Diagnose SDK content in JSON file")));
+                     "Diagnose SDK content in JSON file"),
+          clEnumValN(ActionType::DeserializeDiffItems,
+                     "deserialize-diff",
+                     "Deserialize diff items in a JSON file")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
@@ -147,6 +151,9 @@ IgnoreRemovedDeclUSRs("ignored-usrs",
 static llvm::cl::opt<std::string>
 SwiftVersion("swift-version",
              llvm::cl::desc("The Swift compiler version to invoke"));
+
+static llvm::cl::opt<bool>
+OutputInJson("json", llvm::cl::desc("Print output in JSON format."));
 } // namespace options
 
 namespace {
@@ -766,10 +773,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   for (auto Pair : *Node) {
     switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
     case KeyKind::KK_kind:
-      Kind = llvm::StringSwitch<SDKNodeKind>(GetScalarString(Pair.getValue()))
-#define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
-#include "swift/IDE/DigesterEnums.def"
-      ;
+      Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
       break;
     case KeyKind::KK_name:
       Info.Name = GetScalarString(Pair.getValue());
@@ -1343,14 +1347,6 @@ namespace swift {
   // In the namespace of swift::json, we define several functions so that the
   // JSON serializer will know how to interpret and dump types defined in this
   // file.
-  template<>
-    struct ScalarEnumerationTraits<SDKNodeKind> {
-      static void enumeration(Output &out, SDKNodeKind &value) {
-#define NODE_KIND(X) out.enumCase(value, #X, SDKNodeKind::X);
-#include "swift/IDE/DigesterEnums.def"
-      }
-    };
-
     template<>
     struct ScalarEnumerationTraits<TypeAttrKind> {
       static void enumeration(Output &out, TypeAttrKind &value) {
@@ -2329,7 +2325,7 @@ public:
   }
 };
 
-typedef std::vector<DiffItem> DiffVector;
+typedef std::vector<CommonDiffItem> DiffVector;
 
 typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
 
@@ -2760,15 +2756,17 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   switch(Anno) {
   case NodeAnnotation::Removed: {
     if (auto *Added = findAddedDecl(Node)) {
-      MovedDecls.Diags.emplace_back(Node->getDeclKind(),
-                                    Added->getDeclKind(),
-                                    Node->getFullyQualifiedName(),
-                                    Added->getFullyQualifiedName());
-    } else {
-      RemovedDecls.Diags.emplace_back(Node->getDeclKind(),
+      if (Node->getDeclKind() != DeclKind::Constructor) {
+        MovedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                      Added->getDeclKind(),
                                       Node->getFullyQualifiedName(),
-                                      Node->isDeprecated());
+                                      Added->getFullyQualifiedName());
+        return;
+      }
     }
+    RemovedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                    Node->getFullyQualifiedName(),
+                                    Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
@@ -2842,11 +2840,12 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
       Descriptor = isa<SDKNodeAbstractFunc>(Parent) ?
         SDKNodeAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
         Ctx.buffer("declared");
-      TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
-                                          Parent->getFullyQualifiedName(),
-                                          Node->getPrintedName(),
-                                          Count->getPrintedName(),
-                                          Descriptor);
+      if (Node->getPrintedName() != Count->getPrintedName())
+        TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
+                                            Parent->getFullyQualifiedName(),
+                                            Node->getPrintedName(),
+                                            Count->getPrintedName(),
+                                            Descriptor);
       break;
     default:
       break;
@@ -3068,7 +3067,8 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   RefinementPass.pass(LeftModule, RightModule);
   DiffVector AllItems;
   DiffItemEmitter::collectDiffItems(LeftModule, AllItems);
-  AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(), [&](DiffItem &Item) {
+  AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
+                                [&](CommonDiffItem &Item) {
     return Item.DiffKind == NodeAnnotation::RemovedDecl &&
       IgnoredRemoveUsrs.find(Item.LeftUsr) != IgnoredRemoveUsrs.end();
   }), AllItems.end());
@@ -3082,7 +3082,23 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
 
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
-
+  if (options::OutputInJson) {
+    std::vector<APIDiffItem*> TotalItems;
+    std::transform(AllItems.begin(), AllItems.end(),
+                   std::back_inserter(TotalItems),
+                   [](CommonDiffItem &Item) { return &Item; });
+    std::transform(typeMemberDiffs.begin(), typeMemberDiffs.end(),
+                   std::back_inserter(TotalItems),
+                   [](TypeMemberDiffItem &Item) { return &Item; });
+    std::transform(AllNoEscapingFuncs.begin(), AllNoEscapingFuncs.end(),
+                   std::back_inserter(TotalItems),
+                   [](NoEscapeFuncParam &Item) { return &Item; });
+    std::transform(Overloads.begin(), Overloads.end(),
+                   std::back_inserter(TotalItems),
+                   [](OverloadedFuncInfo &Item) { return &Item; });
+    APIDiffItemStore::serialize(Fs, TotalItems);
+    return 0;
+  }
   serializeDiffs(Fs, AllItems);
   serializeDiffs(Fs, typeMemberDiffs);
   serializeDiffs(Fs, AllNoEscapingFuncs);
@@ -3309,6 +3325,15 @@ static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs) {
   readFileLineByLine(Path, IgnoredUsrs);
 }
 
+static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
+  APIDiffItemStore Store;
+  Store.addStorePath(DiffPath);
+  std::error_code EC;
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  APIDiffItemStore::serialize(FS, Store.getAllDiffItems());
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   INITIALIZE_LLVM(argc, argv);
 
@@ -3344,6 +3369,13 @@ int main(int argc, char *argv[]) {
     else
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1]);
+  case ActionType::DeserializeDiffItems: {
+    if (options::SDKJsonPaths.size() != 1) {
+      llvm::cl::PrintHelpMessage();
+      return 1;
+    }
+    return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+  }
   case ActionType::None:
     llvm::errs() << "Action required\n";
     llvm::cl::PrintHelpMessage();

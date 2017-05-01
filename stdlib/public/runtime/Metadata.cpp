@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
@@ -1381,6 +1382,9 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     case sizeWithAlignmentMask(32, 31):
       commonVWT = &VALUE_WITNESS_SYM(Bi256_);
       break;
+    case sizeWithAlignmentMask(64, 63):
+      commonVWT = &VALUE_WITNESS_SYM(Bi512_);
+      break;
     }
     
   #define INSTALL_POD_COMMON_WITNESS(NAME) vwtable->NAME = commonVWT->NAME;
@@ -2081,10 +2085,16 @@ public:
   }
 
   static size_t getExtraAllocationSize(Key key) {
-    return sizeof(const ProtocolDescriptor *) * key.NumProtocols;
+    return (sizeof(const ProtocolDescriptor *) * key.NumProtocols +
+            (key.SuperclassConstraint != nullptr
+             ? sizeof(const Metadata *)
+             : 0));
   }
   size_t getExtraAllocationSize() const {
-    return sizeof(const ProtocolDescriptor *) * Data.Protocols.NumProtocols;
+    return (sizeof(const ProtocolDescriptor *) * Data.Protocols.NumProtocols +
+            (Data.Flags.hasSuperclassConstraint()
+             ? sizeof(const Metadata *)
+             : 0));
   }
 };
 
@@ -2544,9 +2554,18 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
     .withNumWitnessTables(numWitnessTables)
     .withClassConstraint(key.ClassConstraint)
     .withSpecialProtocol(special);
-  // FIXME
-  //Data.Superclass = key.superclassConstraint;
-  assert(!key.SuperclassConstraint);
+
+  if (key.SuperclassConstraint != nullptr) {
+    Data.Flags = Data.Flags.withHasSuperclass(true);
+
+    // Get a pointer to tail-allocated storage for this metadata record.
+    auto Pointer = reinterpret_cast<
+      const Metadata **>(&Data + 1);
+
+    // The superclass immediately follows the list of protocol descriptors.
+    Pointer[key.NumProtocols] = key.SuperclassConstraint;
+  }
+
   Data.Protocols.NumProtocols = key.NumProtocols;
   for (size_t i = 0; i < key.NumProtocols; ++i)
     Data.Protocols[i] = key.Protocols[i];

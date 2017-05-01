@@ -66,9 +66,6 @@ public:
 
     /// Compile and execute the inputs immediately
     Immediate,
-
-    /// Invoke swift-update with the compiler frontend options.
-    UpdateCode,
   };
 
   /// The mode in which the driver should invoke the frontend.
@@ -98,9 +95,6 @@ public:
   /// Whether the compiler picked the current module name, rather than the user.
   bool ModuleNameIsFallback = false;
 
-  // Whether the driver should generate compiler fixits as source edits.
-  bool ShouldGenerateFixitEdits = false;
-  
   /// The number of threads for multi-threaded compilation.
   unsigned numThreads = 0;
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 

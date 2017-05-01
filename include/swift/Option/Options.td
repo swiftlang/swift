@@ -199,6 +199,16 @@ def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 
+def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit a JSON file containing information about what modules were loaded">;
+def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-path">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit the loaded module trace JSON to <path>">,
+  MetaVarName<"<path>">;
+def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_loaded_module_trace_path>;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Serialize diagnostics in a binary format">;
@@ -404,6 +414,55 @@ def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
+// Migrator Options
+
+def update_code : Flag<["-"], "update-code">,
+  HelpText<"Update Swift code">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
+def migrate_keep_objc_visibility: Flag<["-"], "migrate-keep-objc-visibility">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When migrating, add '@objc' to declarations that would've been implicitly visible in Swift 3">;
+
+def disable_migrator_fixits: Flag<["-"], "disable-migrator-fixits">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Disable the Migrator phase which automatically applies fix-its">;
+
+def emit_remap_file_path: Separate<["-"], "emit-remap-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the replacement map describing Swift Migrator changes to <path>">,
+  MetaVarName<"<path>">;
+
+def emit_migrated_file_path: Separate<["-"], "emit-migrated-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the migrated source file to <path>">,
+  MetaVarName<"<path>">;
+
+def dump_migration_states_dir: Separate<["-"], "dump-migration-states-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the input text, output text, and states for migration to <path>">,
+  MetaVarName<"<path>">;
+
+def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
+def dump_usr: Flag<["-"], "dump-usr">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Dump USR for each declaration reference">;
+
+// FIXME: Remove these once Xcode stops appending these flags.
+// rdar://problem/31844718
+
+def migrator_update_sdk: Flag<["-"], "migrator-update-sdk">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
+
+def migrator_update_swift: Flag<["-"], "migrator-update-swift">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
@@ -463,13 +522,6 @@ def c : Flag<["-"], "c">, Alias<emit_object>,
 def S: Flag<["-"], "S">, Alias<emit_assembly>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 
-def update_code : Flag<["-"], "update-code">,
-  HelpText<"Update Swift code">, ModeOpt,
-  Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
-def fixit_code : Flag<["-"], "fixit-code">,
-  HelpText<"Get compiler fixits as code edits">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def fixit_all : Flag<["-"], "fixit-all">,
   HelpText<"Apply all fixits from diagnostics without any filtering">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

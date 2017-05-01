@@ -72,7 +72,7 @@ public struct _stdlib_ShardedAtomicCounter {
 
     public mutating func randomInt() -> Int {
       var result = 0
-      for _ in 0..<Int._sizeInBits {
+      for _ in 0..<Int.bitWidth {
         result = (result << 1) | (_state & 1)
         _state = (_state >> 1) ^ (-(_state & 1) & Int(bitPattern: 0xD0000001))
       }

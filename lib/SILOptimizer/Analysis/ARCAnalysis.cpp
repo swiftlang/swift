@@ -788,7 +788,7 @@ isOneOfConventions(SILArgumentConvention Convention,
 void
 ConsumedArgToEpilogueReleaseMatcher::
 collectMatchingDestroyAddresses(SILBasicBlock *BB) {
-  // Check if we can find destory_addr for each @in argument.
+  // Check if we can find destroy_addr for each @in argument.
   SILFunction::iterator AnotherEpilogueBB =
       (Kind == ExitKind::Return) ? F->findThrowBB() : F->findReturnBB();
   for (auto Arg : F->begin()->getFunctionArguments()) {
@@ -910,7 +910,7 @@ collectMatchingReleases(SILBasicBlock *BB) {
   }
 
   if (IsTrackingInArgs) {
-    // Find destory_addr for each @in argument.
+    // Find destroy_addr for each @in argument.
     collectMatchingDestroyAddresses(BB);
   }
 }

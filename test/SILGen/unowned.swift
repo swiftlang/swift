@@ -42,8 +42,8 @@ func test0(c c: C) {
 
   var a: A
   // CHECK:   [[A1:%.*]] = alloc_box ${ var A }, var, name "a"
-  // CHECK:   [[PBA:%.*]] = project_box [[A1]]
-  // CHECK:   [[A:%.*]] = mark_uninitialized [var] [[PBA]]
+  // CHECK:   [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
+  // CHECK:   [[PBA:%.*]] = project_box [[MARKED_A1]]
 
   unowned var x = c
   // CHECK:   [[X:%.*]] = alloc_box ${ var @sil_unowned C }
@@ -59,7 +59,8 @@ func test0(c c: C) {
   a.x = c
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK:   [[T1:%.*]] = struct_element_addr [[A]] : $*A, #A.x
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
+  // CHECK:   [[T1:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C
   // CHECK:   unowned_retain [[T2]] : $@sil_unowned C
   // CHECK:   assign [[T2]] to [[T1]] : $*@sil_unowned C
@@ -67,16 +68,18 @@ func test0(c c: C) {
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
   a.x = x
-  // CHECK:   [[T2:%.*]] = load [take] [[PBX]] : $*@sil_unowned C     
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
+  // CHECK:   [[T2:%.*]] = load [take] [[READ]] : $*@sil_unowned C     
   // CHECK:   strong_retain_unowned  [[T2]] : $@sil_unowned C  
   // CHECK:   [[T3:%.*]] = unowned_to_ref [[T2]] : $@sil_unowned C to $C
-  // CHECK:   [[XP:%.*]] = struct_element_addr [[A]] : $*A, #A.x
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
+  // CHECK:   [[XP:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T4:%.*]] = ref_to_unowned [[T3]] : $C to $@sil_unowned C
   // CHECK:   unowned_retain [[T4]] : $@sil_unowned C  
   // CHECK:   assign [[T4]] to [[XP]] : $*@sil_unowned C
   // CHECK:   destroy_value [[T3]] : $C
   // CHECK:   destroy_value [[X]]
-  // CHECK:   destroy_value [[A1]]
+  // CHECK:   destroy_value [[MARKED_A1]]
   // CHECK:   destroy_value [[ARG]]
 }
 // CHECK: } // end sil function '_T07unowned5test0yAA1CC1c_tF'

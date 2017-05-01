@@ -21,6 +21,7 @@ func foo2(_ a : inout [S1]) {
 import Swift
 func foo3(a: Float, b: Bool) {}
 
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=cursor -pos=3:18 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-OVERLAY %s
 // CHECK-OVERLAY:      source.lang.swift.ref.var.global
 // CHECK-OVERLAY-NEXT: NSUTF8StringEncoding

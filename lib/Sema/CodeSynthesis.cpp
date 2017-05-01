@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 using namespace swift;
@@ -242,11 +243,9 @@ bool needsToBeRegisteredAsExternalDecl(AbstractStorageDecl *storage) {
   if (storage->hasClangNode())
     return true;
 
-  // ...or it was synthesized into an imported type.
-  auto nominal = dyn_cast<NominalTypeDecl>(storage->getDeclContext());
-  if (!nominal)
-    return false;
-  return nominal->hasClangNode();
+  // ...or it was synthesized into an imported context.
+  const DeclContext *dc = storage->getDeclContext();
+  return isa<ClangModuleUnit>(dc->getModuleScopeContext());
 }
 
 /// Mark the accessor as transparent if we can.
@@ -1805,19 +1804,16 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // The conformance will be on the containing 'self' type, or '()' if the
       // property is in a non-type context.
       Type behaviorSelf;
-      Type behaviorInterfaceSelf;
       if (dc->isTypeContext()) {
-        behaviorInterfaceSelf = dc->getSelfInterfaceType();
-        behaviorSelf = dc->mapTypeIntoContext(behaviorInterfaceSelf);
+        behaviorSelf = dc->getSelfTypeInContext();
         assert(behaviorSelf && "type context doesn't have self type?!");
         if (var->isStatic())
           behaviorSelf = MetatypeType::get(behaviorSelf);
       } else {
-        behaviorSelf = behaviorInterfaceSelf = TC.Context.TheEmptyTupleType;
+        behaviorSelf = TC.Context.TheEmptyTupleType;
       }
       
       conformance = TC.Context.getBehaviorConformance(behaviorSelf,
-                                            behaviorInterfaceSelf,
                                             behaviorProto,
                                             behavior->getLoc(), var,
                                             ProtocolConformanceState::Checking);

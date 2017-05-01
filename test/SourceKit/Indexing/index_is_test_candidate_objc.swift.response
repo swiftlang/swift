@@ -30,6 +30,12 @@
           key.usr: "s:28index_is_test_candidate_objc8MyStructV0C63_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStructyyF",
           key.line: 12,
           key.column: 8
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_is_test_candidate_objc8MyStructVACycfc",
+          key.line: 11,
+          key.column: 8
         }
       ]
     },
@@ -38,7 +44,15 @@
       key.name: "XCTestCase",
       key.usr: "s:28index_is_test_candidate_objc10XCTestCaseC",
       key.line: 14,
-      key.column: 7
+      key.column: 7,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_is_test_candidate_objc10XCTestCaseCACycfc",
+          key.line: 14,
+          key.column: 7
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -69,7 +83,26 @@
           key.usr: "s:28index_is_test_candidate_objc14MyPrivateClass33_32FED72643814BE1A523406CD2E729AALLC0c47_startsWithTest_takesNoParams_returnsVoid_andIsG0yyF",
           key.line: 16,
           key.column: 8,
+          key.is_dynamic: 1,
           key.is_test_candidate: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_is_test_candidate_objc14MyPrivateClass33_32FED72643814BE1A523406CD2E729AALLCADycfc",
+          key.line: 15,
+          key.column: 43,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.constructor,
+              key.name: "init()",
+              key.usr: "s:28index_is_test_candidate_objc10XCTestCaseCACycfc"
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
+          ]
         }
       ],
       key.is_test_candidate: 1
@@ -102,7 +135,8 @@
           key.name: "doesNotStartWithTest()",
           key.usr: "s:28index_is_test_candidate_objc7MyClassC20doesNotStartWithTestyyF",
           key.line: 20,
-          key.column: 8
+          key.column: 8,
+          key.is_dynamic: 1
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -110,6 +144,7 @@
           key.usr: "s:28index_is_test_candidate_objc7MyClassC0C30_startsWithTest_butTakesAParamySi5param_tF",
           key.line: 21,
           key.column: 8,
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.struct,
@@ -126,6 +161,7 @@
           key.usr: "s:28index_is_test_candidate_objc7MyClassC0C50_startsWithTest_andTakesNoParams_butReturnsNonVoidSiyF",
           key.line: 22,
           key.column: 8,
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.struct,
@@ -142,6 +178,7 @@
           key.usr: "s:28index_is_test_candidate_objc7MyClassC0C54_startsWithTest_takesNoParams_returnsVoid_andIsPrivate33_32FED72643814BE1A523406CD2E729AALLyyF",
           key.line: 23,
           key.column: 16,
+          key.is_dynamic: 1,
           key.is_test_candidate: 1
         },
         {
@@ -150,6 +187,7 @@
           key.usr: "s:28index_is_test_candidate_objc7MyClassC0C41_startsWithTest_takesNoParams_returnsVoidyyF",
           key.line: 24,
           key.column: 8,
+          key.is_dynamic: 1,
           key.is_test_candidate: 1
         },
         {
@@ -158,7 +196,26 @@
           key.usr: "s:28index_is_test_candidate_objc7MyClassC0C51_startsWithTest_takesNoParams_returnsVoid_andThrowsyyKF",
           key.line: 25,
           key.column: 8,
+          key.is_dynamic: 1,
           key.is_test_candidate: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:28index_is_test_candidate_objc7MyClassCACycfc",
+          key.line: 19,
+          key.column: 35,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.constructor,
+              key.name: "init()",
+              key.usr: "s:28index_is_test_candidate_objc10XCTestCaseCACycfc"
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.override
+            }
+          ]
         }
       ],
       key.is_test_candidate: 1

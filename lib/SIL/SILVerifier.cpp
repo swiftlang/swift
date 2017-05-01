@@ -60,7 +60,7 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
-static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
+static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   if (!A->getOpenedExistentialType().isNull())
     return true;
 
@@ -165,6 +165,22 @@ public:
   }
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
+
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireAddressType(SILType type, const Twine &valueDescription,
+                      const char *typeName) {
+    _require(type.isAddress(), valueDescription + " must be an address");
+    auto result = type.getAs<T>();
+    _require(bool(result), valueDescription + " must have type " + typeName);
+    return result;
+  }
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _requireAddressType(SILValue value, const Twine &valueDescription,
+                     const char *typeName) {
+    return _requireAddressType<T>(value->getType(), valueDescription, typeName);
+  }
+#define requireAddressType(type, value, valueDescription) \
+  _requireAddressType<type>(value, valueDescription, #type)
 
   template <class T>
   typename CanTypeWrapperTraits<T>::type
@@ -809,6 +825,19 @@ public:
     require(fnTy->isPolymorphic(),
             "callee of apply with substitutions must be polymorphic");
 
+    // Each archetype occurring in the substitutions list should belong to the
+    // current function.
+    for (auto sub : subs) {
+      sub.getReplacement()->getCanonicalType().visit([&](CanType t) {
+        auto A = dyn_cast<ArchetypeType>(t);
+        if (!A)
+          return;
+        require(isArchetypeValidInFunction(A, &F),
+                "Replacment type of a substitution contains an ArchetypeType "
+                "that does not exist in the Caller's generic param list.");
+      });
+    }
+
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs);
   }
@@ -1253,23 +1282,11 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
-    require(F.hasAccessMarkers(), "Unexpected begin_access");
-
     auto op = BAI->getOperand();
     requireSameType(BAI->getType(), op->getType(),
                     "result must be same type as operand");
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
-
-    require(isa<GlobalAddrInst>(op) ||
-            isa<AllocStackInst>(op) ||
-            isa<ProjectBoxInst>(op) ||
-            isa<RefElementAddrInst>(op) ||
-            isa<PointerToAddressInst>(op) ||
-            isa<SILFunctionArgument>(op) ||
-            isa<BeginAccessInst>(op) ||
-            isa<MarkUninitializedInst>(op),
-            "begin_access operand must be a root address derivation");
 
     if (BAI->getModule().getStage() != SILStage::Raw) {
       require(BAI->getEnforcement() != SILAccessEnforcement::Unknown,
@@ -1290,8 +1307,6 @@ public:
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
-    require(F.hasAccessMarkers(), "Unexpected end_access");
-
     auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
     require(BAI != nullptr,
             "operand of end_access must be a begin_access");
@@ -1301,6 +1316,22 @@ public:
               BAI->getAccessKind() == SILAccessKind::Deinit,
               "aborting access must apply to init or deinit");
     }
+  }
+
+  void checkBeginUnpairedAccessInst(BeginUnpairedAccessInst *I) {
+    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+            "unpaired access can never use unknown enforcement");
+    require(I->getSource()->getType().isAddress(),
+            "address operand must have address type");
+    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+                       "scratch buffer operand");
+  }
+
+  void checkEndUnpairedAccessInst(EndUnpairedAccessInst *I) {
+    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+            "unpaired access can never use unknown enforcement");
+    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+                       "scratch buffer operand");
   }
 
   void checkStoreInst(StoreInst *SI) {
@@ -1415,9 +1446,17 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
-            "mark_uninitialized must be an address or class");
+                Src->getType()
+                    .getSwiftRValueType()
+                    ->getClassOrBoundGenericClass() ||
+                Src->getType().getAs<SILBoxType>(),
+            "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+#if 0
+    // This will be turned back on in a couple of commits.
+    require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
+            "Mark Uninitialized should always be on the storage location");
+#endif
   }
   
   void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
@@ -1485,6 +1524,13 @@ public:
             "retain_value is only in functions with unqualified ownership");
   }
 
+  void checkRetainValueAddrInst(RetainValueAddrInst *I) {
+    require(I->getOperand()->getType().isAddress(),
+            "Source value should be an address value");
+    require(F.hasUnqualifiedOwnership(),
+            "retain_value is only in functions with unqualified ownership");
+  }
+
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -1517,7 +1563,14 @@ public:
     require(F.hasUnqualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
-  
+
+  void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
+    require(I->getOperand()->getType().isAddress(),
+            "Source value should be an address value");
+    require(F.hasUnqualifiedOwnership(),
+            "release_value is only in functions with unqualified ownership");
+  }
+
   void checkAutoreleaseValueInst(AutoreleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -1888,9 +1941,19 @@ public:
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
       verifyOpenedArchetype(AI,
                    AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
+    }
+
+    // An alloc_box with a mark_uninitialized user can not have any other users.
+    require(none_of(AI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isa<MarkUninitializedInst>(Op->getUser());
+                    }) ||
+                AI->hasOneUse(),
+            "An alloc_box with a mark_uninitialized user can not have any "
+            "other users.");
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
@@ -2174,7 +2237,7 @@ public:
     
     require(getDynamicMethodType(operandType, EMI->getMember())
               .getSwiftRValueType()
-              ->isBindableTo(EMI->getType().getSwiftRValueType(), nullptr),
+              ->isBindableTo(EMI->getType().getSwiftRValueType()),
             "result must be of the method's type");
     verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
   }
@@ -2280,6 +2343,7 @@ public:
 
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_In_Constant:
       case SILArgumentConvention::Indirect_Inout:
       case SILArgumentConvention::Indirect_InoutAliasable:
         return true;
@@ -2651,7 +2715,7 @@ public:
     }
 
     if (layout.superclass) {
-      require(layout.superclass->isExactSuperclassOf(concreteType, nullptr),
+      require(layout.superclass->isExactSuperclassOf(concreteType),
               "init_existential of subclass existential with wrong type");
     }
 
@@ -2944,10 +3008,10 @@ public:
       
       if (instClass->usesObjCGenericsModel()) {
         require(instClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(opInstTy, nullptr),
+                  ->isBindableToSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
-        require(instTy->isExactSuperclassOf(opInstTy, nullptr),
+        require(instTy->isExactSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
       }
       return;
@@ -2977,8 +3041,7 @@ public:
             "upcast must convert a class instance to a class type");
       if (ToClass->usesObjCGenericsModel()) {
         require(ToClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType(),
-                                             nullptr),
+                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType()),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
         require(ToTy.isExactSuperclassOf(FromTy),
@@ -3517,7 +3580,7 @@ public:
     auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
     require(getDynamicMethodType(operandType, DMBI->getMember())
               .getSwiftRValueType()
-              ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
+              ->isBindableTo(bbArgTy.getSwiftRValueType()),
             "bb argument for dynamic_method_br must be of the method's type");
   }
 
@@ -3625,6 +3688,90 @@ public:
     require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
             "objc_metatype_to_object must produce an AnyObject value");
   }
+  
+  void checkKeyPathInst(KeyPathInst *KPI) {
+    auto kpTy = KPI->getType();
+    
+    require(kpTy.isObject(), "keypath result must be an object type");
+    
+    auto kpBGT = kpTy.getAs<BoundGenericType>();
+    require(kpBGT, "keypath result must be a generic type");
+    auto &C = F.getASTContext();
+    require(kpBGT->getDecl() == C.getKeyPathDecl()
+            || kpBGT->getDecl() == C.getWritableKeyPathDecl()
+            || kpBGT->getDecl() == C.getReferenceWritableKeyPathDecl(),
+            "keypath result must be a key path type");
+    
+    auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
+    auto pattern = KPI->getPattern();
+    SubstitutionMap patternSubs;
+    if (pattern->getGenericSignature())
+      patternSubs = pattern->getGenericSignature()
+                           ->getSubstitutionMap(KPI->getSubstitutions());
+    require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
+            "keypath root type should match root type of keypath pattern");
+
+    auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
+    require(leafTy == pattern->getValueType().subst(patternSubs)->getCanonicalType(),
+            "keypath value type should match value type of keypath pattern");
+    
+    {
+      Lowering::GenericContextScope scope(F.getModule().Types,
+                                          pattern->getGenericSignature());
+      
+      for (auto &component : pattern->getComponents()) {
+        auto loweredBaseTy =
+          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             baseTy);
+        auto componentTy = component.getComponentType().subst(patternSubs)
+          ->getCanonicalType();
+        auto loweredComponentTy =
+          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             componentTy);
+        
+        switch (auto kind = component.getKind()) {
+        case KeyPathPatternComponent::Kind::StoredProperty: {
+          auto property = component.getStoredPropertyDecl();
+          require(property->getDeclContext()
+                   == baseTy->getAnyNominal(),
+                  "property decl should be a member of the component base type");
+          switch (property->getStorageKind()) {
+          case AbstractStorageDecl::Stored:
+          case AbstractStorageDecl::StoredWithObservers:
+          case AbstractStorageDecl::StoredWithTrivialAccessors:
+            break;
+          case AbstractStorageDecl::Addressed:
+          case AbstractStorageDecl::AddressedWithObservers:
+          case AbstractStorageDecl::AddressedWithTrivialAccessors:
+          case AbstractStorageDecl::Computed:
+          case AbstractStorageDecl::ComputedWithMutableAddress:
+          case AbstractStorageDecl::InheritedWithObservers:
+            require(false, "property must be stored");
+          }
+          auto propertyTy = loweredBaseTy.getFieldType(property, F.getModule());
+          require(propertyTy.getObjectType()
+                    == loweredComponentTy.getObjectType(),
+                  "component type should match the maximal abstraction of the "
+                  "formal type");
+          break;
+        }
+          
+        case KeyPathPatternComponent::Kind::GettableProperty:
+        case KeyPathPatternComponent::Kind::SettableProperty: {
+          require(component.getComputedPropertyIndices().empty(),
+                  "subscripts not implemented");
+
+          // TODO: Verify the signatures of the getter and setter
+          break;
+        }
+        }
+        
+        baseTy = componentTy;
+      }
+    }
+    require(CanType(baseTy) == CanType(leafTy),
+            "final component should match leaf value type of key path type");
+  }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
@@ -3688,6 +3835,7 @@ public:
                          default:
                            return false;
                          case ParameterConvention::Indirect_In:
+                         case ParameterConvention::Indirect_In_Constant:
                          case ParameterConvention::Indirect_Inout:
                          case ParameterConvention::Indirect_InoutAliasable:
                          case ParameterConvention::Indirect_In_Guaranteed:

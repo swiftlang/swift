@@ -2,7 +2,8 @@
 
 // SR-139:
 // Infinite recursion parsing bitwise operators
-let x = UInt32(0x1FF)&0xFF << 24 | UInt32(0x1FF)&0xFF << 16 | UInt32(0x1FF)&0xFF << 8 | (UInt32(0x1FF)&0xFF);
+// FIXME: SR-4714 tracks re-enabling this
+// let x = UInt32(0x1FF)&0xFF << 24 | UInt32(0x1FF)&0xFF << 16 | UInt32(0x1FF)&0xFF << 8 | (UInt32(0x1FF)&0xFF);
 
 // SR-838:
 // expression test_seconds() was too complex to be solved in reasonable time
@@ -93,7 +94,7 @@ func sr1794(pt: P, p0: P, p1: P) -> Bool {
 let v1 = (1 - 2 / 3 * 6) as UInt
 let v2 = (([1 + 2 * 3, 4, 5])) as [UInt]
 let v3 = ["hello": 1 + 2, "world": 3 + 4 + 5 * 3] as Dictionary<String, UInt>
-// expected-error@-1 {{ambiguous use of operator '+'}}
+// expected-warning@-1 {{mixed-type arithmetics}}
 let v4 = [1 + 2 + 3, 4] as [UInt32] + [2 * 3] as [UInt32]
 let v5 = ([1 + 2 + 3, 4] as [UInt32]) + ([2 * 3] as [UInt32])
 let v6 = [1 + 2 + 3, 4] as Set<UInt32>

@@ -102,7 +102,7 @@ class CursorInfoTest : public ::testing::Test {
 public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
 
-  void SetUp() {
+  void SetUp() override {
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
     llvm::InitializeAllAsmPrinters();

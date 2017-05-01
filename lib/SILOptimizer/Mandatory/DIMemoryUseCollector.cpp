@@ -599,6 +599,19 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   }
 }
 
+/// Return the underlying accessed pointer value. This peeks through
+/// begin_access patterns such as:
+///
+/// %mark = mark_uninitialized [rootself] %alloc : $*T
+/// %access = begin_access [modify] [unknown] %mark : $*T
+/// apply %f(%access) : $(@inout T) -> ()
+static SILValue getAccessedPointer(SILValue Pointer) {
+  if (auto *Access = dyn_cast<BeginAccessInst>(Pointer))
+    return Access->getSource();
+
+  return Pointer;
+}
+
 /// Returns true when the instruction represents added instrumentation for
 /// run-time sanitizers.
 static bool isSanitizerInstrumentation(SILInstruction *Instruction,
@@ -782,6 +795,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
@@ -794,8 +808,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
         auto Kind = DIUseKind::InOutUse;
-        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf()) &&
-            Pointer == TheMemory.getAddress())
+        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf())
+            && getAccessedPointer(Pointer) == TheMemory.getAddress())
           Kind = DIUseKind::Escape;
  
         addElementUses(BaseEltNo, PointeeType, User, Kind);

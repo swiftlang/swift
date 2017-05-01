@@ -169,6 +169,9 @@ struct ASTContext::Implementation {
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
+  /// func reserveCapacityForAppend(newElementsCount: Int)
+  FuncDecl *ArrayReserveCapacityDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -419,7 +422,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                            /*hasExplicitAnyObject=*/false)),
+                                            /*HasExplicitAnyObject=*/false)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -693,7 +696,7 @@ CanType ASTContext::getAnyObjectType() const {
 
   Impl.AnyObjectType = CanType(
     ProtocolCompositionType::get(
-      *this, {}, /*hasExplicitAnyObject=*/true));
+      *this, {}, /*HasExplicitAnyObject=*/true));
   return Impl.AnyObjectType;
 }
 
@@ -961,6 +964,68 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
         return nullptr;
 
       Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
+  if (Impl.ArrayReserveCapacityDecl)
+    return Impl.ArrayReserveCapacityDecl;
+
+  auto ReserveFunctions = getArrayDecl()->lookupDirect(
+                                   getIdentifier("reserveCapacityForAppend"));
+
+  for (auto CandidateFn : ReserveFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.reserve_capacity_for_append")
+        continue;
+
+      auto ParamLists = FnDecl->getParameterLists();
+      if (ParamLists.size() != 2)
+        return nullptr;
+      if (ParamLists[0]->size() != 1)
+        return nullptr;
+
+      InOutType *SelfInOutTy =
+        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
+      if (!SelfInOutTy)
+        return nullptr;
+
+      BoundGenericStructType *SelfGenericStructTy =
+        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      if (!SelfGenericStructTy)
+        return nullptr;
+      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+        return nullptr;
+
+      if (ParamLists[1]->size() != 1)
+        return nullptr;
+      StructType *IntType =
+        ParamLists[1]->get(0)->getInterfaceType()->getAs<StructType>();
+      if (!IntType)
+        return nullptr;
+
+      StructDecl *IntDecl = IntType->getDecl();
+      auto StoredProperties = IntDecl->getStoredProperties();
+      auto FieldIter = StoredProperties.begin();
+      if (FieldIter == StoredProperties.end())
+        return nullptr;
+      VarDecl *field = *FieldIter;
+      if (field->hasClangNode())
+        return nullptr;
+      if (!field->getInterfaceType()->is<BuiltinIntegerType>())
+        return nullptr;
+      if (std::next(FieldIter) != StoredProperties.end())
+        return nullptr;
+
+      if (!FnDecl->getResultInterfaceType()->isVoid())
+        return nullptr;
+
+      Impl.ArrayReserveCapacityDecl = FnDecl;
       return FnDecl;
     }
   }
@@ -1294,6 +1359,11 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
   // Create a new generic signature builder with the given signature.
   auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+
+  // Store this generic signature builder (no generic environment yet).
+  Impl.GenericSignatureBuilders[{sig, mod}] =
+    std::unique_ptr<GenericSignatureBuilder>(builder);
+
   builder->addGenericSignature(sig);
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
@@ -1351,10 +1421,6 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     llvm_unreachable("idempotency problem with a generic signature");
   }
 #endif
-
-  // Store this generic signature builder (no generic environment yet).
-  Impl.GenericSignatureBuilders[{sig, mod}] =
-    std::unique_ptr<GenericSignatureBuilder>(builder);
 
   return builder;
 }
@@ -1476,16 +1542,14 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 
 NormalProtocolConformance *
 ASTContext::getBehaviorConformance(Type conformingType,
-                                   Type conformingInterfaceType,
                                    ProtocolDecl *protocol,
                                    SourceLoc loc,
                                    AbstractStorageDecl *storage,
                                    ProtocolConformanceState state) {
   auto conformance = new (*this, AllocationArena::Permanent)
-    NormalProtocolConformance(conformingType, conformingInterfaceType,
-                              protocol, loc, storage, state);
+    NormalProtocolConformance(conformingType, protocol, loc, storage, state);
 
-  if (auto nominal = conformingInterfaceType->getAnyNominal()) {
+  if (auto nominal = conformingType->getRValueInstanceType()->getAnyNominal()) {
     // Note: this is an egregious hack. The conformances need to be associated
     // with the actual storage declarations.
     SmallVector<ProtocolConformance *, 2> conformances;
@@ -1528,7 +1592,7 @@ ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       SubstitutionList substitutions) {
   llvm::FoldingSetNodeID id;
-  SpecializedProtocolConformance::Profile(id, type, generic);
+  SpecializedProtocolConformance::Profile(id, type, generic, substitutions);
 
   // Figure out which arena this conformance should go into.
   AllocationArena arena = getArena(type->getRecursiveProperties());
@@ -3781,19 +3845,19 @@ ForeignRepresentationInfo
 ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                          ForeignLanguage language,
                                          const DeclContext *dc) {
-  if (Impl.ForeignRepresentableCache.empty()) {
-    // Local function to add a type with the given name and module as
-    // trivially-representable.
-    auto addTrivial = [&](Identifier name, ModuleDecl *module,
-                          bool allowOptional = false) {
-      if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
-        auto info = ForeignRepresentationInfo::forTrivial();
-        if (allowOptional)
-          info = ForeignRepresentationInfo::forTrivialWithOptional();
-        Impl.ForeignRepresentableCache.insert({type, info});
-      }
-    };
+  // Local function to add a type with the given name and module as
+  // trivially-representable.
+  auto addTrivial = [&](Identifier name, ModuleDecl *module,
+                        bool allowOptional = false) {
+    if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
+      auto info = ForeignRepresentationInfo::forTrivial();
+      if (allowOptional)
+        info = ForeignRepresentationInfo::forTrivialWithOptional();
+      Impl.ForeignRepresentableCache.insert({type, info});
+    }
+  };
 
+  if (Impl.ForeignRepresentableCache.empty()) {
     // Pre-populate the foreign-representable cache with known types.
     if (auto stdlib = getStdlibModule()) {
       addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
@@ -3845,7 +3909,45 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   // yet. If we've never seen this nominal type before, or if we have
   // an out-of-date negative cached value, we'll have to go looking.
   auto known = Impl.ForeignRepresentableCache.find(nominal);
-  if (known == Impl.ForeignRepresentableCache.end() ||
+  bool wasNotFoundInCache = known == Impl.ForeignRepresentableCache.end();
+
+  // For the REPL. We might have initialized the cache above before CoreGraphics
+  // was loaded.
+  //   let s = "" // Here we initialize the ForeignRepresentableCache.
+  //   import Foundation
+  //   let pt = CGPoint(x: 1.0, y: 2.0) // Here we query for CGFloat.
+  // Add CGFloat as trivial if we encounter it later.
+  // If the type was not found check if it would be found after having recently
+  // loaded the module.
+  // Similar for types for other non stdlib modules.
+  auto conditionallyAddTrivial = [&](NominalTypeDecl *nominalDecl,
+                                     Identifier typeName, Identifier moduleName,
+                                     bool allowOptional = false) {
+    if (nominal->getName() == typeName && wasNotFoundInCache) {
+      if (auto module = getLoadedModule(moduleName)) {
+        addTrivial(typeName, module, allowOptional);
+        known = Impl.ForeignRepresentableCache.find(nominal);
+        wasNotFoundInCache = known == Impl.ForeignRepresentableCache.end();
+      }
+    }
+  };
+  conditionallyAddTrivial(nominal, getIdentifier("DarwinBoolean") , Id_Darwin);
+  conditionallyAddTrivial(nominal, Id_Selector, Id_ObjectiveC, true);
+  conditionallyAddTrivial(nominal, getIdentifier("ObjCBool"), Id_ObjectiveC);
+  conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
+  conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreGraphics"));
+  const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
+#define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
+  {                                                                            \
+    char name[] = #BASENAME "0";                                               \
+    for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {         \
+      *(std::end(name) - 2) = '0' + i;                                         \
+      conditionallyAddTrivial(nominal, getIdentifier(name), Id_simd);          \
+    }                                                                          \
+  }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+
+  if (wasNotFoundInCache ||
       (known->second.getKind() == ForeignRepresentableKind::None &&
        known->second.getGeneration() < CurrentGeneration)) {
     Optional<ForeignRepresentationInfo> result;
@@ -3934,6 +4036,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
+          nominal == getSubstringDecl() ||
           nominal == getErrorDecl() ||
           nominal == getAnyHashableDecl() ||
           // Foundation's overlay depends on the CoreGraphics overlay, but
@@ -4187,8 +4290,13 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionList Args) {
   llvm::FoldingSetNodeID id;
+
+  // Canonicalize substitutions.
+  SmallVector<Substitution, 4> CanArgs;
+  Args = getCanonicalSubstitutionList(Args, CanArgs);
+
   Profile(id, Layout, Args);
-  
+
   // Return an existing layout if there is one.
   void *insertPos;
   auto &SILBoxTypes = C.Impl.SILBoxTypes;

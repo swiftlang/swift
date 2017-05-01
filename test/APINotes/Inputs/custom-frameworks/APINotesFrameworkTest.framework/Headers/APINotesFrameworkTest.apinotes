@@ -103,3 +103,7 @@ SwiftVersions:
         SwiftName: ImportantCStruct
       - Name: InnerInSwift4
         SwiftName: InnerInSwift4
+    Typedefs:
+      - Name: SomeCAlias
+        SwiftName: ImportantCAlias
+

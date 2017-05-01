@@ -105,7 +105,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
     STRINGS FALSE "NOT-MERGED" "MERGED")
 
-set(SWIFT_VERSION "3.1" CACHE STRING
+set(SWIFT_VERSION "4.0" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -380,6 +380,9 @@ else()
 endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
+    ${SWIFT_BUILD_SOURCEKIT_default})
+option(SWIFT_ENABLE_SOURCEKIT_TESTS
+    "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
 
 #

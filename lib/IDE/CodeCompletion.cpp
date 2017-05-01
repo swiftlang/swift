@@ -303,6 +303,9 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   if (D->getName().isEditorPlaceholder())
     return true;
 
+  if (!D->isUserAccessible())
+    return true;
+
   return false;
 }
 
@@ -1298,8 +1301,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Type DT = DC->getDeclaredTypeOfContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
-    OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
-    Type ST = DT->getSuperclass(TypeResolver.get());
+    Type ST = DT->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
       return;
     if (ST->getNominalOrBoundGenericNominal()) {
@@ -1380,7 +1382,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto CheckKind = CompletionTypeCheckKind::Normal;
     if (Kind == CompletionKind::KeyPathExpr ||
         Kind == CompletionKind::KeyPathExprDot)
-      CheckKind = CompletionTypeCheckKind::ObjCKeyPath;
+      CheckKind = CompletionTypeCheckKind::KeyPath;
 
     // If we've already successfully type-checked the expression for some
     // reason, just return the type.
@@ -1431,7 +1433,7 @@ public:
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
-  void completeExprKeyPath(ObjCKeyPathExpr *KPE, bool HasDot) override;
+  void completeExprKeyPath(KeyPathExpr *KPE, bool HasDot) override;
 
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
@@ -1941,7 +1943,7 @@ public:
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
       return ProtocolCompositionType::get(M->getASTContext(), types,
-                                          /*hasExplicitAnyObject=*/false);
+                                          /*HasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
@@ -2048,7 +2050,6 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
-        !VD->isUserAccessible() ||
         (VD->hasAccessibility() && !VD->isAccessibleFrom(CurrDeclContext)) ||
         shouldHideDeclFromCompletionResults(VD))
       return;
@@ -4508,7 +4509,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeExprKeyPath(ObjCKeyPathExpr *KPE,
+void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       bool HasDot) {
   Kind = HasDot ? CompletionKind::KeyPathExprDot : CompletionKind::KeyPathExpr;
   ParsedExpr = KPE;

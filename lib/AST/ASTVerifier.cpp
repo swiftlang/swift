@@ -388,7 +388,7 @@ public:
       // If we've checked types already, do some extra verification.
       if (!SF || SF->ASTStage >= SourceFile::TypeChecked) {
         verifyCheckedAlways(node);
-        if (!HadError)
+        if (!HadError && shouldVerifyChecked(node))
           verifyChecked(node);
       }
 
@@ -404,6 +404,12 @@ public:
     bool shouldVerify(Stmt *S) { return true; }
     bool shouldVerify(Pattern *S) { return true; }
     bool shouldVerify(Decl *S) { return true; }
+
+    // Default cases for whether we should verify a checked subtree.
+    bool shouldVerifyChecked(Expr *E) { return !E->getType().isNull(); }
+    bool shouldVerifyChecked(Stmt *S) { return true; }
+    bool shouldVerifyChecked(Pattern *S) { return S->hasType(); }
+    bool shouldVerifyChecked(Decl *S) { return true; }
 
     // Default cases for cleaning up as we exit a node.
     void cleanup(Expr *E) { }
@@ -782,6 +788,10 @@ public:
       verifyCheckedAlwaysBase(D);
     }
 
+    bool shouldVerifyChecked(ThrowStmt *S) {
+      return shouldVerifyChecked(S->getSubExpr());
+    }
+
     void verifyChecked(ThrowStmt *S) {
       checkSameType(S->getSubExpr()->getType(),
                     checkExceptionTypeExists("throw expression"),
@@ -789,11 +799,19 @@ public:
       verifyCheckedBase(S);
     }
 
+    bool shouldVerifyChecked(CatchStmt *S) {
+      return shouldVerifyChecked(S->getErrorPattern());
+    }
+
     void verifyChecked(CatchStmt *S) {
       checkSameType(S->getErrorPattern()->getType(),
                     checkExceptionTypeExists("catch statement"),
                     "catch pattern");
       verifyCheckedBase(S);
+    }
+
+    bool shouldVerifyChecked(ReturnStmt *S) {
+      return !S->hasResult() || shouldVerifyChecked(S->getResult());
     }
 
     void verifyChecked(ReturnStmt *S) {
@@ -849,15 +867,19 @@ public:
       case StmtConditionElement::CK_Availability: break;
       case StmtConditionElement::CK_Boolean: {
         auto *E = elt.getBoolean();
-        checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
-                      "condition type");
+        if (shouldVerifyChecked(E))
+          checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
+                        "condition type");
         break;
       }
 
       case StmtConditionElement::CK_PatternBinding:
-        checkSameType(elt.getPattern()->getType(),
-                      elt.getInitializer()->getType(),
-                      "conditional binding type");
+        if (shouldVerifyChecked(elt.getPattern()) &&
+            shouldVerifyChecked(elt.getInitializer())) {
+          checkSameType(elt.getPattern()->getType(),
+                    elt.getInitializer()->getType(),
+                    "conditional binding type");
+        }
         break;
       }
     }
@@ -1128,11 +1150,10 @@ public:
         abort();
       }
 
-      SmallVector<ProtocolDecl*, 1> protocols;
-      srcTy->getExistentialTypeProtocols(protocols);
-
-      if (protocols.size() != 1
-          || !protocols[0]->isObjC()) {
+      auto layout = srcTy->getExistentialLayout();
+      if (layout.superclass ||
+          !layout.isObjC() ||
+          layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
         E->print(Out);
         Out << "\n";
@@ -1340,19 +1361,53 @@ public:
     }
 
     void updateExprToPointerWhitelist(Expr *Base, Expr *Arg) {
-      auto handleSubExpr = [&](Expr *SubExpr) {
-        // if we have an inject into optional, strip it off.
-        if (auto *InjectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(SubExpr)) {
-          SubExpr = InjectIntoOpt->getSubExpr();
+      auto handleSubExpr = [&](Expr *origSubExpr) {
+        auto subExpr = origSubExpr;
+        unsigned optionalDepth = 0;
+
+        auto checkIsBindOptional = [&](Expr *expr) {
+          for (unsigned depth = optionalDepth; depth; --depth) {
+            if (auto bind = dyn_cast<BindOptionalExpr>(expr)) {
+              expr = bind->getSubExpr();
+            } else {
+              Out << "malformed optional pointer conversion\n";
+              origSubExpr->print(Out);
+              Out << '\n';
+              abort();
+            }
+          }
+        };
+
+        // These outer entities will be interleaved in multi-level optionals.
+        while (true) {
+          // Look through optional evaluations.
+          if (auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+            subExpr = optionalEval->getSubExpr();
+            optionalDepth++;
+            continue;
+          }
+
+          // Look through injections into Optional<Pointer>.
+          if (auto *injectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+            subExpr = injectIntoOpt->getSubExpr();
+            continue;
+          }
+
+          break;
         }
 
-        if (auto *InOutToPtr = dyn_cast<InOutToPointerExpr>(SubExpr)) {
-          WhitelistedInOutToPointerExpr.insert(InOutToPtr);
+        // Whitelist inout-to-pointer conversions.
+        if (auto *inOutToPtr = dyn_cast<InOutToPointerExpr>(subExpr)) {
+          WhitelistedInOutToPointerExpr.insert(inOutToPtr);
+          checkIsBindOptional(inOutToPtr->getSubExpr());
           return;
         }
 
-        if (auto *ArrayToPtr = dyn_cast<ArrayToPointerExpr>(SubExpr)) {
-          WhitelistedArrayToPointerExpr.insert(ArrayToPtr);
+        // Whitelist array-to-pointer conversions.
+        if (auto *arrayToPtr = dyn_cast<ArrayToPointerExpr>(subExpr)) {
+          WhitelistedArrayToPointerExpr.insert(arrayToPtr);
+          checkIsBindOptional(arrayToPtr->getSubExpr());
+          return;
         }
       };
 
@@ -1687,22 +1742,6 @@ public:
         }
       }
 
-      verifyCheckedBase(E);
-    }
-    
-    void verifyChecked(LValueToPointerExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying LValueToPointerExpr", E);
-
-      if (!E->getSubExpr()->getType()->is<LValueType>()) {
-        Out << "LValueToPointerExpr subexpression must be an lvalue\n";
-        abort();
-      }
-      if (!E->getType()->isEqual(
-                             E->getType()->getASTContext().TheRawPointerType)) {
-        Out << "LValueToPointerExpr result type must be RawPointer\n";
-        abort();
-      }
-      
       verifyCheckedBase(E);
     }
     
@@ -2042,7 +2081,7 @@ public:
       for (auto proto : protocols)
         protocolTypes.push_back(proto->getDeclaredType());
       auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
-                                               /*hasExplicitAnyObject=*/false);
+                                               /*HasExplicitAnyObject=*/false);
       auto layout = type->getExistentialLayout();
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
       for (auto *protoTy : layout.getProtocols())
@@ -2761,7 +2800,7 @@ public:
 
       // If the destination is a class, walk the supertypes of the source.
       if (destTy->getClassOrBoundGenericClass()) {
-        if (!destTy->isBindableToSuperclassOf(srcTy, nullptr)) {
+        if (!destTy->isBindableToSuperclassOf(srcTy)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";
           destTy.print(Out);

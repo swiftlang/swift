@@ -33,6 +33,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -59,6 +60,7 @@
 #include "GenOpaque.h"
 #include "GenPoly.h"
 #include "GenType.h"
+#include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -97,9 +99,6 @@ public:
   PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
 
   ArrayRef<MetadataSource> getSources() const { return Sources; }
-
-  using RequirementCallback =
-    llvm::function_ref<void(GenericRequirement requirement)>;
 
   void enumerateRequirements(const RequirementCallback &callback);
 
@@ -199,16 +198,18 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
   });
 }
 
-void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
-  if (!Generics) return;
+void
+irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
+                                          const RequirementCallback &callback) {
+  if (!signature) return;
 
   // Get all of the type metadata.
-  for (auto gp : Generics->getSubstitutableParams()) {
+  for (auto gp : signature->getSubstitutableParams()) {
     callback({CanType(gp), nullptr});
   }
 
   // Get the protocol conformances.
-  for (auto &reqt : Generics->getRequirements()) {
+  for (auto &reqt : signature->getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -228,6 +229,11 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
     }
     llvm_unreachable("bad requirement kind");
   }
+}
+
+void
+PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
+  return enumerateGenericSignatureRequirements(Generics, callback);
 }
 
 void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCallback &callback) {
@@ -340,6 +346,7 @@ void PolymorphicConvention::considerParameter(SILParameterInfo param,
       // we don't bother, for no good reason. But if this is 'self',
       // consider passing an extra metatype.
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -1734,7 +1741,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     if (ClassDecl *clas = dyn_cast<ClassDecl>(Nominal)) {
       if (clas->isForeign())
         getAddrOfForeignTypeMetadataCandidate(conformingType);
-    } else if (Nominal->hasClangNode()) {
+    } else if (isa<ClangModuleUnit>(Nominal->getModuleScopeContext())) {
       getAddrOfForeignTypeMetadataCandidate(conformingType);
     }
   }
@@ -2438,7 +2445,6 @@ void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
 NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          CanSILFunctionType substType,
                                           const SubstitutionMap &subs) {
   NecessaryBindings bindings;
 

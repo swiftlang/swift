@@ -189,7 +189,7 @@ public final class _DataStorage {
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
                 let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.length, &stopv)
+                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.location, &stopv)
                 if stopv {
                     stop.pointee = true
                 }
@@ -198,7 +198,7 @@ public final class _DataStorage {
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
                 let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.length, &stopv)
+                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.location, &stopv)
                 if stopv {
                     stop.pointee = true
                 }

@@ -818,10 +818,7 @@ handleSemanticRequest(RequestDict Req,
     }
     std::transform(ArgParts.begin(), ArgParts.end(),
                    std::back_inserter(Input.ArgNames),
-      [](const char *C) {
-        StringRef Original(C);
-        return Original == "_" ? StringRef() : Original;
-      });
+                   [](const char *C) { return StringRef(C); });
     std::transform(Selectors.begin(), Selectors.end(),
                    std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });
@@ -882,7 +879,7 @@ public:
 
     DependenciesStack.push_back({UIdent(), TopDict, ResponseBuilder::Array() });
   }
-  ~SKIndexingConsumer() {
+  ~SKIndexingConsumer() override {
     assert(Cancelled ||
            (EntitiesStack.size() == 1 && DependenciesStack.size() == 1));
     (void) Cancelled;
@@ -906,7 +903,7 @@ public:
 
   bool finishSourceEntity(UIdent Kind) override;
 };
-}
+} // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
                                          ArrayRef<const char *> Args,
@@ -1084,7 +1081,7 @@ public:
           ResponseBuilder::Array(),
           ResponseBuilder::Array() });
   }
-  ~SKDocConsumer() {
+  ~SKDocConsumer() override {
     assert(Cancelled || EntitiesStack.size() == 1);
     (void) Cancelled;
   }
@@ -1114,7 +1111,7 @@ public:
 
   bool handleDiagnostic(const DiagnosticEntryInfo &Info) override;
 };
-}
+} // end anonymous namespace
 
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
@@ -1563,7 +1560,7 @@ public:
 
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
-}
+} // end anonymous namespace
 
 static sourcekitd_response_t codeComplete(llvm::MemoryBuffer *InputBuf,
                                           int64_t Offset,
@@ -1934,13 +1931,13 @@ public:
 
   bool handleSourceText(StringRef Text) override;
 
-  virtual void finished() override {
+  void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
   }
 };
 
-}
+} // end anonymous namespace
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,

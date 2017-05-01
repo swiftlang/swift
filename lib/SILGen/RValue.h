@@ -222,19 +222,8 @@ public:
     return RValue(*this, SGF, l);
   }
 
-  bool isObviouslyEqual(const RValue &rhs) const {
-    assert(isComplete() && rhs.isComplete() && "Comparing incomplete rvalues");
-
-    // Compare the count of elements instead of the type.
-    if (values.size() != rhs.values.size())
-      return false;
-
-    return std::equal(values.begin(), values.end(), rhs.values.begin(),
-                  [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
-                    return lhs.getValue() == rhs.getValue() &&
-                    lhs.getCleanup() == rhs.getCleanup();
-                  });
-  }
+  static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
+  bool isObviouslyEqual(const RValue &rhs) const;
 };
 
 } // end namespace Lowering

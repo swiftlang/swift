@@ -79,14 +79,17 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   }
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
+
+  // Select access kind after capture promotion and before stack promotion.
+  // This guarantees that stack-promotable boxes have [static] enforcement.
+  P.addAccessEnforcementSelection();
+  P.addInactiveAccessMarkerElimination();
+
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   P.addOwnershipModelEliminator();
+  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
-
-  P.addAccessEnforcementSelection();
-  P.addAccessMarkerElimination();
-
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
   P.addDiagnosticConstantPropagation();
@@ -434,11 +437,27 @@ static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
+  P.addLoadableByAddress();
 }
 
 SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
   SILPassPipelinePlan P;
   addIRGenPreparePipeline(P);
+  return P;
+}
+
+SILPassPipelinePlan
+SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P;
+
+  if (Options.DebugSerialization) {
+    addPerfDebugSerializationPipeline(P);
+    return P;
+  }
+
+  P.startPipeline("SILOpt Prepare Passes");
+  P.addFullAccessMarkerElimination();
+
   return P;
 }
 

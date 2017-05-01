@@ -338,6 +338,8 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::KeyPathGetterThunkHelper:
+    case Node::Kind::KeyPathSetterThunkHelper:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
@@ -404,6 +406,8 @@ private:
     case Node::Kind::VariadicMarker:
     case Node::Kind::OutlinedCopy:
     case Node::Kind::OutlinedConsume:
+    case Node::Kind::OutlinedRetain:
+    case Node::Kind::OutlinedRelease:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -775,6 +779,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::OutlinedConsume:
     Printer << "outlined consume of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedRetain:
+    Printer << "outlined retain of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedRelease:
+    Printer << "outlined release of ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::Directness:
@@ -1171,6 +1183,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << " for ";
       print(Node->getFirstChild());
     }
+    return nullptr;
+  case Node::Kind::KeyPathGetterThunkHelper:
+    Printer << "key path getter for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::KeyPathSetterThunkHelper:
+    Printer << "key path setter for ";
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::FieldOffset: {
     print(Node->getChild(0)); // directness

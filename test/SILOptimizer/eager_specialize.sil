@@ -35,7 +35,7 @@ public struct G<Container : HasElt> {
 // CHECK: @_specialize(exported: false, kind: full, where T == S)
 // CHECK: public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T : HasElt, T.Elt : AnElt
 @_specialize(where T == S)
-public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T : HasElt, T.Elt : AnElt
+public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T.Elt : AnElt
 
 enum ArithmeticError : Error {
   case DivByZero
@@ -44,9 +44,9 @@ enum ArithmeticError : Error {
 }
 
 // CHECK: @_specialize(exported: false, kind: full, where T == Int)
-// CHECK: public func divideNum<T>(num: T, den: T) throws -> T where T : SignedInteger
+// CHECK: public func divideNum<T>(num: T, den: T) throws -> T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral
 @_specialize(where T == Int)
-public func divideNum<T : SignedInteger>(num: T, den: T) throws -> T
+public func divideNum<T : SignedInteger & _ExpressibleByBuiltinIntegerLiteral>(num: T, den: T) throws -> T
 
 @inline(never) @_semantics("optimize.sil.never") func foo<T>(t: T) -> Int64
 
@@ -147,7 +147,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // divideNum<A where ...> (A, den : A) throws -> A
-sil [_specialize where T == Int] @_T016eager_specialize9divideNumxx_x3dentKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
+sil [_specialize where T == Int] @_T016eager_specialize9divideNumxx_x3dentKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
 bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   // function_ref static != infix<A where ...> (A, A) -> Bool
   %5 = function_ref @_T0s2neoiSbx_xts9EquatableRzlFZ : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
@@ -174,8 +174,8 @@ bb1:
   throw %24 : $Error
 
 bb2:
-  %18 = witness_method $T, #IntegerArithmetic."/"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-  %19 = apply %18<T>(%0, %1, %2, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %18 = witness_method $T, #BinaryInteger."/"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %19 = apply %18<T>(%0, %1, %2, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   %20 = tuple ()
   return %20 : $()
 }
@@ -188,7 +188,7 @@ bb2:
 
 // Generic with specialized dispatch. No more [specialize] attribute.
 //
-// CHECK-LABEL: sil @_T016eager_specialize9divideNumxx_x3dentKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
+// CHECK-LABEL: sil @_T016eager_specialize9divideNumxx_x3dentKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type
 // CHECK:   %4 = metatype $@thick Int.Type
@@ -208,8 +208,8 @@ bb2:
 // CHECK:   throw %{{.*}} : $Error
 
 // CHECK: bb4:
-// CHECK:   %{{.*}} = witness_method $T, #IntegerArithmetic."/"!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-// CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : IntegerArithmetic> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %{{.*}} = witness_method $T, #BinaryInteger."/"!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   br bb5
 
 // CHECK: bb5:
@@ -741,3 +741,103 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // CHECK-IRGEN-NOT: ret void
 // CHECK-IRGEN:   call {{.*}}elease
 // CHECK-IRGEN:   ret void
+
+////////////////////////////////////////////////////////////////////
+// Check that try_apply instructions are handled correctly by the
+// eager specializer.
+////////////////////////////////////////////////////////////////////
+
+protocol ThrowingP {
+  func action() throws -> Int64
+}
+
+extension Int64 : ThrowingP {
+  public func action() throws -> Int64
+}
+
+class ClassUsingThrowingP {
+  required init()
+  @_specialize(exported: false, kind: full, where T == Int64)
+  public static func f<T>(_: T) throws -> Self where T : ThrowingP
+  @_specialize(exported: false, kind: full, where T == Int64)
+  public static func g<T>(_ t: T) throws -> Int64 where T : ThrowingP
+  deinit
+}
+
+// Int64.action()
+sil @_T0s5Int64V34eager_specialize_throwing_functionE6actionAByKF : $@convention(method) (Int64) -> (Int64, @error Error)
+
+// protocol witness for ThrowingP.action() in conformance Int64
+sil @_T0s5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW : $@convention(witness_method) (@in_guaranteed Int64) -> (Int64, @error Error)
+
+sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfc : $@convention(method) (@owned ClassUsingThrowingP) -> @owned ClassUsingThrowingP
+
+sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPCfd : $@convention(method) (@guaranteed ClassUsingThrowingP) -> @owned Builtin.NativeObject
+
+// ClassUsingThrowingP.__allocating_init()
+sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfC : $@convention(method) (@thick ClassUsingThrowingP.Type) -> @owned ClassUsingThrowingP 
+
+// ClassUsingThrowingP.__deallocating_deinit
+sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPCfD : $@convention(method) (@owned ClassUsingThrowingP) -> () 
+
+// f is a function that may throw according to its type, but does not actually do it.
+// Check that this function is properly specialized by the eager specializer.
+// It should dispatch to its specialized version, but use apply [nothrow] to invoke
+// the specialized version.
+
+// CHECK-LABEL: sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1fACXDxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error Error)
+// CHECK: [[SPECIALIZED:%.*]] = function_ref @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1fACXDxKAA0G1PRzlFZs5Int64V_Tg5 : $@convention(method) (Int64, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error Error)
+// CHECK: apply [nothrow] [[SPECIALIZED]]
+// CHECK: // end sil function '_T034eager_specialize_throwing_function19ClassUsingThrowingPC1fACXDxKAA0G1PRzlFZ'
+// static ClassUsingThrowingP.f<A>(_:)
+sil [_specialize exported: false, kind: full, where T == Int64] @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1fACXDxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error Error) {
+bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
+  destroy_addr %0 : $*T
+  %4 = unchecked_trivial_bit_cast %1 : $@thick ClassUsingThrowingP.Type to $@thick @dynamic_self ClassUsingThrowingP.Type
+  // function_ref ClassUsingThrowingP.__allocating_init()
+  %7 = function_ref @_T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfC : $@convention(method) (@thick ClassUsingThrowingP.Type) -> @owned ClassUsingThrowingP
+  %8 = upcast %4 : $@thick @dynamic_self ClassUsingThrowingP.Type to $@thick ClassUsingThrowingP.Type
+  %9 = apply %7(%8) : $@convention(method) (@thick ClassUsingThrowingP.Type) -> @owned ClassUsingThrowingP
+  %10 = unchecked_ref_cast %9 : $ClassUsingThrowingP to $ClassUsingThrowingP
+  return %10 : $ClassUsingThrowingP
+} // end sil function '_T034eager_specialize_throwing_function19ClassUsingThrowingPC1fACXDxKAA0G1PRzlFZ'
+
+// g is a function that may throw according to its type and has a try_apply inisde
+// its body.
+// Check that this function is properly specialized by the eager specializer.
+// It should dispatch to its specialized version and use try_apply to invoke
+// the specialized version.
+
+// CHECK-LABEL: sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error)
+// CHECK: [[SPECIALIZED:%.*]] = function_ref @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZAF_Tg5 : $@convention(method) (Int64, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error)
+// CHECK: try_apply [[SPECIALIZED]]
+// CHECK: // end sil function '_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZ'
+
+// static ClassUsingThrowingP.g<A>(_:)
+sil [_specialize exported: false, kind: full, where T == Int64] @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error) {
+bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
+  %5 = witness_method $T, #ThrowingP.action!1 : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error)
+  try_apply %5<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error), normal bb1, error bb2
+
+bb1(%7 : $Int64):                                 // Preds: bb0
+  destroy_addr %0 : $*T
+  return %7 : $Int64
+
+bb2(%10 : $Error):                                // Preds: bb0
+  destroy_addr %0 : $*T
+  throw %10 : $Error
+} // end sil function '_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZ'
+
+sil_vtable ClassUsingThrowingP {
+  #ClassUsingThrowingP.init!allocator.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : _T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
+  #ClassUsingThrowingP.init!initializer.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : _T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()
+  #ClassUsingThrowingP.deinit!deallocator: _T034eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
+}
+
+sil_witness_table hidden Int64: ThrowingP module eager_specialize_throwing_function {
+  method #ThrowingP.action!1: <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : @_T0s5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW	// protocol witness for ThrowingP.action() in conformance Int64
+}
+
+sil_default_witness_table hidden ThrowingP {
+  no_default
+}

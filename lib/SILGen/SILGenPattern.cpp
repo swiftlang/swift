@@ -78,7 +78,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   }
 
   case PatternKind::OptionalSome:
-    os << ".Some";
+    os << ".some";
     return;
 
   case PatternKind::Bool:
@@ -515,11 +515,6 @@ public:
     return Columns;
   }
 
-  /// Add new columns to the end of the row.
-  void addColumns(ArrayRef<Pattern *> columns) {
-    Columns.append(columns.begin(), columns.end());
-  }
-
   /// Specialize the given column to the given array of new columns.
   ///
   /// Places the new columns using the column-specialization algorithm.
@@ -680,7 +675,7 @@ void ClauseMatrix::print(llvm::raw_ostream &out) const {
       std::string &str = rowStrings.back();
       {
         llvm::raw_string_ostream ss(str);
-        dumpPattern(row[r], ss);
+        dumpPattern(row[c], ss);
         ss.flush();
       }
 

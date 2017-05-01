@@ -149,7 +149,7 @@ public:
 
   using StreamPrinter::StreamPrinter;
 
-  ~AnnotatingPrinter() {
+  ~AnnotatingPrinter() override {
     assert(EntitiesStack.empty());
   }
 
@@ -252,7 +252,7 @@ struct SourceTextInfo {
   std::vector<TextReference> References;
 };
 
-}
+} // end anonymous namespace
 
 static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   auto *DC = dyn_cast<DeclContext>(D);
@@ -299,6 +299,8 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
                               bool IsRef, bool IsSynthesizedExtension,
                               DocEntityInfo &Info,
                               StringRef Arg = StringRef()) {
+  if (!IsRef && D->isImplicit())
+    return true;
   if (!D || isa<ParamDecl>(D) ||
       (isa<VarDecl>(D) && D->getDeclContext()->isLocalContext())) {
     Info.Kind = SwiftLangSupport::getUIDForLocalVar(IsRef);
@@ -760,10 +762,11 @@ private:
     }
   }
 };
-}
+} // end anonymous namespace
 
-static bool makeParserAST(CompilerInstance &CI, StringRef Text) {
-  CompilerInvocation Invocation;
+static bool makeParserAST(CompilerInstance &CI, StringRef Text,
+                          CompilerInvocation Invocation) {
+  Invocation.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::IFK_Swift);
 
@@ -894,7 +897,7 @@ public:
     return false; // skip body.
   }
 };
-}
+} // end anonymous namespace
 
 static void addParameterEntities(CompilerInstance &CI,
                                  SourceTextInfo &IFaceInfo) {
@@ -974,7 +977,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   CompilerInstance ParseCI;
-  if (makeParserAST(ParseCI, IFaceInfo.Text))
+  if (makeParserAST(ParseCI, IFaceInfo.Text, Invocation))
     return true;
   addParameterEntities(ParseCI, IFaceInfo);
 
@@ -998,7 +1001,7 @@ public:
   SourceDocASTWalker(SourceManager &SM, unsigned BufferID)
     : SM(SM), BufferID(BufferID) {}
 
-  ~SourceDocASTWalker() {
+  ~SourceDocASTWalker() override {
     assert(EntitiesStack.empty());
   }
 
@@ -1055,7 +1058,7 @@ public:
     return TextRange{ Start, End-Start };
   }
 };
-}
+} // end anonymous namespace
 
 static bool getSourceTextInfo(CompilerInstance &CI,
                               SourceTextInfo &Info) {

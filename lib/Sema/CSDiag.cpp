@@ -484,6 +484,11 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
           tc.diagnose(choice.getDecl(), diag::found_candidate);
         break;
 
+      case OverloadChoiceKind::KeyPathApplication:
+        // Skip key path applications, since we don't want them to noise up
+        // unrelated subscript diagnostics.
+        break;
+
       case OverloadChoiceKind::BaseType:
       case OverloadChoiceKind::TupleIndex:
         // FIXME: Actually diagnose something here.
@@ -2878,7 +2883,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
     bindOverload = constraint->getNestedConstraints().front();
 
   auto overloadChoice = bindOverload->getOverloadChoice();
-  auto overloadName = overloadChoice.getDecl()->getFullName();
+  auto overloadName = overloadChoice.getName();
 
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
@@ -2916,6 +2921,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   if (constraint->getKind() == ConstraintKind::Disjunction) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
+      if (!elt->getOverloadChoice().isDecl()) continue;
       auto candidate = elt->getOverloadChoice().getDecl();
       diagnose(candidate, diag::found_candidate);
     }
@@ -5273,15 +5279,25 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                Expr *fnExpr, Expr *argExpr,
                                                ArrayRef<Identifier> argLabels) {
-  // If we are invoking a constructor and there are absolutely no candidates,
-  // then they must all be private.
   if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
-    if (!MTT->getInstanceType()->is<TupleType>() &&
-        (CCI.size() == 0 ||
-         (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
-          isa<ProtocolDecl>(CCI.candidates[0].getDecl())))) {
-      CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
-                      MTT->getInstanceType());
+    auto instTy = MTT->getInstanceType();
+    if (instTy->getAnyNominal()) {
+      // If we are invoking a constructor on a nominal type and there are
+      // absolutely no candidates, then they must all be private.
+      if (CCI.size() == 0 || (CCI.size() == 1 && CCI.candidates[0].getDecl() &&
+                              isa<ProtocolDecl>(CCI.candidates[0].getDecl()))) {
+        CS->TC.diagnose(fnExpr->getLoc(), diag::no_accessible_initializers,
+                        instTy);
+        return true;
+      }
+      // continue below
+    } else if (!instTy->is<TupleType>()) {
+      // If we are invoking a constructor on a non-nominal type, the expression
+      // is malformed.
+      SourceRange initExprRange(fnExpr->getSourceRange().Start,
+                                argExpr->getSourceRange().End);
+      CS->TC.diagnose(fnExpr->getLoc(), diag::non_nominal_no_initializers,
+                      instTy).highlight(initExprRange);
       return true;
     }
   }
@@ -5380,17 +5396,22 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     break;    // Interesting case. :-)
   }
   
+  // Don't noise up diagnostics with key path application candidates, since they
+  // appear on every type.
+  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
+  for (auto candidate : result.ViableCandidates)
+    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
+      viableCandidatesToReport.push_back(candidate);
+  
   // If we have unviable candidates (e.g. because of access control or some
   // other problem) we should diagnose the problem.
-  if (result.ViableCandidates.empty()) {
+  if (viableCandidatesToReport.empty()) {
     diagnoseUnviableLookupResults(result, baseType, baseExpr, subscriptName,
                                   DeclNameLoc(SE->getLoc()), SE->getLoc());
     return true;
   }
 
-  
-  
-  CalleeCandidateInfo calleeInfo(Type(), result.ViableCandidates,
+  CalleeCandidateInfo calleeInfo(Type(), viableCandidatesToReport,
                                  SE->hasTrailingClosure(), CS,
                                  /*selfAlreadyApplied*/false);
 

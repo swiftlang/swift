@@ -389,7 +389,10 @@ public typealias AnyClass = AnyObject.Type
 /// - `~x == x ^ ~Self.allZeros`
 ///
 /// - SeeAlso: `OptionSet`
-public protocol BitwiseOperations {
+@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
+public typealias BitwiseOperations = _BitwiseOperations
+
+public protocol _BitwiseOperations {
   /// Returns the intersection of bits set in the two arguments.
   ///
   /// The bitwise AND operator (`&`) returns a value that has each bit set to
@@ -484,6 +487,7 @@ public protocol BitwiseOperations {
   ///
   /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
   /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0 or init() of a type conforming to FixedWidthInteger")
   static var allZeros: Self { get }
 }
 
@@ -493,7 +497,7 @@ public protocol BitwiseOperations {
 /// - Parameters:
 ///   - lhs: A value to update with the union of bits set in the two arguments.
 ///   - rhs: Another value.
-public func |= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
+public func |= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs | rhs
 }
 
@@ -504,7 +508,7 @@ public func |= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to update with the intersections of bits set in the two
 ///     arguments.
 ///   - rhs: Another value.
-public func &= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
+public func &= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs & rhs
 }
 
@@ -515,7 +519,7 @@ public func &= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 ///   - lhs: A value to update with the bits that are set in exactly one of the
 ///     two arguments.
 ///   - rhs: Another value.
-public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
+public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
   lhs = lhs ^ rhs
 }
 
@@ -656,6 +660,9 @@ infix operator   ^ : AdditionPrecedence
 // FIXME: is this the right precedence level for "..." ?
 infix operator  ... : RangeFormationPrecedence
 infix operator  ..< : RangeFormationPrecedence
+postfix operator ...
+prefix operator ...
+prefix operator ..<
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
@@ -714,7 +721,3 @@ infix operator  |= : AssignmentPrecedence
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~>
-
-@available(*, unavailable, renamed: "BitwiseOperations")
-public typealias BitwiseOperationsType = BitwiseOperations
-

@@ -38,7 +38,23 @@
           key.name: "name",
           key.usr: "s:18index_constructors11HorseObjectC4nameXev",
           key.line: 7,
-          key.column: 7
+          key.column: 7,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:18index_constructors11HorseObjectC4nameXefg",
+              key.line: 7,
+              key.column: 7,
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:18index_constructors11HorseObjectC4nameXefs",
+              key.line: 7,
+              key.column: 7,
+              key.is_dynamic: 1
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -46,6 +62,7 @@
           key.usr: "s:18index_constructors11HorseObjectC4flipyyF",
           key.line: 9,
           key.column: 21,
+          key.is_dynamic: 1,
           key.attributes: [
             {
               key.attribute: source.decl.attribute.objc

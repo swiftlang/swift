@@ -206,7 +206,7 @@ class WeakReference {
   }
 };
 
-}
+} // namespace swift
 
 // Lifecycle paths. One test each.
 // 

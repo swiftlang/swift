@@ -386,6 +386,14 @@ public struct IndexingIterator<
     self._position = _elements.startIndex
   }
 
+  @_inlineable
+  /// Creates an iterator over the given collection.
+  public /// @testable
+  init(_elements: Elements, _position: Elements.Index) {
+    self._elements = _elements
+    self._position = _position
+  }
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -646,6 +654,7 @@ public protocol Collection : _Indexable, Sequence {
   /// supplying `IndexingIterator` as its associated `Iterator`
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
+    where Self.Iterator.Element == _Element
 
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
@@ -660,14 +669,14 @@ public protocol Collection : _Indexable, Sequence {
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
+      where Self.SubSequence.Index == Index,
+            Self.Iterator.Element == Self.SubSequence.Iterator.Element,
+            SubSequence.SubSequence == SubSequence
   // FIXME(ABI)#98 (Recursive Protocol Constraints):
   // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
   //   where
-  //   Iterator.Element == SubSequence.Iterator.Element,
-  //   SubSequence.Index == Index,
   //   SubSequence.Indices == Indices,
-  //   SubSequence.SubSequence == SubSequence
   //
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
@@ -724,14 +733,13 @@ public protocol Collection : _Indexable, Sequence {
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
+    where Indices.Iterator.Element == Index,
+          Indices.Index == Index,
+          Indices.SubSequence == Indices
 
-  // FIXME(ABI)#68 (Associated Types with where clauses):
   // FIXME(ABI)#100 (Recursive Protocol Constraints):
   // associatedtype Indices : Collection
   //   where
-  //   Indices.Iterator.Element == Index,
-  //   Indices.Index == Index,
-  //   Indices.SubSequence == Indices
   //   = DefaultIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending

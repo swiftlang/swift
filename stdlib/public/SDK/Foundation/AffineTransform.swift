@@ -273,7 +273,13 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
     }
     
     public var hashValue : Int {
-        return Int(m11 + m12 + m21 + m22 + tX + tY)
+        // FIXME(integers): the expression was broken into pieces to speed up
+        // compilation.
+        // Used to be just: return Int(m11 + m12 + m21 + m22 + tX + tY)
+        let a: CGFloat = m11 + m12
+        let b: CGFloat = m21 + m22
+        let c: CGFloat = tX + tY
+        return Int(a + b + c)
     }
     
     public var description: String {

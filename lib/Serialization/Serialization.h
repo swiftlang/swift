@@ -117,7 +117,8 @@ public:
   /// table.
   using DeclTable = llvm::MapVector<Identifier, DeclTableData>;
 
-  using ObjCMethodTableData = SmallVector<std::tuple<TypeID, bool, DeclID>, 4>;
+  using ObjCMethodTableData =
+    SmallVector<std::tuple<std::string, bool, DeclID>, 4>;
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of all defined Objective-C methods.
@@ -404,7 +405,8 @@ public:
   /// The Decl will be scheduled for serialization if necessary.
   ///
   /// \returns The ID for the given Decl in this module.
-  DeclID addDeclRef(const Decl *D, bool forceSerialization = false);
+  DeclID addDeclRef(const Decl *D, bool forceSerialization = false,
+                    bool allowTypeAliasXRef = false);
 
   /// Records the use of the given DeclContext.
   ///

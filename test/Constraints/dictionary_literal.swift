@@ -74,7 +74,7 @@ func testDefaultExistentials() {
   let _: [String : Any] = ["a" : 1, "b" : 2.5, "c" : "hello"]
   
   let _ = ["a" : 1, "b" : nil, "c" : "hello"]
-  // expected-error@-1{{heterogeneous collection literal could only be inferred to 'Dictionary<String, Any?>' (aka 'Dictionary<String, Optional<Any>>'); add explicit type annotation if this is intentional}}{{46-46= as Dictionary<String, Any?>}}
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to 'Dictionary<String, Any?>'; add explicit type annotation if this is intentional}}{{46-46= as Dictionary<String, Any?>}}
   
   let _: [String : Any?] = ["a" : 1, "b" : nil, "c" : "hello"]
 

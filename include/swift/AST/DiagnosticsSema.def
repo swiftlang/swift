@@ -426,8 +426,21 @@ ERROR(expr_keypath_generic_type,none,
       "'#keyPath' cannot refer to generic type %0", (DeclName))
 ERROR(expr_keypath_not_property,none,
       "'#keyPath' cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(expr_keypath_mutating_getter,none,
+      "'#keyPath' cannot refer to %0, which has a mutating getter",
+      (DeclName))
 ERROR(expr_keypath_empty,none,
       "empty '#keyPath' does not refer to a property", ())
+ERROR(expr_unsupported_objc_key_path_component,none,
+      "an Objective-C key path cannot contain "
+      "%select{BAD|subscript|BAD|BAD|optional-forcing|optional-chaining|BAD} "
+      "components",
+      (unsigned))
+ERROR(expr_unsupported_objc_key_path_compound_name,none,
+      "an Objective-C key path cannot reference a declaration with a "
+      "compound name", ())
+ERROR(expr_keypath_no_keypath_type,none,
+      "broken standard library: no 'KeyPath' type found", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -895,6 +908,9 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
+ERROR(non_nominal_no_initializers,none,
+      "non-nominal type %0 does not support explicit initialization",
+      (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
 ERROR(unbound_generic_parameter_cast,none,
@@ -1284,7 +1300,7 @@ ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(extension_protocol_via_typealias,none,
       "protocol %0 in the module being compiled cannot be extended via a "
-      "typealias", (Type))
+      "type alias", (Type))
 ERROR(extension_anyobject,none,
       "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
@@ -1520,8 +1536,19 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
+WARNING(witness_unavailable,none,
+        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
+        (DescriptiveDeclKind, DeclName, DeclName))
+
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+WARNING(redundant_conformance_adhoc,none,
+        "conformance of %0 to protocol %1 was already stated in "
+        "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+NOTE(redundant_conformance_witness_ignored,none,
+     "%0 %1 will not be used to satisfy the conformance to %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 // "Near matches"
 WARNING(optional_req_near_match,none,
@@ -1543,7 +1570,7 @@ ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 ERROR(typealias_outside_of_protocol,none,
-      "typealias %0 can only be used with a concrete type or "
+      "type alias %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 
 ERROR(circular_protocol_def,none,
@@ -1596,7 +1623,7 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 ERROR(protocol_typealias_conflict, none,
-      "typealias %0 requires types %1 and %2 to be the same",
+      "type alias %0 requires types %1 and %2 to be the same",
       (Identifier, Type, Type))
 WARNING(redundant_conformance_constraint,none,
         "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
@@ -1638,6 +1665,13 @@ NOTE(previous_same_type_constraint, none,
      "previous same-type constraint %1 == %2 "
      "%select{written here|implied here|inferred from type here}0",
      (unsigned, Type, Type))
+
+WARNING(inherited_associated_type_redecl,none,
+        "redeclaration of associated type %0 from protocol %1 is better "
+        "expressed as a 'where' clause on the protocol", (DeclName, Type))
+WARNING(typealias_override_associated_type,none,
+        "typealias overriding associated type %0 from protocol %1 is better "
+        "expressed as same-type constraint on the protocol", (DeclName, Type))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
@@ -1761,7 +1795,7 @@ ERROR(override_ownership_mismatch,none,
       "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
       (/*Ownership*/unsigned, /*Ownership*/unsigned))
 ERROR(override_class_declaration_in_extension,none,
-      "cannot override a non-dynamic class declaration from an extension", 
+      "cannot override a non-dynamic class declaration from an extension",
       ())
 WARNING(override_class_declaration_in_extension_warning,none,
       "cannot override a non-dynamic class declaration from an extension",
@@ -1940,18 +1974,22 @@ ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
-ERROR(broken_equatable_eq_operator,none,
-      "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
+ERROR(broken_coding_key_requirement,none,
+      "CodingKey protocol is broken: unexpected requirement", ())
+ERROR(broken_encodable_requirement,none,
+      "Encodable protocol is broken: unexpected requirement", ())
+ERROR(broken_decodable_requirement,none,
+      "Decodable protocol is broken: unexpected requirement", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
-ERROR(dynamic_self_struct_enum,none,
-      "%select{struct|enum}0 method cannot return 'Self'; "
-      "did you mean to use the %select{struct|enum}0 type %1?",
-      (int, Identifier))
+
+ERROR(self_in_nominal,none,
+      "'Self' is only available in a protocol or as the result of a "
+      "method in a class; did you mean '%0'?", (StringRef))
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,none,
@@ -2153,6 +2191,17 @@ ERROR(lazy_not_observable,none,
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
+
+// @_implements
+ERROR(implements_attr_protocol_lacks_member,none,
+      "protocol %0 has no member %1", (DeclName, DeclName))
+
+ERROR(implements_attr_non_protocol_type,none,
+      "non-protocol type in @_implements attribute", ())
+
+ERROR(implements_attr_protocol_not_conformed_to,none,
+      "containing type %0 does not conform to protocol %1",
+      (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
@@ -2721,14 +2770,6 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
-ERROR(empty_switch_stmt,none,
-      "%select{'switch' statement body must have at least one 'case' or 'default' block; |}0"
-      "do you want to add "
-      "%select{missing cases?|a default case?}1",(bool, bool))
-ERROR(non_exhaustive_switch,none,
-      "%select{switch must be exhaustive, consider adding |do you want to add }0"
-      "%select{missing cases|a default clause}1"
-      "%select{|?}0", (bool, bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -2890,9 +2931,6 @@ ERROR(array_literal_intrinsics_not_found,none,
       "Array<T>", ())
 ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
-ERROR(self_in_nominal,none,
-      "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean %0?", (Identifier))
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
@@ -3007,8 +3045,7 @@ ERROR(invalid_objc_decl,none,
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
 ERROR(invalid_nonobjc_decl,none,
-      "only methods, initializers, properties and subscript declarations can "
-      "be declared @nonobjc", ())
+      "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
       "only extensions of classes can be declared @nonobjc", ())
 
@@ -3565,6 +3602,23 @@ WARNING(debug_long_function_body, none,
 WARNING(debug_long_closure_body, none,
         "closure took %0ms to type-check (limit: %1ms)",
         (unsigned, unsigned))
+
+//------------------------------------------------------------------------------
+// Pattern match diagnostics
+//------------------------------------------------------------------------------
+
+
+ERROR(empty_switch_stmt,none,
+      "'switch' statement body must have at least one 'case' or 'default' "
+      "block; do you want to add a default case?",())
+ERROR(non_exhaustive_switch,none,
+      "%select{switch must be exhaustive, consider adding |do you want to add }0"
+      "%select{missing cases|a default clause}1"
+      "%select{:|?}0 %2", (bool, bool, StringRef))
+NOTE(missing_particular_case,none,
+     "missing case: '%0'", (StringRef))
+WARNING(redundant_particular_case,none,
+        "case is already handled by previous patterns; consider removing it",())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

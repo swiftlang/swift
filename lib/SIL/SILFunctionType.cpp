@@ -1906,8 +1906,8 @@ bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef derived) {
 
     auto overrideInterfaceTy =
         selfInterfaceTy->adjustSuperclassMemberDeclType(
-            base.getDecl(), derived.getDecl(), baseInterfaceTy,
-            /*resolver=*/nullptr)->getCanonicalType();
+            base.getDecl(), derived.getDecl(), baseInterfaceTy)
+      ->getCanonicalType();
 
     if (checkASTTypeForABIDifferences(derivedInterfaceTy, overrideInterfaceTy))
       return true;
@@ -1937,13 +1937,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
                                                 CanType base) {
   // Unwrap optionals, but remember that we did.
   bool derivedWasOptional = false;
-  bool baseWasOptional = false;
   if (auto object = derived.getAnyOptionalObjectType()) {
     derivedWasOptional = true;
     derived = object;
   }
   if (auto object = base.getAnyOptionalObjectType()) {
-    baseWasOptional = true;
     base = object;
   }
 
@@ -2030,8 +2028,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          base.getDecl(), derived.getDecl(), baseInterfaceTy,
-          /*resolver=*/nullptr);
+          base.getDecl(), derived.getDecl(), baseInterfaceTy);
 
   // Copy generic signature from derived to the override type, to handle
   // the case where the base member is not generic (because the base class

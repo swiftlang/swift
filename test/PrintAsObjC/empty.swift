@@ -13,6 +13,10 @@
 
 // CHECK-NOT: @import Swift;
 
+// CHECK-LABEL: #if !defined(__has_feature)
+// CHECK-NEXT: # define __has_feature(x) 0
+// CHECK-NEXT: #endif
+
 // CHECK-LABEL: #include <objc/NSObject.h>
 // CHECK: #include <stdint.h>
 // CHECK: #include <stddef.h>
@@ -26,7 +30,7 @@
 // CHECK: # define SWIFT_EXTENSION(M)
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
 
-// CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
+// CHECK-LABEL: #if __has_feature(modules)
 // CHECK-NEXT: #endif
 
 

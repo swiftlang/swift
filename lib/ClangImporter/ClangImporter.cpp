@@ -110,7 +110,7 @@ namespace {
     explicit PCHDeserializationCallbacks(ClangImporter::Implementation &impl)
       : Impl(impl) {}
     void ModuleImportRead(clang::serialization::SubmoduleID ID,
-                          clang::SourceLocation ImportLoc) {
+                          clang::SourceLocation ImportLoc) override {
       if (Impl.IsReadingBridgingPCH) {
         Impl.PCHImportedSubmodules.push_back(ID);
       }
@@ -223,7 +223,7 @@ namespace {
            /*null-terminated*/true);
     }
 
-    ~ZeroFilledMemoryBuffer() {
+    ~ZeroFilledMemoryBuffer() override {
       llvm::sys::MemoryBlock memory{const_cast<char *>(getBufferStart()),
         getBufferSize()};
       std::error_code error = llvm::sys::Memory::releaseMappedMemory(memory);
@@ -329,7 +329,7 @@ public:
             || Filename == ImporterImpl::bridgingHeaderBufferName);
   }
 
-  // Currently preserving older ClangImporter behaviour of ignoring system
+  // Currently preserving older ClangImporter behavior of ignoring system
   // dependencies, but possibly revisit?
   bool needSystemDependencies() override { return false; }
 
@@ -340,7 +340,7 @@ public:
                                                    IsSystem, IsClangModuleFile,
                                                    IsMissing))
       return false;
-    // Currently preserving older ClangImporter behaviour of ignoring .pcm
+    // Currently preserving older ClangImporter behavior of ignoring .pcm
     // file dependencies, but possibly revisit?
     if (IsClangModuleFile
         || isClangImporterSpecialName(Filename)
@@ -1263,7 +1263,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   if (ReusingDiags) {
     Diags = &Impl.Instance->getDiagnosticClient();
   }
-  emitInstance.createDiagnostics(Diags, /*ShouldOwnDiags=*/!ReusingDiags);
+  emitInstance.createDiagnostics(Diags, /*ShouldOwnClient=*/!ReusingDiags);
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   emitInstance.setFileManager(&fileManager);
@@ -2953,7 +2953,7 @@ void ClangImporter::Implementation::lookupValue(
           auto alternateNamedDecl =
               cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
                                                      nameVersion));
-          if (!alternateNamedDecl)
+          if (!alternateNamedDecl || alternateNamedDecl == decl)
             return;
           assert(alternateNamedDecl->getFullName().matchesRef(name) &&
                  "importFullName behaved differently from importDecl");

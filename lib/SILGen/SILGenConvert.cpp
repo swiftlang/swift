@@ -125,6 +125,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   assert(optTL.isLoadable() && "Address-only optionals cannot use this");
   SILType optType = optTL.getLoweredType();
   CanType formalOptType = optType.getSwiftRValueType();
+  (void)formalOptType;
 
   assert(formalOptType.getAnyOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
@@ -462,7 +463,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
     auto nsErrorType = nsErrorDecl->getDeclaredType()->getCanonicalType();
-    if (nsErrorType->isExactSuperclassOf(concreteFormalType, nullptr)) {
+    if (nsErrorType->isExactSuperclassOf(concreteFormalType)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
         nsError = B.createUpcast(loc, nsError, getLoweredType(nsErrorType));
@@ -483,10 +484,12 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
       if (storedNSErrorConformance->isConcrete()) {
-        if (auto witnessVar = storedNSErrorConformance->getConcrete()
-                                          ->getWitness(nsErrorVar, nullptr)) {
-          nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
-          nsErrorVarSubstitutions = witnessVar.getSubstitutions();
+        if (auto normal = dyn_cast<NormalProtocolConformance>(
+                                    storedNSErrorConformance->getConcrete())) {
+          if (auto witnessVar = normal->getWitness(nsErrorVar, nullptr)) {
+            nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
+            nsErrorVarSubstitutions = witnessVar.getSubstitutions();
+          }
         }
       }
 

@@ -207,7 +207,15 @@ namespace {
       return true;
     }
 
+    bool visitReleaseValueAddrInst(const ReleaseValueAddrInst *RHS) {
+      return true;
+    }
+
     bool visitRetainValueInst(const RetainValueInst *RHS) {
+      return true;
+    }
+
+    bool visitRetainValueAddrInst(const RetainValueAddrInst *RHS) {
       return true;
     }
 
@@ -263,6 +271,29 @@ namespace {
 
     bool visitProjectExistentialBoxInst(const ProjectExistentialBoxInst *RHS) {
       return true;
+    }
+
+    bool visitBeginAccessInst(const BeginAccessInst *right) {
+      auto left = cast<BeginAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndAccessInst(const EndAccessInst *right) {
+      auto left = cast<EndAccessInst>(LHS);
+      return left->isAborting() == right->isAborting();
+    }
+
+    bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
+      auto left = cast<BeginUnpairedAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
+      auto left = cast<EndUnpairedAccessInst>(LHS);
+      return left->getEnforcement() == right->getEnforcement()
+          && left->isAborting() == right->isAborting();
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
@@ -863,6 +894,7 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::StrongReleaseInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::ReleaseValueAddrInst:
     return true;
 
   case ValueKind::DestroyValueInst:

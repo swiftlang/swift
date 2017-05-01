@@ -13,7 +13,13 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "C2",
-      key.usr: "s:11test_module2C2C"
+      key.usr: "s:11test_module2C2C",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:11test_module2C2CACycfc"
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -28,14 +34,20 @@
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.name: "getter:value",
-              key.usr: "s:11test_module16ComputedPropertyC5valueSifg"
+              key.usr: "s:11test_module16ComputedPropertyC5valueSifg",
+              key.is_dynamic: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.name: "setter:value",
-              key.usr: "s:11test_module16ComputedPropertyC5valueSifs"
+              key.usr: "s:11test_module16ComputedPropertyC5valueSifs",
+              key.is_dynamic: 1
             }
           ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:11test_module16ComputedPropertyCACycfc"
         }
       ]
     },
@@ -64,12 +76,36 @@
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "x",
-          key.usr: "s:11test_module7TwoIntsC1xSiv"
+          key.usr: "s:11test_module7TwoIntsC1xSiv",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:11test_module7TwoIntsC1xSifg",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:11test_module7TwoIntsC1xSifs",
+              key.is_dynamic: 1
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "y",
-          key.usr: "s:11test_module7TwoIntsC1ySiv"
+          key.usr: "s:11test_module7TwoIntsC1ySiv",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:11test_module7TwoIntsC1ySifg",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:11test_module7TwoIntsC1ySifs",
+              key.is_dynamic: 1
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
@@ -91,7 +127,13 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "Empty",
-      key.usr: "s:11test_module5EmptyC"
+      key.usr: "s:11test_module5EmptyC",
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:11test_module5EmptyCACycfc"
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.extension.class,

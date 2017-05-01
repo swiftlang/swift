@@ -339,7 +339,7 @@ private:
     ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
       ContainedInRange(ContainedInRange) {}
 
-    bool isMultiStatment() {
+    bool isMultiStatement() {
       if (StartMatches.empty() || EndMatches.empty())
         return false;
 
@@ -348,7 +348,7 @@ private:
       if (Parent.isStmt(StmtKind::Brace))
         return true;
 
-      // Explicitly allow the selection of multiple case statments.
+      // Explicitly allow the selection of multiple case statements.
       auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
       return llvm::any_of(StartMatches, IsCase) &&
           llvm::any_of(EndMatches, IsCase);
@@ -550,6 +550,8 @@ public:
   class CompleteWalker : public SourceEntityWalker {
     Implementation *Impl;
     bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      if (D->isImplicit())
+        return false;
       Impl->analyzeDecl(D);
       return true;
     }
@@ -685,7 +687,7 @@ public:
       }
     }
 
-    if (DCInfo.isMultiStatment()) {
+    if (DCInfo.isMultiStatement()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
@@ -801,6 +803,8 @@ bool RangeResolver::walkToStmtPre(Stmt *S) {
 };
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  if (D->isImplicit())
+    return false;
   if (!Impl->shouldEnter(D))
     return false;
   Impl->analyze(D);
@@ -911,4 +915,31 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
     return getLocationInfoForClangNode(ClangNode, Importer,
                                        DeclarationLoc, Filename);
   }
+}
+
+std::vector<CharSourceRange> swift::ide::
+getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
+  std::vector<CharSourceRange> Ranges;
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(Arg)) {
+    size_t ElemIndex = 0;
+    for (Expr *Elem : TE->getElements()) {
+      SourceLoc LabelStart(Elem->getStartLoc());
+      SourceLoc LabelEnd(LabelStart);
+
+      auto NameIdentifier = TE->getElementName(ElemIndex);
+      if (!NameIdentifier.empty()) {
+        LabelStart = TE->getElementNameLoc(ElemIndex);
+        if (EndKind == LabelRangeEndAt::LabelNameOnly)
+          LabelEnd = LabelStart.getAdvancedLoc(NameIdentifier.getLength());
+      }
+
+      Ranges.push_back(CharSourceRange(SM, LabelStart, LabelEnd));
+      ++ElemIndex;
+    }
+  } else if (ParenExpr *PE = dyn_cast<ParenExpr>(Arg)) {
+    if (PE->getSubExpr())
+      Ranges.push_back(CharSourceRange(PE->getSubExpr()->getStartLoc(), 0));
+  }
+
+  return Ranges;
 }

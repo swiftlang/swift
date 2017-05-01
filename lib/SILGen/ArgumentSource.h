@@ -215,6 +215,7 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  bool isExpr() const & { return StoredKind == Kind::Expr; }
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
 

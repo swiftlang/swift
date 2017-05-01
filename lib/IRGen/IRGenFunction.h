@@ -49,6 +49,7 @@ namespace swift {
   class PatternBindingDecl;
   class SILDebugScope;
   class SILType;
+  class KeyPathInst;
   class SourceLoc;
   class StructType;
   class Substitution;

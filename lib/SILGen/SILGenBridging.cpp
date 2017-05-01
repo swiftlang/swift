@@ -44,7 +44,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _bridgeToObjectiveC witness.
-  auto witness = conformance->getWitness(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement, nullptr);
   assert(witness);
 
   // Determine the type we're bridging to.
@@ -55,7 +55,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   assert(objcType);
 
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness.getDecl());
+  SILDeclRef witnessConstant(witness);
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
@@ -65,10 +65,10 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
 
   // FIXME: Figure out the right SubstitutionMap stuff if the witness
   // has generic parameters of its own.
-  assert(!cast<FuncDecl>(witness.getDecl())->isGeneric() &&
+  assert(!cast<FuncDecl>(witness)->isGeneric() &&
          "Generic witnesses not supported");
 
-  auto *dc = cast<FuncDecl>(witness.getDecl())->getDeclContext();
+  auto *dc = cast<FuncDecl>(witness)->getDeclContext();
   auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
@@ -118,11 +118,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitness(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement, nullptr);
   assert(witness);
 
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness.getDecl());
+  SILDeclRef witnessConstant(witness);
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
@@ -269,6 +269,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
         break;
         
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -292,6 +293,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
 
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("indirect arguments to blocks not supported");
@@ -1295,6 +1297,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = ManagedValue::forLValue(paramValue);
           break;
         case ParameterConvention::Indirect_In:
+        case ParameterConvention::Indirect_In_Constant:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
         case ParameterConvention::Indirect_In_Guaranteed:

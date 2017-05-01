@@ -64,6 +64,13 @@ SILType SILType::getBuiltinWordType(const ASTContext &C) {
   return getPrimitiveObjectType(CanType(BuiltinIntegerType::getWordType(C)));
 }
 
+SILType SILType::getOptionalType(SILType type) {
+  auto &ctx = type.getSwiftRValueType()->getASTContext();
+  auto optType = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
+                                           { type.getSwiftRValueType() });
+  return getPrimitiveType(CanType(optType), type.getCategory());
+}
+
 bool SILType::isTrivial(SILModule &M) const {
   return M.getTypeLowering(*this).isTrivial();
 }
@@ -467,7 +474,7 @@ static bool isBridgedErrorClass(SILModule &M,
 
   // NSError (TODO: and CFError) can be bridged.
   auto nsErrorType = M.Types.getNSErrorType();
-  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t, nullptr)) {
+  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t)) {
     return true;
   }
   

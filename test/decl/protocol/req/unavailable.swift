@@ -23,3 +23,13 @@ class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to pr
   func good() {}
 }
 
+
+// Warn about unavailable witnesses.
+protocol P {
+  func foo(bar: Foo) // expected-note{{requirement 'foo(bar:)' declared here}}
+}
+
+struct ConformsToP : P {
+  @available(*, unavailable)
+  func foo(bar: Foo) { } // expected-warning{{unavailable instance method 'foo(bar:)' was used to satisfy a requirement of protocol 'P'}}
+}

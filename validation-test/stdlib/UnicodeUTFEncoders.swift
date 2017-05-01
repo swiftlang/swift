@@ -12,7 +12,7 @@ import StdlibUnittest
 import Foundation
 
 protocol TestableUnicodeCodec : UnicodeCodec {
-  associatedtype CodeUnit : Integer
+  associatedtype CodeUnit : FixedWidthInteger
   static func encodingId() -> String.Encoding
   static func name() -> NSString
 }

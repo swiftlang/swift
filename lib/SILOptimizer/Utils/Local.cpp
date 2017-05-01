@@ -499,7 +499,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
         // A is a superclass of B, then it can be done by means
         // of a simple upcast.
         if (mt2.getInstanceType()->isExactSuperclassOf(
-              mt1.getInstanceType(), nullptr)) {
+              mt1.getInstanceType())) {
           return B->createUpcast(Loc, Value, DestTy);
         }
  
@@ -1257,7 +1257,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   if (!BridgedFunc)
     return nullptr;
 
-  CanType CanBridgedTy(BridgedTargetTy);
+  CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
   SILType SILBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
   SILBuilderWithScope Builder(Inst);
@@ -1619,6 +1619,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Indirect_In_Guaranteed:
       // Source as-is, we don't need to copy it due to guarantee
       break;
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_In: {
       assert(substConv.isSILIndirect(ParamTypes[0])
              && "unsupported convention for bridging conversion");
@@ -1661,6 +1662,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     if ((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy))) {
       CastedValue = SILValue(
           (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
+    } else if (ConvTy.isExactSuperclassOf(DestTy)) {
+      CastedValue = SILValue(
+          Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
     } else if (ConvTy.getSwiftRValueType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
                                               DestTy.getSwiftRValueType()) ||
@@ -1673,8 +1677,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     } else {
       llvm_unreachable(
           "Destination should have the same type, be bridgeable CF "
-          "type or be a superclass "
-          "of the source operand");
+          "type or be a superclass/subclass of the source operand");
     }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
@@ -1733,8 +1736,8 @@ optimizeBridgedCasts(SILInstruction *Inst,
   if (!BridgedSourceTy)
     return nullptr;
 
-  CanType CanBridgedTargetTy(BridgedTargetTy);
-  CanType CanBridgedSourceTy(BridgedSourceTy);
+  CanType CanBridgedTargetTy = BridgedTargetTy->getCanonicalType();
+  CanType CanBridgedSourceTy = BridgedSourceTy->getCanonicalType();
 
   if (CanBridgedSourceTy == source && CanBridgedTargetTy == target) {
     // Both source and target type are ObjC types.

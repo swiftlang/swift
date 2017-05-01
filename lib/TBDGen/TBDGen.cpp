@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -39,6 +40,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
+  bool FileHasEntryPoint;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -60,12 +62,29 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
       addSymbol(linkage.getName());
   }
 
+  void addConformances(DeclContext *DC) {
+    for (auto conformance : DC->getLocalConformances()) {
+      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
+          conformance->getProtocol());
+      if (!needsWTable)
+        continue;
+
+      // Only normal conformances get symbols; the others get any public symbols
+      // from their parent normal conformance.
+      if (conformance->getKind() != ProtocolConformanceKind::Normal)
+        continue;
+
+      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
+      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
+    }
+  }
+
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule)
+                ModuleDecl *swiftModule, bool fileHasEntryPoint)
       : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule) {}
+        SwiftModule(swiftModule), FileHasEntryPoint(fileHasEntryPoint) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -87,37 +106,31 @@ public:
 
   void visitValueDecl(ValueDecl *VD);
 
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
+
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // any information here is encoded elsewhere
+  }
+
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    // Any getters and setters etc. exist as independent FuncDecls in the AST,
+    // so get processed elsewhere; subscripts don't have any symbols other than
+    // these.
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
 
-  void visitProtocolDecl(ProtocolDecl *PD) {
-    addSymbol(LinkEntity::forProtocolDescriptor(PD));
+  void visitExtensionDecl(ExtensionDecl *ED);
 
-#ifndef NDEBUG
-    // There's no (currently) relevant information about members of a protocol
-    // at individual protocols, each conforming type has to handle them
-    // individually. Let's assert this fact:
-    for (auto *member : PD->getMembers()) {
-      auto isExpectedKind =
-          isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
-          isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-          isa<AbstractFunctionDecl>(member);
-      assert(isExpectedKind &&
-             "unexpected member of protocol during TBD generation");
-    }
-#endif
-  }
+  void visitProtocolDecl(ProtocolDecl *PD);
 
   void visitVarDecl(VarDecl *VD);
 
   void visitDecl(Decl *D) { visitMembers(D); }
 };
-}
+} // end anonymous namespace
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
@@ -147,7 +160,7 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   // currently need to refer to them by symbol for their own vtable.
   switch (declRef.getSubclassScope()) {
   case SubclassScope::External:
-    // Allocating constructors retain their normal linkage behaviour.
+    // Allocating constructors retain their normal linkage behavior.
     if (declRef.kind == SILDeclRef::Kind::Allocator)
       break;
 
@@ -178,6 +191,26 @@ void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
   visitMembers(VD);
 }
 
+void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  // Default arguments (of public functions) are public symbols, as the default
+  // values are computed at the call site.
+  auto index = 0;
+  auto paramLists = AFD->getParameterLists();
+  // Skip the first arguments, which contains Self (etc.), can't be defaulted,
+  // and are ignored for the purposes of default argument indices.
+  if (AFD->getDeclContext()->isTypeContext())
+    paramLists = paramLists.slice(1);
+  for (auto *paramList : paramLists) {
+    for (auto *param : *paramList) {
+      if (auto defaultArg = param->getDefaultValue())
+        addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
+      index++;
+    }
+  }
+
+  visitValueDecl(AFD);
+}
+
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   if (isPrivateDecl(VD))
     return;
@@ -188,7 +221,10 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
-    addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // Variables in the main file don't get accessors, despite otherwise looking
+    // like globals.
+    if (!FileHasEntryPoint)
+      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
   visitMembers(VD);
@@ -199,30 +235,18 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 
   addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
 
-  addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                        TypeMetadataAddress::AddressPoint,
-                                        /*isPattern=*/false));
+  // Generic types do not get metadata directly, only through the function.
+  if (!NTD->isGenericContext()) {
+    addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                          TypeMetadataAddress::AddressPoint,
+                                          /*isPattern=*/false));
+  }
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
   // There are symbols associated with any protocols this type conforms to.
-  for (auto conformance : NTD->getLocalConformances()) {
-    auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
-        conformance->getProtocol());
-    if (!needsWTable)
-      continue;
-
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
-    addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
-  }
+  addConformances(NTD);
 
   visitMembers(NTD);
-}
-
-template <typename T> bool isaAnd(Decl *D, llvm::function_ref<bool(T *)> f) {
-  if (auto *x = dyn_cast_or_null<T>(D))
-    return f(x);
-
-  return false;
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
@@ -230,9 +254,20 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     return;
 
   auto &ctxt = CD->getASTContext();
+  auto isGeneric = CD->isGenericContext();
+  auto objCCompatible = ctxt.LangOpts.EnableObjCInterop && !isGeneric;
+  auto isObjC = objCCompatible && CD->isObjC();
 
-  if (ctxt.LangOpts.EnableObjCInterop) {
-    addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
+  // Metaclasses and ObjC class (duh) are a ObjC thing, and so are not needed in
+  // build artifacts/for classes which can't touch ObjC.
+  if (objCCompatible) {
+    if (isObjC)
+      addSymbol(LinkEntity::forObjCClass(CD));
+
+    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+      addSymbol(LinkEntity::forObjCMetaclass(CD));
+    else
+      addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
   }
 
   // Some members of classes get extra handling, beyond members of struct/enums,
@@ -243,21 +278,52 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       continue;
 
     auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
+    auto hasFieldOffset =
+        !isGeneric && var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
-      // These fields are always direct.
-      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+      // Field are only direct if the class's internals are completely known.
+      auto isIndirect = !CD->hasFixedLayout();
+      addSymbol(LinkEntity::forFieldOffset(var, isIndirect));
     }
 
     // The non-allocating forms of the constructors and destructors.
     if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
       addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
     } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
+      // ObjC classes don't have a symbol for their destructor.
+      if (!isObjC)
+        addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
     }
   }
 
   visitNominalTypeDecl(CD);
+}
+
+void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
+  if (!ED->getExtendedType()->isExistentialType()) {
+    addConformances(ED);
+  }
+
+  visitMembers(ED);
+}
+
+void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
+  if (!PD->isObjC())
+    addSymbol(LinkEntity::forProtocolDescriptor(PD));
+
+#ifndef NDEBUG
+  // There's no (currently) relevant information about members of a protocol
+  // at individual protocols, each conforming type has to handle them
+  // individually. Let's assert this fact:
+  for (auto *member : PD->getMembers()) {
+    auto isExpectedKind =
+        isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
+        isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
+        isa<AbstractFunctionDecl>(member);
+    assert(isExpectedKind &&
+           "unexpected member of protocol during TBD generation");
+  }
+#endif
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
@@ -269,7 +335,13 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
-  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
+  auto hasEntryPoint = file->hasEntryPoint();
+
+  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule(),
+                        hasEntryPoint);
   for (auto d : decls)
     visitor.visit(d);
+
+  if (hasEntryPoint)
+    symbols.insert("main");
 }

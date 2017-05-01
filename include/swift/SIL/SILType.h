@@ -407,16 +407,15 @@ public:
 
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
-  SILType getSuperclass(LazyResolver *resolver) const {
-    auto superclass = getSwiftRValueType()->getSuperclass(resolver);
+  SILType getSuperclass() const {
+    auto superclass = getSwiftRValueType()->getSuperclass();
     if (!superclass) return SILType();
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
   /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
   bool isExactSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType(),
-                                                     nullptr);
+    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType());
   }
 
   /// Return true if Ty is a subtype of this SILType, or if this SILType
@@ -424,8 +423,7 @@ public:
   /// otherwise.
   bool isBindableToSuperclassOf(SILType Ty) const {
     return getSwiftRValueType()->isBindableToSuperclassOf(
-                                                        Ty.getSwiftRValueType(),
-                                                        nullptr);
+                                                        Ty.getSwiftRValueType());
   }
 
   /// Transform the function type SILType by replacing all of its interface
@@ -522,6 +520,9 @@ public:
                                      const ASTContext &C);
   /// Get the builtin word type as a SILType;
   static SILType getBuiltinWordType(const ASTContext &C);
+
+  /// Given a value type, return an optional type wrapping it.
+  static SILType getOptionalType(SILType valueType);
 
   /// Get the standard exception type.
   static SILType getExceptionType(const ASTContext &C);

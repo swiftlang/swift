@@ -37,8 +37,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-/// The name of the Swift migrator binary.
-static const char * const SWIFT_UPDATE_NAME = "swift-update";
 /// The limit for passing a list of files on the command line.
 static const size_t TOO_MANY_FILES = 128;
 
@@ -94,7 +92,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::UpdateCode:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -186,10 +183,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    II.ExecutableName = SWIFT_UPDATE_NAME;
-  else
-    Arguments.push_back("-frontend");
+  Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
@@ -234,6 +228,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_TBD:
       FrontendModeOption = "-emit-tbd";
       break;
+    case types::TY_Remapping:
+      FrontendModeOption = "-update-code";
+      break;
     case types::TY_Nothing:
       // We were told to output nothing, so get the last mode option and use that.
       if (const Arg *A = context.Args.getLastArg(options::OPT_modes_Group))
@@ -252,7 +249,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ObjCHeader:
     case types::TY_Image:
     case types::TY_SwiftDeps:
-    case types::TY_Remapping:
+    case types::TY_ModuleTrace:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -262,11 +259,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
-  case OutputInfo::Mode::UpdateCode:
-    // Make sure that adding '-update-code' will permit accepting all arguments
-    // '-c' accepts.
-    FrontendModeOption = "-c";
-    break;
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
@@ -275,8 +267,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add input arguments.
   switch (context.OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::UpdateCode: {
+  case OutputInfo::Mode::StandardCompile: {
     assert(context.InputActions.size() == 1 &&
            "The Swift frontend expects exactly one input (the primary file)!");
 
@@ -302,6 +293,16 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           FoundPrimaryInput = true;
         }
         Arguments.push_back(inputPair.second->getValue());
+
+        // Forward migrator flags.
+        if (auto DataPath = context.Args.getLastArg(options::
+                                                    OPT_api_diff_data_file)) {
+          Arguments.push_back("-api-diff-data-file");
+          Arguments.push_back(DataPath->getValue());
+        }
+        if (context.Args.hasArg(options::OPT_dump_usr)) {
+          Arguments.push_back("-dump-usr");
+        }
       }
     }
     break;
@@ -391,10 +392,21 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(ReferenceDependenciesPath.c_str());
   }
 
+  const std::string &LoadedModuleTracePath =
+      context.Output.getAdditionalOutputForType(types::TY_ModuleTrace);
+  if (!LoadedModuleTracePath.empty()) {
+    Arguments.push_back("-emit-loaded-module-trace-path");
+    Arguments.push_back(LoadedModuleTracePath.c_str());
+  }
+
+  if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
+    Arguments.push_back("-migrate-keep-objc-visibility");
+  }
+
   const std::string &FixitsPath =
     context.Output.getAdditionalOutputForType(types::TY_Remapping);
   if (!FixitsPath.empty()) {
-    Arguments.push_back("-emit-fixits-path");
+    Arguments.push_back("-emit-remap-file-path");
     Arguments.push_back(FixitsPath.c_str());
   }
 
@@ -521,6 +533,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case types::TY_Image:
     case types::TY_SwiftDeps:
     case types::TY_Remapping:
+    case types::TY_ModuleTrace:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -529,7 +542,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
-  case OutputInfo::Mode::UpdateCode:
     llvm_unreachable("invalid mode for backend job");
   }
 
@@ -560,7 +572,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
-  case OutputInfo::Mode::UpdateCode:
     llvm_unreachable("invalid mode for backend job");
   }
 
@@ -608,10 +619,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    II.ExecutableName = SWIFT_UPDATE_NAME;
-  else
-    Arguments.push_back("-frontend");
+  Arguments.push_back("-frontend");
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.

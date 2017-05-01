@@ -88,12 +88,12 @@ public struct Character :
     var shift: UInt64 = 0
 
     let output: (UTF8.CodeUnit) -> Void = {
-      asInt |= UInt64($0) << shift
+      asInt |= UInt64($0) &<< shift
       shift += 8
     }
 
     UTF8.encode(scalar, into: output)
-    asInt |= (~0) << shift
+    asInt |= (~0) &<< shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
 
@@ -102,21 +102,6 @@ public struct Character :
     self = Character(
       String._fromWellFormedCodeUnitSequence(
         UTF32.self, input: CollectionOfOne(UInt32(value))))
-  }
-
-  /// Creates a character with the specified value.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when you
-  /// use a string literal to initialize a `Character` instance. For example:
-  ///
-  ///     let snowflake: Character = "❄︎"
-  ///     print(snowflake)
-  ///     // Prints "❄︎"
-  ///
-  /// The assignment to the `snowflake` constant calls this initializer behind
-  /// the scenes.
-  public init(unicodeScalarLiteral value: Character) {
-    self = value
   }
 
   @effects(readonly)
@@ -140,7 +125,7 @@ public struct Character :
       let bits = maxCodeUnitCount &* 8 &- 1
       // Verify that the highest bit isn't set so that we can truncate it to
       // 63 bits.
-      if _fastPath(utf8Chunk & (1 << numericCast(bits)) != 0) {
+      if _fastPath(utf8Chunk & (1 &<< numericCast(bits)) != 0) {
         _representation = .small(Builtin.trunc_Int64_Int63(utf8Chunk._value))
         return
       }
@@ -200,7 +185,7 @@ public struct Character :
     // overflow when multiplied by 8.
     let bits = MemoryLayout.size(ofValue: initialUTF8) &* 8 &- 1
     if _fastPath(
-      count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
+      count == s._core.count && (initialUTF8 & (1 &<< numericCast(bits))) != 0) {
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
@@ -229,13 +214,13 @@ public struct Character :
       if (value & mask) == mask {
         return i
       }
-      mask <<= 8
+      mask &<<= 8
     }
     return 8
   }
 
   static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
-    return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
+    return UInt64(Builtin.zext_Int63_Int64(value)) | (1 &<< 63)
   }
 
   internal struct _SmallUTF8 : RandomAccessCollection {
@@ -278,7 +263,7 @@ public struct Character :
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
-        truncatingBitPattern: data >> (UInt64(position) &* 8))
+        extendingOrTruncating: data &>> (UInt64(position) &* 8))
     }
 
     internal struct Iterator : IteratorProtocol {
@@ -287,11 +272,11 @@ public struct Character :
       }
 
       internal mutating func next() -> UInt8? {
-        let result = UInt8(truncatingBitPattern: _data)
+        let result = UInt8(extendingOrTruncating: _data)
         if result == 0xFF {
           return nil
         }
-        _data = (_data >> 8) | 0xFF00_0000_0000_0000
+        _data = (_data &>> 8) | 0xFF00_0000_0000_0000
         return result
       }
 
@@ -318,8 +303,8 @@ public struct Character :
       self.count = UInt16(count)
       var u16: UInt64 = 0
       let output: (UTF16.CodeUnit) -> Void = {
-        u16 = u16 << 16
-        u16 = u16 | UInt64($0)
+        u16 = u16 &<< 16
+        u16 = u16 | UInt64(extendingOrTruncating: $0)
       }
       _ = transcode(
         _SmallUTF8(u8).makeIterator(),
@@ -354,8 +339,8 @@ public struct Character :
       _sanityCheck(position < Int(count))
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
-      return UTF16.CodeUnit(truncatingBitPattern:
-        data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
+      return UTF16.CodeUnit(extendingOrTruncating:
+        data &>> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
     }
 
     var count: UInt16

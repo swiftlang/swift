@@ -36,7 +36,15 @@
       key.name: "globalSec",
       key.usr: "s:18forbid_typecheck_29globalSecSiv",
       key.line: 1,
-      key.column: 18
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.function.accessor.getter,
+          key.usr: "s:18forbid_typecheck_29globalSecSifg",
+          key.line: 1,
+          key.column: 18
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
@@ -60,11 +68,28 @@
           key.column: 11
         },
         {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.name: "init()",
+          key.usr: "s:18forbid_typecheck_26ClsSecCACycfc",
+          key.line: 5,
+          key.column: 11
+        },
+        {
           key.kind: source.lang.swift.ref.var.instance,
           key.name: "member",
           key.usr: "s:18forbid_typecheck_26ClsSecC6memberSiv",
           key.line: 5,
-          key.column: 20
+          key.column: 20,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:18forbid_typecheck_26ClsSecC6memberSifg",
+              key.line: 5,
+              key.column: 20,
+              key.receiver_usr: "s:18forbid_typecheck_26ClsSecC",
+              key.is_dynamic: 1
+            }
+          ]
         }
       ]
     }

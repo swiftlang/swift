@@ -195,10 +195,6 @@ private:
   /// after the pass runs, we only see a semantic-arc world.
   bool HasQualifiedOwnership = true;
 
-  /// True if all memory access in this function is demarcated by well-formed
-  /// memory access markers.
-  bool HasAccessMarkers = false;
-
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
@@ -243,9 +239,9 @@ public:
   /// or return instructions; you need to do that yourself
   /// if you care.
   ///
-  /// This is a hack and should be removed!
+  /// This routine does not update all the references in the module
+  /// You have to do that yourself
   void rewriteLoweredTypeUnsafe(CanSILFunctionType newType) {
-    assert(canBeDeleted());
     LoweredType = newType;
   }
 
@@ -309,15 +305,6 @@ public:
   /// ownership instructions should be in this function any more.
   void setUnqualifiedOwnership() {
     HasQualifiedOwnership = false;
-  }
-
-  /// Returns true if this function has well-formed access markers describing
-  /// all memory access.
-  bool hasAccessMarkers() const { return HasAccessMarkers; }
-
-  /// Sets the HasAccessMarkers flag to false.
-  void disableAccessMarkers() {
-    HasAccessMarkers = false;
   }
 
   /// Returns the calling convention used by this entry point.

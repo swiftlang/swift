@@ -116,6 +116,9 @@ public:
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
 
+  /// The path to which we should output a loaded module trace file.
+  std::string LoadedModuleTracePath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 

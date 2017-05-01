@@ -28,6 +28,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -63,6 +64,20 @@ SourceRange TypeLoc::getSourceRange() const {
   if (TyR)
     return TyR->getSourceRange();
   return SourceRange();
+}
+
+TypeLoc TypeLoc::clone(ASTContext &ctx) const {
+  if (TyR) {
+    TypeLoc result(TyR->clone(ctx));
+    result.TAndValidBit = this->TAndValidBit;
+    return result;
+  }
+  return *this;
+}
+
+SourceLoc TypeLoc::getLoc() const {
+  if (TyR) return TyR->getLoc();
+  return SourceLoc();
 }
 
 // Only allow allocation of Types using the allocator in ASTContext.
@@ -206,22 +221,6 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 ///   - function types
 bool TypeBase::allowsOwnership() {
   return getCanonicalType().isAnyClassReferenceType();
-}
-
-void TypeBase::getExistentialTypeProtocols(
-                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
-  getCanonicalType().getExistentialTypeProtocols(protocols);
-}
-
-void CanType::getExistentialTypeProtocols(
-                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
-  // FIXME: Remove this completely
-  auto layout = getExistentialLayout();
-  assert(!layout.superclass && "Subclass existentials not fully supported yet");
-  assert((!layout.requiresClass || layout.requiresClassImplied) &&
-         "Explicit AnyObject should not appear yet");
-  for (auto proto : layout.getProtocols())
-    protocols.push_back(proto->getDecl());
 }
 
 ExistentialLayout::ExistentialLayout(ProtocolType *type) {
@@ -1566,7 +1565,7 @@ bool TypeBase::mayHaveSuperclass() {
   return is<DynamicSelfType>();
 }
 
-Type TypeBase::getSuperclass(LazyResolver *resolver) {
+Type TypeBase::getSuperclass() {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
 
@@ -1605,7 +1604,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   return superclassTy.subst(subMap);
 }
 
-bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
+bool TypeBase::isExactSuperclassOf(Type ty) {
   // For there to be a superclass relationship, we must be a superclass, and
   // the potential subtype must be a class or superclass-bounded archetype.
   if (!getClassOrBoundGenericClass() || !ty->mayHaveSuperclass())
@@ -1616,12 +1615,12 @@ bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
       return true;
     if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
       return false;
-  } while ((ty = ty->getSuperclass(resolver)));
+  } while ((ty = ty->getSuperclass()));
   return false;
 }
 
 /// Returns true if type `a` has archetypes that can be bound to form `b`.
-bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
+bool TypeBase::isBindableTo(Type b) {
   class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, bool, CanType>
   {
     llvm::DenseMap<ArchetypeType *, CanType> Bindings;
@@ -1846,10 +1845,10 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
                                    b->getCanonicalType());
 }
 
-bool TypeBase::isBindableToSuperclassOf(Type ty, LazyResolver *resolver) {
+bool TypeBase::isBindableToSuperclassOf(Type ty) {
   // Do an exact match if no archetypes are involved.
   if (!hasArchetype())
-    return isExactSuperclassOf(ty, resolver);
+    return isExactSuperclassOf(ty);
   
   // For there to be a superclass relationship,
   // the potential subtype must be a class or superclass-bounded archetype.
@@ -1866,11 +1865,11 @@ bool TypeBase::isBindableToSuperclassOf(Type ty, LazyResolver *resolver) {
     return true;
   
   do {
-    if (isBindableTo(ty, resolver))
+    if (isBindableTo(ty))
       return true;
     if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
       return false;
-  } while ((ty = ty->getSuperclass(resolver)));
+  } while ((ty = ty->getSuperclass()));
   return false;
 }
 
@@ -2419,7 +2418,7 @@ static bool canOverride(CanType t1, CanType t2,
   }
 
   // Class-to-class.
-  return t2->isExactSuperclassOf(t1, resolver);
+  return t2->isExactSuperclassOf(t1);
 }
 
 bool TypeBase::canOverride(Type other, OverrideMatchMode matchMode,
@@ -2637,7 +2636,7 @@ void ArchetypeType::populateNestedTypes() const {
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
     // Objective-C protocols don't have type members.
-    if (proto->hasClangNode()) return false;
+    if (proto->isObjC()) return false;
 
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2789,7 +2788,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // Minimize the set of protocols composed together.
   ProtocolType::canonicalizeProtocols(Protocols);
 
-  // If one protocol remains with no further constrants, its nominal
+  // If one protocol remains with no further constraints, its nominal
   // type is the canonical type.
   if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
     return Protocols.front()->getDeclaredType();
@@ -2947,17 +2946,7 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
                                        Type conformingReplacementType,
                                        ProtocolType *conformedProtocol) const {
-  auto result = Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
-  if ((result && result->isConcrete()) ||
-      conformingReplacementType->hasError() ||
-      conformingReplacementType->isTypeParameter())
-    return result;
-
-  // FIXME: Rip this out once ConformanceAccessPaths are plumbed through
-  auto *M = conformedProtocol->getDecl()->getParentModule();
-  return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              nullptr);
+  return Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
 }
 
 Optional<ProtocolConformanceRef>
@@ -3065,7 +3054,7 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig)) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return Type(type);
+      return Type();
     }
 
     auto archetype = cast<ArchetypeType>(substOrig);
@@ -3081,7 +3070,7 @@ static Type substType(Type derivedType,
     if (!parent) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return Type(type);
+      return Type();
     }
 
     // Substitute into the parent type.
@@ -3123,8 +3112,7 @@ Type Type::substDependentTypesWithErrorTypes() const {
                     SubstFlags::UseErrorType));
 }
 
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
-                                    LazyResolver *resolver) {
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
   Type t(this);
   while (t) {
     // If we have a class-constrained archetype or class-constrained
@@ -3132,8 +3120,8 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
     auto *nominalDecl = t->getAnyNominal();
     if (!nominalDecl) {
       assert(t->is<ArchetypeType>() || t->isExistentialType() &&
-             "expected a class, archetype or existentiall");
-      t = t->getSuperclass(resolver);
+             "expected a class, archetype or existential");
+      t = t->getSuperclass();
       assert(t && "archetype or existential is not class constrained");
       continue;
     }
@@ -3142,7 +3130,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
     if (nominalDecl == baseClass)
       return t;
 
-    t = t->getSuperclass(resolver);
+    t = t->getSuperclass();
   }
   llvm_unreachable("no inheritance relationship between given classes");
 }
@@ -3170,13 +3158,10 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     return substitutions;
   }
 
-  // Extract the lazy resolver.
-  LazyResolver *resolver = dc->getASTContext().getLazyResolver();
-
   // Find the superclass type with the context matching that of the member.
   auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
-    baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
+    baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
   assert(ownerNominal == baseTy->getAnyNominal());
 
@@ -3308,10 +3293,9 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                               const ValueDecl *derivedDecl,
-                                              Type memberType,
-                                              LazyResolver *resolver) {
+                                              Type memberType) {
   auto subs = SubstitutionMap::getOverrideSubstitutions(
-      baseDecl, derivedDecl, /*derivedSubs=*/None, resolver);
+      baseDecl, derivedDecl, /*derivedSubs=*/None);
 
   if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
     memberType = FunctionType::get(genericMemberType->getInput(),
@@ -3977,7 +3961,6 @@ static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
 
 static bool usesNativeReferenceCounting(ClassDecl *theClass,
                                         ResilienceExpansion resilience) {
-  // NOTE: if you change this, change irgen::getReferenceCountingForClass.
   // TODO: Resilience? there might be some legal avenue of changing this.
   while (Type supertype = theClass->getSuperclass()) {
     theClass = supertype->getClassOrBoundGenericClass();
@@ -3987,8 +3970,6 @@ static bool usesNativeReferenceCounting(ClassDecl *theClass,
 }
 
 bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
-  assert(allowsOwnership());
-
   CanType type = getCanonicalType();
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4011,6 +3992,10 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     return ::usesNativeReferenceCounting(
                                   cast<BoundGenericClassType>(type)->getDecl(),
                                          resilience);
+  case TypeKind::UnboundGeneric:
+    return ::usesNativeReferenceCounting(
+                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
+                                         resilience);
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
@@ -4018,17 +4003,24 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
-    assert(archetype->requiresClass());
+    auto layout = archetype->getLayoutConstraint();
+    (void)layout;
+    assert(archetype->requiresClass() ||
+           (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
       return supertype->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
   }
 
   case TypeKind::Protocol:
-  case TypeKind::ProtocolComposition:
+  case TypeKind::ProtocolComposition: {
+    auto layout = getExistentialLayout();
+    assert(layout.requiresClass && "Opaque existentials don't use refcounting");
+    if (layout.superclass)
+      return layout.superclass->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+  }
 
-  case TypeKind::UnboundGeneric:
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
@@ -4069,11 +4061,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
                          SubstitutionList Args) {
   id.AddPointer(Layout);
-  for (auto &arg : Args) {
-    id.AddPointer(arg.getReplacement().getPointer());
-    for (auto conformance : arg.getConformances())
-      id.AddPointer(conformance.getOpaqueValue());
-  }
+  profileSubstitutionList(id, Args);
 }
 
 SILBoxType::SILBoxType(ASTContext &C,

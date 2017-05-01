@@ -215,7 +215,7 @@ namespace SourceKit {
   void ASTUnit::performAsync(std::function<void()> Fn) {
     Impl.Queue.dispatch(std::move(Fn));
   }
-}
+} // namespace SourceKit
 
 namespace {
 

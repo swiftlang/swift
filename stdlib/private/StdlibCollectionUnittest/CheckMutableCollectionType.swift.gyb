@@ -77,7 +77,7 @@ public func withInvalidOrderings(_ body: (@escaping (Int, Int) -> Bool) -> Void)
 internal func _mapInPlace<C : MutableCollection>(
   _ elements: inout C,
   _ transform: (C.Iterator.Element) -> C.Iterator.Element
-) where C.Indices.Iterator.Element == C.Index {
+) {
   for i in elements.indices {
     elements[i] = transform(elements[i])
   }
@@ -122,17 +122,8 @@ extension TestSuite {
     collectionIsBidirectional: Bool = false
   ) where
     C.SubSequence : MutableCollection,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithEquatableElement.SubSequence.Iterator.Element
-      == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
@@ -498,7 +489,7 @@ func checkSortedPredicateThrow(
     result = try c.sorted {
       (lhs, rhs) throws -> Bool in
       _blackHole(closureLifetimeTracker)
-      if  throwElement == extractValue(rhs).value {
+      if throwElement == extractValue(rhs).value {
         thrown = true
         throw SillyError.JazzHands
       }
@@ -671,7 +662,7 @@ self.test("\(testNamePrefix).sorted/ThrowingPredicate") {
   }
 }
 
-self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElememts") {
+self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElements") {
   for sequence in largeElementSortTests {
       for i in 0..<sequence.count {
       checkSortedPredicateThrow(
@@ -793,17 +784,8 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     isFixedLengthCollection: Bool
   ) where
     C.SubSequence : BidirectionalCollection & MutableCollection,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : BidirectionalCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithEquatableElement.SubSequence.Iterator.Element
-      == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
@@ -948,19 +930,9 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     isFixedLengthCollection: Bool
   ) where
     C.SubSequence : RandomAccessCollection & MutableCollection,
-    C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index == C.Index,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : RandomAccessCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithEquatableElement.SubSequence.Iterator.Element
-      == CollectionWithEquatableElement.Iterator.Element,
-    CollectionWithComparableElement.Iterator.Element : Comparable,
-    CollectionWithComparableElement.SubSequence.Indices.Iterator.Element == CollectionWithComparableElement.Index {
+    CollectionWithComparableElement.Iterator.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
 
@@ -1033,7 +1005,7 @@ func checkSortPredicateThrow(
     try c.sort {
       (lhs, rhs) throws -> Bool in
       _blackHole(closureLifetimeTracker)
-      if  throwElement == extractValue(rhs).value {
+      if throwElement == extractValue(rhs).value {
         throw SillyError.JazzHands
       }
       return lessImpl(extractValue(lhs).value, extractValue(rhs).value)

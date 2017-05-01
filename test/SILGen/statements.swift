@@ -166,6 +166,7 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
