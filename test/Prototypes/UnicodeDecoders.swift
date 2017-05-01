@@ -263,7 +263,7 @@ public protocol _UnicodeEncodingBase {
     where EncodedScalar.Iterator.Element == CodeUnit
 
   /// The replacement character U+FFFD as represented in this encoding
-  static var encodedReplacementScalar : EncodedScalar { get }
+  static var encodedReplacementCharacter : EncodedScalar { get }
 
   /// Returns true if `x` only appears in this encoding as the representation of
   /// a complete scalar value.
@@ -275,8 +275,6 @@ public protocol _UnicodeEncodingBase {
 
 public protocol UnicodeDecoder {
   associatedtype Encoding : _UnicodeEncodingBase
-  
-  static var replacement: Encoding.EncodedScalar { get }
   
   init()
 
@@ -328,7 +326,7 @@ extension Unicode.ParsingIterator : IteratorProtocol, Sequence {
   mutating func next() -> Decoder.Encoding.EncodedScalar? {
     switch decoder.parseOne(&codeUnits) {
     case let .valid(scalarContent): return scalarContent
-    case .invalid: return Decoder.replacement
+    case .invalid: return Decoder.Encoding.encodedReplacementCharacter
     case .emptyInput: return nil
     }
   }
@@ -598,8 +596,8 @@ extension _UTF8Decoder {
 extension Unicode.UTF8 : UnicodeEncoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt8>
 
-  public static var encodedReplacementScalar : EncodedScalar {
-    fatalError()
+  public static var encodedReplacementCharacter : EncodedScalar {
+    return EncodedScalar(_storage: 0xbdbfef, _bitCount: 24)
   }
 
   public static func _isScalar(_ x: CodeUnit) -> Bool  { return x & 0x80 == 0 }
@@ -624,10 +622,6 @@ extension Unicode.UTF8 : UnicodeEncoding {
 extension UTF8.ReverseDecoder : _UTF8Decoder {
   public typealias Encoding = Unicode.UTF8
 
-  public static var replacement : Encoding.EncodedScalar {
-    return Encoding.EncodedScalar(_storage: 0xefbfbd, _bitCount: 24)
-  }
-  
   public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
     return UTF8.ForwardDecoder.decodeOne(source)
   }
@@ -706,10 +700,6 @@ extension UTF8.ReverseDecoder : _UTF8Decoder {
 extension
  Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias Encoding = Unicode.UTF8
-  
-  public static var replacement : Encoding.EncodedScalar {
-    return Encoding.EncodedScalar(_storage: 0xbdbfef, _bitCount: 24)
-  }
   
   public // @testable
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
@@ -815,8 +805,8 @@ extension _UTF16Decoder {
 extension Unicode.UTF16 : UnicodeEncoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
-  public static var encodedReplacementScalar : EncodedScalar {
-    fatalError()
+  public static var encodedReplacementCharacter : EncodedScalar {
+    return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
   }
 
   public static func _isScalar(_ x: CodeUnit) -> Bool  {
@@ -829,18 +819,12 @@ extension Unicode.UTF16 : UnicodeEncoding {
   
   public struct ForwardDecoder {
     public typealias Buffer = _UIntBuffer<UInt32, UInt16>
-    public static var replacement : Encoding.EncodedScalar {
-      return Encoding.EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
-    }
     public init() { buffer = Buffer() }
     public var buffer: Buffer
   }
   
   public struct ReverseDecoder {
     public typealias Buffer = _UIntBuffer<UInt32, UInt16>
-    public static var replacement : Encoding.EncodedScalar {
-      return Encoding.EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
-    }
     public init() { buffer = Buffer() }
     public var buffer: Buffer
   }
