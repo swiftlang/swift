@@ -281,9 +281,19 @@ public protocol UnicodeDecoder {
   mutating func parseOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar> where I.Element == Encoding.CodeUnit
-
-  static func decodeOne(_ content: Encoding.EncodedScalar) -> UnicodeScalar
 }
+
+public protocol _UnicodeEncoding : _UnicodeEncodingBase {
+
+  associatedtype ForwardDecoder : UnicodeDecoder
+  // where ForwardDecoder.Encoding == Self
+  
+  associatedtype ReverseDecoder : UnicodeDecoder
+  // where ReverseDecoder.Encoding == Self
+}
+
+protocol UnicodeEncoding : _UnicodeEncoding
+where ForwardDecoder.Encoding == Self, ReverseDecoder.Encoding == Self {}
 
 extension UnicodeDecoder {
   @inline(__always)
@@ -300,7 +310,7 @@ extension UnicodeDecoder {
     while true {
       switch d.parseOne(&input) {
       case let .valid(scalarContent):
-        output(decodeOne(scalarContent))
+        output(Encoding.decode(scalarContent))
       case .invalid:
         if !makeRepairs { return 1 }
         errors += 1
@@ -364,9 +374,7 @@ extension Unicode.DefaultScalarView : Sequence {
 
 extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
   mutating func next() -> UnicodeScalar? {
-    return parsing.next().map {
-      Encoding.ForwardDecoder.decodeOne($0)
-    }
+    return parsing.next().map { Encoding.decode($0) }
   }
 }
 
@@ -435,7 +443,7 @@ extension Unicode.DefaultScalarView : Collection {
     case .valid(let scalarContent):
       return Index(
         codeUnitIndex: nextPosition,
-        scalar: Encoding.ForwardDecoder.decodeOne(scalarContent),
+        scalar: Encoding.decode(scalarContent),
         stride: numericCast(scalarContent.count))
     case .invalid(let stride):
       return Index(
@@ -492,7 +500,7 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
       let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d),
-        scalar: Encoding.ReverseDecoder.decodeOne(scalarContent),
+        scalar: Encoding.decode(scalarContent),
         stride: numericCast(scalarContent.count))
     case .invalid(let stride):
       let d: CodeUnits.IndexDistance = -numericCast(stride)
@@ -503,15 +511,6 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
     case .emptyInput: fatalError("index out of bounds.")
     }
   }
-}
-
-public protocol UnicodeEncoding : _UnicodeEncodingBase {
-  
-  associatedtype ForwardDecoder : UnicodeDecoder
-    where ForwardDecoder.Encoding.CodeUnit == CodeUnit
-
-  associatedtype ReverseDecoder : UnicodeDecoder
-    where ReverseDecoder.Encoding.CodeUnit == CodeUnit
 }
 
 public protocol _UTFDecoder : UnicodeDecoder
@@ -602,8 +601,28 @@ extension Unicode.UTF8 : UnicodeEncoding {
 
   public static func _isScalar(_ x: CodeUnit) -> Bool  { return x & 0x80 == 0 }
 
-  public static func decode(_ content: EncodedScalar) -> UnicodeScalar {
-    fatalError()
+  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    switch source._bitCount {
+    case 8:
+      return UnicodeScalar(_unchecked: bits)
+    case 16:
+      var value = (bits & 0b0_______________________11_1111__0000_0000) &>> 8
+      value    |= (bits & 0b0________________________________0001_1111) &<< 6
+      return UnicodeScalar(_unchecked: value)
+    case 24:
+      var value = (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 16
+      value    |= (bits & 0b0_______________________11_1111__0000_0000) &>> 2
+      value    |= (bits & 0b0________________________________0000_1111) &<< 12
+      return UnicodeScalar(_unchecked: value)
+    default:
+      _sanityCheck(source.count == 4)
+      var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
+      value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
+      value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
+      value    |= (bits & 0b0________________________________0000_0111) &<< 18
+      return UnicodeScalar(_unchecked: value)
+    }
   }
   
   public struct ForwardDecoder {
@@ -621,10 +640,6 @@ extension Unicode.UTF8 : UnicodeEncoding {
 
 extension UTF8.ReverseDecoder : _UTF8Decoder {
   public typealias Encoding = Unicode.UTF8
-
-  public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
-    return UTF8.ForwardDecoder.decodeOne(source)
-  }
 
   public // @testable
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
@@ -758,30 +773,6 @@ extension
     return 1
   }
   
-  public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
-    let bits = source._storage
-    switch source._bitCount {
-    case 8:
-      return UnicodeScalar(_unchecked: bits)
-    case 16:
-      var value = (bits & 0b0_______________________11_1111__0000_0000) &>> 8
-      value    |= (bits & 0b0________________________________0001_1111) &<< 6
-      return UnicodeScalar(_unchecked: value)
-    case 24:
-      var value = (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 16
-      value    |= (bits & 0b0_______________________11_1111__0000_0000) &>> 2
-      value    |= (bits & 0b0________________________________0000_1111) &<< 12
-      return UnicodeScalar(_unchecked: value)
-    default:
-      _sanityCheck(source.count == 4)
-      var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
-      value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
-      value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
-      value    |= (bits & 0b0________________________________0000_0111) &<< 18
-      return UnicodeScalar(_unchecked: value)
-    }
-  }
-
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     var r = buffer
     r._bitCount = bitCount
@@ -813,8 +804,14 @@ extension Unicode.UTF16 : UnicodeEncoding {
     return x & 0xf800 != 0xd800
   }
 
-  public static func decode(_ content: EncodedScalar) -> UnicodeScalar {
-    fatalError()
+  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
+    let bits = source._storage
+    if _fastPath(source._bitCount == 16) {
+      return UnicodeScalar(_unchecked: bits & 0xffff)
+    }
+    _sanityCheck(source._bitCount == 32)
+    let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
+    return UnicodeScalar(_unchecked: value)
   }
   
   public struct ForwardDecoder {
@@ -843,10 +840,6 @@ extension UTF16.ReverseDecoder : _UTF16Decoder {
     return (false, 1*16)
   }
   
-  public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
-    return UTF16.ForwardDecoder.decodeOne(source)
-  }
-  
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     return Encoding.EncodedScalar(
       _storage:
@@ -869,16 +862,6 @@ extension Unicode.UTF16.ForwardDecoder : _UTF16Decoder {
     return (false, 1*16)
   }
   
-  public static func decodeOne(_ source: Encoding.EncodedScalar) -> UnicodeScalar {
-    let bits = source._storage
-    if _fastPath(source._bitCount == 16) {
-      return UnicodeScalar(_unchecked: bits & 0xffff)
-    }
-    _sanityCheck(source._bitCount == 32)
-    let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
-    return UnicodeScalar(_unchecked: value)
-  }  
-
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     var r = buffer
     r._bitCount = bitCount
