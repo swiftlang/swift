@@ -10,7 +10,7 @@ func introducedFollowedByDeprecated() {}
 
 @available(OSX 10.0, deprecated: 10.12)
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'OSX 10.0'}}
-// expected-note@-2 {{did you mean to use 'OSX, introduced: 10.0'?}} {{15-15=, introduced:}}
+// expected-note@-2 {{did you mean to specify an introduction version?}} {{15-15=, introduced:}}
 // expected-error@-3 {{expected declaration}}
 func shorthandFollowedByDeprecated() {}
 

@@ -1137,11 +1137,8 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
                 PlatformSpec->getPlatformLoc().getAdvancedLoc(
                     PlatformName.size());
 
-            StringRef VersionName = PlatformSpec->getVersion().getAsString();
-
             diagnose(PlatformSpec->getPlatformLoc(),
-                     diag::avail_query_meant_introduced, PlatformName,
-                     VersionName)
+                     diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
 
