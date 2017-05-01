@@ -4923,6 +4923,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   ) rethrows where S.Iterator.Element == (Key, Value) {
     if _fastPath(guaranteedNative) {
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
+      return
     }
 
     switch self {
