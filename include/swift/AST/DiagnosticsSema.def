@@ -3614,7 +3614,7 @@ ERROR(empty_switch_stmt,none,
 ERROR(non_exhaustive_switch,none,
       "%select{switch must be exhaustive, consider adding |do you want to add }0"
       "%select{missing cases|a default clause}1"
-      "%select{:|?}0 %2", (bool, bool, StringRef))
+      "%select{:|?}0", (bool, bool))
 NOTE(missing_particular_case,none,
      "missing case: '%0'", (StringRef))
 WARNING(redundant_particular_case,none,
