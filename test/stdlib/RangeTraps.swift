@@ -17,6 +17,9 @@
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
+// CountablePartialRangeFrom fails in resilient mode. <rdar://problem/31909976>
+// XFAIL: resilient_stdlib
+
 
 import StdlibUnittest
 
