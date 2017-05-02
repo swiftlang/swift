@@ -2027,8 +2027,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// A collection containing just the keys of the dictionary.
   ///
-  /// When iterated over, keys appear in this collection in the same order as they
-  /// occur in the dictionary's key-value pairs. Each key in the keys
+  /// When iterated over, keys appear in this collection in a non-deterministic order. Each key in the keys
   /// collection has a unique value.
   ///
   ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
@@ -2044,8 +2043,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// A collection containing just the values of the dictionary.
   ///
-  /// When iterated over, values appear in this collection in the same order as they
-  /// occur in the dictionary's key-value pairs.
+  /// When iterated over, values appear in this collection in a non-deterministic order.
   ///
   ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
   ///     print(countryCodes)
