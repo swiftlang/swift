@@ -410,8 +410,8 @@ class ExistentialTypeFlags {
   };
   int_type Data;
 
-  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
 public:
+  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
   constexpr ExistentialTypeFlags() : Data(0) {}
   constexpr ExistentialTypeFlags withNumWitnessTables(unsigned numTables) const {
     return ExistentialTypeFlags((Data & ~NumWitnessTablesMask) | numTables);

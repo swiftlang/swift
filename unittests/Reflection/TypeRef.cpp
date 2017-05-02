@@ -166,10 +166,10 @@ TEST(TypeRefTest, UniqueProtocolTypeRef) {
   EXPECT_NE(P2, P3);
   EXPECT_NE(P3, P4);
 
-  auto PC1 = Builder.createProtocolCompositionType({P1, P2});
-  auto PC2 = Builder.createProtocolCompositionType({P1, P2});
-  auto PC3 = Builder.createProtocolCompositionType({P1, P2, P2});
-  auto Any = Builder.createProtocolCompositionType({});
+  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, false);
+  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, false);
+  auto PC3 = Builder.createProtocolCompositionType({P1, P2, P2}, false);
+  auto Any = Builder.createProtocolCompositionType({}, false);
 
   EXPECT_EQ(PC1, PC2);
   EXPECT_NE(PC2, PC3);

@@ -215,12 +215,16 @@ public:
   }
 
   const ProtocolCompositionTypeRef *
-  createProtocolCompositionType(const std::vector<const TypeRef*> &protocols) {
-    for (auto protocol : protocols) {
-      if (!isa<ProtocolTypeRef>(protocol))
+  createProtocolCompositionType(const std::vector<const TypeRef*> &members,
+                                bool hasExplicitAnyObject) {
+    for (auto member : members) {
+      if (!isa<ProtocolTypeRef>(member) &&
+          !isa<NominalTypeRef>(member) &&
+          !isa<BoundGenericTypeRef>(member))
         return nullptr;
     }
-    return ProtocolCompositionTypeRef::create(*this, protocols);
+    return ProtocolCompositionTypeRef::create(*this, members,
+                                              hasExplicitAnyObject);
   }
 
   const ExistentialMetatypeTypeRef *
