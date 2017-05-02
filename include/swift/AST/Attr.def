@@ -273,6 +273,10 @@ DECL_ATTR(_implements, Implements,
           | NotSerialized | UserInaccessible,
           /* Not serialized */ 67)
 
+DECL_ATTR(NSKeyedArchiveLegacy, NSKeyedArchiveLegacy,
+          OnClass | NotSerialized | LongAttribute,
+          /*Not serialized */ 68)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

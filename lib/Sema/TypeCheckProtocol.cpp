@@ -5912,7 +5912,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           }
         }
 
-        if (kind && !hasExplicitObjCName(classDecl)) {
+        if (kind && !hasExplicitObjCName(classDecl) &&
+            !classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>()) {
           SourceLoc loc;
           if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
             loc = normal->getLoc();

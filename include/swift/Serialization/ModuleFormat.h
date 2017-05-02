@@ -1314,6 +1314,8 @@ namespace decls_block {
   using SynthesizedProtocolDeclAttrLayout
     = BCRecordLayout<SynthesizedProtocol_DECL_ATTR>;
   using ImplementsDeclAttrLayout = BCRecordLayout<Implements_DECL_ATTR>;
+  using NSKeyedArchiveLegacyDeclAttrLayout
+    = BCRecordLayout<NSKeyedArchiveLegacy_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
