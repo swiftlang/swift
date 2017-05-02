@@ -101,11 +101,52 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
   globalX = X() // no-trap
 }
 
-ExclusiveAccessTestSuite.test("ClosureCaptureModifyModify") {
+ExclusiveAccessTestSuite.test("ClosureCaptureModifyModify")
+.skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("modify/modify access conflict detected on address")
+  .code
+{
   var x = X()
   modifyAndPerform(&x) {
-    // FIXME: This should be caught dynamically.
+    expectCrashLater()
     x.i = 12
+  }
+}
+
+ExclusiveAccessTestSuite.test("ClosureCaptureReadModify")
+.skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("read/modify access conflict detected on address")
+  .code
+{
+  var x = X()
+  modifyAndPerform(&x) {
+    expectCrashLater()
+    _blackHole(x.i)
+  }
+}
+
+ExclusiveAccessTestSuite.test("ClosureCaptureModifyRead")
+.skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("modify/read access conflict detected on address")
+  .code
+{
+  var x = X()
+  readAndPerform(&x) {
+    expectCrashLater()
+    x.i = 12
+  }
+}
+
+ExclusiveAccessTestSuite.test("ClosureCaptureReadRead") {
+  var x = X()
+  readAndPerform(&x) {
+    _blackHole(x.i) // no-trap
   }
 }
 
@@ -113,7 +154,7 @@ ExclusiveAccessTestSuite.test("ClosureCaptureModifyModify") {
 // have overlapping accesses
 ExclusiveAccessTestSuite.test("PerThreadEnforcement") {
   modifyAndPerform(&globalX) {
-    var (_, otherThread) = _stdlib_pthread_create_block(nil, { (_ : Void) -> () in
+    let (_, otherThread) = _stdlib_pthread_create_block(nil, { (_ : Void) -> () in
       globalX.i = 12 // no-trap
       return ()
     }, ())
