@@ -378,7 +378,7 @@ private:
     return true;
   }
 
-  Decl *getParentDecl() {
+  Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
     return nullptr;
@@ -390,7 +390,7 @@ private:
     EntitiesStack.back().RefsToSuppress.push_back(Loc);
   }
 
-  bool isRepressed(SourceLoc Loc) {
+  bool isRepressed(SourceLoc Loc) const {
     if (EntitiesStack.empty() || Loc.isInvalid())
       return false;
     auto &Suppressed = EntitiesStack.back().RefsToSuppress;
@@ -398,17 +398,17 @@ private:
 
   }
 
-  Expr *getContainingExpr(size_t index) {
+  Expr *getContainingExpr(size_t index) const {
     if (ExprStack.size() > index)
       return ExprStack.end()[-(index + 1)];
     return nullptr;
   }
 
-  Expr *getCurrentExpr() {
+  Expr *getCurrentExpr() const {
     return ExprStack.empty() ? nullptr : ExprStack.back();
   }
 
-  Expr *getParentExpr() {
+  Expr *getParentExpr() const {
     return getContainingExpr(1);
   }
 
@@ -466,8 +466,11 @@ private:
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
       return false;
-    if (!IdxConsumer.indexLocals() && isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
-      return false;
+
+    if (!IdxConsumer.indexLocals() && isLocalSymbol(D))
+      return isa<ParamDecl>(D) && !IsRef &&
+        D->getDeclContext()->getContextKind() != DeclContextKind::AbstractClosureExpr;
+
     if (D->isPrivateStdlibDecl())
       return false;
 
