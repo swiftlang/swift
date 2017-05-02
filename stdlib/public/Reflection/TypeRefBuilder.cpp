@@ -124,15 +124,16 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
-std::vector<FieldTypeInfo>
-TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
+
+bool TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR,
+                                      const FieldDescriptor *FD,
+                                      std::vector<FieldTypeInfo> &Fields) {
   if (FD == nullptr)
-    return {};
+    return false;
 
   auto Subs = TR->getSubstMap();
 
   Demangle::Demangler Dem;
-  std::vector<FieldTypeInfo> Fields;
   for (auto &Field : *FD) {
     auto FieldName = Field.getFieldName();
 
@@ -145,7 +146,7 @@ TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
     auto Demangled = Dem.demangleType(Field.getMangledTypeName());
     auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
     if (!Unsubstituted)
-      return {};
+      return false;
 
     auto Substituted = Unsubstituted->subst(*this, Subs);
 
@@ -156,7 +157,7 @@ TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
 
     Fields.push_back(FieldTypeInfo::forField(FieldName, Substituted));
   }
-  return Fields;
+  return true;
 }
 
 const BuiltinTypeDescriptor *
