@@ -463,7 +463,7 @@ class ClassConformsToClassProtocolBad2 : ProtoRefinesClass {} // FIXME
 class ClassConformsToClassProtocolGood2 : Derived, ProtoRefinesClass {}
 
 // Subclass existentials inside inheritance clauses
-class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 {
+class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 { // FIXME: expected-error {{}}
   required init(classInit: ()) {
     super.init(classInit: ()) // FIXME: expected-error {{}}
   }
