@@ -118,10 +118,21 @@ protected:
   }
   
   SILType getTypeInClonedContext(SILType Ty) {
+    auto objectTy = Ty.getSwiftRValueType();
+    // Do not substitute opened existential types, if we do not have any.
+    if (!objectTy->hasOpenedExistential())
+      return Ty;
+    // Do not substitute opened existential types, if it is not required.
+    // This is often the case when cloning basic blocks inside the same
+    // function.
+    if (OpenedExistentialSubs.empty())
+      return Ty;
+
     // Substitute opened existential types, if we have any.
-    return SILType::getPrimitiveObjectType(
-      getASTTypeInClonedContext(Ty.getSwiftRValueType()))
-      .copyCategory(Ty);
+    return Ty.subst(
+      Builder.getModule(),
+      QueryTypeSubstitutionMapOrIdentity{OpenedExistentialSubs},
+      MakeAbstractConformanceForGenericType());
   }
   SILType getOpType(SILType Ty) {
     Ty = getTypeInClonedContext(Ty);
@@ -138,24 +149,10 @@ protected:
     if (OpenedExistentialSubs.empty())
       return ty->getCanonicalType();
 
-    return ty.transform(
-      [&](Type t) -> Type {
-        if (t->isOpenedExistential()) {
-          auto found = OpenedExistentialSubs.find(
-            t->castTo<ArchetypeType>());
-          // If an opened existential is supposed to be
-          // remapped, it is guaranteed by construction
-          // to be in the OpenedExistentialSubs, because
-          // a cloner always processes definitions of
-          // opened existentials before their uses and
-          // adds found opened existentials definitions
-          // to the map.
-          if (found != OpenedExistentialSubs.end())
-            return found->second;
-          return t;
-        }
-        return t;
-      })->getCanonicalType();
+    return ty.subst(
+      QueryTypeSubstitutionMapOrIdentity{OpenedExistentialSubs},
+      MakeAbstractConformanceForGenericType()
+    )->getCanonicalType();
   }
 
   CanType getOpASTType(CanType ty) {
