@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgensil"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
