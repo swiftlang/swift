@@ -64,6 +64,41 @@ sil hidden @markFuncEscape : $@convention(thin) () -> () {
   %99 = return %98 : $()
 }
 
+
+sil @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+sil @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+
+// Test dynamic enforcement of box addresses that escape via closure
+// partial_applys.
+// application.
+// CHECK-LABEL: sil hidden @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:  [[BOX:%.*]] = alloc_box ${ var Builtin.Int64 }, var, name "x"
+// CHECK:  [[ADR:%.*]] = project_box [[BOX]] : ${ var Builtin.Int64 }, 0
+// CHECK:  [[FUNC:%.*]] = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+// CHECK:  [[CLOSURE:%.*]] = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+// CHECK:  [[PA:%.*]] = partial_apply [[CLOSURE]]([[ADR]]) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+// CHECK:  [[MODIFY:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Builtin.Int64
+// CHECK:  %{{.*}} = apply [[FUNC]]([[MODIFY]], [[PA]]) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+// CHECK:  end_access [[MODIFY]] : $*Builtin.Int64
+// CHECK:  destroy_value [[BOX]] : ${ var Builtin.Int64 }
+// CHECK:  return %{{.*}} : $()
+// CHECK-LABEL:} // end sil function 'escapeAsArgumentToPartialApply'
+sil hidden @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
+  %2 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %3 = project_box %2 : ${ var Builtin.Int64 }, 0
+  %4 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  %5 = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %7 = begin_access [modify] [unknown] %3 : $*Builtin.Int64
+  %8 = apply %4(%7, %6) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  end_access %7 : $*Builtin.Int64
+  destroy_value %2 : ${ var Builtin.Int64 }
+  %9 = tuple ()
+  %10 = return %9 : $()
+}
+
+
 // Test static enforcement of copied boxes.
 // FIXME: Oops... We make this dynamic.
 //
