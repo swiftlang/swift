@@ -4,9 +4,6 @@
 // REQUIRES: executable_test
 // REQUIRES: PTRSIZE=64
 
-// Disabled for now
-// REQUIRES: rdar31776015
-
 import StdlibUnittest
 
 var keyPath = TestSuite("key paths")

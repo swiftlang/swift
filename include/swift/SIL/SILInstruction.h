@@ -1599,6 +1599,9 @@ public:
                                    getter, setter, indices, ty);
   }
   
+  void incrementRefCounts() const;
+  void decrementRefCounts() const;
+  
   void Profile(llvm::FoldingSetNodeID &ID);
 };
 
@@ -1696,6 +1699,7 @@ class KeyPathInst final
   
 public:
   KeyPathPattern *getPattern() const;
+  bool hasPattern() const { return (bool)Pattern; }
 
   ArrayRef<Operand> getAllOperands() const {
     // TODO: Subscript keypaths will have operands.
@@ -1711,6 +1715,8 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::KeyPathInst;
   }
+  
+  void dropReferencedPattern();
   
   ~KeyPathInst();
 };
