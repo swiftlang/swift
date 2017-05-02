@@ -82,19 +82,17 @@ lookupSuperclass(const std::string &MangledTypeName) {
 
 const TypeRef * TypeRefBuilder::
 lookupSuperclass(const TypeRef *TR) {
-  const TypeRef *Superclass = nullptr;
-
-  if (auto *Nominal = dyn_cast<NominalTypeRef>(TR)) {
-    Superclass = lookupSuperclass(Nominal->getMangledName());
-  } else {
-    auto BG = cast<BoundGenericTypeRef>(TR);
-    Superclass = lookupSuperclass(BG->getMangledName());
-  }
-
-  if (Superclass == nullptr)
+  auto *FD = getFieldTypeInfo(TR);
+  if (FD == nullptr)
     return nullptr;
 
-  return Superclass->subst(*this, TR->getSubstMap());
+  Demangle::Demangler Dem;
+  auto Demangled = Dem.demangleType(FD->getSuperclass());
+  auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
+  if (!Unsubstituted)
+    return nullptr;
+
+  return Unsubstituted->subst(*this, TR->getSubstMap());
 }
 
 const FieldDescriptor *
