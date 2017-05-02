@@ -1405,34 +1405,36 @@ static size_t firstNotOf(const char * haystack, const char * needles,
 static void diagnoseInvalidMultilineIndents(
                                       DiagnosticEngine *Diags, 
                                       StringRef ExpectedIndentation,
-                                      CharSourceRange ExpectedIndentationRange,
+                                      SourceLoc IndentationLoc,
                                       const char * LinePtr) {
+  auto lineLoc = Lexer::getSourceLoc(LinePtr);
+
+  Diags->diagnose(lineLoc, diag::lex_inconsistent_string_indent);
+  
   // Find the first mismatched character. LinePtr must eventually include a 
   // newline, and ExpectedIndentation never includes newlines, so we don't need 
   // to bounds-check access to LinePtr.
   size_t mistakeOffset = commonPrefixLength(ExpectedIndentation, LinePtr);
   
-  Diag<> error;
   switch(LinePtr[mistakeOffset]) {
   case ' ':
-    assert(ExpectedIndentation[mistakeOffset] == '\t');
-    error = diag::lex_unexpected_space_in_string_indent;
-    break;
-
   case '\t':
-    assert(ExpectedIndentation[mistakeOffset] == ' ');
-    error = diag::lex_unexpected_tab_in_string_indent;
+    Diags->diagnose(lineLoc.getAdvancedLoc(mistakeOffset), 
+                    diag::note_unexpected_char_in_string_indent, 
+                    LinePtr[mistakeOffset] == '\t');
     break;
 
   default:
     // Expected space or tab, got something else.
-    error = diag::lex_insufficient_string_indent;
+      Diags->diagnose(lineLoc.getAdvancedLoc(mistakeOffset),
+                      diag::note_insufficient_string_indent);
     break;
   }
   
-  auto lineLoc = Lexer::getSourceLoc(LinePtr);
-  
-  Diags->diagnose(lineLoc, error);
+  // Point out character expected to match.
+  Diags->diagnose(IndentationLoc.getAdvancedLoc(mistakeOffset), 
+                  diag::note_matching_indentation_char_here,
+                  ExpectedIndentation[mistakeOffset] == '\t');
   
   // Scan past any remaining indentation in the line, which we will assume is 
   // incorrect.
@@ -1444,13 +1446,6 @@ static void diagnoseInvalidMultilineIndents(
   Diags->diagnose(lineLoc, diag::note_change_current_line_indentation)
     .fixItReplaceChars(lineLoc, lineLoc.getAdvancedLoc(allIndentationOffset), 
                        ExpectedIndentation);
-  
-  // Also suggest adjusting the literal's indentation to match this line.
-  Diags->diagnose(ExpectedIndentationRange.getStart(), 
-                  diag::note_change_last_line_indentation)
-    .fixItReplaceChars(ExpectedIndentationRange.getStart(), 
-                       ExpectedIndentationRange.getEnd(), 
-                       StringRef(LinePtr, allIndentationOffset));
 }
 
 /// validateMultilineIndents:
@@ -1470,7 +1465,7 @@ static void validateMultilineIndents(const Token &Str,
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
       if (Bytes.substr(nextpos, Indent.size()) != Indent) {
-        diagnoseInvalidMultilineIndents(Diags, Indent, IndentRange, 
+        diagnoseInvalidMultilineIndents(Diags, Indent, IndentRange.getStart(), 
                                         BytesPtr + nextpos);
       }
     }

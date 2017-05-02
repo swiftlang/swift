@@ -131,17 +131,17 @@ ERROR(lex_unicode_escape_braces,none,
 ERROR(lex_illegal_multiline_string_start,none,
       "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,
-      "multi-line string literal content must not be on the delimiter's line", ())
-ERROR(lex_insufficient_string_indent,none,
-      "string literal content is insufficiently indented", ())
-ERROR(lex_unexpected_tab_in_string_indent,none,
-      "string literal content is indented with a tab where a space is expected", ())
-ERROR(lex_unexpected_space_in_string_indent,none,
-      "string literal content is indented with a space where a tab is expected", ())
+      "multi-line string literal closing delimiter must begin on a new line", ())
+ERROR(lex_inconsistent_string_indent,none,
+      "line does not start with same indentation as closing delimiter of multi-line string literal", ())
+NOTE(note_insufficient_string_indent,none,
+      "unexpectedly found non-indentation character here", ())
+NOTE(note_unexpected_char_in_string_indent,none,
+      "unexpected %select{space|tab}0 in indentation here", (bool))
+NOTE(note_matching_indentation_char_here,none,
+      "should match %select{space|tab}0 in same position before closing delimiter", (bool))
 NOTE(note_change_current_line_indentation,none,
-      "change indentation to match last line", ())
-NOTE(note_change_last_line_indentation,none,
-      "change last line's indentation to match this line", ())
+      "change indentation of this line to match closing delimiter", ())
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
