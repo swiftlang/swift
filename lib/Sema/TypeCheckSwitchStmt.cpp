@@ -945,7 +945,6 @@ namespace {
           }
         }
 
-
         TC.Context.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
         TC.Context.Diags.diagnose(StartLoc, diag::missing_several_cases, false)
           .fixItInsert(EndLoc, Buffer.str());
