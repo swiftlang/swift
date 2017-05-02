@@ -30,6 +30,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/ABI/KeyPath.h"
+#include "swift/ABI/HeapObject.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -42,15 +43,6 @@ using namespace irgen;
 llvm::Constant *
 IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                      SILLocation diagLoc) {
-  // TODO: Landing 32-bit key paths requires some runtime changes to get the
-  // 8-byte object header.
-  if (getPointerSize() != Size(8)) {
-    Context.Diags.diagnose(diagLoc.getSourceLoc(),
-                           diag::not_implemented,
-                           "32-bit key paths");
-    return llvm::UndefValue::get(Int8PtrTy);
-  }
-  
   // See if we already emitted this.
   auto found = KeyPathPatterns.find(pattern);
   if (found != KeyPathPatterns.end())
@@ -119,12 +111,35 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   fields.setPacked(true);
   // Add a zero-initialized header we can use for lazy initialization.
   fields.add(llvm::ConstantInt::get(SizeTy, 0));
-  
+
+#ifndef NDEBUG
+  auto startOfObject = fields.getNextOffsetFromGlobal();
+#endif
+
   // Store references to metadata generator functions to generate the metadata
   // for the root and leaf. These sit in the "isa" and object header parts of
   // the final object.
   fields.add(emitMetadataGenerator(rootTy));
   fields.add(emitMetadataGenerator(valueTy));
+  
+  // TODO: 32-bit still has a padding word
+  if (SizeTy == Int32Ty) {
+    fields.addInt32(0);
+  }
+  
+#ifndef NDEBUG
+  auto endOfObjectHeader = fields.getNextOffsetFromGlobal();
+  unsigned expectedObjectHeaderSize;
+  if (SizeTy == Int64Ty)
+    expectedObjectHeaderSize = SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64;
+  else if (SizeTy == Int32Ty)
+    expectedObjectHeaderSize = SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32;
+  else
+    llvm_unreachable("unexpected pointer size");
+  assert((endOfObjectHeader - startOfObject).getValue()
+            == expectedObjectHeaderSize
+       && "key path pattern header size doesn't match heap object header size");
+#endif
   
   // Add a pointer to the ObjC KVC compatibility string, if there is one, or
   // null otherwise.

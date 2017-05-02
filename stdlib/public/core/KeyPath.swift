@@ -1414,7 +1414,8 @@ public func _appendingKeyPaths<
 }
 
 // The distance in bytes from the address point of a KeyPath object to its
-// buffer header. Includes the size of the Swift heap object header and
+// buffer header. Includes the size of the Swift heap object header and the
+// pointer to the KVC string.
 
 internal var keyPathObjectHeaderSize: Int {
   return MemoryLayout<HeapObject>.size + MemoryLayout<Int>.size
@@ -1437,7 +1438,7 @@ public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   //   global object will itself always have the "trivial" bit set, since it
   //   never needs to be destroyed.)
   // - Components may have unresolved forms that require instantiation.
-  // - The component type metadata pointers are unresolved, and instead
+  // - Type metadata pointers are unresolved, and instead
   //   point to accessor functions that instantiate the metadata.
   //
   // The pattern never precomputes the capabilities of the key path (readonly/
@@ -1649,7 +1650,7 @@ internal func _instantiateKeyPathBuffer(
 ) {
   // NB: patternBuffer and destData alias when the pattern is instantiable
   // in-line. Therefore, do not read from patternBuffer after the same position
-  // in destBuffer has been written to.
+  // in destData has been written to.
 
   var patternBuffer = origPatternBuffer
   let destHeaderPtr = origDestData.baseAddress.unsafelyUnwrapped
