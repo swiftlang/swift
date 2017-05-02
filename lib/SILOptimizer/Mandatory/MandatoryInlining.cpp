@@ -133,15 +133,23 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     for (Operand *ABIUse : ABI->getUses()) {
       if (SRI == nullptr && isa<StrongReleaseInst>(ABIUse->getUser())) {
         SRI = cast<StrongReleaseInst>(ABIUse->getUser());
-      } else if (ABIUse->getUser() != PBI)
-        return;
+        continue;
+      }
+
+      if (ABIUse->getUser() == PBI)
+        continue;
+
+      return;
     }
+
     StoreInst *SI = nullptr;
     for (Operand *PBIUse : PBI->getUses()) {
       if (SI == nullptr && isa<StoreInst>(PBIUse->getUser())) {
         SI = cast<StoreInst>(PBIUse->getUser());
-      } else
-        return;
+        continue;
+      }
+
+      return;
     }
 
     // If we found a store, record its source and erase it.
