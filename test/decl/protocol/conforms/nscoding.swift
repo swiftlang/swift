@@ -14,11 +14,13 @@ class CodingA : NSObject, NSCoding {
 // Nested classes
 extension CodingA {
   class NestedA : NSObject, NSCoding { // expected-error{{nested class 'CodingA.NestedA' has an unstable name when archiving via 'NSCoding'}}
+    // expected-note@-1{{add the '@NSKeyedArchiveLegacy' attribute to specify the class name used for archiving}}{{3-3=@NSKeyedArchiveLegacy("<#class archival name#>")}}
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
 
   class NestedB : NSObject {
+    // expected-note@-1{{add the '@NSKeyedArchiveLegacy' attribute to specify the class name used for archiving}}{{3-3=@NSKeyedArchiveLegacy("<#class archival name#>")}}
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
@@ -57,12 +59,14 @@ extension CodingB {
 
 // Fileprivate classes.
 fileprivate class CodingC : NSObject, NSCoding {    // expected-error{{fileprivate class 'CodingC' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{add the '@NSKeyedArchiveLegacy' attribute to specify the class name used for archiving}}{{1-1=@NSKeyedArchiveLegacy("<#class archival name#>")}}
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
 // Private classes
 private class CodingD : NSObject, NSCoding {       // expected-error{{private class 'CodingD' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{add the '@NSKeyedArchiveLegacy' attribute to specify the class name used for archiving}}{{1-1=@NSKeyedArchiveLegacy("<#class archival name#>")}}
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }

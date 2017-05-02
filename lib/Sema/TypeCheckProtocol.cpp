@@ -5891,8 +5891,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         // Note: these 'kind' values are synchronized with
         // diag::nscoding_unstable_mangled_name.
         Optional<unsigned> kind;
+        bool isFixable = true;
         if (classDecl->getGenericSignature()) {
           kind = 3;
+          isFixable = false;
         } else if (classDecl->getDeclContext()->isTypeContext()) {
           kind = 2;
         } else {
@@ -5925,6 +5927,12 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                    emitWarning ? diag::nscoding_unstable_mangled_name_warn
                                : diag::nscoding_unstable_mangled_name,
                    *kind, classDecl->TypeDecl::getDeclaredInterfaceType());
+          if (isFixable) {
+            diagnose(classDecl, diag::add_nskeyedarchivelegacy_attr)
+              .fixItInsert(
+                classDecl->getAttributeInsertionLoc(/*forModifier=*/false),
+                "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
+          }
         }
       }
     }

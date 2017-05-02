@@ -1220,7 +1220,9 @@ WARNING(nscoding_unstable_mangled_name_warn,none,
         "%select{private|fileprivate|nested|generic}0 class %1 has an unstable "
         "name when archiving via 'NSCoding'",
         (unsigned, Type))
-
+NOTE(add_nskeyedarchivelegacy_attr,none,
+     "add the '@NSKeyedArchiveLegacy' attribute to specify the class name "
+     "used for archiving", ())
 
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,
