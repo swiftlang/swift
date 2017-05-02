@@ -417,7 +417,11 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
     SILValue currOperand = operand.get();
     SILType silType = currOperand->getType();
     SILType newSilType = getNewSILType(genEnv, silType, pass.Mod);
-    if (silType != newSilType) {
+    if (silType != newSilType ||
+        std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
+                  currOperand) != pass.largeLoadableArgs.end() ||
+        std::find(pass.funcSigArgs.begin(), pass.funcSigArgs.end(),
+                  currOperand) != pass.funcSigArgs.end()) {
       pass.applies.push_back(applySite.getInstruction());
       return;
     }
