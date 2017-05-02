@@ -2244,9 +2244,11 @@ public:
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
     auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
-    requireSameType(CMI->getType(),
-                    SILType::getPrimitiveObjectType(overrideTy),
-        "result type of class_method must match abstracted type of method");
+    if (CMI->getModule().getStage() != SILStage::Lowered) {
+      requireSameType(
+          CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+          "result type of class_method must match abstracted type of method");
+    }
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of class_method");
     require(!methodType->getExtInfo().hasContext(),
@@ -2280,8 +2282,11 @@ public:
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
     auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
-    requireSameType(CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
-                    "result type of super_method must match abstracted type of method");
+    if (CMI->getModule().getStage() != SILStage::Lowered) {
+      requireSameType(
+          CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
+          "result type of super_method must match abstracted type of method");
+    }
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
     require(!methodType->getExtInfo().hasContext(),
@@ -4226,12 +4231,14 @@ void SILVTable::verify(const SILModule &M) const {
       llvm::raw_svector_ostream os(baseName);
       entry.Method.print(os);
     }
-    
-    SILVerifier(*entry.Implementation)
-      .requireABICompatibleFunctionTypes(
-                    baseInfo.getSILType().castTo<SILFunctionType>(),
-                    entry.Implementation->getLoweredFunctionType(),
-                    "vtable entry for " + baseName + " must be ABI-compatible");
+
+    if (M.getStage() != SILStage::Lowered) {
+      SILVerifier(*entry.Implementation)
+          .requireABICompatibleFunctionTypes(
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              entry.Implementation->getLoweredFunctionType(),
+              "vtable entry for " + baseName + " must be ABI-compatible");
+    }
   }
 #endif
 }
