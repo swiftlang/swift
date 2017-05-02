@@ -14,7 +14,7 @@ import SwiftShims
 
 public protocol StringProtocol
   : RangeReplaceableCollection, BidirectionalCollection,
-  CustomStringConvertible, CustomDebugStringConvertible,
+  CustomDebugStringConvertible,
   CustomReflectable, CustomPlaygroundQuickLookable,
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringLiteral,
