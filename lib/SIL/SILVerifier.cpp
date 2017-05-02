@@ -2707,10 +2707,10 @@ public:
             "init_existential instruction must have the "
             "right number of conformances");
 
-    if (layout.requiresClass) {
+    if (layout.requiresClass()) {
       require(concreteType->mayHaveSuperclass() ||
               (concreteType.isExistentialType() &&
-               concreteType.getExistentialLayout().requiresClass),
+               concreteType.getExistentialLayout().requiresClass()),
               "init_existential of class existential with non-class type");
     }
 

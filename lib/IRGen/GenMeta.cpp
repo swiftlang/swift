@@ -951,7 +951,7 @@ namespace {
       // Note: ProtocolClassConstraint::Class is 0, ::Any is 1.
       auto classConstraint =
         llvm::ConstantInt::get(IGF.IGM.Int1Ty,
-                               !layout.requiresClass);
+                               !layout.requiresClass());
       llvm::Value *superclassConstraint =
         llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
       if (layout.superclass) {

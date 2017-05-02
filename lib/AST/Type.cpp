@@ -228,14 +228,7 @@ ExistentialLayout::ExistentialLayout(ProtocolType *type) {
 
   auto *protoDecl = type->getDecl();
 
-  if (protoDecl->requiresClass()) {
-    requiresClass = true;
-    requiresClassImplied = true;
-  } else {
-    requiresClass = false;
-    requiresClassImplied = false;
-  }
-
+  hasExplicitAnyObject = false;
   containsNonObjCProtocol =
     !(protoDecl->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
       protoDecl->isObjC());
@@ -246,8 +239,7 @@ ExistentialLayout::ExistentialLayout(ProtocolType *type) {
 ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   assert(type->isCanonical());
 
-  requiresClass = type->hasExplicitAnyObject();
-  requiresClassImplied = false;
+  hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsNonObjCProtocol = false;
 
   auto members = type->getMembers();
@@ -255,17 +247,10 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
       isa<ClassDecl>(members[0]->getAnyNominal())) {
     superclass = members[0];
     members = members.slice(1);
-    requiresClass = true;
-    requiresClassImplied = true;
   }
 
   for (auto member : members) {
     auto *protoDecl = member->castTo<ProtocolType>()->getDecl();
-    if (protoDecl->requiresClass()) {
-      requiresClass = true;
-      requiresClassImplied = true;
-    }
-
     containsNonObjCProtocol |=
       !(protoDecl->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
         protoDecl->isObjC());
@@ -291,10 +276,22 @@ ExistentialLayout CanType::getExistentialLayout() {
   return ExistentialLayout(comp);
 }
 
+bool ExistentialLayout::requiresClass() const {
+  if (hasExplicitAnyObject || superclass)
+    return true;
+
+  for (auto proto : getProtocols()) {
+    if (proto->requiresClass())
+      return true;
+  }
+
+  return false;
+}
+
 bool ExistentialLayout::isAnyObject() const {
   // New implementation
   auto protocols = getProtocols();
-  if (requiresClass && !requiresClassImplied && protocols.empty())
+  if (hasExplicitAnyObject && !superclass && protocols.empty())
     return true;
 
   // Old implementation -- FIXME: remove this
@@ -583,7 +580,8 @@ bool TypeBase::isAnyObject() {
 
 bool ExistentialLayout::isErrorExistential() const {
   auto protocols = getProtocols();
-  return (!requiresClass &&
+  return (!hasExplicitAnyObject &&
+          !superclass &&
           protocols.size() == 1 &&
           protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
 }
@@ -602,7 +600,7 @@ bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
 }
 
 LayoutConstraint ExistentialLayout::getLayoutConstraint() const {
-  if (requiresClass && !requiresClassImplied) {
+  if (hasExplicitAnyObject) {
     return LayoutConstraint::getLayoutConstraint(
       LayoutConstraintKind::Class);
   }
@@ -2768,7 +2766,7 @@ bool ProtocolType::requiresClass() {
 }
 
 bool ProtocolCompositionType::requiresClass() {
-  return getExistentialLayout().requiresClass;
+  return getExistentialLayout().requiresClass();
 }
 
 Type ProtocolCompositionType::get(const ASTContext &C,
@@ -4015,7 +4013,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
     auto layout = getExistentialLayout();
-    assert(layout.requiresClass && "Opaque existentials don't use refcounting");
+    assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (layout.superclass)
       return layout.superclass->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());

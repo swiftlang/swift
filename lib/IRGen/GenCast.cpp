@@ -521,7 +521,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   SmallVector<llvm::Value*, 4> objcProtos;
   SmallVector<llvm::Value*, 4> witnessTableProtos;
 
-  bool hasClassConstraint = layout.requiresClass;
+  bool hasClassConstraint = layout.requiresClass();
   bool hasClassConstraintByProtocol = false;
 
   bool hasSuperclassConstraint = bool(layout.superclass);
