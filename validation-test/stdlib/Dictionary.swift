@@ -1189,7 +1189,7 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   assert(identity1 == d1._rawIdentifier())
   
   checkCollection(
-    [1010, 1020, 1030],
+    Array(d1.values),
     d1.values,
     stackTrace: SourceLocStack())
   { $0 == $1 }
@@ -1207,7 +1207,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   assert(identity1 == d1._rawIdentifier())
 
   checkCollection(
-    [10, 20, 30],
+    Array(d1.keys),
     d1.keys,
     stackTrace: SourceLocStack())
   { $0 == $1 }
