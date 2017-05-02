@@ -52,27 +52,34 @@ llvm::cl::opt<bool> EnableAccessMarkers(
 
 namespace {
 
-struct AccessMarkerElimination : SILModuleTransform {
-  virtual bool isFullElimination() = 0;
+struct AccessMarkerElimination {
+  SILModule *Mod;
+  SILFunction *F;
+  bool isFullElimination;
 
   bool removedAny = false;
 
+  AccessMarkerElimination(SILFunction *F, bool isFullElimination)
+      : Mod(&F->getModule()), F(F), isFullElimination(isFullElimination) {}
+
   SILBasicBlock::iterator eraseInst(SILInstruction *inst) {
+    DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
     removedAny = true;
     return inst->getParent()->erase(inst);
   };
 
   void replaceBeginAccessUsers(BeginAccessInst *beginAccess);
 
-  // Precondition: !EnableAccessMarkers || isFullElimination()
+  // Precondition: !EnableAccessMarkers || isFullElimination
   bool shouldPreserveAccess(SILAccessEnforcement enforcement);
 
   // Check if the instruction is a marker that should be eliminated. If so,
   // updated the SIL, short of erasing the marker itself, and return true.
   bool checkAndEliminateMarker(SILInstruction *inst);
 
-  // Entry point called by the pass manager.
-  void run() override;
+  // Entry point called either by the pass by the same name
+  // or as a utility (e.g. during deserialization).
+  bool stripMarkers();
 };
 
 void AccessMarkerElimination::replaceBeginAccessUsers(
@@ -93,24 +100,24 @@ void AccessMarkerElimination::replaceBeginAccessUsers(
   }
 }
 
-// Precondition: !EnableAccessMarkers || isFullElimination()
+// Precondition: !EnableAccessMarkers || isFullElimination
 bool AccessMarkerElimination::shouldPreserveAccess(
     SILAccessEnforcement enforcement) {
-  if (isFullElimination())
+  if (isFullElimination)
     return false;
 
-  auto &M = *getModule();
   switch (enforcement) {
   case SILAccessEnforcement::Unknown:
     return false;
   case SILAccessEnforcement::Static:
     // Even though static enforcement is already performed, this flag is
     // useful to control marker preservation for now.
-    return EnableAccessMarkers || M.getOptions().EnforceExclusivityStatic;
+    return EnableAccessMarkers || Mod->getOptions().EnforceExclusivityStatic;
   case SILAccessEnforcement::Dynamic:
     // FIXME: when dynamic markers are fully supported, don't strip:
-    // return EnableAccessMarkers || M.getOptions().EnforceExclusivityDynamic;
-    return M.getOptions().EnforceExclusivityDynamic;
+    //   return
+    //     EnableAccessMarkers || Mod->getOptions().EnforceExclusivityDynamic;
+    return Mod->getOptions().EnforceExclusivityDynamic;
   case SILAccessEnforcement::Unsafe:
     return false;
   }
@@ -152,38 +159,66 @@ bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
   return false;
 }
 
-void AccessMarkerElimination::run() {
+// Top-level per-function entry-point.
+// Return `true` if any markers were removed.
+bool AccessMarkerElimination::stripMarkers() {
   // FIXME: When dynamic markers are fully supported, just skip this pass:
-  //   if (EnableAccessMarkers && !isFullElimination())
-  //     return;
+  //   if (EnableAccessMarkers && !isFullElimination)
+  //     return false;
 
-  auto &M = *getModule();
-  for (auto &F : M) {
-    // Iterating in reverse eliminates more begin_access users before they
-    // need to be replaced.
-    for (auto &BB : reversed(F)) {
-      // Don't cache the begin iterator since we're reverse iterating.
-      for (auto II = BB.end(); II != BB.begin();) {
-        SILInstruction *inst = &*(--II);
-        if (checkAndEliminateMarker(inst))
-          II = eraseInst(inst);
-      }
+  // Iterating in reverse eliminates more begin_access users before they
+  // need to be replaced.
+  for (auto &BB : reversed(*F)) {
+    // Don't cache the begin iterator since we're reverse iterating.
+    for (auto II = BB.end(); II != BB.begin();) {
+      SILInstruction *inst = &*(--II);
+      if (checkAndEliminateMarker(inst))
+        II = eraseInst(inst);
     }
-
-    // Don't invalidate any analyses if we didn't do anything.
-    if (!removedAny)
-      continue;
-
-    auto InvalidKind = SILAnalysis::InvalidationKind::Instructions;
-    invalidateAnalysis(&F, InvalidKind);
   }
+  return removedAny;
 }
 
-struct InactiveAccessMarkerElimination : AccessMarkerElimination {
+} // end anonymous namespace
+
+// Implement a SILModule::SILFunctionBodyCallback that strips all access
+// markers from newly deserialized function bodies.
+static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
+  DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName() << "\n");
+
+  AccessMarkerElimination(F, /*isFullElimination=*/true).stripMarkers();
+}
+
+namespace {
+
+struct AccessMarkerEliminationPass : SILModuleTransform {
+  virtual bool isFullElimination() = 0;
+
+  void run() override {
+    auto &M = *getModule();
+    for (auto &F : M) {
+      bool removedAny = AccessMarkerElimination(&F, isFullElimination())
+                            .stripMarkers();
+
+      // Only invalidate analyses if we removed some markers.
+      if (removedAny) {
+        auto InvalidKind = SILAnalysis::InvalidationKind::Instructions;
+        invalidateAnalysis(&F, InvalidKind);
+      }
+
+      // Markers from all current SIL functions are stripped. Register a
+      // callback to strip an subsequently loaded functions on-the-fly.
+      if (isFullElimination())
+        M.registerDeserializationCallback(prepareSILFunctionForOptimization);
+    }
+  }
+};
+
+struct InactiveAccessMarkerElimination : AccessMarkerEliminationPass {
   virtual bool isFullElimination() { return false; }
 };
 
-struct FullAccessMarkerElimination : AccessMarkerElimination {
+struct FullAccessMarkerElimination : AccessMarkerEliminationPass {
   virtual bool isFullElimination() { return true; }
 };
 

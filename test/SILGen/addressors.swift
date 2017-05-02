@@ -2,6 +2,10 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s -check-prefix=SILGEN
 // RUN: %target-swift-frontend -parse-stdlib -emit-ir %s
 
+// This test includes some calls to transparent stdlib functions.
+// We pattern match for the absence of access markers in the inlined code.
+// REQUIRES: optimized_stdlib
+
 import Swift
 
 func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
