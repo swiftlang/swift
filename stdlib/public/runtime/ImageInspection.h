@@ -18,8 +18,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_IMAGE_INSPECTION_H
-#define SWIFT_RUNTIME_IMAGE_INSPECTION_H
+#ifndef SWIFT_RUNTIME_IMAGEINSPECTION_H
+#define SWIFT_RUNTIME_IMAGEINSPECTION_H
 
 #include "ImageInspectionELF.h"
 #include <cstdint>

@@ -16,8 +16,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_IMAGE_INSPECTION_ELF_H
-#define SWIFT_RUNTIME_IMAGE_INSPECTION_ELF_H
+#ifndef SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
+#define SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
 
 #if defined(__ELF__) || defined(__ANDROID__)
 
