@@ -110,7 +110,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
                    ArrayRef<SILValue> FullArgs) {
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
-    if (SILInstruction *I = dyn_cast<SILInstruction>(V))
+    if (auto *I = dyn_cast<SILInstruction>(V))
       if (I != CalleeValue &&
           isInstructionTriviallyDead(I))
         InstsToDelete.push_back(I);
@@ -118,7 +118,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
 
   // Handle the case where the callee of the apply is a load instruction.
-  if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
+  if (auto *LI = dyn_cast<LoadInst>(CalleeValue)) {
     auto *PBI = cast<ProjectBoxInst>(LI->getOperand());
     auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
 
@@ -183,7 +183,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     CalleeValue = Callee;
   }
 
-  if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
+  if (auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue)) {
     if (!FRI->use_empty())
       return;
     FRI->eraseFromParent();
