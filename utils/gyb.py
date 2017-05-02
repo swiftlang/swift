@@ -50,9 +50,8 @@ def split_lines(s):
     """
     return [l + '\n' for l in s.split('\n')]
 
-
-# text on a line up to the first '$$', '${', or '%%'
-literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
+# text on a line up to the first '$$', '${', <{, or '%%'
+literalText = r'(?: [^$\n%] | \$(?![${]) | \<(?![<{]) | %(?!%) )*'
 
 # The part of an '%end' line that follows the '%' sign
 linesClose = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
@@ -84,6 +83,10 @@ tokenize_re = re.compile(
 # Substitutions
 | (?P<substitutionOpen> \$\{ )
   [^}]* \} # Absorb
+
+# Embedded Templates
+| (?P<templateOpen> \<\{ )
+  [^}]* \}
 
 # %% and $$ are literal % and $ respectively
 | (?P<symbol>[$%]) (?P=symbol)
@@ -503,8 +506,11 @@ class ParseContext(object):
                     if not m2:
                         raise ValueError("Invalid block closure")
                     next_pos = m2.end(0)
+                elif (kind == 'substitutionOpen'):
+                    # skip past the closing '}'
+                    next_pos = close_pos + 1
                 else:
-                    assert kind == 'substitutionOpen'
+                    assert kind == 'templateOpen'
                     # skip past the closing '}'
                     next_pos = close_pos + 1
 
@@ -622,6 +628,8 @@ class Block(ASTNode):
         while context.token_kind and not context.close_lines:
             if context.token_kind == 'literal':
                 node = Literal
+            elif context.token_kind == 'templateOpen':
+                node = Template
             else:
                 node = Code
             self.children.append(node(context))
@@ -745,6 +753,25 @@ class Code(ASTNode):
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
 
+class Template(ASTNode):
+
+    """An AST node that is evaluated as an embedded Template"""
+
+    children = ()
+    filename = None
+
+    def __init__(self, context):
+        self.filename = context.filename
+        self.template_filename = os.path.dirname(context.filename) + '/' + context.code_text
+        self.children += (Block(ParseContext(self.template_filename)),)
+        context.next_token()
+
+    def execute(self, context):
+        for x in self.children:
+            x.execute(context)
+
+    def __str__(self, indent=''):
+        return self.filename
 
 def expand(filename, line_directive=_default_line_directive, **local_bindings):
     r"""Return the contents of the givepn template file, executed with the given
@@ -802,7 +829,6 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
                 t, line_directive=line_directive, **local_bindings)
         finally:
             os.chdir(d)
-
 
 def parse_template(filename, text=None):
     r"""Return an AST corresponding to the given template file.
@@ -1224,7 +1250,6 @@ def main():
     sys.path = ['.'] + sys.path
 
     args.target.write(execute_template(ast, args.line_directive, **bindings))
-
 
 if __name__ == '__main__':
     main()
