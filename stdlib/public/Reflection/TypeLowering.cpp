@@ -878,7 +878,13 @@ public:
     unsigned NoPayloadCases = 0;
     std::vector<FieldTypeInfo> PayloadCases;
 
-    for (auto Case : TC.getBuilder().getFieldTypeRefs(TR, FD)) {
+    std::vector<FieldTypeInfo> Fields;
+    if (!TC.getBuilder().getFieldTypeRefs(TR, FD, Fields)) {
+      Invalid = true;
+      return nullptr;
+    }
+
+    for (auto Case : Fields) {
       if (Case.TR == nullptr) {
         NoPayloadCases++;
         continue;
@@ -1024,7 +1030,12 @@ public:
       // Lower the struct's fields using substitutions from the
       // TypeRef to make field types concrete.
       RecordTypeInfoBuilder builder(TC, RecordKind::Struct);
-      for (auto Field : TC.getBuilder().getFieldTypeRefs(TR, FD))
+
+      std::vector<FieldTypeInfo> Fields;
+      if (!TC.getBuilder().getFieldTypeRefs(TR, FD, Fields))
+        return nullptr;
+
+      for (auto Field : Fields)
         builder.addField(Field.Name, Field.TR);
       return builder.build();
     }
@@ -1266,11 +1277,15 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     // TypeRef to make field types concrete.
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
+    std::vector<FieldTypeInfo> Fields;
+    if (!getBuilder().getFieldTypeRefs(TR, FD, Fields))
+      return nullptr;
+
     // Start layout from the given instance start offset. This should
     // be the superclass instance size.
     builder.addField(start, 1, /*numExtraInhabitants=*/0);
 
-    for (auto Field : getBuilder().getFieldTypeRefs(TR, FD))
+    for (auto Field : Fields)
       builder.addField(Field.Name, Field.TR);
     return builder.build();
   }
