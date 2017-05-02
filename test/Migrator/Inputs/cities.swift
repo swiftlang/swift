@@ -15,3 +15,7 @@ public protocol ExtraCities {
   func blibli(x: (String?, String) -> String!)
   func currimundi(x: (Int, (Int, Int))!)
 }
+
+public protocol MoreCities {
+  func setZooLocation(x: Int, y: Int, z: Int)
+}
