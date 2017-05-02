@@ -939,8 +939,8 @@ namespace {
           }
         }
 
-        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch),
-        Ctx.Diags.diagnose(StartLoc, diag::missing_several_cases, false)
+        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
+        Ctx.Diags.diagnose(EndLoc, diag::missing_several_cases, false)
           .fixItInsert(EndLoc, Buffer.str());
       } else {
         Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
