@@ -323,16 +323,18 @@ static bool isInterestingTypealias(Type type) {
   if (type->is<BuiltinType>())
     return false;
 
-  auto underlyingTy = aliasTy->getDecl()->getUnderlyingTypeLoc().getType();
+  auto aliasDecl = aliasTy->getDecl();
 
-  // A typealias that directly points at Builtin.AnyObject is not
-  // 'interesting', since it is in fact the AnyObject typealias in
-  // the standard library.
-  if (underlyingTy->isAnyObject() &&
-      isa<ProtocolCompositionType>(underlyingTy.getPointer()))
+  // The 'Swift.AnyObject' typealias is not 'interesting'.
+  if (aliasDecl->getName() ==
+      aliasDecl->getASTContext().getIdentifier("AnyObject") &&
+      aliasDecl->getParentModule()->isStdlibModule()) {
     return false;
+  }
 
-  if (aliasTy->getDecl()->isCompatibilityAlias())
+  auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
+
+  if (aliasDecl->isCompatibilityAlias())
     return isInterestingTypealias(underlyingTy);
 
   return true;
