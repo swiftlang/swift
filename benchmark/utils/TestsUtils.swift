@@ -66,3 +66,9 @@ struct MyStruct : SomeProtocol {
 }
 public func someProtocolFactory() -> SomeProtocol { return MyStruct() }
 
+// Just consume the argument.
+// It's important that this function is in a another module than the tests
+// which are using it.
+public func blackHole<T>(_ x: T) {
+}
+
