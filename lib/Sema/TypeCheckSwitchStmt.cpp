@@ -901,9 +901,10 @@ namespace {
           Ctx.Diags.diagnose(StartLoc, diag::empty_switch_stmt)
              .fixItInsert(EndLoc, Buffer.str());
         } else {
-          Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch,
-                             InEditor, uncovered.isEmpty())
-             .fixItInsert(EndLoc, Buffer.str());
+          Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
+          Ctx.Diags.diagnose(StartLoc, diag::missing_several_cases,
+                             uncovered.isEmpty()).fixItInsert(EndLoc,
+                                                              Buffer.str());
         }
         return;
       }
@@ -938,11 +939,11 @@ namespace {
           }
         }
 
-        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch, InEditor,
-                           false).fixItInsert(EndLoc, Buffer.str());
+        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch),
+        Ctx.Diags.diagnose(StartLoc, diag::missing_several_cases, false)
+          .fixItInsert(EndLoc, Buffer.str());
       } else {
-        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch,
-                           InEditor, false);
+        Ctx.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
 
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;

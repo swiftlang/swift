@@ -3611,12 +3611,14 @@ WARNING(debug_long_closure_body, none,
 ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' "
       "block; do you want to add a default case?",())
-ERROR(non_exhaustive_switch,none,
-      "%select{switch must be exhaustive, consider adding |do you want to add }0"
-      "%select{missing cases|a default clause}1"
-      "%select{:|?}0", (bool, bool))
+ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
+NOTE(missing_several_cases,none,
+     "do you want to add "
+     "%select{missing cases|a default clause}0"
+     "?", (bool))
+
 NOTE(missing_particular_case,none,
-     "missing case: '%0'", (StringRef))
+     "add missing case: '%0'", (StringRef))
 WARNING(redundant_particular_case,none,
         "case is already handled by previous patterns; consider removing it",())
 
