@@ -35,6 +35,7 @@ using namespace swift::ide::api;
 
 struct FoundResult {
   SourceRange TokenRange;
+  bool Optional; // Range has a trailing ? or ! included
   bool Suffixable; // No need to wrap parens when adding optionality
   bool isValid() const { return TokenRange.isValid(); }
 };
@@ -53,11 +54,12 @@ public:
         return findChild(Func->getBodyResultTypeLoc());
       if (auto Init = dyn_cast<ConstructorDecl>(Parent)) {
         SourceLoc End = Init->getFailabilityLoc();
-        if (End.isInvalid())
+        bool Optional = End.isValid();
+        if (!Optional)
           End = Init->getNameLoc();
-        return {SourceRange(Init->getNameLoc(), End), true};
+        return {SourceRange(Init->getNameLoc(), End), Optional, /*suffixable=*/true};
       }
-      return {SourceRange(), false};
+      return {SourceRange(), false, false};
     }
 
     for (auto *Params: Parent->getParameterLists()) {
@@ -73,7 +75,7 @@ public:
   }
 
 private:
-  bool hasNextIndex() {
+  bool hasNextIndex() const {
     return !ChildIndices.empty();
   }
 
@@ -83,36 +85,48 @@ private:
     return Next;
   }
 
+  bool isUserTypeAlias(TypeRepr *T) const {
+    if (auto Ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+      if (auto Bound = Ident->getBoundDecl()) {
+        return isa<TypeAliasDecl>(Bound) &&
+          !Bound->getModuleContext()->isSystemModule();
+      }
+    }
+    return false;
+  }
+
   FoundResult findChild(TypeLoc Loc) {
     if (!Loc.hasLocation())
-      return {SourceRange(), false};
+      return {SourceRange(), false, false};
     return visit(Loc.getTypeRepr());
   }
 
 public:
-  FoundResult handleParent(TypeRepr *Parent, TypeRepr *FirstChild,
-                           TypeRepr *SecondChild, bool Suffixable = true) {
-    if (!hasNextIndex())
-      return {Parent->getSourceRange(), Suffixable};
-    auto NextIndex = consumeNext();
-    assert(NextIndex < 2 && "child index out of bounds");
-    return visit(NextIndex ? SecondChild : FirstChild);
-  }
 
   template<typename T>
   FoundResult handleParent(TypeRepr *Parent, const ArrayRef<T> Children,
-                           bool Suffixable = true) {
+                           bool Optional = false, bool Suffixable = true) {
     if (!hasNextIndex())
-      return {Parent->getSourceRange(), Suffixable};
+      return {Parent->getSourceRange(), Optional, Suffixable};
     auto NextIndex = consumeNext();
+    if (isUserTypeAlias(Parent))
+      return {SourceRange(), false, false};
     assert(NextIndex < Children.size());
     TypeRepr *Child = Children[NextIndex];
     return visit(Child);
   }
 
-  FoundResult handleParent(TypeRepr *Parent, TypeRepr *Base,
+  FoundResult handleParent(TypeRepr *Parent, TypeRepr *FirstChild,
+                           TypeRepr *SecondChild, bool Optional = false,
                            bool Suffixable = true) {
-    return handleParent(Parent, llvm::makeArrayRef(Base), Suffixable);
+    TypeRepr *Children[] = {FirstChild, SecondChild};
+    return handleParent(Parent, llvm::makeArrayRef(Children), Optional,
+                        Suffixable);
+  }
+
+  FoundResult handleParent(TypeRepr *Parent, TypeRepr *Base,
+                           bool Optional = false, bool Suffixable = true) {
+    return handleParent(Parent, llvm::makeArrayRef(Base), Optional, Suffixable);
   }
 
   FoundResult visitTypeRepr(TypeRepr *T) {
@@ -120,7 +134,7 @@ public:
   }
 
   FoundResult visitErrorTypeRepr(ErrorTypeRepr *T) {
-    return {SourceRange(), false};
+    return {SourceRange(), false, false};
   }
 
   FoundResult visitAttributedTypeRepr(AttributedTypeRepr *T) {
@@ -149,36 +163,32 @@ public:
 
   FoundResult visitFunctionTypeRepr(FunctionTypeRepr *T) {
     return handleParent(T, T->getResultTypeRepr(), T->getArgsTypeRepr(),
-                       /*Suffixable=*/false);
+                       /*Optional=*/false, /*Suffixable=*/false);
   }
 
   FoundResult visitCompositionTypeRepr(CompositionTypeRepr *T) {
-    return handleParent(T, T->getTypes(), /*Suffixable=*/false);
+    return handleParent(T, T->getTypes(), /*Optional=*/false,
+                        /*Suffixable=*/false);
   }
 
   FoundResult visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
-    if (!hasNextIndex())
-      return {T->getSourceRange(), true};
-    // This may be a typealias so report no match
-    return {SourceRange(), false};
+    return handleParent(T, ArrayRef<TypeRepr*>());
   }
 
   FoundResult visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
-    // FIXME: This could be a generic type alias
     return handleParent(T, T->getGenericArgs());
   }
 
   FoundResult visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
-    // FIXME: this could be a nested typealias
-    return handleParent(T, T->Components);
+    return visit(T->Components.back());
   }
 
   FoundResult visitOptionalTypeRepr(OptionalTypeRepr *T) {
-    return handleParent(T, T->getBase());
+    return handleParent(T, T->getBase(), /*Optional=*/true);
   }
 
   FoundResult visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
-    return handleParent(T, T->getBase());
+    return handleParent(T, T->getBase(), /*Optional=*/true);
   }
 
   FoundResult visitProtocolTypeRepr(ProtocolTypeRepr *T) {
@@ -190,8 +200,7 @@ public:
   }
 
   FoundResult visitFixedTypeRepr(FixedTypeRepr *T) {
-    assert(!hasNextIndex());
-    return {T->getSourceRange(), true};
+    return handleParent(T, ArrayRef<TypeRepr*>());
   }
 };
 
@@ -450,10 +459,12 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
             }
             break;
           case ide::api::NodeAnnotation::UnwrapOptional:
-            Editor.remove(Result.TokenRange.End);
+            if (Result.Optional)
+              Editor.remove(Result.TokenRange.End);
             break;
           case ide::api::NodeAnnotation::ImplicitOptionalToOptional:
-            Editor.replace(Result.TokenRange.End, "?");
+            if (Result.Optional)
+              Editor.replace(Result.TokenRange.End, "?");
             break;
           case ide::api::NodeAnnotation::TypeRewritten:
             Editor.replace(Result.TokenRange, DiffItem->RightComment);
