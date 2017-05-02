@@ -4558,11 +4558,20 @@ public:
 /// #keyPath(Person.friends.firstName)
 /// \endcode
 class KeyPathExpr : public Expr {
-  SourceLoc KeywordLoc;
+  SourceLoc StartLoc;
   SourceLoc LParenLoc;
-  SourceLoc RParenLoc;
-  TypeRepr *RootType;
+  SourceLoc EndLoc;
   Expr *ObjCStringLiteralExpr = nullptr;
+
+  // The parsed root of a Swift keypath (the section before an unusual dot, like
+  // Foo.Bar in \Foo.Bar.?.baz).
+  Expr *ParsedRoot = nullptr;
+  // The parsed path of a Swift keypath (the section after an unusual dot, like
+  // ?.baz in \Foo.Bar.?.baz).
+  Expr *ParsedPath = nullptr;
+
+  // The processed/resolved type, like Foo.Bar in \Foo.Bar.?.baz.
+  TypeRepr *RootType = nullptr;
 
 public:
   /// A single stored component, which will be one of:
@@ -4772,16 +4781,22 @@ public:
   /// Create a new #keyPath expression.
   KeyPathExpr(ASTContext &C,
               SourceLoc keywordLoc, SourceLoc lParenLoc,
-              TypeRepr *root,
               ArrayRef<Component> components,
               SourceLoc rParenLoc,
-              bool isObjC,
               bool isImplicit = false);
 
-  SourceLoc getLoc() const { return KeywordLoc; }
-  SourceRange getSourceRange() const {
-    return SourceRange(KeywordLoc, RParenLoc);
+  KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
+              bool isImplicit = false)
+      : Expr(ExprKind::KeyPath, isImplicit), StartLoc(backslashLoc),
+        EndLoc(parsedPath ? parsedPath->getEndLoc() : parsedRoot->getEndLoc()),
+        ParsedRoot(parsedRoot), ParsedPath(parsedPath) {
+    assert((parsedRoot || parsedPath) &&
+           "keypath must have either root or path");
+    KeyPathExprBits.IsObjC = false;
   }
+
+  SourceLoc getLoc() const { return StartLoc; }
+  SourceRange getSourceRange() const { return SourceRange(StartLoc, EndLoc); }
 
   /// Get the components array.
   ArrayRef<Component> getComponents() const {
@@ -4807,11 +4822,34 @@ public:
   void setObjCStringLiteralExpr(Expr *expr) {
     ObjCStringLiteralExpr = expr;
   }
-  
+
+  Expr *getParsedRoot() const {
+    assert(!isObjC() && "cannot get parsed root of ObjC keypath");
+    return ParsedRoot;
+  }
+  void setParsedRoot(Expr *root) {
+    assert(!isObjC() && "cannot get parsed root of ObjC keypath");
+    ParsedRoot = root;
+  }
+
+  Expr *getParsedPath() const {
+    assert(!isObjC() && "cannot get parsed path of ObjC keypath");
+    return ParsedPath;
+  }
+  void setParsedPath(Expr *path) {
+    assert(!isObjC() && "cannot set parsed path of ObjC keypath");
+    ParsedPath = path;
+  }
+
   TypeRepr *getRootType() const {
+    assert(!isObjC() && "cannot get root type of ObjC keypath");
     return RootType;
   }
-  
+  void setRootType(TypeRepr *rootType) {
+    assert(!isObjC() && "cannot set root type of ObjC keypath");
+    RootType = rootType;
+  }
+
   /// True if this is an ObjC key path expression.
   bool isObjC() const { return KeyPathExprBits.IsObjC; }
 
@@ -4820,6 +4858,22 @@ public:
   }
 };
 
+/// Represents the unusual behaviour of a . in a \ keypath expression, such as
+/// \.[0] and \Foo.?.
+class KeyPathDotExpr : public Expr {
+  SourceLoc DotLoc;
+
+public:
+  KeyPathDotExpr(SourceLoc dotLoc)
+      : Expr(ExprKind::KeyPathDot, /*isImplicit=*/true), DotLoc(dotLoc) {}
+
+  SourceLoc getLoc() const { return DotLoc; }
+  SourceRange getSourceRange() const { return SourceRange(DotLoc, DotLoc); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::KeyPathDot;
+  }
+};
 
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||

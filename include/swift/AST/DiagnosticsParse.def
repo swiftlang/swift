@@ -1176,6 +1176,8 @@ ERROR(expr_keypath_expected_property_or_type,PointsToFirstBadToken,
       "expected property or type name within '#keyPath(...)'", ())
 ERROR(expr_keypath_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#keyPath' expression", ())
+ERROR(expr_keypath_expected_expr,none,
+      "expected expression path in Swift key path",())
 
 // Selector expressions.
 ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,
