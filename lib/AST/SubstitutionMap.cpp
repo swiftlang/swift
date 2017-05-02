@@ -116,7 +116,9 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   auto genericParam = cast<GenericTypeParamType>(type);
   auto mutableThis = const_cast<SubstitutionMap *>(this);
   auto replacementTypes = mutableThis->getReplacementTypes();
-  auto genericParams = getGenericSignature()->getGenericParams();
+  auto genericSig = getGenericSignature();
+  assert(genericSig);
+  auto genericParams = genericSig->getGenericParams();
   auto replacementIndex =
     GenericParamKey(genericParam).findIndexIn(genericParams);
 
@@ -133,7 +135,6 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // The generic parameter may have been made concrete by the generic signature,
   // substitute into the concrete type.
   ModuleDecl &anyModule = *genericParam->getASTContext().getStdlibModule();
-  auto genericSig = getGenericSignature();
   if (auto concreteType = genericSig->getConcreteType(genericParam, anyModule)){
     // Set the replacement type to an error, to block infinite recursion.
     replacementType = ErrorType::get(concreteType);
