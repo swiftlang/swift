@@ -623,23 +623,23 @@ namespace {
         }
       }
 
-      void show(llvm::raw_ostream &buffer, bool normalize = true) const {
+      void show(llvm::raw_ostream &buffer, bool forDisplay = true) const {
         switch (getKind()) {
         case SpaceKind::Empty:
-          if (normalize) {
+          if (forDisplay) {
             buffer << "_";
           } else {
             buffer << "[EMPTY]";
           }
           break;
         case SpaceKind::Disjunct: {
-          if (normalize) {
+          if (forDisplay) {
             assert(false && "Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
             for (auto &sp : Spaces) {
               buffer << "\n";
-              sp.show(buffer, normalize);
+              sp.show(buffer, forDisplay);
               buffer << " |";
             }
             buffer << ")";
@@ -665,7 +665,7 @@ namespace {
             if (!first) {
               buffer << ", ";
             }
-            param.show(buffer, normalize);
+            param.show(buffer, forDisplay);
             if (first) {
               first = false;
             }
@@ -674,7 +674,7 @@ namespace {
         }
           break;
         case SpaceKind::Type:
-          if (!normalize) {
+          if (!forDisplay) {
             getType()->print(buffer);
           }
           buffer << "_";
@@ -937,9 +937,6 @@ namespace {
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
-          if (flats.empty()) {
-            flats.append({ uncoveredSpace });
-          }
           for (auto &flat : flats) {
             OS << tok::kw_case << " ";
             flat.show(OS);
@@ -956,9 +953,6 @@ namespace {
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
-          if (flats.empty()) {
-            flats.append({ uncoveredSpace });
-          }
           for (auto &flat : flats) {
             Buffer.clear();
             flat.show(OS);
@@ -972,39 +966,91 @@ namespace {
   private:
     // Recursively unpacks a space of disjunctions or constructor parameters
     // into its component parts such that the resulting array of flattened
-    // spaces contains no further disjunctions.  If there were no disjunctions
-    // in the starting space, the original space is already flat and the
-    // returned array of spaces will be empty.
+    // spaces contains no further disjunctions.  The resulting flattened array
+    // will never be empty.
     static void flatten(const Space space, SmallVectorImpl<Space> &flats) {
       switch (space.getKind()) {
       case SpaceKind::Constructor: {
-        size_t i = 0;
-        for (auto &param : space.getSpaces()) {
-          // We're only interested in recursively unpacking constructors and
-          // disjunctions (booleans are considered constructors).
-          if (param.getKind() != SpaceKind::Constructor
-              || param.getKind() != SpaceKind::Disjunct
-              || param.getKind() != SpaceKind::BooleanConstant)
-            continue;
+        // Optimization: If this space is just a constructor head, it is already
+        // flat.
+        if (space.getSpaces().empty()) {
+          flats.push_back(space);
+          return;
+        }
 
-          SmallVector<Space, 4> flattenedParams;
-          flatten(param, flattenedParams);
-          for (auto &space : flattenedParams) {
-            SmallVector<Space, 4> row(space.getSpaces().begin(),
-                                      space.getSpaces().end());
-            row[i] = space;
-            Space cs(space.getType(), space.getHead(), row);
-            flats.push_back(cs);
+        // To recursively recover a pattern matrix from a bunch of disjuncts:
+        // 1) Unpack the arguments to the constructor under scrutiny.
+        // 2) Traverse each argument in turn.
+        // 3) Flatten the argument space into a column vector.
+        // 4) Extend the existing pattern matrix by a factor of the size of
+        //    the column vector and copy each previous component.
+        // 5) Extend the expanded matrix with multiples of the column vector's
+        //    components until filled.
+        // 6) Wrap each matrix row in the constructor under scrutiny.
+        size_t multiplier = 1;
+        SmallVector<SmallVector<Space, 4>, 2> matrix;
+        for (auto &subspace : space.getSpaces()) {
+          SmallVector<Space, 4> columnVect;
+          flatten(subspace, columnVect);
+
+          // Pattern matrices grow quasi-factorially in the size of the
+          // input space.
+          multiplier *= columnVect.size();
+
+          size_t startSize = matrix.size();
+          if (!matrix.empty() && columnVect.size() > 1) {
+            size_t oldCount = matrix.size();
+            matrix.reserve(multiplier * oldCount);
+            // Indexing starts at 1, we already have 'startSize'-many elements
+            // in the matrix; multiplies by 1 are no-ops.
+            for (size_t i = 1; i < multiplier; ++i) {
+              std::copy_n(matrix.begin(), oldCount, std::back_inserter(matrix));
+            }
           }
-          ++i;
+
+          if (matrix.empty()) {
+            // Get the empty matrix setup with its starting row vectors.
+            for (auto &vspace : columnVect) {
+              matrix.push_back({});
+              matrix.back().push_back(vspace);
+            }
+          } else {
+            // Given a matrix of 'n' rows and '(m-1)*k' columns, to make a
+            // matrix of size 'n' by 'm*k' we need to copy each element of the
+            // column vector into a row 'm' times - as many times as there were
+            // elements of the original matrix before multiplication.
+            size_t stride = multiplier;
+            if (startSize == 1) {
+              // Special case: If the column vector is bigger than the matrix
+              // before multiplication, we need to index it linearly
+              stride = 1;
+            } else if (columnVect.size() == 1) {
+              // Special case: If the column vector has size 1 then we needn't
+              // stride at all.
+              stride = matrix.size();
+            }
+
+            for (size_t rowIdx = 0, colIdx = 0; rowIdx < matrix.size(); ++rowIdx) {
+              if (rowIdx != 0 && (rowIdx % stride) == 0) {
+                colIdx++;
+              }
+
+              matrix[rowIdx].push_back(columnVect[colIdx]);
+            }
+          }
+        }
+
+        // Wrap the matrix rows into this constructor.
+        for (auto &row : matrix) {
+          flats.push_back(Space(space.getType(), space.getHead(), row));
         }
       }
         break;
       case SpaceKind::Disjunct: {
-        auto begin = space.getSpaces().begin();
-        auto end = space.getSpaces().end();
-        for (; begin != end; ++begin) {
-          flatten(*begin, flats);
+        for (auto &subspace : space.getSpaces()) {
+          SmallVector<Space, 4> buf;
+          flatten(subspace, buf);
+          flats.append(buf.begin(), buf.end());
         }
       }
         break;
@@ -1114,5 +1160,4 @@ void SpaceEngine::Space::dump() const {
   llvm::raw_svector_ostream os(buf);
   this->show(os, /*normalize*/false);
   llvm::errs() << buf.str();
-  llvm::errs() << "\n";
 }
