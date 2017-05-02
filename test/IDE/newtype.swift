@@ -6,7 +6,7 @@
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t
 // REQUIRES: objc_interop
 
-// PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
@@ -28,7 +28,7 @@
 // PRINT-NEXT:  extension Food {
 // PRINT-NEXT:    static let err: ErrorDomain
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:  struct ClosedEnum : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
@@ -40,7 +40,7 @@
 // PRINT-NEXT:    static let secondEntry: ClosedEnum
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct IUONewtype : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:  struct IUONewtype : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
@@ -48,7 +48,7 @@
 // PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
+// PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: Float)
 // PRINT-NEXT:    init(rawValue: Float)
 // PRINT-NEXT:    let rawValue: Float
@@ -60,7 +60,7 @@
 // PRINT-NEXT:    static let version: MyFloat{{$}}
 // PRINT-NEXT:  }
 //
-// PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
+// PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: Int32)
 // PRINT-NEXT:    init(rawValue: Int32)
 // PRINT-NEXT:    let rawValue: Int32
@@ -118,7 +118,7 @@
 // PRINT-NEXT:  func takeMyABIOldType(_: MyABIOldType!)
 // PRINT-NEXT:  func takeMyABINewTypeNonNull(_: MyABINewType)
 // PRINT-NEXT:  func takeMyABIOldTypeNonNull(_: MyABIOldType)
-// PRINT-NEXT:  struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:  struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
@@ -138,7 +138,7 @@
 // PRINT-NEXT:    init(i: Int32)
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext {
-// PRINT-NEXT:    struct Name : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
+// PRINT-NEXT:    struct Name : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:      init(_ rawValue: String)
 // PRINT-NEXT:      init(rawValue: String)
 // PRINT-NEXT:      var _rawValue: NSString
@@ -179,14 +179,12 @@ func tests() {
 func acceptSwiftNewtypeWrapper<T : _SwiftNewtypeWrapper>(_ t: T) { }
 func acceptEquatable<T : Equatable>(_ t: T) { }
 func acceptHashable<T : Hashable>(_ t: T) { }
-func acceptComparable<T : Hashable>(_ t: T) { }
 func acceptObjectiveCBridgeable<T : _ObjectiveCBridgeable>(_ t: T) { }
 
 func testConformances(ed: ErrorDomain) {
   acceptSwiftNewtypeWrapper(ed)
   acceptEquatable(ed)
   acceptHashable(ed)
-  acceptComparable(ed)
   acceptObjectiveCBridgeable(ed)
 }
 
