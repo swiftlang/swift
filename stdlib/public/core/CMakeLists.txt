@@ -132,7 +132,6 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift.gyb
-  Unicode.swift
   UnicodeEncoding.swift
   UnicodeParser.swift
   UnicodeScalar.swift
@@ -146,6 +145,7 @@ set(SWIFTLIB_ESSENTIAL
   UTFEncoding.swift
   UTF8.swift
   UTF16.swift
+  Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
   WriteBackMutableSlice.swift
   )
 
