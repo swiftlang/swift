@@ -97,10 +97,6 @@ static bool modifiableFunction(CanSILFunctionType funcType) {
     // C functions should use the old ABI
     return false;
   }
-  if (funcType->getRepresentation() == SILFunctionTypeRepresentation::Method) {
-    // C functions should use the old ABI
-    return false;
-  }
   return true;
 }
 
@@ -396,10 +392,6 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
       SILFunctionTypeRepresentation::CFunctionPointer) {
     return false;
   }
-  if (applySite.getSubstCalleeType()->getRepresentation() ==
-      SILFunctionTypeRepresentation::Method) {
-    return false;
-  }
   auto callee = applySite.getCallee();
   if (dyn_cast<ProjectBlockStorageInst>(callee)) {
     return false;
@@ -425,7 +417,11 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
     SILValue currOperand = operand.get();
     SILType silType = currOperand->getType();
     SILType newSilType = getNewSILType(genEnv, silType, pass.Mod);
-    if (silType != newSilType) {
+    if (silType != newSilType ||
+        std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
+                  currOperand) != pass.largeLoadableArgs.end() ||
+        std::find(pass.funcSigArgs.begin(), pass.funcSigArgs.end(),
+                  currOperand) != pass.funcSigArgs.end()) {
       pass.applies.push_back(applySite.getInstruction());
       return;
     }
@@ -433,9 +429,6 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
 }
 
 static bool isMethodInstUnmodifiable(MethodInst *instr) {
-  if (dyn_cast<ClassMethodInst>(instr)) {
-    return true;
-  }
   for (auto *user : instr->getUses()) {
     if (ApplySite::isa(user->getUser())) {
       ApplySite applySite = ApplySite(user->getUser());
@@ -445,10 +438,6 @@ static bool isMethodInstUnmodifiable(MethodInst *instr) {
       }
       if (applySite.getSubstCalleeType()->getRepresentation() ==
           SILFunctionTypeRepresentation::CFunctionPointer) {
-        return true;
-      }
-      if (applySite.getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::Method) {
         return true;
       }
     }
