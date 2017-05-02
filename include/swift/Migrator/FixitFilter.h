@@ -118,7 +118,9 @@ struct FixitFilter {
         Info.ID == diag::objc_inference_swift3_addobjc.ID ||
         Info.ID == diag::objc_inference_swift3_dynamic.ID ||
         Info.ID == diag::override_swift3_objc_inference.ID ||
-        Info.ID == diag::objc_inference_swift3_objc_derived.ID)
+        Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
+        Info.ID == diag::missing_several_cases.ID ||
+        Info.ID == diag::missing_particular_case.ID)
       return true;
 
     return false;
