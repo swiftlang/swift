@@ -97,10 +97,6 @@ static bool modifiableFunction(CanSILFunctionType funcType) {
     // C functions should use the old ABI
     return false;
   }
-  if (funcType->getRepresentation() == SILFunctionTypeRepresentation::Method) {
-    // C functions should use the old ABI
-    return false;
-  }
   return true;
 }
 
@@ -396,10 +392,6 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
       SILFunctionTypeRepresentation::CFunctionPointer) {
     return false;
   }
-  if (applySite.getSubstCalleeType()->getRepresentation() ==
-      SILFunctionTypeRepresentation::Method) {
-    return false;
-  }
   auto callee = applySite.getCallee();
   if (dyn_cast<ProjectBlockStorageInst>(callee)) {
     return false;
@@ -433,9 +425,6 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
 }
 
 static bool isMethodInstUnmodifiable(MethodInst *instr) {
-  if (dyn_cast<ClassMethodInst>(instr)) {
-    return true;
-  }
   for (auto *user : instr->getUses()) {
     if (ApplySite::isa(user->getUser())) {
       ApplySite applySite = ApplySite(user->getUser());
@@ -445,10 +434,6 @@ static bool isMethodInstUnmodifiable(MethodInst *instr) {
       }
       if (applySite.getSubstCalleeType()->getRepresentation() ==
           SILFunctionTypeRepresentation::CFunctionPointer) {
-        return true;
-      }
-      if (applySite.getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::Method) {
         return true;
       }
     }
