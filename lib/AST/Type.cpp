@@ -889,16 +889,20 @@ Type TypeBase::getRValueInstanceType() {
 
 /// \brief Collect the protocols in the existential type T into the given
 /// vector.
-static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
-                         Type &Superclass) {
+static void addProtocols(Type T,
+                         SmallVectorImpl<ProtocolDecl *> &Protocols,
+                         Type &Superclass,
+                         bool &HasExplicitAnyObject) {
   if (auto Proto = T->getAs<ProtocolType>()) {
     Protocols.push_back(Proto->getDecl());
     return;
   }
 
   if (auto PC = T->getAs<ProtocolCompositionType>()) {
+    if (PC->hasExplicitAnyObject())
+      HasExplicitAnyObject = true;
     for (auto P : PC->getMembers())
-      addProtocols(P, Protocols, Superclass);
+      addProtocols(P, Protocols, Superclass, HasExplicitAnyObject);
     return;
   }
 
@@ -2554,6 +2558,8 @@ CanArchetypeType ArchetypeType::getNew(
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                    Type Superclass,
                                    LayoutConstraint Layout) {
+  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
@@ -2574,6 +2580,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
+  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
   assert(genericEnvironment && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.
@@ -2780,11 +2787,15 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   Type Superclass;
   SmallVector<ProtocolDecl *, 4> Protocols;
   for (Type t : Members) {
-    addProtocols(t, Protocols, Superclass);
+    addProtocols(t, Protocols, Superclass, HasExplicitAnyObject);
   }
   
   // Minimize the set of protocols composed together.
   ProtocolType::canonicalizeProtocols(Protocols);
+
+  // The presence of a superclass constraint makes AnyObject redundant.
+  if (Superclass)
+    HasExplicitAnyObject = false;
 
   // If one protocol remains with no further constraints, its nominal
   // type is the canonical type.
@@ -2803,8 +2814,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
                  });
 
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
-  // by one of our member protocols or the presence of a superclass
-  // constraint.
+  // by one of our member protocols.
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 

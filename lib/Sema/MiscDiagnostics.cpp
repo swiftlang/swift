@@ -1469,53 +1469,46 @@ bool TypeChecker::getDefaultGenericArgumentsString(
   genericParamText << "<";
 
   auto printGenericParamSummary =
-      [&](const GenericTypeParamType *genericParamTy) {
+      [&](GenericTypeParamType *genericParamTy) {
     const GenericTypeParamDecl *genericParam = genericParamTy->getDecl();
     if (Type result = getPreferredType(genericParam)) {
       result.print(genericParamText);
       return;
     }
 
-    ArrayRef<ProtocolDecl *> protocols =
-        genericParam->getConformingProtocols();
+    auto contextTy = typeDecl->mapTypeIntoContext(genericParamTy);
+    if (auto archetypeTy = contextTy->getAs<ArchetypeType>()) {
+      SmallVector<Type, 2> members;
 
-    Type superclass = genericParam->getSuperclass();
-    if (superclass && !superclass->hasError()) {
-      if (protocols.empty()) {
-        superclass.print(genericParamText);
+      bool hasExplicitAnyObject = archetypeTy->requiresClass();
+      if (auto superclass = archetypeTy->getSuperclass()) {
+        hasExplicitAnyObject = false;
+        members.push_back(superclass);
+      }
+
+      for (auto proto : archetypeTy->getConformsTo()) {
+        members.push_back(proto->getDeclaredType());
+        if (proto->requiresClass())
+          hasExplicitAnyObject = false;
+      }
+
+      if (hasExplicitAnyObject)
+        members.push_back(typeDecl->getASTContext().getAnyObjectType());
+
+      auto type = ProtocolCompositionType::get(typeDecl->getASTContext(),
+                                               members, hasExplicitAnyObject);
+
+      if (type->isObjCExistentialType() || type->isAny()) {
+        genericParamText << type;
         return;
       }
 
       genericParamText << "<#" << genericParam->getName() << ": ";
-      superclass.print(genericParamText);
-      for (const ProtocolDecl *proto : protocols) {
-        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-          continue;
-        genericParamText << " & " << proto->getName();
-      }
-      genericParamText << "#>";
+      genericParamText << type << "#>";
       return;
     }
 
-    if (protocols.empty()) {
-      genericParamText << Context.Id_Any;
-      return;
-    }
-
-    if (protocols.size() == 1 &&
-        (protocols.front()->isObjC() ||
-         protocols.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))) {
-      genericParamText << protocols.front()->getName();
-      return;
-    }
-
-    genericParamText << "<#" << genericParam->getName() << ": ";
-    interleave(protocols,
-               [&](const ProtocolDecl *proto) {
-                 genericParamText << proto->getName();
-               },
-               [&] { genericParamText << " & "; });
-    genericParamText << "#>";
+    genericParamText << contextTy;
   };
 
   interleave(typeDecl->getInnermostGenericParamTypes(),
