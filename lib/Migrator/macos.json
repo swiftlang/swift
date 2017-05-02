@@ -354,61 +354,6 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(cs)PDFAnnotation(im)setValue:forAnnotationKey:",
-    "LeftComment": "String",
-    "RightUsr": "",
-    "RightComment": "PDFAnnotationKey",
-    "ModuleName": "Quartz"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(cs)PDFAnnotation(im)setBoolean:forAnnotationKey:",
-    "LeftComment": "String",
-    "RightUsr": "",
-    "RightComment": "PDFAnnotationKey",
-    "ModuleName": "Quartz"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2",
-    "LeftUsr": "c:objc(cs)PDFAnnotation(im)setRect:forAnnotationKey:",
-    "LeftComment": "String",
-    "RightUsr": "",
-    "RightComment": "PDFAnnotationKey",
-    "ModuleName": "Quartz"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)PDFAnnotation(im)valueForAnnotationKey:",
-    "LeftComment": "String",
-    "RightUsr": "",
-    "RightComment": "PDFAnnotationKey",
-    "ModuleName": "Quartz"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)PDFAnnotation(im)removeValueForAnnotationKey:",
-    "LeftComment": "String",
-    "RightUsr": "",
-    "RightComment": "PDFAnnotationKey",
-    "ModuleName": "Quartz"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)PDFAnnotationLine(im)startLineStyle",
@@ -1181,6 +1126,50 @@
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:writablePasteboardTypesForCell:atIndex:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "Social"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:writeCell:atIndex:toPasteboard:type:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "Social"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldChangeTypingAttributes:toAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Social"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldChangeTypingAttributes:toAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Social"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
     "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:willCheckTextInRange:options:types:",
     "LeftComment": "String",
     "RightUsr": "",
@@ -1531,6 +1520,39 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(cm)textTypes",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(cm)textUnfilteredTypes",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
@@ -1543,11 +1565,187 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)fontAttributesInRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)rulerAttributesInRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)dataFromRange:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)fileWrapperFromRange:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithHTML:options:documentAttributes:",
+    "LeftComment": "AnyHashable",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)RTFFromRange:documentAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)RTFDFromRange:documentAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)RTFDFileWrapperFromRange:documentAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)docFormatFromRange:documentAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
     "ModuleName": "AppKit"
   },
   {
@@ -1625,6 +1823,17 @@
     "LeftComment": "AnyObject",
     "RightUsr": "",
     "RightComment": "Any",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "Foundation"
   },
   {
@@ -1818,6 +2027,50 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithHTML:options:documentAttributes:",
+    "LeftComment": "AnyHashable",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2:0:0",
     "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
     "LeftComment": "String",
@@ -1857,6 +2110,28 @@
     "RightUsr": "",
     "RightComment": "NSAttributedStringKey",
     "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)readFromURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -1904,6 +2179,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "2",
@@ -1959,6 +2245,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2",
@@ -1966,6 +2263,17 @@
     "LeftComment": "NSStringDrawingOptions",
     "RightUsr": "",
     "RightComment": "NSString.DrawingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)drawWithRect:options:attributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
     "ModuleName": "AppKit"
   },
   {
@@ -1983,11 +2291,33 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)boundingRectWithSize:options:attributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2",
     "LeftUsr": "c:objc(cs)NSString(im)drawWithRect:options:attributes:context:",
     "LeftComment": "NSStringDrawingOptions",
     "RightUsr": "",
     "RightComment": "NSString.DrawingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)drawWithRect:options:attributes:context:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
     "ModuleName": "AppKit"
   },
   {
@@ -2005,6 +2335,61 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)boundingRectWithSize:options:attributes:context:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)sizeWithAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)drawAtPoint:withAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)drawInRect:withAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
@@ -2016,11 +2401,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.ReadingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -2071,6 +2511,17 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
@@ -2082,11 +2533,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.ReadingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -3043,7 +3549,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3054,7 +3571,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3065,7 +3593,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:displayGamut:bundle:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:displayGamut:bundle:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3076,7 +3615,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3087,7 +3637,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:bundle:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3098,7 +3659,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:displayGamut:bundle:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:displayGamut:bundle:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3109,7 +3681,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3120,7 +3703,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3131,7 +3725,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3142,7 +3747,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3153,7 +3769,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3164,7 +3791,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3175,7 +3813,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3186,7 +3835,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3197,7 +3857,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3208,7 +3879,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:displayGamut:bundle:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:displayGamut:bundle:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -3425,6 +4107,50 @@
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSObject(im)pasteboard:provideDataForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSObject(im)pasteboard:provideDataForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSObject(im)validModesForFontPanel:",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "NSFontPanel.ModeMask",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSObject(im)validModesForFontPanel:",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "NSFontPanel.ModeMask",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
     "LeftUsr": "c:objc(cs)NSObject(im)accessibilitySetOverrideValue:forAttribute:",
     "LeftComment": "String",
     "RightUsr": "",
@@ -3683,6 +4409,127 @@
     "RightUsr": "",
     "RightComment": "NSAccessibilityAttributeName",
     "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)blackColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)whiteColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)grayColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)redColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)greenColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)blueColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)cyanColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)magentaColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)yellowColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)clearColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)MDLAsset(im)initWithURL:vertexDescriptor:bufferAllocator:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "ModelIO"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -3725,7 +4572,7 @@
     "LeftUsr": "c:objc(cs)MDLMesh(im)initCapsuleWithExtent:cylinderSegments:hemisphereSegments:inwardNormals:geometryType:allocator:",
     "LeftComment": "UInt32",
     "RightUsr": "",
-    "RightComment": "Int32",
+    "RightComment": "Int",
     "ModuleName": "ModelIO"
   },
   {
@@ -4100,6 +4947,17 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSNib.Name",
+    "ModuleName": "GameKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)GKDialogController(im)presentViewController:",
+    "LeftComment": "NSViewController",
+    "RightUsr": "",
+    "RightComment": "NSViewController & GKViewController",
     "ModuleName": "GameKit"
   },
   {
@@ -4628,6 +5486,50 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSApplication.AboutPanelOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSApplication(im)registerServicesMenuSendTypes:returnTypes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSApplication(im)registerServicesMenuSendTypes:returnTypes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSApplication(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSApplication(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -5404,11 +6306,33 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSCollectionView(im)supplementaryViewForElementKind:atIndexPath:",
+    "LeftComment": "NSView",
+    "RightUsr": "",
+    "RightComment": "NSView & NSCollectionViewElement",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)NSCollectionView(im)supplementaryViewForElementKind:atIndexPath:",
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSCollectionView.SupplementaryElementKind",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSCollectionView(im)visibleSupplementaryViewsOfKind:",
+    "LeftComment": "NSView",
+    "RightUsr": "",
+    "RightComment": "NSView & NSCollectionViewElement",
     "ModuleName": "AppKit"
   },
   {
@@ -5844,6 +6768,17 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
@@ -5855,11 +6790,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -6988,11 +7978,44 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -7010,11 +8033,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.ReadingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSFont(cm)systemFontOfSize:weight:",
+    "LeftComment": "CGFloat",
+    "RightUsr": "",
+    "RightComment": "NSFont.Weight",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSFont(cm)monospacedDigitSystemFontOfSize:weight:",
+    "LeftComment": "CGFloat",
+    "RightUsr": "",
+    "RightComment": "NSFont.Weight",
     "ModuleName": "AppKit"
   },
   {
@@ -7042,12 +8120,34 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSFont(cm)labelFontSize",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)NSFont(cm)systemFontSizeForControlSize:",
     "LeftComment": "NSControlSize",
     "RightUsr": "",
     "RightComment": "NSControl.ControlSize",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSFontCollection(cm)fontCollectionWithAllAvailableDescriptors",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "AppKit"
   },
   {
@@ -7191,6 +8291,72 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSFontCollectionMatchingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSFontDescriptor(im)objectForKey:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFontDescriptor.AttributeName",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)NSFontDescriptor(im)initWithFontAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFontDescriptor.AttributeName",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)NSFontDescriptor(im)matchingFontDescriptorsWithMandatoryKeys:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFontDescriptor.AttributeName",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)NSFontDescriptor(im)matchingFontDescriptorWithMandatoryKeys:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFontDescriptor.AttributeName",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSFontDescriptor(im)fontDescriptorByAddingAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSFontDescriptor.AttributeName",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSFontDescriptor(im)fontDescriptorWithSymbolicTraits:",
+    "LeftComment": "NSFontSymbolicTraits",
+    "RightUsr": "",
+    "RightComment": "NSFontDescriptor.SymbolicTraits",
     "ModuleName": "AppKit"
   },
   {
@@ -7526,6 +8692,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSImage(cm)imageUnfilteredPasteboardTypes",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSImage(cm)imagePasteboardTypes",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSImage(cm)imageTypes",
@@ -7582,6 +8770,17 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
@@ -7593,11 +8792,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -7620,6 +8874,39 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSImageRep.HintKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSImageRep(cm)imageRepClassForPasteboardType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSImageRep(cm)imageUnfilteredPasteboardTypes",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSImageRep(cm)imagePasteboardTypes",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -7730,6 +9017,193 @@
     "LeftComment": "NSLayoutConstraintOrientation",
     "RightUsr": "",
     "RightComment": "NSLayoutConstraint.Orientation",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)setGlyphs:properties:characterIndexes:font:forGlyphRange:",
+    "LeftComment": "NSGlyphProperty",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.GlyphProperty",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)propertyForGlyphAtIndex:",
+    "LeftComment": "NSGlyphProperty",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.GlyphProperty",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)getGlyphsInRange:glyphs:properties:characterIndexes:bidiLevels:",
+    "LeftComment": "NSGlyphProperty",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.GlyphProperty",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "6:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)showCGGlyphs:positions:count:font:matrix:attributes:inContext:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)temporaryAttributesAtCharacterIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)setTemporaryAttributes:forCharacterRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)addTemporaryAttributes:forCharacterRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)removeTemporaryAttribute:forCharacterRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)temporaryAttribute:atCharacterIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)temporaryAttribute:atCharacterIndex:longestEffectiveRange:inRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)temporaryAttributesAtCharacterIndex:longestEffectiveRange:inRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSLayoutManager(im)addTemporaryAttribute:value:forCharacterRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0",
+    "LeftUsr": "c:objc(pl)NSLayoutManagerDelegate(im)layoutManager:shouldGenerateGlyphs:properties:characterIndexes:font:forGlyphRange:",
+    "LeftComment": "NSGlyphProperty",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.GlyphProperty",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)NSLayoutManagerDelegate(im)layoutManager:shouldUseAction:forControlCharacterAtIndex:",
+    "LeftComment": "NSControlCharacterAction",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.ControlCharacterAction",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSLayoutManagerDelegate(im)layoutManager:shouldUseAction:forControlCharacterAtIndex:",
+    "LeftComment": "NSControlCharacterAction",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.ControlCharacterAction",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0:0",
+    "LeftUsr": "c:objc(pl)NSLayoutManagerDelegate(im)layoutManager:shouldUseTemporaryAttributes:forDrawingToScreen:atCharacterIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(pl)NSLayoutManagerDelegate(im)layoutManager:shouldUseTemporaryAttributes:forDrawingToScreen:atCharacterIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
     "ModuleName": "AppKit"
   },
   {
@@ -8144,6 +9618,17 @@
     "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSParagraphStyle(cm)defaultParagraphStyle",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSPasteboard(cm)generalPasteboard",
     "LeftComment": "",
     "RightUsr": "",
@@ -8198,11 +9683,308 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)declareTypes:owner:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)addTypes:owner:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)availableTypeFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)availableTypeFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)setData:forType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)setPropertyList:forType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)setString:forType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)dataForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)propertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)stringForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSPasteboard(cm)typesFilterableTo:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboard(cm)typesFilterableTo:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboard(cm)pasteboardByFilteringData:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSPasteboard(im)readFileContentsType:toFile:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)availableTypeFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)availableTypeFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)setDataProvider:forTypes:",
+    "LeftComment": "Any",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)setData:forType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)setString:forType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)setPropertyList:forType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)dataForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)stringForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPasteboardItem(im)propertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -8220,6 +10002,50 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(pl)NSPasteboardItemDataProvider(im)pasteboard:item:provideDataForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
@@ -8231,11 +10057,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -8396,6 +10277,28 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPrintPanel(im)addAccessoryController:",
+    "LeftComment": "NSViewController",
+    "RightUsr": "",
+    "RightComment": "NSViewController & NSPrintPanelAccessorizing",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSPrintPanel(im)removeAccessoryController:",
+    "LeftComment": "NSViewController",
+    "RightUsr": "",
+    "RightComment": "NSViewController & NSPrintPanelAccessorizing",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0:0:0",
     "LeftUsr": "c:objc(pl)NSPrintPanelAccessorizing(im)localizedSummaryItems",
     "LeftComment": "String",
@@ -8445,6 +10348,28 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSPrinter.PaperName",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSResponder(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSResponder(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -8944,6 +10869,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(pl)NSServicesMenuRequestor(im)writeSelectionToPasteboard:types:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
@@ -9078,6 +11014,17 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardReadingOptions",
@@ -9089,11 +11036,66 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(cm)readingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writableTypesForPasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
     "LeftComment": "NSPasteboardWritingOptions",
     "RightUsr": "",
     "RightComment": "NSPasteboard.WritingOptions",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)writingOptionsForType:pasteboard:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(pl)NSPasteboardWriting(im)pasteboardPropertyListForType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -9860,6 +11862,50 @@
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:writablePasteboardTypesForCell:atIndex:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:writeCell:atIndex:toPasteboard:type:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldChangeTypingAttributes:toAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldChangeTypingAttributes:toAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
     "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:willCheckTextInRange:options:types:",
     "LeftComment": "String",
     "RightUsr": "",
@@ -9958,6 +12004,149 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setValue:type:forDimension:",
+    "LeftComment": "NSTextBlockValueType",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.ValueType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setValue:type:forDimension:",
+    "LeftComment": "NSTextBlockDimension",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Dimension",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)valueForDimension:",
+    "LeftComment": "NSTextBlockDimension",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Dimension",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)valueTypeForDimension:",
+    "LeftComment": "NSTextBlockValueType",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.ValueType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)valueTypeForDimension:",
+    "LeftComment": "NSTextBlockDimension",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Dimension",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setContentWidth:type:",
+    "LeftComment": "NSTextBlockValueType",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.ValueType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setWidth:type:forLayer:edge:",
+    "LeftComment": "NSTextBlockValueType",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.ValueType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setWidth:type:forLayer:edge:",
+    "LeftComment": "NSTextBlockLayer",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Layer",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setWidth:type:forLayer:",
+    "LeftComment": "NSTextBlockValueType",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.ValueType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)setWidth:type:forLayer:",
+    "LeftComment": "NSTextBlockLayer",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Layer",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)widthForLayer:edge:",
+    "LeftComment": "NSTextBlockLayer",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Layer",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)widthValueTypeForLayer:edge:",
+    "LeftComment": "NSTextBlockValueType",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.ValueType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextBlock(im)widthValueTypeForLayer:edge:",
+    "LeftComment": "NSTextBlockLayer",
+    "RightUsr": "",
+    "RightComment": "NSTextBlock.Layer",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)NSTextFinder(im)performAction:",
     "LeftComment": "NSTextFinderAction",
@@ -9979,12 +12168,34 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextInputClient(im)validAttributesForMarkedText",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSTextInputContext(cm)currentInputContext",
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextInputContext(cm)localizedNameForInputSource:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSTextInputSourceIdentifier",
     "ModuleName": "AppKit"
   },
   {
@@ -10002,6 +12213,50 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSPasteboardReading(im)initWithPasteboardPropertyList:ofType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithHTML:options:documentAttributes:",
+    "LeftComment": "AnyHashable",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2:0:0",
     "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
     "LeftComment": "String",
@@ -10013,11 +12268,44 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0",
+    "LeftUsr": "c:objc(cs)NSTextTab(im)initWithTextAlignment:location:options:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSTextTab.OptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)NSTextTab(im)initWithType:location:",
     "LeftComment": "NSTextTabType",
     "RightUsr": "",
     "RightComment": "NSParagraphStyle.TextTabType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextView(im)setLayoutOrientation:",
+    "LeftComment": "NSTextLayoutOrientation",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.TextLayoutOrientation",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextInputClient(im)validAttributesForMarkedText",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
     "ModuleName": "AppKit"
   },
   {
@@ -10051,6 +12339,149 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSSpellChecker.OptionKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextView(im)dragOperationForDraggingInfo:type:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextView(im)writeSelectionToPasteboard:type:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSTextView(im)writeSelectionToPasteboard:types:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSTextView(im)preferredPasteboardTypeFromArray:restrictedToTypesFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSTextView(im)preferredPasteboardTypeFromArray:restrictedToTypesFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSTextView(im)preferredPasteboardTypeFromArray:restrictedToTypesFromArray:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextView(im)readSelectionFromPasteboard:type:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTextView(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSTextView(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:writablePasteboardTypesForCell:atIndex:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:writeCell:atIndex:toPasteboard:type:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldChangeTypingAttributes:toAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0",
+    "LeftUsr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldChangeTypingAttributes:toAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
     "ModuleName": "AppKit"
   },
   {
@@ -10344,6 +12775,39 @@
     "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSTypesetter(cm)sharedSystemTypesetter",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSTypesetter(cm)sharedSystemTypesetterForBehavior:",
+    "LeftComment": "NSTypesetterBehavior",
+    "RightUsr": "",
+    "RightComment": "NSLayoutManager.TypesetterBehavior",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSTypesetter(cm)defaultTypesetterBehavior",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSUserDefaultsController(cm)sharedUserDefaultsController",
     "LeftComment": "",
     "RightUsr": "",
@@ -10606,6 +13070,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSView(im)registerForDraggedTypes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSView(im)registerForDraggedTypes:",
@@ -10799,6 +13274,28 @@
     "LeftComment": "NSBackingStoreType",
     "RightUsr": "",
     "RightComment": "NSWindow.BackingStoreType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSWindow(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSWindow(im)validRequestorForSendType:returnType:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -11118,6 +13615,17 @@
     "LeftComment": "NSLayoutConstraintOrientation",
     "RightUsr": "",
     "RightComment": "NSLayoutConstraint.Orientation",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSWindow(im)registerForDraggedTypes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSPasteboard.PasteboardType",
     "ModuleName": "AppKit"
   },
   {
@@ -12750,6 +15258,39 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVFragmentedAssetMinder(cm)fragmentedAssetMinderWithAsset:mindingInterval:",
+    "LeftComment": "AVAsset",
+    "RightUsr": "",
+    "RightComment": "AVAsset & AVFragmentMinding",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVFragmentedAssetMinder(im)addFragmentedAsset:",
+    "LeftComment": "AVAsset",
+    "RightUsr": "",
+    "RightComment": "AVAsset & AVFragmentMinding",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVFragmentedAssetMinder(im)removeFragmentedAsset:",
+    "LeftComment": "AVAsset",
+    "RightUsr": "",
+    "RightComment": "AVAsset & AVFragmentMinding",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
@@ -12768,6 +15309,17 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AVMediaCharacteristic",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AVFragmentedAssetMinder(cm)fragmentedAssetMinderWithAsset:mindingInterval:",
+    "LeftComment": "AVAsset",
+    "RightUsr": "",
+    "RightComment": "AVAsset & AVFragmentMinding",
     "ModuleName": "AVFoundation"
   },
   {
@@ -13949,128 +16501,737 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextEffectLetterpressStyle",
+    "OldPrintedName": "NSTextEffectLetterpressStyle",
+    "NewPrintedName": "letterpressStyle",
+    "NewTypeName": "NSAttributedString.TextEffectStyle"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPlainTextDocumentType",
+    "OldPrintedName": "NSPlainTextDocumentType",
+    "NewPrintedName": "plain",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRTFTextDocumentType",
+    "OldPrintedName": "NSRTFTextDocumentType",
+    "NewPrintedName": "rtf",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRTFDTextDocumentType",
+    "OldPrintedName": "NSRTFDTextDocumentType",
+    "NewPrintedName": "rtfd",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSHTMLTextDocumentType",
+    "OldPrintedName": "NSHTMLTextDocumentType",
+    "NewPrintedName": "html",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSMacSimpleTextDocumentType",
+    "OldPrintedName": "NSMacSimpleTextDocumentType",
+    "NewPrintedName": "macSimpleText",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDocFormatTextDocumentType",
+    "OldPrintedName": "NSDocFormatTextDocumentType",
+    "NewPrintedName": "docFormat",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSWordMLTextDocumentType",
+    "OldPrintedName": "NSWordMLTextDocumentType",
+    "NewPrintedName": "wordML",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSWebArchiveTextDocumentType",
+    "OldPrintedName": "NSWebArchiveTextDocumentType",
+    "NewPrintedName": "webArchive",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSOfficeOpenXMLTextDocumentType",
+    "OldPrintedName": "NSOfficeOpenXMLTextDocumentType",
+    "NewPrintedName": "officeOpenXML",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSOpenDocumentTextDocumentType",
+    "OldPrintedName": "NSOpenDocumentTextDocumentType",
+    "NewPrintedName": "openDocument",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionOrientation",
+    "OldPrintedName": "NSTextLayoutSectionOrientation",
+    "NewPrintedName": "orientation",
+    "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionRange",
+    "OldPrintedName": "NSTextLayoutSectionRange",
+    "NewPrintedName": "range",
+    "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDocumentTypeDocumentAttribute",
+    "OldPrintedName": "NSDocumentTypeDocumentAttribute",
+    "NewPrintedName": "documentType",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSConvertedDocumentAttribute",
+    "OldPrintedName": "NSConvertedDocumentAttribute",
+    "NewPrintedName": "converted",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCocoaVersionDocumentAttribute",
+    "OldPrintedName": "NSCocoaVersionDocumentAttribute",
+    "NewPrintedName": "cocoaVersion",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFileTypeDocumentAttribute",
+    "OldPrintedName": "NSFileTypeDocumentAttribute",
+    "NewPrintedName": "fileType",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTitleDocumentAttribute",
+    "OldPrintedName": "NSTitleDocumentAttribute",
+    "NewPrintedName": "title",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCompanyDocumentAttribute",
+    "OldPrintedName": "NSCompanyDocumentAttribute",
+    "NewPrintedName": "company",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCopyrightDocumentAttribute",
+    "OldPrintedName": "NSCopyrightDocumentAttribute",
+    "NewPrintedName": "copyright",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSSubjectDocumentAttribute",
+    "OldPrintedName": "NSSubjectDocumentAttribute",
+    "NewPrintedName": "subject",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSAuthorDocumentAttribute",
+    "OldPrintedName": "NSAuthorDocumentAttribute",
+    "NewPrintedName": "author",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSKeywordsDocumentAttribute",
+    "OldPrintedName": "NSKeywordsDocumentAttribute",
+    "NewPrintedName": "keywords",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCommentDocumentAttribute",
+    "OldPrintedName": "NSCommentDocumentAttribute",
+    "NewPrintedName": "comment",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSEditorDocumentAttribute",
+    "OldPrintedName": "NSEditorDocumentAttribute",
+    "NewPrintedName": "editor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCreationTimeDocumentAttribute",
+    "OldPrintedName": "NSCreationTimeDocumentAttribute",
+    "NewPrintedName": "creationTime",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSModificationTimeDocumentAttribute",
+    "OldPrintedName": "NSModificationTimeDocumentAttribute",
+    "NewPrintedName": "modificationTime",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSManagerDocumentAttribute",
+    "OldPrintedName": "NSManagerDocumentAttribute",
+    "NewPrintedName": "manager",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCategoryDocumentAttribute",
+    "OldPrintedName": "NSCategoryDocumentAttribute",
+    "NewPrintedName": "category",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCharacterEncodingDocumentAttribute",
+    "OldPrintedName": "NSCharacterEncodingDocumentAttribute",
+    "NewPrintedName": "characterEncoding",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultAttributesDocumentAttribute",
+    "OldPrintedName": "NSDefaultAttributesDocumentAttribute",
+    "NewPrintedName": "defaultAttributes",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPaperSizeDocumentAttribute",
+    "OldPrintedName": "NSPaperSizeDocumentAttribute",
+    "NewPrintedName": "paperSize",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLeftMarginDocumentAttribute",
+    "OldPrintedName": "NSLeftMarginDocumentAttribute",
+    "NewPrintedName": "leftMargin",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRightMarginDocumentAttribute",
+    "OldPrintedName": "NSRightMarginDocumentAttribute",
+    "NewPrintedName": "rightMargin",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTopMarginDocumentAttribute",
+    "OldPrintedName": "NSTopMarginDocumentAttribute",
+    "NewPrintedName": "topMargin",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBottomMarginDocumentAttribute",
+    "OldPrintedName": "NSBottomMarginDocumentAttribute",
+    "NewPrintedName": "bottomMargin",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewSizeDocumentAttribute",
+    "OldPrintedName": "NSViewSizeDocumentAttribute",
+    "NewPrintedName": "viewSize",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewZoomDocumentAttribute",
+    "OldPrintedName": "NSViewZoomDocumentAttribute",
+    "NewPrintedName": "viewZoom",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewModeDocumentAttribute",
+    "OldPrintedName": "NSViewModeDocumentAttribute",
+    "NewPrintedName": "viewMode",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSReadOnlyDocumentAttribute",
+    "OldPrintedName": "NSReadOnlyDocumentAttribute",
+    "NewPrintedName": "readOnly",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBackgroundColorDocumentAttribute",
+    "OldPrintedName": "NSBackgroundColorDocumentAttribute",
+    "NewPrintedName": "backgroundColor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSHyphenationFactorDocumentAttribute",
+    "OldPrintedName": "NSHyphenationFactorDocumentAttribute",
+    "NewPrintedName": "hyphenationFactor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultTabIntervalDocumentAttribute",
+    "OldPrintedName": "NSDefaultTabIntervalDocumentAttribute",
+    "NewPrintedName": "defaultTabInterval",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionsAttribute",
+    "OldPrintedName": "NSTextLayoutSectionsAttribute",
+    "NewPrintedName": "textLayoutSections",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSExcludedElementsDocumentAttribute",
+    "OldPrintedName": "NSExcludedElementsDocumentAttribute",
+    "NewPrintedName": "excludedElements",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextEncodingNameDocumentAttribute",
+    "OldPrintedName": "NSTextEncodingNameDocumentAttribute",
+    "NewPrintedName": "textEncodingName",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPrefixSpacesDocumentAttribute",
+    "OldPrintedName": "NSPrefixSpacesDocumentAttribute",
+    "NewPrintedName": "prefixSpaces",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDocumentTypeDocumentOption",
+    "OldPrintedName": "NSDocumentTypeDocumentOption",
+    "NewPrintedName": "documentType",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultAttributesDocumentOption",
+    "OldPrintedName": "NSDefaultAttributesDocumentOption",
+    "NewPrintedName": "defaultAttributes",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCharacterEncodingDocumentOption",
+    "OldPrintedName": "NSCharacterEncodingDocumentOption",
+    "NewPrintedName": "characterEncoding",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextEncodingNameDocumentOption",
+    "OldPrintedName": "NSTextEncodingNameDocumentOption",
+    "NewPrintedName": "textEncodingName",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBaseURLDocumentOption",
+    "OldPrintedName": "NSBaseURLDocumentOption",
+    "NewPrintedName": "baseURL",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTimeoutDocumentOption",
+    "OldPrintedName": "NSTimeoutDocumentOption",
+    "NewPrintedName": "timeout",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSWebPreferencesDocumentOption",
+    "OldPrintedName": "NSWebPreferencesDocumentOption",
+    "NewPrintedName": "webPreferences",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSWebResourceLoadDelegateDocumentOption",
+    "OldPrintedName": "NSWebResourceLoadDelegateDocumentOption",
+    "NewPrintedName": "webResourceLoadDelegate",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextSizeMultiplierDocumentOption",
+    "OldPrintedName": "NSTextSizeMultiplierDocumentOption",
+    "NewPrintedName": "textSizeMultiplier",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFileTypeDocumentOption",
+    "OldPrintedName": "NSFileTypeDocumentOption",
+    "NewPrintedName": "fileType",
+    "NewTypeName": "NSAttributedString.DocumentReadingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityFontTextAttribute",
     "OldPrintedName": "NSAccessibilityFontTextAttribute",
-    "NewPrintedName": "font",
+    "NewPrintedName": "accessibilityFont",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityForegroundColorTextAttribute",
     "OldPrintedName": "NSAccessibilityForegroundColorTextAttribute",
-    "NewPrintedName": "foregroundColor",
+    "NewPrintedName": "accessibilityForegroundColor",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityBackgroundColorTextAttribute",
     "OldPrintedName": "NSAccessibilityBackgroundColorTextAttribute",
-    "NewPrintedName": "backgroundColor",
+    "NewPrintedName": "accessibilityBackgroundColor",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityUnderlineColorTextAttribute",
     "OldPrintedName": "NSAccessibilityUnderlineColorTextAttribute",
-    "NewPrintedName": "underlineColor",
+    "NewPrintedName": "accessibilityUnderlineColor",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityStrikethroughColorTextAttribute",
     "OldPrintedName": "NSAccessibilityStrikethroughColorTextAttribute",
-    "NewPrintedName": "strikethroughColor",
+    "NewPrintedName": "accessibilityStrikethroughColor",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityUnderlineTextAttribute",
     "OldPrintedName": "NSAccessibilityUnderlineTextAttribute",
-    "NewPrintedName": "underline",
+    "NewPrintedName": "accessibilityUnderline",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilitySuperscriptTextAttribute",
     "OldPrintedName": "NSAccessibilitySuperscriptTextAttribute",
-    "NewPrintedName": "superscript",
+    "NewPrintedName": "accessibilitySuperscript",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityStrikethroughTextAttribute",
     "OldPrintedName": "NSAccessibilityStrikethroughTextAttribute",
-    "NewPrintedName": "strikethrough",
+    "NewPrintedName": "accessibilityStrikethrough",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityShadowTextAttribute",
     "OldPrintedName": "NSAccessibilityShadowTextAttribute",
-    "NewPrintedName": "shadow",
+    "NewPrintedName": "accessibilityShadow",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityAttachmentTextAttribute",
     "OldPrintedName": "NSAccessibilityAttachmentTextAttribute",
-    "NewPrintedName": "attachment",
+    "NewPrintedName": "accessibilityAttachment",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityLinkTextAttribute",
     "OldPrintedName": "NSAccessibilityLinkTextAttribute",
-    "NewPrintedName": "link",
+    "NewPrintedName": "accessibilityLink",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityAutocorrectedTextAttribute",
     "OldPrintedName": "NSAccessibilityAutocorrectedTextAttribute",
-    "NewPrintedName": "autocorrected",
+    "NewPrintedName": "accessibilityAutocorrected",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityTextAlignmentAttribute",
     "OldPrintedName": "NSAccessibilityTextAlignmentAttribute",
-    "NewPrintedName": "alignment",
+    "NewPrintedName": "accessibilityAlignment",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityListItemPrefixTextAttribute",
     "OldPrintedName": "NSAccessibilityListItemPrefixTextAttribute",
-    "NewPrintedName": "listItemPrefix",
+    "NewPrintedName": "accessibilityListItemPrefix",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityListItemIndexTextAttribute",
     "OldPrintedName": "NSAccessibilityListItemIndexTextAttribute",
-    "NewPrintedName": "listItemIndex",
+    "NewPrintedName": "accessibilityListItemIndex",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityListItemLevelTextAttribute",
     "OldPrintedName": "NSAccessibilityListItemLevelTextAttribute",
-    "NewPrintedName": "listItemLevel",
+    "NewPrintedName": "accessibilityListItemLevel",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityMisspelledTextAttribute",
     "OldPrintedName": "NSAccessibilityMisspelledTextAttribute",
-    "NewPrintedName": "misspelled",
+    "NewPrintedName": "accessibilityMisspelled",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAccessibilityMarkedMisspelledTextAttribute",
     "OldPrintedName": "NSAccessibilityMarkedMisspelledTextAttribute",
-    "NewPrintedName": "markedMisspelled",
+    "NewPrintedName": "accessibilityMarkedMisspelled",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontAttributeName",
+    "OldPrintedName": "NSFontAttributeName",
+    "NewPrintedName": "font",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSParagraphStyleAttributeName",
+    "OldPrintedName": "NSParagraphStyleAttributeName",
+    "NewPrintedName": "paragraphStyle",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSForegroundColorAttributeName",
+    "OldPrintedName": "NSForegroundColorAttributeName",
+    "NewPrintedName": "foregroundColor",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBackgroundColorAttributeName",
+    "OldPrintedName": "NSBackgroundColorAttributeName",
+    "NewPrintedName": "backgroundColor",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLigatureAttributeName",
+    "OldPrintedName": "NSLigatureAttributeName",
+    "NewPrintedName": "ligature",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSKernAttributeName",
+    "OldPrintedName": "NSKernAttributeName",
+    "NewPrintedName": "kern",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSStrikethroughStyleAttributeName",
+    "OldPrintedName": "NSStrikethroughStyleAttributeName",
+    "NewPrintedName": "strikethroughStyle",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSUnderlineStyleAttributeName",
+    "OldPrintedName": "NSUnderlineStyleAttributeName",
+    "NewPrintedName": "underlineStyle",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSStrokeColorAttributeName",
+    "OldPrintedName": "NSStrokeColorAttributeName",
+    "NewPrintedName": "strokeColor",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSStrokeWidthAttributeName",
+    "OldPrintedName": "NSStrokeWidthAttributeName",
+    "NewPrintedName": "strokeWidth",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSShadowAttributeName",
+    "OldPrintedName": "NSShadowAttributeName",
+    "NewPrintedName": "shadow",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextEffectAttributeName",
+    "OldPrintedName": "NSTextEffectAttributeName",
+    "NewPrintedName": "textEffect",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSAttachmentAttributeName",
+    "OldPrintedName": "NSAttachmentAttributeName",
+    "NewPrintedName": "attachment",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinkAttributeName",
+    "OldPrintedName": "NSLinkAttributeName",
+    "NewPrintedName": "link",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBaselineOffsetAttributeName",
+    "OldPrintedName": "NSBaselineOffsetAttributeName",
+    "NewPrintedName": "baselineOffset",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSUnderlineColorAttributeName",
+    "OldPrintedName": "NSUnderlineColorAttributeName",
+    "NewPrintedName": "underlineColor",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSStrikethroughColorAttributeName",
+    "OldPrintedName": "NSStrikethroughColorAttributeName",
+    "NewPrintedName": "strikethroughColor",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSObliquenessAttributeName",
+    "OldPrintedName": "NSObliquenessAttributeName",
+    "NewPrintedName": "obliqueness",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSExpansionAttributeName",
+    "OldPrintedName": "NSExpansionAttributeName",
+    "NewPrintedName": "expansion",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSWritingDirectionAttributeName",
+    "OldPrintedName": "NSWritingDirectionAttributeName",
+    "NewPrintedName": "writingDirection",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSVerticalGlyphFormAttributeName",
+    "OldPrintedName": "NSVerticalGlyphFormAttributeName",
+    "NewPrintedName": "verticalGlyphForm",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCursorAttributeName",
+    "OldPrintedName": "NSCursorAttributeName",
+    "NewPrintedName": "cursor",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSToolTipAttributeName",
+    "OldPrintedName": "NSToolTipAttributeName",
+    "NewPrintedName": "toolTip",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSMarkedClauseSegmentAttributeName",
+    "OldPrintedName": "NSMarkedClauseSegmentAttributeName",
+    "NewPrintedName": "markedClauseSegment",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextAlternativesAttributeName",
+    "OldPrintedName": "NSTextAlternativesAttributeName",
+    "NewPrintedName": "textAlternatives",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSSpellingStateAttributeName",
+    "OldPrintedName": "NSSpellingStateAttributeName",
+    "NewPrintedName": "spellingState",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSSuperscriptAttributeName",
+    "OldPrintedName": "NSSuperscriptAttributeName",
+    "NewPrintedName": "superscript",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSGlyphInfoAttributeName",
+    "OldPrintedName": "NSGlyphInfoAttributeName",
+    "NewPrintedName": "glyphInfo",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCharacterShapeAttributeName",
+    "OldPrintedName": "NSCharacterShapeAttributeName",
+    "NewPrintedName": "characterShapeAttributeName",
+    "NewTypeName": "NSAttributedStringKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSUsesScreenFontsDocumentAttribute",
+    "OldPrintedName": "NSUsesScreenFontsDocumentAttribute",
+    "NewPrintedName": "usesScreenFontsDocumentAttribute",
     "NewTypeName": "NSAttributedStringKey"
   },
   {
@@ -14376,101 +17537,115 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@MTKTextureLoaderCubeLayoutVertical",
-    "OldPrintedName": "MTKTextureLoaderCubeLayoutVertical",
-    "NewPrintedName": "vertical",
-    "NewTypeName": "MTKTextureLoaderCubeLayout"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderErrorDomain",
     "OldPrintedName": "MTKTextureLoaderErrorDomain",
     "NewPrintedName": "domain",
-    "NewTypeName": "MTKTextureLoaderError"
+    "NewTypeName": "MTKTextureLoader.Error"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderErrorKey",
     "OldPrintedName": "MTKTextureLoaderErrorKey",
     "NewPrintedName": "key",
-    "NewTypeName": "MTKTextureLoaderError"
+    "NewTypeName": "MTKTextureLoader.Error"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionAllocateMipmaps",
     "OldPrintedName": "MTKTextureLoaderOptionAllocateMipmaps",
     "NewPrintedName": "allocateMipmaps",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionGenerateMipmaps",
     "OldPrintedName": "MTKTextureLoaderOptionGenerateMipmaps",
     "NewPrintedName": "generateMipmaps",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionSRGB",
     "OldPrintedName": "MTKTextureLoaderOptionSRGB",
     "NewPrintedName": "SRGB",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionTextureUsage",
     "OldPrintedName": "MTKTextureLoaderOptionTextureUsage",
     "NewPrintedName": "textureUsage",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionTextureCPUCacheMode",
     "OldPrintedName": "MTKTextureLoaderOptionTextureCPUCacheMode",
     "NewPrintedName": "textureCPUCacheMode",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionTextureStorageMode",
     "OldPrintedName": "MTKTextureLoaderOptionTextureStorageMode",
     "NewPrintedName": "textureStorageMode",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionCubeLayout",
     "OldPrintedName": "MTKTextureLoaderOptionCubeLayout",
     "NewPrintedName": "cubeLayout",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionOrigin",
     "OldPrintedName": "MTKTextureLoaderOptionOrigin",
     "NewPrintedName": "origin",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderCubeLayoutVertical",
+    "OldPrintedName": "MTKTextureLoaderCubeLayoutVertical",
+    "NewPrintedName": "vertical",
+    "NewTypeName": "MTKTextureLoader.CubeLayout"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOriginTopLeft",
     "OldPrintedName": "MTKTextureLoaderOriginTopLeft",
     "NewPrintedName": "topLeft",
-    "NewTypeName": "MTKTextureLoaderOrigin"
+    "NewTypeName": "MTKTextureLoader.Origin"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOriginBottomLeft",
     "OldPrintedName": "MTKTextureLoaderOriginBottomLeft",
     "NewPrintedName": "bottomLeft",
-    "NewTypeName": "MTKTextureLoaderOrigin"
+    "NewTypeName": "MTKTextureLoader.Origin"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOriginFlippedVertically",
     "OldPrintedName": "MTKTextureLoaderOriginFlippedVertically",
     "NewPrintedName": "flippedVertically",
-    "NewTypeName": "MTKTextureLoaderOrigin"
+    "NewTypeName": "MTKTextureLoader.Origin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@T@MTKTextureLoaderCallback",
+    "OldPrintedName": "MTKTextureLoaderCallback",
+    "NewPrintedName": "Callback",
+    "NewTypeName": "MTKTextureLoader"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@T@MTKTextureLoaderArrayCallback",
+    "OldPrintedName": "MTKTextureLoaderArrayCallback",
+    "NewPrintedName": "ArrayCallback",
+    "NewTypeName": "MTKTextureLoader"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -16569,6 +19744,13 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSAppKitVersionNumber",
+    "OldPrintedName": "NSAppKitVersionNumber",
+    "NewPrintedName": "current",
+    "NewTypeName": "NSAppKitVersion"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAppearanceNameAqua",
     "OldPrintedName": "NSAppearanceNameAqua",
     "NewPrintedName": "aqua",
@@ -18027,6 +21209,69 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightUltraLight",
+    "OldPrintedName": "NSFontWeightUltraLight",
+    "NewPrintedName": "ultraLight",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightThin",
+    "OldPrintedName": "NSFontWeightThin",
+    "NewPrintedName": "thin",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightLight",
+    "OldPrintedName": "NSFontWeightLight",
+    "NewPrintedName": "light",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightRegular",
+    "OldPrintedName": "NSFontWeightRegular",
+    "NewPrintedName": "regular",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightMedium",
+    "OldPrintedName": "NSFontWeightMedium",
+    "NewPrintedName": "medium",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightSemibold",
+    "OldPrintedName": "NSFontWeightSemibold",
+    "NewPrintedName": "semibold",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightBold",
+    "OldPrintedName": "NSFontWeightBold",
+    "NewPrintedName": "bold",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightHeavy",
+    "OldPrintedName": "NSFontWeightHeavy",
+    "NewPrintedName": "heavy",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightBlack",
+    "OldPrintedName": "NSFontWeightBlack",
+    "NewPrintedName": "black",
+    "NewTypeName": "NSFont.Weight"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontIdentityMatrix",
     "OldPrintedName": "NSFontIdentityMatrix",
     "NewPrintedName": "identityMatrix",
@@ -18036,29 +21281,50 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontCollectionActionKey",
     "OldPrintedName": "NSFontCollectionActionKey",
-    "NewPrintedName": "actionUserInfoKey",
-    "NewTypeName": "NSFontCollection"
+    "NewPrintedName": "action",
+    "NewTypeName": "NSFontCollection.UserInfoKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontCollectionNameKey",
     "OldPrintedName": "NSFontCollectionNameKey",
-    "NewPrintedName": "nameUserInfoKey",
-    "NewTypeName": "NSFontCollection"
+    "NewPrintedName": "name",
+    "NewTypeName": "NSFontCollection.UserInfoKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontCollectionOldNameKey",
     "OldPrintedName": "NSFontCollectionOldNameKey",
-    "NewPrintedName": "oldNameUserInfoKey",
-    "NewTypeName": "NSFontCollection"
+    "NewPrintedName": "oldName",
+    "NewTypeName": "NSFontCollection.UserInfoKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontCollectionVisibilityKey",
     "OldPrintedName": "NSFontCollectionVisibilityKey",
-    "NewPrintedName": "visibilityUserInfoKey",
-    "NewTypeName": "NSFontCollection"
+    "NewPrintedName": "visibility",
+    "NewTypeName": "NSFontCollection.UserInfoKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontCollectionWasShown",
+    "OldPrintedName": "NSFontCollectionWasShown",
+    "NewPrintedName": "shown",
+    "NewTypeName": "NSFontCollection.ActionTypeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontCollectionWasHidden",
+    "OldPrintedName": "NSFontCollectionWasHidden",
+    "NewPrintedName": "hidden",
+    "NewTypeName": "NSFontCollection.ActionTypeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontCollectionWasRenamed",
+    "OldPrintedName": "NSFontCollectionWasRenamed",
+    "NewPrintedName": "renamed",
+    "NewTypeName": "NSFontCollection.ActionTypeKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -18115,6 +21381,167 @@
     "OldPrintedName": "NSFontCollectionDisallowAutoActivationOption",
     "NewPrintedName": "disallowAutoActivationOption",
     "NewTypeName": "NSFontCollectionMatchingOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontFamilyAttribute",
+    "OldPrintedName": "NSFontFamilyAttribute",
+    "NewPrintedName": "family",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontNameAttribute",
+    "OldPrintedName": "NSFontNameAttribute",
+    "NewPrintedName": "name",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontFaceAttribute",
+    "OldPrintedName": "NSFontFaceAttribute",
+    "NewPrintedName": "face",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontSizeAttribute",
+    "OldPrintedName": "NSFontSizeAttribute",
+    "NewPrintedName": "size",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVisibleNameAttribute",
+    "OldPrintedName": "NSFontVisibleNameAttribute",
+    "NewPrintedName": "visibleName",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontMatrixAttribute",
+    "OldPrintedName": "NSFontMatrixAttribute",
+    "NewPrintedName": "matrix",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVariationAttribute",
+    "OldPrintedName": "NSFontVariationAttribute",
+    "NewPrintedName": "variation",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontCharacterSetAttribute",
+    "OldPrintedName": "NSFontCharacterSetAttribute",
+    "NewPrintedName": "characterSet",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontCascadeListAttribute",
+    "OldPrintedName": "NSFontCascadeListAttribute",
+    "NewPrintedName": "cascadeList",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontTraitsAttribute",
+    "OldPrintedName": "NSFontTraitsAttribute",
+    "NewPrintedName": "traits",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontFixedAdvanceAttribute",
+    "OldPrintedName": "NSFontFixedAdvanceAttribute",
+    "NewPrintedName": "fixedAdvance",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontFeatureSettingsAttribute",
+    "OldPrintedName": "NSFontFeatureSettingsAttribute",
+    "NewPrintedName": "featureSettings",
+    "NewTypeName": "NSFontDescriptor.AttributeName"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontSymbolicTrait",
+    "OldPrintedName": "NSFontSymbolicTrait",
+    "NewPrintedName": "symbolic",
+    "NewTypeName": "NSFontDescriptor.TraitKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWeightTrait",
+    "OldPrintedName": "NSFontWeightTrait",
+    "NewPrintedName": "weight",
+    "NewTypeName": "NSFontDescriptor.TraitKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontWidthTrait",
+    "OldPrintedName": "NSFontWidthTrait",
+    "NewPrintedName": "width",
+    "NewTypeName": "NSFontDescriptor.TraitKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontSlantTrait",
+    "OldPrintedName": "NSFontSlantTrait",
+    "NewPrintedName": "slant",
+    "NewTypeName": "NSFontDescriptor.TraitKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVariationAxisIdentifierKey",
+    "OldPrintedName": "NSFontVariationAxisIdentifierKey",
+    "NewPrintedName": "identifier",
+    "NewTypeName": "NSFontDescriptor.VariationKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVariationAxisMinimumValueKey",
+    "OldPrintedName": "NSFontVariationAxisMinimumValueKey",
+    "NewPrintedName": "minimumValue",
+    "NewTypeName": "NSFontDescriptor.VariationKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVariationAxisMaximumValueKey",
+    "OldPrintedName": "NSFontVariationAxisMaximumValueKey",
+    "NewPrintedName": "maximumValue",
+    "NewTypeName": "NSFontDescriptor.VariationKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVariationAxisDefaultValueKey",
+    "OldPrintedName": "NSFontVariationAxisDefaultValueKey",
+    "NewPrintedName": "defaultValue",
+    "NewTypeName": "NSFontDescriptor.VariationKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontVariationAxisNameKey",
+    "OldPrintedName": "NSFontVariationAxisNameKey",
+    "NewPrintedName": "name",
+    "NewTypeName": "NSFontDescriptor.VariationKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontFeatureTypeIdentifierKey",
+    "OldPrintedName": "NSFontFeatureTypeIdentifierKey",
+    "NewPrintedName": "typeIdentifier",
+    "NewTypeName": "NSFontDescriptor.FeatureKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFontFeatureSelectorIdentifierKey",
+    "OldPrintedName": "NSFontFeatureSelectorIdentifierKey",
+    "NewPrintedName": "selectorIdentifier",
+    "NewTypeName": "NSFontDescriptor.FeatureKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -19294,6 +22721,34 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTextLayoutOrientation",
+    "OldPrintedName": "NSTextLayoutOrientation",
+    "NewPrintedName": "TextLayoutOrientation",
+    "NewTypeName": "NSLayoutManager"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSGlyphProperty",
+    "OldPrintedName": "NSGlyphProperty",
+    "NewPrintedName": "GlyphProperty",
+    "NewTypeName": "NSLayoutManager"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSControlCharacterAction",
+    "OldPrintedName": "NSControlCharacterAction",
+    "NewPrintedName": "ControlCharacterAction",
+    "NewTypeName": "NSLayoutManager"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTypesetterBehavior",
+    "OldPrintedName": "NSTypesetterBehavior",
+    "NewPrintedName": "TypesetterBehavior",
+    "NewTypeName": "NSLayoutManager"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@E@NSLevelIndicatorStyle",
     "OldPrintedName": "NSLevelIndicatorStyle",
     "NewPrintedName": "Style",
@@ -19378,6 +22833,196 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeString",
+    "OldPrintedName": "NSPasteboardTypeString",
+    "NewPrintedName": "string",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypePDF",
+    "OldPrintedName": "NSPasteboardTypePDF",
+    "NewPrintedName": "pdf",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeTIFF",
+    "OldPrintedName": "NSPasteboardTypeTIFF",
+    "NewPrintedName": "tiff",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypePNG",
+    "OldPrintedName": "NSPasteboardTypePNG",
+    "NewPrintedName": "png",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeRTF",
+    "OldPrintedName": "NSPasteboardTypeRTF",
+    "NewPrintedName": "rtf",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeRTFD",
+    "OldPrintedName": "NSPasteboardTypeRTFD",
+    "NewPrintedName": "rtfd",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeHTML",
+    "OldPrintedName": "NSPasteboardTypeHTML",
+    "NewPrintedName": "html",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeTabularText",
+    "OldPrintedName": "NSPasteboardTypeTabularText",
+    "NewPrintedName": "tabularText",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeFont",
+    "OldPrintedName": "NSPasteboardTypeFont",
+    "NewPrintedName": "font",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeRuler",
+    "OldPrintedName": "NSPasteboardTypeRuler",
+    "NewPrintedName": "ruler",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeColor",
+    "OldPrintedName": "NSPasteboardTypeColor",
+    "NewPrintedName": "color",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeSound",
+    "OldPrintedName": "NSPasteboardTypeSound",
+    "NewPrintedName": "sound",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeMultipleTextSelection",
+    "OldPrintedName": "NSPasteboardTypeMultipleTextSelection",
+    "NewPrintedName": "multipleTextSelection",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPasteboardTypeTextFinderOptions",
+    "OldPrintedName": "NSPasteboardTypeTextFinderOptions",
+    "NewPrintedName": "textFinderOptions",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPostScriptPboardType",
+    "OldPrintedName": "NSPostScriptPboardType",
+    "NewPrintedName": "postScript",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSVCardPboardType",
+    "OldPrintedName": "NSVCardPboardType",
+    "NewPrintedName": "vCard",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSInkTextPboardType",
+    "OldPrintedName": "NSInkTextPboardType",
+    "NewPrintedName": "inkText",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFilesPromisePboardType",
+    "OldPrintedName": "NSFilesPromisePboardType",
+    "NewPrintedName": "filePromise",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFileContentsPboardType",
+    "OldPrintedName": "NSFileContentsPboardType",
+    "NewPrintedName": "fileContents",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@F@NSCreateFilenamePboardType",
+    "OldPrintedName": "NSCreateFilenamePboardType(_:)",
+    "NewPrintedName": "fileNameType(forPathExtension:)",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@F@NSCreateFileContentsPboardType",
+    "OldPrintedName": "NSCreateFileContentsPboardType(_:)",
+    "NewPrintedName": "fileContentsType(forPathExtension:)",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@F@NSGetFileType",
+    "OldPrintedName": "NSGetFileType(_:)",
+    "NewPrintedName": "representedPathExtension",
+    "NewTypeName": "NSPasteboard.PasteboardType",
+    "SelfIndex": 0
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFindPanelSearchOptionsPboardType",
+    "OldPrintedName": "NSFindPanelSearchOptionsPboardType",
+    "NewPrintedName": "findPanelSearchOptions",
+    "NewTypeName": "NSPasteboard.PasteboardType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFindPanelCaseInsensitiveSearch",
+    "OldPrintedName": "NSFindPanelCaseInsensitiveSearch",
+    "NewPrintedName": "findPanelCaseInsensitiveSearch",
+    "NewTypeName": "NSPasteboard.PasteboardType.FindPanelSearchOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSFindPanelSubstringMatch",
+    "OldPrintedName": "NSFindPanelSubstringMatch",
+    "NewPrintedName": "findPanelSubstringMatch",
+    "NewTypeName": "NSPasteboard.PasteboardType.FindPanelSearchOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextFinderCaseInsensitiveKey",
+    "OldPrintedName": "NSTextFinderCaseInsensitiveKey",
+    "NewPrintedName": "textFinderCaseInsensitiveKey",
+    "NewTypeName": "NSPasteboard.PasteboardType.TextFinderOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextFinderMatchingTypeKey",
+    "OldPrintedName": "NSTextFinderMatchingTypeKey",
+    "NewPrintedName": "textFinderMatchingTypeKey",
+    "NewTypeName": "NSPasteboard.PasteboardType.TextFinderOptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSGeneralPboard",
     "OldPrintedName": "NSGeneralPboard",
     "NewPrintedName": "generalPboard",
@@ -19445,62 +23090,6 @@
     "OldPrintedName": "NSPasteboardReadingOptions",
     "NewPrintedName": "ReadingOptions",
     "NewTypeName": "NSPasteboard"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@F@NSCreateFilenamePboardType",
-    "OldPrintedName": "NSCreateFilenamePboardType(_:)",
-    "NewPrintedName": "fileNamePasteboardType(fileType:)",
-    "NewTypeName": "NSPasteboard"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@F@NSCreateFileContentsPboardType",
-    "OldPrintedName": "NSCreateFileContentsPboardType(_:)",
-    "NewPrintedName": "fileContentsPasteboardType(fileType:)",
-    "NewTypeName": "NSPasteboard"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@F@NSGetFileType",
-    "OldPrintedName": "NSGetFileType(_:)",
-    "NewPrintedName": "fileType(forPasteboardType:)",
-    "NewTypeName": "NSPasteboard"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@F@NSGetFileTypes",
-    "OldPrintedName": "NSGetFileTypes(_:)",
-    "NewPrintedName": "fileTypes(forPasteboardTypes:)",
-    "NewTypeName": "NSPasteboard"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@NSFindPanelCaseInsensitiveSearch",
-    "OldPrintedName": "NSFindPanelCaseInsensitiveSearch",
-    "NewPrintedName": "findPanelCaseInsensitiveSearch",
-    "NewTypeName": "NSPasteboardTypeFindPanelSearchOptionKey"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@NSFindPanelSubstringMatch",
-    "OldPrintedName": "NSFindPanelSubstringMatch",
-    "NewPrintedName": "findPanelSubstringMatch",
-    "NewTypeName": "NSPasteboardTypeFindPanelSearchOptionKey"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@NSTextFinderCaseInsensitiveKey",
-    "OldPrintedName": "NSTextFinderCaseInsensitiveKey",
-    "NewPrintedName": "textFinderCaseInsensitiveKey",
-    "NewTypeName": "NSPasteboardTypeTextFinderOptionKey"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@NSTextFinderMatchingTypeKey",
-    "OldPrintedName": "NSTextFinderMatchingTypeKey",
-    "NewPrintedName": "textFinderMatchingTypeKey",
-    "NewTypeName": "NSPasteboardTypeTextFinderOptionKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -20904,6 +24493,34 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTextBlockValueType",
+    "OldPrintedName": "NSTextBlockValueType",
+    "NewPrintedName": "ValueType",
+    "NewTypeName": "NSTextBlock"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTextBlockDimension",
+    "OldPrintedName": "NSTextBlockDimension",
+    "NewPrintedName": "Dimension",
+    "NewTypeName": "NSTextBlock"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTextBlockLayer",
+    "OldPrintedName": "NSTextBlockLayer",
+    "NewPrintedName": "Layer",
+    "NewTypeName": "NSTextBlock"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTextBlockVerticalAlignment",
+    "OldPrintedName": "NSTextBlockVerticalAlignment",
+    "NewPrintedName": "VerticalAlignment",
+    "NewTypeName": "NSTextBlock"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@E@NSTextFieldBezelStyle",
     "OldPrintedName": "NSTextFieldBezelStyle",
     "NewPrintedName": "BezelStyle",
@@ -20929,6 +24546,20 @@
     "OldPrintedName": "NSTextListOptions",
     "NewPrintedName": "Options",
     "NewTypeName": "NSTextList"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTabColumnTerminatorsAttributeName",
+    "OldPrintedName": "NSTabColumnTerminatorsAttributeName",
+    "NewPrintedName": "columnTerminators",
+    "NewTypeName": "NSTextTab.OptionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@NSTextTableLayoutAlgorithm",
+    "OldPrintedName": "NSTextTableLayoutAlgorithm",
+    "NewPrintedName": "LayoutAlgorithm",
+    "NewTypeName": "NSTextTable"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -21646,13 +25277,6 @@
     "Usr": "c:@E@AVCaptureTorchMode",
     "OldPrintedName": "AVCaptureTorchMode",
     "NewPrintedName": "TorchMode",
-    "NewTypeName": "AVCaptureDevice"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@AVCaptureMaxAvailableTorchLevel",
-    "OldPrintedName": "AVCaptureMaxAvailableTorchLevel",
-    "NewPrintedName": "maxAvailableTorchLevel",
     "NewTypeName": "AVCaptureDevice"
   },
   {
@@ -26190,6 +29814,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromURL:options:documentAttributes:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSString(im)drawWithRect:options:attributes:"
   },
   {
@@ -26203,6 +29835,22 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSString(im)boundingRectWithSize:options:attributes:context:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSProgress(im)performAsCurrentWithPendingUnitCount:usingBlock:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:So8ProgressC10FoundationE16performAsCurrentxs5Int64V20withPendingUnitCount_xyKc5usingtKlF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation19PropertyListDecoderC6decodexxm_AA4DataV4fromtKs9DecodableRzlF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation19PropertyListDecoderC6decodexxm_AA4DataV4fromSo0bC13SerializationC0bC6FormatOz6formattKs9DecodableRzlF"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -26350,6 +29998,22 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSObject(im)validModesForFontPanel:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSObject(im)validModesForFontPanel:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSObject(im)pasteboard:provideDataForType:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSObject(im)pasteboard:provideDataForType:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSObject(im)accessibilitySetOverrideValue:forAttribute:"
   },
   {
@@ -26438,163 +30102,27 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble2Property(im)setValue:atTime:"
+    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyFloatArrayInto:maxCount:atTime:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble2Property(im)valueAtTime:"
+    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyDoubleArrayInto:maxCount:atTime:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble2Property(im)setValue:atTime:atIndex:"
+    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)resetWithFloatArray:count:atTimes:count:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble2Property(im)valueAtTime:atIndex:"
+    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)resetWithDoubleArray:count:atTimes:count:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble3Property(im)setValue:atTime:"
+    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyFloatArrayInto:maxCount:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble3Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble3Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble3Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4Property(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4x4Property(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4x4Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4x4Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDouble4x4Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDoubleProperty(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDoubleProperty(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDoubleProperty(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedDoubleProperty(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat2Property(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat2Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat2Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat2Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat3Property(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat3Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat3Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat3Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4x4Property(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4x4Property(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4x4Property(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloat4x4Property(im)valueAtTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloatProperty(im)setValue:atTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloatProperty(im)valueAtTime:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloatProperty(im)setValue:atTime:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MDLAnimatedFloatProperty(im)valueAtTime:atIndex:"
+    "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyDoubleArrayInto:maxCount:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -26631,6 +30159,10 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:@F@NSAccessibilityRoleDescriptionForUIElement"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)NSApplicationDelegate(im)application:openURLs:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -26702,6 +30234,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSLayoutManager(im)temporaryAttributesAtCharacterIndex:effectiveRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSLayoutManager(im)temporaryAttribute:atCharacterIndex:effectiveRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)NSPageControllerDelegate(im)pageController:identifierForObject:"
   },
   {
@@ -26719,6 +30259,22 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)NSTextViewDelegate(im)textView:shouldUpdateTouchBarItemIdentifiers:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSTextBlock(im)setWidth:type:forLayer:edge:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSTextBlock(im)setWidth:type:forLayer:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSTextView(im)writeSelectionToPasteboard:type:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSTextView(im)writeSelectionToPasteboard:types:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -26815,6 +30371,10 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)SCNAnimatable(im)removeAnimationForKey:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)SCNAnimatable(im)removeAnimationForKey:blendOutDuration:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
