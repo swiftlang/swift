@@ -134,6 +134,8 @@ public:
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
 private:
+  Demangle::Demangler Dem;
+
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
   /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;

@@ -49,7 +49,6 @@ lookupTypeWitness(const std::string &MangledTypeName,
         continue;
 
       std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName);
-      Demangle::Demangler Dem;
       auto DemangledProto = Dem.demangleType(ProtocolMangledName);
       auto TR = swift::remote::decodeMangledType(*this, DemangledProto);
 
@@ -86,7 +85,6 @@ lookupSuperclass(const TypeRef *TR) {
   if (FD == nullptr)
     return nullptr;
 
-  Demangle::Demangler Dem;
   auto Demangled = Dem.demangleType(FD->getSuperclass());
   auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
   if (!Unsubstituted)
@@ -131,7 +129,6 @@ bool TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR,
 
   auto Subs = TR->getSubstMap();
 
-  Demangle::Demangler Dem;
   for (auto &Field : *FD) {
     auto FieldName = Field.getFieldName();
 
@@ -207,7 +204,6 @@ ClosureContextInfo
 TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD) {
   ClosureContextInfo Info;
 
-  Demangle::Demangler Dem;
   for (auto i = CD.capture_begin(), e = CD.capture_end(); i != e; ++i) {
     const TypeRef *TR = nullptr;
     if (i->hasMangledTypeName()) {
@@ -250,7 +246,6 @@ TypeRefBuilder::dumpTypeRef(const std::string &MangledName,
   auto TypeName = Demangle::demangleTypeAsString(MangledName);
   OS << TypeName << '\n';
 
-  Demangle::Demangler Dem;
   auto DemangleTree = Dem.demangleType(MangledName);
   auto TR = swift::remote::decodeMangledType(*this, DemangleTree);
   if (!TR) {
