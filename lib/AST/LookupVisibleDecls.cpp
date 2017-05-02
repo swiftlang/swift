@@ -471,11 +471,6 @@ static void lookupVisibleProtocolMemberDecls(
     Type BaseTy, ProtocolType *PT, VisibleDeclConsumer &Consumer,
     const DeclContext *CurrDC, LookupState LS, DeclVisibilityKind Reason,
     LazyResolver *TypeResolver, VisitedSet &Visited) {
-  if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-    // Handle AnyObject in a special way.
-    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
-    return;
-  }
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
@@ -524,6 +519,12 @@ static void lookupVisibleMemberDeclsImpl(
     MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
+    return;
+  }
+
+  // If the base is AnyObject, we are doing dynamic lookup.
+  if (BaseTy->isAnyObject()) {
+    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
     return;
   }
 
