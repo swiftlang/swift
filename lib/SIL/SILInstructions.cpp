@@ -1978,6 +1978,40 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   }
 }
 
+static void
+forEachRefcountableReference(const KeyPathPatternComponent &component,
+                         llvm::function_ref<void (SILFunction*)> forFunction) {
+  switch (component.getKind()) {
+  case KeyPathPatternComponent::Kind::StoredProperty:
+    return;
+  case KeyPathPatternComponent::Kind::SettableProperty:
+    forFunction(component.getComputedPropertySetter());
+    LLVM_FALLTHROUGH;
+  case KeyPathPatternComponent::Kind::GettableProperty:
+    forFunction(component.getComputedPropertyGetter());
+    
+    switch (component.getComputedPropertyId().getKind()) {
+    case KeyPathPatternComponent::ComputedPropertyId::DeclRef:
+      // Mark the vtable entry as used somehow?
+      return;
+    case KeyPathPatternComponent::ComputedPropertyId::Function:
+      forFunction(component.getComputedPropertyId().getFunction());
+      return;
+    case KeyPathPatternComponent::ComputedPropertyId::Property:
+      return;
+    }
+  }
+}
+
+void KeyPathPatternComponent::incrementRefCounts() const {
+  forEachRefcountableReference(*this,
+    [&](SILFunction *f) { f->incrementRefCount(); });
+}
+void KeyPathPatternComponent::decrementRefCounts() const {
+  forEachRefcountableReference(*this,
+                               [&](SILFunction *f) { f->decrementRefCount(); });
+}
+
 KeyPathPattern *
 KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     CanType rootType, CanType valueType,
@@ -2116,6 +2150,11 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
 {
   auto *subsBuf = getTrailingObjects<Substitution>();
   std::uninitialized_copy(Subs.begin(), Subs.end(), subsBuf);
+  
+  // Increment the use of any functions referenced from the keypath pattern.
+  for (auto component : Pattern->getComponents()) {
+    component.incrementRefCounts();
+  }
 }
 
 MutableArrayRef<Substitution>
@@ -2130,9 +2169,24 @@ KeyPathInst::getAllOperands() {
 }
 
 KeyPathInst::~KeyPathInst() {
+  if (!Pattern)
+    return;
+
+  // Decrement the use of any functions referenced from the keypath pattern.
+  for (auto component : Pattern->getComponents()) {
+    component.decrementRefCounts();
+  }
   // TODO: destroy operands
 }
 
 KeyPathPattern *KeyPathInst::getPattern() const {
+  assert(Pattern && "pattern was reset!");
   return Pattern;
+}
+
+void KeyPathInst::dropReferencedPattern() {
+  for (auto component : Pattern->getComponents()) {
+    component.decrementRefCounts();
+  }
+  Pattern = nullptr;
 }
