@@ -159,7 +159,13 @@ ProtocolConformanceRef::subst(Type origType,
     SmallVector<ProtocolConformance *, 1> lookupResults;
     classDecl->lookupConformance(classDecl->getParentModule(), proto,
                                  lookupResults);
-    return ProtocolConformanceRef(lookupResults.front());
+    auto *conf = lookupResults.front();
+    auto subMap = substType->getContextSubstitutionMap(
+        conf->getDeclContext()->getParentModule(), conf->getDeclContext());
+    if (!subMap.empty())
+      conf = substType->getASTContext().getSpecializedConformance(substType,
+                                                                  conf, subMap);
+    return ProtocolConformanceRef(conf);
   }
 
   llvm_unreachable("Invalid conformance substitution");
