@@ -314,8 +314,8 @@ public:
   const FieldDescriptor *getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  std::vector<FieldTypeInfo>
-  getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD);
+  bool getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD,
+                        std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
   const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
