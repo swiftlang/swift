@@ -215,6 +215,8 @@ func lookUpManyTopLevelNames() {
   switch getOtherFileEnum() {
   case .Value:
     break
+  default:
+    break
   }
 
   _ = .Value as OtherFileEnumWrapper.Enum
