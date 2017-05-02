@@ -9,7 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+extension _Unicode {
+  public enum UTF8 {
+  case _swift3Buffer(_Unicode.UTF8.ForwardParser)
+  }
+}
+
 extension _Unicode.UTF8 : UnicodeEncoding {
+  public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt8>
 
   public static var encodedReplacementCharacter : EncodedScalar {
@@ -45,31 +52,30 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   }
   
   public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
-    let x = source.value
-    if _fastPath(x < (1 << 7)) {
-      return EncodedScalar(_storage: x, _bitCount: 8)
+    var c = source.value
+    if _fastPath(c < (1&<<7)) {
+      return EncodedScalar(_storage: c, _bitCount: 8)
     }
-    else if _fastPath(x < (1 << 11)) {
-      var r = x &>> 6
-      r |= (x & 0b11_1111) &<< 8
-      r |= 0b1000_0000__1100_0000
-      return EncodedScalar(_storage: r, _bitCount: 2*8)
+    var o = c & 0b0__0011_1111
+    c &>>= 6
+    o &<<= 8
+    if _fastPath(c < (1&<<5)) {
+      return EncodedScalar(
+        _storage: o | c | 0b0__1000_0000__1100_0000, _bitCount: 16)
     }
-    else if _fastPath(x < (1 << 16)) {
-      var r = x &>> 12
-      r |= (x & 0b1111__1100_0000) &<< 2
-      r |= (x & 0b11_1111) &<< 16
-      r |= 0b1000_0000__1000_0000__1110_0000
-      return EncodedScalar(_storage:  r, _bitCount: 3*8)
+    o |= c & 0b0__0011_1111
+    c &>>= 6
+    o &<<= 8
+    if _fastPath(c < (1&<<4)) {
+      return EncodedScalar(
+        _storage: o | c | 0b0__1000_0000__1000_0000__1110_0000, _bitCount: 24)
     }
-    else {
-      var r = x &>> 18
-      r |= (x & 0b11__1111_0000__0000_0000) &>> 4
-      r |= (x & 0b1111__1100_0000) &<< 10
-      r |= (x & 0b11_1111) << 24
-      r |= 0b1000_0000__1000_0000__1000_0000__1111_0000
-      return EncodedScalar(_storage: r, _bitCount: 4*8)
-    }
+    o |= c & 0b0__0011_1111
+    c &>>= 6
+    o &<<= 8
+    return EncodedScalar(
+      _storage: o | c | 0b0__1000_0000__1000_0000__1000_0000__1111_0000,
+      _bitCount: 32)
   }
   
   public struct ForwardParser {
