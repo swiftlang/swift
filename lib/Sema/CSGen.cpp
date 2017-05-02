@@ -2932,6 +2932,10 @@ namespace {
       }
       return kpTy;
     }
+
+    Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
+      llvm_unreachable("found KeyPathDotExpr in CSGen");
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

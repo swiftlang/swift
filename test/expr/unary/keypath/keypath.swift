@@ -39,97 +39,97 @@ struct Exactly<T> {}
 func expect<T>(_ x: inout T, toHaveType _: Exactly<T>.Type) {}
 
 func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
-  var a = #keyPath2(A, .property)
+  var a = \A.property
   expect(&a, toHaveType: Exactly<WritableKeyPath<A, Prop>>.self)
 
-  var b = #keyPath2(A, [sub])
+  var b = \A.[sub]
   expect(&b, toHaveType: Exactly<WritableKeyPath<A, A>>.self)
 
-  var c = #keyPath2(A, [sub].property)
+  var c = \A.[sub].property
   expect(&c, toHaveType: Exactly<WritableKeyPath<A, Prop>>.self)
 
-  var d = #keyPath2(A, .optProperty?)
+  var d = \A.optProperty?
   expect(&d, toHaveType: Exactly<KeyPath<A, Prop?>>.self)
 
-  var e = #keyPath2(A, .optProperty?[sub])
+  var e = \A.optProperty?[sub]
   expect(&e, toHaveType: Exactly<KeyPath<A, A?>>.self)
 
-  var f = #keyPath2(A, .optProperty!)
+  var f = \A.optProperty!
   expect(&f, toHaveType: Exactly<WritableKeyPath<A, Prop>>.self)
 
-  var g = #keyPath2(A, .property[optSub]?.optProperty![sub])
+  var g = \A.property[optSub]?.optProperty![sub]
   expect(&g, toHaveType: Exactly<KeyPath<A, A?>>.self)
 
-  var h = #keyPath2([A], .property)
+  var h = \[A].property
   expect(&h, toHaveType: Exactly<KeyPath<[A], Prop>>.self)
 
-  var i = #keyPath2([A], .property.nonMutatingProperty)
+  var i = \[A].property.nonMutatingProperty
   expect(&i, toHaveType: Exactly<ReferenceWritableKeyPath<[A], B>>.self)
 
-  var j = #keyPath2([A], [x])
+  var j = \[A].[x]
   expect(&j, toHaveType: Exactly<WritableKeyPath<[A], A>>.self)
 
-  var k = #keyPath2([A: B], [A()])
+  var k = \[A: B].[A()]
   expect(&k, toHaveType: Exactly<WritableKeyPath<[A: B], B?>>.self)
 
-  var l = #keyPath2(C<A>, .value)
+  var l = \C<A>.value
   expect(&l, toHaveType: Exactly<WritableKeyPath<C<A>, A>>.self)
 
   // expected-error@+1{{generic parameter 'T' could not be inferred}}
-  _ = #keyPath2(C, .value)
+  _ = \C.value
 
   // expected-error@+1{{}}
-  _ = #keyPath2(() -> (), .noMember)
+  _ = \(() -> ()).noMember
 
-  // FIXME crash let _: PartialKeyPath<A> = #keyPath2(.property)
-  let _: KeyPath<A, Prop> = #keyPath2(.property)
-  let _: WritableKeyPath<A, Prop> = #keyPath2(.property)
+  // FIXME crash let _: PartialKeyPath<A> = \.property
+  let _: KeyPath<A, Prop> = \.property
+  let _: WritableKeyPath<A, Prop> = \.property
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
-  let _: ReferenceWritableKeyPath<A, Prop> = #keyPath2(.property)
+  let _: ReferenceWritableKeyPath<A, Prop> = \.property
 
-  // FIXME crash let _: PartialKeyPath<A> = #keyPath2([sub])
+  // FIXME crash let _: PartialKeyPath<A> = \[sub]
   // FIXME should resolve: expected-error@+1{{}}
-  let _: KeyPath<A, A> = #keyPath2([sub])
+  let _: KeyPath<A, A> = \.[sub]
   // FIXME should resolve: expected-error@+1{{}}
-  let _: WritableKeyPath<A, A> = #keyPath2([sub])
+  let _: WritableKeyPath<A, A> = \.[sub]
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
-  let _: ReferenceWritableKeyPath<A, A> = #keyPath2([sub])
+  let _: ReferenceWritableKeyPath<A, A> = \.[sub]
 
-  // FIXME crash let _: PartialKeyPath<A> = #keyPath2(.optProperty?)
-  let _: KeyPath<A, Prop?> = #keyPath2(.optProperty?)
+  // FIXME crash let _: PartialKeyPath<A> = \.optProperty?
+  let _: KeyPath<A, Prop?> = \.optProperty?
   // expected-error@+1{{cannot convert}}
-  let _: WritableKeyPath<A, Prop?> = #keyPath2(.optProperty?)
+  let _: WritableKeyPath<A, Prop?> = \.optProperty?
   // expected-error@+1{{cannot convert}}
-  let _: ReferenceWritableKeyPath<A, Prop?> = #keyPath2(.optProperty?)
+  let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
-  // FIXME crash let _: PartialKeyPath<A> = #keyPath2(.optProperty?[sub])
-  let _: KeyPath<A, A?> = #keyPath2(.optProperty?[sub])
+  // FIXME crash let _: PartialKeyPath<A> = \.optProperty?[sub]
+  let _: KeyPath<A, A?> = \.optProperty?[sub]
   // expected-error@+1{{cannot convert}}
-  let _: WritableKeyPath<A, A?> = #keyPath2(.optProperty?[sub])
+  let _: WritableKeyPath<A, A?> = \.optProperty?[sub]
   // expected-error@+1{{cannot convert}}
-  let _: ReferenceWritableKeyPath<A, A?> = #keyPath2(.optProperty?[sub])
+  let _: ReferenceWritableKeyPath<A, A?> = \.optProperty?[sub]
 
   // FIXME should resolve: expected-error@+1{{}}
-  let _: KeyPath<A, Prop> = #keyPath2(.optProperty!)
+  let _: KeyPath<A, Prop> = \.optProperty!
   // FIXME should resolve: expected-error@+1{{}}
-  let _: KeyPath<A, Prop?> = #keyPath2(.property[optSub]?.optProperty![sub])
+  let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty![sub]
 
-  // FIXME crash let _: PartialKeyPath<C<A>> = #keyPath2(.value)
-  let _: KeyPath<C<A>, A> = #keyPath2(.value)
-  let _: WritableKeyPath<C<A>, A> = #keyPath2(.value)
+  // FIXME crash let _: PartialKeyPath<C<A>> = \.value
+  let _: KeyPath<C<A>, A> = \.value
+  let _: WritableKeyPath<C<A>, A> = \.value
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
-  let _: ReferenceWritableKeyPath<C<A>, A> = #keyPath2(.value)
+  let _: ReferenceWritableKeyPath<C<A>, A> = \.value
 
-  // FIXME crash let _: PartialKeyPath<C<A>> = #keyPath2(C, .value)
-  let _: KeyPath<C<A>, A> = #keyPath2(C, .value)
-  let _: WritableKeyPath<C<A>, A> = #keyPath2(C, .value)
+  // FIXME crash let _: PartialKeyPath<C<A>> = \C, .value
+  let _: KeyPath<C<A>, A> = \C.value
+  let _: WritableKeyPath<C<A>, A> = \C.value
   // expected-error@+1{{cannot convert}}
-  let _: ReferenceWritableKeyPath<C<A>, A> = #keyPath2(C, .value)
+  let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
-  // FIXME crash let _: PartialKeyPath<Prop> = #keyPath2(.nonMutatingProperty)
-  let _: KeyPath<Prop, B> = #keyPath2(.nonMutatingProperty)
-  let _: WritableKeyPath<Prop, B> = #keyPath2(.nonMutatingProperty)
-  let _: ReferenceWritableKeyPath<Prop, B> = #keyPath2(.nonMutatingProperty)
+  // FIXME crash let _: PartialKeyPath<Prop> = \.nonMutatingProperty
+  let _: KeyPath<Prop, B> = \.nonMutatingProperty
+  let _: WritableKeyPath<Prop, B> = \.nonMutatingProperty
+  let _: ReferenceWritableKeyPath<Prop, B> = \.nonMutatingProperty
 }
 
 struct Z { }
@@ -196,35 +196,35 @@ func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
 
 func testSyntaxErrors() { // expected-note{{}}
   // TODO: recovery
-  _ = #keyPath2(.  ; // expected-error{{expected property or type name}}
-  _ = #keyPath2(.a ;
-  _ = #keyPath2([a ;
-  _ = #keyPath2([a];
-  _ = #keyPath2(?  ;
-  _ = #keyPath2(!  ;
-  _ = #keyPath2(.  ;
-  _ = #keyPath2(.a ;
-  _ = #keyPath2([a ;
-  _ = #keyPath2([a,;
-  _ = #keyPath2([a:;
-  _ = #keyPath2([a];
-  _ = #keyPath2(.a?;
-  _ = #keyPath2(.a!;
-  _ = #keyPath2(A     ;
-  _ = #keyPath2(A,    ;
-  _ = #keyPath2(A<    ;
-  _ = #keyPath2(A, .  ;
-  _ = #keyPath2(A, .a ;
-  _ = #keyPath2(A, [a ;
-  _ = #keyPath2(A, [a];
-  _ = #keyPath2(A, ?  ;
-  _ = #keyPath2(A, !  ;
-  _ = #keyPath2(A, .  ;
-  _ = #keyPath2(A, .a ;
-  _ = #keyPath2(A, [a ;
-  _ = #keyPath2(A, [a,;
-  _ = #keyPath2(A, [a:;
-  _ = #keyPath2(A, [a];
-  _ = #keyPath2(A, .a?;
-  _ = #keyPath2(A, .a!;
+  _ = \.  ; // expected-error{{expected member name following '.'}}
+  _ = \.a ;
+  _ = \[a ;
+  _ = \[a];
+  _ = \?  ;
+  _ = \!  ;
+  _ = \.  ; // expected-error{{expected member name following '.'}}
+  _ = \.a ;
+  _ = \[a ;
+  _ = \[a,;
+  _ = \[a:;
+  _ = \[a];
+  _ = \.a?;
+  _ = \.a!;
+  _ = \A     ;
+  _ = \A,    ;
+  _ = \A<    ;
+  _ = \A.  ; // expected-error{{expected member name following '.'}}
+  _ = \A.a ;
+  _ = \A[a ;
+  _ = \A[a];
+  _ = \A?  ;
+  _ = \A!  ;
+  _ = \A.  ; // expected-error{{expected member name following '.'}}
+  _ = \A.a ;
+  _ = \A[a ;
+  _ = \A[a,;
+  _ = \A[a:;
+  _ = \A[a];
+  _ = \A.a?;
+  _ = \A.a!;
 } // expected-error@+1{{}}
