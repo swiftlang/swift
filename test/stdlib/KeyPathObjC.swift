@@ -5,9 +5,6 @@
 // REQUIRES: PTRSIZE=64
 // REQUIRES: objc_interop
 
-// Disabled for now
-// REQUIRES: rdar31776015
-
 import StdlibUnittest
 import Foundation
 
