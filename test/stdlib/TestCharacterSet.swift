@@ -10,6 +10,8 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// REQUIRES: determinism!  See <rdar://problem/31706753>
+
 import Foundation
 
 #if FOUNDATION_XCTEST

@@ -523,16 +523,7 @@ func _StringLegacy(c: Character, u: UnicodeScalar) {
 
 func _Unicode<C : UnicodeCodec>(s: UnicodeScalar, c: C.Type, out: (C.CodeUnit) -> Void) {
   func fn<T : UnicodeCodecType>(_: T) {} // expected-error {{'UnicodeCodecType' has been renamed to 'UnicodeCodec'}} {{15-31=UnicodeCodec}} {{none}}
-  c.encode(s, output: out) // expected-error {{encode(_:output:)' has been renamed to 'encode(_:into:)}} {{5-11=encode}} {{15-21=into}} {{none}}
   c.encode(s) { _ in } // OK
-  UTF8.encode(s, output: { _ in }) // expected-error {{'encode(_:output:)' has been renamed to 'encode(_:into:)'}} {{8-14=encode}} {{18-24=into}} {{none}}
-  UTF16.encode(s, output: { _ in }) // expected-error {{'encode(_:output:)' has been renamed to 'encode(_:into:)'}} {{9-15=encode}} {{19-25=into}} {{none}}
-  UTF32.encode(s, output: { _ in }) // expected-error {{'encode(_:output:)' has been renamed to 'encode(_:into:)'}} {{9-15=encode}} {{19-25=into}} {{none}}
-}
-
-func _Unicode<I : IteratorProtocol, E : UnicodeCodec>(i: I, e: E.Type) where I.Element == E.CodeUnit {
-  _ = transcode(e, e, i, { _ in }, stopOnError: true) // expected-error {{'transcode(_:_:_:_:stopOnError:)' is unavailable: use 'transcode(_:from:to:stoppingOnError:into:)'}} {{none}}
-  _ = UTF16.measure(e, input: i, repairIllFormedSequences: true) // expected-error {{'measure(_:input:repairIllFormedSequences:)' is unavailable: use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'}} {{none}}
 }
 
 func _UnicodeScalar(s: UnicodeScalar) {

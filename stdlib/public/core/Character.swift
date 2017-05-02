@@ -295,22 +295,21 @@ public struct Character :
     typealias Indices = CountableRange<Int>
     
     init(_ u8: UInt64) {
-      let count = UTF16.transcodedLength(
-        of: _SmallUTF8(u8).makeIterator(),
-        decodedAs: UTF8.self,
-        repairingIllFormedSequences: true)!.0
-      _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
-      self.count = UInt16(count)
+      var utf16Count = 0
       var u16: UInt64 = 0
-      let output: (UTF16.CodeUnit) -> Void = {
-        u16 = u16 &<< 16
-        u16 = u16 | UInt64(extendingOrTruncating: $0)
+      
+      UTF8.parseForward(_SmallUTF8(u8)) {
+        let c = $0.utf16.count
+        utf16Count += c
+        u16 = u16 &<< 16 | UInt64(
+          extendingOrTruncating: $0.utf16.first.unsafelyUnwrapped)
+        
+        if _slowPath(c > 1) {
+          u16 = u16 &<< 16 | UInt64(
+            extendingOrTruncating: $0.utf16.last.unsafelyUnwrapped)
+        }
       }
-      _ = transcode(
-        _SmallUTF8(u8).makeIterator(),
-        from: UTF8.self, to: UTF16.self,
-        stoppingOnError: false,
-        into: output)
+      self.count = UInt16(utf16Count)
       self.data = u16
     }
 
