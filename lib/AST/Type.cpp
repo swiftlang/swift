@@ -2558,6 +2558,8 @@ CanArchetypeType ArchetypeType::getNew(
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                    Type Superclass,
                                    LayoutConstraint Layout) {
+  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
@@ -2578,6 +2580,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
+  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
   assert(genericEnvironment && "missing generic environment for archetype");
 
   // Gather the set of protocol declarations to which this archetype conforms.

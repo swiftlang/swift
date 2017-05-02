@@ -2020,11 +2020,13 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
   Type superclass = representative->getSuperclass();
   if (superclass && superclass->hasTypeParameter()) {
     if (representative->RecursiveSuperclassType) {
-      superclass = ErrorType::get(superclass);
+      superclass = Type();
     } else {
       superclass = genericEnv->mapTypeIntoContext(
                                               superclass,
                                               builder.getLookupConformanceFn());
+      if (superclass->is<ErrorType>())
+        superclass = Type();
 
       // We might have recursively recorded the archetype; if so, return early.
       // FIXME: This should be detectable before we end up building archetypes.
