@@ -97,3 +97,15 @@ private class CodingG : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
+
+// Errors with @NSKeyedArchiveLegacy.
+@NSKeyedArchiveLegacy("TheCodingG") // expected-error{{@NSKeyedArchiveLegacy may only be used on 'class' declarations}}
+struct Foo { }
+
+@NSKeyedArchiveLegacy("TheCodingG") // expected-error{{@NSKeyedArchiveLegacy attribute cannot be applied to generic class 'Bar<T>'}}
+class Bar<T> : NSObject { }
+
+extension CodingB {
+  @NSKeyedArchiveLegacy("GenericViaParent") // expected-error{{@NSKeyedArchiveLegacy attribute cannot be applied to generic class 'CodingB<T>.GenericViaParent'}}
+  class GenericViaParent : NSObject { }
+}

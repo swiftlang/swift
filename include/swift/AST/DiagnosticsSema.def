@@ -1223,6 +1223,9 @@ WARNING(nscoding_unstable_mangled_name_warn,none,
 NOTE(add_nskeyedarchivelegacy_attr,none,
      "add the '@NSKeyedArchiveLegacy' attribute to specify the class name "
      "used for archiving", ())
+ERROR(attr_nskeyedarchivelegacy_generic,none,
+      "@NSKeyedArchiveLegacy attribute cannot be applied to generic class %0",
+      (Type))
 
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,
