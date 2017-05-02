@@ -21,6 +21,7 @@
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "clang/AST/ExternalASTSource.h"
 #include "swift/SIL/SILLocation.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/Support/Allocator.h"
@@ -296,6 +297,9 @@ private:
   /// Return a cached module for an access path or create a new one.
   llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath);
+  llvm::DIModule *
+  getOrCreateModule(clang::ExternalASTSource::ASTSourceDescriptor M);
+
   llvm::DIScope *getModule(StringRef MangledName);
   /// Return an array with the DITypes for each of a struct's elements.
   llvm::DINodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
