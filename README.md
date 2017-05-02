@@ -65,6 +65,8 @@ with version 2 shipped with Ubuntu.
 
 Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md)
 
+If you are building in a Virtual Machine, then make sure to setup memory to be at least 4GB and Disk space to be at least 80GB
+
 ### Getting Sources for Swift and Related Projects
 
 First create a directory for all of the Swift sources:
@@ -98,6 +100,19 @@ bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
     export PATH=/Applications/CMake.app/Contents/bin:$PATH
+
+To install cmake 3.4.3 from source in Linux:
+
+```
+sudo apt-get install build-essential
+wget http://www.cmake.org/files/v3.4/cmake-3.4.3.tar.gz
+tar xf cmake-3.4.3.tar.gz
+cd cmake-3.4.3
+./configure
+make
+sudo apt-get install checkinstall
+sudo checkinstall
+```
 
 #### Ninja
 [Ninja](https://ninja-build.org) is the current recommended build system
@@ -147,6 +162,24 @@ Ninja:
 
     utils/build-script -r -t
 
+To build the default packages up to swift-package-manager:
+    
+    ./swift/utils/build-script -t
+
+If you get error about SwiftGlibc is missing:
+
+    Download and unzip the swift 3.0 package from https://swift.org/download
+    find -name "glibc.modulemap"
+    cp /path/to/glibc.modulemap ./build/Ninja-DebugAssert/swift-linux-x86_64/lib/swift/linux/x86_64
+    
+## Toolchain
+
+To build the toolchain:
+
+1. Update `utils/build-presets.init` file, in case of Linux then update section `[preset: buildbot_linux]`
+2. Run `utils/build-toolchain local.swift`
+ 
+            
 ## Developing Swift in Xcode
 
 `build-script` can also generate Xcode projects:
