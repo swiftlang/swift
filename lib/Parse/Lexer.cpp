@@ -1936,6 +1936,8 @@ Restart:
   case ',': return formToken(tok::comma, TokStart);
   case ';': return formToken(tok::semi, TokStart);
   case ':': return formToken(tok::colon, TokStart);
+  case '\\':
+    return formToken(tok::backslash, TokStart);
 
   case '#':
     return lexHash();

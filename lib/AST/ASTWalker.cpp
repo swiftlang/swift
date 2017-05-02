@@ -915,10 +915,35 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setObjCStringLiteralExpr(sub);
       return E;
     }
-  
+
+    auto components = E->getComponents();
+    if (components.empty()) {
+      // No components means a parsed-only/pre-resolution Swift key path.
+      assert(!E->isObjC());
+      if (auto parsedRoot = E->getParsedRoot()) {
+        Expr *newRoot = doIt(parsedRoot);
+        if (!newRoot)
+          return nullptr;
+        E->setParsedRoot(newRoot);
+      }
+      if (auto parsedPath = E->getParsedPath()) {
+        Expr *newPath = doIt(parsedPath);
+        if (!newPath)
+          return nullptr;
+        E->setParsedPath(newPath);
+      }
+      return E;
+    }
+
+    if (!E->isObjC()) {
+      auto rootType = E->getRootType();
+      if (rootType && doIt(rootType))
+        return nullptr;
+    }
+
     SmallVector<KeyPathExpr::Component, 4> updatedComponents;
     bool didChangeComponents = false;
-    for (auto &origComponent : E->getComponents()) {
+    for (auto &origComponent : components) {
       auto component = origComponent;
       switch (auto kind = component.getKind()) {
       case KeyPathExpr::Component::Kind::Subscript:
@@ -955,9 +980,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->resolveComponents(E->getType()->getASTContext(),
                            updatedComponents);
     }
-    
+
     return E;
   }
+
+  Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   //===--------------------------------------------------------------------===//
   //                           Everything Else

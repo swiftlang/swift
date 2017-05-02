@@ -25,21 +25,21 @@ class Bar: NSObject {
 // CHECK-LABEL: sil hidden @_T013keypaths_objc0B8KeypathsyyF
 func objcKeypaths() {
   // CHECK: keypath $WritableKeyPath<NonObjC, Int>, (root
-  _ = #keyPath2(NonObjC, .x)
+  _ = \NonObjC.x
   // CHECK: keypath $WritableKeyPath<NonObjC, NSObject>, (root
-  _ = #keyPath2(NonObjC, .y)
+  _ = \NonObjC.y
   // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"
-  _ = #keyPath2(Foo, .int)
+  _ = \Foo.int
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
-  _ = #keyPath2(Foo, .bar)
+  _ = \Foo.bar
   // CHECK: keypath $KeyPath<Foo, Foo>, (objc "bar.foo"
-  _ = #keyPath2(Foo, .bar.foo)
+  _ = \Foo.bar.foo
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar.foo.bar"
-  _ = #keyPath2(Foo, .bar.foo.bar)
+  _ = \Foo.bar.foo.bar
   // CHECK: keypath $KeyPath<Foo, NonObjC>, (root
-  _ = #keyPath2(Foo, .nonobjc)
+  _ = \Foo.nonobjc
   // CHECK: keypath $KeyPath<Foo, NSObject>, (root
-  _ = #keyPath2(Foo, .bar.foo.nonobjc.y)
+  _ = \Foo.bar.foo.nonobjc.y
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "thisIsADifferentName"
-  _ = #keyPath2(Foo, .differentName)
+  _ = \Foo.differentName
 }

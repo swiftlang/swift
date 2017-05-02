@@ -1263,6 +1263,13 @@ LegacyASTTransformer::visitKeyPathExpr(KeyPathExpr *E,
   return getUnknownExpr(E);
 }
 
+RC<SyntaxData>
+LegacyASTTransformer::visitKeyPathDotExpr(KeyPathDotExpr *E,
+                                          const SyntaxData *Parent,
+                                          const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
 RC<TokenSyntax>
 syntax::findTokenSyntax(tok ExpectedKind,
                         OwnedString ExpectedText,
