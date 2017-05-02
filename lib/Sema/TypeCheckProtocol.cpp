@@ -5210,7 +5210,7 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
     // AnyObject.
     //
     // FIXME: This check is moving elsewhere soon.
-    if (layout.requiresClass &&
+    if (layout.requiresClass() &&
         Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       return ProtocolConformanceRef(Proto);
     }

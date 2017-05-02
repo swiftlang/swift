@@ -1538,7 +1538,7 @@ collectExistentialConformances(Parser &P, CanType conformingType, SourceLoc loc,
                                CanType protocolType) {
   auto layout = protocolType.getExistentialLayout();
 
-  if (layout.requiresClass) {
+  if (layout.requiresClass()) {
     if (!conformingType->mayHaveSuperclass() &&
         !conformingType->isObjCExistentialType()) {
       P.diagnose(loc, diag::sil_not_class, conformingType);

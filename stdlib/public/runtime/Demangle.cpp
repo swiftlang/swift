@@ -149,43 +149,16 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
-    NodePointer proto_list;
     
     std::vector<const ProtocolDescriptor *> protocols;
     protocols.reserve(exis->Protocols.NumProtocols);
     for (unsigned i = 0, e = exis->Protocols.NumProtocols; i < e; ++i)
       protocols.push_back(exis->Protocols[i]);
 
-    if (exis->getSuperclassConstraint()) {
-      // If there is a superclass constraint, we mangle it specially.
-      proto_list = Dem.createNode(Node::Kind::ProtocolListWithClass);
-    } else if (exis->isClassBounded()) {
-      // Check if the class constraint is implied by any of our
-      // protocols.
-      bool requiresClassImplicit = false;
-
-      for (auto *protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-            == ProtocolClassConstraint::Class)
-          requiresClassImplicit = true;
-      }
-
-      // If it was implied, we don't do anything special.
-      if (requiresClassImplicit)
-        proto_list = Dem.createNode(Node::Kind::ProtocolList);
-      // If the existential type has an explicit AnyObject constraint,
-      // we must mangle it as such.
-      else
-        proto_list = Dem.createNode(Node::Kind::ProtocolListWithAnyObject);
-    } else {
-      // Just a simple composition of protocols.
-      proto_list = Dem.createNode(Node::Kind::ProtocolList);
-    }
-
-    NodePointer type_list = Dem.createNode(Node::Kind::TypeList);
-
+    auto type_list = Dem.createNode(Node::Kind::TypeList);
+    auto proto_list = Dem.createNode(Node::Kind::ProtocolList);
     proto_list->addChild(type_list, Dem);
-    
+
     // Sort the protocols by their mangled names.
     // The ordering in the existential type metadata is by metadata pointer,
     // which isn't necessarily stable across invocations.
@@ -226,11 +199,39 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       type_list->addChild(protocolNode, Dem);
     }
 
-    if (auto *superclass = exis->getSuperclassConstraint()) {
+    if (auto superclass = exis->getSuperclassConstraint()) {
+      // If there is a superclass constraint, we mangle it specially.
+      auto result = Dem.createNode(Node::Kind::ProtocolListWithClass);
       auto superclassNode = _swift_buildDemanglingForMetadata(superclass, Dem);
-      proto_list->addChild(superclassNode, Dem);
+
+      result->addChild(proto_list, Dem);
+      result->addChild(superclassNode, Dem);
+      return result;
     }
 
+    if (exis->isClassBounded()) {
+      // Check if the class constraint is implied by any of our
+      // protocols.
+      bool requiresClassImplicit = false;
+
+      for (auto *protocol : protocols) {
+        if (protocol->Flags.getClassConstraint()
+            == ProtocolClassConstraint::Class)
+          requiresClassImplicit = true;
+      }
+
+      // If it was implied, we don't do anything special.
+      if (requiresClassImplicit)
+        return proto_list;
+
+      // If the existential type has an explicit AnyObject constraint,
+      // we must mangle it as such.
+      auto result = Dem.createNode(Node::Kind::ProtocolListWithAnyObject);
+      result->addChild(proto_list, Dem);
+      return result;
+    }
+
+    // Just a simple composition of protocols.
     return proto_list;
   }
   case MetadataKind::ExistentialMetatype: {

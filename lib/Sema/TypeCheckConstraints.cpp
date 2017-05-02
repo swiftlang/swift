@@ -3426,13 +3426,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
     bool toRequiresClass;
     if (toType->isExistentialType())
-      toRequiresClass = toType->getExistentialLayout().requiresClass;
+      toRequiresClass = toType->getExistentialLayout().requiresClass();
     else
       toRequiresClass = toType->mayHaveSuperclass();
 
     bool fromRequiresClass;
     if (fromType->isExistentialType())
-      fromRequiresClass = fromType->getExistentialLayout().requiresClass;
+      fromRequiresClass = fromType->getExistentialLayout().requiresClass();
     else
       fromRequiresClass = fromType->mayHaveSuperclass();
 

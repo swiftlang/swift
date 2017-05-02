@@ -34,6 +34,36 @@ extension MutableCollection where Self : BidirectionalCollection {
   }
 }
 
+/// An iterator that can be much faster than the iterator of a reversed slice.
+// TODO: See about using this in more places
+@_fixed_layout
+public struct _ReverseIndexingIterator<
+  Elements : BidirectionalCollection
+> : IteratorProtocol, Sequence {
+
+  @_inlineable
+  @inline(__always)
+  /// Creates an iterator over the given collection.
+  public /// @testable
+  init(_elements: Elements, _position: Elements.Index) {
+    self._elements = _elements
+    self._position = _position
+  }
+  
+  @_inlineable
+  @inline(__always)
+  public mutating func next() -> Elements._Element? {
+    guard _fastPath(_position != _elements.startIndex) else { return nil }
+    _position = _elements.index(before: _position)
+    return _elements[_position]
+  }
+  
+  @_versioned
+  internal let _elements: Elements
+  @_versioned
+  internal var _position: Elements.Index
+}
+
 // FIXME(ABI)#59 (Conditional Conformance): we should have just one type,
 // `ReversedCollection`, that has conditional conformances to
 // `RandomAccessCollection`, and possibly `MutableCollection` and

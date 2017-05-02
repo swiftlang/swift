@@ -1126,6 +1126,7 @@ extension UTF16 {
 extension UnicodeScalar {
   /// Create an instance with numeric value `value`, bypassing the regular
   /// precondition checks for code point validity.
+  @_versioned
   internal init(_unchecked value: UInt32) {
     _sanityCheck(value < 0xD800 || value > 0xDFFF,
       "high- and low-surrogate code points are not valid Unicode scalar values")
@@ -1192,5 +1193,9 @@ extension UTF16 {
 }
 
 /// A namespace for Unicode utilities.
-internal enum _Unicode {}
+public enum _Unicode {
+  public typealias UTF8 = Swift.UTF8
+  public typealias UTF16 = Swift.UTF16
+  public typealias UTF32 = Swift.UTF32
+}
 
