@@ -48,7 +48,7 @@ extension Array where Element == Int {
     return e!
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE9subscriptSiycfg : $@convention(method) (@guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE9subscriptSiyt_tcfg : $@convention(method) (@guaranteed Array<Int>) -> Int
   public subscript(i: ()) -> Element {
     return self[0]
   }
@@ -119,7 +119,7 @@ extension Dictionary where Key == Int {
     return Dictionary(x: ()).instanceMethod()
   }
 
-  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE9subscriptq_ycfg : $@convention(method) <Key, Value where Key == Int> (@guaranteed Dictionary<Int, Value>) -> @out Value
+  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE9subscriptq_yt_tcfg : $@convention(method) <Key, Value where Key == Int> (@guaranteed Dictionary<Int, Value>) -> @out Value
   public subscript(i: ()) -> Value {
     return self[0]!
   }
@@ -153,10 +153,10 @@ extension GenericClass where Y == () {
     set {}
   }
 
-  // CHECK-LABEL: sil @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxycfg : $@convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> @out X
-  // CHECK-LABEL: sil @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxycfs : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxycfmytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxycfm : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxyt_tcfg : $@convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> @out X
+  // CHECK-LABEL: sil @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxyt_tcfs : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
+  // CHECK-LABEL: sil [transparent] [serialized] @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxyt_tcfmytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
+  // CHECK-LABEL: sil [transparent] [serialized] @_T022constrained_extensions12GenericClassCAAytRs_r0_lE9subscriptxyt_tcfm : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public subscript(_: Y) -> X {
     get { while true {} }
     set {}
