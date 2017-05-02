@@ -547,7 +547,7 @@ where Base.SubSequence: ${Collection} {
     return RotatedCollectionIndex(_index: _concatenation.endIndex)
   }
 
-  public subscript(i: Index) -> Base.SubSequence.Iterator.Element {
+  public subscript(i: Index) -> Base.Iterator.Element {
     return _concatenation[i._index]
   }
 
@@ -604,8 +604,7 @@ extension ${Collection} where SubSequence: ${Collection} {
 
 extension BidirectionalCollection
   where Self : MutableCollectionAlgorithms,
-  SubSequence : BidirectionalCollection,
-  SubSequence.Index == Self.Index {
+  SubSequence : BidirectionalCollection {
 
   @discardableResult
   mutating func stablePartition(

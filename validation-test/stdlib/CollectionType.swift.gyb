@@ -692,16 +692,8 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
 
 % end
 
-extension Collection where
-  Iterator.Element : Equatable,
-
-  // FIXME: the following constraints should go away after
-  // <rdar://problem/20715697> Collection.SubSlice should constrain its
-  // Element type
-  SubSequence : Collection,
-  SubSequence.SubSequence == SubSequence,
-  SubSequence.Iterator.Element == Iterator.Element,
-  SubSequence.Index == Index {
+extension Collection
+  where Iterator.Element : Equatable, SubSequence : Collection {
 
   func _test_indicesOf(_ element: Iterator.Element) -> [Index] {
     var result: [Index] = []

@@ -61,10 +61,7 @@ public enum UnicodeDecodingResult : Equatable {
 /// decoded Unicode scalar values.
 ///
 /// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `UnicodeScalar`
-public protocol UnicodeCodec {
-
-  /// A type that can hold code unit values for this encoding.
-  associatedtype CodeUnit
+public protocol UnicodeCodec : UnicodeEncoding {
 
   /// Creates an instance of the codec.
   init()
@@ -134,36 +131,99 @@ public protocol UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   )
+}
 
-  /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
-  ///
-  /// Is an equivalent of `strlen` for C-strings.
-  ///
-  /// - Complexity: O(*n*)
-  static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
+//===--- Swift 3 compatibility --------------------------------------------===//
+// Adapt UTF8, UTF16, and UTF32 to present their Swift 3 interfaces
+
+extension EncodedScalarProtocol {
+  public var _scalarValue: UnicodeScalar {
+    @inline(__always)
+    get {
+      return UnicodeScalar(utf32.first.unsafelyUnwrapped).unsafelyUnwrapped
+    }
+  }
+}
+
+@_versioned
+internal struct _UInt32Buffered<Element : UnsignedInteger> {
+  @_versioned
+  let _buffer: UInt32
+  
+  @_versioned
+  init(_ buffer: UInt32) {
+    self._buffer = buffer
+  }
+  
+  @_versioned
+  var _shiftShift : UInt32 {
+    _sanityCheck(MemoryLayout<Element>.size <= 2)
+    return UInt32(truncatingBitPattern: MemoryLayout<Element>.size + 2)
+  }
+}
+
+extension _UInt32Buffered  : Collection {
+  typealias Index = UInt32
+
+  @_versioned
+  func index(after i: Index) -> Index { return i + (1 << _shiftShift) }
+  
+  @_versioned
+  var startIndex : Index { return 0 }
+  @_versioned
+  var endIndex : Index { return 32 }
+
+  @_versioned
+  var _mask : UInt32 {
+    return numericCast(~0 as Element)
+  }
+  
+  @_versioned
+  subscript(i: Index) -> Element {
+    _sanityCheck(i < endIndex)
+    return numericCast(
+      _buffer &>> numericCast(i & 0x1f) & _mask)
+  }
 }
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
 /// units.
-public struct UTF8 : UnicodeCodec {
+extension UTF8 : UnicodeCodec {
   // See Unicode 8.0.0, Ch 3.9, UTF-8.
   // http://www.unicode.org/versions/Unicode8.0.0/ch03.pdf
 
-  /// A type that can hold code unit values for this encoding.
-  public typealias CodeUnit = UInt8
-
   /// Creates an instance of the UTF-8 codec.
-  public init() {}
+  public init() {
+    self = ._swift3Buffer(bits: 0, bitCount: 0)
+  }
 
-  /// Lookahead buffer used for UTF-8 decoding.  New bytes are inserted at MSB,
-  /// and bytes are read at LSB.  Note that we need to use a buffer, because
-  /// in case of invalid subsequences we sometimes don't know whether we should
-  /// consume a certain byte before looking at it.
-  internal var _decodeBuffer: UInt32 = 0
+  @_versioned
+  internal var _decodeBuffer: UInt32 {
+    @inline(__always)
+    get {
+      if case ._swift3Buffer(let r, _) = self { return r }
+      fatalError("unreachable")
+    }
+    @inline(__always)
+    set {
+      self = ._swift3Buffer(bits: newValue, bitCount: UInt32(_bitsInBuffer))
+    }
+  }
 
-  /// The number of bits in `_decodeBuffer` that are current filled.
-  internal var _bitsInBuffer: UInt8 = 0
-
+  @_versioned
+  internal var _bitsInBuffer: UInt8 {
+    @inline(__always)
+    get {
+      if case ._swift3Buffer(_, let r) = self {
+        return UInt8(truncatingBitPattern: r)
+      }
+      fatalError("unreachable")
+    }
+    @inline(__always)
+    set {
+      self = ._swift3Buffer(bits: _decodeBuffer, bitCount: UInt32(newValue))
+    }
+  }
   /// Starts or continues decoding a UTF-8 sequence.
   ///
   /// To decode a code unit sequence completely, call this method repeatedly
@@ -205,6 +265,7 @@ public struct UTF8 : UnicodeCodec {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
+  @inline(__always)
   public mutating func decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
@@ -255,9 +316,9 @@ public struct UTF8 : UnicodeCodec {
     // Swift doesn't allow shifts greater than or equal to the type width.
     // _decodeBuffer >>= UInt32(bitsConsumed) // >>= 32 crashes.
     // Mask with 0x3f (63) to let the compiler omit the '>= 64' bounds check.
-    _decodeBuffer = UInt32(extendingOrTruncating:
-      UInt64(extendingOrTruncating: _decodeBuffer) &>>
-      (UInt64(extendingOrTruncating: bitsConsumed) & 0x3f))
+    _decodeBuffer = UInt32(
+      extendingOrTruncating: UInt64(extendingOrTruncating: _decodeBuffer) 
+      &>> (UInt64(extendingOrTruncating: bitsConsumed) & 0x3f))
     _bitsInBuffer = _bitsInBuffer &- bitsConsumed
 
     guard _fastPath(result != nil) else { return .error }
@@ -280,6 +341,7 @@ public struct UTF8 : UnicodeCodec {
   /// - Requires: There is at least one used byte in `buffer`, and the unused
   ///   space in `buffer` is filled with some value not matching the UTF-8
   ///   continuation byte form (`0b10xxxxxx`).
+  @inline(__always)
   public // @testable
   static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].
@@ -385,33 +447,9 @@ public struct UTF8 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var c = UInt32(input)
-    var buf3 = UInt8(extendingOrTruncating: c & 0xFF)
-
-    if c >= ((1 as UInt32) &<< 7) {
-      c &>>= 6
-      buf3 = (buf3 & 0x3F) | 0x80 // 10xxxxxx
-      var buf2 = UInt8(extendingOrTruncating: c & 0xFF)
-      if c < ((1 as UInt32) &<< 5) {
-        buf2 |= 0xC0              // 110xxxxx
-      }
-      else {
-        c &>>= 6
-        buf2 = (buf2 & 0x3F) | 0x80 // 10xxxxxx
-        var buf1 = UInt8(extendingOrTruncating: c & 0xFF)
-        if c < UInt32(1 &<< 4) {
-          buf1 |= 0xE0              // 1110xxxx
-        }
-        else {
-          c &>>= 6
-          buf1 = (buf1 & 0x3F) | 0x80 // 10xxxxxx
-          processCodeUnit(UInt8(extendingOrTruncating: c | 0xF0)) // 11110xxx
-        }
-        processCodeUnit(buf1)
-      }
-      processCodeUnit(buf2)
+    for u in UTF32.EncodedScalar(input.value).utf8 {
+      processCodeUnit(u)
     }
-    processCodeUnit(buf3)
   }
 
   /// Returns a Boolean value indicating whether the specified code unit is a
@@ -450,15 +488,12 @@ public struct UTF8 : UnicodeCodec {
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
-public struct UTF16 : UnicodeCodec {
-  /// A type that can hold code unit values for this encoding.
-  public typealias CodeUnit = UInt16
+extension UTF16 : UnicodeCodec {
 
   /// Creates an instance of the UTF-16 codec.
-  public init() {}
-
-  /// A lookahead buffer for one UTF-16 code unit.
-  internal var _decodeLookahead: UInt16?
+  public init() {
+    self = ._swift3Buffer(bits: 0, bitCount: 0)
+  }
 
   /// Starts or continues decoding a UTF-16 sequence.
   ///
@@ -504,47 +539,30 @@ public struct UTF16 : UnicodeCodec {
   public mutating func decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
-    // Note: maximal subpart of ill-formed sequence for UTF-16 can only have
-    // length 1.  Length 0 does not make sense.  Neither does length 2 -- in
-    // that case the sequence is valid.
-
-    let unit0: UInt16
-    if _fastPath(_decodeLookahead == nil) {
-      guard let next = input.next() else { return .emptyInput }
-      unit0 = next
-    } else { // Consume lookahead first.
-      unit0 = _decodeLookahead!
-      _decodeLookahead = nil
+    guard case ._swift3Buffer(var buffer, var bitCount) = self else {
+      fatalError("unreachable")
     }
 
-    // A well-formed pair of surrogates looks like this:
-    //     high-surrogate        low-surrogate
-    // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
-
-    // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit0 &>> 11) != 0b1101_1) {
-      return .scalarValue(UnicodeScalar(
-        _unchecked: UInt32(extendingOrTruncating: unit0)))
+    // Fill as much of the buffer as possible
+    while let next = input.next() {
+      buffer |= (numericCast(next) as UInt32) << (bitCount & 0x1f)
+      bitCount += 16
+      if bitCount == 32 { break }
     }
+    if bitCount == 0 { return .emptyInput }
 
-    // Ensure `unit0` is a high-surrogate.
-    guard _fastPath((unit0 &>> 10) == 0b1101_10) else { return .error }
-
-    // We already have a high-surrogate, so there should be a next code unit.
-    guard let unit1 = input.next() else { return .error }
-
-    // `unit0` is a high-surrogate, so `unit1` should be a low-surrogate.
-    guard _fastPath((unit1 &>> 10) == 0b1101_11) else {
-      // Invalid sequence, discard `unit0` and store `unit1` for the next call.
-      _decodeLookahead = unit1
-      return .error
+    let r = UTF16.parse1Forward(_UInt32Buffered<CodeUnit>(buffer))
+    if case .emptyInput = r {
+      return .emptyInput
     }
-
-    // We have a well-formed surrogate pair, decode it.
-    let result = 0x10000 + (
-      (UInt32(extendingOrTruncating: unit0 & 0x03ff) &<< 10) |
-      UInt32(extendingOrTruncating: unit1 & 0x03ff))
-    return .scalarValue(UnicodeScalar(_unchecked: result))
+    let p = r.resumptionPoint!
+    let newBuffer = UInt64(buffer) >> UInt64(p)
+    self = ._swift3Buffer(
+      bits: UInt32(truncatingBitPattern: newBuffer), bitCount: bitCount - p)
+    if case .valid(let e,_) = r {
+      return .scalarValue(UnicodeScalar(e._scalarValue))
+    }
+    return .error
   }
 
   /// Try to decode one Unicode scalar, and return the actual number of code
@@ -557,7 +575,7 @@ public struct UTF16 : UnicodeCodec {
     let result = decode(&input)
     switch result {
     case .scalarValue(let us):
-      return (result, UTF16.width(us))
+      return (result, Swift.UTF16.width(us))
 
     case .emptyInput:
       return (result, 0)
@@ -566,7 +584,7 @@ public struct UTF16 : UnicodeCodec {
       return (result, 1)
     }
   }
-
+  
   /// Encodes a Unicode scalar as a series of code units by calling the given
   /// closure on each code unit.
   ///
@@ -587,28 +605,19 @@ public struct UTF16 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    let scalarValue: UInt32 = UInt32(input)
-
-    if scalarValue <= UInt32(extendingOrTruncating: UInt16.max) {
-      processCodeUnit(UInt16(extendingOrTruncating: scalarValue))
-    }
-    else {
-      let lead_offset =
-        (0xd800 as UInt32) - UInt32(extendingOrTruncating: 0x10000 &>> 10)
-      processCodeUnit(UInt16(lead_offset + (scalarValue &>> (10 as UInt32))))
-      processCodeUnit(UInt16(0xdc00 + (scalarValue & 0x3ff)))
+    for u in UTF32.EncodedScalar(input.value).utf16 {
+      processCodeUnit(u)
     }
   }
 }
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
-public struct UTF32 : UnicodeCodec {
-  /// A type that can hold code unit values for this encoding.
-  public typealias CodeUnit = UInt32
-
+extension UTF32 : UnicodeCodec {
   /// Creates an instance of the UTF-32 codec.
-  public init() {}
+  public init() {
+    self = ._swift3
+  }
 
   /// Starts or continues decoding a UTF-32 sequence.
   ///
@@ -660,12 +669,15 @@ public struct UTF32 : UnicodeCodec {
   internal static func _decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
-    guard let x = input.next() else { return .emptyInput }
-    // Check code unit is valid: not surrogate-reserved and within range.
-    guard _fastPath((x &>> 11) != 0b1101_1 && x <= 0x10ffff)
-      else { return .error }
-    // x is a valid scalar.
-    return .scalarValue(UnicodeScalar(_unchecked: x))
+    guard let u = input.next() else { return .emptyInput }
+    
+    switch UTF32.parse1Forward(CollectionOfOne(u)) {
+    case .emptyInput: fatalError("unreachable")
+    case .valid(let encodedScalar, _):
+      return .scalarValue(UnicodeScalar(encodedScalar._scalarValue))
+    case .error(_):
+      return .error
+    }
   }
 
   /// Encodes a Unicode scalar as a UTF-32 code unit by calling the given
@@ -727,18 +739,18 @@ public struct UTF32 : UnicodeCodec {
 ///     unit at a time.
 /// - Returns: `true` if the translation detected encoding errors in `input`;
 ///   otherwise, `false`.
-public func transcode<Input, InputEncoding, OutputEncoding>(
+public func transcode<
+  Input : IteratorProtocol, 
+  InputEncoding : UnicodeCodec,
+  OutputEncoding : UnicodeCodec
+>(
   _ input: Input,
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
   into processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool
-  where
-  Input : IteratorProtocol,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec,
-  InputEncoding.CodeUnit == Input.Element {
+  where InputEncoding.CodeUnit == Input.Element {
   var input = input
 
   // NB.  It is not possible to optimize this routine to a memcpy if
@@ -946,8 +958,8 @@ extension UTF16 {
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.trailSurrogate(_:)`
   public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return 0xD800 + UTF16.CodeUnit(extendingOrTruncating:
-      (x.value - 0x1_0000) &>> (10 as UInt32))
+    return 0xD800 + UTF16.CodeUnit(
+      extendingOrTruncating: (x.value - 0x1_0000) &>> (10 as UInt32))
   }
 
   /// Returns the low-surrogate code unit of the surrogate pair representing
@@ -971,8 +983,8 @@ extension UTF16 {
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
-    return 0xDC00 + UTF16.CodeUnit(extendingOrTruncating:
-      (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1))
+    return 0xDC00 + UTF16.CodeUnit(
+      extendingOrTruncating: (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1))
   }
 
   /// Returns a Boolean value indicating whether the specified code unit is a
@@ -1049,76 +1061,6 @@ extension UTF16 {
       }
     }
   }
-
-  /// Returns the number of UTF-16 code units required for the given code unit
-  /// sequence when transcoded to UTF-16, and a Boolean value indicating
-  /// whether the sequence was found to contain only ASCII characters.
-  ///
-  /// The following example finds the length of the UTF-16 encoding of the
-  /// string `"Fermata 𝄐"`, starting with its UTF-8 representation.
-  ///
-  ///     let fermata = "Fermata 𝄐"
-  ///     let bytes = fermata.utf8
-  ///     print(Array(bytes))
-  ///     // Prints "[70, 101, 114, 109, 97, 116, 97, 32, 240, 157, 132, 144]"
-  ///
-  ///     let result = transcodedLength(of: bytes.makeIterator(),
-  ///                                   decodedAs: UTF8.self,
-  ///                                   repairingIllFormedSequences: false)
-  ///     print(result)
-  ///     // Prints "Optional((10, false))"
-  ///
-  /// - Parameters:
-  ///   - input: An iterator of code units to be translated, encoded as
-  ///     `sourceEncoding`. If `repairingIllFormedSequences` is `true`, the
-  ///     entire iterator will be exhausted. Otherwise, iteration will stop if
-  ///     an ill-formed sequence is detected.
-  ///   - sourceEncoding: The Unicode encoding of `input`.
-  ///   - repairingIllFormedSequences: Pass `true` to measure the length of
-  ///     `input` even when `input` contains ill-formed sequences. Each
-  ///     ill-formed sequence is replaced with a Unicode replacement character
-  ///     (`"\u{FFFD}"`) and is measured as such. Pass `false` to immediately
-  ///     stop measuring `input` when an ill-formed sequence is encountered.
-  /// - Returns: A tuple containing the number of UTF-16 code units required to
-  ///   encode `input` and a Boolean value that indicates whether the `input`
-  ///   contained only ASCII characters. If `repairingIllFormedSequences` is
-  ///   `false` and an ill-formed sequence is detected, this method returns
-  ///   `nil`.
-  public static func transcodedLength<Input, Encoding>(
-    of input: Input,
-    decodedAs sourceEncoding: Encoding.Type,
-    repairingIllFormedSequences: Bool
-  ) -> (count: Int, isASCII: Bool)?
-    where
-    Input : IteratorProtocol,
-    Encoding : UnicodeCodec,
-    Encoding.CodeUnit == Input.Element {
-
-    var input = input
-    var count = 0
-    var isAscii = true
-
-    var inputDecoder = Encoding()
-    loop:
-    while true {
-      switch inputDecoder.decode(&input) {
-      case .scalarValue(let us):
-        if us.value > 0x7f {
-          isAscii = false
-        }
-        count += width(us)
-      case .emptyInput:
-        break loop
-      case .error:
-        if !repairingIllFormedSequences {
-          return nil
-        }
-        isAscii = false
-        count += width(UnicodeScalar(0xfffd)!)
-      }
-    }
-    return (count, isAscii)
-  }
 }
 
 // Unchecked init to avoid precondition branches in hot code paths where we
@@ -1126,6 +1068,7 @@ extension UTF16 {
 extension UnicodeScalar {
   /// Create an instance with numeric value `value`, bypassing the regular
   /// precondition checks for code point validity.
+  @_versioned
   internal init(_unchecked value: UInt32) {
     _sanityCheck(value < 0xD800 || value > 0xDFFF,
       "high- and low-surrogate code points are not valid Unicode scalar values")
@@ -1135,7 +1078,7 @@ extension UnicodeScalar {
   }
 }
 
-extension UnicodeCodec where CodeUnit : UnsignedInteger {
+extension UnicodeEncoding {
   public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     var length = 0
     while input[length] != 0 {
@@ -1145,51 +1088,8 @@ extension UnicodeCodec where CodeUnit : UnsignedInteger {
   }
 }
 
-extension UnicodeCodec {
-  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
-    fatalError("_nullCodeUnitOffset(in:) implementation should be provided")
-  }
-}
-
 @available(*, unavailable, renamed: "UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
-
-extension UnicodeCodec {
-  @available(*, unavailable, renamed: "encode(_:into:)")
-  public static func encode(
-    _ input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
-  ) {
-    Builtin.unreachable()
-  }
-}
-
-@available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:into:)'")
-public func transcode<Input, InputEncoding, OutputEncoding>(
-  _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
-  stopOnError: Bool
-) -> Bool
-  where
-  Input : IteratorProtocol,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec,
-  InputEncoding.CodeUnit == Input.Element {
-  Builtin.unreachable()
-}
-
-extension UTF16 {
-  @available(*, unavailable, message: "use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
-  public static func measure<Encoding, Input>(
-    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)?
-    where
-    Encoding : UnicodeCodec,
-    Input : IteratorProtocol,
-    Encoding.CodeUnit == Input.Element {
-    Builtin.unreachable()
-  }
-}
 
 /// A namespace for Unicode utilities.
 internal enum _Unicode {}
