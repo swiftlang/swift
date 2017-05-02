@@ -97,6 +97,7 @@ public:
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
   IGNORED_ATTR(Implements)
+  IGNORED_ATTR(NSKeyedArchiveLegacy)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -766,6 +767,7 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(ObjCMembers)
+    IGNORED_ATTR(NSKeyedArchiveLegacy)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

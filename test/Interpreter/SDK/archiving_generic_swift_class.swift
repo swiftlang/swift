@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift -swift-version 3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=tvos
@@ -210,6 +210,6 @@ if CommandLine.arguments.count < 2 {
 } else if CommandLine.arguments[1] == "-unarchive" {
   unarchive()
 } else {
-  driver()
+  fatalError("invalid commandline argument")
 }
 

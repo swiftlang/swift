@@ -72,3 +72,24 @@ class CodingE<T> : CodingB<T> {   // expected-error{{generic class 'CodingE<T>' 
   required init(coder: NSCoder) { super.init(coder: coder) }
   override func encode(coder: NSCoder) { }
 }
+
+// @NSKeyedArchiveLegacy suppressions
+extension CodingA {
+  @NSKeyedArchiveLegacy("TheNestedE")
+  class NestedE : NSObject, NSCoding {
+    required init(coder: NSCoder) { }
+    func encode(coder: NSCoder) { }
+  }
+}
+
+@NSKeyedArchiveLegacy("TheCodingF")
+fileprivate class CodingF : NSObject, NSCoding {
+  required init(coder: NSCoder) { }
+  func encode(coder: NSCoder) { }
+}
+
+@NSKeyedArchiveLegacy("TheCodingG")
+private class CodingG : NSObject, NSCoding {
+  required init(coder: NSCoder) { }
+  func encode(coder: NSCoder) { }
+}

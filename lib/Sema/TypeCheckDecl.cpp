@@ -6069,6 +6069,7 @@ public:
 
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(Implements)
+    UNINTERESTING_ATTR(NSKeyedArchiveLegacy)
 
 #undef UNINTERESTING_ATTR
 
