@@ -30,22 +30,22 @@ class Bar: NSObject {
 var testKVCStrings = TestSuite("KVC strings")
 
 testKVCStrings.test("KVC strings") {
-  expectEqual((#keyPath2(NonObjC, .x))._kvcKeyPathString, nil)
-  expectEqual((#keyPath2(NonObjC, .y))._kvcKeyPathString, nil)
-  expectEqual((#keyPath2(Foo, .int))._kvcKeyPathString, "int")
-  expectEqual((#keyPath2(Foo, .bar))._kvcKeyPathString, "bar")
-  expectEqual((#keyPath2(Foo, .bar.foo))._kvcKeyPathString, "bar.foo")
-  expectEqual((#keyPath2(Foo, .bar.foo.bar))._kvcKeyPathString, "bar.foo.bar")
-  expectEqual((#keyPath2(Foo, .nonobjc))._kvcKeyPathString, nil)
-  expectEqual((#keyPath2(Foo, .bar.foo.nonobjc.y))._kvcKeyPathString, nil)
-  expectEqual((#keyPath2(Foo, .differentName))._kvcKeyPathString, "thisIsADifferentName")
-  expectEqual((#keyPath2(Bar, .foo))._kvcKeyPathString, "foo")
+  expectEqual((\NonObjC.x)._kvcKeyPathString, nil)
+  expectEqual((\NonObjC.y)._kvcKeyPathString, nil)
+  expectEqual((\Foo.int)._kvcKeyPathString, "int")
+  expectEqual((\Foo.bar)._kvcKeyPathString, "bar")
+  expectEqual((\Foo.bar.foo)._kvcKeyPathString, "bar.foo")
+  expectEqual((\Foo.bar.foo.bar)._kvcKeyPathString, "bar.foo.bar")
+  expectEqual((\Foo.nonobjc)._kvcKeyPathString, nil)
+  expectEqual((\Foo.bar.foo.nonobjc.y)._kvcKeyPathString, nil)
+  expectEqual((\Foo.differentName)._kvcKeyPathString, "thisIsADifferentName")
+  expectEqual((\Bar.foo)._kvcKeyPathString, "foo")
 
-  let foo_bar = #keyPath2(Foo, .bar)
-  let foo_nonobjc = #keyPath2(Foo, .nonobjc)
-  let bar_foo = #keyPath2(Bar, .foo)
+  let foo_bar = \Foo.bar
+  let foo_nonobjc = \Foo.nonobjc
+  let bar_foo = \Bar.foo
 
-  let nonobjc_y = #keyPath2(NonObjC, .y)
+  let nonobjc_y = \NonObjC.y
 
   do {
     let foo_bar_foo = foo_bar.appending(path: bar_foo)
