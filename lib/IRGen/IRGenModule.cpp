@@ -97,8 +97,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
   case IRGenDebugInfoKind::ASTTypes:
-    // TODO: Enable -gmodules for the clang code generator.
   case IRGenDebugInfoKind::DwarfTypes:
+    CGO.DebugTypeExtRefs = true;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }

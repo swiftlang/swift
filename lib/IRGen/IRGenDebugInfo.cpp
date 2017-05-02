@@ -34,11 +34,14 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Serialization/ASTReader.h"
 #include "llvm/Config/config.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Module.h"
@@ -190,7 +193,7 @@ SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template <typename WithLoc>
 SILLocation::DebugLoc getDebugLoc(IRGenDebugInfo &DI, WithLoc *S,
-                                  bool End = false) {
+                                  bool End = false) {  
   SILLocation::DebugLoc L;
   if (S == nullptr)
     return L;
@@ -813,6 +816,23 @@ llvm::DIModule *IRGenDebugInfo::getOrCreateModule(StringRef Key,
   DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
   return M;
 }
+
+llvm::DIModule *IRGenDebugInfo::getOrCreateModule(
+    clang::ExternalASTSource::ASTSourceDescriptor Desc) {
+  // Handle Clang modules.
+  if (const clang::Module *ClangModule = Desc.getModuleOrNull()) {
+    llvm::DIModule *Parent = nullptr;
+    if (ClangModule->Parent) {
+      clang::ExternalASTSource::ASTSourceDescriptor PM(*ClangModule->Parent);
+      Parent = getOrCreateModule(PM);
+    }
+    return getOrCreateModule(ClangModule->getFullModuleName(), Parent,
+                             Desc.getModuleName(), Desc.getPath());
+  }
+  // Handle PCH.
+  return getOrCreateModule(Desc.getASTFile(), nullptr, Desc.getModuleName(),
+                           Desc.getPath());
+};
 
 llvm::DISubprogram *IRGenDebugInfo::emitFunction(SILFunction &SILFn,
                                                  llvm::Function *Fn) {
@@ -1491,6 +1511,13 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *StructTy = BaseTy->castTo<StructType>();
     auto *Decl = StructTy->getDecl();
     auto L = getDebugLoc(*this, Decl);
+    if (auto *ClangDecl = Decl->getClangDecl()) {
+      auto ClangSrcLoc = ClangDecl->getLocStart();
+      clang::SourceManager &ClangSM =
+          CI.getClangASTContext().getSourceManager();
+      L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
+      L.Filename = ClangSM.getBufferName(ClangSrcLoc);
+    }
     auto *File = getOrCreateFile(L.Filename);
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
       return createStructType(DbgTy, Decl, StructTy, Scope, File, L.Line,
@@ -1515,28 +1542,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
           CI.getClangASTContext().getSourceManager();
       L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
       L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-
-      // Use "__ObjC" as default for implicit decls.
-      // FIXME: Do something more clever based on the decl's mangled name.
-      std::string FullModuleNameBuffer;
-      StringRef ModulePath;
-      StringRef ModuleName = "__ObjC";
-      if (auto *OwningModule = ClangDecl->getImportedOwningModule())
-        ModuleName = OwningModule->getTopLevelModuleName();
-
-      if (auto *SwiftModule = Decl->getParentModule())
-        if (auto *ClangModule = SwiftModule->findUnderlyingClangModule()) {
-          // FIXME: Clang submodules are not handled here.
-          // FIXME: Clang module config macros are not handled here.
-          FullModuleNameBuffer = ClangModule->getFullModuleName();
-          ModuleName = FullModuleNameBuffer;
-          // FIXME: A clang module's Directory is supposed to be the
-          // directory containing the module map, but ClangImporter
-          // sets it to the module cache directory.
-          if (ClangModule->Directory)
-            ModulePath = ClangModule->Directory->getName();
-        }
-      Scope = getOrCreateModule(ModuleName, TheCU, ModuleName, ModulePath);
     }
     assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
     return createPointerSizedStruct(Scope, Decl->getNameStr(),
@@ -1856,10 +1861,20 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   //
   // FIXME: Builtin and qualified types in LLVM have no parent
   // scope. TODO: This can be fixed by extending DIBuilder.
+  llvm::DIScope *Scope = nullptr;
   DeclContext *Context = DbgTy.getType()->getNominalOrBoundGenericNominal();
-  if (Context)
+  if (Context) {
+    if (auto *D = Context->getAsNominalTypeOrNominalTypeExtensionContext())
+      if (auto *ClangDecl = D->getClangDecl()) {
+        clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
+        auto Idx = ClangDecl->getOwningModuleID();
+        if (auto Info = Reader.getSourceDescriptor(Idx))
+          Scope = getOrCreateModule(*Info);
+      }
     Context = Context->getParent();
-  llvm::DIScope *Scope = getOrCreateContext(Context);
+  }
+  if (!Scope)
+    Scope = getOrCreateContext(Context);
   llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
 
   // Incrementally build the DIRefMap.
