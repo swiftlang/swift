@@ -591,6 +591,7 @@ public struct UTF32 : UnicodeCodec {
 ///     unit at a time.
 /// - Returns: `true` if the translation detected encoding errors in `input`;
 ///   otherwise, `false`.
+@inline(__always)
 public func transcode<Input, InputEncoding, OutputEncoding>(
   _ input: Input,
   from inputEncoding: InputEncoding.Type,
