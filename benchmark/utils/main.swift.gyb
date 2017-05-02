@@ -25,12 +25,13 @@ from gyb_benchmark_support import (
 
 import re
 
-# main.swift imports
 imports = sorted(tests + [msb.name for msb in multisource_benches])
 
-# main.swift run functions
+# The list of all "run_" functions is split into 3 test suites.
+# By default all tests belong to the "precommit" test suite.
+# Functions that match the following regular expressions will be in the "other"
+# and "string" test suites.
 
-# The test suites. Currently, "other" and "string"
 other_re = [
     "Ackermann",
     "Fibonacci",
@@ -61,38 +62,28 @@ import ${IMPORT}
 % end
 
 @inline(__always)
-private func addPrecommitTest(
-  _ name: String, _ function: @escaping (Int) -> ()
+private func addTo(
+  _ testSuite: inout [String : (Int) -> ()],
+  _ name: String,
+  _ function: @escaping (Int) -> ()
 ) {
-  precommitTests[name] = function
-}
-@inline(__always)
-private func addStringTest(
-  _ name: String, _ function: @escaping (Int) -> ()
-) {
-  stringTests[name] = function
-}
-@inline(__always)
-private func addOtherTest(
-  _ name: String, _ function: @escaping (Int) -> ()
-) {
-  otherTests[name] = function
+  testSuite[name] = function
 }
 
 // The main test suite: precommit tests
 % for run_func in run_funcs:
-addPrecommitTest("${run_func}", run_${run_func})
+addTo(&precommitTests, "${run_func}", run_${run_func})
 % end
 
 // Other tests
 % for test_name in other_tests:
-addOtherTest("${test_name }", run_${test_name})
+addTo(&otherTests, "${test_name }", run_${test_name})
 % end
 
 // String tests, an extended benchmark suite exercising finer-granularity
 // behavior of our Strings.
 % for test_name in string_tests:
-addStringTest("${test_name}", run_${test_name})
+addTo(&stringTests, "${test_name}", run_${test_name})
 % end
 
 main()

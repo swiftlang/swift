@@ -30,6 +30,7 @@ parser.add_argument("--output-dir",
 args = parser.parse_args()
 output_dir = args.output_dir
 
+
 def all_files(directory, extension):  # matching: [directory]/**/*[extension]
     return [
         os.path.join(root, f)
@@ -47,9 +48,9 @@ def will_write(filename):  # ensure path to file exists before writing
 
 if __name__ == '__main__':
     # Generate Your Boilerplate
-    gyb_files = all_files(perf_dir, '.gyb')
-    # FIXME make sure longer paths are done first,
-    # as CMakeLists and main.swift depend on the other gybs being generated first!
+    # Make sure longer paths are done first as CMakeLists.txt and main.swift
+    # depend on the other gybs being generated first.
+    gyb_files = sorted(all_files(perf_dir, '.gyb'), key=len, reverse=True)
     for f in gyb_files:
         relative_path = os.path.relpath(f[:-4], perf_dir)
         out_file = os.path.join(output_dir, relative_path)
