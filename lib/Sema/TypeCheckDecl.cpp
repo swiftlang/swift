@@ -2416,7 +2416,9 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     if (TC.Context.LangOpts.EnableSwift3ObjCInference) {
       // If we've been asked to warn about deprecated @objc inference, do so
       // now.
-      if (TC.Context.LangOpts.WarnSwift3ObjCInference && !isAccessor) {
+      if (TC.Context.LangOpts.WarnSwift3ObjCInference !=
+            Swift3ObjCInferenceWarnings::None &&
+          !isAccessor) {
         TC.diagnose(VD, diag::objc_inference_swift3_dynamic)
           .highlight(attr->getLocation())
           .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
@@ -2845,7 +2847,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
     // accessors---just the main storage declarations.
-    if (TC.Context.LangOpts.WarnSwift3ObjCInference &&
+    if (TC.Context.LangOpts.WarnSwift3ObjCInference ==
+          Swift3ObjCInferenceWarnings::Complete &&
         !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
       TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
       TC.diagnose(D, diag::objc_inference_swift3_addobjc)
@@ -6136,7 +6139,8 @@ public:
 
       // When warning about all deprecated @objc inference rules,
       // we only need to do this check if we have implicit 'dynamic'.
-      if (TC.Context.LangOpts.WarnSwift3ObjCInference) {
+      if (TC.Context.LangOpts.WarnSwift3ObjCInference !=
+            Swift3ObjCInferenceWarnings::None) {
         if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>())
           if (!dynamicAttr->isImplicit()) return;
       }
