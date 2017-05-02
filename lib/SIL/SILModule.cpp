@@ -74,6 +74,12 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
       return;
     }
   }
+
+  void didDeserializeFunctionBody(ModuleDecl *M, SILFunction *fn) override {
+    // Callbacks are currently applied in the order they are registered.
+    for (auto callBack : fn->getModule().getDeserializationCallbacks())
+      callBack(M, fn);
+  }
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
@@ -726,6 +732,18 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   return nullptr;
 }
 
+void SILModule::registerDeserializationCallback(
+    SILFunctionBodyCallback callBack) {
+  if (std::find(DeserializationCallbacks.begin(),
+                DeserializationCallbacks.end(), callBack)
+      == DeserializationCallbacks.end())
+    DeserializationCallbacks.push_back(callBack);
+}
+
+ArrayRef<SILModule::SILFunctionBodyCallback>
+SILModule::getDeserializationCallbacks() {
+  return DeserializationCallbacks;
+}
 
 void SILModule::
 registerDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
