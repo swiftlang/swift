@@ -1229,15 +1229,23 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     var lastKey: MinimalHashableValue = d2.first!.key
     for i in d2.indices { lastKey = d2[i].key }
 
+    // index(where:) - linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let j = d2.index(forKey: lastKey)!
-    expectEqual(1, MinimalHashableValue.timesEqualEqualWasCalled)
+    let j = d2.index(where: { (k, _) in k == lastKey })!
+    expectGE(MinimalHashableValue.timesEqualEqualWasCalled, 8)
+
+    // index(forKey:) - O(1) bucket + linear search
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    let k = d2.index(forKey: lastKey)!
+    expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
     
+    // keys.index(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let k = d2.keys.index(of: lastKey)!
-    expectEqual(1, MinimalHashableValue.timesEqualEqualWasCalled)
+    let l = d2.keys.index(of: lastKey)!
+    expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
     
     expectEqual(j, k)
+    expectEqual(k, l)
   }
 }
 
