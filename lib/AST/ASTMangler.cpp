@@ -1693,14 +1693,19 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
                                      requirements, requirementsBuf);
  
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    bool forceSingleParam = false;
+
+    const ParameterList *Params = nullptr;
     if (const auto *FDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
       unsigned PListIdx = isMethodDecl(decl) ? 1 : 0;
       if (PListIdx < FDecl->getNumParameterLists()) {
-        const ParameterList *Params = FDecl->getParameterList(PListIdx);
-        forceSingleParam = (Params->size() == 1);
+        Params = FDecl->getParameterList(PListIdx);
       }
+    } else if (const auto *SDecl = dyn_cast<SubscriptDecl>(decl)) {
+        Params = SDecl->getIndices();
     }
+    bool forceSingleParam = Params && (Params->size() == 1);
+          
+
     if (isFunctionMangling) {
       appendFunctionSignature(FuncTy, forceSingleParam);
     } else {
