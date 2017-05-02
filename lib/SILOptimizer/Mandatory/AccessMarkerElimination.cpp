@@ -63,6 +63,7 @@ struct AccessMarkerElimination {
       : Mod(&F->getModule()), F(F), isFullElimination(isFullElimination) {}
 
   SILBasicBlock::iterator eraseInst(SILInstruction *inst) {
+    DEBUG(llvm::dbgs() << "Erasing access marker: " << *inst);
     removedAny = true;
     return inst->getParent()->erase(inst);
   };
@@ -183,6 +184,8 @@ bool AccessMarkerElimination::stripMarkers() {
 // Implement a SILModule::SILFunctionBodyCallback that strips all access
 // markers from newly deserialized function bodies.
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
+  DEBUG(llvm::dbgs() << "Stripping all markers in: " << F->getName() << "\n");
+
   AccessMarkerElimination(F, /*isFullElimination=*/true).stripMarkers();
 }
 
