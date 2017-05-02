@@ -225,7 +225,7 @@ class Observers {
 }
 
 class C9 {}
-// CHECK: func <Func>test6</Func>(_ <Param>o</Param>: <iProtocol@>AnyObject</iProtocol>) {
+// CHECK: func <Func>test6</Func>(_ <Param>o</Param>: <iTypeAlias@>AnyObject</iTypeAlias>) {
 func test6(_ o: AnyObject) {
   // CHECK: let <Var>x</Var> = <Param@[[@LINE-1]]:14>o</Param> as! <Class@[[@LINE-3]]:7>C9</Class>
   let x = o as! C9

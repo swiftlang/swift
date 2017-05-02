@@ -587,14 +587,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       }
     }
 
-    // FIXME: This will go away soon.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (archetype->requiresClass())
-        return ProtocolConformanceRef(protocol);
-
-      return None;
-    }
-
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
         return ProtocolConformanceRef(protocol);
@@ -620,12 +612,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
     // @objc protocols.
     if (!layout.isObjC())
       return None;
-
-    // Special-case AnyObject, which may not be in the list of conformances.
-    //
-    // FIXME: This is going away soon.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject))
-      return ProtocolConformanceRef(protocol);
 
     // If the existential is class-constrained, the class might conform
     // concretely.

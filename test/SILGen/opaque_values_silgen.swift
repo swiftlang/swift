@@ -253,7 +253,7 @@ public func s060__callMultiResult(i: Int) -> (Int, (Int, Int)) {
 // SILGen, prepareArchetypeCallee. Materialize a
 // non-class-constrainted self from a class-constrained archetype.
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s070__materializeSelfyx1t_ts9AnyObjectRzAA3FooRzlF : $@convention(thin) <T where T : AnyObject, T : Foo> (@owned T) -> () {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s070__materializeSelfyx1t_tRlzCAA3FooRzlF : $@convention(thin) <T where T : AnyObject, T : Foo> (@owned T) -> () {
 // CHECK: bb0([[ARG:%.*]] : $T):
 // CHECK: [[WITNESS_METHOD:%.*]] = witness_method $T, #Foo.foo!1 : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -261,7 +261,7 @@ public func s060__callMultiResult(i: Int) -> (Int, (Int, Int)) {
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: destroy_value [[ARG]] : $T
 // CHECK: return %{{[0-9]+}} : $()
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s070__materializeSelfyx1t_ts9AnyObjectRzAA3FooRzlF'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s070__materializeSelfyx1t_tRlzCAA3FooRzlF'
 func s070__materializeSelf<T: Foo>(t: T) where T: AnyObject {
   t.foo()
 }

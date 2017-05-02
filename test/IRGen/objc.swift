@@ -13,7 +13,7 @@ import gizmo
 // CHECK: [[MYBLAMMO:%T4objc8MyBlammoC]] = type
 // CHECK: [[TEST2:%T4objc5Test2C]] = type
 // CHECK: [[OBJC:%objc_object]] = type
-// CHECK: [[ID:%T4objc2idV]] = type <{ %Ts9AnyObjectP }>
+// CHECK: [[ID:%T4objc2idV]] = type <{ %AnyObject }>
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type
 // CHECK: [[RECT:%TSo4RectV]] = type
 // CHECK: [[FLOAT:%TSf]] = type

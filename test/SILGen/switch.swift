@@ -524,7 +524,7 @@ func test_isa_class_1(x: B) {
 }
 // CHECK: } // end sil function '_T06switch16test_isa_class_1yAA1BC1x_tF'
 
-// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF : $@convention(thin)
+// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2yXlAA1BC1x_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : $B):
   // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
@@ -639,7 +639,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   destroy_value [[X]]
   // CHECK:   return [[T0]]
 }
-// CHECK: } // end sil function '_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF'
+// CHECK: } // end sil function '_T06switch16test_isa_class_2yXlAA1BC1x_tF'
 
 enum MaybePair {
   case Neither

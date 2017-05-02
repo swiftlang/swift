@@ -2048,11 +2048,6 @@ void PrintAST::printInherited(const Decl *decl,
   if (inherited.empty() && superclass.isNull() && !explicitClass) {
     if (protos.empty())
       return;
-    // If only conforms to AnyObject protocol, nothing to print.
-    if (protos.size() == 1) {
-      if (protos.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))
-        return;
-    }
   }
 
   if (inherited.empty()) {
@@ -2076,8 +2071,6 @@ void PrintAST::printInherited(const Decl *decl,
 
     for (auto Proto : protos) {
       if (!shouldPrint(Proto))
-        continue;
-      if (Proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
         continue;
       if (auto Enum = dyn_cast<EnumDecl>(decl)) {
         // Conformance to RawRepresentable is implied by having a raw type.
