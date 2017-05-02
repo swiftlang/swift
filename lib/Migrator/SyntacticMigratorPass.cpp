@@ -389,10 +389,41 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
     return true;
   }
 
+  void handleFuncDeclRename(AbstractFunctionDecl *AFD,
+                            CharSourceRange NameRange) {
+    bool IgnoreBase = false;
+    if (auto View = getFuncRename(AFD, IgnoreBase)) {
+      if (!IgnoreBase)
+        Editor.replace(NameRange, View.base());
+      unsigned Index = 0;
+      for (auto PL : AFD->getParameterLists()) {
+        for (auto *PD : *PL) {
+          if (Index == View.argSize())
+            break;
+          // Self parameter should not be updated.
+          if (PD->isSelfParameter())
+            continue;
+          StringRef NewArg = View.args()[Index++];
+          auto ArgLoc = PD->getArgumentNameLoc();
+
+          // If the argument name is not specified, add the argument name before
+          // the paramter name.
+          if (ArgLoc.isInvalid())
+            Editor.insertBefore(PD->getNameLoc(),
+                                (llvm::Twine(NewArg) + " ").str());
+          else
+            // Otherwise, replace the argument name directly.
+            Editor.replaceToken(ArgLoc, NewArg);
+        }
+      }
+    }
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (D->isImplicit())
       return true;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      handleFuncDeclRename(AFD, Range);
       for (auto *Item: getRelatedDiffItems(AFD)) {
         if (auto *DiffItem = dyn_cast<CommonDiffItem>(Item)) {
           if (!DiffItem->isTypeChange())
