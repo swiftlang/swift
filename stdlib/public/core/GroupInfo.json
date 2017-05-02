@@ -23,9 +23,14 @@
     "StringUnicodeScalarView.swift",
     "Substring.swift",
     "Unicode.swift",
+    "UnicodeEncoding.swift",
+    "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeTrie.swift",
-    "UnavailableStringAPIs.swift"
+    "UnavailableStringAPIs.swift",
+    "UTFEncoding.swift",
+    "UTF8.swift",
+    "UTF16.swift"
   ],
   "Bool": [
     "Bool.swift"
@@ -52,6 +57,7 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "UIntBuffer.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
