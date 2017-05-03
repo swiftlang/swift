@@ -50,6 +50,16 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   return Type();
 }
 
+Type
+QueryTypeSubstitutionMapOrIdentity::operator()(SubstitutableType *type) const {
+  auto key = type->getCanonicalType()->castTo<SubstitutableType>();
+  auto known = substitutions.find(key);
+  if (known != substitutions.end() && known->second)
+    return known->second;
+  
+  return type;
+}
+
 Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
   auto key = cast<SubstitutableType>(type->getCanonicalType());
   return subMap.lookupSubstitution(key);
