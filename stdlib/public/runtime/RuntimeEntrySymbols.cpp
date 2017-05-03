@@ -65,9 +65,9 @@ typedef void (*RuntimeEntry)();
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs)
 #endif
 // Allow for a custom global symbol name and implementation.
-#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(Id, Name, GlobalSymbolName, Impl, \
-                                             CC, ReturnTys, ArgTys, Attrs)     \
-  DEFINE_SYMBOL(GlobalSymbolName, Impl, CC)
+#define FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(Id, Name, CC, ReturnTys, ArgTys,  \
+                                             Attrs)                            \
+  DEFINE_SYMBOL(SWIFT_RT_ENTRY_REF(Name), SWIFT_RT_ENTRY_IMPL(Name), CC)
 
 // Indicate that we are going to generate the global symbols for those runtime
 // functions that require it.
