@@ -61,7 +61,7 @@ necessary control over the binary layout. Some examples:
     var y: UInt8
   }
 
-  // LLVM <{ i8, [7 x i8], <{ i64, i8 }>, i8 }>
+  // LLVM <{ i8, <{ i64, i8 }>, i8 }>
   struct S2 {
     var x: UInt8
     var s: S
