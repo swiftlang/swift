@@ -863,8 +863,7 @@ private:
     if (Mangled.nextIf('o'))
       return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     if (Mangled.nextIf('C'))
-      return Factory.createNode(Node::Kind::Module,
-                                MANGLING_MODULE_CLANG_IMPORTER);
+      return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_C);
     if (Mangled.nextIf('a'))
       return createSwiftType(Node::Kind::Structure, "Array");
     if (Mangled.nextIf('b'))

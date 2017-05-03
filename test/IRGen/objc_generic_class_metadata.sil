@@ -71,7 +71,7 @@ entry(%0: $Subclass):
   unreachable
 }
 
-sil @_T027objc_generic_class_metadata8SubclassCSQyACGs10DictionaryVySo13GenericOptionVypGSg7options_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
+sil @_T027objc_generic_class_metadata8SubclassCSQyACGs10DictionaryVySC13GenericOptionVypGSg7options_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
 entry(%0: $Subclass, %1: $NSDictionary):
   unreachable
 }

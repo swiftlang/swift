@@ -9,7 +9,7 @@ import Foundation
 import gizmo
 
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
-// CHECK: [[NSRECT:%TSo6NSRectV]] = type <{ [[NSPOINT:%TSo7NSPointV]], [[NSSIZE:%TSo6NSSizeV]] }>
+// CHECK: [[NSRECT:%TSC6NSRectV]] = type <{ [[NSPOINT:%TSC7NSPointV]], [[NSSIZE:%TSC6NSSizeV]] }>
 // CHECK: [[NSPOINT]] = type <{ [[DOUBLE:%TSd]], [[DOUBLE]] }>
 // CHECK: [[DOUBLE]] = type <{ double }>
 // CHECK: [[NSSIZE]] = type <{ [[DOUBLE]], [[DOUBLE]] }>
@@ -61,7 +61,7 @@ func convertRectFromBase(_ v: NSView, r: NSRect) -> NSRect {
 }
 // CHECK: }
 
-// CHECK: define hidden swiftcc { {{.*}}*, {{.*}}*, {{.*}}*, {{.*}}* } @_T012objc_structs20useStructOfNSStringsSo0deF0VADF({{.*}}*, {{.*}}*, {{.*}}*, {{.*}}*)
+// CHECK: define hidden swiftcc { {{.*}}*, {{.*}}*, {{.*}}*, {{.*}}* } @_T012objc_structs20useStructOfNSStringsSC0deF0VADF({{.*}}*, {{.*}}*, {{.*}}*, {{.*}}*)
 // CHECK:   call void @useStructOfNSStringsInObjC(%struct.StructOfNSStrings* noalias nocapture sret {{%.*}}, %struct.StructOfNSStrings* byval align 8 {{%.*}})
 func useStructOfNSStrings(_ s: StructOfNSStrings) -> StructOfNSStrings {
   return useStructOfNSStringsInObjC(s)

@@ -16,7 +16,6 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/MetadataReader.h"
-#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -523,8 +522,7 @@ bool RemoteASTTypeBuilder::isForeignModule(const Demangle::NodePointer &node) {
   if (node->getKind() != Demangle::Node::Kind::Module)
     return false;
 
-  return (node->getText() == MANGLING_MODULE_OBJC ||
-          node->getText() == MANGLING_MODULE_CLANG_IMPORTER);
+  return (node->getText() == "__ObjC");
 }
 
 DeclContext *
