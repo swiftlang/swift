@@ -2348,27 +2348,6 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (constraint->getKind() == ConstraintKind::CheckedCast)
     return true;
 
-  // Binding an operator overloading to a generic operator is weaker than
-  // binding to a non-generic operator, always.
-  // FIXME: this is a hack to improve performance when we're dealing with
-  // overloaded operators.
-  if (constraint->getKind() == ConstraintKind::BindOverload &&
-      constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
-      constraint->getOverloadChoice().getDecl()->isOperator() &&
-      successfulConstraint->getKind() == ConstraintKind::BindOverload &&
-      successfulConstraint->getOverloadChoice().getKind()
-        == OverloadChoiceKind::Decl &&
-      successfulConstraint->getOverloadChoice().getDecl()->isOperator()) {
-    auto decl = constraint->getOverloadChoice().getDecl();
-    auto successfulDecl = successfulConstraint->getOverloadChoice().getDecl();
-    auto &ctx = decl->getASTContext();
-    if (decl->getInterfaceType()->is<GenericFunctionType>() &&
-        !successfulDecl->getInterfaceType()->is<GenericFunctionType>() &&
-        (!successfulDecl->getAttrs().isUnavailable(ctx) ||
-         decl->getAttrs().isUnavailable(ctx)))
-      return true;
-  }
-
   return false;
 }
 
@@ -2484,6 +2463,21 @@ static unsigned countUnboundTypes(ConstraintSystem &CS,
       ++count;
 
   return count;
+}
+
+// Is this constraint a bind overload to a generic operator or one
+// that is unavailable?
+static bool isGenericOperatorOrUnavailable(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::BindOverload ||
+      constraint->getOverloadChoice().getKind() != OverloadChoiceKind::Decl ||
+      !constraint->getOverloadChoice().getDecl()->isOperator())
+    return false;
+
+  auto decl = constraint->getOverloadChoice().getDecl();
+  auto &ctx = decl->getASTContext();
+
+  return decl->getInterfaceType()->is<GenericFunctionType>() ||
+    decl->getAttrs().isUnavailable(ctx);
 }
 
 bool ConstraintSystem::solveSimplified(
@@ -2620,6 +2614,7 @@ bool ConstraintSystem::solveSimplified(
 
   // Try each of the constraints within the disjunction.
   Constraint *firstSolvedConstraint = nullptr;
+  Constraint *firstNonGenericOperatorSolution = nullptr;
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
   for (auto index : indices(constraints)) {
@@ -2635,12 +2630,24 @@ bool ConstraintSystem::solveSimplified(
       continue;
     }
 
+    // Don't attempt to solve for generic operators if we already have
+    // a non-generic solution.
+
+    // FIXME: Less-horrible but still horrible hack to attempt to
+    //        speed things up. Skip the generic operators if we
+    //        already have a solution involving non-generic operators,
+    //        but continue looking for a better non-generic operator
+    //        solution.
+    if (firstNonGenericOperatorSolution &&
+        isGenericOperatorOrUnavailable(constraint))
+      continue;
+
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (firstSolvedConstraint &&
         shortCircuitDisjunctionAt(constraint, firstSolvedConstraint))
       break;
-    
+
     // If the expression was deemed "too complex", stop now and salvage.
     if (getExpressionTooComplex(solutions))
       break;
@@ -2686,6 +2693,10 @@ bool ConstraintSystem::solveSimplified(
     solverState->addGeneratedConstraint(constraint);
 
     if (!solveRec(solutions, allowFreeTypeVariables)) {
+      if (!firstNonGenericOperatorSolution &&
+          !isGenericOperatorOrUnavailable(constraint))
+        firstNonGenericOperatorSolution = constraint;
+
       firstSolvedConstraint = constraint;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
