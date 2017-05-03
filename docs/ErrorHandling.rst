@@ -55,7 +55,7 @@ passing the error back to their own clients.
 These errors will be the focus of this proposal.
 
 The final two classes of error are outside the scope of this proposal.
-A **universal error** is theoretically recoverable, but by its nature
+A **universal error** is theoretically recoverable, but by its nature,
 the language can't help the programmer anticipate where it will come
 from.  A **logic failure** arises from a programmer mistake and should
 not be recoverable at all.  In our system, these kinds of errors are
@@ -327,7 +327,7 @@ the type::
   }
 
 The ``enum`` provides a namespace of errors, a list of possible errors
-within that namespace, and optional values to attach to each option.
+within that namespace and optional values to attach to each option.
 
 Note that this corresponds very cleanly to the ``NSError`` model of an
 error domain, an error code, and optional user data.  We expect to
@@ -534,7 +534,7 @@ For other sentinel cases, we can consider adding a new clang attribute
 to indicate to the compiler what the sentinel is:
 
 * There are several APIs returning ``NSInteger`` or ``NSUInteger``.  At
-  least some of these return 0 on error, but that doesn't seem like a
+  least some of these return 0 on the error, but that doesn't seem like a
   reasonable general assumption.
 
 * ``AVFoundation`` provides a couple methods returning
