@@ -218,7 +218,6 @@ endif()
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
-  target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
 
