@@ -33,3 +33,21 @@ class MyExtraCities : ExtraCities {
   func blibli(x: (String?, String) -> String!) {}
   func currimundi(x: (Int, (Int, Int))!) {}
 }
+
+typealias IntAnd<T> = (Int, T)
+class Outer {
+  typealias Inner = (String?, String) -> String!
+}
+
+class MyExtraCitiesWithAliases : ExtraCities {
+  func blibli(x: Outer.Inner) {}
+  func currimundi(x: (Int, IntAnd<Int>)!) {}
+}
+
+typealias OptString = String?
+typealias ImplicitlyUnwrapped<T> = T!
+
+class MyExtraCitiesWithMoreAliases : ExtraCities {
+  func blibli(x: (OptString, String) -> String!) {}
+  func currimundi(x: ImplicitlyUnwrapped<(Int, (Int, Int))>) {}
+}
