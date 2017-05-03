@@ -32,6 +32,7 @@ extension _StringCore {
   /// and the second element contains the encoded UTF-8 starting in its
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
+  @inline(__always)
   func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 

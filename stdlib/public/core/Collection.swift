@@ -379,6 +379,7 @@ public struct IndexingIterator<
 > : IteratorProtocol, Sequence {
 
   @_inlineable
+  @inline(__always)
   /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements) {
@@ -387,6 +388,7 @@ public struct IndexingIterator<
   }
 
   @_inlineable
+  @inline(__always)
   /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements, _position: Elements.Index) {
@@ -419,12 +421,14 @@ public struct IndexingIterator<
   /// - Returns: The next element in the underlying sequence if a next element
   ///   exists; otherwise, `nil`.
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
     _elements.formIndex(after: &_position)
     return element
   }
+  
   @_versioned
   internal let _elements: Elements
   @_versioned
@@ -1326,12 +1330,15 @@ extension Collection {
   ///     // Prints "10"
   @_inlineable
   public var first: Iterator.Element? {
-    // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
-    // so instead of testing `isEmpty` and then returning the first element,
-    // we'll just rely on the fact that the iterator always yields the
-    // first element first.
-    var i = makeIterator()
-    return i.next()
+    @inline(__always)
+    get {
+      // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
+      // so instead of testing `isEmpty` and then returning the first element,
+      // we'll just rely on the fact that the iterator always yields the
+      // first element first.
+      var i = makeIterator()
+      return i.next()
+    }
   }
   
   // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)

@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Demangling/ManglingUtils.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Strings.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -301,12 +302,18 @@ std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
   return finalize();
 }
 
+#ifdef USE_NEW_MANGLING_FOR_OBJC_RUNTIME_NAMES
 static bool isPrivate(const NominalTypeDecl *Nominal) {
   return Nominal->hasAccessibility() &&
          Nominal->getFormalAccess() <= Accessibility::FilePrivate;
 }
+#endif
 
 std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
+#ifdef USE_NEW_MANGLING_FOR_OBJC_RUNTIME_NAMES
+  // Using the new mangling for ObjC runtime names (except for top-level
+  // classes). This is currently disabled to support old archives.
+  // TODO: re-enable this as we switch to the new mangling for ObjC names.
   DeclContext *Ctx = Nominal->getDeclContext();
 
   if (Ctx->isModuleScopeContext() && !isPrivate(Nominal)) {
@@ -338,6 +345,34 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   beginMangling();
   appendAnyGenericType(Nominal);
   return finalize();
+#else
+  // Use the old mangling for ObjC runtime names.
+  beginMangling();
+  appendAnyGenericType(Nominal);
+  std::string NewName = finalize();
+  Demangle::Demangler Dem;
+  Demangle::Node *Root = Dem.demangleSymbol(NewName);
+  assert(Root->getKind() == Node::Kind::Global);
+  Node *NomTy = Root->getFirstChild();
+  if (NomTy->getKind() == Node::Kind::Protocol) {
+    // Protocols are actually mangled as protocol lists.
+    Node *PTy = Dem.createNode(Node::Kind::Type);
+    PTy->addChild(NomTy, Dem);
+    Node *TList = Dem.createNode(Node::Kind::TypeList);
+    TList->addChild(PTy, Dem);
+    NomTy = Dem.createNode(Node::Kind::ProtocolList);
+    NomTy->addChild(TList, Dem);
+  }
+  // Add a TypeMangling node at the top
+  Node *Ty = Dem.createNode(Node::Kind::Type);
+  Ty->addChild(NomTy, Dem);
+  Node *TyMangling = Dem.createNode(Node::Kind::TypeMangling);
+  TyMangling->addChild(Ty, Dem);
+  Node *NewGlobal = Dem.createNode(Node::Kind::Global);
+  NewGlobal->addChild(TyMangling, Dem);
+  std::string OldName = mangleNodeOld(NewGlobal);
+  return OldName;
+#endif
 }
 
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {

@@ -28,6 +28,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 /// - Note: If `text` begins with `"+"` or `"-"`, even if the rest of
 ///   the characters are `"0"`, the result is `nil`.
   // FIXME(integers): support a more general BinaryInteger protocol
+@inline(__always)
 internal func _parseUnsignedAsciiAsUInt64(
   _ u16: String.UTF16View, _ radix: Int, _ maximum: UInt64
 ) -> UInt64? {
@@ -70,6 +71,7 @@ internal func _parseUnsignedAsciiAsUInt64(
 /// - Note: For text matching the regular expression "-0+", the result
 ///   is `0`, not `nil`.
   // FIXME(integers): support a more general BinaryInteger protocol
+@inline(__always)
 internal func _parseAsciiAsUInt64(
   _ utf16: String.UTF16View, _ radix: Int, _ maximum: UInt64
 ) -> UInt64? {
@@ -92,6 +94,7 @@ internal func _parseAsciiAsUInt64(
 /// - Note: For text matching the regular expression "-0+", the result
 ///   is `0`, not `nil`.
   // FIXME(integers): support a more general BinaryInteger protocol
+@inline(__always)
 internal func _parseAsciiAsInt64(
   _ utf16: String.UTF16View, _ radix: Int, _ maximum: Int64
 ) -> Int64? {
@@ -109,6 +112,7 @@ internal func _parseAsciiAsInt64(
 }
 
 /// Strip an optional single leading ASCII plus/minus sign from `utf16`.
+@inline(__always)
 private func _parseOptionalAsciiSign(
   _ utf16: String.UTF16View
 ) -> (digitsUTF16: String.UTF16View, isMinus: Bool) {
