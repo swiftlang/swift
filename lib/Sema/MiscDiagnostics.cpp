@@ -2151,7 +2151,18 @@ public:
     return (VarDecls[VD] & RK_Written) != 0;
   }
 
+  bool isImplicitNewValueInSetter(VarDecl *VD) {
+    auto FD = dyn_cast<FuncDecl>(VD->getDeclContext());
+
+    return (VD->isImplicit() && VD->getName().str() == "newValue" &&
+        FD && FD->getAccessorKind() == AccessorKind::IsSetter);
+  }
+
   bool shouldTrackVarDecl(VarDecl *VD) {
+    // Track implicit newValue properties in setters.
+    if (isImplicitNewValueInSetter(VD))
+      return true;
+
     // If the variable is implicit, ignore it.
     if (VD->isImplicit() || VD->getLoc().isInvalid())
       return false;
@@ -2321,12 +2332,21 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (var->isInOut())
       continue;    
     
-    // Consider parameters to always have been read.  It is common to name a
-    // parameter and not use it (e.g. because you are an override or want the
+    // Consider most parameters to always have been read.  It is common to name
+    // a parameter and not use it (e.g. because you are an override or want the
     // named keyword, etc).  Warning to rewrite it to _ is more annoying than
-    // it is useful.
-    if (isa<ParamDecl>(var))
-      access |= RK_Read;
+    // it is useful. The one exception to this rule is the implicit `newValue`
+    // parameter added to property setters. If this value is not used, it is
+    // frequently a programmer error.
+    if (auto param = dyn_cast<ParamDecl>(var)) {
+      if (isImplicitNewValueInSetter(param) && (access & RK_Read) == 0) {
+        Diags.diagnose(var->getLoc(), diag::unused_implicit_setter_newvalue);
+        continue;
+      }
+      else {
+        access |= RK_Read;
+      }
+    }
     
     // Diagnose variables that were never used (other than their
     // initialization).
