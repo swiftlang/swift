@@ -62,9 +62,7 @@ extension _UIntBuffer : Sequence {
   }
 }
 
-extension _UIntBuffer : Collection {
-  public typealias _Element = Element
-  
+extension _UIntBuffer : Collection {  
   public struct Index : Comparable {
     @_versioned
     var bitOffset: UInt8
@@ -178,7 +176,7 @@ extension _UIntBuffer : RangeReplaceableCollection {
   @inline(__always)
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
-  ) where C._Element == Element {
+  ) where C.Element == Element {
     _debugPrecondition(
       (0..<_bitCount)._contains_(
         target.lowerBound.bitOffset..<target.upperBound.bitOffset))
