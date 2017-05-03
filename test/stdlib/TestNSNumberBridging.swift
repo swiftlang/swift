@@ -737,7 +737,7 @@ func testNSNumberBridgeFromCGFloat() {
 
 func test_numericBitPatterns_to_floatingPointTypes() {
     let signed_numbers: [NSNumber] = [
-        NSNumber(value: Int64(bitPattern: 6)),
+        NSNumber(value: Int64(6)),
         NSNumber(value: Int64(bitPattern: 1 << 56)),
         NSNumber(value: Int64(bitPattern: 1 << 53)),
         NSNumber(value: Int64(bitPattern: 1 << 52)),
@@ -746,7 +746,7 @@ func test_numericBitPatterns_to_floatingPointTypes() {
         NSNumber(value: Int64(bitPattern: 1 << 23)),
         NSNumber(value: -Int64(bitPattern: 1 << 53)),
         NSNumber(value: -Int64(bitPattern: 1 << 52)),
-        NSNumber(value: -Int64(bitPattern: 6)),
+        NSNumber(value: -Int64(6)),
         NSNumber(value: -Int64(bitPattern: 1 << 56)),
         NSNumber(value: -Int64(bitPattern: 1 << 25)),
         NSNumber(value: -Int64(bitPattern: 1 << 24)),
@@ -754,7 +754,7 @@ func test_numericBitPatterns_to_floatingPointTypes() {
     ]
 
     let signed_values: [Int64] = [
-        Int64(bitPattern: 6),
+        Int64(6),
         Int64(bitPattern: 1 << 56),
         Int64(bitPattern: 1 << 53),
         Int64(bitPattern: 1 << 52),
@@ -763,7 +763,7 @@ func test_numericBitPatterns_to_floatingPointTypes() {
         Int64(bitPattern: 1 << 23),
         -Int64(bitPattern: 1 << 53),
         -Int64(bitPattern: 1 << 52),
-        -Int64(bitPattern: 6),
+        -Int64(6),
         -Int64(bitPattern: 1 << 56),
         -Int64(bitPattern: 1 << 25),
         -Int64(bitPattern: 1 << 24),
