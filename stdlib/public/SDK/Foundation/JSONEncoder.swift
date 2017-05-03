@@ -148,7 +148,7 @@ fileprivate class _JSONEncoder : Encoder {
     let options: JSONEncoder._Options
 
     /// The path to the current point in encoding.
-    var codingPath: [CodingKey?] = []
+    var codingPath: [CodingKey?]
 
     /// Contextual user-provided information for use during encoding.
     var userInfo: [CodingUserInfoKey : Any] {
@@ -158,9 +158,10 @@ fileprivate class _JSONEncoder : Encoder {
     // MARK: - Initialization
 
     /// Initializes `self` with the given top-level encoder options.
-    init(options: JSONEncoder._Options) {
+    init(options: JSONEncoder._Options, codingPath: [CodingKey?] = []) {
         self.options = options
         self.storage = _JSONEncodingStorage()
+        self.codingPath = codingPath
     }
 
     // MARK: - Coding Path Actions
@@ -697,14 +698,14 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
     init(referencing encoder: _JSONEncoder, wrapping array: NSMutableArray, at index: Int) {
         self.encoder = encoder
         self.reference = .array(array, index)
-        super.init(options: encoder.options)
+        super.init(options: encoder.options, codingPath: encoder.codingPath)
     }
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
     init(referencing encoder: _JSONEncoder, wrapping dictionary: NSMutableDictionary, key: String) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, key)
-        super.init(options: encoder.options)
+        super.init(options: encoder.options, codingPath: encoder.codingPath)
     }
 
 
