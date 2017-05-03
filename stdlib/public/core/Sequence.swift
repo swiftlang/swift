@@ -780,7 +780,7 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
     self._iterator = iterator
     self._nextElement = nextElement ?? _iterator.next()
     
-    while try _nextElement.flatMap(predicate) == true {
+    while try _nextElement.flatMap(predicate) {
       _nextElement = _iterator.next()
     }
   }
