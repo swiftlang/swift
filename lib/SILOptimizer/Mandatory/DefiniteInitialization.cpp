@@ -658,6 +658,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(SILBasicBlock *BB) {
   return BlocksReachableFromEntry.count(BB);
 }
 
+llvm::cl::opt<bool> VisitDebugInfoLocs("definite-init-visit-debuginfo-locs");
 
 /// shouldEmitError - Check to see if we've already emitted an error at the
 /// specified instruction.  If so, return false.  If not, remember the
@@ -671,12 +672,40 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
     return false;
 
   // Check to see if we've already emitted an error at this location.  If so,
-  // swallow the error.
+  // swallow the error. This is a policy decision.
   SILLocation InstLoc = Inst->getLoc();
-  if (llvm::any_of(EmittedErrorLocs, [&](SILLocation L) -> bool {
-        return L.getSourceLoc() == InstLoc.getSourceLoc();
-      }))
+  SourceLoc InstSourceLoc = InstLoc.getSourceLoc();
+
+  // If we have a real source loc, compare against the other source locs that we
+  // have and return early.
+  if (InstSourceLoc != SourceLoc()) {
+    if (llvm::any_of(EmittedErrorLocs, [&](SILLocation L) -> bool {
+          return L.getSourceLoc() == InstSourceLoc;
+        }))
+      return false;
+    EmittedErrorLocs.push_back(InstLoc);
+    return true;
+  }
+
+  // Otherwise, if we are not supposed to visit debug info locs, just return
+  // true. This means we either had an invalid source loc or a debug info
+  // loc. In either case, we will get back an invalid SourceLoc.
+  if (!VisitDebugInfoLocs || !InstLoc.isDebugInfoLoc()) {
+    EmittedErrorLocs.push_back(InstLoc);
+    return true;
+  }
+
+  // Ok, at this point we know that InstSourceLoc is null and the user asked us
+  // to also check DebugInfo locations.
+  auto &SourceMgr = Inst->getModule().getASTContext().SourceMgr;
+  SILLocation::DebugLoc InstDebugLoc = InstLoc.decodeDebugLoc(SourceMgr);
+  if (llvm::any_of(EmittedErrorLocs, [&](SILLocation Loc) -> bool {
+        if (!Loc.isDebugInfoLoc())
+          return false;
+        return InstDebugLoc == Loc.decodeDebugLoc(SourceMgr);
+      })) {
     return false;
+  }
 
   EmittedErrorLocs.push_back(InstLoc);
   return true;
