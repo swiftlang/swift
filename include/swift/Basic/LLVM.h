@@ -26,7 +26,7 @@
 // without a definition of NoneType.
 #include "llvm/ADT/None.h"
 
-// Forward declarations.
+// Forward declarations
 namespace llvm {
   // Containers.
   class StringRef;
@@ -42,7 +42,7 @@ namespace llvm {
   template<typename T> class Optional;
   template <typename PT1, typename PT2> class PointerUnion;
 
-  // Other common classes.
+  // Other common classes
   class raw_ostream;
   class APInt;
   class APFloat;
@@ -50,7 +50,7 @@ namespace llvm {
 
 
 namespace swift {
-  // Casting operators.
+  // Casting operators
   using llvm::isa;
   using llvm::cast;
   using llvm::dyn_cast;
@@ -72,7 +72,7 @@ namespace swift {
   using llvm::TinyPtrVector;
   using llvm::PointerUnion;
 
-  // Other common classes.
+  // Other common classes
   using llvm::raw_ostream;
   using llvm::APInt;
   using llvm::APFloat;
