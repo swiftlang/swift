@@ -78,8 +78,7 @@ reflect(object: TestGeneric(D() as (P & AnyObject)))
 // CHECK-64: Type reference:
 // CHECK-64: (bound_generic_class reflect_existential.TestGeneric
 // CHECK-64:   (protocol_composition any_object
-// CHECK-64:     (protocol reflect_existential.P)
-// CHECK-64:     (protocol Swift.AnyObject)))
+// CHECK-64:     (protocol reflect_existential.P)))
 
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=32 alignment=8 stride=32 num_extra_inhabitants=0
@@ -93,8 +92,7 @@ reflect(object: TestGeneric(D() as (P & AnyObject)))
 // CHECK-32: Type reference:
 // CHECK-32: (bound_generic_class reflect_existential.TestGeneric
 // CHECK-32:   (protocol_composition any_object
-// CHECK-32:     (protocol reflect_existential.P)
-// CHECK-32:     (protocol Swift.AnyObject)))
+// CHECK-32:     (protocol reflect_existential.P)))
 
 // CHECK-32: Type info:
 // CHECK-32: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0

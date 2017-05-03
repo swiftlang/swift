@@ -150,11 +150,6 @@ static bool shouldUseObjCUSR(const Decl *D) {
     return false;
 
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (auto *PD = dyn_cast<ProtocolDecl>(D))
-      if (auto known = PD->getKnownProtocolKind())
-        if (known == KnownProtocolKind::AnyObject)
-          return false;
-
     if (isa<EnumElementDecl>(VD))
       return true;
     return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);

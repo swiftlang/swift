@@ -2395,8 +2395,7 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
 /// types.
 static ConstraintResult visitInherited(
          ArrayRef<TypeLoc> inheritedTypes,
-         llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType,
-         llvm::function_ref<ConstraintResult(LayoutConstraint, const TypeRepr *)> visitLayout) {
+         llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
@@ -2413,11 +2412,6 @@ static ConstraintResult visitInherited(
           visitInherited(memberType, composition->getTypes()[index]);
           index++;
         }
-
-        auto layout = compositionType->getExistentialLayout()
-          .getLayoutConstraint();
-        if (layout)
-          visitLayout(layout, composition);
 
         return;
       }
@@ -3378,14 +3372,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                               UnresolvedHandlingKind::GenerateConstraints);
   };
 
-  auto visitLayout = [&](LayoutConstraint layout, const TypeRepr *typeRepr) {
-    return addLayoutRequirement(type, layout,
-                                getFloatingSource(typeRepr,
-                                                  /*forInferred=*/false),
-                                UnresolvedHandlingKind::GenerateConstraints);
-  };
-
-  return visitInherited(decl->getInherited(), visitType, visitLayout);
+  return visitInherited(decl->getInherited(), visitType);
 }
 
 ConstraintResult GenericSignatureBuilder::addRequirement(

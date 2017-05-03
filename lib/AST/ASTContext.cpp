@@ -682,18 +682,6 @@ CanType ASTContext::getAnyObjectType() const {
     return Impl.AnyObjectType;
   }
 
-  // Go find 'AnyObject' in the Swift module.
-  //
-  // FIXME: This is going away.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("AnyObject", results);
-  for (auto result : results) {
-    if (auto proto = dyn_cast<ProtocolDecl>(result)) {
-      Impl.AnyObjectType = proto->getDeclaredType()->getCanonicalType();
-      return Impl.AnyObjectType;
-    }
-  }
-
   Impl.AnyObjectType = CanType(
     ProtocolCompositionType::get(
       *this, {}, /*HasExplicitAnyObject=*/true));

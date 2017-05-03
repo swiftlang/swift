@@ -154,10 +154,11 @@ SubclassExistentialsTestSuite.test("Metadata instantiation") {
   expectTrue(((Base<Int>) & P & Q).self == (P & (Base<Int>) & Q).self)
   expectTrue((P & Q & (Base<Int>)).self == (Q & (Base<Int>) & P).self)
 
-  // For now...
-  expectFalse((P & Q).self == (P & Q & AnyObject).self)
-  expectFalse((P & Q).self == (Q & P & AnyObject).self)
-  expectFalse(((Base<Int>) & Q).self == (Q & (Base<Int>) & AnyObject).self)
+  expectTrue((P & Q).self == (P & Q & AnyObject).self)
+  expectTrue((P & Q).self == (Q & P & AnyObject).self)
+  expectTrue(((Base<Int>) & Q).self == (Q & (Base<Int>) & AnyObject).self)
+
+  expectFalse((R & AnyObject).self == R.self)
 }
 
 SubclassExistentialsTestSuite.test("Metadata to string") {

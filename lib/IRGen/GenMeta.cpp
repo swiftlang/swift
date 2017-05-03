@@ -5497,8 +5497,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   if (!known)
     return SpecialProtocol::None;
   switch (*known) {
-  case KnownProtocolKind::AnyObject:
-    return SpecialProtocol::AnyObject;
   case KnownProtocolKind::Error:
     return SpecialProtocol::Error;
     

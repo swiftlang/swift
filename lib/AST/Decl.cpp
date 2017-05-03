@@ -2919,9 +2919,6 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   ProtocolDeclBits.ExistentialConformsToSelfValid = true;
   ProtocolDeclBits.ExistentialConformsToSelf = true;
 
-  if (isSpecificProtocol(KnownProtocolKind::AnyObject))
-    return true;
-
   if (!isObjC()) {
     ProtocolDeclBits.ExistentialConformsToSelf = false;
     return false;

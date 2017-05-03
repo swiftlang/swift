@@ -444,11 +444,19 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // protocols.
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
-      for (auto proto : layout.getProtocols()) {
-        auto *protoDecl = proto->getDecl();
-        allProtocols.insert(protoDecl);
+
+      // Classes and extensions cannot inherit from subclass
+      // existentials or AnyObject.
+      if (isa<ProtocolDecl>(decl) ||
+          isa<AbstractTypeParamDecl>(decl) ||
+          (!layout.hasExplicitAnyObject &&
+           !layout.superclass)) {
+        for (auto proto : layout.getProtocols()) {
+          auto *protoDecl = proto->getDecl();
+          allProtocols.insert(protoDecl);
+        }
+        continue;
       }
-      continue;
     }
     
     // If this is an enum inheritance clause, check for a raw type.
@@ -7696,15 +7704,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     ext->getExtendedTypeLoc().setType(extendedType);
     ext->setGenericEnvironment(env);
-
-    // Speculatively ban extension of AnyObject; it won't be a
-    // protocol forever, and we don't want to allow code that we know
-    // we'll break later.
-    if (proto->getDecl()->isSpecificProtocol(
-          KnownProtocolKind::AnyObject)) {
-      diagnose(ext, diag::extension_anyobject)
-        .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    }
     return;
   }
 

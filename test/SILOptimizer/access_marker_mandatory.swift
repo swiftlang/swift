@@ -5,7 +5,7 @@ public struct S {
   var o: AnyObject
 }
 
-// CHECK-LABEL: sil [noinline] @_T023access_marker_mandatory5initSAA1SVSi_s9AnyObject_ptF : $@convention(thin) (Int, @owned AnyObject) -> @owned S {
+// CHECK-LABEL: sil [noinline] @_T023access_marker_mandatory5initSAA1SVSi_yXltF : $@convention(thin) (Int, @owned AnyObject) -> @owned S {
 // CHECK: bb0(%0 : $Int, %1 : $AnyObject):
 // CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
 // CHECK: cond_br %{{.*}}, bb1, bb2
@@ -24,7 +24,7 @@ public struct S {
 // CHECK: destroy_addr [[STK]]
 // CHECK: dealloc_stack [[STK]]
 // CHECK: return [[RET]] : $S
-// CHECK-LABEL: } // end sil function '_T023access_marker_mandatory5initSAA1SVSi_s9AnyObject_ptF'
+// CHECK-LABEL: } // end sil function '_T023access_marker_mandatory5initSAA1SVSi_yXltF'
 @inline(never)
 public func initS(_ x: Int, _ o: AnyObject) -> S {
   var s: S
@@ -39,10 +39,10 @@ public func initS(_ x: Int, _ o: AnyObject) -> S {
 @inline(never)
 func takeS(_ s: S) {}
 
-// CHECK-LABEL: sil @_T023access_marker_mandatory14modifyAndReadSys9AnyObject_p1o_tF : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK-LABEL: sil @_T023access_marker_mandatory14modifyAndReadSyyXl1o_tF : $@convention(thin) (@owned AnyObject) -> () {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
-// CHECK: [[FINIT:%.*]] = function_ref @_T023access_marker_mandatory5initSAA1SVSi_s9AnyObject_ptF : $@convention(thin) (Int, @owned AnyObject) -> @owned S
+// CHECK: [[FINIT:%.*]] = function_ref @_T023access_marker_mandatory5initSAA1SVSi_yXltF : $@convention(thin) (Int, @owned AnyObject) -> @owned S
 // CHECK: [[INITS:%.*]] = apply [[FINIT]](%{{.*}}, %0) : $@convention(thin) (Int, @owned AnyObject) -> @owned S
 // CHECK: store [[INITS]] to [[STK]] : $*S
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*S
@@ -53,7 +53,7 @@ func takeS(_ s: S) {}
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
 // CHECK: end_access [[READ]]
 // CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@owned S) -> ()
-// CHECK-LABEL: } // end sil function '_T023access_marker_mandatory14modifyAndReadSys9AnyObject_p1o_tF'
+// CHECK-LABEL: } // end sil function '_T023access_marker_mandatory14modifyAndReadSyyXl1o_tF'
 public func modifyAndReadS(o: AnyObject) {
   var s = initS(3, o)
   s.i = 42
