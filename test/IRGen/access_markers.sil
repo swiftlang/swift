@@ -5,6 +5,7 @@ import Swift
 
 class A {
   @sil_stored var property: Int { get set }
+  @sil_stored var exProperty: Any { get set }
   deinit
   init()
 }
@@ -74,6 +75,21 @@ bb0(%0 : $A):
 
   dealloc_stack %1 : $*Builtin.UnsafeValueBuffer
 
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// rdar://31964550
+// Just check that this doesn't crash.
+sil @testCopyAddr : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.exProperty
+  %3 = begin_access [dynamic] [read] %2 : $*Any
+  copy_addr %2 to [initialization] %1 : $*Any
+  end_access %3 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %1 : $*Any
   %20 = tuple ()
   return %20 : $()
 }
