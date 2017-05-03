@@ -81,7 +81,9 @@ func single_protocol_composition(x x: protocol<Foo>) {} // expected-warning {{'p
 func uses_objc_class_and_protocol(o o: NSObject, p: NSAnsing) {}
 
 // Clang-imported structs get mangled using their Clang module name.
-// CHECK-LABEL: sil hidden @_T08mangling17uses_clang_structySo6NSRectV1r_tF
+// FIXME: Temporarily mangles everything into the virtual module __C__
+// <rdar://problem/14221244>
+// CHECK-LABEL: sil hidden @_T08mangling17uses_clang_structySC6NSRectV1r_tF
 func uses_clang_struct(r r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @_T08mangling14uses_optionalsScSgSiSg1x_tF

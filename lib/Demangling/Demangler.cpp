@@ -505,7 +505,7 @@ NodePointer Demangler::demangleStandardSubstitution() {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
-      return createNode(Node::Kind::Module, MANGLING_MODULE_CLANG_IMPORTER);
+      return createNode(Node::Kind::Module, MANGLING_MODULE_C);
     case 'g': {
       NodePointer OptionalTy =
         createType(createWithChildren(Node::Kind::BoundGenericEnum,

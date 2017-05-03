@@ -128,7 +128,7 @@ func configureWithoutOptions() {
 // foreign to native thunk for init(options:), uses GenericOption : Hashable
 // conformance
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So12GenericClassCSQyAByxGGs10DictionaryVySo0A6OptionVypGSg7options_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So12GenericClassCSQyAByxGGs10DictionaryVySC0A6OptionVypGSg7options_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
 // CHECK: [[FN:%.*]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: apply [[FN]]<GenericOption, Any>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: return
@@ -141,5 +141,5 @@ func configureWithoutOptions() {
 // Make sure we emitted the witness table for the above conformance
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
-// CHECK: method #Hashable.hashValue!getter.1: {{.*}}: @_T0So13GenericOptionVs8Hashable13objc_genericssACP9hashValueSifgTW
+// CHECK: method #Hashable.hashValue!getter.1: {{.*}}: @_T0SC13GenericOptionVs8Hashable13objc_genericssACP9hashValueSifgTW
 // CHECK: }

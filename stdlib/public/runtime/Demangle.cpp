@@ -131,7 +131,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
     
-    auto module = Dem.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
+    // ObjC classes mangle as being in the magic "__ObjC" module.
+    auto module = Dem.createNode(Node::Kind::Module, "__ObjC");
+    
     auto node = Dem.createNode(Node::Kind::Class);
     node->addChild(module, Dem);
     node->addChild(Dem.createNode(Node::Kind::Identifier,
