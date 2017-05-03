@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -enable-experimental-keypaths -emit-silgen %s | %FileCheck %s
-// REQUIRES: PTRSIZE=64
 
 struct S<T> {
   var x: T
