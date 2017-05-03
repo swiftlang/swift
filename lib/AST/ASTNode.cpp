@@ -56,6 +56,16 @@ DeclContext *ASTNode::getAsDeclContext() const {
   return nullptr;
 }
 
+bool ASTNode::isImplicit() const {
+  if (const Expr *E = this->dyn_cast<Expr*>())
+    return E->isImplicit();
+  if (const Stmt *S = this->dyn_cast<Stmt*>())
+    return S->isImplicit();
+  if (const Decl *D = this->dyn_cast<Decl*>())
+    return D->isImplicit();
+  llvm_unreachable("unsupported AST node");
+}
+
 void ASTNode::walk(ASTWalker &Walker) {
   if (Expr *E = this->dyn_cast<Expr*>())
     E->walk(Walker);
