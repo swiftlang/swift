@@ -25,6 +25,7 @@
 #include <cassert>
 #include <string>
 #include <cstring>
+#include <cassert>
 #include <type_traits>
 
 namespace swift {
