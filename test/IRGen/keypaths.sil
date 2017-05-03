@@ -1,6 +1,4 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// TODO: 32-bit support
-// REQUIRES: PTRSIZE=64
 
 sil_stage canonical
 import Swift
@@ -64,7 +62,7 @@ sil_vtable C {}
 //               -- 0x8000_0018 - instantiable in-line, size 4
 // CHECK-SAME: i32 -2147483644,
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: i32 1073741832 }>
+// CHECK-32-SAME: i32 1073741836 }>
 // CHECK-64-SAME: i32 1073741840 }>
 
 // -- %e: C.y
@@ -75,7 +73,7 @@ sil_vtable C {}
 //               -- 0x8000_0018 - instantiable in-line, size 4
 // CHECK-SAME: i32 -2147483644,
 // -- 0x4000_0000 (class) + offset of C.y
-// CHECK-32-SAME: i32 1073741836 }>
+// CHECK-32-SAME: i32 1073741840 }>
 // CHECK-64-SAME: i32 1073741848 }>
 
 // -- %f: C.z
@@ -86,7 +84,7 @@ sil_vtable C {}
 //               -- 0x8000_0018 - instantiable in-line, size 4
 // CHECK-SAME: i32 -2147483644,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: i32 1073741848 }>
+// CHECK-32-SAME: i32 1073741852 }>
 // CHECK-64-SAME: i32 1073741872 }>
 
 // -- %g: S.z.x
@@ -103,7 +101,7 @@ sil_vtable C {}
 // CHECK-64-SAME: i32 32,
 // CHECK: %swift.type* (i8*)*
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: i32 1073741832 }>
+// CHECK-32-SAME: i32 1073741836 }>
 // CHECK-64-SAME: i32 1073741840 }>
 
 // -- %h: C.z.x
@@ -116,7 +114,7 @@ sil_vtable C {}
 //                  -- 0x8000_0018 - instantiable in-line, size 16
 // CHECK-64-SAME: i32 -2147483632,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: i32 1073741848,
+// CHECK-32-SAME: i32 1073741852,
 // CHECK-64-SAME: i32 1073741872,
 // CHECK: %swift.type* (i8*)*
 // -- offset of S.x
@@ -130,7 +128,7 @@ sil_vtable C {}
 //              -- 0x8000_0014 - instantiable in-line, size 20
 // CHECK-64-SAME: i32 -2147483628,
 //              -- 0x8000_000c - instantiable in-line, size 12
-// CHECK-32-SAME: i32 -2147483640,
+// CHECK-32-SAME: i32 -2147483636,
 // -- 0x2000_0000 - computed, get-only, identified by function pointer, no args
 // CHECK-SAME: i32 536870912,
 // CHECK-SAME: void ()* @k_id,
@@ -144,7 +142,7 @@ sil_vtable C {}
 //              -- 0x8000_001c - instantiable in-line, size 28
 // CHECK-64-SAME: i32 -2147483620,
 //              -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483636,
+// CHECK-32-SAME: i32 -2147483632,
 // -- 0x2a00_0000 - computed, settable, nonmutating, identified by vtable, no args
 // CHECK-SAME: i32 704643072,
 // CHECK-SAME: [[WORD]]
@@ -159,7 +157,7 @@ sil_vtable C {}
 //              -- 0x8000_001c - instantiable in-line, size 28
 // CHECK-64-SAME: i32 -2147483620,
 //              -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483636,
+// CHECK-32-SAME: i32 -2147483632,
 // -- 0x3c00_0000 - computed, settable, nonmutating, identified by property offset, no args
 // CHECK-SAME: i32 1006632960,
 // CHECK-SAME: [[WORD]]
