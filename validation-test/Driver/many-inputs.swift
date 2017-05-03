@@ -19,3 +19,5 @@
 // REQUIRES: long_test
 // REQUIRES: executable_test
 
+// Disable on non-macOS for now; we're seeing this cause timeouts.
+// REQUIRES: OS=macosx
