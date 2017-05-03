@@ -5767,15 +5767,15 @@ public:
         }
 
         // Failing that, check for subtyping.
-        auto matchMode = OverrideMatchMode::Strict;
+        TypeMatchOptions matchMode = TypeMatchFlags::AllowOverride;
         if (attempt == OverrideCheckingAttempt::MismatchedOptional ||
             attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional){
-          matchMode = OverrideMatchMode::AllowTopLevelOptionalMismatch;
+          matchMode |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
         } else if (parentDecl->isObjC()) {
-          matchMode = OverrideMatchMode::AllowNonOptionalForIUOParam;
+          matchMode |= TypeMatchFlags::AllowNonOptionalForIUOParam;
         }
 
-        if (declTy->canOverride(parentDeclTy, matchMode, &TC)) {
+        if (declTy->matches(parentDeclTy, matchMode, &TC)) {
           // If the Objective-C selectors match, always call it exact.
           matches.push_back({parentDecl, objCMatch, parentDeclTy});
           hadExactMatch |= objCMatch;
@@ -5992,9 +5992,9 @@ public:
         auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
             matchDecl, decl, matchDecl->getInterfaceType());
         
-        if (!propertyTy->canOverride(parentPropertyTy,
-                                     OverrideMatchMode::Strict,
-                                     &TC)) {
+        if (!propertyTy->matches(parentPropertyTy,
+                                 TypeMatchFlags::AllowOverride,
+                                 &TC)) {
           TC.diagnose(property, diag::override_property_type_mismatch,
                       property->getName(), propertyTy, parentPropertyTy);
           noteFixableMismatchedTypes(TC, decl, matchDecl);
