@@ -9,17 +9,29 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+extension _Unicode {
+  @_fixed_layout
+  public enum UTF8 {
+  case _swift3Buffer(_Unicode.UTF8.ForwardParser)
+  }
+}
+
 extension _Unicode.UTF8 : UnicodeEncoding {
+  public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt8>
 
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar(_storage: 0xbdbfef, _bitCount: 24)
   }
 
+  @inline(__always)
+  @_inlineable
   public static func _isScalar(_ x: CodeUnit) -> Bool {
     return x & 0x80 == 0
   }
 
+  @inline(__always)
+  @_inlineable
   public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
     let bits = source._storage
     switch source._bitCount {
@@ -44,42 +56,47 @@ extension _Unicode.UTF8 : UnicodeEncoding {
     }
   }
   
+  @inline(__always)
+  @_inlineable
   public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
-    let x = source.value
-    if _fastPath(x < (1 << 7)) {
-      return EncodedScalar(_storage: x, _bitCount: 8)
+    var c = source.value
+    if _fastPath(c < (1&<<7)) {
+      return EncodedScalar(_storage: c, _bitCount: 8)
     }
-    else if _fastPath(x < (1 << 11)) {
-      var r = x &>> 6
-      r |= (x & 0b11_1111) &<< 8
-      r |= 0b1000_0000__1100_0000
-      return EncodedScalar(_storage: r, _bitCount: 2*8)
+    var o = c & 0b0__0011_1111
+    c &>>= 6
+    o &<<= 8
+    if _fastPath(c < (1&<<5)) {
+      return EncodedScalar(
+        _storage: o | c | 0b0__1000_0000__1100_0000, _bitCount: 16)
     }
-    else if _fastPath(x < (1 << 16)) {
-      var r = x &>> 12
-      r |= (x & 0b1111__1100_0000) &<< 2
-      r |= (x & 0b11_1111) &<< 16
-      r |= 0b1000_0000__1000_0000__1110_0000
-      return EncodedScalar(_storage:  r, _bitCount: 3*8)
+    o |= c & 0b0__0011_1111
+    c &>>= 6
+    o &<<= 8
+    if _fastPath(c < (1&<<4)) {
+      return EncodedScalar(
+        _storage: o | c | 0b0__1000_0000__1000_0000__1110_0000, _bitCount: 24)
     }
-    else {
-      var r = x &>> 18
-      r |= (x & 0b11__1111_0000__0000_0000) &>> 4
-      r |= (x & 0b1111__1100_0000) &<< 10
-      r |= (x & 0b11_1111) << 24
-      r |= 0b1000_0000__1000_0000__1000_0000__1111_0000
-      return EncodedScalar(_storage: r, _bitCount: 4*8)
-    }
+    o |= c & 0b0__0011_1111
+    c &>>= 6
+    o &<<= 8
+    return EncodedScalar(
+      _storage: o | c | 0b0__1000_0000__1000_0000__1000_0000__1111_0000,
+      _bitCount: 32)
   }
   
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
+    @inline(__always)
+    @_inlineable
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
   
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
+    @inline(__always)
+    @_inlineable
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -87,7 +104,8 @@ extension _Unicode.UTF8 : UnicodeEncoding {
 
 extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   public typealias Encoding = _Unicode.UTF8
-
+  @inline(__always)
+  @_inlineable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     if _buffer._storage                & 0b0__1110_0000__1100_0000
@@ -122,6 +140,7 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   /// Returns the length of the invalid sequence that ends with the LSB of
   /// buffer.
   @inline(never)
+  @_versioned
   func _invalidLength() -> UInt8 {
     if _buffer._storage                 & 0b0__1111_0000__1100_0000
                                        == 0b0__1110_0000__1000_0000 {
@@ -150,6 +169,8 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
     return 1
   }
   
+  @inline(__always)
+  @_inlineable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     return Encoding.EncodedScalar(
       _storage: _buffer._storage.byteSwapped &>> (32 - bitCount),
@@ -160,7 +181,9 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
 
 extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
   public typealias Encoding = _Unicode.UTF8
-  
+
+  @inline(__always)
+  @_inlineable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     
@@ -195,6 +218,7 @@ extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
   /// Returns the length of the invalid sequence that starts with the LSB of
   /// buffer.
   @inline(never)
+  @_versioned
   func _invalidLength() -> UInt8 {
     if _buffer._storage               & 0b0__1100_0000__1111_0000
                                      == 0b0__1000_0000__1110_0000 {
