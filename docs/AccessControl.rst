@@ -106,9 +106,9 @@ Swift does not currently support private protocol conformances, so for runtime
 consistency, the access level of the conformance of type T to protocol P is
 equal to the minimum of T's access level and P's access level; that is, the
 conformance is accessible whenever both T and P are accessible. This does not
-change if the protocol is conformed to in an extension. (The access level of a
+change if the protocol is conformed to in an extension (The access level of a
 conformance is not currently reflected in the source, but is a useful concept
-for applying restrictions consistently.)
+for applying restrictions consistently.).
 
 All members used to satisfy a conformance must have an access level at least as
 high as the conformance's. This ensures consistency between views of the type;
