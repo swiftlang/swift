@@ -2894,13 +2894,28 @@ public extension RawRepresentable where RawValue == String, Self : Decodable {
 //===----------------------------------------------------------------------===//
 
 // FIXME: Uncomment when conditional conformance is available.
-extension Array : Codable /* where Element : Codable */ {
-    public init(from decoder: Decoder) throws {
-        guard Element.self is Decodable.Type else {
-            preconditionFailure("Array<\(Element.self)> does not conform to Decodable because \(Element.self) does not conform to Decodable.")
+extension Array : Encodable /* where Element : Encodable */ {
+    public func encode(to encoder: Encoder) throws {
+        guard Element.self is Encodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Encodable because \(Element.self) does not conform to Encodable.")
         }
 
+        var container = encoder.unkeyedContainer()
+        for element in self {
+            // superEncoder appends an empty element and wraps an Encoder around it.
+            // This is normally appropriate for encoding super, but this is really what we want to do.
+            let subencoder = container.superEncoder()
+            try (element as! Encodable).encode(to: subencoder)
+        }
+    }
+}
+
+extension Array : Decodable /* where Element : Decodable */ {
+    public init(from decoder: Decoder) throws {
         self.init()
+        guard Element.self is Decodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Element.self) does not conform to Decodable.")
+        }
 
         let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
@@ -2912,10 +2927,12 @@ extension Array : Codable /* where Element : Codable */ {
             self.append(element as! Element)
         }
     }
+}
 
+extension Set : Encodable /* where Element : Encodable */ {
     public func encode(to encoder: Encoder) throws {
         guard Element.self is Encodable.Type else {
-            preconditionFailure("Array<\(Element.self)> does not conform to Encodable because \(Element.self) does not conform to Encodable.")
+            preconditionFailure("\(type(of: self)) does not conform to Encodable because \(Element.self) does not conform to Encodable.")
         }
 
         var container = encoder.unkeyedContainer()
@@ -2924,6 +2941,160 @@ extension Array : Codable /* where Element : Codable */ {
             // This is normally appropriate for encoding super, but this is really what we want to do.
             let subencoder = container.superEncoder()
             try (element as! Encodable).encode(to: subencoder)
+        }
+    }
+}
+
+extension Set : Decodable /* where Element : Decodable */ {
+    public init(from decoder: Decoder) throws {
+        self.init()
+
+        guard Element.self is Decodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Element.self) does not conform to Decodable.")
+        }
+
+        let metaType = (Element.self as! Decodable.Type)
+        var container = try decoder.unkeyedContainer()
+        while !container.isAtEnd {
+            // superDecoder fetches the next element as a container and wraps a Decoder around it.
+            // This is normally appropriate for decoding super, but this is really what we want to do.
+            let subdecoder = try container.superDecoder()
+            let element = try metaType.init(from: subdecoder)
+            self.insert(element as! Element)
+        }
+    }
+}
+
+/// A wrapper for dictionary keys which are Strings or Ints.
+internal struct _DictionaryCodingKey : CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = Int(stringValue)
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
+}
+
+extension Dictionary : Encodable /* where Key : Encodable, Value : Encodable */ {
+    public func encode(to encoder: Encoder) throws {
+        guard Key.self is Encodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Encodable because \(Key.self) does not conform to Encodable.")
+        }
+
+        guard Value.self is Encodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Encodable because \(Value.self) does not conform to Encodable.")
+        }
+
+        if Key.self == String.self {
+            // Since the keys are already Strings, we can use them as keys directly.
+            var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
+            for (key, value) in self {
+                let codingKey = _DictionaryCodingKey(stringValue: key as! String)!
+                let valueEncoder = container.superEncoder(forKey: codingKey)
+                try (value as! Encodable).encode(to: valueEncoder)
+            }
+        } else if Key.self == Int.self {
+            // Since the keys are already Ints, we can use them as keys directly.
+            var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
+            for (key, value) in self {
+                let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
+                let valueEncoder = container.superEncoder(forKey: codingKey)
+                try (value as! Encodable).encode(to: valueEncoder)
+            }
+        } else {
+            // Keys are Encodable but not Strings or Ints, so we cannot arbitrarily convert to keys.
+            // We can encode as an array of alternating key-value pairs, though.
+            var container = encoder.unkeyedContainer()
+            for (key, value) in self {
+                // superEncoder appends an empty element and wraps an Encoder around it.
+                // This is normally appropriate for encoding super, but this is really what we want to do.
+                let keyEncoder = container.superEncoder()
+                try (key as! Encodable).encode(to: keyEncoder)
+
+                let valueEncoder = container.superEncoder()
+                try (value as! Encodable).encode(to: valueEncoder)
+            }
+        }
+    }
+}
+
+extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ {
+    public init(from decoder: Decoder) throws {
+        self.init()
+
+        guard Key.self is Encodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Key.self) does not conform to Decodable.")
+        }
+
+        guard Value.self is Encodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Value.self) does not conform to Decodable.")
+        }
+
+        if Key.self == String.self {
+            // The keys are Strings, so we should be able to expect a keyed container.
+            let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
+            let valueMetaType = Value.self as! Decodable.Type
+            for key in container.allKeys {
+                let valueDecoder = try container.superDecoder(forKey: key)
+                let value = try valueMetaType.init(from: valueDecoder)
+                self[key.stringValue as! Key] = (value as! Value)
+            }
+        } else if Key.self == Int.self {
+            // The keys are Ints, so we should be able to expect a keyed container.
+            let valueMetaType = Value.self as! Decodable.Type
+            let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
+            for key in container.allKeys {
+                guard key.intValue != nil else {
+                    // We provide stringValues for Int keys; if an encoder chooses not to use the actual intValues, we've encoded string keys.
+                    // So on init, _DictionaryCodingKey tries to parse string keys as Ints. If that succeeds, then we would have had an intValue here.
+                    // We don't, so this isn't a valid Int key.
+                    var codingPath = decoder.codingPath
+                    codingPath.append(key)
+                    throw DecodingError.typeMismatch(Int.self,
+                                                     DecodingError.Context(codingPath: codingPath,
+                                                                           debugDescription: "Expected Int key but found String key instead."))
+                }
+
+                let valueDecoder = try container.superDecoder(forKey: key)
+                let value = try valueMetaType.init(from: valueDecoder)
+                self[key.intValue! as! Key] = (value as! Value)
+            }
+        } else {
+            // We should have encoded as an array of alternating key-value pairs.
+            var container = try decoder.unkeyedContainer()
+
+            // We're expecting to get pairs. If the container has a known count, it had better be even; no point in doing work if not.
+            if let count = container.count {
+                guard count % 2 == 0 else {
+                    throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
+                                                                            debugDescription: "Expected collection of key-value pairs; encountered odd-length array instead."))
+                }
+            }
+
+            let keyMetaType = (Key.self as! Decodable.Type)
+            let valueMetaType = (Value.self as! Decodable.Type)
+            while !container.isAtEnd {
+                // superDecoder fetches the next element as a container and wraps a Decoder around it.
+                // This is normally appropriate for decoding super, but this is really what we want to do.
+                let keyDecoder = try container.superDecoder()
+                let key = try keyMetaType.init(from: keyDecoder)
+
+                guard !container.isAtEnd else {
+                    throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
+                                                                                 debugDescription: "Unkeyed container reached end before value in key-value pair."))
+                }
+
+                let valueDecoder = try container.superDecoder()
+                let value = try valueMetaType.init(from: valueDecoder)
+
+                self[key as! Key] = (value as! Value)
+            }
         }
     }
 }
