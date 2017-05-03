@@ -103,6 +103,7 @@ def get_slice_doc_comment(Self):
 %         BaseRequirements.append('_RangeReplaceableIndexable')
 %       BaseRequirements = ' & '.join(BaseRequirements)
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
+%       if Self == 'BidirectionalSlice' or Self == 'Slice' or Self == 'MutableRandomAccessSlice' or Self == 'RandomAccessSlice' or Self == 'MutableSlice':
 
 ${get_slice_doc_comment(Self)}
 %     if Mutable:
@@ -464,6 +465,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   }
 }
 
+%       end
 %     end
 %   end
 % end
