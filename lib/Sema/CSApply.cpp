@@ -4161,6 +4161,10 @@ namespace {
       return E;
     }
 
+    Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
+      llvm_unreachable("found KeyPathDotExpr in CSApply");
+    }
+
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       ExprStack.push_back(expr);

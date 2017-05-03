@@ -441,6 +441,10 @@ ERROR(expr_unsupported_objc_key_path_compound_name,none,
       "compound name", ())
 ERROR(expr_keypath_no_keypath_type,none,
       "broken standard library: no 'KeyPath' type found", ())
+ERROR(expr_swift_keypath_invalid_component,none,
+      "invalid component of Swift key path", ())
+ERROR(expr_swift_keypath_not_starting_with_type,none,
+      "a Swift key path must begin with a type", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
