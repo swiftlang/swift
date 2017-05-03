@@ -139,5 +139,9 @@ extension CodingB {
 // Inference of @_staticInitializeObjCMetadata.
 class SubclassOfCodingE : CodingE<Int> { }
 
+// CHECK-NOT: class_decl "CodingA"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
+// CHECK: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
+// CHECK-NOT: class_decl "NestedE"{{.*}}@_staticInitializeObjCMetadata
+// CHECK-NOT: class_decl "CodingGeneric"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "SubclassOfCodingE"{{.*}}@_staticInitializeObjCMetadata
