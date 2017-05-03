@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -verify
 
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -dump-ast 2> %t.ast
+// RUN: %FileCheck %s < %t.ast
+
 // REQUIRES: objc_interop
 
 import Foundation
@@ -109,3 +112,9 @@ extension CodingB {
   @NSKeyedArchiveLegacy("GenericViaParent") // expected-error{{@NSKeyedArchiveLegacy attribute cannot be applied to generic class 'CodingB<T>.GenericViaParent'}}
   class GenericViaParent : NSObject { }
 }
+
+// Inference of @_staticInitializeObjCMetadata.
+class SubclassOfCodingE : CodingE<Int> { }
+
+// CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
+// CHECK: class_decl "SubclassOfCodingE"{{.*}}@_staticInitializeObjCMetadata
