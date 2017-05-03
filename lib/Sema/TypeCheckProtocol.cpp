@@ -5906,10 +5906,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         Optional<unsigned> kind;
         bool isFixable = true;
         if (classDecl->getGenericSignature()) {
-          kind = 3;
+          kind = 4;
           isFixable = false;
-        } else if (classDecl->getDeclContext()->isTypeContext()) {
-          kind = 2;
+        } else if (!classDecl->getDeclContext()->isModuleScopeContext()) {
+          if (classDecl->getDeclContext()->isTypeContext())
+            kind = 2;
+          else
+            kind = 3;
         } else {
           switch (classDecl->getFormalAccess()) {
           case Accessibility::FilePrivate:

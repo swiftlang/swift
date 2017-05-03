@@ -74,6 +74,15 @@ private class CodingD : NSObject, NSCoding {       // expected-error{{private cl
   func encode(coder: NSCoder) { }
 }
 
+// Local classes.
+func someFunction() {
+  class LocalCoding : NSObject, NSCoding {       // expected-error{{local class 'LocalCoding' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{add the '@NSKeyedArchiveLegacy' attribute to specify the class name used for archiving}}{{3-3=@NSKeyedArchiveLegacy("<#class archival name#>")}}
+  required init(coder: NSCoder) { }
+  func encode(coder: NSCoder) { }
+}
+}
+
 // Inherited conformances.
 class CodingE<T> : CodingB<T> {   // expected-error{{generic class 'CodingE<T>' has an unstable name when archiving via 'NSCoding'}}
   required init(coder: NSCoder) { super.init(coder: coder) }
