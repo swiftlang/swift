@@ -51,39 +51,6 @@ ConstraintSystem::determineBestBindings() {
   return std::make_pair(bestBindings, bestTypeVar);
 }
 
-/// Find the set of type variables that are inferable from the given type.
-///
-/// \param type The type to search.
-/// \param typeVars Collects the type variables that are inferable from the
-/// given type. This set is not cleared, so that multiple types can be explored
-/// and introduce their results into the same set.
-static void
-findInferableTypeVars(Type type,
-                      SmallPtrSetImpl<TypeVariableType *> &typeVars) {
-  type = type->getCanonicalType();
-  if (!type->hasTypeVariable())
-    return;
-
-  class Walker : public TypeWalker {
-    SmallPtrSetImpl<TypeVariableType *> &typeVars;
-
-  public:
-    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
-        : typeVars(typeVars) {}
-
-    Action walkToTypePre(Type ty) override {
-      if (ty->is<DependentMemberType>())
-        return Action::SkipChildren;
-
-      if (auto typeVar = ty->getAs<TypeVariableType>())
-        typeVars.insert(typeVar);
-      return Action::Continue;
-    }
-  };
-
-  type.walk(Walker(typeVars));
-}
-
 /// \brief Return whether a relational constraint between a type variable and a
 /// trivial wrapper type (autoclosure, unary tuple) should result in the type
 /// variable being potentially bound to the value type, as opposed to the

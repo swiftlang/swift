@@ -883,6 +883,7 @@ public:
   friend class OverloadChoice;
   friend class ConstraintGraph;
   friend class DisjunctionChoice;
+  friend class ConstraintBucket;
 
   class SolverScope;
 
@@ -1996,6 +1997,20 @@ public:
   /// reads the type from the ConstraintSystem expression type map.
   Type getResultType(const AbstractClosureExpr *E);
 
+  /// Determine if the given constraint represents explicit conversion,
+  /// e.g. coercion constraint "as X" which forms a disjunction.
+  bool isExplicitConversionConstraint(Constraint *constraint) const {
+    if (constraint->getKind() != ConstraintKind::Disjunction)
+      return false;
+
+    if (auto locator = constraint->getLocator()) {
+      if (auto anchor = locator->getAnchor())
+        return isa<CoerceExpr>(anchor);
+    }
+
+    return false;
+  }
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
@@ -2661,6 +2676,17 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
+  /// \brief Pick a disjunction from the given list, which,
+  /// based on the associated constraints, is the most viable to
+  /// reduce depth of the search tree.
+  ///
+  /// \param disjunctions A collection of disjunctions to examine.
+  ///
+  /// \returns The disjunction with most weight relative to others, based
+  /// on the number of constraints associated with it.
+  Optional<Constraint *>
+  selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
+
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
       llvm::SetVector<Constraint *> &neighbors);
@@ -2832,6 +2858,38 @@ public:
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &out);
+
+  /// Find the set of type variables that are inferable from the given type.
+  ///
+  /// \param type The type to search.
+  /// \param typeVars Collects the type variables that are inferable from the
+  /// given type. This set is not cleared, so that multiple types can be explored
+  /// and introduce their results into the same set.
+  void findInferableTypeVars(Type type,
+                             SmallPtrSetImpl<TypeVariableType *> &typeVars) {
+    type = type->getCanonicalType();
+    if (!type->hasTypeVariable())
+      return;
+
+    class Walker : public TypeWalker {
+      SmallPtrSetImpl<TypeVariableType *> &typeVars;
+
+    public:
+      explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVars)
+      : typeVars(typeVars) {}
+
+      Action walkToTypePre(Type ty) override {
+        if (ty->is<DependentMemberType>())
+          return Action::SkipChildren;
+
+        if (auto typeVar = ty->getAs<TypeVariableType>())
+          typeVars.insert(typeVar);
+        return Action::Continue;
+      }
+    };
+
+    type.walk(Walker(typeVars));
+  }
 };
 
 /// \brief Compute the shuffle required to map from a given tuple type to
@@ -2972,11 +3030,13 @@ void simplifyLocator(Expr *&anchor,
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
+  Constraint *Disjunction;
   Constraint *Choice;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, Constraint *constraint)
-      : CS(cs), Choice(constraint) {}
+  DisjunctionChoice(ConstraintSystem *const cs, Constraint *disjunction,
+                    Constraint *constraint)
+      : CS(cs), Disjunction(disjunction), Choice(constraint) {}
 
   Constraint *operator&() const { return Choice; }
 
@@ -2997,6 +3057,8 @@ public:
                         FreeTypeVariableBinding allowFreeTypeVariables);
 
 private:
+  void propagateConversionInfo() const;
+
   static ValueDecl *getOperatorDecl(Constraint *constraint) {
     if (constraint->getKind() != ConstraintKind::BindOverload)
       return nullptr;
@@ -3007,6 +3069,55 @@ private:
 
     auto *decl = choice.getDecl();
     return decl->isOperator() ? decl : nullptr;
+  }
+};
+
+/// \brief Constraint "bucket" represents a single
+/// "solvable" unit of the constraint system which
+/// could be split further into more distinct units.
+///
+/// This helps to abstract away logic of holding and
+/// returning sub-set of the constraints in the system,
+/// as well as its partial solving and result tracking.
+class ConstraintBucket {
+  ConstraintList Constraints;
+  unsigned NumDisjunctions = 0;
+
+public:
+  void reinstateTo(ConstraintList &workList) {
+    workList.splice(workList.end(), Constraints);
+  }
+
+  void record(Constraint *constraint) {
+    if (constraint->getKind() == ConstraintKind::Disjunction)
+      ++NumDisjunctions;
+    Constraints.push_back(constraint);
+  }
+
+  bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables) {
+    // Return constraints from the bucket back into circulation.
+    reinstateTo(cs.InactiveConstraints);
+
+    // Solve for this component. If it fails, we're done.
+    bool failed;
+
+    {
+      // Introduce a scope for this partial solution.
+      ConstraintSystem::SolverScope scope(cs);
+      llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
+          partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
+
+      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
+    }
+
+    // Put the constraints back into their original bucket.
+    Constraints.splice(Constraints.end(), cs.InactiveConstraints);
+    return failed;
+  }
+
+  bool operator<(const ConstraintBucket &other) const {
+    return NumDisjunctions < other.NumDisjunctions;
   }
 };
 } // end namespace constraints
