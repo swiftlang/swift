@@ -8,71 +8,71 @@
 import Foundation
 import gizmo
 
-// CHECK: @_T0So16NSRuncingOptionsOWV = linkonce_odr hidden constant
-// CHECK: @_T0So16NSRuncingOptionsOMn = linkonce_odr hidden constant
-// CHECK: @_T0So16NSRuncingOptionsON = linkonce_odr hidden global
-// CHECK: @_T0So28NeverActuallyMentionedByNameOs9Equatable5gizmoWP = linkonce_odr hidden constant
+// CHECK: @_T0SC16NSRuncingOptionsOWV = linkonce_odr hidden constant
+// CHECK: @_T0SC16NSRuncingOptionsOMn = linkonce_odr hidden constant
+// CHECK: @_T0SC16NSRuncingOptionsON = linkonce_odr hidden global
+// CHECK: @_T0SC28NeverActuallyMentionedByNameOs9Equatable5gizmoWP = linkonce_odr hidden constant
 
 // CHECK-LABEL: define{{( protected)?}} i32 @main
-// CHECK:         call %swift.type* @_T0So16NSRuncingOptionsOMa()
+// CHECK:         call %swift.type* @_T0SC16NSRuncingOptionsOMa()
 
-// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_aSo16NSRuncingOptionsOyF()
+// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_aSC16NSRuncingOptionsOyF()
 // CHECK:   ret i16 123
 func imported_enum_inject_a() -> NSRuncingOptions {
   return .mince
 }
 
-// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_bSo16NSRuncingOptionsOyF()
+// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_bSC16NSRuncingOptionsOyF()
 // CHECK:   ret i16 4567
 func imported_enum_inject_b() -> NSRuncingOptions {
   return .quinceSliced
 }
 
-// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_cSo16NSRuncingOptionsOyF()
+// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_cSC16NSRuncingOptionsOyF()
 // CHECK:   ret i16 5678
 func imported_enum_inject_c() -> NSRuncingOptions {
   return .quinceJulienned
 }
 
-// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_dSo16NSRuncingOptionsOyF()
+// CHECK: define hidden swiftcc i16 @_T012objc_ns_enum09imported_C9_inject_dSC16NSRuncingOptionsOyF()
 // CHECK:   ret i16 6789
 func imported_enum_inject_d() -> NSRuncingOptions {
   return .quinceDiced
 }
 
-// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C17_inject_radixed_aSo16NSRadixedOptionsOyF() {{.*}} {
+// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C17_inject_radixed_aSC16NSRadixedOptionsOyF() {{.*}} {
 // -- octal 0755
 // CHECK:   ret i32 493
 func imported_enum_inject_radixed_a() -> NSRadixedOptions {
   return .octal
 }
 
-// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C17_inject_radixed_bSo16NSRadixedOptionsOyF() {{.*}} {
+// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C17_inject_radixed_bSC16NSRadixedOptionsOyF() {{.*}} {
 // -- hex 0xFFFF
 // CHECK:   ret i32 65535
 func imported_enum_inject_radixed_b() -> NSRadixedOptions {
   return .hex
 }
 
-// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C18_inject_negative_aSo17NSNegativeOptionsOyF() {{.*}} {
+// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C18_inject_negative_aSC17NSNegativeOptionsOyF() {{.*}} {
 // CHECK:   ret i32 -1
 func imported_enum_inject_negative_a() -> NSNegativeOptions {
   return .foo
 }
 
-// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C18_inject_negative_bSo17NSNegativeOptionsOyF() {{.*}} {
+// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C18_inject_negative_bSC17NSNegativeOptionsOyF() {{.*}} {
 // CHECK:   ret i32 -2147483648
 func imported_enum_inject_negative_b() -> NSNegativeOptions {
   return .bar
 }
 
-// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C27_inject_negative_unsigned_aSo25NSNegativeUnsignedOptionsOyF() {{.*}} {
+// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C27_inject_negative_unsigned_aSC25NSNegativeUnsignedOptionsOyF() {{.*}} {
 // CHECK:   ret i32 -1
 func imported_enum_inject_negative_unsigned_a() -> NSNegativeUnsignedOptions {
   return .foo
 }
 
-// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C27_inject_negative_unsigned_bSo25NSNegativeUnsignedOptionsOyF() {{.*}} {
+// CHECK: define hidden swiftcc i32 @_T012objc_ns_enum09imported_C27_inject_negative_unsigned_bSC25NSNegativeUnsignedOptionsOyF() {{.*}} {
 // CHECK:   ret i32 -2147483648
 func imported_enum_inject_negative_unsigned_b() -> NSNegativeUnsignedOptions {
   return .bar
@@ -85,8 +85,8 @@ func test_enum_without_name_Equatable(_ obj: TestThatEnumType) -> Bool {
 func use_metadata<T>(_ t:T){}
 use_metadata(NSRuncingOptions.mince)
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0So16NSRuncingOptionsOMa()
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0So16NSRuncingOptionsON {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0SC16NSRuncingOptionsOMa()
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0SC16NSRuncingOptionsON {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 @objc enum ExportedToObjC: Int {
   case Foo = -1, Bar, Bas

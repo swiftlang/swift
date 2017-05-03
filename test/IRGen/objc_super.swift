@@ -14,7 +14,7 @@ import gizmo
 // CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type
-// CHECK: [[NSRECT:%TSo6NSRectV]] = type
+// CHECK: [[NSRECT:%TSC6NSRectV]] = type
 
 class Hoozit : Gizmo {
   // CHECK: define hidden swiftcc void @_T010objc_super6HoozitC4frobyyF([[HOOZIT]]* swiftself) {{.*}} {
@@ -37,7 +37,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSo6NSRectVyF(%T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSC6NSRectVyF(%T10objc_super6HoozitC* swiftself) {{.*}} {
   override func frame() -> NSRect {
     // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*

@@ -18,9 +18,9 @@ public protocol Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE:%swift.protocol\* @_T033protocol_conformance_records_objc8RuncibleMp]]
 // -- type metadata
-// CHECK:           @_T0So6NSRectVN
+// CHECK:           @_T0SC6NSRectVN
 // -- witness table
-// CHECK:           @_T0So6NSRectV33protocol_conformance_records_objc8RuncibleACWP
+// CHECK:           @_T0SC6NSRectV33protocol_conformance_records_objc8RuncibleACWP
 // -- flags 0x02: nonunique direct metadata
 // CHECK:           i32 2 },
 extension NSRect: Runcible {

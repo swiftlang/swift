@@ -39,9 +39,9 @@ namespace swift {
   static const char LLDB_EXPRESSIONS_MODULE_NAME_PREFIX[] = "__lldb_expr_";
 
   /// The name of the fake module used to hold imported Objective-C things.
-  static const char MANGLING_MODULE_OBJC[] = "__C";
-  /// The name of the fake module used to hold synthesized ClangImporter things.
-  static const char MANGLING_MODULE_CLANG_IMPORTER[] = "__C_Synthesized";
+  static const char MANGLING_MODULE_OBJC[] = "__ObjC";
+  /// The name of the fake module used to hold imported C things.
+  static const char MANGLING_MODULE_C[] = "__C";
 } // end namespace swift
 
 #endif // SWIFT_STRINGS_H
