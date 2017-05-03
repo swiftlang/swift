@@ -51,12 +51,14 @@ extension CodingA.NestedD: NSCoding { // okay
 
 // Generic classes
 class CodingB<T> : NSObject, NSCoding {   // expected-error{{generic class 'CodingB<T>' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{generic classes should not be archived directly}}{{1-1=@NSKeyedArchiveSubclassesOnly}}
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
 extension CodingB {
   class NestedA : NSObject, NSCoding { // expected-error{{generic class 'CodingB<T>.NestedA' has an unstable name when archiving via 'NSCoding'}}
+    // expected-note@-1{{generic classes should not be archived directly}}{{3-3=@NSKeyedArchiveSubclassesOnly}}
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
@@ -90,6 +92,7 @@ func someFunction() {
 
 // Inherited conformances.
 class CodingE<T> : CodingB<T> {   // expected-error{{generic class 'CodingE<T>' has an unstable name when archiving via 'NSCoding'}}
+    // expected-note@-1{{generic classes should not be archived directly}}{{1-1=@NSKeyedArchiveSubclassesOnly}}
   required init(coder: NSCoder) { super.init(coder: coder) }
   override func encode(coder: NSCoder) { }
 }
@@ -101,6 +104,12 @@ extension CodingA {
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
+}
+
+@NSKeyedArchiveSubclassesOnly
+class CodingGeneric<T> : NSObject, NSCoding {
+  required init(coder: NSCoder) { }
+  func encode(coder: NSCoder) { }
 }
 
 @NSKeyedArchiveLegacy("TheCodingF")

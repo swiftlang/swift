@@ -6071,6 +6071,7 @@ public:
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(NSKeyedArchiveLegacy)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
+    UNINTERESTING_ATTR(NSKeyedArchiveSubclassesOnly)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
