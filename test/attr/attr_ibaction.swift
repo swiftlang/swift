@@ -123,3 +123,10 @@ protocol CP2 : class { }
   // expected-note@-2{{non-'@objc' enums cannot be represented in Objective-C}}
   init() { }
 }
+
+
+import ObjectiveC
+class Y: NSObject {
+    @IBAction private func foo(sender: AnyObject?) {}
+}
+let yFoo = #selector(Y.foo)

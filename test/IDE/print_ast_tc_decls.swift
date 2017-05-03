@@ -529,7 +529,7 @@ class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @IBAction func anAction(_: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}

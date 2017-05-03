@@ -2277,7 +2277,8 @@ public:
   /// In that case it was inferred by the type checker and set with a call to
   /// markAsObjC().
   bool isObjC() const {
-    return getAttrs().hasAttribute<ObjCAttr>();
+    return getAttrs().hasAttribute<ObjCAttr>() ||
+      getAttrs().hasAttribute<IBActionAttr>();
   }
   
   void setIsObjC(bool Value);
