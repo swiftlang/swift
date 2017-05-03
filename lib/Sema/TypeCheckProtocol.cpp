@@ -5944,10 +5944,15 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                : diag::nscoding_unstable_mangled_name,
                    *kind, classDecl->TypeDecl::getDeclaredInterfaceType());
           if (isFixable) {
-            diagnose(classDecl, diag::add_nskeyedarchivelegacy_attr)
-              .fixItInsert(
-                classDecl->getAttributeInsertionLoc(/*forModifier=*/false),
-                "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
+            auto insertionLoc =
+              classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
+            diagnose(classDecl, diag::unstable_mangled_name_add_objc)
+              .fixItInsert(insertionLoc,
+                           "@objc(<#Objective-C class name#>)");
+            diagnose(classDecl,
+                     diag::unstable_mangled_name_add_nskeyedarchivelegacy)
+              .fixItInsert(insertionLoc,
+                           "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
           }
         }
 
