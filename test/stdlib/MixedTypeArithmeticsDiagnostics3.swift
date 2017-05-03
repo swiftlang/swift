@@ -33,3 +33,9 @@ func mixedTypeArithemtics() {
     x += (42 as Int)
   }
 }
+
+func radar31909031() {
+  let x = UInt64()
+  let y = UInt64()
+  _ = (x - y) < UInt64(42) // should not produce a mixed-type warning
+}
