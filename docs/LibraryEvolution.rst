@@ -948,6 +948,7 @@ Finally, classes allow the following changes that do not apply to structs:
   marked ``open`` if it is not already marked ``final``.
 - Any public method, subscript, or property may be marked ``final`` if it is not
   already marked ``open``.
+- ``final`` may always be removed from a class, method, subscript, or property.
 - ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
   without providing any extra version information. Removing any of these is
   a `binary-compatible source-breaking change` if the member remains ``@objc``,
@@ -972,10 +973,9 @@ Finally, classes allow the following changes that do not apply to structs:
 
 .. admonition:: TODO
 
-    Both ``final`` and ``open`` may be applied to a declaration after it has
-    been made public. However, these need to be treated as
-    `versioned attributes <versioned attribute>`. It's not clear what syntax
-    should be used for this.
+    ``open`` may be applied to a declaration after it has been made public.
+    However, it needs to be treated as a `versioned attribute`. It's not clear
+    what syntax should be used for this.
 
 .. _NSCollectionViewItem: https://developer.apple.com/library/mac/documentation/Cocoa/Reference/NSCollectionViewItem_Class/index.html
 
@@ -983,13 +983,8 @@ Other than those detailed above, no other changes to a class or its members
 are permitted. In particular:
 
 - ``open`` may not be removed from a class or its members.
-- ``final`` may not be removed from a class or its members. (The presence of
-  ``final`` enables optimization.)
 - ``dynamic`` may not be added to *or* removed from any members. Existing
   clients would not know to invoke the member dynamically.
-- A ``final`` override of a member may *not* be removed, even if the type
-  matches exactly; existing clients may be performing a direct call to the
-  implementation instead of using dynamic dispatch.
 - ``@objc`` and ``@nonobjc`` may not be added to or removed from the class or
   any existing members.
 - ``@NSManaged`` may not be added to or removed from any existing members.
@@ -1105,11 +1100,11 @@ behaves as described for struct subscripts.
 Possible Restrictions on Classes
 --------------------------------
 
-In addition to ``final``, it may be useful to restrict the stored properties of
-a class instance, like `Fixed-Contents Structs`_. However, there are open
-questions about how this would actually work, and the compiler still wouldn't
-be able to make much use of the information, because classes from other
-libraries must almost always be allocated on the heap.
+In addition to non-``open`` classes, it may be useful to restrict the stored
+properties of a class instance, like `Fixed-Contents Structs`_. However, there
+are open questions about how this would actually work, and the compiler still
+wouldn't be able to make much use of the information, because classes from
+other libraries must almost always be allocated on the heap.
 
 The design of this annotation is not covered by this document. As a purely
 additive feature, it can be added to the model at any time.
@@ -1235,7 +1230,7 @@ clients require its presence as well.
 
 Because a versioned class member may eventually be made ``open``, it must be
 assumed that new overrides may eventually appear from outside the module if the
-class is marked ``open`` unless the member is marked ``final``.
+class is marked ``open``.
 
 Non-public conformances are never considered versioned, even if both the
 conforming type and the protocol are versioned. A conformance is considered
@@ -1644,10 +1639,9 @@ document that affect language semantics:
 
 - `SE-0030 Property Behaviors`_
 - (draft) `Overridable methods in extensions`_
-- `SE-0117 Allow Allow distinguishing between public access and public overridability <SE-0117>`_
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
-- (planned) `Generalized existentials (values of protocol type) <Generics>`_
+- (planned) `Generalized existentials (values of protocol type)`_
 - (planned) Open and closed enums
 - (planned) Removing the "constant" guarantee for 'let' across module boundaries
 - (planned) Syntax for declaring "versioned" entities and their features
@@ -1660,8 +1654,7 @@ document that affect language semantics:
 
 .. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
 .. _Overridable methods in extensions: https://github.com/jrose-apple/swift-evolution/blob/overridable-members-in-extensions/proposals/nnnn-overridable-members-in-extensions.md
-.. _SE-0117: https://github.com/apple/swift-evolution/blob/master/proposals/0117-non-public-subclassable-by-default.md
-.. _Generics: https://github.com/apple/swift/blob/master/docs/GenericsManifesto.md#generalized-existentials
+.. _Generalized existentials (values of protocol type): https://github.com/apple/swift/blob/master/docs/GenericsManifesto.md#generalized-existentials
 
 This does not mean all of these proposals need to be accepted, only that their
 acceptance or rejection will affect this document.
