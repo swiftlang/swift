@@ -55,6 +55,7 @@ struct APIDiffItem {
   virtual APIDiffItemKind getKind() const = 0;
   virtual StringRef getKey() const = 0;
   virtual ~APIDiffItem() = default;
+  bool operator==(const APIDiffItem &Other) const;
 };
 
 // CommonDiffItem describes how an element in SDK evolves in a way that migrator can
