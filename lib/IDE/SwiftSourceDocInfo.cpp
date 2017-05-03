@@ -649,6 +649,8 @@ public:
   }
 
   void analyze(ASTNode Node) {
+    if (!shouldAnalyze(Node))
+      return;
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
@@ -675,16 +677,12 @@ public:
       break;
     }
 
-    // If the node's parent is not contained in the range under question but the
-    // node itself is, we keep track of the node as top-level contained node.
-    if (!getCurrentDC().ContainedInRange &&
-        isContainedInSelection(CharSourceRange(SM, Node.getStartLoc(),
-                                               Node.getEndLoc()))) {
-      if (std::find_if(ContainedASTNodes.begin(), ContainedASTNodes.end(),
-          [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
-            Node.getSourceRange()); }) == ContainedASTNodes.end()) {
-        ContainedASTNodes.push_back(Node);
-      }
+    // If no parent is considered as a contained node; this node should be
+    // a top-level contained node.
+    if (std::none_of(ContainedASTNodes.begin(), ContainedASTNodes.end(),
+      [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
+                                               Node.getSourceRange()); })) {
+      ContainedASTNodes.push_back(Node);
     }
 
     if (DCInfo.isMultiStatement()) {
@@ -709,6 +707,18 @@ public:
     if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
       return false;
     if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
+      return false;
+    return true;
+  }
+
+  bool shouldAnalyze(ASTNode Node) {
+    // Avoid analyzing implicit nodes.
+    if (Node.isImplicit())
+      return false;
+    // Avoid analyzing nodes that are not enclosed.
+    if (SM.isBeforeInBuffer(End, Node.getEndLoc()))
+      return false;
+    if (SM.isBeforeInBuffer(Node.getStartLoc(), Start))
       return false;
     return true;
   }
