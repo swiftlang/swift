@@ -138,10 +138,50 @@ static bool containsLargeLoadable(GenericEnvironment *GenericEnv,
   return false;
 }
 
-// Forward declaration - two functions depend on each other
+// Forward declarations - functions depend on each other
 static SmallVector<SILParameterInfo, 4>
 getNewArgTys(GenericEnvironment *GenericEnv, ArrayRef<SILParameterInfo> params,
              irgen::IRGenModule &Mod);
+static SILType getNewSILType(GenericEnvironment *GenericEnv,
+                             SILType storageType, irgen::IRGenModule &Mod);
+
+static bool newResultsDiffer(GenericEnvironment *GenericEnv,
+                             ArrayRef<SILResultInfo> origResults,
+                             irgen::IRGenModule &Mod) {
+  SmallVector<SILResultInfo, 2> newResults;
+  for (auto result : origResults) {
+    SILType currResultTy = result.getSILStorageType();
+    SILType newSILType = getNewSILType(GenericEnv, currResultTy, Mod);
+    // We (currently) only care about function signatures
+    if (!isLargeLoadableType(GenericEnv, currResultTy, Mod) &&
+        (newSILType != currResultTy)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static SmallVector<SILResultInfo, 2>
+getNewResults(GenericEnvironment *GenericEnv,
+              ArrayRef<SILResultInfo> origResults, irgen::IRGenModule &Mod) {
+  // Get new SIL Function results - same as old results UNLESS:
+  // Function type results might have a different signature
+  SmallVector<SILResultInfo, 2> newResults;
+  for (auto result : origResults) {
+    SILType currResultTy = result.getSILStorageType();
+    SILType newSILType = getNewSILType(GenericEnv, currResultTy, Mod);
+    // We (currently) only care about function signatures
+    if (!isLargeLoadableType(GenericEnv, currResultTy, Mod) &&
+        (newSILType != currResultTy)) {
+      SILResultInfo newResult(newSILType.getSwiftRValueType(),
+                              result.getConvention());
+      newResults.push_back(newResult);
+    } else {
+      newResults.push_back(result);
+    }
+  }
+  return newResults;
+}
 
 static SILFunctionType *
 getNewSILFunctionTypePtr(GenericEnvironment *GenericEnv,
@@ -150,13 +190,13 @@ getNewSILFunctionTypePtr(GenericEnvironment *GenericEnv,
   assert(modifiableFunction(CanSILFunctionType(currSILFunctionType)));
   SmallVector<SILParameterInfo, 4> newArgTys =
       getNewArgTys(GenericEnv, currSILFunctionType->getParameters(), Mod);
-  SILFunctionType *newSILFunctionType =
-      SILFunctionType::get(currSILFunctionType->getGenericSignature(),
-                           currSILFunctionType->getExtInfo(),
-                           currSILFunctionType->getCalleeConvention(),
-                           newArgTys, currSILFunctionType->getResults(),
-                           currSILFunctionType->getOptionalErrorResult(),
-                           currSILFunctionType->getASTContext());
+  SILFunctionType *newSILFunctionType = SILFunctionType::get(
+      currSILFunctionType->getGenericSignature(),
+      currSILFunctionType->getExtInfo(),
+      currSILFunctionType->getCalleeConvention(), newArgTys,
+      getNewResults(GenericEnv, currSILFunctionType->getResults(), Mod),
+      currSILFunctionType->getOptionalErrorResult(),
+      currSILFunctionType->getASTContext());
   return newSILFunctionType;
 }
 
@@ -430,6 +470,13 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
       return;
     }
   }
+  SILType currType = applySite.getType();
+  SILType newType = getNewSILType(genEnv, currType, pass.Mod);
+  // We only care about function type results
+  if (!isLargeLoadableType(genEnv, currType, pass.Mod) &&
+      (currType != newType)) {
+    pass.applies.push_back(applySite.getInstruction());
+  }
 }
 
 static bool isMethodInstUnmodifiable(MethodInst *instr) {
@@ -480,6 +527,9 @@ void LargeValueVisitor::visitMethodInst(MethodInst *instr) {
                             pass.Mod)) {
     pass.methodInstsToMod.push_back(instr);
     return;
+  }
+  if (newResultsDiffer(genEnv, currSILFunctionType->getResults(), pass.Mod)) {
+    pass.methodInstsToMod.push_back(instr);
   }
 }
 
