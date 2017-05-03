@@ -123,7 +123,7 @@
                 "swiftpm": "master",
                 "compiler-rt": "swift-4.0-branch",
                 "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
+                "swift-corelibs-foundation": "swift-4.0-branch",
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
