@@ -2071,8 +2071,106 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createUnreachable(Loc);
     break;
   }
+  case ValueKind::KeyPathInst: {
+    unsigned nextValue = 0;
+    SILType kpTy
+      = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+
+    auto rootTy = MF->getType(ListOfValues[nextValue++]);
+    auto valueTy = MF->getType(ListOfValues[nextValue++]);
+    auto numComponents = ListOfValues[nextValue++];
+    auto numOperands = ListOfValues[nextValue++];
+    assert(numOperands == 0 && "operands not implemented yet");
+    auto numSubstitutions = ListOfValues[nextValue++];
+    auto objcString = MF->getIdentifier(ListOfValues[nextValue++]).str();
+    auto numGenericParams = ListOfValues[nextValue++];
+    
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    while (numGenericParams-- > 0) {
+      genericParams.push_back(MF->getType(ListOfValues[nextValue++])
+                                ->castTo<GenericTypeParamType>());
+    }
+    
+    SmallVector<KeyPathPatternComponent, 4> components;
+    while (numComponents-- > 0) {
+      auto kind =
+        (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
+      auto type = MF->getType(ListOfValues[nextValue++])
+        ->getCanonicalType();
+      
+      auto handleComputedId =
+      [&]() -> KeyPathPatternComponent::ComputedPropertyId {
+        auto kind =
+          (KeyPathComputedComponentIdKindEncoding)ListOfValues[nextValue++];
+        switch (kind) {
+        case KeyPathComputedComponentIdKindEncoding::Property:
+          return cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
+        case KeyPathComputedComponentIdKindEncoding::Function: {
+          auto name = MF->getIdentifier(ListOfValues[nextValue++]);
+          return getFuncForReference(name.str());
+        }
+        case KeyPathComputedComponentIdKindEncoding::DeclRef: {
+          // read SILDeclRef
+          return getSILDeclRef(MF, ListOfValues, nextValue);
+        }
+        }
+      };
+      
+      switch (kind) {
+      case KeyPathComponentKindEncoding::StoredProperty: {
+        auto decl = cast<VarDecl>(MF->getDecl(ListOfValues[nextValue++]));
+        components.push_back(
+          KeyPathPatternComponent::forStoredProperty(decl, type));
+        break;
+      }
+      case KeyPathComponentKindEncoding::GettableProperty: {
+        auto id = handleComputedId();
+        auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
+        auto getter = getFuncForReference(getterName.str());
+        components.push_back(
+          KeyPathPatternComponent::forComputedGettableProperty(id, getter, {},
+                                                               type));
+        break;
+      }
+      case KeyPathComponentKindEncoding::SettableProperty: {
+        auto id = handleComputedId();
+        auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
+        auto getter = getFuncForReference(getterName.str());
+        auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
+        auto setter = getFuncForReference(setterName.str());
+        components.push_back(
+          KeyPathPatternComponent::forComputedSettableProperty(id,
+                                                               getter, setter,
+                                                               {}, type));
+        break;
+      }
+      }
+    }
+    
+    SmallVector<Requirement, 4> requirements;
+    MF->readGenericRequirements(requirements, SILCursor);
+    
+    SmallVector<Substitution, 4> substitutions;
+    while (numSubstitutions-- > 0) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      substitutions.push_back(*sub);
+    }
+    
+    CanGenericSignature sig = nullptr;
+    if (!genericParams.empty() || !requirements.empty())
+      sig = GenericSignature::get(genericParams, requirements)
+         ->getCanonicalSignature();
+    
+    auto pattern = KeyPathPattern::get(SILMod, sig,
+                                       rootTy->getCanonicalType(),
+                                       valueTy->getCanonicalType(),
+                                       components,
+                                       objcString);
+    
+    ResultVal = Builder.createKeyPath(Loc, pattern, substitutions, kpTy);
+    break;
+  }
   case ValueKind::MarkUninitializedBehaviorInst:
-  case ValueKind::KeyPathInst:
     llvm_unreachable("todo");
   }
 
