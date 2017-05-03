@@ -190,6 +190,28 @@ bool swift::ide::api::NAME::classof(const APIDiffItem *D) {                    \
 }
 #include "swift/IDE/DigesterEnums.def"
 
+bool APIDiffItem::operator==(const APIDiffItem &Other) const {
+  if (getKind() != Other.getKind())
+    return false;
+  if (getKey() != Other.getKey())
+    return false;
+  switch(getKind()) {
+  case APIDiffItemKind::ADK_CommonDiffItem: {
+    auto *Left = static_cast<const CommonDiffItem*>(this);
+    auto *Right = static_cast<const CommonDiffItem*>(&Other);
+    return Left->ChildIndex == Right->ChildIndex;
+  }
+  case APIDiffItemKind::ADK_NoEscapeFuncParam: {
+    auto *Left = static_cast<const NoEscapeFuncParam*>(this);
+    auto *Right = static_cast<const NoEscapeFuncParam*>(&Other);
+    return Left->Index == Right->Index;
+  }
+  case APIDiffItemKind::ADK_TypeMemberDiffItem:
+  case APIDiffItemKind::ADK_OverloadedFuncInfo:
+    llvm_unreachable("should be handled above.");
+  }
+}
+
 namespace {
 enum class DiffItemKeyKind {
 #define DIFF_ITEM_KEY_KIND(NAME) KK_##NAME,
@@ -392,8 +414,12 @@ public:
       for (auto It = Array->begin(); It != Array->end(); ++ It) {
         APIDiffItem *Item = serializeDiffItem(Allocator,
           cast<llvm::yaml::MappingNode>(&*It));
-        Data[Item->getKey()].push_back(Item);
-        AllItems.push_back(Item);
+        auto &Bag = Data[Item->getKey()];
+        if(std::find_if(Bag.begin(), Bag.end(),
+            [&](APIDiffItem* I) { return *Item == *I; }) == Bag.end()) {
+          Bag.push_back(Item);
+          AllItems.push_back(Item);
+        }
       }
     }
 
