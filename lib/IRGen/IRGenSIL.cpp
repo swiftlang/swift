@@ -274,11 +274,6 @@ public:
     return kind == Kind::BoxWithAddress;
   }
   
-  Address getAddress() const {
-    assert(kind == Kind::Address && "not an allocated address");
-    return address.getAddress();
-  }
-
   StackAddress getStackAddress() const {
     assert(kind == Kind::Address && "not an allocated address");
     return address;
@@ -300,6 +295,17 @@ public:
   const DynamicallyEnforcedAddress &getDynamicallyEnforcedAddress() const {
     assert(kind == Kind::DynamicallyEnforcedAddress);
     return dynamicallyEnforcedAddress;
+  }
+
+  Address getAnyAddress() const {
+    if (kind == LoweredValue::Kind::Address) {
+      return address.getAddress();
+    } else if (kind == LoweredValue::Kind::ContainedAddress) {
+      return getAddressInContainer();
+    } else {
+      assert(kind == LoweredValue::Kind::DynamicallyEnforcedAddress);
+      return getDynamicallyEnforcedAddress().Addr;
+    }
   }
   
   void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
@@ -559,15 +565,7 @@ public:
   /// Get the Address of a SIL value of address type, which must have been
   /// lowered.
   Address getLoweredAddress(SILValue v) {
-    auto &&lv = getLoweredValue(v);
-    if (lv.kind == LoweredValue::Kind::Address) {
-      return lv.getAddress();
-    } else if (lv.kind == LoweredValue::Kind::ContainedAddress) {
-      return lv.getAddressInContainer();
-    } else {
-      assert(lv.kind == LoweredValue::Kind::DynamicallyEnforcedAddress);
-      return lv.getDynamicallyEnforcedAddress().Addr;
-    }
+    return getLoweredValue(v).getAnyAddress();
   }
 
   StackAddress getLoweredStackAddress(SILValue v) {
@@ -2624,14 +2622,13 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
                                               OperandValueArrayRef args) {
   unsigned phiIndex = 0;
   for (SILValue arg : args) {
-    const LoweredValue &lv = IGF.getLoweredValue(arg);
-  
-    if (lv.isAddress()) {
-      addIncomingAddressToPHINodes(IGF, lbb, phiIndex, lv.getAddress());
+    if (arg->getType().isAddress()) {
+      addIncomingAddressToPHINodes(IGF, lbb, phiIndex,
+                                   IGF.getLoweredAddress(arg));
       continue;
     }
     
-    Explosion argValue = lv.getExplosion(IGF);
+    Explosion argValue = IGF.getLoweredExplosion(arg);
     addIncomingExplosionToPHINodes(IGF, lbb, phiIndex, argValue);
   }
 }
@@ -4648,16 +4645,18 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   // Get the value we're testing, which may be a function, an address or an
   // instance pointer.
   llvm::Value *val;
-  const LoweredValue &lv = getLoweredValue(i->getOperand());
-  
-  if (i->getOperand()->getType().is<SILFunctionType>()) {
-    Explosion values = lv.getExplosion(*this);
-    val = values.claimNext();   // Function pointer.
-    values.claimNext();         // Ignore the data pointer.
-  } else if (lv.isAddress()) {
-    val = lv.getAddress().getAddress();
+
+  SILValue operand = i->getOperand();
+  auto type = operand->getType();
+  if (type.isAddress()) {
+    val = getLoweredAddress(operand).getAddress();
+  } else if (auto fnType = type.getAs<SILFunctionType>()) {
+    Explosion values = getLoweredExplosion(operand);
+    val = values.claimNext();    // Function pointer.
+    if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Thick)
+      (void) values.claimNext(); // Ignore the data pointer.
   } else {
-    Explosion values = lv.getExplosion(*this);
+    Explosion values = getLoweredExplosion(operand);
     val = values.claimNext();
   }
   
@@ -5050,7 +5049,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
       setAllocatedAddressForBuffer(i->getDest(), addr);
     }
   } else {
-    Address dest = loweredDest.getAddress();
+    Address dest = loweredDest.getAnyAddress();
     
     if (i->isInitializationOfDest()) {
       if (i->isTakeOfSrc()) {
