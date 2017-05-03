@@ -112,13 +112,21 @@ public func ⨁= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
   lhs.formSymmetricDifference(rhs)
 }
 
-/// - Returns: True if `x` is in the set.
-public func ∈ <T>(x: T, rhs: Set<T>) -> Bool {
+/// - Returns: True if `x` is in the sequence.
+public func ∈ <T : SequenceType where T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
+  return rhs.contains(x)
+}
+/// - Returns: True if `x` is in the interval.
+public func ∈ <T : IntervalType>(x: T.Bound, rhs: T) -> Bool {
   return rhs.contains(x)
 }
 
-/// - Returns: True if `x` is not in the set.
-public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
+/// - Returns: True if `x` is not in the sequence.
+public func ∉ <T : SequenceType where T.Generator.Element : Equatable>(x: T.Generator.Element, rhs: T) -> Bool {
+  return !rhs.contains(x)
+}
+/// - Returns: True if `x` is not in the interval.
+public func ∉ <T : IntervalType>(x: T.Bound, rhs: T) -> Bool {
   return !rhs.contains(x)
 }
 
