@@ -267,7 +267,7 @@ func breakContinue(_ x : Int) -> Int {
 Outer:
   for _ in 0...1000 {
 
-  Switch: // expected-error {{switch must be exhaustive, consider adding a default clause:}}
+  Switch: // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
   switch x {
     case 42: break Outer
     case 97: continue Outer
@@ -299,7 +299,7 @@ Loop:  // expected-note {{previously declared here}}
   let x : Int? = 42
   
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
-  switch x { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  switch x { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.some(_)'}}
   case .some(42): break
   case nil: break
@@ -452,7 +452,7 @@ enum Type {
   case Bar
 }
 func r25178926(_ a : Type) {
-  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo, .Bar where 1 != 100:
     // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
@@ -461,20 +461,20 @@ func r25178926(_ a : Type) {
     break
   }
 
-  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo: break
   case .Bar where 1 != 100: break
   }
 
-  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo,  // no warn
        .Bar where 1 != 100:
     break
   }
 
-  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Foo'}}
   // expected-note@-2 {{missing case: '.Bar'}}
   case .Foo where 1 != 100, .Bar where 1 != 100:
