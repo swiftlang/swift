@@ -33,7 +33,7 @@ write fewer explicit type conversions.
 Importing ``size_t`` as a signed ``Int`` type would not be a problem for 64-bit
 platforms.  The only concern is about 32-bit platforms, and only about
 operating on array-like data structures that span more than half of the address
-space.  Even today, in 2015, there are enough 32-bit platforms that are still
+space.  Even today there are enough 32-bit platforms that are still
 interesting, and x32 ABIs for 64-bit CPUs are also important.  We agree that
 32-bit platforms are important, but the usecase for an unsigned ``size_t`` on
 32-bit platforms is pretty marginal, and for code that nevertheless needs to do
