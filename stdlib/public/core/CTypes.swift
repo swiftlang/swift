@@ -206,6 +206,8 @@ extension CVaListPointer : CustomDebugStringConvertible {
   }
 }
 
+@_versioned
+@_inlineable
 func _memcpy(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeMutableRawPointer,
