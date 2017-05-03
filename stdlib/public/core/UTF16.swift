@@ -9,7 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+extension _Unicode {
+  public enum UTF16 {
+  case _swift3Buffer(_Unicode.UTF16.ForwardParser)
+  }
+}
+
 extension _Unicode.UTF16 : UnicodeEncoding {
+  public typealias CodeUnit = UInt16
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
   public static var encodedReplacementCharacter : EncodedScalar {
@@ -37,8 +44,8 @@ extension _Unicode.UTF16 : UnicodeEncoding {
     }
     let x1 = x - (1 << 16)
     var r = (0xdc00 + (x1 & 0x3ff))
-    r <<= 16
-    r |= (0xd800 + (x1 >> 10 & 0x3ff))
+    r &<<= 16
+    r |= (0xd800 + (x1 &>> 10 & 0x3ff))
     return EncodedScalar(_storage: r, _bitCount: 32)
   }
   
