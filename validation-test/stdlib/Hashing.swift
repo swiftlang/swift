@@ -113,5 +113,6 @@ HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
   _HashingDetail.fixedSeedOverride = 0
 }
 
+_HashingDetail.fixedSeedOverride = 42
 runAllTests()
 
