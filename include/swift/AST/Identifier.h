@@ -71,17 +71,21 @@ public:
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
-  /// FIXME: We should maybe cache this.
+  /// The result is cached once calculated, since the check isn't trivial.
   bool isOperator() const {
-    if (empty())
-      return false;
-    if (isEditorPlaceholder())
-      return false;
-    if ((unsigned char)Pointer[0] < 0x80)
-      return isOperatorStartCodePoint((unsigned char)Pointer[0]);
-
-    // Handle the high unicode case out of line.
-    return isOperatorSlow();
+    if (isOperatorCachedKnown)
+      return isOperatorCached;
+      
+    if (empty() || isEditorPlaceholder())
+      isOperatorCached = false;
+    else if ((unsigned char)Pointer[0] < 0x80)
+      isOperatorCached = isOperatorStartCodePoint((unsigned char)Pointer[0]);
+    else
+      // Handle the high unicode case out of line.
+      isOperatorCached = isOperatorSlow();
+    
+    isOperatorCachedKnown = true;
+    return isOperatorCached;
   }
   
   /// isOperatorStartCodePoint - Return true if the specified code point is a
@@ -158,6 +162,8 @@ public:
 
 private:
   bool isOperatorSlow() const;
+  mutable bool isOperatorCached;
+  mutable bool isOperatorCachedKnown = false;
 };
   
 class DeclName;
