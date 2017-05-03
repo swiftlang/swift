@@ -9,13 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// ELF specific image inspection routines.
-//
+///
+/// \file
+///
+/// ELF specific image inspection routines.
+///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_IMAGE_INSPECTION_ELF_H
-#define SWIFT_RUNTIME_IMAGE_INSPECTION_ELF_H
+#ifndef SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
+#define SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
 
 #if defined(__ELF__) || defined(__ANDROID__)
 
