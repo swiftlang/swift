@@ -1119,3 +1119,99 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
       });
   }
 }
+
+TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  testTable.size = sizeof(ValueBuffer);
+  testTable.flags = ValueWitnessFlags()
+    .withAlignment(alignof(ValueBuffer))
+    .withPOD(true)
+    .withBitwiseTakable(true)
+    .withInlineStorage(true);
+  testTable.stride = sizeof(ValueBuffer);
+  installCommonValueWitnesses(&testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  testTable2.size = sizeof(ValueBuffer);
+  testTable2.flags = ValueWitnessFlags()
+    .withAlignment(alignof(ValueBuffer))
+    .withPOD(true)
+    .withBitwiseTakable(true)
+    .withInlineStorage(true);
+  testTable2.stride = sizeof(ValueBuffer);
+  installCommonValueWitnesses(&testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  void *zeroPtr = nullptr;
+  void *otherPtr = &zeroPtr;
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox{{{zeroPtr, zeroPtr, zeroPtr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{otherPtr, otherPtr, zeroPtr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+  EXPECT_EQ(existBox.type, metadata2);
+  EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], otherPtr);
+  EXPECT_EQ(existBox.buffer.PrivateData[1], otherPtr);
+  EXPECT_EQ(existBox.buffer.PrivateData[2], zeroPtr);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithTake_pod) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  testTable.size = sizeof(ValueBuffer);
+  testTable.flags = ValueWitnessFlags()
+    .withAlignment(alignof(ValueBuffer))
+    .withPOD(true)
+    .withBitwiseTakable(true)
+    .withInlineStorage(true);
+  testTable.stride = sizeof(ValueBuffer);
+  installCommonValueWitnesses(&testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  testTable2.size = sizeof(ValueBuffer);
+  testTable2.flags = ValueWitnessFlags()
+    .withAlignment(alignof(ValueBuffer))
+    .withPOD(true)
+    .withBitwiseTakable(true)
+    .withInlineStorage(true);
+  testTable2.stride = sizeof(ValueBuffer);
+  installCommonValueWitnesses(&testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  void *zeroPtr = nullptr;
+  void *otherPtr = &zeroPtr;
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox{{{zeroPtr, zeroPtr, zeroPtr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{otherPtr, otherPtr, zeroPtr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+  EXPECT_EQ(existBox.type, metadata2);
+  EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], otherPtr);
+  EXPECT_EQ(existBox.buffer.PrivateData[1], otherPtr);
+  EXPECT_EQ(existBox.buffer.PrivateData[2], zeroPtr);
+}
