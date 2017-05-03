@@ -708,6 +708,24 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
         super.init(options: encoder.options, codingPath: encoder.codingPath)
     }
 
+    // MARK: - Overridden Implementations
+
+    /// Asserts that we can add a new container at this coding path. See _JSONEncoder.assertCanRequestNewContainer for the logic behind this.
+    /// This differs from super's implementation only in the condition: we need to account for the fact that we copied our reference's coding path, but not its list of containers, so the counts are mismatched.
+    override func assertCanRequestNewContainer() {
+        guard self.storage.count == self.codingPath.count - self.encoder.codingPath.count else {
+            let previousContainerType: String
+            if self.storage.containers.last is NSDictionary {
+                previousContainerType = "keyed"
+            } else if self.storage.containers.last is NSArray {
+                previousContainerType = "unkeyed"
+            } else {
+                previousContainerType = "single value"
+            }
+
+            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
+        }
+    }
 
     // MARK: - Deinitialization
 
