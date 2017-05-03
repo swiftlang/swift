@@ -27,8 +27,7 @@ public protocol _UTFParser {
 
 extension _UTFParser
 where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
-
-  @inline(__always)
+  
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
   ) -> _Unicode.ParseResult<Encoding.EncodedScalar>
