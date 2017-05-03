@@ -79,8 +79,8 @@ enum Threepeat {
 }
 
 func test3(x: Threepeat, y: Threepeat) {
-  switch (x, y) { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
-  // expected-note@-1 {{missing case: '(.a, .c)'}}
+  switch (x, y) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.a, .c)'}}
   case (.a, .a):
     ()
   case (.b, _):

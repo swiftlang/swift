@@ -6,14 +6,15 @@ enum E {
 }
 
 func foo1(e : E) {
-  switch e { // expected-error{{switch must be exhaustive, consider adding missing cases:}}
-  // expected-note@-1 {{missing case: '.e2'}}
+  switch e { // expected-error{{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '.e2'}}
   case .e1: return
   }
 }
 
 func foo2(i : Int) {
-  switch i { // expected-error{{switch must be exhaustive, consider adding a default clause}}{{3-3=default: <#code#>\n}}
+  switch i { // expected-error{{switch must be exhaustive}}
+  // expected-note@-1{{do you want to add a default clause?}}{{3-3=default: <#code#>\n}}
   case 1: return
   }
 }
@@ -75,7 +76,7 @@ func testSwitchOptionalBool(_ b: Bool?, xi: Int) -> Int {
   }
 
   switch b { // expected-error{{switch must be exhaustive}}
-  // expected-note@-1 {{missing case: '.some(false)'}}
+  // expected-note@-1 {{add missing case: '.some(false)'}}
   case .some(true):
     x += 1
   case .none:
@@ -97,15 +98,15 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
   }
 
   switch Cond { // expected-error{{switch must be exhaustive}}
-  // expected-note@-1 {{missing case: '(false, _)'}}
-  // expected-note@-2 {{missing case: '(_, false)'}}
+  // expected-note@-1 {{add missing case: '(false, _)'}}
+  // expected-note@-2 {{add missing case: '(_, false)'}}
   case (true, true):
     x += 1
   }
 
   switch Cond { // expected-error{{switch must be exhaustive}}
-  // expected-note@-1 {{missing case: '(true, _)'}}
-  // expected-note@-2 {{missing case: '(_, false)'}}
+  // expected-note@-1 {{add missing case: '(true, _)'}}
+  // expected-note@-2 {{add missing case: '(_, false)'}}
   case (false, true):
     x += 1
   }
@@ -126,7 +127,8 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
 
 func non_fully_covered_switch(x: Int) -> Int {
   var x = x
-  switch x { // expected-error{{switch must be exhaustive, consider adding a default clause:}}
+  switch x { // expected-error{{switch must be exhaustive}}
+  // expected-note@-1{{do you want to add a default clause?}}
   case 0:
     x += 1
   case 3:
