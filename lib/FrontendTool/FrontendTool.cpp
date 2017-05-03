@@ -517,9 +517,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
 
   ASTContext &Context = Instance->getASTContext();
 
-  if (!Context.hadError() &&
-      Invocation.getMigratorOptions().shouldRunMigrator()) {
-    migrator::updateCodeAndEmitRemap(*Instance, Invocation);
+  if (Invocation.getMigratorOptions().shouldRunMigrator()) {
+    migrator::updateCodeAndEmitRemap(Instance.get(), Invocation);
   }
 
   if (Action == FrontendOptions::REPL) {
