@@ -13,7 +13,7 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: [[CURRIED1_FALSE]]:
     // CHECK: [[CURRIED1_TRUE]]([[CURRIED1_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject):
     // CHECK: [[CURRIED1_PARTIAL:%.+]] = partial_apply [[CURRIED1_METHOD]]([[CURRIED1_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
-    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_T0s9AnyObject_pIxo_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
+    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_T0yXlIxo_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
     // CHECK: = partial_apply [[CURRIED1_THUNK]]([[CURRIED1_PARTIAL]])
     curried1()
   }

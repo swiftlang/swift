@@ -3227,21 +3227,9 @@ private:
           emittedArg = ManagedValue(opened, emittedArg.getCleanup());
         }
         
-        // Erase to AnyObject.
-        auto conformance = SGF.SGM.SwiftModule->lookupConformance(
-          emittedArgTy,
-          SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
-          nullptr);
-        assert(conformance &&
-               "no AnyObject conformance for class?!");
-        
-        ArrayRef<ProtocolConformanceRef> conformances(*conformance);
-        auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
-        
         auto erased = SGF.B.createInitExistentialRef(loc,
                          SILType::getPrimitiveObjectType(getAnyObjectType()),
-                         emittedArgTy, emittedArg.getValue(),
-                         ctxConformances);
+                         emittedArgTy, emittedArg.getValue(), {});
         emittedArg = ManagedValue(erased, emittedArg.getCleanup());
       }
       

@@ -4465,9 +4465,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.ref.protocol,
-    key.name: "AnyObject",
-    key.usr: "s:s9AnyObjectP",
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 6668,
     key.length: 9
   },
@@ -4487,9 +4485,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 16
   },
   {
-    key.kind: source.lang.swift.ref.protocol,
-    key.name: "AnyObject",
-    key.usr: "s:s9AnyObjectP",
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 6722,
     key.length: 9
   },
@@ -4554,9 +4550,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.ref.protocol,
-    key.name: "AnyObject",
-    key.usr: "s:s9AnyObjectP",
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 6831,
     key.length: 9
   },
@@ -7541,7 +7535,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)assignable",
         key.offset: 6636,
         key.length: 42,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>assignable</decl.name>: <decl.var.type><ref.protocol usr=\"s:s9AnyObjectP\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>assignable</decl.name>: <decl.var.type>AnyObject!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -7549,7 +7543,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)unsafeAssignable",
         key.offset: 6684,
         key.length: 48,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>unsafeAssignable</decl.name>: <decl.var.type><ref.protocol usr=\"s:s9AnyObjectP\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>unsafeAssignable</decl.name>: <decl.var.type>AnyObject!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -7581,7 +7575,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)weakRef",
         key.offset: 6813,
         key.length: 28,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>weak</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>weakRef</decl.name>: <decl.var.type><ref.protocol usr=\"s:s9AnyObjectP\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>weak</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>weakRef</decl.name>: <decl.var.type>AnyObject!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,

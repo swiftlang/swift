@@ -51,10 +51,10 @@ struct Unrelated {}
 // FIXME: Not implemented yet.
 //
 
-func alreadyConforms<T>(_: Base<T>) {}
-func alreadyConforms<T>(_: Base<T> & P1) {}
-func alreadyConforms<T>(_: Base<T> & AnyObject) {}
-func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {}
+func alreadyConforms<T>(_: Base<T>) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & P1) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
+func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
 func alreadyConforms(_: P3) {}
 func alreadyConforms(_: P3 & AnyObject) {}
@@ -463,7 +463,7 @@ class ClassConformsToClassProtocolBad2 : ProtoRefinesClass {} // FIXME
 class ClassConformsToClassProtocolGood2 : Derived, ProtoRefinesClass {}
 
 // Subclass existentials inside inheritance clauses
-class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 {
+class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 { // FIXME: expected-error {{}}
   required init(classInit: ()) {
     super.init(classInit: ()) // FIXME: expected-error {{}}
   }

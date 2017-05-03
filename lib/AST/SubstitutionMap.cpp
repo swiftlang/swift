@@ -195,13 +195,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   auto genericSig = getGenericSignature();
   auto &mod = *proto->getModuleContext();
 
-  // HACK: Deal with AnyObject conformances, which get magically dropped in
-  // frustrating ways.
-  // FIXME: This hack dies with AnyObject-as-a-protocol.
-  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject) &&
-      genericSig->requiresClass(type, mod))
-    return ProtocolConformanceRef(proto);
-
   // If the type doesn't conform to this protocol, fail.
   if (!genericSig->conformsToProtocol(type, proto, mod))
     return None;
@@ -459,9 +452,8 @@ void SubstitutionMap::verify() const {
       // AnyObject or an @objc protocol.
       if (citer->isAbstract() && replacement->isExistentialType()) {
         auto *proto = citer->getRequirement();
-        assert((proto->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
-                proto->isObjC()) &&
-               "an existential type can conform only to AnyObject or an "
+        assert(proto->isObjC() &&
+               "an existential type can conform only to an "
                "@objc-protocol");
         continue;
       }

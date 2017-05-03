@@ -61,9 +61,9 @@ func testBindExistential() {
   blackHole(GP<P>()) // expected-error{{using 'P' as a concrete type conforming to protocol 'P' is not supported}}
   blackHole(GOP<OP>())
   blackHole(GCP<CP>()) // expected-error{{using 'CP' as a concrete type conforming to protocol 'CP' is not supported}}
-  blackHole(GAO<P>()) // expected-error{{type 'P' does not conform to protocol 'AnyObject'}}
+  blackHole(GAO<P>()) // expected-error{{'P' is not convertible to 'AnyObject'}}
   blackHole(GAO<OP>())
-  blackHole(GAO<CP>()) // expected-error{{using 'CP' as a concrete type conforming to protocol 'AnyObject' is not supported}}
+  blackHole(GAO<CP>()) // expected-error{{'CP' is not convertible to 'AnyObject'}}
   blackHole(GSP<SP>()) // expected-error{{'SP' cannot be used as a type conforming to protocol 'SP' because 'SP' has static requirements}}
   blackHole(GAO<AnyObject>())
 }

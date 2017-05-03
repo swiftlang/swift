@@ -199,7 +199,7 @@ let prop3ResultCChecked: Int? = prop3ResultC
 
 var obj2 : AnyObject & P = Y()
 
-class Z2 : AnyObject { }
+class Z2 { }
 class Z3<T : AnyObject> { }
 class Z4<T> where T : AnyObject { }
 
