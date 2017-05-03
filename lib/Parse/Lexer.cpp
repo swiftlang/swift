@@ -1349,7 +1349,7 @@ static StringRef getStringLiteralContent(const Token &Str) {
 
 /// getMultilineTrailingIndent:
 /// Determine trailing indent to be used for multiline literal indent stripping.
-static std::tuple<StringRef, CharSourceRange>
+static std::tuple<StringRef, SourceLoc>
 getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
@@ -1366,10 +1366,10 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       auto bytes = start + 1;
       auto length = end-(start+1);
       
-      auto range = CharSourceRange(Lexer::getSourceLoc(bytes), length);
+      auto bytesLoc = Lexer::getSourceLoc(bytes);
       auto string = StringRef(bytes, length);
       
-      return std::make_tuple(string, range);
+      return std::make_tuple(string, bytesLoc);
     }
     default:
       sawNonWhitespace = true;
@@ -1383,7 +1383,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       .fixItInsert(loc, "\n");
   }
 
-  return std::make_tuple("", CharSourceRange(Lexer::getSourceLoc(end - 1), 0));
+  return std::make_tuple("", Lexer::getSourceLoc(end - 1));
 }
 
 static size_t commonPrefixLength(StringRef shorter, const char * longer) {
@@ -1453,8 +1453,8 @@ static void diagnoseInvalidMultilineIndents(
 static void validateMultilineIndents(const Token &Str,
                                      DiagnosticEngine *Diags) {
   StringRef Indent;
-  CharSourceRange IndentRange;
-  std::tie(Indent, IndentRange) = getMultilineTrailingIndent(Str, Diags);
+  SourceLoc IndentStartLoc;
+  std::tie(Indent, IndentStartLoc) = getMultilineTrailingIndent(Str, Diags);
   if (Indent.empty())
     return;
 
@@ -1465,7 +1465,7 @@ static void validateMultilineIndents(const Token &Str,
     size_t nextpos = pos + 1;
     if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
       if (Bytes.substr(nextpos, Indent.size()) != Indent) {
-        diagnoseInvalidMultilineIndents(Diags, Indent, IndentRange.getStart(), 
+        diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, 
                                         BytesPtr + nextpos);
       }
     }
