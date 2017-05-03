@@ -1,0 +1,22 @@
+[proposal] default func ==(_:_:)
+
+Feature name - provide default func ==(_:_:) for types declared Equatable
+
+Author: Jan E.Schotsman
+
+Introduction:
+
+If all of a type's stored properties are Equatable it makes sense for Swift to provide a default equality implementation.
+
+Motivation:
+
+In a project where many large types are defined that need to be Equatable it gets cumbersome to write explicit equality functions for all types.
+
+Proposed solution
+
+If a type is declared Equatable, all its stored properties are Equatable and no func ==(_:_:) is defined by the developer the compiler will synthetisize a memberwise equality function.
+(Recursiveness of this procedure is almost automatic)
+
+Impact on existing code
+
+There is no impact on existing code. Equality functions equal to the default implementation can simply be removed.
