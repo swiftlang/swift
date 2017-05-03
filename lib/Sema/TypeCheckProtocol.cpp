@@ -5850,6 +5850,35 @@ static bool hasGenericAncestry(ClassDecl *classDecl) {
   return false;
 }
 
+/// Infer the attribute tostatic-initialize the Objective-C metadata for the
+/// given class, if needed.
+static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl,
+                                               bool requiresNSCodingAttr) {
+  // If we already have the attribute, there's nothing to do.
+  if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
+    return;
+
+  // A class with the @NSKeyedArchiveLegacyAttr will end up getting registered
+  // with the Objective-C runtime anyway.
+  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>())
+    return;
+
+  // A class with @NSKeyedArchiveSubclassesOnly promises not to be archived,
+  // so don't static-initialize its Objective-C metadata.
+  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiveSubclassesOnlyAttr>())
+    return;
+
+  // If we know that the Objective-C metadata will be statically registered,
+  // there's nothing to do.
+  if (!requiresNSCodingAttr && !hasGenericAncestry(classDecl))
+    return;
+
+  // Infer @_staticInitializeObjCMetadata.
+  ASTContext &ctx = classDecl->getASTContext();
+  classDecl->getAttrs().add(
+            new (ctx) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
@@ -5962,18 +5991,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           }
         }
 
-        // If the class declaration doesn't have the
-        // @_staticInitializeObjCMetadata attribute but requires one because
-        // either we complained above, have @NSKeyedArchiveLegacy, or
-        // have generic ancestry, add @_staticInitializeObjCMetadata to indicate
-        // that we need to statically initialize Objective-C metadata.
-        if (!classDecl->getAttrs()
-              .hasAttribute<StaticInitializeObjCMetadataAttr>() &&
-            (kind || hasGenericAncestry(classDecl) ||
-             classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>())) {
-          classDecl->getAttrs().add(
-            new (Context) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
-        }
+        // Infer @_staticInitializeObjCMetadata if needed.
+        inferStaticInitializeObjCMetadata(classDecl, kind.hasValue());
       }
     }
   }
