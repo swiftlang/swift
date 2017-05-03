@@ -741,6 +741,10 @@ namespace swift {
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
     bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
+
+    /// \returns true if any diagnostic consumer gave an error while invoking
+    //// \c finishProcessing.
+    bool finishProcessing();
     
     /// \brief Format the given diagnostic text and place the result in the given
     /// buffer.
