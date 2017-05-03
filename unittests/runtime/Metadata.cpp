@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Metadata.h"
 #include "gtest/gtest.h"
 #include <iterator>
 #include <functional>
@@ -1120,13 +1121,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
   }
 }
 
-TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod) {
-  auto any =
-      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
-                                       /*superclass=*/nullptr, 0, nullptr);
-  auto anyVWT = any->getValueWitnesses();
-
-  ValueWitnessTable testTable;
+static void initialize_pod_witness_table(ValueWitnessTable &testTable) {
   testTable.size = sizeof(ValueBuffer);
   testTable.flags = ValueWitnessFlags()
     .withAlignment(alignof(ValueBuffer))
@@ -1135,19 +1130,22 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod) {
     .withInlineStorage(true);
   testTable.stride = sizeof(ValueBuffer);
   installCommonValueWitnesses(&testTable);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_pod_witness_table(testTable);
   FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
   Metadata *metadata = &testMetadata.base;
 
   ValueWitnessTable testTable2;
-  testTable2.size = sizeof(ValueBuffer);
-  testTable2.flags = ValueWitnessFlags()
-    .withAlignment(alignof(ValueBuffer))
-    .withPOD(true)
-    .withBitwiseTakable(true)
-    .withInlineStorage(true);
-  testTable2.stride = sizeof(ValueBuffer);
-  installCommonValueWitnesses(&testTable2);
-  FullOpaqueMetadata testMetadata2 = {{&testTable}, {{MetadataKind::Opaque}}};
+  initialize_pod_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
   Metadata *metadata2 = &testMetadata2.base;
 
   void *zeroPtr = nullptr;
@@ -1175,27 +1173,13 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_pod) {
   auto anyVWT = any->getValueWitnesses();
 
   ValueWitnessTable testTable;
-  testTable.size = sizeof(ValueBuffer);
-  testTable.flags = ValueWitnessFlags()
-    .withAlignment(alignof(ValueBuffer))
-    .withPOD(true)
-    .withBitwiseTakable(true)
-    .withInlineStorage(true);
-  testTable.stride = sizeof(ValueBuffer);
-  installCommonValueWitnesses(&testTable);
+  initialize_pod_witness_table(testTable);
   FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
   Metadata *metadata = &testMetadata.base;
 
   ValueWitnessTable testTable2;
-  testTable2.size = sizeof(ValueBuffer);
-  testTable2.flags = ValueWitnessFlags()
-    .withAlignment(alignof(ValueBuffer))
-    .withPOD(true)
-    .withBitwiseTakable(true)
-    .withInlineStorage(true);
-  testTable2.stride = sizeof(ValueBuffer);
-  installCommonValueWitnesses(&testTable2);
-  FullOpaqueMetadata testMetadata2 = {{&testTable}, {{MetadataKind::Opaque}}};
+  initialize_pod_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
   Metadata *metadata2 = &testMetadata2.base;
 
   void *zeroPtr = nullptr;
@@ -1214,4 +1198,229 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], otherPtr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], otherPtr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], zeroPtr);
+}
+
+static void initialize_indirect_witness_table(ValueWitnessTable &testTable) {
+  testTable.size = sizeof(ValueBuffer) + 1;
+  testTable.flags = ValueWitnessFlags()
+    .withAlignment(alignof(ValueBuffer))
+    .withPOD(true)
+    .withBitwiseTakable(true)
+    .withInlineStorage(false);
+  testTable.stride = sizeof(ValueBuffer) + 1;
+  installCommonValueWitnesses(&testTable);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_indirect) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_indirect_witness_table(testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  initialize_indirect_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  void *zeroPtr = nullptr;
+  auto refAndObjectAddr = BoxPair(swift_allocBox(metadata));
+  swift_retain(refAndObjectAddr.first);
+  auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox{{{refAndObjectAddr.first, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+
+  EXPECT_EQ(existBox.type, metadata2);
+  EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_indirect_witness_table(testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  initialize_indirect_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  void *zeroPtr = nullptr;
+  auto refAndObjectAddr = BoxPair(swift_allocBox(metadata));
+  swift_retain(refAndObjectAddr.first);
+  auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox{{{refAndObjectAddr.first, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+
+  EXPECT_EQ(existBox.type, metadata2);
+  EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_pod_witness_table(testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  initialize_indirect_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+
+  EXPECT_EQ(existBox.type, metadata2);
+  EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_pod_witness_table(testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  initialize_indirect_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+
+  EXPECT_EQ(existBox.type, metadata2);
+  EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_pod_witness_table(testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  initialize_indirect_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
+  void *someAddr = &anyVWT;
+  swift_retain(refAndObjectAddr2.first);
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox2{{{someAddr, nullptr, someAddr}}, metadata, 0x5A5A5A5AU},
+    existBox{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+
+  EXPECT_EQ(existBox.type, metadata);
+  EXPECT_EQ(existBox.canary, 0xB5A5A5A5U);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
+  EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
+  EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
+}
+
+TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
+  auto any =
+      swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                       /*superclass=*/nullptr, 0, nullptr);
+  auto anyVWT = any->getValueWitnesses();
+
+  ValueWitnessTable testTable;
+  initialize_pod_witness_table(testTable);
+  FullOpaqueMetadata testMetadata = {{&testTable}, {{MetadataKind::Opaque}}};
+  Metadata *metadata = &testMetadata.base;
+
+  ValueWitnessTable testTable2;
+  initialize_indirect_witness_table(testTable2);
+  FullOpaqueMetadata testMetadata2 = {{&testTable2}, {{MetadataKind::Opaque}}};
+  Metadata *metadata2 = &testMetadata2.base;
+
+  auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
+  void *someAddr = &anyVWT;
+  swift_retain(refAndObjectAddr2.first);
+  struct {
+    ValueBuffer buffer;
+    Metadata *type;
+    uintptr_t canary;
+  } existBox2{{{someAddr, nullptr, someAddr}}, metadata, 0x5A5A5A5AU},
+    existBox{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+
+  anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
+                         reinterpret_cast<OpaqueValue *>(&existBox2), any);
+
+  EXPECT_EQ(existBox.type, metadata);
+  EXPECT_EQ(existBox.canary, 0xB5A5A5A5U);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
+  EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
+  EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1);
 }
