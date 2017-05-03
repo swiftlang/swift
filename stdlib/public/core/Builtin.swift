@@ -205,7 +205,7 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
   }
 }
 
-/// Returns an `UnsafePointer` to the storage used for `object`.  There's
+/// Returns an `UnsafeRawPointer` to the storage used for `object`.  There's
 /// not much you can do with this other than use it to identify the
 /// object.
 @available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
