@@ -4735,7 +4735,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   Decl *importedDecl = nullptr;
   if (getVersion() >= getActiveSwiftVersion())
     importedDecl = Impl.importDecl(decl, ImportNameVersion::ForTypes);
-  if (!importedDecl)
+  if (!importedDecl && getVersion() != getActiveSwiftVersion())
     importedDecl = Impl.importDecl(decl, getActiveSwiftVersion());
   auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
   if (!typeDecl)
