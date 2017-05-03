@@ -277,6 +277,10 @@ DECL_ATTR(NSKeyedArchiveLegacy, NSKeyedArchiveLegacy,
           OnClass | NotSerialized | LongAttribute,
           /*Not serialized */ 68)
 
+SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
+                 OnClass | NotSerialized | LongAttribute | UserInaccessible,
+                 /*Not serialized */ 69)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

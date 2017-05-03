@@ -855,6 +855,8 @@ namespace {
 
     void visitClassDecl(ClassDecl *CD) {
       printCommon(CD, "class_decl");
+      if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
+        OS << " @_staticInitializeObjCMetadata";
       printInherited(CD->getInherited());
       for (Decl *D : CD->getMembers()) {
         OS << '\n';

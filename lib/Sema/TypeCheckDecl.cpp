@@ -6070,7 +6070,7 @@ public:
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(NSKeyedArchiveLegacy)
-
+    UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

@@ -5837,6 +5837,19 @@ static bool hasExplicitObjCName(ClassDecl *classDecl) {
   return objcAttr->hasName() && !objcAttr->isNameImplicit();
 }
 
+/// Determine whether a particular class has generic ancestry.
+static bool hasGenericAncestry(ClassDecl *classDecl) {
+  SmallPtrSet<ClassDecl *, 4> visited;
+  while (classDecl && visited.insert(classDecl).second) {
+    if (classDecl->isGeneric() || classDecl->getGenericSignatureOfContext())
+      return true;
+
+    classDecl = classDecl->getSuperclassDecl();
+  }
+
+  return false;
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
@@ -5933,6 +5946,19 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                 classDecl->getAttributeInsertionLoc(/*forModifier=*/false),
                 "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
           }
+        }
+
+        // If the class declaration doesn't have the
+        // @_staticInitializeObjCMetadata attribute but requires one because
+        // either we complained above, have @NSKeyedArchiveLegacy, or
+        // have generic ancestry, add @_staticInitializeObjCMetadata to indicate
+        // that we need to statically initialize Objective-C metadata.
+        if (!classDecl->getAttrs()
+              .hasAttribute<StaticInitializeObjCMetadataAttr>() &&
+            (kind || hasGenericAncestry(classDecl) ||
+             classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>())) {
+          classDecl->getAttrs().add(
+            new (Context) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
         }
       }
     }
