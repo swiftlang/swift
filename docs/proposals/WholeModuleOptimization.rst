@@ -106,7 +106,7 @@ have them ask for the results of an analysis for the entire SCC and
 then iterate over all functions in the SCC?**
 
 In some cases we have transforms that generate new work in a top-down
-fashion, for example the devirtualizer as well as any pass that
+fashion, for example the de-virtualizer as well as any pass that
 clones. These can be handled by allowing function passes to push new
 work at the top of the stack of work items, and then upon finishing a
 pass the pass pipeline will be restarted with those new functions at
