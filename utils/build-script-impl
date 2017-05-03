@@ -2433,8 +2433,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
-                if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
-                    echo "Reconfiguring libdispatch"
+                if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
                     # First time building; need to run autotools and configure
                     if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
                         dispatch_build_variant_arg="release"
@@ -2451,8 +2450,7 @@ for host in "${ALL_HOSTS[@]}"; do
                             "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
                             --with-build-variant=$dispatch_build_variant_arg \
                             --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
-                else
-                    echo "Skipping reconfiguration of libdispatch"
+
                 fi
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                     call make
