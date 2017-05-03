@@ -70,6 +70,8 @@ extension _Unicode {
     CodeUnitIterator : IteratorProtocol, 
     Parser: UnicodeParser
   > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
+    @inline(__always)
+    @_inlineable
     public init(codeUnits: CodeUnitIterator, parser: Parser) {
       self.codeUnits = codeUnits
       self.parser = parser
@@ -80,6 +82,8 @@ extension _Unicode {
 }
 
 extension _Unicode.ParsingIterator : IteratorProtocol, Sequence {
+  @inline(__always)
+  @_inlineable
   public mutating func next() -> Parser.Encoding.EncodedScalar? {
     switch parser.parseScalar(from: &codeUnits) {
     case let .valid(scalarContent): return scalarContent
