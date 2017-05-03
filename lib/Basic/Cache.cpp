@@ -105,7 +105,14 @@ bool CacheImpl::getAndRetain(const void *Key, void **Value_out) {
 }
 
 void CacheImpl::releaseValue(void *Value) {
-  // FIXME: Implementation.
+  DefaultCache &DCache = *static_cast<DefaultCache*>(Impl);
+  llvm::sys::ScopedLock L(DCache.Mux);
+
+  for (auto Entry = DCache.Entries.begin(); Entry != DCache.Entries.end(); ++Entry) {
+    if (Entry->second == *Value) {
+      DCache.CBs.valueDestroyCB(Entry->second, nullptr);
+    }
+  }
 }
 
 bool CacheImpl::remove(const void *Key) {
