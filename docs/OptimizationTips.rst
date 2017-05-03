@@ -177,12 +177,9 @@ Advice: Use value types in Array
 --------------------------------
 
 In Swift, types can be divided into two different categories: value types
-(structs, enums, tuples) and reference types (classes). A key distinction is
-that value types cannot be included inside an NSArray. Thus when using value
-types, the optimizer can remove most of the overhead in Array that is necessary
-to handle the possibility of the array being backed an NSArray.
+(structs, enums, tuples) and reference types (classes).
 
-Additionally, In contrast to reference types, value types only need reference
+In contrast to reference types, value types only need reference
 counting if they contain, recursively, a reference type. By using value types
 without reference types, one can avoid additional retain, release traffic inside
 Array.
@@ -199,14 +196,12 @@ Array.
 
 Keep in mind that there is a trade-off between using large value types and using
 reference types. In certain cases, the overhead of copying and moving around
-large value types will outweigh the cost of removing the bridging and
-retain/release overhead.
+large value types will outweigh the cost of the retain/release overhead.
 
 Advice: Use ContiguousArray with reference types when NSArray bridging is unnecessary
 -------------------------------------------------------------------------------------
 
-If you need an array of reference types and the array does not need to be
-bridged to NSArray, use ContiguousArray instead of Array:
+If you need an array which does not need to be bridged to NSArray, use ContiguousArray instead of Array:
 
 ::
 
