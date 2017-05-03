@@ -106,6 +106,7 @@ public:
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(NSKeyedArchiveLegacy)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
+  IGNORED_ATTR(NSKeyedArchiveSubclassesOnly)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -782,6 +783,7 @@ public:
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
+    IGNORED_ATTR(NSKeyedArchiveSubclassesOnly)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

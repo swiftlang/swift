@@ -5931,7 +5931,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         }
 
         if (kind && !hasExplicitObjCName(classDecl) &&
-            !classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>()) {
+            !classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>() &&
+            !classDecl->getAttrs()
+              .hasAttribute<NSKeyedArchiveSubclassesOnlyAttr>()) {
           SourceLoc loc;
           if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
             loc = normal->getLoc();
@@ -5943,9 +5945,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                    emitWarning ? diag::nscoding_unstable_mangled_name_warn
                                : diag::nscoding_unstable_mangled_name,
                    *kind, classDecl->TypeDecl::getDeclaredInterfaceType());
+          auto insertionLoc =
+            classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
           if (isFixable) {
-            auto insertionLoc =
-              classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
             diagnose(classDecl, diag::unstable_mangled_name_add_objc)
               .fixItInsert(insertionLoc,
                            "@objc(<#Objective-C class name#>)");
@@ -5953,6 +5955,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                      diag::unstable_mangled_name_add_nskeyedarchivelegacy)
               .fixItInsert(insertionLoc,
                            "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
+          } else {
+            diagnose(classDecl, diag::add_nskeyedarchivesubclassesonly_attr,
+                     classDecl->getDeclaredInterfaceType())
+              .fixItInsert(insertionLoc, "@NSKeyedArchiveSubclassesOnly");
           }
         }
 
