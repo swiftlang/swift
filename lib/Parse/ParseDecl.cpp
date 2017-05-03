@@ -743,7 +743,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_CDecl:
-  case DAK_SILGenName: {
+  case DAK_SILGenName:
+  case DAK_NSKeyedArchiveLegacy: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -785,6 +786,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
+                                               AttrRange, /*Implicit=*/false));
+      else if (DK == DAK_NSKeyedArchiveLegacy)
+        Attributes.add(new (Context) NSKeyedArchiveLegacyAttr(
+                                               AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
