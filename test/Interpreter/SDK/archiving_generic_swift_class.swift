@@ -6,6 +6,7 @@
 
 import Foundation
 
+@NSKeyedArchiveSubclassesOnly
 final class Foo<T: NSCoding>: NSObject, NSCoding {
   var one, two: T
 

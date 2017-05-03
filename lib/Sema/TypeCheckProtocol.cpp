@@ -5812,6 +5812,63 @@ static void diagnosePotentialWitness(TypeChecker &tc,
   tc.diagnose(req, diag::protocol_requirement_here, req->getFullName());
 }
 
+/// Whether the given protocol is "NSCoding".
+static bool isNSCoding(ProtocolDecl *protocol) {
+  ASTContext &ctx = protocol->getASTContext();
+  return protocol->getModuleContext()->getName() == ctx.Id_Foundation &&
+    protocol->getName().str().equals("NSCoding");
+}
+
+/// Whether the given class has an explicit '@objc' name.
+static bool hasExplicitObjCName(ClassDecl *classDecl) {
+  auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
+  if (!objcAttr) return false;
+
+  return objcAttr->hasName() && !objcAttr->isNameImplicit();
+}
+
+/// Determine whether a particular class has generic ancestry.
+static bool hasGenericAncestry(ClassDecl *classDecl) {
+  SmallPtrSet<ClassDecl *, 4> visited;
+  while (classDecl && visited.insert(classDecl).second) {
+    if (classDecl->isGeneric() || classDecl->getGenericSignatureOfContext())
+      return true;
+
+    classDecl = classDecl->getSuperclassDecl();
+  }
+
+  return false;
+}
+
+/// Infer the attribute tostatic-initialize the Objective-C metadata for the
+/// given class, if needed.
+static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl,
+                                               bool requiresNSCodingAttr) {
+  // If we already have the attribute, there's nothing to do.
+  if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
+    return;
+
+  // A class with the @NSKeyedArchiveLegacyAttr will end up getting registered
+  // with the Objective-C runtime anyway.
+  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>())
+    return;
+
+  // A class with @NSKeyedArchiveSubclassesOnly promises not to be archived,
+  // so don't static-initialize its Objective-C metadata.
+  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiveSubclassesOnlyAttr>())
+    return;
+
+  // If we know that the Objective-C metadata will be statically registered,
+  // there's nothing to do.
+  if (!requiresNSCodingAttr && !hasGenericAncestry(classDecl))
+    return;
+
+  // Infer @_staticInitializeObjCMetadata.
+  ASTContext &ctx = classDecl->getASTContext();
+  classDecl->getAttrs().add(
+            new (ctx) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
+}
+
 void TypeChecker::checkConformancesInContext(DeclContext *dc,
                                              IterableDeclContext *idc) {
   // For anything imported from Clang, lazily check conformances.
@@ -5819,6 +5876,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     return;
 
   // Determine the accessibility of this conformance.
+  Decl *currentDecl = nullptr;
   Accessibility defaultAccessibility;
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     Type extendedTy = ext->getExtendedType();
@@ -5828,14 +5886,15 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (!nominal)
       return;
     defaultAccessibility = nominal->getFormalAccess();
+    currentDecl = ext;
   } else {
     defaultAccessibility = cast<NominalTypeDecl>(dc)->getFormalAccess();
+    currentDecl = cast<NominalTypeDecl>(dc);
   }
 
   ReferencedNameTracker *tracker = nullptr;
   if (SourceFile *SF = dc->getParentSourceFile())
     tracker = SF->getReferencedNameTracker();
-
 
   // Check each of the conformances associated with this context.
   SmallVector<ConformanceDiagnostic, 4> diagnostics;
@@ -5856,6 +5915,76 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (tracker)
       tracker->addUsedMember({conformance->getProtocol(), Identifier()},
                              defaultAccessibility > Accessibility::FilePrivate);
+
+    // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
+    // have unstable archival names.
+    if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+      if (isNSCoding(conformance->getProtocol())) {
+        // Note: these 'kind' values are synchronized with
+        // diag::nscoding_unstable_mangled_name.
+        Optional<unsigned> kind;
+        bool isFixable = true;
+        if (classDecl->getGenericSignature()) {
+          kind = 4;
+          isFixable = false;
+        } else if (!classDecl->getDeclContext()->isModuleScopeContext()) {
+          if (classDecl->getDeclContext()->isTypeContext())
+            kind = 2;
+          else
+            kind = 3;
+        } else {
+          switch (classDecl->getFormalAccess()) {
+          case Accessibility::FilePrivate:
+            kind = 1;
+            break;
+
+          case Accessibility::Private:
+            kind = 0;
+            break;
+
+          case Accessibility::Internal:
+          case Accessibility::Open:
+          case Accessibility::Public:
+            break;
+          }
+        }
+
+        if (kind && !hasExplicitObjCName(classDecl) &&
+            !classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>() &&
+            !classDecl->getAttrs()
+              .hasAttribute<NSKeyedArchiveSubclassesOnlyAttr>()) {
+          SourceLoc loc;
+          if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
+            loc = normal->getLoc();
+          if (loc.isInvalid())
+            loc = currentDecl->getLoc();
+
+          bool emitWarning = Context.LangOpts.isSwiftVersion3();
+          diagnose(loc,
+                   emitWarning ? diag::nscoding_unstable_mangled_name_warn
+                               : diag::nscoding_unstable_mangled_name,
+                   *kind, classDecl->TypeDecl::getDeclaredInterfaceType());
+          auto insertionLoc =
+            classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
+          if (isFixable) {
+            diagnose(classDecl, diag::unstable_mangled_name_add_objc)
+              .fixItInsert(insertionLoc,
+                           "@objc(<#Objective-C class name#>)");
+            diagnose(classDecl,
+                     diag::unstable_mangled_name_add_nskeyedarchivelegacy)
+              .fixItInsert(insertionLoc,
+                           "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
+          } else {
+            diagnose(classDecl, diag::add_nskeyedarchivesubclassesonly_attr,
+                     classDecl->getDeclaredInterfaceType())
+              .fixItInsert(insertionLoc, "@NSKeyedArchiveSubclassesOnly");
+          }
+        }
+
+        // Infer @_staticInitializeObjCMetadata if needed.
+        inferStaticInitializeObjCMetadata(classDecl, kind.hasValue());
+      }
+    }
   }
 
   // Check all conformances.
