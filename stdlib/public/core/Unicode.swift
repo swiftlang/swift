@@ -195,7 +195,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     guard case ._swift3Buffer(var parser) = self else {
-      fatalError("unreachable")
+      Builtin.unreachable()
     }
     defer { self = ._swift3Buffer(parser) }
 
@@ -315,15 +315,9 @@ public typealias UTF8 = _Unicode.UTF8
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
-public struct UTF16 : UnicodeCodec {
-  /// A type that can hold code unit values for this encoding.
-  public typealias CodeUnit = UInt16
-
+extension _Unicode.UTF16 : UnicodeCodec {
   /// Creates an instance of the UTF-16 codec.
-  public init() {}
-
-  /// A lookahead buffer for one UTF-16 code unit.
-  internal var _decodeLookahead: UInt16?
+  public init() { self = ._swift3Buffer(ForwardParser()) }
 
   /// Starts or continues decoding a UTF-16 sequence.
   ///
@@ -369,47 +363,15 @@ public struct UTF16 : UnicodeCodec {
   public mutating func decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
-    // Note: maximal subpart of ill-formed sequence for UTF-16 can only have
-    // length 1.  Length 0 does not make sense.  Neither does length 2 -- in
-    // that case the sequence is valid.
-
-    let unit0: UInt16
-    if _fastPath(_decodeLookahead == nil) {
-      guard let next = input.next() else { return .emptyInput }
-      unit0 = next
-    } else { // Consume lookahead first.
-      unit0 = _decodeLookahead!
-      _decodeLookahead = nil
+    guard case ._swift3Buffer(var parser) = self else {
+      Builtin.unreachable()
     }
-
-    // A well-formed pair of surrogates looks like this:
-    //     high-surrogate        low-surrogate
-    // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
-
-    // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit0 &>> 11) != 0b1101_1) {
-      return .scalarValue(UnicodeScalar(
-        _unchecked: UInt32(extendingOrTruncating: unit0)))
+    defer { self = ._swift3Buffer(parser) }
+    switch parser.parseScalar(from: &input) {
+    case .valid(let s): return .scalarValue(UTF16.decode(s))
+    case .invalid: return .error
+    case .emptyInput: return .emptyInput
     }
-
-    // Ensure `unit0` is a high-surrogate.
-    guard _fastPath((unit0 &>> 10) == 0b1101_10) else { return .error }
-
-    // We already have a high-surrogate, so there should be a next code unit.
-    guard let unit1 = input.next() else { return .error }
-
-    // `unit0` is a high-surrogate, so `unit1` should be a low-surrogate.
-    guard _fastPath((unit1 &>> 10) == 0b1101_11) else {
-      // Invalid sequence, discard `unit0` and store `unit1` for the next call.
-      _decodeLookahead = unit1
-      return .error
-    }
-
-    // We have a well-formed surrogate pair, decode it.
-    let result = 0x10000 + (
-      (UInt32(extendingOrTruncating: unit0 & 0x03ff) &<< 10) |
-      UInt32(extendingOrTruncating: unit1 & 0x03ff))
-    return .scalarValue(UnicodeScalar(_unchecked: result))
   }
 
   /// Try to decode one Unicode scalar, and return the actual number of code
@@ -452,19 +414,14 @@ public struct UTF16 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    let scalarValue: UInt32 = UInt32(input)
-
-    if scalarValue <= UInt32(extendingOrTruncating: UInt16.max) {
-      processCodeUnit(UInt16(extendingOrTruncating: scalarValue))
-    }
-    else {
-      let lead_offset =
-        (0xd800 as UInt32) - UInt32(extendingOrTruncating: 0x10000 &>> 10)
-      processCodeUnit(UInt16(lead_offset + (scalarValue &>> (10 as UInt32))))
-      processCodeUnit(UInt16(0xdc00 + (scalarValue & 0x3ff)))
-    }
+    var s = encode(input)._storage
+    processCodeUnit(UInt16(extendingOrTruncating: s))
+    s &>>= 16
+    if _fastPath(s == 0) { return }
+    processCodeUnit(UInt16(extendingOrTruncating: s))
   }
 }
+public typealias UTF16 = _Unicode.UTF16
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
@@ -1060,7 +1017,6 @@ extension UTF16 {
 
 /// A namespace for Unicode utilities.
 public enum _Unicode {
-  public typealias UTF16 = Swift.UTF16
   public typealias UTF32 = Swift.UTF32
 }
 
