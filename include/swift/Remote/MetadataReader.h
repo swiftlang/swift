@@ -172,7 +172,16 @@ class TypeDecoder {
     }
     case NodeKind::Protocol: {
       auto moduleName = Node->getChild(0)->getText();
-      auto name = Node->getChild(1)->getText();
+      auto nameNode = Node->getChild(1);
+      std::string privateDiscriminator, name;
+      if (nameNode->getKind() == NodeKind::PrivateDeclName) {
+        privateDiscriminator = nameNode->getChild(0)->getText();
+        name = nameNode->getChild(1)->getText();
+      } else if (nameNode->getKind() == NodeKind::Identifier) {
+        name = Node->getChild(1)->getText();
+      } else {
+        return BuiltType();
+      }
 
       // Consistent handling of protocols and protocol compositions
       Demangle::Demangler Dem;
@@ -184,7 +193,8 @@ class TypeDecoder {
       protocolList->addChild(typeList, Dem);
 
       auto mangledName = Demangle::mangleNode(protocolList);
-      return Builder.createProtocolType(mangledName, moduleName, name);
+      return Builder.createProtocolType(mangledName, moduleName,
+                                        privateDiscriminator, name);
     }
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
