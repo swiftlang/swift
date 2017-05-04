@@ -43,10 +43,6 @@ class PerformanceTestResult:
         return (0 if self.samples < 2 else
                 sqrt(self.S_runtime / (self.samples - 1)))
 
-    @property
-    def cv(self):  # Coeficient of Variation (%)
-        return self.sd / self.mean
-
     # Compute running variance, B. P. Welford's method
     # See Knuth TAOCP vol 2, 3rd edition, page 232, or
     # https://www.johndcook.com/blog/standard_deviation/
@@ -299,7 +295,6 @@ class ReportFormatter:
                 name, old, new, delta, speedup_color, speedup)
 
         def header(contents):
-            # exit(contents)
             return self.HTML_HEADER_ROW.format(* contents)
 
         def table(title, results, speedup_color):
