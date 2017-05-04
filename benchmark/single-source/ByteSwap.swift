@@ -42,8 +42,8 @@ func byteswap_logn(_ a: UInt64) -> UInt64 {
 public func run_ByteSwap(_ N: Int) {
   for _ in 1...100*N {
     // Check some results.
-    CheckResults(byteswap_logn(byteswap_n(2457)) == 2457, "Incorrect results in ByteSwap.")
-    CheckResults(byteswap_logn(byteswap_n(9129)) == 9129, "Incorrect results in ByteSwap.")
-    CheckResults(byteswap_logn(byteswap_n(3333)) == 3333, "Incorrect results in ByteSwap.")
+    CheckResults(byteswap_logn(byteswap_n(2457)) == 2457)
+    CheckResults(byteswap_logn(byteswap_n(9129)) == 9129)
+    CheckResults(byteswap_logn(byteswap_n(3333)) == 3333)
   }
 }
