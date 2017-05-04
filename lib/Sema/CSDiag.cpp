@@ -3830,6 +3830,45 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   return false;
 }
 
+/// Try to add a fix-it when converting between a collection and its slice type,
+/// such as String <-> Substring or (eventually) Array <-> ArraySlice
+static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
+                                                   ConstraintSystem *CS,
+                                                   Type fromType,
+                                                   Type toType,
+                                                   Expr *expr) {
+  if (CS->TC.Context.getStdlibModule() == nullptr) {
+    return false;
+  }
+  auto String = CS->TC.getStringType(CS->DC);
+  auto Substring = CS->TC.getSubstringType(CS->DC);
+
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// Make this unconditional and remove the if statement.
+  if (CS->TC.getLangOpts().FixStringToSubstringConversions) {
+    // String -> Substring conversion
+    // Add '[]' void subscript call to turn the whole String into a Substring
+    if (fromType->getCanonicalType() == String->getCanonicalType()) {
+      if (toType->getCanonicalType() == Substring->getCanonicalType()) {
+        diag.fixItInsertAfter(expr->getEndLoc (), "[]");
+        return true;
+      }
+    }
+  }
+
+  // Substring -> String conversion
+  // Wrap in String.init
+  if (fromType->getCanonicalType() == Substring->getCanonicalType()) {
+    if (toType->getCanonicalType() == String->getCanonicalType()) {
+      diag.fixItInsert(expr->getLoc(), "String(");
+      diag.fixItInsertAfter(expr->getSourceRange().End, ")");
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Attempts to add fix-its for these two mistakes:
 ///
 /// - Passing an integer with the right type but which is getting wrapped with a
@@ -4267,6 +4306,13 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,
                                      exprType, contextualType);
   diag.highlight(expr->getSourceRange());
+
+  // Try to convert between a sequence and its subsequence, notably
+  // String <-> Substring.
+  if (trySequenceSubsequenceConversionFixIts(diag, CS, exprType, contextualType,
+                                             expr)) {
+    return true;
+  }
 
   // Attempt to add a fixit for the error.
   switch (CS->getContextualTypePurpose()) {
