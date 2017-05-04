@@ -165,7 +165,26 @@ enum class SubstFlags {
 };
 
 /// Options for performing substitutions into a type.
-typedef OptionSet<SubstFlags> SubstOptions;
+struct SubstOptions : public OptionSet<SubstFlags> {
+  typedef std::function<Type(const NormalProtocolConformance *,
+                             AssociatedTypeDecl *)>
+    GetTentativeTypeWitness;
+
+  /// Function that retrieves a tentative type witness for a protocol
+  /// conformance with the state \c CheckingTypeWitnesses.
+  GetTentativeTypeWitness getTentativeTypeWitness;
+
+  SubstOptions(llvm::NoneType) : OptionSet(None) { }
+
+  SubstOptions(SubstFlags flags) : OptionSet(flags) { }
+
+  SubstOptions(OptionSet<SubstFlags> options) : OptionSet(options) { }
+
+  SubstOptions(OptionSet<SubstFlags> options,
+              GetTentativeTypeWitness getTentativeTypeWitness)
+    : OptionSet(options),
+      getTentativeTypeWitness(std::move(getTentativeTypeWitness)) { }
+};
 
 inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
   return SubstOptions(lhs) | rhs;
