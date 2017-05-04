@@ -140,6 +140,7 @@ static sourcekitd_uid_t KeyBaseName;
 static sourcekitd_uid_t KeyArgNames;
 static sourcekitd_uid_t KeySelectorPieces;
 static sourcekitd_uid_t KeyNameKind;
+static sourcekitd_uid_t KeySwiftVersion;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -270,6 +271,8 @@ static int skt_main(int argc, const char **argv) {
   KeyArgNames = sourcekitd_uid_get_from_cstr("key.argnames");
   KeySelectorPieces = sourcekitd_uid_get_from_cstr("key.selectorpieces");
   KeyNameKind = sourcekitd_uid_get_from_cstr("key.namekind");
+
+  KeySwiftVersion = sourcekitd_uid_get_from_cstr("key.swift_version");
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
@@ -824,6 +827,11 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (!Opts.HeaderPath.empty()) {
     sourcekitd_request_dictionary_set_string(Req, KeyFilePath,
                                              Opts.HeaderPath.c_str());
+  }
+
+  if (Opts.SwiftVersion.hasValue()) {
+    sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion,
+                                             Opts.SwiftVersion.getValue());
   }
 
   if (Opts.PrintRequest)

@@ -443,7 +443,8 @@ public:
                                          StringRef Name,
                                          StringRef HeaderName,
                                          ArrayRef<const char *> Args,
-                                         bool SynthesizedExtensions) = 0;
+                                         bool SynthesizedExtensions,
+                                         Optional<unsigned> swiftVersion) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,
