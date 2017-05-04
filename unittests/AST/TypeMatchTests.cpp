@@ -220,6 +220,33 @@ TEST(TypeMatch, IUONearMatch) {
   EXPECT_FALSE(check(optToOpt, baseToBase));
   EXPECT_FALSE(checkIUO(optToOpt, baseToBase));
   EXPECT_TRUE(checkIUOOverride(optToOpt, baseToBase));
+
+  Type tupleOfBase = TupleType::get({baseTy, baseTy}, C.Ctx);
+  Type tupleOfOpt = TupleType::get({optTy, optTy}, C.Ctx);
+
+  Type baseTupleToVoid = FunctionType::get(tupleOfBase,C.Ctx.TheEmptyTupleType);
+  Type optTupleToVoid = FunctionType::get(tupleOfOpt, C.Ctx.TheEmptyTupleType);
+  EXPECT_TRUE(check(baseTupleToVoid, optTupleToVoid));
+  EXPECT_FALSE(checkIUO(baseTupleToVoid, optTupleToVoid));
+  EXPECT_TRUE(checkIUOOverride(baseTupleToVoid, optTupleToVoid));
+  EXPECT_FALSE(check(optTupleToVoid, baseTupleToVoid));
+  EXPECT_TRUE(checkIUO(optTupleToVoid, baseTupleToVoid));
+  EXPECT_TRUE(checkIUOOverride(optTupleToVoid, baseTupleToVoid));
+
+  Type nestedBaseTuple = TupleType::get({C.Ctx.TheEmptyTupleType, tupleOfBase},
+                                        C.Ctx);
+  Type nestedOptTuple = TupleType::get({C.Ctx.TheEmptyTupleType, tupleOfOpt},
+                                        C.Ctx);
+  Type nestedBaseTupleToVoid = FunctionType::get(nestedBaseTuple,
+                                                 C.Ctx.TheEmptyTupleType);
+  Type nestedOptTupleToVoid = FunctionType::get(nestedOptTuple,
+                                                C.Ctx.TheEmptyTupleType);
+  EXPECT_TRUE(check(nestedBaseTupleToVoid, nestedOptTupleToVoid));
+  EXPECT_FALSE(checkIUO(nestedBaseTupleToVoid, nestedOptTupleToVoid));
+  EXPECT_TRUE(checkIUOOverride(nestedBaseTupleToVoid, nestedOptTupleToVoid));
+  EXPECT_FALSE(check(nestedOptTupleToVoid, nestedBaseTupleToVoid));
+  EXPECT_FALSE(checkIUO(nestedOptTupleToVoid, nestedBaseTupleToVoid));
+  EXPECT_FALSE(checkIUOOverride(nestedOptTupleToVoid, nestedBaseTupleToVoid));
 }
 
 TEST(TypeMatch, OptionalMismatch) {

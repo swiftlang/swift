@@ -2316,8 +2316,16 @@ bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
+namespace {
+  enum class ParameterPosition {
+    NotParameter,
+    Parameter,
+    ParameterTupleElement
+  };
+} // end anonymous namespace
+
 static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
-                    bool isParameter, bool insideOptional,
+                    ParameterPosition paramPosition, bool insideOptional,
                     LazyResolver *resolver) {
   if (t1 == t2) return true;
 
@@ -2329,14 +2337,14 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       // Optional-to-optional.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
         // Allow T? and T! to freely match one another.
-        return matches(obj1, obj2, matchMode, /*isParameter=*/false,
+        return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
                        /*insideOptional=*/true, resolver);
       }
 
       // Value-to-optional.
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
-        return matches(t1, obj2, matchMode, /*isParameter=*/false,
+        return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
                        /*insideOptional=*/true, resolver);
       }
 
@@ -2344,7 +2352,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                  TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
-        return matches(obj1, t2, matchMode, /*isParameter=*/false,
+        return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
                        /*insideOptional=*/true, resolver);
       }
     }
@@ -2354,10 +2362,21 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (auto tuple2 = dyn_cast<TupleType>(t2)) {
     // We only ever look into singleton tuples on the RHS if we're
     // certain that the LHS isn't also a singleton tuple.
+    ParameterPosition elementPosition;
+    switch (paramPosition) {
+    case ParameterPosition::NotParameter:
+    case ParameterPosition::ParameterTupleElement:
+      elementPosition = ParameterPosition::NotParameter;
+      break;
+    case ParameterPosition::Parameter:
+      elementPosition = ParameterPosition::ParameterTupleElement;
+      break;
+    }
+
     auto tuple1 = dyn_cast<TupleType>(t1);
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1) {
-        return matches(t1, tuple2.getElementType(0), matchMode, isParameter,
+        return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
                        /*insideOptional=*/false, resolver);
       }
       return false;
@@ -2365,7 +2384,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
-                   matchMode, isParameter, /*insideOptional=*/false, resolver)){
+                   matchMode, elementPosition, /*insideOptional=*/false,
+                   resolver)){
         return false;
       }
     }
@@ -2393,13 +2413,17 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
     // Inputs are contravariant, results are covariant.
     return (matches(fn2.getInput(), fn1.getInput(), matchMode,
-                    /*isParameter=*/true, /*insideOptional=*/false, resolver) &&
+                    ParameterPosition::Parameter, /*insideOptional=*/false,
+                    resolver) &&
             matches(fn1.getResult(), fn2.getResult(), matchMode,
-                    /*isParameter=*/false, /*insideOptional=*/false, resolver));
+                    ParameterPosition::NotParameter, /*insideOptional=*/false,
+                    resolver));
   }
 
   if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
-      isParameter && !insideOptional) {
+      (paramPosition == ParameterPosition::Parameter ||
+       paramPosition == ParameterPosition::ParameterTupleElement) &&
+      !insideOptional) {
     // Allow T to override T! in certain cases.
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
@@ -2412,13 +2436,18 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (t2->isExactSuperclassOf(t1))
       return true;
 
+  if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
+    if (isABICompatibleEvenAddingOptional(t1, t2))
+      return true;
+
   return false;
 }
 
 bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
                        LazyResolver *resolver) {
   return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
-                   /*isParameter=*/false, /*insideOptional=*/false, resolver);
+                   ParameterPosition::NotParameter, /*insideOptional=*/false,
+                   resolver);
 }
 
 /// getNamedElementId - If this tuple has a field with the specified name,
