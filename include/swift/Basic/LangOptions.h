@@ -229,7 +229,7 @@ namespace swift {
       Swift3ObjCInferenceWarnings::None;
     
     /// Enable keypaths.
-    bool EnableExperimentalKeyPaths = false;
+    bool EnableExperimentalKeyPaths = true;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
