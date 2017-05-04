@@ -439,6 +439,22 @@ extension String.CharacterView : BidirectionalCollection {
   /// - Parameter position: A valid index of the character view. `position`
   ///   must be less than the view's end index.
   public subscript(i: Index) -> Character {
+    if i._countUTF16 == 1 {
+      // For single-code-unit graphemes, we can construct a Character directly
+      // from a single unicode scalar (if sub-surrogate).
+      let relativeOffset = i._base._position - _coreOffset
+      if _core.isASCII {
+        let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+        return Character(UnicodeScalar(asciiBuffer[relativeOffset]))
+      } else if _core._baseAddress != nil {
+        let cu = _core._nthContiguous(relativeOffset)
+        // Only constructible if sub-surrogate
+        if (cu < 0xd800) {
+          return Character(UnicodeScalar(cu)._unsafelyUnwrappedUnchecked)
+        }
+      }
+    }
+
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 }
