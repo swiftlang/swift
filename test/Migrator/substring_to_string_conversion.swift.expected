@@ -1,0 +1,47 @@
+let s = "foo"
+let ss = s[s.startIndex..<s.endIndex]
+
+// CTP_ReturnStmt
+
+func returnSubstringButWantedString() -> String {
+  return String(ss)
+}
+
+// CTP_DefaultParameter
+
+// Never do this.
+func defaultArgIsString(s: String = String(ss)) {}
+
+// CTP_CalleeResult
+func returnSubstring() -> Substring {
+  return String(ss)
+}
+let s2: String = String(returnSubstring())
+
+// CTP_CallArgument
+func takeString(s: String) {}
+func takeSubstring(ss: Substring) {}
+
+takeString(string)
+takeString(String(substring))
+
+// CTP_ClosureResult
+[1,2,3].map { (x: Int) -> String in
+  return String(ss)
+}
+
+// CTP_ArrayElement
+let a: [String] = [ String(ss) ]
+
+// CTP_DictionaryKey
+// CTP_DictionaryValue
+let d: [String : String] = [
+  "CTP_DictionaryValue" : String(ss),
+  String(ss) : "CTP_DictionaryKey",
+]
+
+// CTP_CoerceOperand
+let s3: String = String(ss) as String
+
+// CTP_AssignSource
+let s4: String = String(ss)
