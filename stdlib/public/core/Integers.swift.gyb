@@ -3035,6 +3035,13 @@ ${operatorComment(x.operator, True)}
 
   @available(swift, obsoleted: 4)
   public static var _sizeInBytes: ${Self} { return ${bits}/8 }
+
+  @inline(__always)
+  public func signum() -> ${Self} {
+    let isPositive = ${Self}(Builtin.zext_Int1_Int${bits}(
+      (self > (0 as ${Self}))._value))
+    return isPositive | (self &>> ${bits - 1})
+  }
 }
 %# end of concrete type: ${Self}
 
