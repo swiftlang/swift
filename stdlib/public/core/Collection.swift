@@ -88,20 +88,6 @@ public protocol _IndexableBase {
   ///
   /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get }
-
-  // WORKAROUND: rdar://25214066
-  // FIXME(ABI)#178 (Type checker)
-  /// A sequence that represents a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence
-
-  /// Accesses the subsequence bounded by the given range.
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The upper and
-  ///   lower bounds of the range must be valid indices of the collection.
-  ///
-  /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence { get }
   
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).

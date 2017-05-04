@@ -475,7 +475,7 @@ ${orderingExplanation}
   }
 }
 
-% for Self in '_Indexable', '_MutableIndexable':
+% for Self in 'Collection', 'MutableCollection':
 %{
 
 subscriptCommentPre = """\
@@ -511,8 +511,6 @@ subscriptCommentPost = """\
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection."""
 }%
-// FIXME(ABI)#180 (Type checker)
-// WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} {
 ${subscriptCommentPre}
 ${subscriptCommentMid}
@@ -540,8 +538,6 @@ ${subscriptCommentPost}
   }
 }
 
-// FIXME(ABI)#180 (Type checker)
-// WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
 ${subscriptCommentPre}
 ${subscriptCommentMid}

@@ -527,6 +527,8 @@ extension String.CharacterView : RangeReplaceableCollection {
 
 // Algorithms
 extension String.CharacterView {
+  public typealias SubSequence = String.CharacterView
+
   /// Accesses the characters in the given range.
   ///
   /// The example below uses this subscript to access the characters up to, but
