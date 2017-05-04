@@ -27,7 +27,7 @@ protocol Test2 {
   associatedtype mytype
   associatedtype mybadtype = Int
 
-  associatedtype V : Test = // expected-error {{expected type in associated type declaration}}
+  associatedtype V : Test = // expected-error {{expected type in associated type declaration}} {{28-28= <#type#>}}
 }
 
 func test1() {

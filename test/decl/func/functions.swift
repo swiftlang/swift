@@ -71,20 +71,20 @@ func g_recover_missing_tuple_paren(_ b: Int) {
 
 //===--- Parse errors.
 
-func parseError1a(_ a: ) {} // expected-error {{expected parameter type following ':'}}
+func parseError1a(_ a: ) {} // expected-error {{expected parameter type following ':'}} {{23-23= <#type#>}}
 
-func parseError1b(_ a: // expected-error {{expected parameter type following ':'}}
+func parseError1b(_ a: // expected-error {{expected parameter type following ':'}} {{23-23= <#type#>}}
                   ) {}
 
-func parseError2(_ a: Int, b: ) {} // expected-error {{expected parameter type following ':'}}
+func parseError2(_ a: Int, b: ) {} // expected-error {{expected parameter type following ':'}} {{30-30= <#type#>}}
 
-func parseError3(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
+func parseError3(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}} {{39-39= <#type#>}}
 
 func parseError4(_ a: , b: ) {} // expected-error 2{{expected parameter type following ':'}}
 
 func parseError5(_ a: b: ) {} // expected-error {{use of undeclared type 'b'}}  expected-error {{expected ',' separator}} {{24-24=,}} expected-error {{expected parameter name followed by ':'}}
 
-func parseError6(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}}
+func parseError6(_ a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}}  expected-error {{expected parameter type following ':'}} {{39-39= <#type#>}}
 
 func parseError7(_ a: Int, goo b: unknown_type) {} // expected-error {{use of undeclared type 'unknown_type'}}
 
