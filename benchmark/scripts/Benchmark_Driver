@@ -122,9 +122,9 @@ def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     tests = subprocess.check_output([driver_path, '--list']).split()[2:]
     if args.filters:
-        return sorted(list(set([ name
-            for prefix in args.filters
-            for name in tests if name.startswith(prefix) ])))
+        regexes = [re.compile(pattern) for pattern in args.filters]
+        return sorted(list(set([name for pattern in regexes
+                                for name in tests if pattern.match(name)])))
     if not args.benchmarks:
         return tests
     return sorted(list(set(tests).intersection(set(args.benchmarks))))
@@ -352,7 +352,7 @@ def positive_int(value):
 
 def main():
     parser = argparse.ArgumentParser(
-        epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f Suffix -f Drop'
+        epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f .*Suffix.*'
     )
     subparsers = parser.add_subparsers(
         title='Swift benchmark driver commands',
@@ -366,8 +366,8 @@ def main():
         help='benchmark to run (default: all)', nargs='*', metavar="BENCHMARK")
     benchmarks_group.add_argument(
         '-f', '--filter', dest='filters', action='append',
-        help='run all tests whose name starts with PREFIX, '+
-        'multiple filters are supported', metavar="PREFIX")
+        help='run all tests whose name match regular expression PATTERN, ' +
+        'multiple filters are supported', metavar="PATTERN")
     parent_parser.add_argument(
         '-t', '--tests',
         help='directory containing Benchmark_O{,none,unchecked} ' +
