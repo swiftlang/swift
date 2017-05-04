@@ -179,11 +179,6 @@ struct SubstOptions : public OptionSet<SubstFlags> {
   SubstOptions(SubstFlags flags) : OptionSet(flags) { }
 
   SubstOptions(OptionSet<SubstFlags> options) : OptionSet(options) { }
-
-  SubstOptions(OptionSet<SubstFlags> options,
-              GetTentativeTypeWitness getTentativeTypeWitness)
-    : OptionSet(options),
-      getTentativeTypeWitness(std::move(getTentativeTypeWitness)) { }
 };
 
 inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
