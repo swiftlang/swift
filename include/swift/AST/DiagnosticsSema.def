@@ -1909,7 +1909,8 @@ ERROR(inheritance_from_cf_class,none,
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "cannot inherit from class %0 because it is only visible via the "
       "Objective-C runtime", (Identifier))
-
+WARNING(class_inherits_anyobject,none,
+        "conformance of class %0 to 'AnyObject' is redundant", (Type))
 
 // Enums
 ERROR(enum_case_access,none,
