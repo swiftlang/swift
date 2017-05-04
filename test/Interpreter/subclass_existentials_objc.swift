@@ -1,4 +1,4 @@
-//===--- subclass_existentials.swift --------------------------------------===//
+//===--- subclass_existentials_objc.swift ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
