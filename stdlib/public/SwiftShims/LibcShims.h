@@ -111,6 +111,29 @@ double _swift_stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
 }
 
+// TLS - thread local storage
+
+// FIXME: multi-platform
+typedef unsigned long __swift_pthread_key_t;
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_pthread_key_create(
+  __swift_pthread_key_t * _Nonnull key, void
+  (* _Nullable destructor)(void * _Nullable )
+);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void * _Nullable _swift_stdlib_pthread_getspecific(__swift_pthread_key_t key);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_pthread_setspecific(
+  __swift_pthread_key_t key, const void * _Nullable value
+);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_pthread_key_t _swift_stdlib_PTHREAD_KEYS_MAX(void);
+
+
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
 static inline SWIFT_ALWAYS_INLINE
