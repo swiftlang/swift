@@ -85,6 +85,10 @@ private:
   void analyzeUsesOfBox(SILInstruction *source);
   void analyzeProjection(ProjectBoxInst *projection);
 
+  /// Note that the given instruction is a use of the box (or a use of
+  /// a projection from it) in which the address escapes.
+  void noteEscapingUse(SILInstruction *inst);
+
   void propagateEscapes();
   void propagateEscapesFrom(SILBasicBlock *bb);
 
@@ -137,20 +141,7 @@ void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
       continue;
 
     // Treat everything else as an escape:
-
-    // Add it to the escapes set.
-    Escapes.insert(user);
-
-    // Record this point as escaping.
-    auto userBB = user->getParent();
-    auto &state = StateMap[userBB];
-    if (!state.IsInWorklist) {
-      state.HasEscape = true;
-      state.IsInWorklist = true;
-      Worklist.push_back(userBB);
-    }
-    assert(state.HasEscape);
-    assert(state.IsInWorklist);
+    noteEscapingUse(user);
   }
 
   assert(!Accesses.empty() && "didn't find original access!");
@@ -165,7 +156,32 @@ void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
       if (access->getEnforcement() == SILAccessEnforcement::Unknown)
         Accesses.push_back(access);
     }
+
+    // FIXME: We should distinguish between escapes via arguments to escaping
+    // closures (which must propagate to to all reachable blocks because they
+    // could access the address at any later point in the program) and
+    // non-escaping closures (which only force dynamic enforcement for
+    // accesses that are in progress at the time of the escape).
+    if (auto partialApply = dyn_cast<PartialApplyInst>(user)) {
+      noteEscapingUse(partialApply);
+    }
   }
+}
+
+void SelectEnforcement::noteEscapingUse(SILInstruction *inst) {
+  // Add it to the escapes set.
+  Escapes.insert(inst);
+
+  // Record this point as escaping.
+  auto userBB = inst->getParent();
+  auto &state = StateMap[userBB];
+  if (!state.IsInWorklist) {
+    state.HasEscape = true;
+    state.IsInWorklist = true;
+    Worklist.push_back(userBB);
+  }
+  assert(state.HasEscape);
+  assert(state.IsInWorklist);
 }
 
 void SelectEnforcement::propagateEscapes() {
