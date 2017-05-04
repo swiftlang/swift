@@ -472,6 +472,19 @@ void LargeValueVisitor::visitApply(ApplySite applySite) {
   if (!isLargeLoadableType(genEnv, currType, pass.Mod) &&
       (currType != newType)) {
     pass.applies.push_back(applySite.getInstruction());
+    return;
+  }
+  // Check callee - need new generic env:
+  SILFunctionType *origSILFunctionType = applySite.getSubstCalleeType();
+  GenericEnvironment *genEnvCallee = nullptr;
+  if (origSILFunctionType->isPolymorphic()) {
+    genEnvCallee = getGenericEnvironment(
+        applySite.getModule(), CanSILFunctionType(origSILFunctionType));
+  }
+  SILFunctionType *newSILFunctionType =
+      getNewSILFunctionTypePtr(genEnvCallee, origSILFunctionType, pass.Mod);
+  if (origSILFunctionType != newSILFunctionType) {
+    pass.applies.push_back(applySite.getInstruction());
   }
 }
 
