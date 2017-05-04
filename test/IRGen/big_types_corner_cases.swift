@@ -32,6 +32,20 @@ public func f3_uses_f2() {
 // CHECK: call swiftcc void %16(%T22big_types_corner_cases9BigStructV* noalias nocapture sret %call.aggresult1, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable
 // CHECK: ret void
 
+public func f4_tuple_use_of_f2() {
+  let x = BigStruct()
+  let tupleWithFunc = (f2_returns_f1(), x)
+  let useOfF2 = tupleWithFunc.0
+  let _ = useOfF2(x)
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases18f4_tuple_use_of_f2yyF()
+// CHECK: [[TUPLE:%.*]] = call swiftcc { i8*, %swift.refcounted* } @_T022big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF()
+// CHECK: [[TUPLE_EXTRACT:%.*]] = extractvalue { i8*, %swift.refcounted* } [[TUPLE]], 0
+// CHECK: [[CAST_EXTRACT:%.*]] = bitcast i8* [[TUPLE_EXTRACT]] to void (%T22big_types_corner_cases9BigStructV*, %T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
+// CHECK:  call swiftcc void [[CAST_EXTRACT]](%T22big_types_corner_cases9BigStructV* noalias nocapture sret %call.aggresult1, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable
+// CHECK: ret void
+
 public struct MyStruct {
   public let a: Int
   public let b: String?
