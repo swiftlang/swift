@@ -120,6 +120,7 @@ extension String {
 }
 
 extension String : Equatable {
+  @inline(__always)
   public static func == (lhs: String, rhs: String) -> Bool {
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
