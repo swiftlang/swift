@@ -5453,6 +5453,7 @@ bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
   case RequirementCheckResult::UnsatisfiedDependency:
     return true;
   case RequirementCheckResult::Failure:
+  case RequirementCheckResult::SubstitutionFailure:
     return false;
   case RequirementCheckResult::Success: {
     bool anyUnsatisfied = false;

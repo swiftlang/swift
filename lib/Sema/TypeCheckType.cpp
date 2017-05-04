@@ -764,6 +764,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     case RequirementCheckResult::UnsatisfiedDependency:
       return Type();
     case RequirementCheckResult::Failure:
+    case RequirementCheckResult::SubstitutionFailure:
       return ErrorType::get(Context);
     case RequirementCheckResult::Success:
       break;
