@@ -166,8 +166,11 @@ enum class SubstFlags {
 
 /// Options for performing substitutions into a type.
 struct SubstOptions : public OptionSet<SubstFlags> {
-  typedef std::function<Type(const NormalProtocolConformance *,
-                             AssociatedTypeDecl *)>
+  // Note: The unfortunate use of TypeBase * here, rather than Type,
+  // is due to a libc++ quirk that requires the result type to be
+  // complete.
+  typedef std::function<TypeBase *(const NormalProtocolConformance *,
+                                   AssociatedTypeDecl *)>
     GetTentativeTypeWitness;
 
   /// Function that retrieves a tentative type witness for a protocol

@@ -490,7 +490,8 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
   if (getState() == ProtocolConformanceState::CheckingTypeWitnesses) {
     // If there is a tentative-type-witness function, use it.
     if (options.getTentativeTypeWitness) {
-      if (Type witnessType = options.getTentativeTypeWitness(this, assocType))
+     if (Type witnessType =
+           Type(options.getTentativeTypeWitness(this, assocType)))
         return { witnessType, nullptr };
     }
 

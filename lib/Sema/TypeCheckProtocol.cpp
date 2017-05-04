@@ -4204,10 +4204,10 @@ void ConformanceChecker::resolveTypeWitnesses() {
       SubstOptions options(None);
       options.getTentativeTypeWitness =
         [&](const NormalProtocolConformance *conformance,
-            AssociatedTypeDecl *assocType) -> Type {
-          if (conformance != Conformance) return Type(0);
+            AssociatedTypeDecl *assocType) -> TypeBase * {
+          if (conformance != Conformance) return nullptr;
 
-          return typeWitnesses.begin(assocType)->first;
+          return typeWitnesses.begin(assocType)->first.getPointer();
         };
 
       auto substitutions =
