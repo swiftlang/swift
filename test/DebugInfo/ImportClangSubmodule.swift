@@ -1,13 +1,12 @@
-// RUN: rm -rf %t && mkdir -p %t
-// REQUIRES: OS=macosx
+// RUN: %target-swift-frontend -emit-ir %s -g -I %S/Inputs -o - | %FileCheck %s
 
-// RUN: %target-swift-frontend -emit-ir %s -g -o - | %FileCheck %s
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "Bar",
+// CHECK-SAME:             scope: ![[SUBMODULE:[0-9]+]]
 
-// CHECK: !DIImportedEntity(
-// CHECK: tag: DW_TAG_imported_module{{.*}}entity: ![[C:.*]], line: [[@LINE+1]])
-import Darwin.C
+// CHECK: ![[SUBMODULE]] = !DIModule(scope: ![[CLANGMODULE:[0-9]+]],
+// CHECK-SAME:                       name: "SubModule",
+// CHECK: ![[CLANGMODULE]] = !DIModule(scope: null, name: "ClangModule",
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], line: [[@LINE+1]])
+import ClangModule.SubModule
 
-let irrational = sqrt(2 as Double)
-
-// CHECK: ![[C]] = !DIModule(scope: ![[Darwin:.*]], name: "C",
-// CHECK: ![[Darwin]] = !DIModule(scope: null, name: "Darwin",
+let bar = Bar()

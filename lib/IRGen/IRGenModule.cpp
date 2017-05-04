@@ -97,8 +97,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
   case IRGenDebugInfoKind::ASTTypes:
-    // TODO: Enable -gmodules for the clang code generator.
   case IRGenDebugInfoKind::DwarfTypes:
+    CGO.DebugTypeExtRefs = true;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
@@ -380,7 +380,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   UseSwiftCC = (SwiftCC == llvm::CallingConv::Swift);
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
-    DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
+    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
+                                                     Module, SF);
 
   initClangTypeConverter();
 

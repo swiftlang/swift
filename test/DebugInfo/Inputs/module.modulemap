@@ -1,0 +1,8 @@
+module ClangModule {
+  header "ClangModule.h"
+  export *
+  module SubModule {
+    header "SubModule.h"
+    export *
+  }
+}
