@@ -58,7 +58,7 @@ case _: // expected-warning {{case is already handled by previous patterns; cons
 
 var e : Any = 0
 
-switch e { // expected-error {{switch must be exhaustive, consider adding a default clause:}}
+switch e { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
 // 'is' pattern.
 case is Int,
      is A<Int>,
@@ -152,7 +152,7 @@ struct ContainsEnum {
   }
 
   func member(_ n: Possible<Int>) {
-    switch n { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+    switch n { // expected-error {{switch must be exhaustive}}
     // expected-note@-1 {{missing case: '.Mere(_)'}}
     // expected-note@-2 {{missing case: '.Twain(_, _)'}}
     case ContainsEnum.Possible<Int>.Naught,
@@ -166,7 +166,7 @@ struct ContainsEnum {
 }
 
 func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
-  switch n { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  switch n { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Mere(_)'}}
   // expected-note@-2 {{missing case: '.Twain(_, _)'}}
   case ContainsEnum.Possible<Int>.Naught,
