@@ -681,12 +681,14 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
 void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
   switch (NumMembersAndParamIdx.first) {
-    case -1: Buffer << "RL"; return; // substitution
+    case -1: Buffer << "RL"; break; // substitution
     case 0: Buffer << "Rl"; break;
     case 1: Buffer << "Rm"; break;
     default: Buffer << "RM"; break;
   }
-  mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
+  // If not a substitution, mangle the dependent generic param index.
+  if (NumMembersAndParamIdx.first != -1)
+    mangleDependentGenericParamIndex(NumMembersAndParamIdx.second);
   assert(node->getChild(1)->getKind() == Node::Kind::Identifier);
   assert(node->getChild(1)->getText().size() == 1);
   Buffer << node->getChild(1)->getText()[0];
