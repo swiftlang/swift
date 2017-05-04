@@ -69,6 +69,17 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
 };
 
+enum class KeyPathComponentKindEncoding : uint8_t {
+  StoredProperty,
+  GettableProperty,
+  SettableProperty,
+};
+enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
+  Property,
+  Function,
+  DeclRef,
+};
+
 // Constants for packing an encoded CheckedCastKind and
 // CastConsumptionKind together.
 enum {
