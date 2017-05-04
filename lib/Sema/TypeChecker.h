@@ -367,7 +367,9 @@ public:
 };
 
 /// The result of `checkGenericRequirement`.
-enum class RequirementCheckResult { Success, Failure, UnsatisfiedDependency };
+enum class RequirementCheckResult {
+  Success, Failure, UnsatisfiedDependency, SubstitutionFailure
+};
 
 class ConformsToProtocolResult {
   Optional<ProtocolConformanceRef> Data;
@@ -1349,7 +1351,8 @@ public:
       LookupConformanceFn conformances,
       UnsatisfiedDependency *unsatisfiedDependency,
       ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
-      GenericRequirementsCheckListener *listener = nullptr);
+      GenericRequirementsCheckListener *listener = nullptr,
+      SubstOptions options = None);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;

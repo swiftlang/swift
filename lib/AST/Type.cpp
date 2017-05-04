@@ -2909,17 +2909,11 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
 
-    // If we have an unsatisfied type witness while we're checking the
-    // conformances we're supposed to skip this conformance's unsatisfied type
-    // witnesses, and we have an unsatisfied type witness, return
-    // "missing".
-    if (conformance->getConcrete()->getRootNormalConformance()->getState()
-          == ProtocolConformanceState::CheckingTypeWitnesses &&
-        !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
-      return failed();
-
+    // Retrieve the type witness.
     auto witness =
-      conformance->getConcrete()->getTypeWitness(assocType, resolver);
+      conformance->getConcrete()->getTypeWitness(assocType, resolver, options);
+    if (!witness)
+      return failed();
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.
