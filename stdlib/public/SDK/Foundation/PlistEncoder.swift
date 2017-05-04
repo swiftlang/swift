@@ -90,7 +90,7 @@ fileprivate class _PlistEncoder : Encoder {
     let options: PropertyListEncoder._Options
 
     /// The path to the current point in encoding.
-    var codingPath: [CodingKey?] = []
+    var codingPath: [CodingKey?]
 
     /// Contextual user-provided information for use during encoding.
     var userInfo: [CodingUserInfoKey : Any] {
@@ -100,9 +100,10 @@ fileprivate class _PlistEncoder : Encoder {
     // MARK: - Initialization
 
     /// Initializes `self` with the given top-level encoder options.
-    init(options: PropertyListEncoder._Options) {
+    init(options: PropertyListEncoder._Options, codingPath: [CodingKey?] = []) {
         self.options = options
         self.storage = _PlistEncodingStorage()
+        self.codingPath = codingPath
     }
 
     // MARK: - Coding Path Actions
@@ -507,16 +508,34 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
     init(referencing encoder: _PlistEncoder, wrapping array: NSMutableArray, at index: Int) {
         self.encoder = encoder
         self.reference = .array(array, index)
-        super.init(options: encoder.options)
+        super.init(options: encoder.options, codingPath: encoder.codingPath)
     }
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
     init(referencing encoder: _PlistEncoder, wrapping dictionary: NSMutableDictionary, key: String) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, key)
-        super.init(options: encoder.options)
+        super.init(options: encoder.options, codingPath: encoder.codingPath)
     }
 
+    // MARK: - Overridden Implementations
+
+    /// Asserts that we can add a new container at this coding path. See _PlistEncoder.assertCanRequestNewContainer for the logic behind this.
+    /// This differs from super's implementation only in the condition: we need to account for the fact that we copied our reference's coding path, but not its list of containers, so the counts are mismatched.
+    override func assertCanRequestNewContainer() {
+        guard self.storage.count == self.codingPath.count - self.encoder.codingPath.count else {
+            let previousContainerType: String
+            if self.storage.containers.last is NSDictionary {
+                previousContainerType = "keyed"
+            } else if self.storage.containers.last is NSArray {
+                previousContainerType = "unkeyed"
+            } else {
+                previousContainerType = "single value"
+            }
+
+            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
+        }
+    }
 
     // MARK: - Deinitialization
 
