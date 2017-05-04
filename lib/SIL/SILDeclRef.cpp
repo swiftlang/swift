@@ -455,6 +455,18 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     }
   }
 
+  // ivar initializers and destroyers are completely contained within the class
+  // from which they come, and never get seen externally.
+  if (isIVarInitializerOrDestroyer()) {
+    switch (d->getEffectiveAccess()) {
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return maybeAddExternal(SILLinkage::Private);
+    default:
+      return maybeAddExternal(SILLinkage::Hidden);
+    }
+  }
+
   // Calling convention thunks have shared linkage.
   if (isForeignToNativeThunk())
     return SILLinkage::Shared;
