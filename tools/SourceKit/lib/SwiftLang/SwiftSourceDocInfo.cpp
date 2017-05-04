@@ -613,9 +613,16 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
-static Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD) {
+static Optional<unsigned>
+getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
+  if (Cursor.isInvalid())
+    return None;
   SourceLoc Loc;
   if (auto PD = dyn_cast<ParamDecl>(VD)) {
+
+    // Avoid returning parent loc for internal-only names.
+    if (PD->getArgumentNameLoc().isValid() && PD->getNameLoc() == Cursor)
+      return None;
     auto *DC = PD->getDeclContext();
     switch (DC->getContextKind()) {
       case DeclContextKind::SubscriptDecl:
@@ -642,6 +649,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
                                   const Type ContainerTy,
                                   bool IsRef,
                                   Optional<unsigned> OrigBufferID,
+                                  SourceLoc CursorLoc,
                                   SwiftLangSupport &Lang,
                                   const CompilerInvocation &Invok,
                             ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps,
@@ -875,7 +883,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
-  Info.ParentNameOffset = getParamParentNameOffset(VD);
+  Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
   Receiver(Info);
   return false;
 }
@@ -1152,7 +1160,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
         bool Failed = passCursorInfoForDecl(VD, MainModule,
                                             SemaTok.ContainerType,
                                             SemaTok.ContainerType,
-                                            SemaTok.IsRef, BufferID, Lang,
+                                            SemaTok.IsRef, BufferID, Loc, Lang,
                                             CompInvok, getPreviousASTSnaps(),
                                             Receiver);
         if (Failed) {
@@ -1406,7 +1414,7 @@ void SwiftLangSupport::getCursorInfo(
           // it's not necessary.
           passCursorInfoForDecl(
               Entity.Dcl, /*MainModule*/ nullptr, Type(), Type(), Entity.IsRef,
-              /*OrigBufferID=*/None, *this, Invok, {}, Receiver);
+              /*OrigBufferID=*/None, SourceLoc(), *this, Invok, {}, Receiver);
         }
       } else {
         Receiver({});
@@ -1593,8 +1601,8 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
         }
         bool Failed =
             passCursorInfoForDecl(VD, MainModule, selfTy, Type(),
-                                  /*IsRef=*/false, BufferID, Lang, CompInvok,
-                                  PreviousASTSnaps, Receiver);
+                                  /*IsRef=*/false, BufferID, SourceLoc(), Lang,
+                                  CompInvok, PreviousASTSnaps, Receiver);
         if (Failed) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
