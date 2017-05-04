@@ -133,6 +133,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF8.swift
   Substring.swift.gyb
   SwiftNativeNSArray.swift
+  ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift.gyb
   UnicodeEncoding.swift
