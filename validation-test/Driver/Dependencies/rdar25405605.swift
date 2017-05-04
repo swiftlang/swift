@@ -58,7 +58,7 @@
 
 // RUN: cp %S/Inputs/rdar25405605/helper-3.swift %t/helper.swift
 // RUN: touch -t 201401240007 %t/helper.swift
-// RUN: cd %t && %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | %FileCheck -check-prefix=CHECK-3 %s
+// RUN: cd %t && not %target-build-swift -c -incremental -output-file-map %S/Inputs/rdar25405605/output.json -parse-as-library ./main.swift ./helper.swift -parseable-output -j1 -module-name main 2>&1 | %FileCheck -check-prefix=CHECK-3 %s
 
 // CHECK-3-NOT: warning
 // CHECK-3: {{^{$}}
