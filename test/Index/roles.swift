@@ -74,6 +74,10 @@ func aCalledFunction(a: Int, b: inout Int) {
   // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
   // CHECK: [[@LINE-3]]:7 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
   // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+
+  _ = { ignored in ignored + 1}
+  // CHECK-NOT: [[@LINE-1]]:9 {{.*}} | ignored | {{.*}}
+
 }
 
 aCalledFunction(a: 1, b: &z)
