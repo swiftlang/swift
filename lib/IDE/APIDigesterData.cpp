@@ -208,7 +208,7 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem:
   case APIDiffItemKind::ADK_OverloadedFuncInfo:
-    llvm_unreachable("should be handled above.");
+    return true;
   }
 }
 
