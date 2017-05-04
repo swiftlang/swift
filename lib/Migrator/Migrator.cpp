@@ -1,4 +1,4 @@
-//===--- Migrator.cpp -----------------------------------------------------===////
+//===--- Migrator.cpp -----------------------------------------------------===//
 // This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors

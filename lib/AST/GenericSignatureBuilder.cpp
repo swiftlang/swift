@@ -2567,7 +2567,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
     return Type();
   };
 
-  // An an inferred same-type requirement between the two type declarations
+  // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
     Type firstType = formUnsubstitutedType(first);
