@@ -26,5 +26,5 @@ protocol Superproto {
   func lala()
 }
 
-class MyLittleCFType : _CFObject {
+class MyLittleCFType {
 }
