@@ -10,4 +10,5 @@
 
 // RUN: echo '#include "header2.h"' > %t.m
 // RUN: %sourcekitd-test -req=interface-gen -header %S/Inputs/header2.h -swift-version=4 -- -fsyntax-only %t.m -I %S/Inputs > %t.header2.swift4.response
-// RUN: diff -u %s.header2.swift4.response %t.header2.swift4.response
+// RUN: %FileCheck -input-file %t.header2.swift4.response %s -check-prefix=SWIFT4
+// SWIFT4: public func show_only_for_swift_4()
