@@ -94,6 +94,9 @@ def async : Flag<["-"], "async">,
 def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
 def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
 
+def swift_version : Separate<["-"], "swift-version">, HelpText<"the swift version to use">;
+def swift_version_EQ : Joined<["-"], "swift-version=">, Alias<swift_version>;
+
 def swift_name : Separate<["-"], "swift-name">,
   HelpText<"Swift name to translate from">;
 

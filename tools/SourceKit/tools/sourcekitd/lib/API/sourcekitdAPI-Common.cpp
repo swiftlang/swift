@@ -145,6 +145,8 @@ UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
 UIdent sourcekitd::KeyNameKind("key.namekind");
 UIdent sourcekitd::KeyLocalizationKey("key.localization_key");
 
+UIdent sourcekitd::KeySwiftVersion("key.swift_version");
+
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
@@ -243,7 +245,9 @@ static UIdent *OrderedKeys[] = {
   &KeyArgNames,
   &KeySelectorPieces,
   &KeyNameKind,
+  &KeyLocalizationKey,
 
+  &KeySwiftVersion,
 };
 
 static unsigned findPrintOrderForDictKey(UIdent Key) {
