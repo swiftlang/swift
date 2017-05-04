@@ -385,6 +385,55 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     }
   }
 
+  // Retrieve the location of the start of the inheritance clause.
+  auto getStartLocOfInheritanceClause = [&] {
+    if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(decl)) {
+      if (auto genericParams = genericTypeDecl->getGenericParams())
+        return genericParams->getSourceRange().End;
+
+      return genericTypeDecl->getNameLoc();
+    }
+
+    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
+      return typeDecl->getNameLoc();
+
+    if (auto ext = dyn_cast<ExtensionDecl>(decl))
+      return ext->getSourceRange().End;
+
+    return SourceLoc();
+  };
+
+  // Compute the source range to be used when removing something from an
+  // inheritance clause.
+  auto getRemovalRange = [&](unsigned i) {
+    // If there is just one entry, remove the entire inheritance clause.
+    if (inheritedClause.size() == 1) {
+      SourceLoc start = getStartLocOfInheritanceClause();
+      SourceLoc end = inheritedClause[i].getSourceRange().End;
+      return SourceRange(Lexer::getLocForEndOfToken(Context.SourceMgr, start),
+                         Lexer::getLocForEndOfToken(Context.SourceMgr, end));
+    }
+
+    // If we're at the first entry, remove from the start of this entry to the
+    // start of the next entry.
+    if (i == 0) {
+      return SourceRange(inheritedClause[i].getSourceRange().Start,
+                         inheritedClause[i+1].getSourceRange().Start);
+    }
+
+    // Otherwise, remove from the end of the previous entry to the end of this
+    // entry.
+    SourceLoc afterPriorLoc =
+      Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                 inheritedClause[i-1].getSourceRange().End);
+
+    SourceLoc afterMyEndLoc =
+      Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                 inheritedClause[i].getSourceRange().End);
+
+    return SourceRange(afterPriorLoc, afterMyEndLoc);
+  };
+
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
@@ -424,16 +473,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
-      SourceLoc afterPriorLoc
-        = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     inheritedClause[i-1].getSourceRange().End);
-      SourceLoc afterMyEndLoc
-        = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     inherited.getSourceRange().Start);
-
+      auto removeRange = getRemovalRange(i);
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
-        .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
+        .fixItRemoveChars(removeRange.Start, removeRange.End)
         .highlight(knownType->second);
       inherited.setInvalidType(Context);
       continue;
@@ -457,6 +500,18 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         }
         continue;
       }
+
+      // Swift 3 compatibility:
+      if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
+          inheritedTy->isAnyObject()) {
+        auto classDecl = cast<ClassDecl>(decl);
+        auto removeRange = getRemovalRange(i);
+        diagnose(inherited.getSourceRange().Start,
+                 diag::class_inherits_anyobject,
+                 classDecl->getDeclaredInterfaceType())
+          .fixItRemoveChars(removeRange.Start, removeRange.End);
+        continue;
+      }
     }
     
     // If this is an enum inheritance clause, check for a raw type.
@@ -472,17 +527,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
-        SourceLoc afterPriorLoc
-          = Lexer::getLocForEndOfToken(
-              Context.SourceMgr,
-              inheritedClause[i-1].getSourceRange().End);
-        SourceLoc afterMyEndLoc
-          = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                       inherited.getSourceRange().End);
+        auto removeRange = getRemovalRange(i);
 
         diagnose(inherited.getSourceRange().Start,
                  diag::raw_type_not_first, inheritedTy)
-          .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
+          .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
 
@@ -532,17 +581,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
-        SourceLoc afterPriorLoc
-          = Lexer::getLocForEndOfToken(
-              Context.SourceMgr,
-              inheritedClause[i-1].getSourceRange().End);
-        SourceLoc afterMyEndLoc
-          = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                       inherited.getSourceRange().End);
-
+        auto removeRange = getRemovalRange(i);
         diagnose(inherited.getSourceRange().Start,
                  diag::superclass_not_first, inheritedTy)
-          .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
+          .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
 
