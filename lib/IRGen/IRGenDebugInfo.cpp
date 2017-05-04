@@ -467,7 +467,9 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
       }
 
       SmallVector<char, 64> Buf;
-      StringRef Name = (VD->getName().str() + Twine(Kind)).toStringRef(Buf);
+      // TODO: Handle special names
+      StringRef Name = (VD->getBaseName().getIdentifier().str() + Twine(Kind))
+                           .toStringRef(Buf);
       return BumpAllocatedString(Name);
     }
 

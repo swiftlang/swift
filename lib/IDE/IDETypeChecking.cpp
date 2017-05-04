@@ -32,7 +32,7 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
         continue;
 
       // Skip decls with empty names, e.g. setter/getters for properties.
-      if (VD->getName().empty())
+      if (VD->getBaseName().empty())
         continue;
 
       ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
