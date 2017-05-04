@@ -298,38 +298,67 @@ void printRemap(const StringRef OriginalFilename,
         OffsetIncrement += Diff.text.size();
         break;
       case decltype(DMP)::INSERT:
-        if (!Replacements.empty()) {
-          auto &Prev = Replacements.back();
-          if (Prev.endOffset() == Offset) {
-            if (Prev.isRemove()) {
-              Prev.Text = Diff.text;
-              break;
-            } else if (Prev.isInsert()) {
-              Prev.Text += Diff.text;
-              break;
-            }
-          }
-        }
         Replacements.push_back({ Offset, 0, Diff.text });
         break;
       case decltype(DMP)::DELETE:
-        if (!Replacements.empty()) {
-          auto &Prev = Replacements.back();
-          if (Prev.endOffset() == Offset) {
-            if (Prev.isInsert()) {
-              Prev.Remove = Diff.text.size();
-              break;
-            } else if (Prev.isRemove()) {
-              Prev.Remove += Diff.text.size();
-              break;
-            }
-          }
-        }
         Replacements.push_back({ Offset, Diff.text.size(), "" });
         OffsetIncrement = Diff.text.size();
         break;
     }
     Offset += OffsetIncrement;
+  }
+
+  assert(Offset == InputText.size());
+
+  // Combine removal edits with previous edits that are consecutive.
+  for (unsigned i = 1; i < Replacements.size();) {
+    auto &Previous = Replacements[i-1];
+    auto &Current = Replacements[i];
+    assert(Current.Offset >= Previous.Offset + Previous.Remove);
+    unsigned Distance = Current.Offset-(Previous.Offset + Previous.Remove);
+    if (Distance > 0) {
+      ++i;
+      continue;
+    }
+    if (!Current.Text.empty()) {
+      ++i;
+      continue;
+    }
+    Previous.Remove += Current.Remove;
+    Replacements.erase(Replacements.begin() + i);
+  }
+
+  // Combine removal edits with next edits that are consecutive.
+  for (unsigned i = 0; i + 1 < Replacements.size();) {
+    auto &Current = Replacements[i];
+    auto &nextRep = Replacements[i + 1];
+    assert(nextRep.Offset >= Current.Offset + Current.Remove);
+    unsigned Distance = nextRep.Offset - (Current.Offset + Current.Remove);
+    if (Distance > 0) {
+      ++i;
+      continue;
+    }
+    if (!Current.Text.empty()) {
+      ++i;
+      continue;
+    }
+    nextRep.Offset -= Current.Remove;
+    nextRep.Remove += Current.Remove;
+    Replacements.erase(Replacements.begin() + i);
+  }
+
+  // For remaining removal diffs, include the byte adjacent to the range on the
+  // left. libclang applies the diffs as byte diffs, so it doesn't matter if the
+  // byte is part of a multi-byte UTF8 character.
+  for (unsigned i = 0; i < Replacements.size(); ++i) {
+    auto &Current = Replacements[i];
+    if (!Current.Text.empty())
+      continue;
+    if (Current.Offset == 0)
+      continue;
+    Current.Offset -= 1;
+    Current.Remove += 1;
+    Current.Text = InputText.substr(Current.Offset, 1);
   }
 
   for (auto Rep = Replacements.begin(); Rep != Replacements.end(); ++Rep) {
