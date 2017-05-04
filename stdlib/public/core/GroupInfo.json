@@ -163,6 +163,7 @@
     "REPL.swift",
     "Runtime.swift",
     "Shims.swift",
+    "ThreadLocalStorage.swift",
     "Unmanaged.swift",
     "Availability.swift",
     "CommandLine.swift",
