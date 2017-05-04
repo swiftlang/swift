@@ -112,6 +112,8 @@ public:
 
   static bool classof(const TypeRepr *T) { return true; }
 
+  TypeRepr *getBase() const;
+
   /// Walk this type representation.
   TypeRepr *walk(ASTWalker &walker);
   TypeRepr *walk(ASTWalker &&walker) {
@@ -463,7 +465,6 @@ public:
   ArrayTypeRepr(TypeRepr *Base, SourceRange Brackets)
     : TypeRepr(TypeReprKind::Array), Base(Base), Brackets(Brackets) { }
 
-  TypeRepr *getBase() const { return Base; }
   SourceRange getBrackets() const { return Brackets; }
 
   static bool classof(const TypeRepr *T) {
@@ -524,7 +525,6 @@ public:
     : TypeRepr(TypeReprKind::Optional), Base(Base), QuestionLoc(Question) {
   }
 
-  TypeRepr *getBase() const { return Base; }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
   static bool classof(const TypeRepr *T) {
@@ -557,7 +557,6 @@ public:
       Base(Base),
       ExclamationLoc(Exclamation) {}
 
-  TypeRepr *getBase() const { return Base; }
   SourceLoc getExclamationLoc() const { return ExclamationLoc; }
 
   static bool classof(const TypeRepr *T) {
@@ -767,7 +766,6 @@ public:
     : TypeRepr(TypeReprKind::Metatype), Base(Base), MetaLoc(MetaLoc) {
   }
 
-  TypeRepr *getBase() const { return Base; }
   SourceLoc getMetaLoc() const { return MetaLoc; }
 
   static bool classof(const TypeRepr *T) {
@@ -796,7 +794,6 @@ public:
     : TypeRepr(TypeReprKind::Protocol), Base(Base), ProtocolLoc(ProtocolLoc) {
   }
 
-  TypeRepr *getBase() const { return Base; }
   SourceLoc getProtocolLoc() const { return ProtocolLoc; }
 
   static bool classof(const TypeRepr *T) {
@@ -824,8 +821,7 @@ public:
   InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
   : TypeRepr(TypeReprKind::InOut), Base(Base), InOutLoc(InOutLoc) {
   }
-  
-  TypeRepr *getBase() const { return Base; }
+
   SourceLoc getInOutLoc() const { return InOutLoc; }
   
   static bool classof(const TypeRepr *T) {
