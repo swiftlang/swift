@@ -518,7 +518,7 @@ static bool performCompile(CompilerInstance &Instance,
   ASTContext &Context = Instance.getASTContext();
 
   if (Invocation.getMigratorOptions().shouldRunMigrator()) {
-    migrator::updateCodeAndEmitRemap(Instance.get(), Invocation);
+    migrator::updateCodeAndEmitRemap(&Instance, Invocation);
   }
 
   if (Action == FrontendOptions::REPL) {
