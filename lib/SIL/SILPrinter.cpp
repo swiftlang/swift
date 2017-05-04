@@ -2099,7 +2099,7 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "\n\n";
 }
 
-void SILGlobalVariable::dump(bool Verbose) const {
+void swift::SILGlobalVariable::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
 }
 

@@ -96,7 +96,7 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment, arena);
 }
 
-bool CanType::isActuallyCanonicalOrNull() const {
+bool swift::CanType::isActuallyCanonicalOrNull() const {
   return getPointer() == nullptr ||
          getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
          getPointer()->isCanonical();
