@@ -210,6 +210,7 @@ public:
 
   const ProtocolTypeRef *createProtocolType(const std::string &mangledName,
                                             const std::string &moduleName,
+                                            const std::string &privateDiscriminator,
                                             const std::string &name) {
     return ProtocolTypeRef::create(*this, mangledName);
   }

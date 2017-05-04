@@ -579,6 +579,14 @@
 // CHECK: TypesToReflect.ClassBoundP
 // CHECK: --------------------------
 
+// CHECK: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: -------------------------------------------------------------------------
+
+// CHECK: TypesToReflect.HasFileprivateProtocol
+// CHECK: -------------------------------------
+// CHECK: x: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: (protocol TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}}))
+
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
 // CHECK: - TypesToReflect.C1 : TypesToReflect.ClassBoundP

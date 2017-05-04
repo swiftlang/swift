@@ -19,3 +19,9 @@ public protocol P4 {
 public protocol ClassBoundP: class {
   associatedtype Inner
 }
+
+fileprivate protocol FileprivateProtocol {}
+
+public struct HasFileprivateProtocol {
+  fileprivate let x: FileprivateProtocol
+}
