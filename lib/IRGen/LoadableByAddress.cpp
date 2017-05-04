@@ -433,11 +433,11 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
     return false;
   }
   auto callee = applySite.getCallee();
-  if (dyn_cast<ProjectBlockStorageInst>(callee)) {
+  if (isa<ProjectBlockStorageInst>(callee)) {
     return false;
   } else if (LoadInst *instr = dyn_cast<LoadInst>(callee)) {
     auto loadedSrcValue = instr->getOperand();
-    if (dyn_cast<ProjectBlockStorageInst>(loadedSrcValue)) {
+    if (isa<ProjectBlockStorageInst>(loadedSrcValue)) {
       return false;
     }
   }
@@ -1877,7 +1877,7 @@ void LoadableByAddress::run() {
           }
         } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
           auto dest = SI->getDest();
-          if (dyn_cast<ProjectBlockStorageInst>(dest)) {
+          if (isa<ProjectBlockStorageInst>(dest)) {
             storeToBlockStorageInstrs.insert(SI);
           }
         }

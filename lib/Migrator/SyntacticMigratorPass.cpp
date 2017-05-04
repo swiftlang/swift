@@ -316,7 +316,7 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
   void handleFuncRename(ValueDecl *FD, Expr* FuncRefContainer, Expr *Arg) {
     bool IgnoreBase = false;
     if (auto View = getFuncRename(FD, IgnoreBase)) {
-      if(!IgnoreBase) {
+      if (!IgnoreBase) {
         ReferenceCollector Walker(FD);
         Walker.walk(FuncRefContainer);
         Editor.replace(Walker.Result, View.base());
@@ -337,7 +337,7 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
 
   void handleFunctionCallToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,
                                           Expr *Arg) {
-    for(auto *Item :getRelatedDiffItems(FD)) {
+    for (auto *Item : getRelatedDiffItems(FD)) {
       if (auto *CD = dyn_cast<CommonDiffItem>(Item)) {
         switch (CD->DiffKind) {
         case NodeAnnotation::GetterToProperty: {

@@ -415,7 +415,7 @@ public:
         APIDiffItem *Item = serializeDiffItem(Allocator,
           cast<llvm::yaml::MappingNode>(&*It));
         auto &Bag = Data[Item->getKey()];
-        if(std::find_if(Bag.begin(), Bag.end(),
+        if (std::find_if(Bag.begin(), Bag.end(),
             [&](APIDiffItem* I) { return *Item == *I; }) == Bag.end()) {
           Bag.push_back(Item);
           AllItems.push_back(Item);
