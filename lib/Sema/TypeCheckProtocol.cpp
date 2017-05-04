@@ -4012,6 +4012,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   typedef decltype(typeWitnesses)::ScopeTy TypeWitnessesScope;
   unsigned numTypeWitnesses = 0;
   SmallVector<InferredTypeWitnessesSolution, 4> solutions;
+  SmallVector<InferredTypeWitnessesSolution, 4> nonViableSolutions;
 
   // Information to use for diagnosing failures when we don't have
   // something more specific.
@@ -4194,13 +4195,44 @@ void ConformanceChecker::resolveTypeWitnesses() {
         if (replaced.isNull())
           return true;
         
-        if (checkTypeWitness(TC, DC, assocType, replaced))
-          return true;
-
         known->first = replaced;
       }
     }
 
+    // Check any same-type requirements in the protocol's requirement signature.
+    if (Proto->isRequirementSignatureComputed()) {
+      SubstOptions options(None);
+      options.getTentativeTypeWitness =
+        [&](const NormalProtocolConformance *conformance,
+            AssociatedTypeDecl *assocType) -> Type {
+          if (conformance != Conformance) return Type(0);
+
+          return typeWitnesses.begin(assocType)->first;
+        };
+
+      auto substitutions =
+        SubstitutionMap::getProtocolSubstitutions(
+                                          Proto, Conformance->getType(),
+                                          ProtocolConformanceRef(Conformance));
+
+      auto requirementSig = Proto->getRequirementSignature();
+      auto result =
+        TC.checkGenericArguments(DC, SourceLoc(), SourceLoc(),
+                                 Conformance->getType(), requirementSig,
+                                 QuerySubstitutionMap{substitutions},
+                                 TypeChecker::LookUpConformance(
+                                   TC, Conformance->getDeclContext()),
+                                 nullptr, None, nullptr, options);
+      switch (result) {
+      case RequirementCheckResult::Failure:
+      case RequirementCheckResult::UnsatisfiedDependency:
+        return true;
+
+      case RequirementCheckResult::Success:
+      case RequirementCheckResult::SubstitutionFailure:
+        return false;
+      }
+    }
     return false;
   };
 
@@ -4262,9 +4294,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       }
 
       /// Check the current set of type witnesses.
-      if (checkCurrentTypeWitnesses()) {
-        return;
-      }
+      bool invalid = checkCurrentTypeWitnesses();
 
       // Determine whether there is already a solution with the same
       // bindings.
@@ -4284,8 +4314,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
           return;
       }
 
-      solutions.push_back(InferredTypeWitnessesSolution());
-      auto &solution = solutions.back();
+      auto &solutionList = invalid ? nonViableSolutions : solutions;
+      solutionList.push_back(InferredTypeWitnessesSolution());
+      auto &solution = solutionList.back();
 
       // Copy the type witnesses.
       for (auto assocType : unresolvedAssocTypes) {
@@ -4477,6 +4508,12 @@ void ConformanceChecker::resolveTypeWitnesses() {
         solutions[0] = std::move(solutions[bestIdx]);
       solutions.erase(solutions.begin() + 1, solutions.end());
     }
+  }
+
+  // If we have no solution, but we did find something that is nonviable,
+  // use the first nonviable one to improve error reporting.
+  if (solutions.empty() && !nonViableSolutions.empty()) {
+    solutions.push_back(std::move(nonViableSolutions.front()));
   }
 
   // If we found a single solution, take it.
@@ -5453,6 +5490,7 @@ bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
   case RequirementCheckResult::UnsatisfiedDependency:
     return true;
   case RequirementCheckResult::Failure:
+  case RequirementCheckResult::SubstitutionFailure:
     return false;
   case RequirementCheckResult::Success: {
     bool anyUnsatisfied = false;

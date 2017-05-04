@@ -1246,11 +1246,12 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     LookupConformanceFn conformances,
     UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
-    GenericRequirementsCheckListener *listener) {
+    GenericRequirementsCheckListener *listener,
+    SubstOptions options) {
   bool valid = true;
 
   for (const auto &rawReq : genericSig->getRequirements()) {
-    auto req = rawReq.subst(substitutions, conformances);
+    auto req = rawReq.subst(substitutions, conformances, options);
     if (!req) {
       // Another requirement will fail later; just continue.
       valid = false;
@@ -1286,6 +1287,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       switch (status) {
       case RequirementCheckResult::UnsatisfiedDependency:
       case RequirementCheckResult::Failure:
+      case RequirementCheckResult::SubstitutionFailure:
         // pass it on up.
         return status;
       case RequirementCheckResult::Success:
@@ -1308,14 +1310,16 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     case RequirementKind::Superclass:
       // Superclass requirements.
       if (!isSubtypeOf(firstType, secondType, dc)) {
-        // FIXME: Poor source-location information.
-        diagnose(loc, diag::type_does_not_inherit, owner, firstType,
-                 secondType);
+        if (loc.isValid()) {
+          // FIXME: Poor source-location information.
+          diagnose(loc, diag::type_does_not_inherit, owner, firstType,
+                   secondType);
 
-        diagnose(noteLoc, diag::type_does_not_inherit_requirement, rawFirstType,
-                 rawSecondType,
-                 genericSig->gatherGenericParamBindingsText(
-                     {rawFirstType, rawSecondType}, substitutions));
+          diagnose(noteLoc, diag::type_does_not_inherit_requirement,
+                   rawFirstType, rawSecondType,
+                   genericSig->gatherGenericParamBindingsText(
+                       {rawFirstType, rawSecondType}, substitutions));
+        }
 
         return RequirementCheckResult::Failure;
       }
@@ -1323,13 +1327,15 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
     case RequirementKind::SameType:
       if (!firstType->isEqual(secondType)) {
-        // FIXME: Better location info for both diagnostics.
-        diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
+        if (loc.isValid()) {
+          // FIXME: Better location info for both diagnostics.
+          diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
 
-        diagnose(noteLoc, diag::types_not_equal_requirement, rawFirstType,
-                 rawSecondType,
-                 genericSig->gatherGenericParamBindingsText(
-                     {rawFirstType, rawSecondType}, substitutions));
+          diagnose(noteLoc, diag::types_not_equal_requirement, rawFirstType,
+                   rawSecondType,
+                   genericSig->gatherGenericParamBindingsText(
+                       {rawFirstType, rawSecondType}, substitutions));
+        }
 
         return RequirementCheckResult::Failure;
       }
@@ -1339,5 +1345,5 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
   if (valid)
     return RequirementCheckResult::Success;
-  return RequirementCheckResult::Failure;
+  return RequirementCheckResult::SubstitutionFailure;
 }
