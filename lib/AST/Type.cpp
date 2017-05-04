@@ -2316,6 +2316,31 @@ bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
+static bool isABICompatibleEvenAddingOptional(CanType t1, CanType t2) {
+  // Classes, class-constrained archetypes, and pure-ObjC existential
+  // types all have single retainable pointer representation; optionality
+  // change is allowed.
+  // NOTE: This doesn't use isAnyClassReferenceType because we want it to
+  // return a conservative answer for dependent types. There's probably
+  // a better answer here, though.
+  if ((t1->mayHaveSuperclass() || t1->isObjCExistentialType()) &&
+      (t2->mayHaveSuperclass() || t2->isObjCExistentialType())) {
+    return true;
+  }
+
+  // Class metatypes are ABI-compatible even under optionality change.
+  if (auto metaTy1 = dyn_cast<MetatypeType>(t1)) {
+    if (auto metaTy2 = dyn_cast<MetatypeType>(t2)) {
+      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
+          metaTy2.getInstanceType().getClassOrBoundGenericClass()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 namespace {
   enum class ParameterPosition {
     NotParameter,
@@ -2342,6 +2367,10 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       }
 
       // Value-to-optional.
+      if (matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+        if (isABICompatibleEvenAddingOptional(t1, obj2))
+          return true;
+      }
       if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
           matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
         return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
@@ -2393,11 +2422,16 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   }
 
   // Function-to-function.
-  // FIXME: This completely leaves out generic functions.
-  if (auto fn2 = dyn_cast<FunctionType>(t2)) {
-    auto fn1 = dyn_cast<FunctionType>(t1);
+  if (auto fn2 = dyn_cast<AnyFunctionType>(t2)) {
+    auto fn1 = dyn_cast<AnyFunctionType>(t1);
     if (!fn1)
       return false;
+
+    // FIXME: Handle generic functions in non-ABI matches.
+    if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+      if (!isa<FunctionType>(t1) || !isa<FunctionType>(t2))
+        return false;
+    }
 
     // When checking overrides, allow the base type to be throwing even if the
     // overriding type isn't.

@@ -232,7 +232,9 @@ enum class TypeMatchFlags {
   ///
   /// This includes function parameters and result types as well as tuple
   /// elements, but excludes generic parameters.
-  AllowTopLevelOptionalMismatch = 1 << 2
+  AllowTopLevelOptionalMismatch = 1 << 2,
+  /// Allow any ABI-compatible types to be considered matching.
+  AllowABICompatible = 1 << 3,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
