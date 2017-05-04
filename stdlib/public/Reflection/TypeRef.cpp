@@ -255,7 +255,6 @@ struct TypeRefIsConcrete
   }
 
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
-    std::vector<TypeRef *> SubstitutedArguments;
     for (auto Argument : F->getArguments())
       if (!visit(Argument))
         return false;
