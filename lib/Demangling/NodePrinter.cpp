@@ -1576,7 +1576,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     } else if (c == 'N') {
       name = "_NativeRefCountedObject";
     } else if (c == 'C') {
-      name = "_Class";
+      name = "AnyObject";
     } else if (c == 'D') {
       name = "_NativeClass";
     } else if (c == 'T') {
