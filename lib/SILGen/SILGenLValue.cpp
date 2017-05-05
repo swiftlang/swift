@@ -830,7 +830,7 @@ namespace {
     }
 
     void printBase(raw_ostream &OS, StringRef name) const {
-      OS << name << "(" << decl->getName() << ")";
+      OS << name << "(" << decl->getBaseName() << ")";
       if (IsSuper) OS << " isSuper";
       if (IsDirectAccessorUse) OS << " isDirectAccessorUse";
       if (subscriptIndexExpr) {

@@ -3163,7 +3163,7 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName().str();
+        out << nominal->getName().str() << "." << name.getBaseName();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument
