@@ -962,7 +962,7 @@ ValueDecl *DerivedConformance::deriveEncodable(TypeChecker &tc,
     if (!isa<StructDecl>(type) && !isa<ClassDecl>(type))
         return nullptr;
 
-    if (requirement->getName() != tc.Context.Id_encode) {
+    if (requirement->getBaseName() != tc.Context.Id_encode) {
         // Unknown requirement.
         tc.diagnose(requirement->getLoc(), diag::broken_encodable_requirement);
         return nullptr;
@@ -995,7 +995,7 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
     if (!isa<StructDecl>(type) && !isa<ClassDecl>(type))
         return nullptr;
 
-    if (requirement->getName() != tc.Context.Id_init) {
+    if (requirement->getBaseName() != tc.Context.Id_init) {
         // Unknown requirement.
         tc.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
         return nullptr;
