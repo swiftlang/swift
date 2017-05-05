@@ -1128,6 +1128,8 @@ public:
       ASD->setSetterAccessibility(access);
     // All imported decls are constructed fully validated.
     D->setValidationStarted();
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
+      AFD->setNeedsNewVTableEntry(false);
     return D;
   }
 

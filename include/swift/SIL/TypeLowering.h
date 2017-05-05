@@ -511,8 +511,6 @@ class TypeConverter {
   
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
 
-  llvm::DenseMap<SILDeclRef, bool> RequiresVTableEntry;
-
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
   
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
@@ -664,11 +662,6 @@ public:
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
-
-  /// Return if this method introduces a new vtable entry. This will be true
-  /// if the method does not override any method of its base class, or if it
-  /// overrides a method but has a more general AST type.
-  bool requiresNewVTableEntry(SILDeclRef method);
 
   /// Return the most derived override which requires a new vtable entry.
   /// If the method does not override anything or no override is vtable
@@ -852,8 +845,6 @@ private:
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
                                             AnyFunctionType::ExtInfo extInfo);
-
-  bool requiresNewVTableEntryUncached(SILDeclRef method);
 };
 
 inline const TypeLowering &
