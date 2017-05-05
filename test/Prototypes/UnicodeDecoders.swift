@@ -221,12 +221,12 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
     decoded.append(scalar)
     expectEqual(
       UnicodeScalar(scalar),
-      Codec.decode(Codec.encode(UnicodeScalar(scalar)!)))
+      Codec.decode(Codec.encode(UnicodeScalar(scalar)!)!))
   }
   
   func output1(_ scalar: UnicodeScalar) {
     decoded.append(scalar.value)
-    expectEqual(scalar, Codec.decode(Codec.encode(scalar)))
+    expectEqual(scalar, Codec.decode(Codec.encode(scalar)!))
   }
   
   var result = assertionSuccess()
