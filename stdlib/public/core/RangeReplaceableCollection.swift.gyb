@@ -597,7 +597,7 @@ extension RangeReplaceableCollection {
   @_inlineable
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Iterator.Element {
-
+      
     let approximateCapacity = self.count +
       numericCast(newElements.underestimatedCount)
     self.reserveCapacity(approximateCapacity)
@@ -606,6 +606,12 @@ extension RangeReplaceableCollection {
     }
   }
 
+  @_inlineable
+  public mutating func append<C : Collection>(contentsOf newElements: C)
+    where C.Iterator.Element == Iterator.Element {
+    replaceSubrange(endIndex..<endIndex, with: newElements)
+  }
+      
   /// Inserts a new element into the collection at the specified position.
   ///
   /// The new element is inserted before the element currently at the
