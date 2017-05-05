@@ -1952,15 +1952,15 @@ Accessibility ValueDecl::getEffectiveAccess() const {
   return effectiveAccess;
 }
 
-Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
-  assert((getFormalAccess() == Accessibility::Internal ||
-          getFormalAccess() == Accessibility::Public) &&
-         "should be able to fast-path non-internal cases");
-  assert(useDC && "should fast-path non-scoped cases");
-  if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(getModuleContext()))
-      return getTestableAccess(this);
-  return getFormalAccess();
+Accessibility ValueDecl::getFormalAccess(const DeclContext *useDC) const {
+  assert(hasAccessibility() && "accessibility not computed yet");
+  Accessibility result = TypeAndAccess.getInt().getValue();
+  if (useDC && (result == Accessibility::Internal ||
+                result == Accessibility::Public))
+    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+      if (useSF->hasTestableImport(getModuleContext()))
+        return getTestableAccess(this);
+  return result;
 }
 
 AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {

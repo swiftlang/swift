@@ -2154,9 +2154,6 @@ public:
     return TypeAndAccess.getInt().hasValue();
   }
 
-  /// \see getFormalAccess
-  Accessibility getFormalAccessImpl(const DeclContext *useDC) const;
-
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
@@ -2166,14 +2163,7 @@ public:
   /// taken into account.
   ///
   /// \sa getFormalAccessScope
-  Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const {
-    assert(hasAccessibility() && "accessibility not computed yet");
-    Accessibility result = TypeAndAccess.getInt().getValue();
-    if (useDC && (result == Accessibility::Internal ||
-                  result == Accessibility::Public))
-      return getFormalAccessImpl(useDC);
-    return result;
-  }
+  Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const;
 
   /// Returns the outermost DeclContext from which this declaration can be
   /// accessed, or null if the declaration is public.
