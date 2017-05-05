@@ -2522,7 +2522,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
 ///
 /// This occurs when
 /// - it is implied by an attribute like @NSManaged
-/// - we need to dynamically dispatch to a method in an extension.
+/// - when we have an override of an imported method
+/// - we need to dynamically dispatch to a method in an extension
 ///
 /// FIXME: The latter reason is a hack. We should figure out how to safely
 /// put extension methods into the class vtable.
@@ -2535,11 +2536,15 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (!D->isObjC() || D->hasClangNode())
     return;
 
+  bool overridesImportedMethod =
+    (D->getOverriddenDecl() &&
+     D->getOverriddenDecl()->hasClangNode());
+
   // Only introduce 'dynamic' on declarations...
   bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
   if (!isa<ExtensionDecl>(D->getDeclContext())) {
     // ...and in classes on decls marked @NSManaged.
-    if (!isNSManaged)
+    if (!isNSManaged && !overridesImportedMethod)
       return;
   }
 
