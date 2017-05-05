@@ -300,7 +300,7 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   }
 
   // Hide editor placeholders.
-  if (D->getName().isEditorPlaceholder())
+  if (D->getBaseName().isEditorPlaceholder())
     return true;
 
   if (!D->isUserAccessible())
@@ -4244,15 +4244,9 @@ public:
     Builder.addBraceStmtWithCursor();
   }
 
-  llvm::StringSet<> SatisfiedAssociatedTypes;
-
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-      if (isa<TypeAliasDecl>(D)) {
-        ValueDecl *VD = dyn_cast<ValueDecl>(D);
-        SatisfiedAssociatedTypes.insert(VD->getName().str());
-      }
       return;
     }
 
@@ -5091,7 +5085,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
   if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
-    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
+    Lookup.setIsSelfRefExpr(DRE->getDecl()->getFullName() == Context.Id_self);
   }
 
   if (isInsideObjCSelector())

@@ -480,8 +480,8 @@ void swift::ide::printSubmoduleInterface(
         auto *RHSValue = dyn_cast<ValueDecl>(RHS);
 
         if (LHSValue && RHSValue) {
-          StringRef LHSName = LHSValue->getName().str();
-          StringRef RHSName = RHSValue->getName().str();
+          auto LHSName = LHSValue->getBaseName();
+          auto RHSName = RHSValue->getBaseName();
           if (int Ret = LHSName.compare(RHSName))
             return Ret < 0;
           // FIXME: this is not sufficient to establish a total order for overloaded
