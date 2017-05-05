@@ -1347,6 +1347,15 @@ static StringRef getStringLiteralContent(const Token &Str) {
   return Bytes;
 }
 
+static size_t commonPrefixLength(StringRef shorter, StringRef longer) {
+  size_t offset = 0;
+  while(offset < shorter.size() && offset < longer.size() && shorter[offset] == longer[offset]) {
+    offset++;
+  }
+  
+  return offset;
+}
+
 /// getMultilineTrailingIndent:
 /// Determine trailing indent to be used for multiline literal indent stripping.
 static std::tuple<StringRef, SourceLoc>
@@ -1386,66 +1395,57 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
   return std::make_tuple("", Lexer::getSourceLoc(end - 1));
 }
 
-static size_t commonPrefixLength(StringRef shorter, const char * longer) {
-  size_t offset = 0;
-  while(offset < shorter.size() && shorter[offset] == longer[offset]) {
-    offset++;
-  }
-  
-  return offset;
-}
-
-// FIXME: StringRef has a method like this; we should probably make LinePtr a 
-// StringRef so we can use it.
-static size_t firstNotOf(const char * haystack, const char * needles, 
-                         size_t offset = 0) {
-  return strspn(haystack + offset, needles) + offset;
-}
-
+/// diagnoseInvalidMultilineIndents:
+/// Emit errors for a group of multiline indents with the same MistakeOffset.
+/// Note: Does not emit an error if MistakeOffset does not lie within 
+/// ExpectedIndent.
 static void diagnoseInvalidMultilineIndents(
-                                      DiagnosticEngine *Diags, 
-                                      StringRef ExpectedIndentation,
-                                      SourceLoc IndentationLoc,
-                                      const char * LinePtr) {
-  auto lineLoc = Lexer::getSourceLoc(LinePtr);
-
-  Diags->diagnose(lineLoc, diag::lex_inconsistent_string_indent);
-  
-  // Find the first mismatched character. LinePtr must eventually include a 
-  // newline, and ExpectedIndentation never includes newlines, so we don't need 
-  // to bounds-check access to LinePtr.
-  size_t mistakeOffset = commonPrefixLength(ExpectedIndentation, LinePtr);
-  
-  switch(LinePtr[mistakeOffset]) {
-  case ' ':
-  case '\t':
-    Diags->diagnose(lineLoc.getAdvancedLoc(mistakeOffset), 
-                    diag::note_unexpected_char_in_string_indent, 
-                    LinePtr[mistakeOffset] == '\t');
-    break;
-
-  default:
-    // Expected space or tab, got something else.
-      Diags->diagnose(lineLoc.getAdvancedLoc(mistakeOffset),
-                      diag::note_insufficient_string_indent);
-    break;
+                                            DiagnosticEngine *Diags, 
+                                            StringRef ExpectedIndent,
+                                            SourceLoc IndentLoc,
+                                            StringRef Bytes,
+                                            SmallVector<size_t, 4> LineStarts,
+                                            size_t MistakeOffset,
+                                            StringRef ActualIndent) {
+  if (MistakeOffset >= ExpectedIndent.size()) {
+    // These lines were valid; there's nothing to correct.
+    return;
   }
   
-  // Point out character expected to match.
-  Diags->diagnose(IndentationLoc.getAdvancedLoc(mistakeOffset), 
-                  diag::note_matching_indentation_char_here,
-                  ExpectedIndentation[mistakeOffset] == '\t');
+  auto getLoc = [&](size_t offset) -> SourceLoc {
+    return Lexer::getSourceLoc((const char *)Bytes.bytes_begin() + offset);
+  };
+  auto classify = [&](unsigned char ch) -> unsigned {
+    switch (ch) {
+    case ' ':
+      return 0;
+    case '\t':
+      return 1;
+    default:
+      return 2;
+    }
+  };
   
-  // Scan past any remaining indentation in the line, which we will assume is 
-  // incorrect.
-  // FIXME: It'd be better to examine surrounding lines to see how they're 
-  // indented, and then leave enough whitespace on this line to match them.
-  size_t allIndentationOffset = firstNotOf(LinePtr, " \t", mistakeOffset);
+  Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
+                  diag::lex_inconsistent_string_indent,
+                  LineStarts.size() != 1, LineStarts.size(),
+                  classify(Bytes[LineStarts[0] + MistakeOffset]));
   
-  // Suggest fixing this by replacing with the expected whitespace.
-  Diags->diagnose(lineLoc, diag::note_change_current_line_indentation)
-    .fixItReplaceChars(lineLoc, lineLoc.getAdvancedLoc(allIndentationOffset), 
-                       ExpectedIndentation);
+  Diags->diagnose(IndentLoc.getAdvancedLoc(MistakeOffset), 
+                  diag::note_indentation_should_match_here, 
+                  classify(ExpectedIndent[MistakeOffset]));
+  
+  auto fix = Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
+                             diag::note_change_current_line_indentation,
+                             LineStarts.size() != 1);
+  
+  assert(MistakeOffset <= ActualIndent.size());
+  assert(ExpectedIndent.substr(0, MistakeOffset) == ActualIndent.substr(0, MistakeOffset));
+  for(auto line : LineStarts) {    
+    fix.fixItReplaceChars(getLoc(line + MistakeOffset), 
+                          getLoc(line + ActualIndent.size()),
+                          ExpectedIndent.substr(MistakeOffset));
+  }
 }
 
 /// validateMultilineIndents:
@@ -1457,20 +1457,58 @@ static void validateMultilineIndents(const Token &Str,
   std::tie(Indent, IndentStartLoc) = getMultilineTrailingIndent(Str, Diags);
   if (Indent.empty())
     return;
-
+  
+  // The offset into the previous line where it experienced its first indentation 
+  // error, or Indent.size() if every character matched.
+  size_t lastMistakeOffset = SIZE_T_MAX;
+  // Offsets for each consecutive previous line with its first error at 
+  // lastMatchLength.
+  SmallVector<size_t, 4> linesWithLastMistakeOffset = {};
+  // Prefix of indentation that's present on all lines in linesWithLastMatchLength.
+  StringRef commonIndentation = "";
+  
   StringRef Bytes = getStringLiteralContent(Str);
-  const char *BytesPtr = Bytes.begin();
-  size_t pos = 0;
-  while ((pos = Bytes.find('\n', pos)) != StringRef::npos) {
+  for (size_t pos = Bytes.find('\n'); pos != StringRef::npos; pos = Bytes.find('\n', pos + 1)) {
     size_t nextpos = pos + 1;
-    if (BytesPtr[nextpos] != '\n' && BytesPtr[nextpos] != '\r') {
-      if (Bytes.substr(nextpos, Indent.size()) != Indent) {
-        diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, 
-                                        BytesPtr + nextpos);
-      }
+    auto restOfBytes = Bytes.substr(nextpos);
+    
+    // Ignore blank lines.
+    if (restOfBytes[0] == '\n' || restOfBytes[0] == '\r') {
+      continue;
     }
-    pos = nextpos;
+    
+    // Where is the first difference?
+    auto errorOffset = commonPrefixLength(Indent, restOfBytes);
+    
+    // Are we starting a new run?
+    if (errorOffset != lastMistakeOffset) {
+      // Diagnose problems in the just-finished run of lines.
+      diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
+                                      linesWithLastMistakeOffset, lastMistakeOffset, 
+                                      commonIndentation);
+      
+      // Set up for a new run.
+      lastMistakeOffset = errorOffset;
+      linesWithLastMistakeOffset = {};
+      
+      // To begin with, all whitespace is part of the common indentation.
+      auto prefixLength = restOfBytes.find_first_not_of(" \t");
+      commonIndentation = restOfBytes.substr(0, prefixLength);
+    }
+    else {
+      // We're continuing the run, so include this line in the common prefix.
+      auto prefixLength = commonPrefixLength(commonIndentation, restOfBytes);
+      commonIndentation = commonIndentation.substr(0, prefixLength);
+    }
+    
+    // Either way, add this line to the run.
+    linesWithLastMistakeOffset.push_back(nextpos);
   }
+  
+  // Handle the last run.
+  diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
+                                  linesWithLastMistakeOffset, lastMistakeOffset, 
+                                  commonIndentation);
 }
 
 /// lexStringLiteral:
