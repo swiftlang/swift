@@ -72,3 +72,8 @@ public func someProtocolFactory() -> SomeProtocol { return MyStruct() }
 public func blackHole<T>(_ x: T) {
 }
 
+@inline(__always)
+public func CheckResults(_ resultsMatch: Bool) {
+  guard _fastPath(resultsMatch) else { abort() }
+}
+
