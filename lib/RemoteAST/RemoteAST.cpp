@@ -305,12 +305,16 @@ public:
 
   Type createProtocolType(StringRef mangledName,
                           StringRef moduleName,
-                          StringRef protocolName) {
+                          StringRef privateDiscriminator,
+                          StringRef name) {
     auto module = Ctx.getModuleByName(moduleName);
     if (!module) return Type();
 
-    Identifier name = Ctx.getIdentifier(protocolName);
-    auto decl = findNominalTypeDecl(module, name, Identifier(),
+    auto decl = findNominalTypeDecl(module,
+                                    Ctx.getIdentifier(name),
+                                    (privateDiscriminator.empty()
+                                     ? Identifier()
+                                     : Ctx.getIdentifier(privateDiscriminator)),
                                     Demangle::Node::Kind::Protocol);
     if (!decl) return Type();
 

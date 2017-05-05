@@ -376,6 +376,11 @@ private:
     // solve the problem.
     while (!CaptureTypes.empty()) {
       const TypeRef *OrigCaptureTR = CaptureTypes[0];
+
+      // If we failed to demangle the capture type, we cannot proceed.
+      if (OrigCaptureTR == nullptr)
+        return nullptr;
+
       const TypeRef *SubstCaptureTR = nullptr;
 
       // If we have enough substitutions to make this captured value's
