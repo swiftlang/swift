@@ -2562,6 +2562,17 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
 %   z = 's' if signed else 'z'
+
+%   Article = 'An' if bits == 8 else 'A'
+%   if bits == word_bits:
+/// ${'A ' if signed else 'An un'}signed integer value type.
+///
+/// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and
+/// on 64-bit platforms, `${Self}` is the same size as `${Self}64`.
+%   else:
+/// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
+/// type.
+%   end
 @_fixed_layout
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
