@@ -66,6 +66,7 @@ extension UnicodeParser {
 }
 
 extension _Unicode {
+  @_fixed_layout
   public struct ParsingIterator<
     CodeUnitIterator : IteratorProtocol, 
     Parser: UnicodeParser
