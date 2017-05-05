@@ -975,7 +975,7 @@ getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
 
 AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
     : Value(DC, isPrivate) {
-  if (isPrivate) {
+  if (isPrivate && !DC->getASTContext().isSwiftVersion3()) {
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
   }
