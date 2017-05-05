@@ -47,7 +47,7 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
         return anonTypedef->getIdentifier()->getName();
   }
 
-  return VD->getName().str();
+  return VD->getBaseName().getIdentifier().str();
 }
 
 bool swift::objc_translation::

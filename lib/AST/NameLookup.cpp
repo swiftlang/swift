@@ -173,8 +173,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       signature = asd->getOverloadSignature().InterfaceType;
 
     // If we've seen a declaration with this signature before, note it.
-    auto &knownDecls =
-        CollidingDeclGroups[std::make_pair(signature, decl->getName())];
+    auto &knownDecls = CollidingDeclGroups[std::make_pair(
+        signature, decl->getBaseName().getIdentifier())];
     if (!knownDecls.empty())
       anyCollisions = true;
 
