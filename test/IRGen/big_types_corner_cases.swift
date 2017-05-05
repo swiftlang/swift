@@ -46,6 +46,24 @@ public func f4_tuple_use_of_f2() {
 // CHECK:  call swiftcc void [[CAST_EXTRACT]](%T22big_types_corner_cases9BigStructV* noalias nocapture sret %call.aggresult1, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable
 // CHECK: ret void
 
+public class BigClass {
+  public init() {
+  }
+
+  public var optVar: ((BigStruct)-> Void)? = nil
+    
+  func useBigStruct(bigStruct: BigStruct) {
+    optVar!(bigStruct)
+  }
+}
+
+// CHECK-LABEL define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6StructyAA0eH0V0aH0_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself) #0 {
+// CHECK: getelementptr inbounds %T22big_types_corner_cases8BigClassC, %T22big_types_corner_cases8BigClassC*
+// CHECK: call void @_T0SqWy
+// CHECK: [[BITCAST:%.*]] = bitcast i8* {{.*}} to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
+// CHECK: call swiftcc void [[BITCAST]](%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself 
+// CHECK: ret void
+
 public struct MyStruct {
   public let a: Int
   public let b: String?
