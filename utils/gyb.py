@@ -552,7 +552,6 @@ class ParseContext(object):
 
 _default_line_directive = '// ###sourceLocation'
 
-
 class ExecutionContext(object):
 
     """State we pass around during execution of a template"""
@@ -744,7 +743,6 @@ class Code(ASTNode):
                 indent + 4 * ' ' + l for l in source_lines
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
-
 
 def expand(filename, line_directive=_default_line_directive, **local_bindings):
     r"""Return the contents of the givepn template file, executed with the given
