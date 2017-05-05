@@ -2513,7 +2513,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclContextID contextID;
     uint8_t rawFailability;
-    bool isImplicit, isObjC, hasStubImplementation, throws;
+    bool isImplicit, isObjC, hasStubImplementation, throws, needsNewVTableEntry;
     GenericEnvironmentID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID interfaceID, canonicalTypeID;
@@ -2526,7 +2526,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                throws, storedInitKind,
                                                genericEnvID, interfaceID,
                                                canonicalTypeID, overriddenID,
-                                               rawAccessLevel, argNameIDs);
+                                               rawAccessLevel,
+                                               needsNewVTableEntry, argNameIDs);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2618,6 +2619,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       ctor->setInitKind(initKind.getValue());
     if (auto overriddenCtor = cast_or_null<ConstructorDecl>(overridden.get()))
       ctor->setOverriddenDecl(overriddenCtor);
+    ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
     break;
   }
 
@@ -2744,7 +2746,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool hasCompoundName;
+    bool hasCompoundName, needsNewVTableEntry;
     ArrayRef<uint64_t> nameIDs;
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
@@ -2755,7 +2757,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         associatedDeclID, overriddenID,
                                         accessorStorageDeclID, hasCompoundName,
                                         rawAddressorKind, rawAccessLevel,
-                                        nameIDs);
+                                        needsNewVTableEntry, nameIDs);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
@@ -2873,6 +2875,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setImplicit();
     fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
+    fn->setNeedsNewVTableEntry(needsNewVTableEntry);
     break;
   }
 
