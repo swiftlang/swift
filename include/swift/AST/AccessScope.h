@@ -23,7 +23,8 @@ namespace swift {
 /// a particular declaration can be accessed.
 class AccessScope {
   /// The declaration context (if not public) along with a bit saying
-  /// whether this scope is private (or not).
+  /// whether this scope is private (or not). This bit is used to distinguish
+  /// file-level private and fileprivate.
   llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
 public:
   AccessScope(const DeclContext *DC, bool isPrivate = false);
