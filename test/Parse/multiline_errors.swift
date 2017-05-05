@@ -8,7 +8,7 @@ import Swift
 _ = """
     Eleven
   Mu
-    """ // expected-error@-1{{unexpected end of indentation of line in multi-line string literal}}
+    """ // expected-error@-1{{insufficient indentation of line in multi-line string literal}}
         // expected-note@-1{{should match space here}}
         // expected-note@-3{{change indentation of this line to match closing delimiter}} {{3-3=  }}
 
@@ -16,7 +16,7 @@ _ = """
 _ = """
     Eleven
    Mu
-    """ // expected-error@-1{{unexpected end of indentation of line in multi-line string literal}}
+    """ // expected-error@-1{{insufficient indentation of line in multi-line string literal}}
         // expected-note@-1{{should match space here}}
         // expected-note@-3{{change indentation of this line to match closing delimiter}} {{4-4= }}
 
@@ -24,7 +24,7 @@ _ = """
 _ = """
 	Twelve
 \tNu
-	""" // expected-error@-1{{unexpected end of indentation of line in multi-line string literal}}
+	""" // expected-error@-1{{insufficient indentation of line in multi-line string literal}}
       // expected-note@-1{{should match tab here}}
       // expected-note@-3{{change indentation of this line to match closing delimiter}} {{1-1=	}}
 
@@ -97,10 +97,10 @@ Three B
 		Four B
 			Five A
 			Five B
-		"""   // expected-error@-12{{unexpected end of indentation of next 2 lines in multi-line string literal}}
+		"""   // expected-error@-12{{insufficient indentation of next 2 lines in multi-line string literal}}
           // expected-note@-1{{should match tab here}}
           // expected-note@-14{{change indentation of these lines to match closing delimiter}} {{1-1=		}} {{1-1=		}}
-          // expected-error@-13{{unexpected end of indentation of next 2 lines in multi-line string literal}}
+          // expected-error@-13{{insufficient indentation of next 2 lines in multi-line string literal}}
           // expected-note@-4{{should match tab here}}
           // expected-note@-15{{change indentation of these lines to match closing delimiter}} {{2-2=	}} {{2-2=	}}
           // expected-error@-14{{unexpected space in indentation of next 4 lines in multi-line string literal}}
