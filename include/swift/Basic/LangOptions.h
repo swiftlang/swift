@@ -229,7 +229,7 @@ namespace swift {
       Swift3ObjCInferenceWarnings::None;
     
     /// Enable keypaths.
-    bool EnableExperimentalKeyPaths = false;
+    bool EnableExperimentalKeyPaths = true;
 
     /// When a conversion from String to Substring fails, emit a fix-it to append
     /// the void subscript '[]'.
