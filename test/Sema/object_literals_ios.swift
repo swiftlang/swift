@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 // REQUIRES: OS=ios
 
 struct S: _ExpressibleByColorLiteral {
@@ -22,3 +22,6 @@ struct Path: _ExpressibleByFileReferenceLiteral {
 
 let p1: Path = #fileLiteral(resourceName: "what.txt")
 let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}} expected-note{{import Foundation to use 'URL' as the default file reference literal type}}
+let string = "what.txt"
+let p3: Path = #fileLiteral(resourceName: string) // expected-error{{object literal argument must be literal without interpolation}}
+let p4: Path = #fileLiteral(resourceName: "\(string)") // expected-error{{object literal argument must be literal without interpolation}}
