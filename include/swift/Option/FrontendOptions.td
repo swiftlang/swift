@@ -408,4 +408,9 @@ HelpText<"Diagnostics will be used in editor">;
 def validate_tbd_against_ir: Flag<["-"], "validate-tbd-against-ir">,
     HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">;
 
+// FIXME: Remove this flag when void subscripts are implemented.
+// This is used to guard preemptive testing for the fix-it.
+def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversion">,
+    HelpText<"Emit a fix-it to append '[]' to String expressions when converting to Substring.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

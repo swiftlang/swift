@@ -1,47 +1,78 @@
-let s = "foo"
+let s = "Hello"
 let ss = s[s.startIndex..<s.endIndex]
 
-// CTP_ReturnStmt
-
-func returnSubstringButWantedString() -> String {
-  return String(ss)
+// CTP_Initialization
+do {
+  let s1: String = String({ return ss }())
+  _ = s1
 }
+
+// CTP_ReturnStmt
+do {
+  func returnsAString() -> String {
+    return String(ss)
+  }
+}
+
+// CTP_ThrowStmt
+// Doesn't really make sense for this fix-it - see case in diagnoseContextualConversionError:
+// The conversion destination of throw is always ErrorType (at the moment)
+// if this ever expands, this should be a specific form like () is for
+// return.
+
+// CTP_EnumCaseRawValue
+// Substrings can't be raw values because they aren't literals.
 
 // CTP_DefaultParameter
-
-// Never do this.
-func defaultArgIsString(s: String = String(ss)) {}
+do {
+  func foo(x: String = String(ss)) {}
+}
 
 // CTP_CalleeResult
-func returnSubstring() -> Substring {
-  return String(ss)
+do {
+  func getSubstring() -> Substring { return ss }
+  let gottenString : String = String(getSubstring())
+  _ = gottenString
 }
-let s2: String = String(returnSubstring())
 
 // CTP_CallArgument
-func takeString(s: String) {}
-func takeSubstring(ss: Substring) {}
-
-takeString(string)
-takeString(String(substring))
+do {
+  func takesAString(_ s: String) {}
+  takesAString(String(ss))
+}
 
 // CTP_ClosureResult
-[1,2,3].map { (x: Int) -> String in
-  return String(ss)
+do {
+  [ss].map { (x: Substring) -> String in String(x) }
 }
 
 // CTP_ArrayElement
-let a: [String] = [ String(ss) ]
+do {
+  let a: [String] = [ String(ss) ]
+  _ = a
+}
 
 // CTP_DictionaryKey
+do {
+  let d: [ String : String ] = [ String(ss) : s ]
+  _ = d
+}
+
 // CTP_DictionaryValue
-let d: [String : String] = [
-  "CTP_DictionaryValue" : String(ss),
-  String(ss) : "CTP_DictionaryKey",
-]
+do {
+  let d: [ String : String ] = [ s : String(ss) ]
+  _ = d
+}
 
 // CTP_CoerceOperand
-let s3: String = String(ss) as String
+do {
+  let s1: String = String(ss) as String
+  _ = s1
+}
 
 // CTP_AssignSource
-let s4: String = String(ss)
+do {
+  let s1: String = String(ss)
+  _ = s1
+}
+
