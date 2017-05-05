@@ -34,7 +34,7 @@ public func run_SetIsSubsetOf(_ N: Int) {
     }
   }
 
-  CheckResults(!isSubset, "Incorrect results in SetIsSubsetOf")
+  CheckResults(!isSubset)
 }
 
 @inline(never)
@@ -142,7 +142,7 @@ public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
     }
   }
 
-  CheckResults(!isSubset, "Incorrect results in SetIsSubsetOf")
+  CheckResults(!isSubset)
 }
 
 @inline(never)

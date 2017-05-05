@@ -29,10 +29,8 @@ public func run_MonteCarloE(scale: Int) {
   let numEmptyIntervals = intervals.filter{!$0}.count
   // If there are no empty intervals, then obviously the random generator is
   // not 'random' enough.
-  CheckResults(numEmptyIntervals != N,
-               "Incorrect results in MonteCarloE: no empty intervals.")
+  CheckResults(numEmptyIntervals != N)
   let e_estimate = Double(N)/Double(numEmptyIntervals)
   let e = 2.71828
-  CheckResults(abs(e_estimate - e) < 0.1,
-               "Incorrect results in MonteCarloE: e_estimate == \(e_estimate)")
+  CheckResults(abs(e_estimate - e) < 0.1)
 }

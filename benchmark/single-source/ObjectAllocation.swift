@@ -123,13 +123,8 @@ public func run_ObjectAllocation(_ N: Int) {
     ArrayResult = testArray()
   }
 
-  CheckResults(SingleObjectResult == 499500,
-               "Incorrect results in testSingleObject")
-  CheckResults(TreeResult == 90000,
-               "Incorrect results in testTree")
-  CheckResults(ListResult == 48375,
-               "Incorrect results in testList")
-  CheckResults(ArrayResult == 3000,
-               "Incorrect results in testArray")
+  CheckResults(SingleObjectResult == 499500)
+  CheckResults(TreeResult == 90000)
+  CheckResults(ListResult == 48375)
+  CheckResults(ArrayResult == 3000)
 }
-

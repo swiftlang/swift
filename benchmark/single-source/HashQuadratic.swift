@@ -26,8 +26,7 @@ public func run_HashQuadratic(_ N: Int) {
         for (k, v) in dict1 {
             dict2[k] = v
         }
-    
-        CheckResults(dict1[size/2] == dict2[size/2],
-            "Incorrect results in HashQuadratic")
+
+        CheckResults(dict1[size/2] == dict2[size/2])
     }
 }

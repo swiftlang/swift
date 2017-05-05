@@ -632,10 +632,8 @@ public func run_HashTest(_ N: Int) {
     H2.update(Src2)
     let A1 = H1.digest()
     let A2 = H2.digest()
-    CheckResults(A1 == A2,
-                 "Incorrect result in Hash: check 3 failed.")
-    CheckResults(A1 == "79054025255fb1a26e4bc422aef54eb4",
-                 "Incorrect result in Hash: check 4 failed.")
+    CheckResults(A1 == A2)
+    CheckResults(A1 == "79054025255fb1a26e4bc422aef54eb4")
     H1.reset()
     H2.reset()
 
