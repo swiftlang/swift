@@ -69,7 +69,6 @@ extension Container {
     _ = Container.PrivateInner()
   }
 
-  // FIXME: Why do these errors happen twice?
   var extensionInner: PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
   var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
 }
