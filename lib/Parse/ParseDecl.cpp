@@ -5357,8 +5357,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
   }
 
-  // Parse a 'where' clause if present. These are not supported, but we will
-  // get better QoI this way.
   TrailingWhereClause *TrailingWhere = nullptr;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
