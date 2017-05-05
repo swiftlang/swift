@@ -1639,7 +1639,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseName().str().str();
+    declName = UDE->getName().getBaseIdentifier().str();
     uncurryLevel = 1;
 
     // If we actually resolved the member to use, return it.
@@ -2497,8 +2497,8 @@ findCorrectEnumCaseName(Type Ty, LookupResult &Result,
       continue;
     if (!isa<EnumElementDecl>(correction.Decl))
       continue;
-    if (correctName.getBaseName().str().
-          equals_lower(memberName.getBaseName().str()))
+    if (correctName.getBaseIdentifier().str().equals_lower(
+            memberName.getBaseIdentifier().str()))
       candidates.push_back(correctName);
   }
   if (candidates.size() == 1)
@@ -2537,8 +2537,9 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                                                        correctionResults,
                                                        memberName)) {
         diagnose(loc, diag::could_not_find_enum_case, instanceTy,
-          memberName, rightName).fixItReplace(nameLoc.getBaseNameLoc(),
-                                              rightName.getBaseName().str());
+                 memberName, rightName)
+          .fixItReplace(nameLoc.getBaseNameLoc(),
+                        rightName.getBaseIdentifier().str());
         return;
       }
       diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
@@ -4694,7 +4695,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (baseKind == DescriptiveDeclKind::Module)
       topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
-    auto name = baseName.getBaseName();
+    auto name = baseName.getBaseIdentifier();
     SmallString<32> namePlusDot = name.str();
     namePlusDot.push_back('.');
 
@@ -7763,14 +7764,14 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
   // If this is a tuple, then the index needs to be valid.
   if (auto tuple = baseObjTy->getAs<TupleType>()) {
-    StringRef nameStr = memberName.getBaseName().str();
+    StringRef nameStr = memberName.getBaseIdentifier().str();
     int fieldIdx = -1;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
     if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+      fieldIdx = tuple->getNamedElementId(memberName.getBaseIdentifier());
     }
 
     if (fieldIdx != -1)

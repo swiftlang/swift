@@ -1004,7 +1004,8 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto DM = FD->getFullName();
 
-    Result.append(DM.getBaseName().empty() ? "_" : DM.getBaseName().str());
+    // TODO: Handle special names
+    Result.append(DM.getBaseName().empty() ? "_" :DM.getBaseIdentifier().str());
     Result.append("(");
     for (auto Arg : DM.getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
@@ -1014,7 +1015,8 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(Result.str());
   }
   auto DM = VD->getFullName();
-  Result.append(DM.getBaseName().str());
+  // TODO: Handle special names
+  Result.append(DM.getBaseIdentifier().str());
   return Ctx.buffer(Result.str());
 }
 

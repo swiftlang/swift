@@ -935,7 +935,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
   DeclName OrigName = VD->getFullName();
   Identifier BaseName = Info.BaseName.empty()
-                            ? OrigName.getBaseName()
+                            ? Identifier(OrigName.getBaseName())
                             : Ctx.getIdentifier(Info.BaseName);
   auto OrigArgs = OrigName.getArgumentNames();
   SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
@@ -1006,7 +1006,7 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
     DeclName Name = Importer->importName(Named, ObjCName);
     NameTranslatingInfo Result;
     Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-    Result.BaseName = Name.getBaseName().str();
+    Result.BaseName = Name.getBaseIdentifier().str();
     std::transform(Name.getArgumentNames().begin(),
                    Name.getArgumentNames().end(),
                    std::back_inserter(Result.ArgNames),
