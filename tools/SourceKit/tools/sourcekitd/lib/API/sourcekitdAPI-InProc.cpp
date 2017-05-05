@@ -760,6 +760,13 @@ bool RequestDict::getInt64(SourceKit::UIdent Key, int64_t &Val,
   return false;
 }
 
+Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
+  auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
+  if (!Object)
+    return None;
+  return Object->getInt64().getValueOr(0);
+}
+
 sourcekitd_response_t
 sourcekitd::createErrorRequestInvalid(const char *Description) {
   return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_INVALID, 
