@@ -7361,7 +7361,8 @@ ClangImporter::Implementation::importDeclContextOf(
     auto importedDecl = importDecl(context.getTypedefName(), CurrentVersion);
     if (!importedDecl) return nullptr;
 
-    importedDC = dyn_cast_or_null<DeclContext>(importedDecl);
+    // Dig out the imported DeclContext.
+    importedDC = dynCastIgnoringCompatibilityAlias<NominalTypeDecl>(importedDecl);
     break;
   }
 
