@@ -34,7 +34,7 @@ extension _Unicode.UTF32 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
+  public static func encode(_ source: UnicodeScalar) -> EncodedScalar? {
     return EncodedScalar(source.value)
   }
   
