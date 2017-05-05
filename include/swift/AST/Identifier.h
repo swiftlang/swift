@@ -210,6 +210,8 @@ class DeclBaseName {
   Identifier Ident;
 
 public:
+  DeclBaseName() : DeclBaseName(Identifier()) {}
+
   DeclBaseName(Identifier I) : Ident(I) {}
 
   bool isSpecial() const { return false; }
@@ -223,6 +225,31 @@ public:
 
   bool empty() const { return !isSpecial() && getIdentifier().empty(); }
 
+  bool isOperator() const {
+    return !isSpecial() && getIdentifier().isOperator();
+  }
+
+  bool isEditorPlaceholder() const {
+    return !isSpecial() && getIdentifier().isEditorPlaceholder();
+  }
+
+  int compare(DeclBaseName other) const {
+    // TODO: Sort special names cleverly
+    return getIdentifier().compare(other.getIdentifier());
+  }
+
+  bool operator==(StringRef Str) const {
+    return !isSpecial() && getIdentifier().str() == Str;
+  }
+  bool operator!=(StringRef Str) const { return !(*this == Str); }
+
+  bool operator==(DeclBaseName RHS) const { return Ident == RHS.Ident; }
+  bool operator!=(DeclBaseName RHS) const { return !(*this == RHS); }
+
+  bool operator<(DeclBaseName RHS) const {
+    return Ident.get() < RHS.Ident.get();
+  }
+
   const void *getAsOpaquePointer() const { return Ident.get(); }
 
   static DeclBaseName getFromOpaquePointer(void *P) {
@@ -233,6 +260,24 @@ public:
 } // end namespace swift
 
 namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &OS, swift::DeclBaseName D);
+
+// DeclBaseNames hash just like pointers.
+template<> struct DenseMapInfo<swift::DeclBaseName> {
+  static swift::DeclBaseName getEmptyKey() {
+    return swift::Identifier::getEmptyKey();
+  }
+  static swift::DeclBaseName getTombstoneKey() {
+    return swift::Identifier::getTombstoneKey();
+  }
+  static unsigned getHashValue(swift::DeclBaseName Val) {
+    return DenseMapInfo<const void *>::getHashValue(Val.getAsOpaquePointer());
+  }
+  static bool isEqual(swift::DeclBaseName LHS, swift::DeclBaseName RHS) {
+    return LHS == RHS;
+  }
+};
 
 // A DeclBaseName is "pointer like".
 template <typename T> class PointerLikeTypeTraits;
