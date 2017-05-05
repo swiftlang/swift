@@ -587,8 +587,7 @@ public func run_HashTest(_ N: Int) {
     let MD = MD5()
     for (K, V) in TestMD5 {
       MD.update(K)
-      CheckResults(MD.digest() == V,
-                   "Incorrect result in Hash: check 1 failed.")
+      CheckResults(MD.digest() == V)
       MD.reset()
     }
 
@@ -609,8 +608,7 @@ public func run_HashTest(_ N: Int) {
     }
     let MD2 = MD5()
     MD2.update(L)
-    CheckResults(MD.digest() == MD2.digest(),
-                 "Incorrect result in Hash: check 2 failed.")
+    CheckResults(MD.digest() == MD2.digest())
 
     // Test the famous MD5 collision from 2009: http://www.mscs.dal.ca/~selinger/md5collision/
     let Src1 : [UInt8] =
@@ -641,15 +639,13 @@ public func run_HashTest(_ N: Int) {
     let SH256 = SHA256()
     for (K, V) in TestSHA1 {
       SH.update(K)
-      CheckResults(SH.digest() == V,
-                   "Incorrect result in Hash: check 5 failed.")
+      CheckResults(SH.digest() == V)
       SH.reset()
     }
 
     for (K, V) in TestSHA256 {
       SH256.update(K)
-      CheckResults(SH256.digest() == V,
-                   "Incorrect result in Hash: check 5 failed.")
+      CheckResults(SH256.digest() == V)
       SH256.reset()
     }
 
@@ -670,7 +666,6 @@ public func run_HashTest(_ N: Int) {
     }
     let SH2 = SHA1()
     SH2.update(L)
-    CheckResults(SH.digest() == SH2.digest(),
-                 "Incorrect result in Hash: check 5 failed.")
+    CheckResults(SH.digest() == SH2.digest())
   }
 }

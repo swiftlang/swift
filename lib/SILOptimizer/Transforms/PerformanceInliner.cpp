@@ -809,7 +809,7 @@ void SILPerformanceInliner::visitColdBlocks(
   DominanceOrder domOrder(Root, DT);
   while (SILBasicBlock *block = domOrder.getNext()) {
     for (SILInstruction &I : *block) {
-      ApplyInst *AI = dyn_cast<ApplyInst>(&I);
+      auto *AI = dyn_cast<ApplyInst>(&I);
       if (!AI)
         continue;
 

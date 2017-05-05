@@ -1271,7 +1271,7 @@ public:
   template <typename ATTR>
   ATTR *getAttribute(bool AllowInvalid = false) {
     for (auto Attr : *this)
-      if (ATTR *SpecificAttr = dyn_cast<ATTR>(Attr))
+      if (auto *SpecificAttr = dyn_cast<ATTR>(Attr))
         if (SpecificAttr->isValid() || AllowInvalid)
           return SpecificAttr;
     return nullptr;

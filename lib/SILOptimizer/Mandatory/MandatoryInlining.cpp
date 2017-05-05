@@ -221,7 +221,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
     FullArgs.push_back(Arg);
   SILValue CalleeValue = AI.getCallee();
 
-  if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
+  if (auto *LI = dyn_cast<LoadInst>(CalleeValue)) {
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
     auto *PBI = dyn_cast<ProjectBoxInst>(LI->getOperand());
@@ -282,7 +282,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
     IsThick = true;
   }
 
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
+  auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
 
   if (!FRI)
     return nullptr;

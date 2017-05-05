@@ -203,11 +203,12 @@ func testMultiP(x: MultiPayload) -> Double {
 // CHECK: ret float
 // V7K-LABEL: __T08test_v7k0A3Opt
 // V7K:         tst     r1, #1
-// V7K:         str     r0, [r7, #-4]
-// V7K:         ldr     r0, [r7, #-4]
+// V7K:         str     r0, [r7, #-20]
+// V7K:         ldr     r0, [r7, #-20]
 // V7K:         vmov    s0, r0
-// V7K:         mov     sp, r7
-// V7K:         pop     {r7, pc}
+// V7K:         sub     sp, r7, #16
+// V7K:         pop     {r11}
+// V7K:         pop      {r4, r5, r6, r7, pc}
 func testOpt(x: Float?) -> Float {
   return x!
 }
@@ -337,14 +338,43 @@ func minMax3(x : Int, y : Int) -> Ret? {
 // Passing struct: Int8, MyPoint x 10, MySize * 10
 // CHECK-LABEL: define hidden swiftcc double @_T08test_v7k0A4Ret5{{.*}}(%T8test_v7k7MyRect3V* noalias nocapture dereferenceable(328))
 // V7K-LABEL: __T08test_v7k0A4Ret5
-// V7K: ldrb [[TMP1:r[0-9]+]], [r0]
-// V7K: vldr [[REG1:d[0-9]+]], [r0, #8]
-// V7K: vldr [[REG2:d[0-9]+]], [r0]
-// V7K: sxtb r0, [[TMP1]]
-// V7K: vmov [[TMP2:s[0-9]+]], r0
-// V7K: vcvt.f64.s32 [[INTPART:d[0-9]+]], [[TMP2]]
-// V7K: vadd.f64 [[TMP3:d[0-9]+]], [[INTPART]], [[REG1]]
-// V7K: vadd.f64 d0, [[TMP3]], [[REG2]]
+// V7K:  sub     sp, sp, #56
+// V7K:  ldrb    r1, [r0]
+// V7K:  strb    r1, [sp, #52]
+// V7K:  ldrsb   r1, [sp, #52]
+// V7K:  vmov    s0, r1
+// V7K:  vcvt.f64.s32    d16, s0
+// V7K:  ldr     r1, [r0, #8]
+// V7K:  str     r1, [sp, #24]
+// V7K:  ldr     r1, [r0, #12]
+// V7K:  str     r1, [sp, #28]
+// V7K:  ldr     r1, [r0, #16]
+// V7K:  str     r1, [sp, #32]
+// V7K:  ldr     r1, [r0, #20]
+// V7K:  str     r1, [sp, #36]
+// V7K:  ldr     r1, [sp, #24]
+// V7K:  str     r1, [sp, #40]
+// V7K:  ldr     r1, [sp, #28]
+// V7K:  str     r1, [sp, #44]
+// V7K:  vldr    d18, [sp, #40]
+// V7K:  vadd.f64        d16, d16, d18
+// V7K:  ldr     r1, [r0, #296]
+// V7K:  str     r1, [sp]
+// V7K:  ldr     r1, [r0, #300]
+// V7K:  str     r1, [sp, #4]
+// V7K:  ldr     r1, [r0, #304]
+// V7K:  str     r1, [sp, #8]
+// V7K:  ldr     r0, [r0, #308]
+// V7K:  str     r0, [sp, #12]
+// V7K:  ldr     r0, [sp]
+// V7K:  str     r0, [sp, #16]
+// V7K:  ldr     r0, [sp, #4]
+// V7K:  str     r0, [sp, #20]
+// V7K:  vldr    d18, [sp, #16]
+// V7K:  vadd.f64        d0, d16, d18
+// V7K:  add     sp, sp, #56
+// V7K:  bx      lr
+
 struct MyRect3 {
   var t: Int8
   var p: MyPoint

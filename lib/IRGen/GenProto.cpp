@@ -1738,7 +1738,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (!doesConformanceReferenceNominalTypeDescriptor(*this, conformingType)) {
     // Trigger the lazy emission of the foreign type metadata.
     NominalTypeDecl *Nominal = conformingType->getAnyNominal();
-    if (ClassDecl *clas = dyn_cast<ClassDecl>(Nominal)) {
+    if (auto *clas = dyn_cast<ClassDecl>(Nominal)) {
       if (clas->isForeign())
         getAddrOfForeignTypeMetadataCandidate(conformingType);
     } else if (isa<ClangModuleUnit>(Nominal->getModuleScopeContext())) {

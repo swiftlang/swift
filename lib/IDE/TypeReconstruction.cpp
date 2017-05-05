@@ -669,7 +669,7 @@ static TypeBase *FixCallingConv(Decl *in_decl, TypeBase *in_type) {
   if (!in_decl)
     return in_type;
 
-  AnyFunctionType *func_type = dyn_cast<AnyFunctionType>(in_type);
+  auto *func_type = dyn_cast<AnyFunctionType>(in_type);
   if (func_type) {
     DeclContext *decl_context = in_decl->getDeclContext();
     if (decl_context && decl_context->isTypeContext()) {

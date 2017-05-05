@@ -191,7 +191,7 @@ func testObjectiveCBridgeToNSArray() {
     let nsArray = nativeArray as NSArray
     nsString = nsArray.object(at: 0)
   }
-  CheckResults(nsString != nil && (nsString! as! NSString).isEqual("abcde"), "Expected results did not match")
+  CheckResults(nsString != nil && (nsString! as! NSString).isEqual("abcde"))
 }
 #endif
 
@@ -352,7 +352,7 @@ func testObjectiveCBridgeToNSDictionary() {
     let nsDict = nativeDictionary as NSDictionary
     nsNumber = nsDict.object(forKey: key)
   }
-  CheckResults(nsNumber != nil && (nsNumber as! Int) == 1, "Expected results did not match")
+  CheckResults(nsNumber != nil && (nsNumber as! Int) == 1)
 }
 #endif
 
@@ -518,7 +518,7 @@ func testObjectiveCBridgeToNSSet() {
     let nsDict = nativeSet as NSSet
     nsString = nsDict.member(key)
   }
-  CheckResults(nsString != nil && (nsString as! String) == "abcde1", "Expected results did not match")
+  CheckResults(nsString != nil && (nsString as! String) == "abcde1")
 }
 #endif
 

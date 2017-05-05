@@ -376,7 +376,7 @@ private:
       }
     }
 
-    BraceStmt *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
+    auto *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
     assert(ParentBrace && "Expected parent of GuardStmt to be BraceStmt");
     if (!FallthroughRange.hasValue())
       return;

@@ -4250,7 +4250,7 @@ public:
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
       if (isa<TypeAliasDecl>(D)) {
-        ValueDecl *VD = dyn_cast<ValueDecl>(D);
+        auto *VD = dyn_cast<ValueDecl>(D);
         SatisfiedAssociatedTypes.insert(VD->getName().str());
       }
       return;

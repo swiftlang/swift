@@ -954,7 +954,7 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty) {
   if (Ty->isVoid()) {
     return Ctx.buffer("Void");
   }
-  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
     return NAT->getDecl()->getNameStr();
   }
   if (Ty->getAnyNominal()) {
@@ -2471,7 +2471,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
   }
 
   void visit(NodePtr Node) override {
-    SDKNodeDecl *Parent = dyn_cast<SDKNodeDecl>(Node);
+    auto *Parent = dyn_cast<SDKNodeDecl>(Node);
     if (!Parent) {
       if (auto TN = dyn_cast<SDKNodeType>(Node)) {
         Parent = TN->getClosestParentDecl();

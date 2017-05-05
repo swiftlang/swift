@@ -105,14 +105,14 @@ public:
   }
 
   StringRef getFilename() const {
-    if (SourceFile *SF = SFOrMod.dyn_cast<SourceFile *>())
+    if (auto *SF = SFOrMod.dyn_cast<SourceFile *>())
       return SF->getFilename();
     return SFOrMod.get<ModuleDecl *>()->getModuleFilename();
   }
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
-    if (SourceFile *SF = SFOrMod.dyn_cast<SourceFile *>()) {
+    if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
       SF->getImportedModules(Modules, ModuleDecl::ImportFilter::All);
     } else {
       SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules,
@@ -256,14 +256,14 @@ private:
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (FD->isAccessor() && getParentDecl() != FD->getAccessorStorageDecl())
         return false; // already handled as part of the var decl.
     }
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!report(VD))
         return false;
-      if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(VD)) {
+      if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
         // Avoid indexing the indices, only walk the getter/setter.
         if (SD->getGetter())
           if (SourceEntityWalker::walk(cast<Decl>(SD->getGetter())))
@@ -283,7 +283,7 @@ private:
         return false; // already walked what we needed.
       }
     }
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
+    if (auto *ED = dyn_cast<ExtensionDecl>(D))
       return reportExtension(ED);
     return true;
   }
@@ -973,7 +973,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
     return true;
 
   // Report the accessors that were utilized.
-  if (AbstractStorageDecl *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
     bool UsesGetter = Info.roles & (SymbolRoleSet)SymbolRole::Read;
     bool UsesSetter = Info.roles & (SymbolRoleSet)SymbolRole::Write;
 

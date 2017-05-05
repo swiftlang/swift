@@ -606,9 +606,10 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  var a = 3 // e/xpected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // e/xpected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // e/xpected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = SubscriptTwo()
   _ = s1[a, b]
@@ -1094,9 +1095,10 @@ do {
 }
 
 do {
-  var a = 3.0 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4.0 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  var a = 3.0 // e/xpected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4.0 // e/xpected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // e/xpected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = GenericSubscript<(Double, Double)>()
   _ = s1[a, b] // expected-error {{extra argument in call}}

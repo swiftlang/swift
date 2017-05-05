@@ -1157,7 +1157,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (AE->getElements().size() != 1)
       return nullptr;
 
-    TypeExpr *TyExpr = dyn_cast<TypeExpr>(AE->getElement(0));
+    auto *TyExpr = dyn_cast<TypeExpr>(AE->getElement(0));
     if (!TyExpr)
       return nullptr;
 
@@ -1177,11 +1177,11 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     TypeRepr *keyTypeRepr, *valueTypeRepr;
     
     if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElement(0))) {
-      TypeExpr *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
+      auto *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
       if (!KeyTyExpr)
         return nullptr;
 
-      TypeExpr *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
+      auto *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
       if (!ValueTyExpr)
         return nullptr;
      
@@ -2291,7 +2291,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 /// \brief Compute the rvalue type of the given expression, which is the
 /// destination of an assignment statement.
 Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(dest)) {
+  if (auto *TE = dyn_cast<TupleExpr>(dest)) {
     auto &ctx = getASTContext();
     SmallVector<TupleTypeElt, 4> destTupleTypes;
     for (unsigned i = 0; i != TE->getNumElements(); ++i) {

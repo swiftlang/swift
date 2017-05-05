@@ -910,10 +910,9 @@ static bool performCompile(CompilerInstance &Instance,
   // Free up some compiler resources now that we have an IRModule.
   Instance.freeContextAndSIL();
 
-  DiagnosticEngine &Diags = Context.Diags;
   // Now that we have a single IR Module, hand it over to performLLVM.
-  return performLLVM(IRGenOpts, &Diags, nullptr, HashGlobal, IRModule.get(),
-                  TargetMachine.get(), EffectiveLanguageVersion,
+  return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
+                  IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
                   opts.getSingleOutputFilename()) || HadError;
 }
 
@@ -971,7 +970,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   }
 
   for (auto *FU : Mod->getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(FU))
+    if (auto *SF = dyn_cast<SourceFile>(FU))
       if (dumpFile(SF))
         return true;
   }

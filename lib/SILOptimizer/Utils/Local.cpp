@@ -180,7 +180,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
         // If the operand is an instruction that is only used by the instruction
         // being deleted, delete it.
-        if (SILInstruction *OpValInst = dyn_cast<SILInstruction>(OpVal))
+        if (auto *OpValInst = dyn_cast<SILInstruction>(OpVal))
           if (!DeadInsts.count(OpValInst) &&
               isInstructionTriviallyDead(OpValInst))
             NextInsts.insert(OpValInst);
@@ -369,7 +369,7 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                      TermInst *Branch) {
   SILBuilderWithScope Builder(Branch);
 
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
+  if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;
     SmallVector<SILValue, 8> FalseArgs;
 
@@ -392,7 +392,7 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                     CBI->getFalseBB(), FalseArgs);
   }
 
-  if (BranchInst *BI = dyn_cast<BranchInst>(Branch)) {
+  if (auto *BI = dyn_cast<BranchInst>(Branch)) {
     SmallVector<SILValue, 8> Args;
 
     for (auto A : BI->getArgs())

@@ -440,17 +440,17 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
   for (Decl *D : NewDecls) {
     SF.Decls.push_back(D);
 
-    TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D);
+    auto *TLCD = dyn_cast<TopLevelCodeDecl>(D);
     if (!TLCD || TLCD->getBody()->getElements().empty())
       continue;
 
     auto Entry = TLCD->getBody()->getElement(0);
 
     // Check to see if the TLCD has an expression that we have to transform.
-    if (Expr *E = Entry.dyn_cast<Expr*>())
+    if (auto *E = Entry.dyn_cast<Expr*>())
       RC.processREPLTopLevelExpr(E);
-    else if (Decl *D = Entry.dyn_cast<Decl*>())
-      if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
+    else if (auto *D = Entry.dyn_cast<Decl*>())
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
         RC.processREPLTopLevelPatternBinding(PBD);
   }
 

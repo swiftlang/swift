@@ -349,7 +349,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   if (VI != ValueMap.end())
     return VI->second;
 
-  if (SILInstruction* I = dyn_cast<SILInstruction>(Value)) {
+  if (auto *I = dyn_cast<SILInstruction>(Value)) {
     auto II = InstructionMap.find(I);
     if (II != InstructionMap.end())
       return SILValue(II->second);
@@ -357,7 +357,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   }
 
   // If we have undef, just remap the type.
-  if (SILUndef *U = dyn_cast<SILUndef>(Value)) {
+  if (auto *U = dyn_cast<SILUndef>(Value)) {
     auto type = getOpType(U->getType());
     ValueBase *undef =
       (type == U->getType() ? U : SILUndef::get(type, Builder.getModule()));

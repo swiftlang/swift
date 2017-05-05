@@ -30,7 +30,8 @@
     "UnavailableStringAPIs.swift",
     "UTFEncoding.swift",
     "UTF8.swift",
-    "UTF16.swift"
+    "UTF16.swift",
+    "UTF32.swift"
   ],
   "Bool": [
     "Bool.swift"

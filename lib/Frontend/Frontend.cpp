@@ -638,4 +638,7 @@ void CompilerInstance::performParseOnly() {
 void CompilerInstance::freeContextAndSIL() {
   Context.reset();
   TheSILModule.reset();
+  MainModule = nullptr;
+  SML = nullptr;
+  PrimarySourceFile = nullptr;
 }

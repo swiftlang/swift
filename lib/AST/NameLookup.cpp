@@ -719,14 +719,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           }
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
-        } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
+        } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
           ExtendedType = ED->getSelfTypeInContext();
 
           BaseDecl = ED->getAsNominalTypeOrNominalTypeExtensionContext();
           MetaBaseDecl = BaseDecl;
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
-        } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
+        } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
           ExtendedType = ND->getDeclaredType();
           BaseDecl = ND;
           MetaBaseDecl = BaseDecl;

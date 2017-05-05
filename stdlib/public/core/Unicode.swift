@@ -425,12 +425,9 @@ public typealias UTF16 = _Unicode.UTF16
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
-public struct UTF32 : UnicodeCodec {
-  /// A type that can hold code unit values for this encoding.
-  public typealias CodeUnit = UInt32
-
+extension _Unicode.UTF32 : UnicodeCodec {
   /// Creates an instance of the UTF-32 codec.
-  public init() {}
+  public init() { self = ._swift3Codec }
 
   /// Starts or continues decoding a UTF-32 sequence.
   ///
@@ -482,12 +479,13 @@ public struct UTF32 : UnicodeCodec {
   internal static func _decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
-    guard let x = input.next() else { return .emptyInput }
-    // Check code unit is valid: not surrogate-reserved and within range.
-    guard _fastPath((x &>> 11) != 0b1101_1 && x <= 0x10ffff)
-      else { return .error }
-    // x is a valid scalar.
-    return .scalarValue(UnicodeScalar(_unchecked: x))
+    var parser = ForwardParser()
+    
+    switch parser.parseScalar(from: &input) {
+    case .valid(let s): return .scalarValue(UTF32.decode(s))
+    case .invalid:      return .error
+    case .emptyInput:   return .emptyInput
+    }
   }
 
   /// Encodes a Unicode scalar as a UTF-32 code unit by calling the given
@@ -513,6 +511,7 @@ public struct UTF32 : UnicodeCodec {
     processCodeUnit(UInt32(input))
   }
 }
+public typealias UTF32 = _Unicode.UTF32
 
 /// Translates the given input from one Unicode encoding to another by calling
 /// the given closure.
@@ -1016,7 +1015,5 @@ extension UTF16 {
 }
 
 /// A namespace for Unicode utilities.
-public enum _Unicode {
-  public typealias UTF32 = Swift.UTF32
-}
+public enum _Unicode {}
 
