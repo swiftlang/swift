@@ -250,11 +250,6 @@ public:
     return Ident.get() < RHS.Ident.get();
   }
 
-  // TODO: Remove once migration to DeclBaseName has been completed
-  operator Identifier() {
-    return getIdentifier();
-  }
-
   const void *getAsOpaquePointer() const { return Ident.get(); }
 
   static DeclBaseName getFromOpaquePointer(void *P) {
