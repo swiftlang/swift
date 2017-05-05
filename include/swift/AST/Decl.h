@@ -2201,14 +2201,6 @@ public:
 
   /// Returns true if this declaration is accessible from the given context.
   ///
-  /// A private declaration is accessible from any DeclContext within the same
-  /// source file.
-  ///
-  /// An internal declaration is accessible from any DeclContext within the same
-  /// module.
-  ///
-  /// A public declaration is accessible everywhere.
-  ///
   /// If \p DC is null, returns true only if this declaration is public.
   bool isAccessibleFrom(const DeclContext *DC) const;
 
