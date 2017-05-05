@@ -166,12 +166,12 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       llvm::Constant *offset;
       bool isResolved;
       bool isStruct;
-      if (auto structTy = loweredBaseTy.getStructOrBoundGenericStruct()) {
+      if (loweredBaseTy.getStructOrBoundGenericStruct()) {
         offset = emitPhysicalStructMemberFixedOffset(*this,
                                                      loweredBaseTy,
                                                      property);
         isStruct = true;
-      } else if (auto classTy = loweredBaseTy.getClassOrBoundGenericClass()) {
+      } else if (loweredBaseTy.getClassOrBoundGenericClass()) {
         offset = tryEmitConstantClassFragilePhysicalMemberOffset(*this,
                                                                  loweredBaseTy,
                                                                  property);
@@ -279,7 +279,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         idKind = KeyPathComponentHeader::VTableOffset;
         auto declRef = id.getDeclRef();
         auto dc = declRef.getDecl()->getDeclContext();
-        if (auto methodClass = dyn_cast<ClassDecl>(dc)) {
+        if (isa<ClassDecl>(dc)) {
           auto index = getVirtualMethodIndex(*this, declRef);
           idValue = llvm::ConstantInt::get(SizeTy, index);
           idResolved = true;
