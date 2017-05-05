@@ -2958,6 +2958,11 @@ void Serializer::writeDecl(const Decl *D) {
       getRawStableAccessibility(ctor->getFormalAccess());
     Type ty = ctor->getInterfaceType();
 
+    bool firstTimeRequired = ctor->isRequired();
+    if (auto *overridden = ctor->getOverriddenDecl())
+      if (firstTimeRequired && overridden->isRequired())
+        firstTimeRequired = false;
+
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
@@ -2976,6 +2981,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
+                                  firstTimeRequired,
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams());

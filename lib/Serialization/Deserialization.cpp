@@ -2520,11 +2520,12 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclContextID contextID;
     uint8_t rawFailability;
-    bool isImplicit, isObjC, hasStubImplementation, throws, needsNewVTableEntry;
+    bool isImplicit, isObjC, hasStubImplementation, throws;
     GenericEnvironmentID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID interfaceID, canonicalTypeID;
     DeclID overriddenID;
+    bool needsNewVTableEntry, firstTimeRequired;
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
@@ -2534,7 +2535,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                genericEnvID, interfaceID,
                                                canonicalTypeID, overriddenID,
                                                rawAccessLevel,
-                                               needsNewVTableEntry, argNameIDs);
+                                               needsNewVTableEntry,
+                                               firstTimeRequired,
+                                               argNameIDs);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;

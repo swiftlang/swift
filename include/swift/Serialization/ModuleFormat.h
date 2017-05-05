@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 343; // Last change: new vtable entry flag
+const uint16_t VERSION_MINOR = 344; // Last change: ctor newly required flag
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -859,6 +859,7 @@ namespace decls_block {
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
     BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // 'required' but overridden is not (used for recovery)
     BCArray<IdentifierIDField> // argument names
     // Trailed by its generic parameters, if any, followed by the parameter
     // patterns.
