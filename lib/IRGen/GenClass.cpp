@@ -960,6 +960,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   emitClassMetadata(*this, D,
                     classTI.getLayout(*this, selfType),
                     classTI.getClassLayout(*this, selfType));
+
+  IRGen.addClassForArchiveNameRegistration(D);
+
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
 }
