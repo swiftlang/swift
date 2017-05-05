@@ -2133,7 +2133,7 @@ namespace {
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(Decl, correctSwiftName);
-      auto Name = importedName.getDeclName().getBaseName();
+      auto Name = importedName.getDeclName().getBaseIdentifier();
       if (Name.empty())
         return nullptr;
 
@@ -2360,7 +2360,7 @@ namespace {
         return nullptr;
       
       ASTContext &cxt = Impl.SwiftContext;
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
 
       // Create the enum declaration and record it.
       StructDecl *errorWrapper = nullptr;
@@ -2656,7 +2656,7 @@ namespace {
             if (unimported != constant && enumeratorDecl) {
               ImportedName importedName =
                   Impl.importFullName(constant, getActiveSwiftVersion());
-              Identifier name = importedName.getDeclName().getBaseName();
+              Identifier name = importedName.getDeclName().getBaseIdentifier();
               if (name.empty()) {
                 // Clear the existing declaration so we don't try to process it
                 // twice later.
@@ -2767,7 +2767,7 @@ namespace {
         return nullptr;
 
       // Create the struct declaration and record it.
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  Accessibility::Public,
                                  Impl.importSourceLoc(decl->getLocStart()),
@@ -2962,7 +2962,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
       if (name.empty())
         return nullptr;
 
@@ -3071,7 +3071,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
 
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
@@ -3293,7 +3293,7 @@ namespace {
         importedName.setEffectiveContext(decl->getDeclContext());
       }
 
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
 
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
@@ -3348,7 +3348,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
@@ -4035,7 +4035,7 @@ namespace {
         return importCompatibilityTypeAlias(decl, importedName,
                                             *correctSwiftName);
 
-      Identifier name = importedName.getDeclName().getBaseName();
+      Identifier name = importedName.getDeclName().getBaseIdentifier();
 
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
@@ -4173,7 +4173,7 @@ namespace {
         return importCompatibilityTypeAlias(decl, importedName,
                                             *correctSwiftName);
 
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
 
       if (!decl->hasDefinition()) {
         // Check if this class is implemented in its adapter.
@@ -4379,8 +4379,9 @@ namespace {
       assert(dc);
 
       Optional<ImportedName> correctSwiftName;
-      auto name =
-          importFullName(decl, correctSwiftName).getDeclName().getBaseName();
+      auto name = importFullName(decl, correctSwiftName)
+                      .getDeclName()
+                      .getBaseIdentifier();
       if (name.empty())
         return nullptr;
 
@@ -4512,7 +4513,7 @@ namespace {
 
       Optional<ImportedName> correctSwiftName;
       auto importedName = importFullName(decl, correctSwiftName);
-      auto name = importedName.getDeclName().getBaseName();
+      auto name = importedName.getDeclName().getBaseIdentifier();
 
       if (name.empty()) return nullptr;
 
@@ -4761,7 +4762,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
       decl, Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
-      SourceLoc(), compatibilityName.getDeclName().getBaseName(),
+      SourceLoc(), compatibilityName.getDeclName().getBaseIdentifier(),
       Impl.importSourceLoc(decl->getLocation()), /*generic params*/nullptr, dc);
   alias->setUnderlyingType(underlyingType);
 
@@ -4959,7 +4960,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
   auto &context = Impl.SwiftContext;
   Optional<ImportedName> correctSwiftName;
   auto name =
-      importFullName(decl, correctSwiftName).getDeclName().getBaseName();
+      importFullName(decl, correctSwiftName).getDeclName().getBaseIdentifier();
   if (name.empty())
     return nullptr;
 
@@ -5021,7 +5022,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
                                          NominalTypeDecl *theStruct) {
   Optional<ImportedName> correctSwiftName;
   ImportedName nameInfo = importFullName(decl, correctSwiftName);
-  Identifier name = nameInfo.getDeclName().getBaseName();
+  Identifier name = nameInfo.getDeclName().getBaseIdentifier();
   if (name.empty())
     return nullptr;
 
@@ -5308,7 +5309,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   }
 
   // Find the other accessor, if it exists.
-  auto propertyName = importedName.getDeclName().getBaseName();
+  auto propertyName = importedName.getDeclName().getBaseIdentifier();
   auto lookupTable =
       Impl.findLookupTable(*getClangSubmoduleForDecl(accessor));
   assert(lookupTable && "No lookup table?");
@@ -7820,6 +7821,6 @@ Identifier
 ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
   return Impl.importFullName(enumConstant, Impl.CurrentVersion)
       .getDeclName()
-      .getBaseName();
+      .getBaseIdentifier();
 }
 

@@ -159,7 +159,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   };
   
   // Local function to perform name lookup for the current index.
-  auto performLookup = [&](Identifier componentName,
+  auto performLookup = [&](DeclBaseName componentName,
                            SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
     if (state == Beginning)
@@ -181,13 +181,13 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
   // Local function to print a component to the string.
   bool needDot = false;
-  auto printComponent = [&](Identifier component) {
+  auto printComponent = [&](DeclBaseName component) {
     if (needDot)
       keyPathOS << ".";
     else
       needDot = true;
 
-    keyPathOS << component.str();
+    keyPathOS << component;
   };
 
   bool isInvalid = false;

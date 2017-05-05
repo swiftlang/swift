@@ -168,12 +168,12 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
   }
 
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    Identifier name = DRE->getDecl()->getName();
+    Identifier name = DRE->getDecl()->getBaseName().getIdentifier();
     return lookupPrecedenceGroupForOperator(*this, DC, name, DRE->getLoc());
   }
 
   if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
-    Identifier name = OO->getDecls()[0]->getName();
+    Identifier name = OO->getDecls()[0]->getBaseName().getIdentifier();
     return lookupPrecedenceGroupForOperator(*this, DC, name, OO->getLoc());
   }
 
