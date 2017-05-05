@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Frontend/Frontend.h"
@@ -536,6 +537,38 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
       return;
   }
 
+  /// If the expression is `type(of:)`, in Swift 3 it's a special 'dynamic type
+  /// expression'. In Swift 4, this is resolved by overload resolution, so
+  /// if there is a func type(of:) or even var type, it can shadow
+  /// Swift.type(of:), which is probably not what people want.
+  ///
+  /// This migration operation adds `Swift.` to disambiguate in Swift 4.
+  void handleTypeOfFunction(const DynamicTypeExpr *DTE) {
+    if (!SF->getASTContext().LangOpts.isSwiftVersion3()) {
+      return;
+    }
+    const auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,
+      DTE->getSourceRange());
+    if (SM.extractText(CSR).startswith("Swift.")) {
+      return;
+    }
+
+    UnqualifiedLookup Lookup {
+      { SF->getASTContext().getIdentifier("type") },
+      SF->getModuleScopeContext(),
+      /*TypeResolver=*/nullptr,
+      /*IsKnownPrivate=*/false,
+      DTE->getLoc()
+    };
+    if (Lookup.Results.empty()) {
+      // There won't be a name shadowing here in Swift 4, so we don't need to
+      // do anything.
+      return;
+    }
+
+    Editor.insertBefore(DTE->getLoc(), "Swift.");
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       handleTupleArgumentMismatches(CE);
@@ -566,6 +599,11 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
         break;
       }
     }
+
+    if (const auto *DTE = dyn_cast<DynamicTypeExpr>(E)) {
+      handleTypeOfFunction(DTE);
+    }
+
     return true;
   }
 
