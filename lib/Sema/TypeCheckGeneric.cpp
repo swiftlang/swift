@@ -990,7 +990,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   auto params = subscript->getIndices();
 
   badType |= tc.typeCheckParameterList(params, subscript,
-                                       TypeResolutionOptions(),
+                                       TR_SubscriptParameters,
                                        resolver);
 
   // Infer requirements from the pattern.

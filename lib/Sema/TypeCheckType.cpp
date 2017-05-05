@@ -2786,14 +2786,19 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 
 Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  // inout is only valid for function parameters.
-  if (!(options & TR_FunctionInput) &&
-      !(options & TR_ImmediateFunctionInput)) {
-    TC.diagnose(repr->getInOutLoc(),
-                (options & TR_VariadicFunctionInput)
-                    ? diag::attr_not_on_variadic_parameters
-                    : diag::attr_only_on_parameters,
-                "'inout'");
+  // inout is only valid for (non-subscript) function parameters.
+  if ((options & TR_SubscriptParameters) ||
+        (!(options & TR_FunctionInput) &&
+         !(options & TR_ImmediateFunctionInput))) {
+    decltype(diag::attr_only_on_parameters) diagID;
+    if (options & TR_SubscriptParameters) {
+      diagID = diag::attr_not_on_subscript_parameters;
+    } else if (options & TR_VariadicFunctionInput) {
+      diagID = diag::attr_not_on_variadic_parameters;
+    } else {
+      diagID = diag::attr_only_on_parameters;
+    }
+    TC.diagnose(repr->getInOutLoc(), diagID, "'inout'");
     repr->setInvalid();
     return ErrorType::get(Context);
   }
