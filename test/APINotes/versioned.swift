@@ -84,9 +84,11 @@ func testAKA(structValue: ImportantCStruct, aliasValue: ImportantCAlias) {
   let _: Int = optAliasValue
   // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'Optional<ImportantCAlias>' (aka 'Optional<Int32>') to specified type 'Int'
 }
+
 #endif
 
 #if !swift(>=4)
+
 func useSwift3Name(_: ImportantCStruct) {}
 // CHECK-SILGEN-3: sil hidden @_T09versioned13useSwift3NameySC20VeryImportantCStructVF
 
@@ -97,3 +99,17 @@ func useNewlyNested(_: InnerInSwift4) {}
 func useSwift4Name(_: VeryImportantCStruct) {}
 // CHECK-SILGEN: sil hidden @_T09versioned13useSwift4NameySC20VeryImportantCStructVF
 
+
+
+#if swift(>=4)
+func testSwiftWrapperInSwift4() {
+  _ = EnclosingStruct.Identifier.member
+  let _: EnclosingStruct.Identifier = .member
+}
+
+#else
+func testSwiftWrapperInSwift3() {
+  _ = EnclosingStruct.Identifier.member
+  let _: EnclosingStruct.Identifier = .member
+}
+#endif

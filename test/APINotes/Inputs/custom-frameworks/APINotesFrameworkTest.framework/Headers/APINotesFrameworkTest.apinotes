@@ -106,4 +106,5 @@ SwiftVersions:
     Typedefs:
       - Name: SomeCAlias
         SwiftName: ImportantCAlias
-
+      - Name: EnclosingStructIdentifier
+        SwiftName: EnclosingStructIdentifier
