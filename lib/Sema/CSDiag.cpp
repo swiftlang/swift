@@ -4951,7 +4951,7 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
           // Constructors/descructors and subscripts don't really have names.
           if (!(isa<ConstructorDecl>(decl) || isa<DestructorDecl>(decl) ||
                 isa<SubscriptDecl>(decl))) {
-            name = decl->getName();
+            name = decl->getBaseName().getIdentifier();
           }
 
           TC.diagnose(argExpr->getLoc(), diag::single_tuple_parameter_mismatch,
