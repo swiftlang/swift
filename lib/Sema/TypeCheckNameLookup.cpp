@@ -478,8 +478,9 @@ static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
   // TODO: word-based rather than character-based?
-  StringRef argBase = argName.getBaseName().str();
-  StringRef paramBase = paramName.getBaseName().str();
+  // TODO: Handle special names
+  StringRef argBase = argName.getBaseIdentifier().str();
+  StringRef paramBase = paramName.getBaseIdentifier().str();
 
   unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
 
@@ -635,7 +636,8 @@ void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
   DeclName declName = decl->getFullName();
 
   if (writtenName.getBaseName() != declName.getBaseName())
-    diagnostic.fixItReplace(loc.getBaseNameLoc(), declName.getBaseName().str());
+    diagnostic.fixItReplace(loc.getBaseNameLoc(),
+                            declName.getBaseIdentifier().str());
 
   // TODO: add fix-its for typo'ed argument labels.  This is trickier
   // because of the reordering rules.

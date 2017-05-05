@@ -187,7 +187,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     else
       needDot = true;
 
-    keyPathOS << component.str();
+    keyPathOS << component;
   };
 
   bool isInvalid = false;
