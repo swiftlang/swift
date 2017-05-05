@@ -115,12 +115,12 @@ set(SWIFTLIB_ESSENTIAL
   StaticString.swift
   Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
+  StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
   StringBuffer.swift
   StringComparable.swift
   StringCore.swift
-  StringHashable.swift
   StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
@@ -145,6 +145,7 @@ set(SWIFTLIB_ESSENTIAL
   UTFEncoding.swift
   UTF8.swift
   UTF16.swift
+  UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
   WriteBackMutableSlice.swift
   )
