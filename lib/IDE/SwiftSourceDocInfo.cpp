@@ -203,7 +203,7 @@ bool SemaLocResolver::
 visitExternalArgumentName(Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
   if (isDone())
     return false;
-  return !tryResolve(D, nullptr, nullptr, StartLoc, /*IsRef=*/false);;
+  return !tryResolve(D, nullptr, nullptr, StartLoc, /*IsRef=*/false);
 }
 
 bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
