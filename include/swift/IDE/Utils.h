@@ -199,6 +199,8 @@ private:
                           ReferenceMetaData Data) override;
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override;
+  bool visitExternalArgumentName(Identifier Name, SourceLoc StartLoc,
+                                 ValueDecl *D) override;
   bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
   bool rangeContainsLoc(SourceRange Range) const {
     return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
