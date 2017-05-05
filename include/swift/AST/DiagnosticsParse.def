@@ -132,13 +132,13 @@ ERROR(lex_illegal_multiline_string_start,none,
       "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,
       "multi-line string literal closing delimiter must begin on a new line", ())
-ERROR(lex_inconsistent_string_indent,none,
+ERROR(lex_multiline_string_indent_inconsistent,none,
       "%select{unexpected space in|unexpected tab in|insufficient}2 indentation of "
       "%select{line|next %1 lines}0 in multi-line string literal", 
       (bool, unsigned, unsigned))
-NOTE(note_indentation_should_match_here,none,
+NOTE(lex_multiline_string_indent_should_match_here,none,
       "should match %select{space|tab}0 here", (unsigned))
-NOTE(note_change_current_line_indentation,none,
+NOTE(lex_multiline_string_indent_change_line,none,
       "change indentation of %select{this line|these lines}0 to match closing delimiter", (bool))
 
 ERROR(lex_invalid_character,none,

@@ -1412,6 +1412,8 @@ static void diagnoseInvalidMultilineIndents(
     return;
   }
   
+  assert(LineStarts.size() > 0);
+  
   auto getLoc = [&](size_t offset) -> SourceLoc {
     return Lexer::getSourceLoc((const char *)Bytes.bytes_begin() + offset);
   };
@@ -1427,21 +1429,23 @@ static void diagnoseInvalidMultilineIndents(
   };
   
   Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
-                  diag::lex_inconsistent_string_indent,
+                  diag::lex_multiline_string_indent_inconsistent,
                   LineStarts.size() != 1, LineStarts.size(),
                   classify(Bytes[LineStarts[0] + MistakeOffset]));
   
   Diags->diagnose(IndentLoc.getAdvancedLoc(MistakeOffset), 
-                  diag::note_indentation_should_match_here, 
+                  diag::lex_multiline_string_indent_should_match_here, 
                   classify(ExpectedIndent[MistakeOffset]));
   
   auto fix = Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
-                             diag::note_change_current_line_indentation,
+                             diag::lex_multiline_string_indent_change_line,
                              LineStarts.size() != 1);
   
   assert(MistakeOffset <= ActualIndent.size());
-  assert(ExpectedIndent.substr(0, MistakeOffset) == ActualIndent.substr(0, MistakeOffset));
-  for(auto line : LineStarts) {    
+  assert(ExpectedIndent.substr(0, MistakeOffset) == 
+         ActualIndent.substr(0, MistakeOffset));
+  
+  for(auto line : LineStarts) {
     fix.fixItReplaceChars(getLoc(line + MistakeOffset), 
                           getLoc(line + ActualIndent.size()),
                           ExpectedIndent.substr(MistakeOffset));
