@@ -2147,6 +2147,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
     createStubBody(tc, ctor);
+    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 

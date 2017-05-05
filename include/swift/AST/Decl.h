@@ -365,8 +365,14 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether the function body throws.
     unsigned Throws : 1;
+
+    /// Whether this function requires a new vtable entry.
+    unsigned NeedsNewVTableEntry : 1;
+
+    /// Whether NeedsNewVTableEntry is valid.
+    unsigned HasComputedNeedsNewVTableEntry : 1;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 11 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 13 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -378,15 +384,8 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
-
-    /// Whether this function is a 'mutating' method.
-    unsigned Mutating : 1;
-
-    /// Whether this function has a dynamic Self return type.
-    unsigned HasDynamicSelf : 1;
-    
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 3 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -399,17 +398,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
-
-    /// Whether this initializer is a stub placed into a subclass to
-    /// catch invalid delegations to a designated initializer not
-    /// overridden by the subclass. A stub will always trap at runtime.
-    ///
-    /// Initializer stubs can be invoked from Objective-C or through
-    /// the Objective-C runtime; there is no way to directly express
-    /// an object construction that will invoke a stub.
-    unsigned HasStubImplementation : 1;
   };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 4 };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 3 };
   static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitfields {
@@ -4790,6 +4780,8 @@ protected:
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
     AbstractFunctionDeclBits.Overridden = false;
     AbstractFunctionDeclBits.Throws = Throws;
+    AbstractFunctionDeclBits.NeedsNewVTableEntry = false;
+    AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry = false;
 
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParameterLists == NumParameterLists);
@@ -4903,6 +4895,21 @@ public:
     return getBodyKind() == BodyKind::MemberwiseInitializer;
   }
 
+  void setNeedsNewVTableEntry(bool value) {
+    AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry = true;
+    AbstractFunctionDeclBits.NeedsNewVTableEntry = value;
+  }
+
+  bool needsNewVTableEntry() const {
+    if (!AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry)
+      const_cast<AbstractFunctionDecl *>(this)->computeNeedsNewVTableEntry();
+    return AbstractFunctionDeclBits.NeedsNewVTableEntry;
+  }
+
+private:
+  void computeNeedsNewVTableEntry();
+
+public:
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
@@ -5059,6 +5066,12 @@ class FuncDecl final : public AbstractFunctionDecl,
   /// Whether we are statically dispatched even if overridable
   unsigned ForcedStaticDispatch : 1;
 
+  /// Whether this function has a dynamic Self return type.
+  unsigned HasDynamicSelf : 1;
+
+  /// Whether this function is a 'mutating' method.
+  unsigned Mutating : 1;
+
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
@@ -5086,9 +5099,9 @@ class FuncDecl final : public AbstractFunctionDecl,
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
-    FuncDeclBits.Mutating = false;
-    FuncDeclBits.HasDynamicSelf = false;
 
+    Mutating = false;
+    HasDynamicSelf = false;
     ForcedStaticDispatch = false;
     HaveSearchedForCommonOverloadReturnType = false;
     HaveFoundCommonOverloadReturnType = false;
@@ -5141,10 +5154,10 @@ public:
     FuncDeclBits.IsStatic = IsStatic;
   }
   bool isMutating() const {
-    return FuncDeclBits.Mutating;
+    return Mutating;
   }
-  void setMutating(bool Mutating = true) {
-    FuncDeclBits.Mutating = Mutating;
+  void setMutating(bool mutating = true) {
+    Mutating = mutating;
   }
   
   /// \brief Returns the parameter lists(s) for the function definition.
@@ -5266,11 +5279,11 @@ public:
 
   /// Determine whether this function has a dynamic \c Self return
   /// type.
-  bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
+  bool hasDynamicSelf() const { return HasDynamicSelf; }
 
   /// Set whether this function has a dynamic \c Self return or not.
   void setDynamicSelf(bool hasDynamicSelf) { 
-    FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
+    HasDynamicSelf = hasDynamicSelf;
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -5549,6 +5562,15 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The failability of this initializer, which is an OptionalTypeKind.
   unsigned Failability : 2;
 
+  /// Whether this initializer is a stub placed into a subclass to
+  /// catch invalid delegations to a designated initializer not
+  /// overridden by the subclass. A stub will always trap at runtime.
+  ///
+  /// Initializer stubs can be invoked from Objective-C or through
+  /// the Objective-C runtime; there is no way to directly express
+  /// an object construction that will invoke a stub.
+  unsigned HasStubImplementation : 1;
+
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
@@ -5708,13 +5730,13 @@ public:
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {
-    return ConstructorDeclBits.HasStubImplementation;
+    return HasStubImplementation;
   }
 
   /// Set whether the implementation of this method is a stub that
   /// traps at runtime.
   void setStubImplementation(bool stub) {
-    ConstructorDeclBits.HasStubImplementation = stub;
+    HasStubImplementation = stub;
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
