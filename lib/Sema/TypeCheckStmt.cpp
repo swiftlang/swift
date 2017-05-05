@@ -243,21 +243,21 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
         NTD->lookupConformance(module, optionSetType, conformances)))
     return;
 
-  CallExpr *CE = dyn_cast<CallExpr>(E);
+  auto *CE = dyn_cast<CallExpr>(E);
   if (!CE)
     return;
   if (!isa<ConstructorRefCallExpr>(CE->getFn()))
     return;
-  ParenExpr *ParenE = dyn_cast<ParenExpr>(CE->getArg());
+  auto *ParenE = dyn_cast<ParenExpr>(CE->getArg());
   if (!ParenE)
     return;
-  MemberRefExpr *ME = dyn_cast<MemberRefExpr>(ParenE->getSubExpr());
+  auto *ME = dyn_cast<MemberRefExpr>(ParenE->getSubExpr());
   if (!ME)
     return;
   ValueDecl *VD = ME->getMember().getDecl();
   if (!VD || VD->getName() != Ctx.Id_rawValue)
     return;
-  MemberRefExpr *BME = dyn_cast<MemberRefExpr>(ME->getBase());
+  auto *BME = dyn_cast<MemberRefExpr>(ME->getBase());
   if (!BME)
     return;
   if (!BME->getType()->isEqual(ResultType))
@@ -1197,11 +1197,11 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // constructor calls during CSApply / ExprRewriter::convertLiteral.
     if (call->isImplicit()) {
       Expr *arg = call->getArg();
-      if (TupleExpr *TE = dyn_cast<TupleExpr>(arg))
+      if (auto *TE = dyn_cast<TupleExpr>(arg))
         if (TE->getNumElements() == 1)
           arg = TE->getElement(0);
 
-      if (LiteralExpr *LE = dyn_cast<LiteralExpr>(arg)) {
+      if (auto *LE = dyn_cast<LiteralExpr>(arg)) {
         diagnoseIgnoredLiteral(*this, LE);
         return;
       }
@@ -1245,7 +1245,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   const SourceManager &SM = TC.Context.SourceMgr;
   for (auto &elem : BS->getElements()) {
-    if (Expr *SubExpr = elem.dyn_cast<Expr*>()) {
+    if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       SourceLoc Loc = SubExpr->getStartLoc();
       if (EndTypeCheckLoc.isValid() &&
           (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
@@ -1280,7 +1280,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    if (Stmt *SubStmt = elem.dyn_cast<Stmt*>()) {
+    if (auto *SubStmt = elem.dyn_cast<Stmt*>()) {
       SourceLoc Loc = SubStmt->getStartLoc();
       if (EndTypeCheckLoc.isValid() &&
           (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
@@ -1530,7 +1530,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   if (nominalDecl == nullptr)
     return HadError;
 
-  ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
+  auto *ClassD = dyn_cast<ClassDecl>(nominalDecl);
   bool wantSuperInitCall = false;
   if (ClassD) {
     bool isDelegating = false;

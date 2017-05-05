@@ -77,7 +77,7 @@ struct bind_ty {
 
   template<typename ITy>
   bool match(ITy *V) {
-    if (Class *CV = dyn_cast<Class>(V)) {
+    if (auto *CV = dyn_cast<Class>(V)) {
       VR = CV;
       return true;
     }

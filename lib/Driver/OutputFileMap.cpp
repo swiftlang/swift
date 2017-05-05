@@ -105,7 +105,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   if (!Root)
     return true;
 
-  llvm::yaml::MappingNode *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
+  auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
   if (!Map)
     return true;
 
@@ -119,7 +119,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     if (!Value)
       return true;
 
-    llvm::yaml::ScalarNode *InputPath = dyn_cast<llvm::yaml::ScalarNode>(Key);
+    auto *InputPath = dyn_cast<llvm::yaml::ScalarNode>(Key);
     if (!InputPath)
       return true;
 
@@ -134,11 +134,11 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
       llvm::yaml::Node *Key = OutputPair.getKey();
       llvm::yaml::Node *Value = OutputPair.getValue();
 
-      llvm::yaml::ScalarNode *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
+      auto *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
       if (!KindNode)
         return true;
 
-      llvm::yaml::ScalarNode *Path = dyn_cast<llvm::yaml::ScalarNode>(Value);
+      auto *Path = dyn_cast<llvm::yaml::ScalarNode>(Value);
       if (!Path)
         return true;
 

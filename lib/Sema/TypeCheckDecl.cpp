@@ -5114,7 +5114,7 @@ public:
 
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, FD);
 
-      ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(
+      auto *protocolContext = dyn_cast<ProtocolDecl>(
           FD->getDeclContext());
       if (protocolContext && FD->isAccessor()) {
         if (isObjC)

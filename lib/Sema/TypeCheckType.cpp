@@ -2164,7 +2164,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
   // Function attributes require a syntactic function type.
-  FunctionTypeRepr *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
+  auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
   if (hasFunctionAttr && fnRepr && (options & TR_SILType)) {
     SILFunctionType::Representation rep;

@@ -108,12 +108,12 @@ class AnnotatingPrinter : public StreamPrinter {
   DefaultImplementMap *DefaultMapToUse = nullptr;
 
   void initDefaultMapToUse(const Decl *D) {
-    const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D);
+    const auto *ED = dyn_cast<ExtensionDecl>(D);
     if (!ED)
       return;
     if (ED->getExtendedType()) {
       if (auto NTD = ED->getExtendedType()->getAnyNominal()) {
-        if (ProtocolDecl *PD = dyn_cast<ProtocolDecl>(NTD)) {
+        if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
           auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
           DefaultMapToUse = &Pair.first->getSecond();
           if (Pair.second) {
@@ -134,7 +134,7 @@ class AnnotatingPrinter : public StreamPrinter {
   ValueDecl *getDefaultImplementation(const Decl *D) {
     if (!DefaultMapToUse)
       return nullptr;
-    ValueDecl *VD = const_cast<ValueDecl*>(dyn_cast<ValueDecl>(D));
+    auto *VD = const_cast<ValueDecl*>(dyn_cast<ValueDecl>(D));
     auto Found = DefaultMapToUse->find(VD);
     if (Found != DefaultMapToUse->end()) {
       return Found->second;
@@ -324,7 +324,7 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
 
   if (Info.Kind.isInvalid())
     return true;
-  if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
     llvm::raw_svector_ostream NameOS(Info.Name);
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
@@ -409,7 +409,7 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
     // We report sub-module information only for top-level decls.
     case DeclContextKind::Module:
     case DeclContextKind::FileUnit: {
-      if (auto* CD = D->getClangDecl()) {
+      if (auto *CD = D->getClangDecl()) {
         if (auto *M = CD->getImportedOwningModule()) {
           const clang::Module *Root = M->getTopLevelModule();
 
@@ -517,7 +517,7 @@ static void reportRelated(ASTContext &Ctx,
                           DocInfoConsumer &Consumer) {
   if (!D || isa<ParamDecl>(D))
     return;
-  if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (SynthesizedTarget) {
       passExtends((ValueDecl*)SynthesizedTarget, Consumer);
     } else if (Type T = ED->getExtendedType()) {
@@ -543,7 +543,7 @@ static void reportRelated(ASTContext &Ctx,
 
     // Otherwise, report the inheritance of the type alias itself.
     passInheritsAndConformancesForValueDecl(TAD, Consumer);
-  } else if (const TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
+  } else if (const auto *TD = dyn_cast<TypeDecl>(D)) {
     passInherits(TD->getInherited(), Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);

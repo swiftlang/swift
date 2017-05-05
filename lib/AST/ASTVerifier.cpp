@@ -366,7 +366,7 @@ public:
     /// Helper template for dispatching post-visitation.
     template <class T> T dispatchVisitPost(T node) {
       // Verify source ranges if the AST node was parsed from source.
-      SourceFile *SF = M.dyn_cast<SourceFile *>();
+      auto *SF = M.dyn_cast<SourceFile *>();
       if (SF) {
         // If we are inside an implicit BraceStmt, don't verify source
         // locations.  LLDB creates implicit BraceStmts which contain a mix of
@@ -817,7 +817,7 @@ public:
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(func)) {
+      if (auto *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
         resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
@@ -905,7 +905,7 @@ public:
     }
 
     Type checkAssignDest(Expr *Dest) {
-      if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
+      if (auto *TE = dyn_cast<TupleExpr>(Dest)) {
         SmallVector<TupleTypeElt, 4> lhsTupleTypes;
         for (unsigned i = 0; i != TE->getNumElements(); ++i) {
           Type SubType = checkAssignDest(TE->getElement(i));
@@ -1523,7 +1523,7 @@ public:
       // a computed property or if the base is a protocol or existential.
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
-          VarDecl *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
+          auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
           if (!VD || !VD->hasAccessorFunctions()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
@@ -2154,7 +2154,7 @@ public:
       if (normal->isLazilyResolved()) return;
 
       // Translate the owning declaration into a DeclContext.
-      NominalTypeDecl *nominal = dyn_cast<NominalTypeDecl>(decl);
+      auto *nominal = dyn_cast<NominalTypeDecl>(decl);
       DeclContext *conformingDC;
       if (nominal) {
         conformingDC = nominal;

@@ -399,7 +399,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
+  auto *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
   if (!FRI)
     return nullptr;
 

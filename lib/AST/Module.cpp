@@ -181,23 +181,23 @@ template<typename Range>
 void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D))
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
       }
-    if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
+    if (auto *ED = dyn_cast<ExtensionDecl>(D))
       doPopulateCache(ED->getMembers(), true);
   }
 }
 
 void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
   for (const Decl *D : SF.Decls) {
-    if (const NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addToMemberCache(NTD->getMembers());
-    } else if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    } else if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
       addToMemberCache(ED->getMembers());
     }
   }

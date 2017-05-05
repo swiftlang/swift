@@ -229,7 +229,7 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForUnknownPreds() {
   // for method chaining code like obj.method1().method2().etc()
   auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
   SILInstruction *Inst = &*CCBI->getFailureBB()->begin();
-  if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst)) {
+  if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
     if (CMI->getOperand() == stripClassCasts(CCBI->getOperand())) {
       // Replace checked_cast_br by branch to FailureBB.
       SILBuilder(CCBI->getParent()).createBranch(CCBI->getLoc(),

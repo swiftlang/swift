@@ -2214,7 +2214,7 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
                                                        CanType conformingType) {
   NominalTypeDecl *nom = conformingType->getAnyNominal();
-  ClassDecl *clas = dyn_cast<ClassDecl>(nom);
+  auto *clas = dyn_cast<ClassDecl>(nom);
   if (nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel()))
     return true;
 

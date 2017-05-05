@@ -179,7 +179,7 @@ SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *SVI) {
   SILBasicBlock *TrueBB = nullptr;
   for (unsigned Idx = 0, Num = SVI->getNumCases(); Idx < Num; ++Idx) {
     auto Case = SVI->getCase(Idx);
-    IntegerLiteralInst *CaseVal = dyn_cast<IntegerLiteralInst>(Case.first);
+    auto *CaseVal = dyn_cast<IntegerLiteralInst>(Case.first);
     if (!CaseVal)
       return nullptr;
     SILBasicBlock *DestBB = Case.second;
@@ -606,7 +606,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 
     // ...and the predecessor instruction is a release_value on the same value
     // as our retain_value...
-    if (ReleaseValueInst *Release = dyn_cast<ReleaseValueInst>(&*Pred))
+    if (auto *Release = dyn_cast<ReleaseValueInst>(&*Pred))
       // Remove them...
       if (Release->getOperand() == RVI->getOperand()) {
         eraseInstFromFunction(*Release);
@@ -694,7 +694,7 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
 
     // ...and the predecessor instruction is a strong_release on the same value
     // as our strong_retain...
-    if (StrongReleaseInst *Release = dyn_cast<StrongReleaseInst>(&*Pred))
+    if (auto *Release = dyn_cast<StrongReleaseInst>(&*Pred))
       // Remove them...
       if (Release->getOperand() == SRI->getOperand()) {
         eraseInstFromFunction(*Release);
@@ -908,8 +908,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   if (!hasOneNonDebugUse(DataAddrInst))
     return nullptr;
 
-  StoreInst *SI = dyn_cast<StoreInst>(getSingleNonDebugUser(DataAddrInst));
-  ApplyInst *AI = dyn_cast<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
+  auto *SI = dyn_cast<StoreInst>(getSingleNonDebugUser(DataAddrInst));
+  auto *AI = dyn_cast<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
   if (!SI && !AI) {
     return nullptr;
   }
@@ -1346,7 +1346,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     MDVal = UC->getOperand();
 
   SILInstruction *NewInst = nullptr;
-  if (MetatypeInst *MI = dyn_cast<MetatypeInst>(MDVal)) {
+  if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
 

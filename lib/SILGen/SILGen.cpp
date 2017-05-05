@@ -812,7 +812,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
 
 bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
   for (Decl *member : cd->getMembers()) {
-    VarDecl *vd = dyn_cast<VarDecl>(member);
+    auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
     const TypeLowering &ti = Types.getTypeLowering(vd->getType());
@@ -1171,10 +1171,10 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
  
   for (auto &ESD : td->getBody()->getElements()) {
     if (!TopLevelSGF->B.hasValidInsertionPoint()) {
-      if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+      if (auto *S = ESD.dyn_cast<Stmt*>()) {
         if (S->isImplicit())
           continue;
-      } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+      } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         if (E->isImplicit())
           continue;
       }
@@ -1184,9 +1184,9 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
       return;
     }
 
-    if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+    if (auto *S = ESD.dyn_cast<Stmt*>()) {
       TopLevelSGF->emitStmt(S);
-    } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+    } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       TopLevelSGF->emitIgnoredExpr(E);
     } else {
       TopLevelSGF->visit(ESD.get<Decl*>());

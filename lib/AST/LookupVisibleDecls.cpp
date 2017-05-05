@@ -568,7 +568,7 @@ static void lookupVisibleMemberDeclsImpl(
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, TypeResolver, Visited);
     // If we have a class type, look into its superclass.
-    ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
+    auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
       assert(BaseTy.getPointer() != CurClass->getSuperclass().getPointer() &&

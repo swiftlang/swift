@@ -148,7 +148,7 @@ IsZeroKind swift::isZeroValue(SILValue Value) {
     if (T->getFieldNo() != 0)
       return IsZeroKind::Unknown;
 
-    BuiltinInst *BI = dyn_cast<BuiltinInst>(T->getOperand());
+    auto *BI = dyn_cast<BuiltinInst>(T->getOperand());
     if (!BI)
       return IsZeroKind::Unknown;
 
