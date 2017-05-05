@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/Version.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -800,7 +801,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  StringRef Name,
                                                  StringRef HeaderName,
                                                  ArrayRef<const char *> Args,
-                                                 bool SynthesizedExtensions) {
+                                                 bool SynthesizedExtensions,
+                                              Optional<unsigned> swiftVersion) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -831,6 +833,10 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   }
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
+  if (swiftVersion.hasValue()) {
+    auto swiftVer = version::Version({swiftVersion.getValue()});
+    Invocation.getLangOptions().EffectiveLanguageVersion = swiftVer;
+  }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,
                                                       HeaderName,

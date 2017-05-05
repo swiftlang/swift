@@ -358,7 +358,8 @@ public:
                                  StringRef Name,
                                  StringRef HeaderName,
                                  ArrayRef<const char *> Args,
-                                 bool SynthesizedExtensions) override;
+                                 bool SynthesizedExtensions,
+                                 Optional<unsigned> swiftVersion) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,
