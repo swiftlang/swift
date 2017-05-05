@@ -88,7 +88,7 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
   auto decl = capture.getDecl();
-  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
     switch (var->getStorageKind()) {
     case VarDecl::StoredWithTrivialAccessors:
       llvm_unreachable("stored local variable with trivial accessors?");
@@ -1911,7 +1911,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
-  ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
+  auto *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
@@ -1988,7 +1988,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
 /// Get the generic environment for an entity.
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
+  auto *vd = c.loc.dyn_cast<ValueDecl *>();
   
   /// Get the function generic params, including outer params.
   switch (c.kind) {

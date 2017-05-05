@@ -708,7 +708,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         hasTopLevelCode = true;
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);

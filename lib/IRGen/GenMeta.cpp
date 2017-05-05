@@ -779,7 +779,7 @@ namespace {
 
       auto resultMetadata = extractAndMarkResultType(type);
       
-      CanTupleType inputTuple = dyn_cast<TupleType>(type.getInput());
+      auto inputTuple = dyn_cast<TupleType>(type.getInput());
 
       size_t numArguments = 1;
 

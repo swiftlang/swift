@@ -89,7 +89,7 @@ public:
       : ASI(Asi), DSI(nullptr), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
     // Scan the users in search of a deallocation instruction.
     for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
-      if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+      if (auto *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
         // Don't record multiple dealloc instructions.
         if (DSI) {
           DSI = nullptr;
@@ -216,7 +216,7 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
       continue;
 
     // We can store into an AllocStack (but not the pointer).
-    if (StoreInst *SI = dyn_cast<StoreInst>(II))
+    if (auto *SI = dyn_cast<StoreInst>(II))
       if (SI->getDest() == ASI)
         continue;
 
@@ -248,7 +248,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
     SILInstruction *II = UI->getUser();
 
     // It is okay to store into this AllocStack.
-    if (StoreInst *SI = dyn_cast<StoreInst>(II))
+    if (auto *SI = dyn_cast<StoreInst>(II))
       if (!isa<AllocStackInst>(SI->getSrc()))
         continue;
 
@@ -297,7 +297,7 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
 
 /// Collects all load instructions which (transitively) use \p I as address.
 static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) {
-  if (LoadInst *load = dyn_cast<LoadInst>(I)) {
+  if (auto *load = dyn_cast<LoadInst>(I)) {
     Loads.push_back(load);
     return;
   }
@@ -385,7 +385,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
 
     // Remove stores and record the value that we are saving as the running
     // value.
-    if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
+    if (auto *SI = dyn_cast<StoreInst>(Inst)) {
       if (SI->getDest() != ASI)
         continue;
 
@@ -422,7 +422,7 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
     }
 
     // Stop on deallocation.
-    if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(Inst)) {
+    if (auto *DSI = dyn_cast<DeallocStackInst>(Inst)) {
       if (DSI->getOperand() == ASI)
         break;
     }
@@ -464,7 +464,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
 
     // Remove stores and record the value that we are saving as the running
     // value.
-    if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
+    if (auto *SI = dyn_cast<StoreInst>(Inst)) {
       if (SI->getDest() == ASI) {
         RunningVal = SI->getSrc();
         Inst->eraseFromParent();
@@ -497,7 +497,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     }
 
     // Remove deallocation.
-    if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(Inst)) {
+    if (auto *DSI = dyn_cast<DeallocStackInst>(Inst)) {
       if (DSI->getOperand() == ASI) {
         Inst->eraseFromParent();
         NumInstRemoved++;
@@ -828,7 +828,7 @@ bool MemoryToRegisters::run() {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
       SILInstruction *Inst = &*I;
-      AllocStackInst *ASI = dyn_cast<AllocStackInst>(Inst);
+      auto *ASI = dyn_cast<AllocStackInst>(Inst);
       if (!ASI) {
         ++I;
         continue;

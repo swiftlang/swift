@@ -71,7 +71,7 @@ private:
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
 
   ValueDecl *extractDecl(Expr *Fn) const {
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Fn))
+    if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
       return DRE->getDecl();
     if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
       return extractDecl(ApplyE->getFn());
@@ -93,11 +93,11 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   unsigned NameLen = 0;
   bool IsExtension = false;
 
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (VD->hasName() && !VD->isImplicit())
       NameLen = VD->getName().getLength();
 
-  } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
@@ -224,7 +224,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (!SEWalker.walkToExprPre(E))
     return { false, E };
 
-  if (ConstructorRefCallExpr *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
+  if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
   if (E->isImplicit())
@@ -232,7 +232,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   Optional<AccessKind> OpAccess = getAccessKind(E);
 
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
                          std::make_pair(module->getName(), E->getLoc())))
@@ -243,7 +243,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                                         OpAccess))) {
       return { false, nullptr };
     }
-  } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
+  } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     // Visit in source order.
     if (!MRE->getBase()->walk(*this))
       return { false, nullptr };
@@ -265,7 +265,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                                          OpAccess)))
       return { false, nullptr };
 
-  } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     // Visit in source order.
     if (!SE->getBase()->walk(*this))
       return { false, nullptr };
@@ -292,7 +292,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     return { false, E };
 
-  } else if (BinaryExpr *BinE = dyn_cast<BinaryExpr>(E)) {
+  } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
       return { false, nullptr };
@@ -322,7 +322,7 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
-      if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(VD))
+      if (auto *ModD = dyn_cast<ModuleDecl>(VD))
         return passReference(ModD, std::make_pair(IdT->getIdentifier(),
                                                   IdT->getIdLoc()));
 
@@ -428,7 +428,7 @@ passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtDecl = nullptr;
 
-  if (TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
+  if (auto *TD = dyn_cast<TypeDecl>(D)) {
     if (!CtorRefs.empty() && Loc.isValid()) {
       Expr *Fn = CtorRefs.back()->getFn();
       if (Fn->getLoc() == Loc.getBaseNameLoc()) {

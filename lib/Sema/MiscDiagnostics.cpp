@@ -2011,7 +2011,7 @@ public:
         if (node.is<Decl *>()) {
           // Flag all variables in a PatternBindingDecl
           Decl *D = node.get<Decl *>();
-          PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D);
+          auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
           for (PatternBindingEntry PBE : PBD->getPatternList()) {
             PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
@@ -2021,7 +2021,7 @@ public:
         } else if (node.is<Stmt *>()) {
           // Flag all variables in guard statements
           Stmt *S = node.get<Stmt *>();
-          GuardStmt *GS = dyn_cast<GuardStmt>(S);
+          auto *GS = dyn_cast<GuardStmt>(S);
           if (!GS) continue;
           for (StmtConditionElement SCE : GS->getCond()) {
             if (auto pattern = SCE.getPatternOrNull()) {
@@ -2594,7 +2594,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
     return;
 
-  VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
+  auto *loopVar = dyn_cast<VarDecl>(initializers[1]);
   Expr *startValue = loopVarDecl->getInit(0);
   OperatorKind OpKind;
   Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar, OpKind);
@@ -2926,7 +2926,7 @@ public:
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-    StringLiteralExpr *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
+    auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
     bool fromStringLiteral = false;
     bool hadParens = false;
     if (stringLiteral) {

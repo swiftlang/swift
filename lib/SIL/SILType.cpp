@@ -159,7 +159,7 @@ static bool canUnsafeCastTuple(SILType fromType, CanTupleType fromTupleTy,
     return true;
   }
   // Otherwise, flatten one level of tuple elements on each side.
-  CanTupleType toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
+  auto toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
   if (!toTupleTy)
     return false;
 

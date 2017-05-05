@@ -123,7 +123,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
     return false;
 
   // Make sure it is a release on a SILArgument of the current basic block..
-  SILArgument *SA = dyn_cast<SILArgument>(Head->getOperand(0));
+  auto *SA = dyn_cast<SILArgument>(Head->getOperand(0));
   if (!SA || SA->getParent() != BB)
     return false;
 
@@ -203,7 +203,7 @@ enum OperandRelation {
 static SILValue findValueShallowRoot(const SILValue &In) {
   // If this is a basic block argument with a single caller
   // then we know exactly which value is passed to the argument.
-  if (SILArgument *Arg = dyn_cast<SILArgument>(In)) {
+  if (auto *Arg = dyn_cast<SILArgument>(In)) {
     SILBasicBlock *Parent = Arg->getParent();
     SILBasicBlock *Pred = Parent->getSinglePredecessorBlock();
     if (!Pred) return In;
@@ -309,15 +309,15 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   // This will further enable to sink strong_retain_unowned instructions,
   // which provides more opportunities for the unowned-optimization in
   // LLVMARCOpts.
-  UnownedToRefInst *UTORI1 = dyn_cast<UnownedToRefInst>(First);
-  UnownedToRefInst *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
+  auto *UTORI1 = dyn_cast<UnownedToRefInst>(First);
+  auto *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
   if (UTORI1 && UTORI2) {
     return 0;
   }
 
   // TODO: Add more cases than Struct
-  StructInst *FirstStruct = dyn_cast<StructInst>(First);
-  StructInst *SecondStruct = dyn_cast<StructInst>(Second);
+  auto *FirstStruct = dyn_cast<StructInst>(First);
+  auto *SecondStruct = dyn_cast<StructInst>(Second);
 
   if (!FirstStruct || !SecondStruct)
     return None;
@@ -408,7 +408,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   SILBasicBlock *FirstPred = *BB->pred_begin();
   TermInst *FirstTerm = FirstPred->getTerminator();
   auto FirstPredArg = FirstTerm->getOperand(ArgNum);
-  SILInstruction *FSI = dyn_cast<SILInstruction>(FirstPredArg);
+  auto *FSI = dyn_cast<SILInstruction>(FirstPredArg);
 
   // The list of identical instructions.
   SmallVector<SILValue, 8> Clones;
@@ -443,7 +443,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
     // Find the Nth argument passed to BB.
     SILValue Arg = TI->getOperand(ArgNum);
-    SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
+    auto *SI = dyn_cast<SILInstruction>(Arg);
     if (!SI || !hasOneNonDebugUse(SI))
       return false;
     if (SI->isIdenticalTo(FSI)) {
@@ -495,7 +495,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
       assert((isa<BranchInst>(TI) || isa<CondBranchInst>(TI)) &&
              "Branch instruction required");
 
-      SILInstruction *CloneInst = dyn_cast<SILInstruction>(*CloneIt);
+      auto *CloneInst = dyn_cast<SILInstruction>(*CloneIt);
       TI->setOperand(ArgNum, CloneInst->getOperand(*DifferentOperandIndex));
       // Now delete the clone as we only needed it operand.
       if (CloneInst != FSI)
@@ -1078,7 +1078,7 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
 
 void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 
-  SelectEnumInst *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
+  auto *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
   if (!EITI)
     return;
 

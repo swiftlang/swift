@@ -4955,7 +4955,7 @@ bool Parser::parseSILVTable() {
     return true;
   }
 
-  ClassDecl *theClass = dyn_cast<ClassDecl>(VD);
+  auto *theClass = dyn_cast<ClassDecl>(VD);
   if (!theClass) {
     diagnose(Loc, diag::sil_vtable_class_not_found, Name);
     return true;
@@ -5020,7 +5020,7 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
     P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
     return nullptr;
   }
-  ProtocolDecl *proto = dyn_cast<ProtocolDecl>(VD);
+  auto *proto = dyn_cast<ProtocolDecl>(VD);
   if (!proto)
     P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
   return proto;

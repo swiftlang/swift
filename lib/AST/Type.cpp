@@ -3989,7 +3989,7 @@ bool Type::isPrivateStdlibType(bool whitelistProtocols) const {
     return false;
 
   // A 'public' typealias can have an 'internal' type.
-  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
+  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
     return NAT->getDecl()->isPrivateStdlibDecl(whitelistProtocols);
 
   if (auto Paren = dyn_cast<ParenType>(Ty.getPointer()))

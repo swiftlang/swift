@@ -126,7 +126,7 @@ cmpOperandsIgnoringConsts(const Instruction *L, const Instruction *R,
   if (!isEligibleForConstantSharing(L))
     return Res;
 
-  if (const CallInst *CL = dyn_cast<CallInst>(L)) {
+  if (const auto *CL = dyn_cast<CallInst>(L)) {
     if (CL->isInlineAsm())
       return Res;
     if (Function *CalleeL = CL->getCalledFunction()) {
@@ -673,7 +673,7 @@ void SwiftMergeFunctions::updateUnhandledCalleeCount(FunctionEntry *FE,
   // Iterate over all functions of FE's equivalence class.
   do {
     for (Use &U : FE->F->uses()) {
-      if (Instruction *I = dyn_cast<Instruction>(U.getUser())) {
+      if (auto *I = dyn_cast<Instruction>(U.getUser())) {
         FunctionEntry *CallerFE = getEntry(I->getFunction());
         if (CallerFE && CallerFE->TreeIter != FnTree.end()) {
           // Accumulate the count in the first entry of the equivalence class.
@@ -789,7 +789,7 @@ bool SwiftMergeFunctions::constsDiffer(const FunctionInfos &FInfos,
 
   for (const FunctionInfo &FI : FInfos) {
     Value *Op = FI.CurrentInst->getOperand(OpIdx);
-    if (Constant *C = dyn_cast<Constant>(Op)) {
+    if (auto *C = dyn_cast<Constant>(Op)) {
       if (!CommonConst) {
         CommonConst = C;
       } else if (C != CommonConst) {
@@ -897,7 +897,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
 
     // Collect all functions which are referenced by any parameter.
     for (Value *V : PI.Values) {
-      if (Function *F = dyn_cast<Function>(V))
+      if (auto *F = dyn_cast<Function>(V))
         SelfReferencingFunctions.insert(F);
     }
   }
@@ -1027,7 +1027,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
   SmallVector<CallInst *, 8> Callers;
   
   for (Use &U : Old->uses()) {
-    Instruction *I = dyn_cast<Instruction>(U.getUser());
+    auto *I = dyn_cast<Instruction>(U.getUser());
     if (!I) {
       AllReplaced = false;
       continue;
@@ -1036,7 +1036,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     if (FE)
       removeEquivalenceClassFromTree(FE);
     
-    CallInst *CI = dyn_cast<CallInst>(I);
+    auto *CI = dyn_cast<CallInst>(I);
     if (!CI || CI->getCalledValue() != Old) {
       AllReplaced = false;
       continue;

@@ -641,7 +641,7 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   if (results.size() != 1) return nullptr;
 
   // The property must have type T.
-  VarDecl *property = dyn_cast<VarDecl>(results[0]);
+  auto *property = dyn_cast<VarDecl>(results[0]);
   if (!property) return nullptr;
   if (!property->getInterfaceType()->isEqual(sig->getGenericParams()[0]))
     return nullptr;
@@ -873,7 +873,7 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   // Find the overload for Int.
   for (ValueDecl *vd : equalFuncs) {
     // All "==" decls should be functions, but who knows...
-    FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
+    auto *funcDecl = dyn_cast<FuncDecl>(vd);
     if (!funcDecl)
       continue;
 

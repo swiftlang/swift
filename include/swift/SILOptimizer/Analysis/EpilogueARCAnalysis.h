@@ -161,7 +161,7 @@ public:
       return true;
     // Handle self-recursion. A self-recursion can be considered a +1 on the
     // current argument.
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(II))
+    if (auto *AI = dyn_cast<ApplyInst>(II))
      if (AI->getCalleeFunction() == II->getParent()->getParent())
        return true;
     return false;
@@ -192,7 +192,7 @@ public:
     // We are checking for retain. If this is a self-recursion. call
     // to the function (which returns an owned value) can be treated as
     // the retain instruction.
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(II))
+    if (auto *AI = dyn_cast<ApplyInst>(II))
      if (AI->getCalleeFunction() == II->getParent()->getParent())
        return true;
     // Check whether this is a retain instruction and the argument it

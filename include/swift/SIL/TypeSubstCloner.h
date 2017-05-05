@@ -113,7 +113,7 @@ protected:
     Builder.setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
     SILValue CalleeVal = Inst->getCallee();
     if (!Inlining) {
-      FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+      auto *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
       if (FRI && FRI->getReferencedFunction() == Inst->getFunction() &&
           Inst->getSubstitutions() == this->ApplySubs) {
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
@@ -147,7 +147,7 @@ protected:
     Builder.setCurrentDebugScope(super::getOpScope(Inst->getDebugScope()));
     SmallVector<Substitution, 16> TempSubstList;
     if (!Inlining) {
-      FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+      auto *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
       if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
         auto LoweredFnTy = Builder.getFunction().getLoweredFunctionType();
         auto GenSig = LoweredFnTy->getGenericSignature();

@@ -130,7 +130,7 @@ bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (isa<ExtensionDecl>(D))
     return true;
 
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+  if (auto *VD = dyn_cast<ValueDecl>(D))
     return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
                        Range.getStart(), /*IsRef=*/false);
 
@@ -930,7 +930,7 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
 std::vector<CharSourceRange> swift::ide::
 getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CharSourceRange> Ranges;
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(Arg)) {
+  if (auto *TE = dyn_cast<TupleExpr>(Arg)) {
     size_t ElemIndex = 0;
     for (Expr *Elem : TE->getElements()) {
       SourceLoc LabelStart(Elem->getStartLoc());
@@ -946,7 +946,7 @@ getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
       Ranges.push_back(CharSourceRange(SM, LabelStart, LabelEnd));
       ++ElemIndex;
     }
-  } else if (ParenExpr *PE = dyn_cast<ParenExpr>(Arg)) {
+  } else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
     if (PE->getSubExpr())
       Ranges.push_back(CharSourceRange(PE->getSubExpr()->getStartLoc(), 0));
   }

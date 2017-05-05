@@ -4628,7 +4628,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
   // Capture the tuple expression, if there is one.
   Expr *innerExpr = lookThroughIdentityExprs(expr);
-  TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
+  auto *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
   /// Check each of the tuple elements in the destination.
   bool hasVariadic = false;
@@ -4700,7 +4700,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                             fromTuple, toTuple);
       if (typeFromPattern) {
         std::vector<std::pair<SourceLoc, std::string>> locInsertPairs;
-        TuplePattern *tupleP = dyn_cast<TuplePattern>(typeFromPattern.getValue());
+        auto *tupleP = dyn_cast<TuplePattern>(typeFromPattern.getValue());
         if (tupleP && shouldApplyAddingLabelFixit(tupleP, toTuple, fromTuple,
                                                   locInsertPairs)) {
           for (auto &Pair : locInsertPairs) {
@@ -5321,8 +5321,8 @@ Expr *ExprRewriter::coerceCallArguments(
   (void)failed;
 
   // We should either have parentheses or a tuple.
-  TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
-  ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
+  auto *argTuple = dyn_cast<TupleExpr>(arg);
+  auto *argParen = dyn_cast<ParenExpr>(arg);
   // FIXME: Eventually, we want to enforce that we have either argTuple or
   // argParen here.
 
@@ -7774,7 +7774,7 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) 
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
-  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(members[0].Decl);
+  auto *builtinMethod = dyn_cast<FuncDecl>(members[0].Decl);
   if (!builtinMethod) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;

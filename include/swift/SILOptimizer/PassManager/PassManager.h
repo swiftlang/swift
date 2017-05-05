@@ -118,7 +118,7 @@ public:
   template<typename T>
   T *getAnalysis() {
     for (SILAnalysis *A : Analysis)
-      if (T *R = llvm::dyn_cast<T>(A))
+      if (auto *R = llvm::dyn_cast<T>(A))
         return R;
 
     llvm_unreachable("Unable to find analysis for requested type.");
