@@ -1644,6 +1644,9 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       return false;
   }
 
+  if (Options.SkipVTablePlaceholders && isa<VTablePlaceholderDecl>(D))
+    return false;
+
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
   }
@@ -3214,7 +3217,12 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
-void PrintAST::visitVTablePlaceholderDecl(VTablePlaceholderDecl *decl) {}
+
+void PrintAST::visitVTablePlaceholderDecl(VTablePlaceholderDecl *decl) {
+  Printer << "/* placeholder for ";
+  recordDeclLoc(decl, [&]{ Printer << decl->getFullName(); });
+  Printer << " */";
+}
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   Printer << "{";

@@ -64,18 +64,19 @@ open class User {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   public var unwrappedProp: UnwrappedInt?
   // CHECK: var wrappedProp: WrappedInt?
-  // CHECK-RECOVERY-NEGATIVE-NOT: var wrappedProp:
+  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for _ */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
   public func returnsUnwrappedMethod() -> UnwrappedInt { fatalError() }
   // CHECK: func returnsWrappedMethod() -> WrappedInt
-  // CHECK-RECOVERY-NEGATIVE-NOT: func returnsWrappedMethod(
+  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY-NEGATIVE-NOT: subscript(
+  // CHECK-RECOVERY: /* placeholder for _ */
   public subscript(_: WrappedInt) -> () { return () }
 
   // CHECK: init()
@@ -83,15 +84,21 @@ open class User {
   public init() {}
 
   // CHECK: init(wrapped: WrappedInt)
-  // CHECK-RECOVERY-NEGATIVE-NOT: init(wrapped:
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
   public init(wrapped: WrappedInt) {}
 
   // CHECK: convenience init(conveniently: Int)
   // CHECK-RECOVERY: convenience init(conveniently: Int)
   public convenience init(conveniently: Int) { self.init() }
+
+  // CHECK: required init(wrappedRequired: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  public required init(wrappedRequired: WrappedInt) {}
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}
+
 
 // CHECK-LABEL: class UserConvenience
 // CHECK-RECOVERY-LABEL: class UserConvenience
@@ -101,7 +108,7 @@ open class UserConvenience {
   public init() {}
 
   // CHECK: convenience init(wrapped: WrappedInt)
-  // CHECK-RECOVERY-NEGATIVE-NOT: init(wrapped:
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
   public convenience init(wrapped: WrappedInt) { self.init() }
 
   // CHECK: convenience init(conveniently: Int)
@@ -110,6 +117,23 @@ open class UserConvenience {
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}
+
+
+// CHECK-LABEL: class UserSub
+// CHECK-RECOVERY-LABEL: class UserSub
+open class UserSub : User {
+  // CHECK: init(wrapped: WrappedInt?)
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  public override init(wrapped: WrappedInt?) { super.init() }
+
+  // CHECK: required init(wrappedRequired: WrappedInt?)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  public required init(wrappedRequired: WrappedInt?) { super.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
 
 // CHECK-DAG: let x: MysteryTypedef
 // CHECK-RECOVERY-DAG: let x: Int32
