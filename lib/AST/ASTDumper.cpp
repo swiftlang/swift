@@ -1110,6 +1110,13 @@ namespace {
       printCommon(MD, "module");
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+
+    void visitVTablePlaceholderDecl(VTablePlaceholderDecl *VTPD) {
+      printCommon(VTPD, "vtable_placeholder_decl ");
+      PrintWithColorRAII(OS, IdentifierColor)
+          << '\"' << VTPD->getFullName() << '\"';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
   };
 } // end anonymous namespace
 

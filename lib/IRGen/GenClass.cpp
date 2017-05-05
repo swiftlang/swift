@@ -1491,6 +1491,11 @@ namespace {
       }
     }
 
+    void visitVTablePlaceholderDecl(VTablePlaceholderDecl *placeholder) {
+      // FIXME
+      IGM.fatal_unimplemented(SourceLoc(), "vtable placeholder");
+    }
+
     void addIVarInitializer() {
       if (auto fn = IGM.getAddrOfIVarInitDestroy(getClass(),
                                                  /*destroy*/ false,

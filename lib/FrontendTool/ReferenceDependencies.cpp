@@ -254,6 +254,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::Constructor:
     case DeclKind::Destructor:
     case DeclKind::EnumElement:
+    case DeclKind::VTablePlaceholder:
       llvm_unreachable("cannot appear at the top level of a file");
     }
   }

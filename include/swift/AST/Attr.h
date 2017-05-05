@@ -299,6 +299,9 @@ public:
     OnParam            = 1 << 30,
     OnModule           = 1 << 31,
 
+    // Cannot have any attributes.
+    OnVTablePlaceholder = 0,
+
     // More coarse-grained aggregations for use in Attr.def.
     OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,
 

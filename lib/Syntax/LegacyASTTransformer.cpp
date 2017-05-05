@@ -278,6 +278,15 @@ LegacyASTTransformer::visitPostfixOperatorDecl(
   return getUnknownDecl(D);
 }
 
+
+RC<SyntaxData>
+LegacyASTTransformer::visitVTablePlaceholderDecl(
+    VTablePlaceholderDecl *D,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownDecl(D);
+}
+
 RC<SyntaxData>
 LegacyASTTransformer::visitGenericTypeParamDecl(
     GenericTypeParamDecl *D,

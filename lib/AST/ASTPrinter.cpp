@@ -3214,6 +3214,7 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
+void PrintAST::visitVTablePlaceholderDecl(VTablePlaceholderDecl *decl) {}
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   Printer << "{";

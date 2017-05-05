@@ -140,6 +140,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DidSet,
   EnumElement,
   Module,
+  VTablePlaceholder,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -6129,6 +6130,31 @@ public:
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PostfixOperator;
+  }
+};
+
+class VTablePlaceholderDecl : public Decl {
+  DeclName Name;
+public:
+  VTablePlaceholderDecl(DeclContext *DC, DeclName name)
+      : Decl(DeclKind::VTablePlaceholder, DC), Name(name) {
+    setImplicit();
+  }
+
+  DeclName getFullName() const {
+    return Name;
+  }
+
+  SourceLoc getLoc() const {
+    return SourceLoc();
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::VTablePlaceholder;
   }
 };
 
