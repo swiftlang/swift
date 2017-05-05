@@ -250,11 +250,6 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     }
   }
 
-  @objc
-  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
-    return _core.elementWidth == 2 ? _core.startUTF16 : nil
-  }
-
   //
   // Implement sub-slicing without adding layers of wrapping
   //

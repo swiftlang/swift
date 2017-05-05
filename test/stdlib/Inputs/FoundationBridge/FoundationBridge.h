@@ -20,6 +20,11 @@ typedef NS_ENUM(NSInteger, ObjectBehaviorAction) {
     ObjectBehaviorActionMutableCopy
 };
 
+typedef NS_OPTIONS(NSInteger, ObjectBehaviorEqualityOptions) {
+    ObjectBehaviorEqualityOptionsCopy = 1 << 0,
+    ObjectBehaviorEqualityOptionsRawPointerCompare = 1 << 1,
+};
+
 // NOTE: this class is NOT meant to be used in threaded contexts.
 @interface ObjectBehaviorVerifier : NSObject
 @property (readonly) BOOL wasRetained;
@@ -30,6 +35,9 @@ typedef NS_ENUM(NSInteger, ObjectBehaviorAction) {
 - (void)enumerate:(void (^)(ObjectBehaviorAction))block;
 - (void)reset;
 - (void)dump;
+
++ (BOOL)verifyEqualityOfObject:(NSObject *)left withObject:(NSObject *)right options:(ObjectBehaviorEqualityOptions)options;
+
 @end
 
 #pragma mark - NSData verification

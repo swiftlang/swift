@@ -24,6 +24,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Notification.swift
   NSArray.swift
   NSCoder.swift
+  NSContiguousString.swift
   NSDate.swift
   NSDictionary.swift
   NSError.swift
