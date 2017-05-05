@@ -192,9 +192,7 @@ StringTests.test("ForeignIndexes/UnexpectedCrash")
   expectEqual("a", acceptor[donor.startIndex])
 }
 
-StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap")
-  .skip(.always("<rdar://problem/31992473>"))
-  .code {
+StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
   let donor = "abcdef"
   let acceptor = "uvw"
 

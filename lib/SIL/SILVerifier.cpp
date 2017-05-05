@@ -2102,10 +2102,12 @@ public:
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
 
-    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
-                                                    F.getModule());
-    require(loweredFieldTy == EI->getType(),
-            "result of ref_element_addr does not match type of field");
+    if (EI->getModule().getStage() != SILStage::Lowered) {
+      SILType loweredFieldTy =
+          operandTy.getFieldType(EI->getField(), F.getModule());
+      require(loweredFieldTy == EI->getType(),
+              "result of ref_element_addr does not match type of field");
+    }
     EI->getFieldNo();  // Make sure we can access the field without crashing.
   }
 

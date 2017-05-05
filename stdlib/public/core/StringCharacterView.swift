@@ -445,7 +445,14 @@ extension String.CharacterView : BidirectionalCollection {
       let relativeOffset = i._base._position - _coreOffset
       if _core.isASCII {
         let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
-        return Character(UnicodeScalar(asciiBuffer[relativeOffset]))
+        // Bounds checks in an UnsafeBufferPointer (asciiBuffer) are only
+        // performed in Debug mode, so they need to be duplicated here.
+        // Falling back to the non-optimal behavior in the case they don't
+        // pass.
+        if relativeOffset >= asciiBuffer.startIndex &&
+          relativeOffset < asciiBuffer.endIndex {
+          return Character(UnicodeScalar(asciiBuffer[relativeOffset]))
+        }
       } else if _core._baseAddress != nil {
         let cu = _core._nthContiguous(relativeOffset)
         // Only constructible if sub-surrogate
