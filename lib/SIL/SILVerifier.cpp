@@ -1681,8 +1681,10 @@ public:
               "member variables of struct");
 
       SILType loweredType = structTy.getFieldType(field, F.getModule());
-      require((*opi)->getType() == loweredType,
-              "struct operand type does not match field type");
+      if (SI->getModule().getStage() != SILStage::Lowered) {
+        require((*opi)->getType() == loweredType,
+                "struct operand type does not match field type");
+      }
       ++opi;
     }
   }
@@ -1781,10 +1783,12 @@ public:
     require(TI->getElements().size() == ResTy->getNumElements(),
             "Tuple field count mismatch!");
 
-    for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
-      require(TI->getElement(i)->getType().getSwiftRValueType()
-              == ResTy.getElementType(i),
-              "Tuple element arguments do not match tuple type!");
+    if (TI->getModule().getStage() != SILStage::Lowered) {
+      for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
+        require(TI->getElement(i)->getType().getSwiftRValueType() ==
+                    ResTy.getElementType(i),
+                "Tuple element arguments do not match tuple type!");
+      }
     }
   }
 
@@ -2009,9 +2013,11 @@ public:
 
     require(EI->getFieldNo() < operandTy->getNumElements(),
             "invalid field index for tuple_extract instruction");
-    require(EI->getType().getSwiftRValueType()
-            == operandTy.getElementType(EI->getFieldNo()),
-            "type of tuple_extract does not match type of element");
+    if (EI->getModule().getStage() != SILStage::Lowered) {
+      require(EI->getType().getSwiftRValueType() ==
+                  operandTy.getElementType(EI->getFieldNo()),
+              "type of tuple_extract does not match type of element");
+    }
   }
 
   void checkStructExtractInst(StructExtractInst *EI) {
@@ -2030,10 +2036,12 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_extract field is not a member of the struct");
 
-    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
-                                                    F.getModule());
-    require(loweredFieldTy == EI->getType(),
-            "result of struct_extract does not match type of field");
+    if (EI->getModule().getStage() != SILStage::Lowered) {
+      SILType loweredFieldTy =
+          operandTy.getFieldType(EI->getField(), F.getModule());
+      require(loweredFieldTy == EI->getType(),
+              "result of struct_extract does not match type of field");
+    }
   }
 
   void checkTupleElementAddrInst(TupleElementAddrInst *EI) {
@@ -2048,9 +2056,11 @@ public:
     ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getElements();
     require(EI->getFieldNo() < fields.size(),
             "invalid field index for element_addr instruction");
-    require(EI->getType().getSwiftRValueType()
-              == CanType(fields[EI->getFieldNo()].getType()),
-            "type of tuple_element_addr does not match type of element");
+    if (EI->getModule().getStage() != SILStage::Lowered) {
+      require(EI->getType().getSwiftRValueType() ==
+                  CanType(fields[EI->getFieldNo()].getType()),
+              "type of tuple_element_addr does not match type of element");
+    }
   }
 
   void checkStructElementAddrInst(StructElementAddrInst *EI) {
@@ -2069,10 +2079,12 @@ public:
     require(EI->getField()->getDeclContext() == sd,
             "struct_element_addr field is not a member of the struct");
 
-    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
-                                                    F.getModule());
-    require(loweredFieldTy == EI->getType(),
-            "result of struct_element_addr does not match type of field");
+    if (EI->getModule().getStage() != SILStage::Lowered) {
+      SILType loweredFieldTy =
+          operandTy.getFieldType(EI->getField(), F.getModule());
+      require(loweredFieldTy == EI->getType(),
+              "result of struct_element_addr does not match type of field");
+    }
   }
 
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
