@@ -95,8 +95,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool IsExtension = false;
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    // TODO: Handle special names
     if (VD->hasName() && !VD->isImplicit())
-      NameLen = VD->getName().getLength();
+      NameLen = VD->getBaseName().getIdentifier().getLength();
 
     auto ReportParamList = [&](ParameterList *PL) {
       for (auto *PD : *PL) {
