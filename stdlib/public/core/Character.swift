@@ -60,6 +60,7 @@
 /// [glossary]: http://www.unicode.org/glossary/
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
+@_fixed_layout
 public struct Character :
   _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
   ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
