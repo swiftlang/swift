@@ -306,26 +306,31 @@ public:
 
   Type createProtocolType(StringRef mangledName,
                           StringRef moduleName,
-                          StringRef protocolName) {
+                          StringRef privateDiscriminator,
+                          StringRef name) {
     auto module = Ctx.getModuleByName(moduleName);
     if (!module) return Type();
 
-    Identifier name = Ctx.getIdentifier(protocolName);
-    auto decl = findNominalTypeDecl(module, name, Identifier(),
+    auto decl = findNominalTypeDecl(module,
+                                    Ctx.getIdentifier(name),
+                                    (privateDiscriminator.empty()
+                                     ? Identifier()
+                                     : Ctx.getIdentifier(privateDiscriminator)),
                                     Demangle::Node::Kind::Protocol);
     if (!decl) return Type();
 
     return decl->getDeclaredType();
   }
 
-  Type createProtocolCompositionType(ArrayRef<Type> protocols) {
-    for (auto protocol : protocols) {
-      if (!protocol->is<ProtocolType>())
+  Type createProtocolCompositionType(ArrayRef<Type> members,
+                                     bool hasExplicitAnyObject) {
+    for (auto member : members) {
+      if (!member->isExistentialType() &&
+          !member->getClassOrBoundGenericClass())
         return Type();
     }
-    return ProtocolCompositionType::get(Ctx, protocols,
-                                        // FIXME
-                                        /*HasExplicitAnyObject=*/false);
+
+    return ProtocolCompositionType::get(Ctx, members, hasExplicitAnyObject);
   }
 
   Type createExistentialMetatypeType(Type instance) {
