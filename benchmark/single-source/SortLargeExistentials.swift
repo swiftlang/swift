@@ -77,7 +77,6 @@ public func run_SortLargeExistentials(_ N: Int) {
     }
 
     // Check whether letters are sorted.
-    CheckResults(letters[0].value <= letters[letters.count/2].value,
-                 "Incorrect results in SortLargeExistentials.")
+    CheckResults(letters[0].value <= letters[letters.count/2].value)
   }
 }

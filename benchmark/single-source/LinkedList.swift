@@ -46,6 +46,5 @@ public func run_LinkedList(_ N: Int) {
       break
     }
   }
-  CheckResults(sum == ref_result,
-               "Incorrect results in LinkedList: \(sum) != \(ref_result)")
+  CheckResults(sum == ref_result)
 }

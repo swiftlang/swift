@@ -30,8 +30,7 @@ public func run_PrefixCountableRange(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixCountableRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -42,8 +41,7 @@ public func run_PrefixSequence(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixSequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -54,8 +52,7 @@ public func run_PrefixAnySequence(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnySequence: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -66,8 +63,7 @@ public func run_PrefixAnySeqCntRange(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnySeqCntRange: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -78,8 +74,7 @@ public func run_PrefixAnySeqCRangeIter(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnySeqCRangeIter: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -90,8 +85,7 @@ public func run_PrefixAnyCollection(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnyCollection: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -102,8 +96,7 @@ public func run_PrefixArray(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixArray: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -114,8 +107,7 @@ public func run_PrefixCountableRangeLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixCountableRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -126,8 +118,7 @@ public func run_PrefixSequenceLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixSequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -138,8 +129,7 @@ public func run_PrefixAnySequenceLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnySequenceLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -150,8 +140,7 @@ public func run_PrefixAnySeqCntRangeLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnySeqCntRangeLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -162,8 +151,7 @@ public func run_PrefixAnySeqCRangeIterLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnySeqCRangeIterLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -174,8 +162,7 @@ public func run_PrefixAnyCollectionLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixAnyCollectionLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
@@ -186,7 +173,6 @@ public func run_PrefixArrayLazy(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in PrefixArrayLazy: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
