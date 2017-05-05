@@ -654,9 +654,22 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     }
     
     public var hashValue: Int {
-        // This is temporary
-        let me = self.makeReference()
-        return me.hash
+        func hashIndexes(first: Int, last: Int, count: Int) -> Int {
+            let totalBits = MemoryLayout<Int>.size * 8
+            let lengthBits = 8
+            let firstIndexBits = (totalBits - lengthBits) / 2
+            return count + (first << lengthBits) + (last << (lengthBits + firstIndexBits))
+        }
+
+        switch _indexes {
+            case .empty: return 0
+            case .single(let index): return index.hashValue
+            case .pair(let first, let second):
+                return hashIndexes(first: first, last: second, count: 2)
+            default:
+                let cnt = _indexes.count
+                return hashIndexes(first: _indexes[0], last: _indexes[cnt - 1], count: cnt)
+        }
     }
     
     // MARK: - Bridging Helpers
