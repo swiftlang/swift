@@ -100,6 +100,9 @@ static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
 Type TypeChecker::getStringType(DeclContext *dc) {
   return ::getStdlibType(*this, StringType, dc, "String");
 }
+Type TypeChecker::getSubstringType(DeclContext *dc) {
+  return ::getStdlibType(*this, SubstringType, dc, "Substring");
+}
 Type TypeChecker::getIntType(DeclContext *dc) {
   return ::getStdlibType(*this, IntType, dc, "Int");
 }

@@ -1,46 +1,80 @@
-let s = "foo"
+// RUN: %target-swift-frontend -typecheck -verify fix-string-substring-conversion %s
+
+let s = "Hello"
 let ss = s[s.startIndex..<s.endIndex]
 
-// CTP_ReturnStmt
-func returnStringButWantedSubstring() -> Substring {
-  return s[]
+// CTP_Initialization
+do {
+  let s1: Substring = { return s }()[]
+  _ = s1
 }
+
+// CTP_ReturnStmt
+do {
+  func returnsASubstring() -> Substring {
+    return s[]
+  }
+}
+
+// CTP_ThrowStmt
+// Doesn't really make sense for this fix-it - see case in diagnoseContextualConversionError:
+// The conversion destination of throw is always ErrorType (at the moment)
+// if this ever expands, this should be a specific form like () is for
+// return.
+
+// CTP_EnumCaseRawValue
+// Substrings can't be raw values because they aren't literals.
 
 // CTP_DefaultParameter
-// Never do this.
-func defaultArgIsSubstring(ss: Substring = s[]) {}
+do {
+  func foo(x: Substring = s[]) {}
+}
 
 // CTP_CalleeResult
-func returnString() -> String {
-  return s[]
+do {
+  func getString() -> String { return s[] }
+  let gottenSubstring: Substring = getString()[]
+  _ = gottenSubstring
 }
-let s2: Substring = returnString()[]
 
 // CTP_CallArgument
-func takeString(s: String) {}
-func takeSubstring(ss: Substring) {}
-
-takeSubstring(ss)
-takeSubstring(s[])
+do {
+  func takesASubstring(_ ss: Substring) {}
+  takesASubstring(s[])
+}
 
 // CTP_ClosureResult
-[1,2,3].map { (x: Int) -> Substring in
-  return s[]
+do {
+  [s].map { (x: String) -> Substring in x[] }
 }
 
 // CTP_ArrayElement
-let a: [Substring] = [ s[] ]
+do {
+  let a: [Substring] = [ s[] ]
+  _ = a
+}
 
 // CTP_DictionaryKey
+do {
+  let d: [ Substring : Substring ] = [ s[] : ss ]
+  _ = d
+}
+
 // CTP_DictionaryValue
-let d: [Substring : Substring] = [
-  "CTP_DictionaryValue" : s[],
-  s[] : "CTP_DictionaryKey",
-]
+do {
+  let d: [ Substring : Substring ] = [ ss : s[] ]
+  _ = d
+}
 
 // CTP_CoerceOperand
-let s3: Substring = s[] as Substring
+do {
+  let s1: Substring = s[] as Substring
+  _ = s1
+}
 
 // CTP_AssignSource
-let s4: Substring = s[]
+do {
+  let s1: Substring = s[]
+  _ = s1
+}
 

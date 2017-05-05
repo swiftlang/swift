@@ -884,6 +884,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// This is used to guard preemptive testing for the fix-it.
+  if (Args.hasArg(OPT_fix_string_substring_conversion)) {
+    Opts.FixStringToSubstringConversions = true;
+  }
+
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
