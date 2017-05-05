@@ -385,7 +385,7 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
     diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
              diag::exclusivity_access_required,
              VD->getDescriptiveKind(),
-             VD->getName(),
+             VD->getBaseName(),
              static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
         .highlight(rangeForMain);
   } else {
