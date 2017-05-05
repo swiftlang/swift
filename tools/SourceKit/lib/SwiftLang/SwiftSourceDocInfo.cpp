@@ -621,7 +621,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   if (auto PD = dyn_cast<ParamDecl>(VD)) {
 
     // Avoid returning parent loc for internal-only names.
-    if (PD->getArgumentNameLoc().isValid() && PD->getNameLoc() == Cursor)
+    if (PD->getArgumentNameLoc().isValid() && PD->getArgumentNameLoc() != Cursor)
       return None;
     auto *DC = PD->getDeclContext();
     switch (DC->getContextKind()) {
