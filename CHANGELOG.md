@@ -20,6 +20,9 @@ CHANGELOG
 
 Swift 4.0
 ---------
+* [SE-0169](https://github.com/apple/swift-evolution/blob/master/proposals/0169-improve-interaction-between-private-declarations-and-extensions.md):
+  In Swift 4 mode, private scope is shared between the declaration and all 
+  extensions of a specific type inside the same file.
 
 * [SE-0138](https://github.com/apple/swift-evolution/blob/master/proposals/0138-unsaferawbufferpointer.md#amendment-to-normalize-the-slice-type):
 
