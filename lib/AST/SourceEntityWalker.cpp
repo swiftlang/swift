@@ -103,8 +103,8 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
         auto Loc = PD->getArgumentNameLoc();
         if (Loc.isInvalid())
           continue;
-        if (!SEWalker.visitExternalArgumentName(PD->getArgumentName(), Loc,
-                                                VD)) {
+        if (!SEWalker.visitDeclarationArgumentName(PD->getArgumentName(), Loc,
+                                                   VD)) {
           Cancelled = true;
           return true;
         }
@@ -582,7 +582,7 @@ bool SourceEntityWalker::visitCallArgName(Identifier Name,
 }
 
 bool SourceEntityWalker::
-visitExternalArgumentName(Identifier Name, SourceLoc Start, ValueDecl *D) {
+visitDeclarationArgumentName(Identifier Name, SourceLoc Start, ValueDecl *D) {
   return true;
 }
 

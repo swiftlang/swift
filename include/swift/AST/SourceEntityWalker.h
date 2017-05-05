@@ -134,8 +134,8 @@ public:
   /// \param Name the argument name.
   /// \param StartLoc the source loc of the argument name start.
   /// \param D the function-like decl.
-  virtual bool visitExternalArgumentName(Identifier Name, SourceLoc StartLoc,
-                                         ValueDecl *D);
+  virtual bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
+                                            ValueDecl *D);
 
   /// This method is called when a Module is referenced in source.
   virtual bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range);

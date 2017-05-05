@@ -200,7 +200,7 @@ bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
 }
 
 bool SemaLocResolver::
-visitExternalArgumentName(Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
+visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
   if (isDone())
     return false;
   return !tryResolve(D, nullptr, nullptr, StartLoc, /*IsRef=*/false);
