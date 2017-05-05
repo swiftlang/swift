@@ -196,6 +196,50 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
   return Diff;
 }
 
+/// Used by _swift_stdlib_unicode_find_longest_contraction below.
+static int32_t CachedLongestContraction = -1;
+
+/// Finds and returns the longest contraction defined by the root collator.
+/// Results is the length of the longest contraction (in UChars, i.e. UTF16 code units).
+/// The result is cached in the global static CachedLongestContraction.
+int32_t
+swift::_swift_stdlib_unicode_find_longest_contraction(void) {
+  // In order to play nice with other threads that enter this function
+  // on SMP systems we copy CachedLongestContraction to a local and use
+  // that during for calculations, only updating it once we're ready
+  // to return to the caller. We don't need any sort of synchronization
+  // because we expect this function to be idempotent.
+  int32_t LocalLongestContraction = CachedLongestContraction;
+  if (LocalLongestContraction >= 0)
+    return LocalLongestContraction;
+  USet *Contractions = uset_openEmpty();
+  UErrorCode ErrorCode = U_ZERO_ERROR;
+  if (!Contractions) {
+    swift::crash("uset_openEmpty: Unable to create a new set.");
+  }
+  std::unique_ptr<USet, decltype(&uset_close)> ContractionsPtr(Contractions, uset_close);
+  ucol_getContractionsAndExpansions(GetRootCollator(), Contractions, nullptr, FALSE, &ErrorCode);
+  if (U_FAILURE(ErrorCode)) {
+    swift::crash("ucol_getContractionsAndExpansions: Unable to get root collator's contractions.");
+  }
+  int32_t NumContractions = uset_getItemCount(Contractions);
+  UChar32 Start, End;
+  for (int32_t i = 0; i < NumContractions; ++i) {
+    int32_t ItemLength = uset_getItem(Contractions, i, &Start, &End, nullptr, 0,
+                                      &ErrorCode);
+    assert(ItemLength > 0 && "Expecting the set of contractions to only contain strings, not ranges");
+    if (ErrorCode == U_BUFFER_OVERFLOW_ERROR)
+      ErrorCode = U_ZERO_ERROR;
+    if (U_FAILURE(ErrorCode)) {
+      swift::crash("uset_getItem: Unable to get item from set.");
+    }
+    if (ItemLength > LocalLongestContraction)
+      LocalLongestContraction = ItemLength;
+  }
+  CachedLongestContraction = LocalLongestContraction;
+  return LocalLongestContraction;
+}
+
 void *swift::_swift_stdlib_unicodeCollationIterator_create(
     const __swift_uint16_t *Str, __swift_uint32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
