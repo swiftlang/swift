@@ -3692,7 +3692,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
     if (!nominal) {
       XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-      tinyTrace.addValue(cast<ValueDecl>(nominalOrError.get())->getName());
+      tinyTrace.addValue(
+          cast<ValueDecl>(nominalOrError.get())->getBaseName().getIdentifier());
       return llvm::make_error<XRefError>("declaration is not a nominal type",
                                          tinyTrace);
     }
