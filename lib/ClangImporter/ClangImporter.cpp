@@ -2942,11 +2942,13 @@ void ClangImporter::Implementation::lookupValue(
       decl = cast_or_null<ValueDecl>(
           importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion));
       if (!decl) continue;
-    } else {
+    } else if (!name.isSpecial()) {
       // Try to import a macro.
       auto clangMacro = entry.get<clang::MacroInfo *>();
       decl = importMacro(name.getBaseIdentifier(), clangMacro);
       if (!decl) continue;
+    } else {
+      continue;
     }
 
     // If we found a declaration from the standard library, make sure
