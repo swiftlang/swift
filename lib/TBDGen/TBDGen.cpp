@@ -202,7 +202,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     paramLists = paramLists.slice(1);
   for (auto *paramList : paramLists) {
     for (auto *param : *paramList) {
-      if (auto defaultArg = param->getDefaultValue())
+      if (param->getDefaultValue())
         addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
       index++;
     }
