@@ -4608,6 +4608,63 @@ AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
   return nullptr;
 }
 
+static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
+  assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
+
+  // Final members are always be called directly.
+  // Dynamic methods are always accessed by objc_msgSend().
+  if (decl->isFinal() || decl->isDynamic())
+    return false;
+
+  if (auto *fd = dyn_cast<FuncDecl>(decl)) {
+    switch (fd->getAccessorKind()) {
+    case AccessorKind::NotAccessor:
+    case AccessorKind::IsGetter:
+    case AccessorKind::IsSetter:
+      break;
+    case AccessorKind::IsAddressor:
+    case AccessorKind::IsMutableAddressor:
+      return false;
+    case AccessorKind::IsMaterializeForSet:
+      // Special case -- materializeForSet on dynamic storage is not
+      // itself dynamic, but should be treated as such for the
+      // purpose of constructing a vtable.
+      // FIXME: It should probably just be 'final'.
+      if (fd->getAccessorStorageDecl()->isDynamic())
+        return false;
+      break;
+    case AccessorKind::IsWillSet:
+    case AccessorKind::IsDidSet:
+      return false;
+    }
+  }
+
+  auto base = decl->getOverriddenDecl();
+  if (!base || base->hasClangNode())
+    return true;
+
+  // If the method overrides something, we only need a new entry if the
+  // override has a more general AST type. However an abstraction
+  // change is OK; we don't want to add a whole new vtable entry just
+  // because an @in parameter because @owned, or whatever.
+  auto baseInterfaceTy = base->getInterfaceType();
+  auto derivedInterfaceTy = decl->getInterfaceType();
+
+  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
+
+  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
+      base, decl, baseInterfaceTy);
+
+  return !derivedInterfaceTy->matches(overrideInterfaceTy,
+                                      TypeMatchFlags::AllowABICompatible,
+                                      /*resolver*/nullptr);
+}
+
+void AbstractFunctionDecl::computeNeedsNewVTableEntry() {
+  setNeedsNewVTableEntry(requiresNewVTableEntry(this));
+}
+
+
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
@@ -4762,7 +4819,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   setParameterLists(SelfDecl, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
-  ConstructorDeclBits.HasStubImplementation = 0;
+  this->HasStubImplementation = 0;
   this->InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
   this->Failability = static_cast<unsigned>(Failability);
 }

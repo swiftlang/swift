@@ -1778,14 +1778,15 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
   return ty->getParameters().back();
 }
 
-bool TypeConverter::requiresNewVTableEntry(SILDeclRef method) {
-  auto found = RequiresVTableEntry.find(method);
-  if (found != RequiresVTableEntry.end())
-    return found->second;
-
-  auto result = requiresNewVTableEntryUncached(method);
-  RequiresVTableEntry.insert(std::make_pair(method, result));
-  return result;
+static bool requiresNewVTableEntry(SILDeclRef method) {
+  if (cast<AbstractFunctionDecl>(method.getDecl())->needsNewVTableEntry())
+    return true;
+  if (method.kind == SILDeclRef::Kind::Allocator) {
+    auto *ctor = cast<ConstructorDecl>(method.getDecl());
+    if (ctor->isRequired() && !ctor->getOverriddenDecl()->isRequired())
+      return true;
+  }
+  return false;
 }
 
 // This check duplicates TypeConverter::checkForABIDifferences(),
@@ -1797,51 +1798,6 @@ static bool checkASTTypeForABIDifferences(CanType type1,
                                           CanType type2) {
   return !type1->matches(type2, TypeMatchFlags::AllowABICompatible,
                          /*resolver*/nullptr);
-}
-
-bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef derived) {
-  auto *decl = derived.getDecl();
-
-  // Final members are always be called directly.
-  // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic())
-    return false;
-
-  // Special case -- materializeForSet on dynamic storage is not
-  // itself dynamic, but should be treated as such for the
-  // purpose of constructing the vtable.
-  if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet &&
-        fd->getAccessorStorageDecl()->isDynamic())
-      return false;
-  }
-
-  // If the method overrides something, we only need a new entry if the
-  // override has a more general AST type. However an abstraction
-  // change is OK; we don't want to add a whole new vtable entry just
-  // because an @in parameter because @owned, or whatever.
-  if (auto base = derived.getNextOverriddenVTableEntry()) {
-    auto baseInfo = getConstantInfo(base);
-    auto derivedInfo = getConstantInfo(derived);
-
-    auto baseInterfaceTy = baseInfo.FormalInterfaceType;
-    auto derivedInterfaceTy = derivedInfo.FormalInterfaceType;
-
-    auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
-
-    auto overrideInterfaceTy =
-        selfInterfaceTy->adjustSuperclassMemberDeclType(
-            base.getDecl(), derived.getDecl(), baseInterfaceTy)
-      ->getCanonicalType();
-
-    if (checkASTTypeForABIDifferences(derivedInterfaceTy, overrideInterfaceTy))
-      return true;
-
-    return false;
-  }
-
-  // We need a new entry.
-  return true;
 }
 
 SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
