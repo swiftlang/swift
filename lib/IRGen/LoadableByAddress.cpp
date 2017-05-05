@@ -435,7 +435,7 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
   auto callee = applySite.getCallee();
   if (isa<ProjectBlockStorageInst>(callee)) {
     return false;
-  } else if (LoadInst *instr = dyn_cast<LoadInst>(callee)) {
+  } else if (auto *instr = dyn_cast<LoadInst>(callee)) {
     auto loadedSrcValue = instr->getOperand();
     if (isa<ProjectBlockStorageInst>(loadedSrcValue)) {
       return false;
@@ -673,31 +673,31 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       break;
     }
     case ValueKind::RetainValueInst: {
-      RetainValueInst *insToInsert = dyn_cast<RetainValueInst>(userIns);
+      auto *insToInsert = dyn_cast<RetainValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.retainInstsToMod.push_back(insToInsert);
       break;
     }
     case ValueKind::ReleaseValueInst: {
-      ReleaseValueInst *insToInsert = dyn_cast<ReleaseValueInst>(userIns);
+      auto *insToInsert = dyn_cast<ReleaseValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.releaseInstsToMod.push_back(insToInsert);
       break;
     }
     case ValueKind::StoreInst: {
-      StoreInst *insToInsert = dyn_cast<StoreInst>(userIns);
+      auto *insToInsert = dyn_cast<StoreInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.storeInstsToMod.push_back(insToInsert);
       break;
     }
     case ValueKind::DebugValueInst: {
-      DebugValueInst *insToInsert = dyn_cast<DebugValueInst>(userIns);
+      auto *insToInsert = dyn_cast<DebugValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.debugInstsToMod.push_back(insToInsert);
       break;
     }
     case ValueKind::StructExtractInst: {
-      StructExtractInst *instToInsert = dyn_cast<StructExtractInst>(userIns);
+      auto *instToInsert = dyn_cast<StructExtractInst>(userIns);
       if (std::find(pass.structExtractInstsToMod.begin(),
                     pass.structExtractInstsToMod.end(),
                     instToInsert) == pass.structExtractInstsToMod.end()) {
@@ -706,7 +706,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       break;
     }
     case ValueKind::SwitchEnumInst: {
-      SwitchEnumInst *instToInsert = dyn_cast<SwitchEnumInst>(userIns);
+      auto *instToInsert = dyn_cast<SwitchEnumInst>(userIns);
       if (std::find(pass.switchEnumInstsToMod.begin(),
                     pass.switchEnumInstsToMod.end(),
                     instToInsert) == pass.switchEnumInstsToMod.end()) {
@@ -815,41 +815,41 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     }
     case ValueKind::RetainValueInst: {
-      RetainValueInst *insToInsert = dyn_cast<RetainValueInst>(userIns);
+      auto *insToInsert = dyn_cast<RetainValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.retainInstsToMod.push_back(insToInsert);
       usersToMod.push_back(user);
       break;
     }
     case ValueKind::ReleaseValueInst: {
-      ReleaseValueInst *insToInsert = dyn_cast<ReleaseValueInst>(userIns);
+      auto *insToInsert = dyn_cast<ReleaseValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.releaseInstsToMod.push_back(insToInsert);
       usersToMod.push_back(user);
       break;
     }
     case ValueKind::StoreInst: {
-      StoreInst *insToInsert = dyn_cast<StoreInst>(userIns);
+      auto *insToInsert = dyn_cast<StoreInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.storeInstsToMod.push_back(insToInsert);
       usersToMod.push_back(user);
       break;
     }
     case ValueKind::DebugValueInst: {
-      DebugValueInst *insToInsert = dyn_cast<DebugValueInst>(userIns);
+      auto *insToInsert = dyn_cast<DebugValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.debugInstsToMod.push_back(insToInsert);
       usersToMod.push_back(user);
       break;
     }
     case ValueKind::StructExtractInst: {
-      StructExtractInst *instToInsert = dyn_cast<StructExtractInst>(userIns);
+      auto *instToInsert = dyn_cast<StructExtractInst>(userIns);
       pass.structExtractInstsToMod.push_back(instToInsert);
       usersToMod.push_back(user);
       break;
     }
     case ValueKind::SwitchEnumInst: {
-      SwitchEnumInst *instToInsert = dyn_cast<SwitchEnumInst>(userIns);
+      auto *instToInsert = dyn_cast<SwitchEnumInst>(userIns);
       pass.switchEnumInstsToMod.push_back(instToInsert);
       usersToMod.push_back(user);
       break;
@@ -1066,7 +1066,7 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
       if (modifiableApply(site, pass.Mod)) {
         userOp->set(allocInstr);
       }
-    } else if (StoreInst *storeUser = dyn_cast<StoreInst>(user)) {
+    } else if (auto *storeUser = dyn_cast<StoreInst>(user)) {
       // Optimization: replace with copy_addr to reduce code size
       assert(std::find(pass.storeInstsToMod.begin(), pass.storeInstsToMod.end(),
                        storeUser) == pass.storeInstsToMod.end() &&
@@ -1114,7 +1114,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
                                              SILValue value,
                                              SILInstruction *applyInst) {
   assert(value->getType().isObject());
-  SILArgument *arg = dyn_cast<SILArgument>(value);
+  auto *arg = dyn_cast<SILArgument>(value);
   assert(arg && "non-instr operand must be an argmuent");
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
@@ -1303,7 +1303,7 @@ static void rewriteFunction(StructLoweringState &pass,
           // Get its storage location as a new operand
           if (!currOperandInstr) {
             allocateAndSetForArgumentOperand(pass, currOperand, applyInst);
-          } else if (LoadInst *load = dyn_cast<LoadInst>(currOperandInstr)) {
+          } else if (auto *load = dyn_cast<LoadInst>(currOperandInstr)) {
             if (allUsesAreReplaceable(load, pass.Mod)) {
               allocator.replaceLoadWithCopyAddr(load);
             } else {
@@ -1399,34 +1399,34 @@ static void rewriteFunction(StructLoweringState &pass,
     SILInstruction *newInstr = nullptr;
     switch (instr->getKind()) {
     case ValueKind::StructExtractInst: {
-      StructExtractInst *convInstr = dyn_cast<StructExtractInst>(instr);
+      auto *convInstr = dyn_cast<StructExtractInst>(instr);
       newInstr = resultTyBuilder.createStructExtract(
           Loc, convInstr->getOperand(), convInstr->getField(),
           newSILType.getObjectType());
       break;
     }
     case ValueKind::StructElementAddrInst: {
-      StructElementAddrInst *convInstr = dyn_cast<StructElementAddrInst>(instr);
+      auto *convInstr = dyn_cast<StructElementAddrInst>(instr);
       newInstr = resultTyBuilder.createStructElementAddr(
           Loc, convInstr->getOperand(), convInstr->getField(),
           newSILType.getAddressType());
       break;
     }
     case ValueKind::RefTailAddrInst: {
-      RefTailAddrInst *convInstr = dyn_cast<RefTailAddrInst>(instr);
+      auto *convInstr = dyn_cast<RefTailAddrInst>(instr);
       newInstr = resultTyBuilder.createRefTailAddr(Loc, convInstr->getOperand(),
                                                    newSILType.getAddressType());
       break;
     }
     case ValueKind::RefElementAddrInst: {
-      RefElementAddrInst *convInstr = dyn_cast<RefElementAddrInst>(instr);
+      auto *convInstr = dyn_cast<RefElementAddrInst>(instr);
       newInstr = resultTyBuilder.createRefElementAddr(
           Loc, convInstr->getOperand(), convInstr->getField(),
           newSILType.getAddressType());
       break;
     }
     case ValueKind::EnumInst: {
-      EnumInst *convInstr = dyn_cast<EnumInst>(instr);
+      auto *convInstr = dyn_cast<EnumInst>(instr);
       SILValue operand =
           convInstr->hasOperand() ? convInstr->getOperand() : SILValue();
       newInstr = resultTyBuilder.createEnum(
@@ -1472,7 +1472,7 @@ static void rewriteFunction(StructLoweringState &pass,
       break;
     }
     case ValueKind::DynamicMethodInst: {
-      DynamicMethodInst *DMI = dyn_cast<DynamicMethodInst>(instr);
+      auto *DMI = dyn_cast<DynamicMethodInst>(instr);
       assert(DMI && "ValueKind is Witness Method but dyn_cast failed");
       SILValue selfValue = instr->getOperand(0);
       newInstr = methodBuilder.createDynamicMethod(loc, selfValue, member,
@@ -1480,7 +1480,7 @@ static void rewriteFunction(StructLoweringState &pass,
       break;
     }
     case ValueKind::WitnessMethodInst: {
-      WitnessMethodInst *WMI = dyn_cast<WitnessMethodInst>(instr);
+      auto *WMI = dyn_cast<WitnessMethodInst>(instr);
       assert(WMI && "ValueKind is Witness Method but dyn_cast failed");
       newInstr = methodBuilder.createWitnessMethod(
           loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType,
@@ -1640,7 +1640,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   SILInstruction *newApply = nullptr;
   switch (applyInst->getKind()) {
   case ValueKind::ApplyInst: {
-    ApplyInst *castedApply = dyn_cast<ApplyInst>(applyInst);
+    auto *castedApply = dyn_cast<ApplyInst>(applyInst);
     assert(castedApply && "ValueKind is ApplyInst but cast to it failed");
     newApply = applyBuilder.createApply(castedApply->getLoc(), callee,
                                         newSubType, resultType, newSubs,
@@ -1649,7 +1649,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     break;
   }
   case ValueKind::TryApplyInst: {
-    TryApplyInst *castedApply = dyn_cast<TryApplyInst>(applyInst);
+    auto *castedApply = dyn_cast<TryApplyInst>(applyInst);
     assert(castedApply && "ValueKind is TryApplyInst but cast to it failed");
     newApply = applyBuilder.createTryApply(
         castedApply->getLoc(), callee, newSubType, newSubs, callArgs,
@@ -1658,7 +1658,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     break;
   }
   case ValueKind::PartialApplyInst: {
-    PartialApplyInst *castedApply = dyn_cast<PartialApplyInst>(applyInst);
+    auto *castedApply = dyn_cast<PartialApplyInst>(applyInst);
     assert(castedApply &&
            "ValueKind is PartialApplyInst but cast to it failed");
     // Change the type of the Closure
@@ -1772,7 +1772,7 @@ void LoadableByAddress::recreateConvInstrs() {
       break;
     }
     case ValueKind::ConvertFunctionInst: {
-      ConvertFunctionInst *instr = dyn_cast<ConvertFunctionInst>(convInstr);
+      auto *instr = dyn_cast<ConvertFunctionInst>(convInstr);
       assert(instr && "Unexpected conversion instruction");
       newInstr = convBuilder.createConvertFunction(
           instr->getLoc(), instr->getOperand(), newType);

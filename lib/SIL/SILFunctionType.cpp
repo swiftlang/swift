@@ -128,7 +128,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       if (decls.size() != 1)
         return CanType();
 
-      const TypeDecl *typeDecl = dyn_cast<TypeDecl>(decls.front());
+      const auto *typeDecl = dyn_cast<TypeDecl>(decls.front());
       if (!typeDecl)
         return CanType();
 
@@ -521,7 +521,7 @@ enum class ConventionsKind : uint8_t {
       }
 
       // Okay, handle 'self'.
-      if (CanTupleType substTupleType = dyn_cast<TupleType>(substType)) {
+      if (auto substTupleType = dyn_cast<TupleType>(substType)) {
         unsigned numEltTypes = substTupleType.getElementTypes().size();
         assert(numEltTypes > 0);
 
@@ -1398,7 +1398,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
 
 /// Try to find a clang method declaration for the given function.
 static const clang::Decl *findClangMethod(ValueDecl *method) {
-  if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
+  if (auto *methodFn = dyn_cast<FuncDecl>(method)) {
     if (auto *decl = methodFn->getClangDecl())
       return decl;
 
@@ -1406,7 +1406,7 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
       return findClangMethod(overridden);
   }
 
-  if (ConstructorDecl *constructor = dyn_cast<ConstructorDecl>(method)) {
+  if (auto *constructor = dyn_cast<ConstructorDecl>(method)) {
     if (auto *decl = constructor->getClangDecl())
       return decl;
   }

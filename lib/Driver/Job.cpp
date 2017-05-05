@@ -117,7 +117,7 @@ void Job::printSummary(raw_ostream &os) const {
   SmallVector<std::string, 4> Inputs;
 
   for (const Action *A : getSource().getInputs())
-    if (const InputAction *IA = dyn_cast<InputAction>(A))
+    if (const auto *IA = dyn_cast<InputAction>(A))
       Inputs.push_back(IA->getInputArg().getValue());
 
   for (const Job *J : getInputs())

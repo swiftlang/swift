@@ -1240,7 +1240,7 @@ private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Range.getByteLength() == 0)
       return true;
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D))
       annotateSourceEntity({ Range, VD, nullptr, /*IsRef=*/false});
     return true;
   }
@@ -1626,7 +1626,7 @@ public:
     if (isa<ProtocolDecl>(D)) {
       InProtocol = true;
       DefaultImplementationMap.clear();
-      ProtocolDecl *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
+      auto *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
       collectDefaultImplementationForProtocolMembers(PD,
                                                      DefaultImplementationMap);
     }
@@ -2497,7 +2497,7 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D))
       printUSR(VD, Range.getStart());
     return true;
   }

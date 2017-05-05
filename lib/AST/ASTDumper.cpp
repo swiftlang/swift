@@ -699,9 +699,9 @@ namespace {
 
       OS << ' ';
       printDeclName(VD);
-      if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
         printGenericParameters(OS, AFD->getGenericParams());
-      if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
+      if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
@@ -1365,9 +1365,9 @@ public:
     PrintWithColorRAII(OS, ASTNodeColor) << Name;
     for (auto Elt : Elements) {
       OS << '\n';
-      if (Expr *SubExpr = Elt.dyn_cast<Expr*>())
+      if (auto *SubExpr = Elt.dyn_cast<Expr*>())
         printRec(SubExpr);
-      else if (Stmt *SubStmt = Elt.dyn_cast<Stmt*>())
+      else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt);
       else
         printRec(Elt.get<Decl*>());

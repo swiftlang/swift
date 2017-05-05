@@ -799,7 +799,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
       if (!isa<BranchInst>(TI) && !isa<CondBranchInst>(TI))
         return nullptr;
 
-      SILArgument *IncomingArg = dyn_cast<SILArgument>(IncomingVal);
+      auto *IncomingArg = dyn_cast<SILArgument>(IncomingVal);
       if (IncomingArg && HandledArgs.count(IncomingArg) != 0)
         continue;
 
@@ -868,12 +868,12 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget) {
     if (isa<EnumInst>(User))
       return true;
 
-    if (SwitchValueInst *SWI = dyn_cast<SwitchValueInst>(User)) {
+    if (auto *SWI = dyn_cast<SwitchValueInst>(User)) {
       if (SWI->getOperand() == BBArg)
         return true;
     }
 
-    if (BranchInst *BI = dyn_cast<BranchInst>(User)) {
+    if (auto *BI = dyn_cast<BranchInst>(User)) {
       if (BudgetForBranch > Budget) {
         BudgetForBranch = Budget;
         for (SILInstruction &I : *BB) {
@@ -1073,7 +1073,7 @@ static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
   if (!onlyHasTerminatorAndDebugInsts(SBB))
     return nullptr;
 
-  BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());
+  auto *BI = dyn_cast<BranchInst>(SBB->getTerminator());
   if (!BI)
     return nullptr;
 
@@ -1111,7 +1111,7 @@ static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
   if (!onlyHasTerminatorAndDebugInsts(SBB))
     return nullptr;
 
-  BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());
+  auto *BI = dyn_cast<BranchInst>(SBB->getTerminator());
   if (!BI)
     return nullptr;
 
@@ -1343,7 +1343,7 @@ static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
   if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
     return V;
   auto Args = BI->getArguments();
-  IntegerLiteralInst *IL = dyn_cast<IntegerLiteralInst>(Args[1]);
+  auto *IL = dyn_cast<IntegerLiteralInst>(Args[1]);
   if (!IL)
     return V;
   SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
@@ -2144,7 +2144,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     return false;
   
   // Check if the condition is a single-used argument in the current block.
-  SILArgument *condArg = dyn_cast<SILArgument>(cond);
+  auto *condArg = dyn_cast<SILArgument>(cond);
   if (!condArg || !condArg->hasOneUse())
     return false;
   
@@ -2270,7 +2270,7 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
   
-    SwitchEnumInstBase *SWI = dyn_cast<SwitchEnumInstBase>(TI);
+    auto *SWI = dyn_cast<SwitchEnumInstBase>(TI);
     if (!SWI)
       continue;
     
@@ -3257,7 +3257,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
         EnumInst *PrevResult =
             dyn_cast<EnumInst>(CaseLiteralsToResultMap[CaseInfo.Literal]);
         assert(PrevResult && "Prev. case result is not an EnumInst");
-        EnumInst *CurrResult = dyn_cast<EnumInst>(CaseInfo.Result);
+        auto *CurrResult = dyn_cast<EnumInst>(CaseInfo.Result);
         assert(CurrResult && "Curr. case result is not an EnumInst");
         if (PrevResult->getElement() != CurrResult->getElement()) {
           // result value does not match - bail

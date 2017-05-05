@@ -102,7 +102,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
 
       // Report diagnostic if the first argument has been folded to '1'.
       OperandValueArrayRef Args = BI->getArguments();
-      IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+      auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
       if (!V || V->getValue() != 1)
         return;
 

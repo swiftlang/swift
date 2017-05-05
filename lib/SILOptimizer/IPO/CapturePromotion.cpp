@@ -534,7 +534,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
       Inst->getFunction()->hasUnqualifiedOwnership() &&
       "Should not see strong release in a function with qualified ownership");
   SILValue Operand = Inst->getOperand();
-  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+  if (auto *A = dyn_cast<SILArgument>(Operand)) {
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
@@ -556,7 +556,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
 /// normally.
 void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
   SILValue Operand = Inst->getOperand();
-  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+  if (auto *A = dyn_cast<SILArgument>(Operand)) {
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with an end_borrow,

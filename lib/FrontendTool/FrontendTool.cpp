@@ -975,7 +975,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   }
 
   for (auto *FU : Mod->getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(FU))
+    if (auto *SF = dyn_cast<SourceFile>(FU))
       if (dumpFile(SF))
         return true;
   }

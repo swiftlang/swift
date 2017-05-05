@@ -377,7 +377,7 @@ bool AbstractFunctionDecl::isTransparent() const {
 
   // If this is an accessor, check if the transparent attribute was set
   // on the value decl.
-  if (const FuncDecl *FD = dyn_cast<FuncDecl>(this)) {
+  if (const auto *FD = dyn_cast<FuncDecl>(this)) {
     if (auto *ASD = FD->getAccessorStorageDecl())
       return ASD->isTransparent();
   }
@@ -2699,7 +2699,7 @@ AbstractFunctionDecl *
 ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
   auto Members = getMembers();
   for (auto M : Members) {
-    AbstractFunctionDecl *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
+    auto *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
     if (!CurMethod)
       continue;
     if (CurMethod->isOverridingDecl(Method)) {
@@ -2726,7 +2726,7 @@ ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
   while (C) {
     auto Members = C->getMembers();
     for (auto M : Members) {
-      AbstractFunctionDecl *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
+      auto *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
       if (!CurMethod)
         continue;
       if (Method == CurMethod)
@@ -4138,9 +4138,9 @@ SourceRange ParamDecl::getSourceRange() const {
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
-  if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
+  if (auto *AT = dyn_cast<ArraySliceType>(T))
     return AT->getBaseType();
-  if (BoundGenericType *BGT = dyn_cast<BoundGenericType>(T)) {
+  if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
     // It's the stdlib Array<T>.
     return BGT->getGenericArgs()[0];
   }

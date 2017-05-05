@@ -562,7 +562,7 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
     // TODO: Handle block arguments.
     // TODO: Handle subobjects with a single composition, and other non-mutating
     // uses such as @in arguments.
-    if (SILInstruction *def = dyn_cast<SILInstruction>(value)) {
+    if (auto *def = dyn_cast<SILInstruction>(value)) {
       Operand *useOper = *value->use_begin();
       if (canProjectFrom(def, useOper->getUser())) {
         storage.setComposedOperand(useOper);

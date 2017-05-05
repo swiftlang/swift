@@ -209,8 +209,8 @@ public:
       return true;
 
     // Evaluate literal integers.
-    IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-    IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+    auto *AI = dyn_cast<IntegerLiteralInst>(A);
+    auto *BI = dyn_cast<IntegerLiteralInst>(B);
     if (AI && BI) {
       APInt Ap = AI->getValue();
       APInt Bp = BI->getValue();
@@ -232,7 +232,7 @@ public:
 
   /// Return True if we can deduct that \p N is always positive (N > 0).
   static bool isKnownPositive(SILValue N) {
-    if (IntegerLiteralInst *NI = dyn_cast<IntegerLiteralInst>(N))
+    if (auto *NI = dyn_cast<IntegerLiteralInst>(N))
       return NI->getValue().isStrictlyPositive();
     return false;
   }
@@ -241,8 +241,8 @@ public:
   /// absolute value of \p B. In other words, check if \p A known to be closer
   /// to zero.
   static bool isKnownAbsLess(SILValue A, SILValue B) {
-    IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-    IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+    auto *AI = dyn_cast<IntegerLiteralInst>(A);
+    auto *BI = dyn_cast<IntegerLiteralInst>(B);
 
     if (AI && BI)
       return AI->getValue().abs().ult(BI->getValue().abs());
@@ -295,8 +295,8 @@ public:
         if (F.Relationship == ValueRelation::SLT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *AI = dyn_cast<IntegerLiteralInst>(A);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (L == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
           if (L == B && AI && AI->getValue().getSExtValue() == 1)
@@ -324,8 +324,8 @@ public:
         if (F.Relationship == ValueRelation::ULT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *AI = dyn_cast<IntegerLiteralInst>(A);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *AI = dyn_cast<IntegerLiteralInst>(A);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (L == A && BI && BI->getValue().getZExtValue() == 1)
             return true;
           if (L == B && AI && AI->getValue().getZExtValue() == 1)
@@ -430,7 +430,7 @@ public:
         if (F.Relationship == ValueRelation::ULT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (R == A && BI && BI->getValue().getZExtValue() == 1)
             return true;
         }
@@ -488,7 +488,7 @@ public:
         if (F.Relationship == ValueRelation::SLT) {
           SILValue A = BI->getOperand(0);
           SILValue B = BI->getOperand(1);
-          IntegerLiteralInst *BI = dyn_cast<IntegerLiteralInst>(B);
+          auto *BI = dyn_cast<IntegerLiteralInst>(B);
           if (R == A && BI && BI->getValue().getSExtValue() == 1)
             return true;
         }

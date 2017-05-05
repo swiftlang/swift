@@ -1737,7 +1737,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
 
   // Some IRGen-generated helper functions don't have a corresponding
   // SIL function, hence the dyn_cast.
-  SILFunction *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
+  auto *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
   StringRef LinkageName;
   if (Fn)
     LinkageName = Fn->getName();

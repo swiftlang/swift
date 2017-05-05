@@ -3849,7 +3849,7 @@ class YamlGroupInputParser {
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
                  StringRef ParentName) {
-    llvm::yaml::MappingNode *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
+    auto *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
     if (!MapNode) {
       return true;
     }
@@ -3923,7 +3923,7 @@ public:
 
     // The format is a map of ("group0" : ["file1", "file2"]), meaning all
     // symbols from file1 and file2 belong to "group0".
-    llvm::yaml::MappingNode *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
+    auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
     if (!Map) {
       return true;
     }

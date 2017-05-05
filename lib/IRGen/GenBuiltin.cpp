@@ -333,7 +333,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       llvm::Instruction *I = static_cast<llvm::Instruction *>(v);
       if (I->getParent() == IGF.Builder.GetInsertBlock()) {
         llvm::LLVMContext &ctx = IGF.IGM.Module.getContext();
-        llvm::IntegerType *intType = dyn_cast<llvm::IntegerType>(v->getType());
+        auto *intType = dyn_cast<llvm::IntegerType>(v->getType());
         llvm::Metadata *rangeElems[] = {
           llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(intType, 0)),
           llvm::ConstantAsMetadata::get(

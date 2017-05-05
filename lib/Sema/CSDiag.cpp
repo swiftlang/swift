@@ -3850,12 +3850,12 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
     return false;
 
   auto getInnerCastedExpr = [&]() -> Expr* {
-    CallExpr *CE = dyn_cast<CallExpr>(expr);
+    auto *CE = dyn_cast<CallExpr>(expr);
     if (!CE)
       return nullptr;
     if (!isa<ConstructorRefCallExpr>(CE->getFn()))
       return nullptr;
-    ParenExpr *parenE = dyn_cast<ParenExpr>(CE->getArg());
+    auto *parenE = dyn_cast<ParenExpr>(CE->getArg());
     if (!parenE)
       return nullptr;
     return parenE->getSubExpr();
@@ -4980,7 +4980,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
     if (rawTy && arg.Ty && resTy->isEqual(arg.Ty)) {
       auto getInnerExpr = [](Expr *E) -> Expr* {
-        ParenExpr *parenE = dyn_cast<ParenExpr>(E);
+        auto *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
           return nullptr;
         return parenE->getSubExpr();

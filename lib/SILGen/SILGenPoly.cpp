@@ -1955,7 +1955,7 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
   // outerOrigType can be a tuple if we're doing something like
   // injecting into an optional tuple.
 
-  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
@@ -2054,7 +2054,7 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
                                          SILResultInfo outerResult) {
   assert(innerOrigType.isTuple());
 
-  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   // If the outer type is not a tuple, it must be optional or we are under
   // opaque value mode
@@ -2265,7 +2265,7 @@ void ResultPlanner::planTupleFromDirectResult(AbstractionPattern innerOrigType,
                                               SILResultInfo innerResult) {
 
   assert(!innerOrigType.isTuple());
-  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   assert(outerSubstTupleType && "Outer type must be a tuple");
   assert(innerSubstType->getNumElements() ==

@@ -25,7 +25,7 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
   DeclContext *DC = PD->getInnermostDeclContext();
   auto HandleMembers = [&](DeclRange Members) {
     for (Decl *D : Members) {
-      ValueDecl *VD = dyn_cast<ValueDecl>(D);
+      auto *VD = dyn_cast<ValueDecl>(D);
 
       // Skip non-value decl.
       if (!VD)
@@ -51,6 +51,6 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
 
   // Collect the default implementations for the members in the inherited
   // protocols.
-  for (auto* IP : PD->getInheritedProtocols())
+  for (auto *IP : PD->getInheritedProtocols())
     HandleMembers(IP->getMembers());
 }

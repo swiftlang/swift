@@ -53,7 +53,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
   auto type = DC->mapTypeIntoContext(interfaceType)->getCanonicalType();
 
   // Restructure tuple arguments.
-  if (CanTupleType tupleTy = dyn_cast<TupleType>(interfaceType)) {
+  if (auto tupleTy = dyn_cast<TupleType>(interfaceType)) {
     RValue tuple(type);
     for (auto fieldType : tupleTy.getElementTypes())
       tuple.addElement(emitImplicitValueConstructorArg(gen, loc, fieldType, DC));
