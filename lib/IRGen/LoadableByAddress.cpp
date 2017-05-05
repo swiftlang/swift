@@ -307,6 +307,8 @@ struct StructLoweringState {
   SmallVector<SwitchEnumInst *, 16> switchEnumInstsToMod;
   // All struct_extract instrs that should be converted to struct_element_addr
   SmallVector<StructExtractInst *, 16> structExtractInstsToMod;
+  // All tuple instructions for which the return type is a function type
+  SmallVector<SILInstruction *, 8> tupleInstsToMod;
   // All Retain and release instrs should be replaced with _addr version
   SmallVector<RetainValueInst *, 16> retainInstsToMod;
   SmallVector<ReleaseValueInst *, 16> releaseInstsToMod;
@@ -350,6 +352,7 @@ protected:
   void visitReleaseInst(ReleaseValueInst *instr);
   void visitResultTyInst(SILInstruction *instr);
   void visitDebugValueInst(DebugValueInst *instr);
+  void visitTupleInst(SILInstruction *instr);
   void visitInstr(SILInstruction *instr);
 };
 } // end anonymous namespace
@@ -409,6 +412,11 @@ void LargeValueVisitor::mapValueStorage() {
       case ValueKind::SwitchEnumInst: {
         auto *SEI = dyn_cast<SwitchEnumInst>(currIns);
         visitSwitchEnumInst(SEI);
+        break;
+      }
+      case ValueKind::TupleElementAddrInst:
+      case ValueKind::TupleExtractInst: {
+        visitTupleInst(currIns);
         break;
       }
       default: {
@@ -605,6 +613,24 @@ void LargeValueVisitor::visitResultTyInst(SILInstruction *instr) {
   } else {
     visitInstr(instr);
   }
+}
+
+void LargeValueVisitor::visitTupleInst(SILInstruction *instr) {
+  SILType currSILType = instr->getType().getObjectType();
+  CanType currCanType = currSILType.getSwiftRValueType();
+  if (auto funcType = dyn_cast<SILFunctionType>(currCanType)) {
+    CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
+    GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
+    if (!genEnv && canFuncType->isPolymorphic()) {
+      genEnv = getGenericEnvironment(instr->getModule(), canFuncType);
+    }
+    SILFunctionType *newSILFunctionType =
+        getNewSILFunctionTypePtr(genEnv, funcType, pass.Mod);
+    if (funcType != newSILFunctionType) {
+      pass.tupleInstsToMod.push_back(instr);
+    }
+  }
+  visitInstr(instr);
 }
 
 void LargeValueVisitor::visitInstr(SILInstruction *instr) {
@@ -1208,6 +1234,40 @@ static bool allUsesAreReplaceable(SILInstruction *instr,
   return allUsesAreReplaceable;
 }
 
+static void castTupleInstr(SILInstruction *instr, IRGenModule &Mod) {
+  SILType currSILType = instr->getType().getObjectType();
+  CanType currCanType = currSILType.getSwiftRValueType();
+  SILFunctionType *funcType = dyn_cast<SILFunctionType>(currCanType);
+  assert(funcType && "Expcted SILFunctionType as tuple's return");
+  CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
+  GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
+  if (!genEnv && canFuncType->isPolymorphic()) {
+    genEnv = getGenericEnvironment(instr->getModule(), canFuncType);
+  }
+  SILType newSILType = getNewSILFunctionType(genEnv, funcType, Mod);
+  auto II = instr->getIterator();
+  ++II;
+  SILBuilder castBuilder(II);
+  SILInstruction *castInstr = nullptr;
+  switch (instr->getKind()) {
+  // Add cast to the new sil function type:
+  case ValueKind::TupleExtractInst: {
+    castInstr = castBuilder.createUncheckedBitCast(instr->getLoc(), instr,
+                                                   newSILType.getObjectType());
+    break;
+  }
+  case ValueKind::TupleElementAddrInst: {
+    castInstr = castBuilder.createUncheckedAddrCast(
+        instr->getLoc(), instr, newSILType.getAddressType());
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected instruction inside tupleInstsToMod");
+  }
+  instr->replaceAllUsesWith(castInstr);
+  castInstr->setOperand(0, instr);
+}
+
 static void rewriteFunction(StructLoweringState &pass,
                             LoadableStorageAllocation &allocator) {
 
@@ -1348,6 +1408,10 @@ static void rewriteFunction(StructLoweringState &pass,
         operand.set(newOperand);
       }
     }
+  }
+
+  for (SILInstruction *instr : pass.tupleInstsToMod) {
+    castTupleInstr(instr, pass.Mod);
   }
 
   for (SILInstruction *instr : pass.debugInstsToMod) {
