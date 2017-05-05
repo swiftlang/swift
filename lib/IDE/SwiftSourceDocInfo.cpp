@@ -124,20 +124,54 @@ SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
 }
 
 bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  auto ReturnFn = [&](bool Result) {
+    if (Result)
+      ParentDecls.push_back(D);
+    return Result;
+  };
+
+  auto FindClosestFuncLikeDecl = [&]() -> Decl* {
+    for (auto It = ParentDecls.rbegin(); It != ParentDecls.rend(); It ++) {
+      switch ((*It)->getKind()) {
+      case DeclKind::Func:
+      case DeclKind::Constructor:
+      case DeclKind::Subscript:
+        return *It;
+      default:
+        break;
+      }
+    }
+    return nullptr;
+  };
+
   if (!rangeContainsLoc(D->getSourceRange()))
-    return false;
+    return ReturnFn(false);
 
   if (isa<ExtensionDecl>(D))
-    return true;
+    return ReturnFn(true);
 
-  if (auto *VD = dyn_cast<ValueDecl>(D))
-    return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
-                       Range.getStart(), /*IsRef=*/false);
+  if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *PD = dyn_cast<ParamDecl>(VD)) {
+      auto ArgLoc = PD->getArgumentNameLoc();
+      if (ArgLoc.isValid()) {
+        if (auto *Parent = FindClosestFuncLikeDecl()) {
+          // Don't push to ParentDecls here, we've seen Parent before.
+          return ReturnFn(!tryResolve(static_cast<ValueDecl*>(Parent), nullptr,
+                                      nullptr, ArgLoc, false));
+        }
+      }
+    }
 
-  return true;
+    return ReturnFn(!tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
+                                Range.getStart(), /*IsRef=*/false));
+  }
+
+  return ReturnFn(true);
 }
 
 bool SemaLocResolver::walkToDeclPost(Decl *D) {
+  assert(D == ParentDecls.back());
+  ParentDecls.pop_back();
   if (isDone())
     return false;
   if (getSourceMgr().isBeforeInBuffer(LocToResolve, D->getStartLoc()))
