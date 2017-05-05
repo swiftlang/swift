@@ -120,7 +120,10 @@ def instrument_test(driver_path, test, num_samples):
 
 def get_tests(driver_path, args):
     """Return a list of available performance tests"""
-    tests = subprocess.check_output([driver_path, '--list']).split()[2:]
+    driver = ([driver_path, '--list'])
+    if args.benchmarks or args.filters:
+        driver.append('--run-all')
+    tests = subprocess.check_output(driver).split()[2:]
     if args.filters:
         regexes = [re.compile(pattern) for pattern in args.filters]
         return sorted(list(set([name for pattern in regexes
