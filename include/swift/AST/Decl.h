@@ -2157,20 +2157,18 @@ public:
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
-  /// This is the access used when calculating if access control is being used
-  /// consistently. If \p useDC is provided (the location where the value is
-  /// being used), features that affect formal access such as \c \@testable are
-  /// taken into account.
+  /// If \p useDC is provided (the location where the value is being used), 
+  /// features that affect formal access such as \c \@testable are taken into 
+  /// account.
   ///
   /// \sa getFormalAccessScope
+  /// \sa isAccessibleFrom
   Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const;
 
-  /// Returns the outermost DeclContext from which this declaration can be
-  /// accessed, or null if the declaration is public.
+  /// Returns the AccessScope from which this declaration can be accessed.
   ///
-  /// This is used when calculating if access control is being used
-  /// consistently. If \p useDC is provided (the location where the value is
-  /// being used), features that affect formal access such as \c \@testable are
+  /// If \p useDC is provided (the location where the value is being used), 
+  /// features that affect formal access such as \c \@testable are
   /// taken into account.
   ///
   /// \invariant

@@ -34,7 +34,7 @@ public:
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
   /// also allow access.
-  static bool allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC);
+  static bool allowsAccess(const DeclContext *useDC, const DeclContext *sourceDC);
 
   /// Returns nullptr if access scope is public.
   const DeclContext *getDeclContext() const { return Value.getPointer(); }
@@ -50,11 +50,9 @@ public:
   bool isFileScope() const;
 
   /// Returns true if this is a child scope of the specified other access scope.
-  ///
-  /// \see DeclContext::isChildContextOf
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
-      return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
+      return allowsAccess(getDeclContext(), AS.getDeclContext());
     if (isPublic() && AS.isPublic())
       return false;
     return AS.isPublic();

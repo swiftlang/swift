@@ -1263,7 +1263,7 @@ static bool checkAccessibility(const DeclContext *useDC,
   switch (access) {
   case Accessibility::Private:
     return (useDC == sourceDC ||
-      AccessScope::allowsPrivateAccess(useDC, sourceDC));
+            AccessScope::allowsAccess(useDC, sourceDC));
   case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {

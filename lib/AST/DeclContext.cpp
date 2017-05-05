@@ -1000,7 +1000,7 @@ Accessibility AccessScope::accessibilityForDiagnostics() const {
   return Accessibility::Private;
 }
 
-bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
+bool AccessScope::allowsAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
   // Check the lexical scope.
   if (useDC->isChildContextOf(sourceDC))
     return true;
