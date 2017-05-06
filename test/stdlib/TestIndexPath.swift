@@ -226,9 +226,6 @@ class TestIndexPath: TestIndexPathSuper {
         let ip2: IndexPath = [1, 1, 1]
         
         expectNotEqual(ip1.hashValue, ip2.hashValue)
-        
-        let nsip1 = ip1._bridgeToObjectiveC()
-        expectEqual(nsip1.hash, ip1.hashValue)
     }
     
     func testEquality() {
