@@ -2672,8 +2672,12 @@ namespace {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy || destTy->getRValueType()->is<UnresolvedType>())
+      if (!destTy)
         return Type();
+      if (destTy->getRValueType()->is<UnresolvedType>()) {
+        return CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                     TVO_CanBindToLValue);
+      }
       
       // The source must be convertible to the destination.
       CS.addConstraint(ConstraintKind::Conversion,
