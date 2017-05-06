@@ -34,6 +34,7 @@ set(sources
   NSDictionaryShims.h
   NSErrorShims.h
   NSFileManagerShims.h
+  NSIndexPathShims.h
   NSIndexSetShims.h
   NSKeyedArchiverShims.h
   NSLocaleShims.h
