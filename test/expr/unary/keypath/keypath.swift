@@ -111,8 +111,8 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
 
   // FIXME should resolve: expected-error@+1{{}}
   let _: KeyPath<A, Prop> = \.optProperty!
-  // FIXME should resolve: expected-error@+1{{}}
-  let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty![sub]
+  let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty!
+  let _: KeyPath<A, A?> = \.property[optSub]?.optProperty![sub]
 
   // FIXME crash let _: PartialKeyPath<C<A>> = \.value
   let _: KeyPath<C<A>, A> = \.value
