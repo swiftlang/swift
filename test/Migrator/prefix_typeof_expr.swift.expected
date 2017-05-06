@@ -1,6 +1,4 @@
-// rdar://problem/32025974
-// XFAIL: linux
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/prefix_typeof_expr.swift.result -emit-remap-file-path %t/member.swift.remap -o /dev/null
+// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/prefix_typeof_expr.swift.result -emit-remap-file-path %t/prefix_typeof_expr.swift.remap -o /dev/null
 // RUN: diff -u %S/prefix_typeof_expr.swift.expected %t/prefix_typeof_expr.swift.result
 
 class HasTypeVar {
