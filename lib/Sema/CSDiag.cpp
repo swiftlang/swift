@@ -325,12 +325,16 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
 
 /// Returns true if any diagnostics were emitted.
 static bool
-tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
+tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
+                                    const Expr *expr,
+                                    const Expr *anchor,
                                     ArrayRef<OverloadChoice> choices) {
   auto *callExpr = dyn_cast<CallExpr>(expr);
   if (!callExpr)
     return false;
   if (!callExpr->hasTrailingClosure())
+    return false;
+  if (callExpr->getFn() != anchor)
     return false;
 
   llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
@@ -465,7 +469,7 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, overload.choices))
+    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, anchor, overload.choices))
       return true;
 
     // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular

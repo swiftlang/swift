@@ -931,3 +931,12 @@ let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{bin
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+
+// Ambiguous overload inside a trailing closure
+
+func ambiguousCall() -> Int {} // expected-note {{found this candidate}}
+func ambiguousCall() -> Float {} // expected-note {{found this candidate}}
+
+func takesClosure(fn: () -> ()) {}
+
+takesClosure() { ambiguousCall() } // expected-error {{ambiguous use of 'ambiguousCall()'}}
