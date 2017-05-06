@@ -121,9 +121,8 @@ extension Notification : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNotification?) -> Notification {
-        var result: Notification?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return Notification(name: Notification.Name("")) }
+        return Notification(name: src.name, object: src.object, userInfo: src.userInfo)
     }
 }
 

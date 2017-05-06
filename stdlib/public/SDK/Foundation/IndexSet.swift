@@ -839,7 +839,8 @@ extension IndexSet : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSIndexSet?) -> IndexSet {
-        return IndexSet(reference: source!)
+        guard let src = source else { return IndexSet() }
+        return IndexSet(reference: src)
     }    
     
 }
