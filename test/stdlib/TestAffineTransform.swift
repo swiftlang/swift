@@ -364,6 +364,10 @@ class TestAffineTransform : TestAffineTransformSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(AffineTransform(), AffineTransform._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -386,6 +390,7 @@ AffineTransformTests.test("test_hashing_identity") { TestAffineTransform().test_
 AffineTransformTests.test("test_hashing_values") { TestAffineTransform().test_hashing_values() }
 AffineTransformTests.test("test_AnyHashableContainingAffineTransform") { TestAffineTransform().test_AnyHashableContainingAffineTransform() }
 AffineTransformTests.test("test_AnyHashableCreatedFromNSAffineTransform") { TestAffineTransform().test_AnyHashableCreatedFromNSAffineTransform() }
+AffineTransformTests.test("test_unconditionallyBridgeFromObjectiveC") { TestAffineTransform().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif
     

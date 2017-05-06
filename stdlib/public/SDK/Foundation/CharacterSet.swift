@@ -758,7 +758,8 @@ extension CharacterSet : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCharacterSet?) -> CharacterSet {
-        return CharacterSet(_bridged: source!)
+        guard let src = source else { return CharacterSet() }
+        return CharacterSet(_bridged: src)
     }
     
 }

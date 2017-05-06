@@ -236,7 +236,8 @@ extension IndexPath : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSIndexPath?) -> IndexPath {
-        return IndexPath(nsIndexPath: source!)
+        guard let src = source else { return IndexPath() }
+        return IndexPath(nsIndexPath: src)
     }    
 }
 
