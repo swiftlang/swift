@@ -3238,14 +3238,14 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   // Numeric
   //
   public init() {
-    self.init((High(), Low()))
+    self.init((0, 0))
   }
 
   // integer
   //
   public var magnitude: DoubleWidth<Low> {
     if Base.isSigned && _storage.high < 0 {
-        return (DoubleWidth() - self).magnitude
+        return (0 - self).magnitude
     }
     return DoubleWidth<Low>((
       _storage.high.magnitude, _storage.low.magnitude))
@@ -3295,17 +3295,15 @@ public struct DoubleWidth<Base : FixedWidthInteger>
     // to write DoubleWidth(DoubleWidth...)
     // T.Magnitude == T.Magnitude.Magnitude
   {
-    // FIXME: Replace init() calls with literals
-    
     // Can't represent a negative 'source' if Base is unsigned
     guard source >= 0 || DoubleWidth<Base>.isSigned else { return nil }
     
     // Is 'source' is entirely representable in Low?
     if let low = Low(exactly: source.magnitude) {
       if source < 0 {
-          self.init((~High(0), ~low + Low(1 as Int)))
+          self.init((~0, ~low + 1))
       } else {
-          self.init((High(0), low))
+          self.init((0, low))
       }
     } else {
       // At this point we know source's bitWidth > Base.bitWidth, or else
@@ -3394,22 +3392,22 @@ public struct DoubleWidth<Base : FixedWidthInteger>
     let (carry, product) = multipliedFullWidth(by: rhs)
     let result = DoubleWidth(product)
     
-    let isNegative = (self < DoubleWidth()) != (rhs < DoubleWidth())
+    let isNegative = (self < 0) != (rhs < 0)
     let overflow = isNegative
-      ? carry != ~DoubleWidth()
-      : carry != DoubleWidth()
+      ? carry != ~0
+      : carry != 0
     return (result, ArithmeticOverflow(overflow))
   }
 
   public func quotientAndRemainder(dividingBy other: DoubleWidth)
     -> (quotient: DoubleWidth, remainder: DoubleWidth) {
-    let isNegative = (self < DoubleWidth()) != (other < DoubleWidth())
+    let isNegative = (self < 0) != (other < 0)
 
     let rhs = other.magnitude
-    let one = Magnitude(1)
+    let one = 1 as Magnitude
 
     var q = self.magnitude
-    var r = Magnitude(0)
+    var r = 0 as Magnitude
 
     for _ in 0..<DoubleWidth.bitWidth {
       r <<= one
@@ -3425,12 +3423,12 @@ public struct DoubleWidth<Base : FixedWidthInteger>
     }
 
     // Sign of remainder matches dividend
-    let remainder = self < DoubleWidth()
-      ? DoubleWidth() - DoubleWidth(r)
+    let remainder = self < 0
+      ? 0 - DoubleWidth(r)
       : DoubleWidth(r)
 
     if isNegative {
-      return (DoubleWidth() - DoubleWidth(q), remainder)
+      return (0 - DoubleWidth(q), remainder)
     } else {
       return (DoubleWidth(q), remainder)
     }
@@ -3438,7 +3436,7 @@ public struct DoubleWidth<Base : FixedWidthInteger>
 
   public func dividedReportingOverflow(by other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
-    if other == DoubleWidth(0) || (other < 0 && self == .min) {
+    if other == 0 || (other < 0 && self == .min) {
       return (self, .overflow)
     }
 
@@ -3447,7 +3445,7 @@ public struct DoubleWidth<Base : FixedWidthInteger>
 
   public func remainderReportingOverflow(dividingBy other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
-    if other == DoubleWidth(0) {
+    if other == 0 {
       return (self, .overflow)
     }
 
@@ -3607,7 +3605,7 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   // other
   //
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    // FIXME: This obviously won't work if Int(x) fails
+    // FIXME: This won't work if `x` is out of range for `Int`
     self.init(Int(_builtinIntegerLiteral: x))
   }
 
@@ -3616,13 +3614,13 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   }
 
   public var leadingZeroBitCount: Int {
-    return high == 0 as High
+    return high == 0
       ? Base.bitWidth + low.leadingZeroBitCount
       : high.leadingZeroBitCount
   }
 
   public var trailingZeroBitCount: Int {
-    return low == 0 as Low
+    return low == 0
       ? Base.bitWidth + high.trailingZeroBitCount
       : low.trailingZeroBitCount
   }
