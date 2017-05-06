@@ -614,5 +614,73 @@ tests.test("signum/concrete") {
 % end
 }
 
+var dwTests = TestSuite("DoubleWidth")
+
+dwTests.test("Literals") {
+  let w: DoubleWidth<UInt8> = 100
+  expectTrue(w == 100 as Int)
+
+  let x: DoubleWidth<UInt8> = 1000
+  expectTrue(x == 1000 as Int)
+
+  let y: DoubleWidth<Int8> = 1000
+  expectTrue(y == 1000 as Int)
+  
+  let z: DoubleWidth<Int8> = -1000
+  expectTrue(z == -1000 as Int)
+}
+
+dwTests.test("Arithmetic/unsigned") {
+  let x: DoubleWidth<UInt8> = 1000
+  let y: DoubleWidth<UInt8> = 1111
+  expectTrue(x + 1 == 1001)
+  expectTrue(x + x == 2000)
+  expectTrue(x - 1 == 999)
+  expectTrue(x - x == 0)
+  expectTrue(y - x == 111)
+  
+  // multiplication triggers an inlining error
+  // expectTrue(x * 7 == 7000)
+  // expectTrue(y * 7 == 7777)
+  
+  expectTrue(x / 3 == 333)
+  expectTrue(x / x == 1)
+  expectTrue(x / y == 0)
+  expectTrue(y / x == 1)
+
+  expectTrue(x % 3 == 1)
+  expectTrue(x % y == x)
+}
+
+dwTests.test("Arithmetic/signed") {
+  let x: DoubleWidth<Int8> = 1000
+  let y: DoubleWidth<Int8> = -1111
+  expectTrue(x + 1 == 1001)
+  expectTrue(x + x == 2000)
+  expectTrue(x - 1 == 999)
+  expectTrue(x - x == 0)
+  expectTrue(0 - x == -1000)
+  expectTrue(x + y == -111)
+  expectTrue(x - y == 2111)
+  
+  // multiplication triggers an inlining error
+  // expectTrue(x * 7 == 7000)
+  // expectTrue(y * 7 == -7777)
+  // expectTrue(x * -7 == -7000)
+  // expectTrue(y * -7 == 7777)
+
+  expectTrue(x / 3 == 333)
+  expectTrue(x / x == 1)
+  expectTrue(x / y == 0)
+  expectTrue(y / x == -1)
+  
+  expectTrue(x % 3 == 1)
+  expectTrue(y % 3 == -1)
+  
+  expectTrue(-y == 1111)
+  expectTrue(-x == -1000)
+}
+
+// FIXME: Need more tests of DoubleWidth
 
 runAllTests()
