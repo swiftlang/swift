@@ -427,8 +427,8 @@ internal class _AnyRandomAccessCollectionBox<Element>
 @_versioned
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
   where
-  S.SubSequence : ${Kind},
 %  if Kind == 'Sequence':
+  S.SubSequence : ${Kind},
   S.SubSequence.Element == S.Element,
   S.SubSequence.SubSequence == S.SubSequence
 %  else:
@@ -1040,7 +1040,6 @@ public struct ${Self}<Element>
     where
     // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
-    C.SubSequence : ${SubProtocol},
     C.SubSequence.Element == Element,
     C.SubSequence.Indices : ${SubProtocol},
     C.Indices : ${SubProtocol}
