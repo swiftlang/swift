@@ -477,6 +477,14 @@ public:
   /// considered a system module.
   bool isSystemModule() const;
 
+  /// \returns true if this module is a clang module.
+  ///
+  /// It will return false for overlays of clang modules.
+  bool isClangModule() const;
+
+  /// \returns true if this module is a serialized Swift AST module.
+  bool isSwiftASTModule() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
 
