@@ -84,7 +84,42 @@ extension _Unicode.UTF8 : UnicodeEncoding {
       _storage: o | c | 0b0__1000_0000__1000_0000__1000_0000__1111_0000,
       _bitCount: 32)
   }
-  
+
+  @inline(__always)
+  public static func transcode<FromEncoding : UnicodeEncoding>(
+    _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
+  ) -> EncodedScalar? {
+    if _fastPath(FromEncoding.self == UTF16.self) {
+      let c = unsafeBitCast(content, to: UTF16.EncodedScalar.self)
+      var u0 = UInt16(extendingOrTruncating: c._storage) 
+      if _fastPath(u0 < 0x80) {
+        return EncodedScalar(containing: UInt8(extendingOrTruncating: u0))
+      }
+      var r = UInt32(u0 & 0b0__11_1111)
+      r &<<= 8
+      u0 &>>= 6
+      if _fastPath(u0 < (1&<<5)) {
+        return EncodedScalar(
+          _storage: UInt32(u0) | r | 0b0__1000_0000__1100_0000,
+          _bitCount: 16)
+      }
+      r |= UInt32(u0 & 0b0__11_1111)
+      r &<<= 8
+      if _fastPath(u0 & (0xF800 &>> 6) != (0xD800 &>> 6)) {
+        u0 &>>= 6
+        return EncodedScalar(
+          _storage: UInt32(u0)
+            | r | 0b0__1000_0000__1000_0000__1000_0000__1110_0000,
+          _bitCount: 24)
+      }
+    }
+    else if _fastPath(FromEncoding.self == UTF8.self) {
+      return unsafeBitCast(content, to: UTF8.EncodedScalar.self)
+    }
+    return encode(FromEncoding.decode(content))
+  }
+
+  @_fixed_layout
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
     @inline(__always)
