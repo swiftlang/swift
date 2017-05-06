@@ -2192,6 +2192,37 @@ extension FixedWidthInteger {
   @_inlineable
   public var bitWidth: Int { return Self.bitWidth }
 
+  public init(littleEndian value: Self) {
+#if _endian(little)
+    self = value
+#else
+    self = value.byteSwapped
+#endif
+  }
+  
+  public init(bigEndian value: Self) {
+#if _endian(big)
+    self = value
+#else
+    self = value.byteSwapped
+#endif
+  }
+  
+  public var littleEndian: Self {
+#if _endian(little)
+    return self
+#else
+    return byteSwapped
+#endif
+  }
+  
+  public var bigEndian: Self {
+#if _endian(big)
+    return self
+#else
+    return byteSwapped
+#endif
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -3631,38 +3662,6 @@ public struct DoubleWidth<Base : FixedWidthInteger>
 
   public var hashValue: Int {
     return _mixInt(high.hashValue) ^ low.hashValue
-  }
-
-  public init(littleEndian value: DoubleWidth) {
-#if _endian(little)
-    self = value
-#else
-    self = value.byteSwapped
-#endif
-  }
-
-  public init(bigEndian value: DoubleWidth) {
-#if _endian(big)
-    self = value
-#else
-    self = value.byteSwapped
-#endif
-  }
-
-  public var littleEndian: DoubleWidth {
-#if _endian(little)
-    return self
-#else
-    return byteSwapped
-#endif
-  }
-
-  public var bigEndian: DoubleWidth {
-#if _endian(big)
-    return self
-#else
-    return byteSwapped
-#endif
   }
 
   public var byteSwapped: DoubleWidth {
