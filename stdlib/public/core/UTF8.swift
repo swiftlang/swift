@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 extension _Unicode {
-  @_fixed_layout
   public enum UTF8 {
   case _swift3Buffer(_Unicode.UTF8.ForwardParser)
   }
@@ -24,14 +23,10 @@ extension _Unicode.UTF8 : UnicodeEncoding {
     return EncodedScalar(_storage: 0xbdbfef, _bitCount: 24)
   }
 
-  @inline(__always)
-  @_inlineable
   public static func _isScalar(_ x: CodeUnit) -> Bool {
     return x & 0x80 == 0
   }
 
-  @inline(__always)
-  @_inlineable
   public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
     let bits = source._storage
     switch source._bitCount {
@@ -56,8 +51,6 @@ extension _Unicode.UTF8 : UnicodeEncoding {
     }
   }
   
-  @inline(__always)
-  @_inlineable
   public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
     var c = source.value
     if _fastPath(c < (1&<<7)) {
@@ -88,8 +81,6 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   @_fixed_layout
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
-    @inline(__always)
-    @_inlineable
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -97,8 +88,6 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   @_fixed_layout
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
-    @inline(__always)
-    @_inlineable
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -106,8 +95,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
 
 extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   public typealias Encoding = _Unicode.UTF8
-  @inline(__always)
-  @_inlineable
+
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     if _buffer._storage                & 0b0__1110_0000__1100_0000
@@ -142,7 +130,6 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   /// Returns the length of the invalid sequence that ends with the LSB of
   /// buffer.
   @inline(never)
-  @_versioned
   func _invalidLength() -> UInt8 {
     if _buffer._storage                 & 0b0__1111_0000__1100_0000
                                        == 0b0__1110_0000__1000_0000 {
@@ -171,8 +158,6 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
     return 1
   }
   
-  @inline(__always)
-  @_inlineable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     return Encoding.EncodedScalar(
       _storage: _buffer._storage.byteSwapped &>> (32 - bitCount),
@@ -183,9 +168,7 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
 
 extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
   public typealias Encoding = _Unicode.UTF8
-
-  @inline(__always)
-  @_inlineable
+  
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     
@@ -220,7 +203,6 @@ extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
   /// Returns the length of the invalid sequence that starts with the LSB of
   /// buffer.
   @inline(never)
-  @_versioned
   func _invalidLength() -> UInt8 {
     if _buffer._storage               & 0b0__1100_0000__1111_0000
                                      == 0b0__1000_0000__1110_0000 {
