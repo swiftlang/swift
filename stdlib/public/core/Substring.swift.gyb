@@ -57,7 +57,7 @@ public struct Substring : StringProtocol {
     let result = _slice.index(i, offsetBy: n)
     // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(
-      (_slice._startIndex ..< _slice.endIndex).contains(result),
+      (_slice._startIndex ... _slice.endIndex).contains(result),
       "Operation results in an invalid index")
     return result
   }
@@ -68,7 +68,7 @@ public struct Substring : StringProtocol {
     let result = _slice.index(i, offsetBy: n, limitedBy: limit)
     // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(result.map {
-        (_slice._startIndex ..< _slice.endIndex).contains($0)
+        (_slice._startIndex ... _slice.endIndex).contains($0)
       } ?? true,
       "Operation results in an invalid index")
     return result
