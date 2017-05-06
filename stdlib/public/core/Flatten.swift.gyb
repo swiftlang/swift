@@ -418,8 +418,7 @@ extension LazyCollectionProtocol
   Self : ${collectionForTraversal(traversal)},
   Elements : ${collectionForTraversal(traversal)},
 %   end
-  ${constraints % {'Base': 'Elements.'}},
-  Element == Elements.Element {
+  ${constraints % {'Base': 'Elements.'}} {
   /// A concatenation of the elements of `self`.
   public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
