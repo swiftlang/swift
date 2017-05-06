@@ -646,7 +646,8 @@ public struct IndexingIterator<
 /// forward or bidirectional collection must traverse the entire collection to
 /// count the number of contained elements, accessing its `count` property is
 /// an O(*n*) operation.
-public protocol Collection : _Indexable, Sequence {
+public protocol Collection : _Indexable, Sequence
+where SubSequence: Collection, SubSequence.Index == Index {
   /// A type that represents the number of steps between a pair of
   /// indices.
   associatedtype IndexDistance = Int
@@ -671,8 +672,8 @@ public protocol Collection : _Indexable, Sequence {
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
-      where Self.SubSequence.Index == Index,
+  associatedtype SubSequence = Slice<Self>
+      where 
             Self.Element == Self.SubSequence.Element,
             SubSequence.SubSequence == SubSequence
   // FIXME(ABI)#98 (Recursive Protocol Constraints):
