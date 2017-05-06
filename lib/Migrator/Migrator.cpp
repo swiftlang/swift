@@ -10,11 +10,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"
 #include "swift/Migrator/RewriteBufferEditsReceiver.h"
-#include "swift/Migrator/SyntacticMigratorPass.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
@@ -196,29 +196,18 @@ bool Migrator::performSyntacticPasses() {
   clang::edit::EditedSource Edits { ClangSourceManager, ClangLangOpts };
 
   auto InputState = States.back();
+  auto InputText = InputState->getOutputText();
 
   EditorAdapter Editor { StartInstance->getSourceMgr(), ClangSourceManager };
 
-  // const auto SF = Instance.getPrimarySourceFile();
+  runAPIDiffMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
+                         getMigratorOptions());
+  runTupleSplatMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
+                            getMigratorOptions());
+  runTypeOfMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
+                        getMigratorOptions());
 
-  // From here, create the syntactic pass:
-  //
-  // SyntacticMigratorPass MyPass {
-  //   Editor, Sema's SourceMgr, ClangSrcManager, SF
-  // };
-  // MyPass.run();
-  //
-  // Once it has run, push the edits into Edits above:
-  // Edits.commit(YourPass.getEdits());
-
-  SyntacticMigratorPass SPass(Editor, StartInstance->getPrimarySourceFile(),
-    getMigratorOptions());
-  SPass.run();
-  Edits.commit(SPass.getEdits());
-
-  // Now, we'll take all of the changes we've accumulated, get a resulting text,
-  // and push a MigrationState.
-  auto InputText = States.back()->getOutputText();
+  Edits.commit(Editor.getEdits());
 
   RewriteBufferEditsReceiver Rewriter {
     ClangSourceManager,
@@ -226,7 +215,7 @@ bool Migrator::performSyntacticPasses() {
       StartInstance->getPrimarySourceFile()->getBufferID().getValue()),
     InputState->getOutputText()
   };
-    
+
   Edits.applyRewrites(Rewriter);
 
   SmallString<1024> Scratch;
