@@ -56,7 +56,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
     DeclContext* DC = Target->getInnermostDeclContext();
     Type BaseTy = Target->getDeclaredTypeInContext();
-    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    const auto *FD = dyn_cast<FuncDecl>(D);
     if (!FD)
       return true;
     ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
@@ -1627,7 +1627,7 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
     return true;
   NominalTypeDecl *Target = Options.TransformContext->getNominal();
   Type BaseTy = Target->getDeclaredTypeInContext();
-  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  const auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
     return true;
   ResolvedMemberResult Result = resolveValueMember(*Target->getDeclContext(),

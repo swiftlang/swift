@@ -506,7 +506,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   auto &capture = IGM.getTypeInfoForLowered(T->getCaptureType());
   
   // TODO: Support dynamic-sized captures.
-  const FixedTypeInfo *fixedCapture = dyn_cast<FixedTypeInfo>(&capture);
+  const auto *fixedCapture = dyn_cast<FixedTypeInfo>(&capture);
   llvm::Type *fixedCaptureTy;
   // The block header is pointer aligned. The capture may be worse aligned.
   Alignment align = IGM.getPointerAlignment();

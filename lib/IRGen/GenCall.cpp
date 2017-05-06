@@ -1230,7 +1230,7 @@ void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
   if (bodyType != callType)
     returned = IGF.coerceValue(returned, bodyType, IGF.IGM.DataLayout);
 
-  if (llvm::StructType *structType = dyn_cast<llvm::StructType>(bodyType))
+  if (auto *structType = dyn_cast<llvm::StructType>(bodyType))
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
       out.add(IGF.Builder.CreateExtractValue(returned, i));
   else

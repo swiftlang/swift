@@ -294,7 +294,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
   // use counts.
   if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
     for (auto &OpI : I.getAllOperands()) {
-      if (SILInstruction *Op = llvm::dyn_cast<SILInstruction>(&*OpI.get())) {
+      if (auto *Op = llvm::dyn_cast<SILInstruction>(&*OpI.get())) {
         DEBUG(llvm::dbgs() << "SC: add op " << *Op <<
               " from erased inst to worklist\n");
         Worklist.add(Op);

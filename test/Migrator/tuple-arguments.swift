@@ -1,6 +1,3 @@
-// FIXME: Figure out why this is not working on linux
-// XFAIL: linux
-
 // RUN: %target-swift-frontend -typecheck %s -swift-version 3
 // RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -disable-migrator-fixits -swift-version 3
 // RUN: diff -u %s.expected %t.result

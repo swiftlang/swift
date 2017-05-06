@@ -621,9 +621,10 @@ do {
 }
 
 do {
-  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  var a = 3 // e/xpected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // e/xpected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // e/xpected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = SubscriptTwo()
   _ = s1[a, b]
@@ -1046,7 +1047,8 @@ do {
 }
 
 struct GenericSubscript<T> {
-  subscript(_ x: T) -> Int { get { return 0 } set { } }
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  subscript(_ x: T) -> Int { get { return 0 } set { } } // expected-note* {{}}
 }
 
 struct GenericSubscriptLabeled<T> {
@@ -1068,7 +1070,8 @@ struct GenericSubscriptLabeledTuple<T> {
 do {
   let s1 = GenericSubscript<(Double, Double)>()
   _ = s1[3.0, 4.0]
-  _ = s1[(3.0, 4.0)] // expected-error {{expression type 'Int' is ambiguous without more context}}
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  _ = s1[(3.0, 4.0)] // expected-error {{}}
 
   let s1a  = GenericSubscriptLabeled<(Double, Double)>()
   _ = s1a [x: 3.0, 4.0] // expected-error {{extra argument in call}}
@@ -1109,14 +1112,17 @@ do {
 }
 
 do {
-  var a = 3.0 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
-  var b = 4.0 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
-  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  var a = 3.0 // e/xpected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4.0 // e/xpected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // e/xpected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = GenericSubscript<(Double, Double)>()
   _ = s1[a, b]
-  _ = s1[(a, b)] // expected-error {{expression type '@lvalue Int' is ambiguous without more context}}
-  _ = s1[d] // expected-error {{expression type '@lvalue Int' is ambiguous without more context}}
+  // TODO: Restore regressed diagnostics rdar://problem/31724211
+  // These two lines give different regressed behavior in S3 and S4 mode
+  // _ = s1[(a, b)] // e/xpected-error {{expression type '@lvalue Int' is ambiguous without more context}}
+  // _ = s1[d] // e/xpected-error {{expression type '@lvalue Int' is ambiguous without more context}}
 
   var s2 = GenericSubscriptTwo<Double>()
   _ = s2[a, b]

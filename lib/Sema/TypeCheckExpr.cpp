@@ -167,12 +167,12 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
                                      castExpr->getAsLoc());
   }
 
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     Identifier name = DRE->getDecl()->getName();
     return lookupPrecedenceGroupForOperator(*this, DC, name, DRE->getLoc());
   }
 
-  if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
+  if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     Identifier name = OO->getDecls()[0]->getName();
     return lookupPrecedenceGroupForOperator(*this, DC, name, OO->getLoc());
   }
@@ -207,7 +207,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     return nullptr;
 
   // If the left-hand-side is a 'try', hoist it up.
-  AnyTryExpr *tryEval = dyn_cast<AnyTryExpr>(LHS);
+  auto *tryEval = dyn_cast<AnyTryExpr>(LHS);
   if (tryEval) {
     LHS = tryEval->getSubExpr();
   }

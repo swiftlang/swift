@@ -26,5 +26,5 @@ public func run_Memset(_ N: Int) {
     memset(&a, 1)
     memset(&a, 0)
   }
-  CheckResults(a[87] == 0, "Incorrect result in Memset.")
+  CheckResults(a[87] == 0)
 }

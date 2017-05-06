@@ -564,7 +564,7 @@ void IRGenModule::emitRuntimeRegistration() {
     for (SILFunction &SF : getSILModule()) {
       if (SF.hasLocation()) {
         if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
-          if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+          if (auto *FD = dyn_cast<FuncDecl>(D)) {
             if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
               EntryPoint = &SF;
               break;
@@ -3422,7 +3422,7 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
                                           llvm::Constant *fn,
                                           bool setIsNoInline) {
-  llvm::Function *def = dyn_cast<llvm::Function>(fn);
+  auto *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
 

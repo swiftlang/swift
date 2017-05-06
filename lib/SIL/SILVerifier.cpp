@@ -751,15 +751,15 @@ public:
     SILBasicBlock *SBB = AI->getParent();
     bool Allocated = true;
     for (auto Inst = AI->getIterator(), E = SBB->end(); Inst != E; ++Inst) {
-      if (LoadInst *LI = dyn_cast<LoadInst>(Inst))
+      if (auto *LI = dyn_cast<LoadInst>(Inst))
         if (LI->getOperand() == AI)
           require(Allocated, "AllocStack used by Load outside its lifetime");
 
-      if (StoreInst *SI = dyn_cast<StoreInst>(Inst))
+      if (auto *SI = dyn_cast<StoreInst>(Inst))
         if (SI->getDest() == AI)
           require(Allocated, "AllocStack used by Store outside its lifetime");
 
-      if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(Inst))
+      if (auto *DSI = dyn_cast<DeallocStackInst>(Inst))
         if (DSI->getOperand() == AI)
           Allocated = false;
     }
@@ -2102,10 +2102,12 @@ public:
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
 
-    SILType loweredFieldTy = operandTy.getFieldType(EI->getField(),
-                                                    F.getModule());
-    require(loweredFieldTy == EI->getType(),
-            "result of ref_element_addr does not match type of field");
+    if (EI->getModule().getStage() != SILStage::Lowered) {
+      SILType loweredFieldTy =
+          operandTy.getFieldType(EI->getField(), F.getModule());
+      require(loweredFieldTy == EI->getType(),
+              "result of ref_element_addr does not match type of field");
+    }
     EI->getFieldNo();  // Make sure we can access the field without crashing.
   }
 

@@ -34,6 +34,5 @@ public func run_ArraySubscript(_ N: Int) {
     arrays[i][bound(i)] =
       max(arrays[i-1][bound(i-1)], arrays[i][bound(i)])
   }
-  CheckResults(arrays[0][0] <= arrays[numArrays-1][bound(numArrays-1)],
-               "Incorrect results in QuickSort.")
+  CheckResults(arrays[0][0] <= arrays[numArrays-1][bound(numArrays-1)])
 }

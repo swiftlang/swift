@@ -232,3 +232,13 @@ func r23331567(_ fn: (_ x: inout Int) -> Void) {
 }
 r23331567 { $0 += 1 }
 
+// <rdar://problem/30685195> Compiler crash with invalid assignment
+struct G<T> {
+  subscript(x: Int) -> T { get { } nonmutating set { } }
+  // expected-note@-1 {{'subscript' declared here}}
+}
+
+func wump<T>(to: T, _ body: (G<T>) -> ()) {}
+
+wump(to: 0, { $0[] = 0 })
+// expected-error@-1 {{missing argument for parameter #1 in call}}

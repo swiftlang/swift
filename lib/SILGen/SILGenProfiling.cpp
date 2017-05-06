@@ -715,11 +715,11 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
 }
 
 static SILLocation getLocation(ASTNode Node) {
-  if (Expr *E = Node.dyn_cast<Expr *>())
+  if (auto *E = Node.dyn_cast<Expr *>())
     return E;
-  else if (Stmt *S = Node.dyn_cast<Stmt *>())
+  else if (auto *S = Node.dyn_cast<Stmt *>())
     return S;
-  else if (Decl *D = Node.dyn_cast<Decl *>())
+  else if (auto *D = Node.dyn_cast<Decl *>())
     return D;
   else
     llvm_unreachable("unsupported ASTNode");

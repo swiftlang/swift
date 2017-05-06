@@ -325,12 +325,16 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
 
 /// Returns true if any diagnostics were emitted.
 static bool
-tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
+tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
+                                    const Expr *expr,
+                                    const Expr *anchor,
                                     ArrayRef<OverloadChoice> choices) {
   auto *callExpr = dyn_cast<CallExpr>(expr);
   if (!callExpr)
     return false;
   if (!callExpr->hasTrailingClosure())
+    return false;
+  if (callExpr->getFn() != anchor)
     return false;
 
   llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
@@ -465,7 +469,7 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, overload.choices))
+    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, anchor, overload.choices))
       return true;
 
     // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
@@ -3889,12 +3893,12 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
     return false;
 
   auto getInnerCastedExpr = [&]() -> Expr* {
-    CallExpr *CE = dyn_cast<CallExpr>(expr);
+    auto *CE = dyn_cast<CallExpr>(expr);
     if (!CE)
       return nullptr;
     if (!isa<ConstructorRefCallExpr>(CE->getFn()))
       return nullptr;
-    ParenExpr *parenE = dyn_cast<ParenExpr>(CE->getArg());
+    auto *parenE = dyn_cast<ParenExpr>(CE->getArg());
     if (!parenE)
       return nullptr;
     return parenE->getSubExpr();
@@ -5026,7 +5030,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
     if (rawTy && arg.Ty && resTy->isEqual(arg.Ty)) {
       auto getInnerExpr = [](Expr *E) -> Expr* {
-        ParenExpr *parenE = dyn_cast<ParenExpr>(E);
+        auto *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
           return nullptr;
         return parenE->getSubExpr();

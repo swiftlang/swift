@@ -2255,7 +2255,7 @@ static unsigned printActions(const Action *A,
   llvm::raw_string_ostream os(str);
 
   os << Action::getClassName(A->getKind()) << ", ";
-  if (const InputAction *IA = dyn_cast<InputAction>(A)) {
+  if (const auto *IA = dyn_cast<InputAction>(A)) {
     os << "\"" << IA->getInputArg().getValue() << "\"";
   } else {
     os << "{";

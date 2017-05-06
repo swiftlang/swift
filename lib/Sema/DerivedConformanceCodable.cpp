@@ -222,7 +222,7 @@ hasValidCodingKeysEnum(TypeChecker &tc, NominalTypeDecl *type,
   // CodingKeys should eventually be an enum. If it's a typealias, we'll need to
   // follow it.
   auto *codingKeysEnum = dyn_cast<EnumDecl>(result);
-  if (auto *typealias = dyn_cast<TypeAliasDecl>(result)) {
+  if (isa<TypeAliasDecl>(result)) {
     // TODO: Do we have to follow through multiple layers of typealiases
     //       here? Or will getCanonicalType() do that for us?
     auto canType = codingKeysType->getCanonicalType();

@@ -716,9 +716,9 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         return { false, nullptr };
 
       for (auto &Element : Clause.Elements) {
-        if (Expr *E = Element.dyn_cast<Expr*>()) {
+        if (auto *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);
-        } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
+        } else if (auto *S = Element.dyn_cast<Stmt*>()) {
           S->walk(*this);
         } else {
           Element.get<Decl*>()->walk(*this);
@@ -761,7 +761,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     return false;
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
+    auto *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isAccessor()) {
       // Pass context sensitive keyword token.
       SourceLoc SL = FD->getFuncLoc();

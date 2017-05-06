@@ -305,19 +305,17 @@ namespace {
 /// format.
 class JSONFixitWriter
   : public DiagnosticConsumer, public migrator::FixitFilter {
+  std::string FixitsOutputPath;
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
   std::vector<SingleEdit> AllEdits;
 
 public:
-  JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS,
+  JSONFixitWriter(std::string fixitsOutputPath,
                   const DiagnosticOptions &DiagOpts)
-    : OSPtr(std::move(OS)),
+    : FixitsOutputPath(fixitsOutputPath),
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
-  ~JSONFixitWriter() override {
-    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
-  }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
@@ -329,6 +327,27 @@ private:
     for (const auto &Fix : Info.FixIts) {
       AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
     }
+  }
+
+  bool finishProcessing() override {
+    std::error_code EC;
+    std::unique_ptr<llvm::raw_fd_ostream> OS;
+    OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
+                                      EC,
+                                      llvm::sys::fs::F_None));
+    if (EC) {
+      // Create a temporary diagnostics engine to print the error to stderr.
+      SourceManager dummyMgr;
+      DiagnosticEngine DE(dummyMgr);
+      PrintingDiagnosticConsumer PDC;
+      DE.addConsumer(PDC);
+      DE.diagnose(SourceLoc(), diag::cannot_open_file,
+                  FixitsOutputPath, EC.message());
+      return true;
+    }
+
+    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OS);
+    return false;
   }
 };
 
@@ -970,7 +989,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   }
 
   for (auto *FU : Mod->getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(FU))
+    if (auto *SF = dyn_cast<SourceFile>(FU))
       if (dumpFile(SF))
         return true;
   }
@@ -1026,9 +1045,23 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&PDC);
 
+  struct FinishDiagProcessingCheckRAII {
+    bool CalledFinishDiagProcessing = false;
+    ~FinishDiagProcessingCheckRAII() {
+      assert(CalledFinishDiagProcessing && "returned from the function "
+        "without calling finishDiagProcessing");
+    }
+  } FinishDiagProcessingCheckRAII;
+
+  auto finishDiagProcessing = [&](int retValue) -> int {
+    FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
+    bool err = Instance->getDiags().finishProcessing();
+    return retValue ? retValue : err;
+  };
+
   if (Args.empty()) {
     Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
-    return 1;
+    return finishDiagProcessing(1);
   }
 
   CompilerInvocation Invocation;
@@ -1041,7 +1074,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   // Parse arguments.
   if (Invocation.parseArgs(Args, Instance->getDiags(), workingDirectory)) {
-    return 1;
+    return finishDiagProcessing(1);
   }
 
   // Setting DWARF Version depend on platform
@@ -1063,14 +1096,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask);
-    return 0;
+    return finishDiagProcessing(0);
   }
 
   if (Invocation.getFrontendOptions().RequestedAction ==
         FrontendOptions::NoneAction) {
     Instance->getDiags().diagnose(SourceLoc(),
                                  diag::error_missing_frontend_action);
-    return 1;
+    return finishDiagProcessing(1);
   }
 
   // Because the serialized diagnostics consumer is initialized here,
@@ -1084,21 +1117,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     const std::string &SerializedDiagnosticsPath =
       Invocation.getFrontendOptions().SerializedDiagnosticsPath;
     if (!SerializedDiagnosticsPath.empty()) {
-      std::error_code EC;
-      std::unique_ptr<llvm::raw_fd_ostream> OS;
-      OS.reset(new llvm::raw_fd_ostream(SerializedDiagnosticsPath,
-                                        EC,
-                                        llvm::sys::fs::F_None));
-
-      if (EC) {
-        Instance->getDiags().diagnose(SourceLoc(),
-                                     diag::cannot_open_serialized_file,
-                                     SerializedDiagnosticsPath, EC.message());
-        return 1;
-      }
-
       SerializedConsumer.reset(
-          serialized_diagnostics::createConsumer(std::move(OS)));
+          serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
       Instance->addDiagnosticConsumer(SerializedConsumer.get());
     }
   }
@@ -1108,20 +1128,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     const std::string &FixitsOutputPath =
       Invocation.getFrontendOptions().FixitsOutputPath;
     if (!FixitsOutputPath.empty()) {
-      std::error_code EC;
-      std::unique_ptr<llvm::raw_fd_ostream> OS;
-      OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
-                                        EC,
-                                        llvm::sys::fs::F_None));
-
-      if (EC) {
-        Instance->getDiags().diagnose(SourceLoc(),
-                                     diag::cannot_open_file,
-                                     FixitsOutputPath, EC.message());
-        return 1;
-      }
-
-      FixitsConsumer.reset(new JSONFixitWriter(std::move(OS),
+      FixitsConsumer.reset(new JSONFixitWriter(FixitsOutputPath,
                                             Invocation.getDiagnosticOptions()));
       Instance->addDiagnosticConsumer(FixitsConsumer.get());
     }
@@ -1167,7 +1174,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   if (Instance->setup(Invocation)) {
-    return 1;
+    return finishDiagProcessing(1);
   }
 
   if (StatsReporter) {
@@ -1212,7 +1219,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     }
   }
 
-  return (HadError ? 1 : ReturnValue);
+  return finishDiagProcessing(HadError ? 1 : ReturnValue);
 }
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}

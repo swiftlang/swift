@@ -21,10 +21,10 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
     SILValue baseAddr = scanProjections(LI->getOperand());
     if (SILInstruction *loadLink = getMemoryContent(baseAddr))
       links[LI] = loadLink;
-  } else if (StoreInst *SI = dyn_cast<StoreInst>(inst)) {
+  } else if (auto *SI = dyn_cast<StoreInst>(inst)) {
     SILValue baseAddr = scanProjections(SI->getOperand(1));
     memoryContent[baseAddr] = SI;
-  } else if (CopyAddrInst *CAI = dyn_cast<CopyAddrInst>(inst)) {
+  } else if (auto *CAI = dyn_cast<CopyAddrInst>(inst)) {
     if (!CAI->isTakeOfSrc()) {
       // Treat a copy_addr as a load + store
       SILValue loadAddr = scanProjections(CAI->getOperand(0));
@@ -109,7 +109,7 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
 
   // Track the value up the dominator tree.
   for (;;) {
-    if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
+    if (auto *inst = dyn_cast<SILInstruction>(val)) {
       if (Projection::isObjectProjection(inst)) {
         // Extract a member from a struct/tuple/enum.
         projStack.push_back(Projection(inst));
@@ -254,14 +254,14 @@ ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val, int depth) 
 // Returns the taken block of a terminator instruction if the condition turns
 // out to be constant.
 SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(term)) {
+  if (auto *CBI = dyn_cast<CondBranchInst>(term)) {
     IntConst condConst = getIntConst(CBI->getCondition());
     if (condConst.isFromCaller) {
       return condConst.value != 0 ? CBI->getTrueBB() : CBI->getFalseBB();
     }
     return nullptr;
   }
-  if (SwitchValueInst *SVI = dyn_cast<SwitchValueInst>(term)) {
+  if (auto *SVI = dyn_cast<SwitchValueInst>(term)) {
     IntConst switchConst = getIntConst(SVI->getOperand());
     if (switchConst.isFromCaller) {
       for (unsigned Idx = 0; Idx < SVI->getNumCases(); ++Idx) {
@@ -278,9 +278,9 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
     }
     return nullptr;
   }
-  if (SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(term)) {
+  if (auto *SEI = dyn_cast<SwitchEnumInst>(term)) {
     if (SILInstruction *def = getDefInCaller(SEI->getOperand())) {
-      if (EnumInst *EI = dyn_cast<EnumInst>(def)) {
+      if (auto *EI = dyn_cast<EnumInst>(def)) {
         for (unsigned Idx = 0; Idx < SEI->getNumCases(); ++Idx) {
           auto enumCase = SEI->getCase(Idx);
           if (enumCase.first == EI->getElement())
@@ -292,9 +292,9 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
     }
     return nullptr;
   }
-  if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
+  if (auto *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
     if (SILInstruction *def = getDefInCaller(CCB->getOperand())) {
-      if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
+      if (auto *UCI = dyn_cast<UpcastInst>(def)) {
         SILType castType = UCI->getOperand()->getType();
         if (CCB->getCastType().isExactSuperclassOf(castType)) {
           return CCB->getSuccessBB();

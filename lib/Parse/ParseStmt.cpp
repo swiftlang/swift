@@ -394,11 +394,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     if (!NeedParseErrorRecovery && Tok.is(tok::semi)) {
       PreviousHadSemi = true;
-      if (Expr *E = Result.dyn_cast<Expr*>())
+      if (auto *E = Result.dyn_cast<Expr*>())
         E->TrailingSemiLoc = consumeToken(tok::semi);
-      else if (Stmt *S = Result.dyn_cast<Stmt*>())
+      else if (auto *S = Result.dyn_cast<Stmt*>())
         S->TrailingSemiLoc = consumeToken(tok::semi);
-      else if (Decl *D = Result.dyn_cast<Decl*>())
+      else if (auto *D = Result.dyn_cast<Decl*>())
         D->TrailingSemiLoc = consumeToken(tok::semi);
       else
         assert(!Result && "Unsupported AST node");

@@ -1211,7 +1211,7 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
 
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
-    if (Expr *SubExpr = Elem.dyn_cast<Expr*>()) {
+    if (auto *SubExpr = Elem.dyn_cast<Expr*>()) {
       if (Expr *E2 = doIt(SubExpr))
         Elem = E2;
       else
@@ -1219,7 +1219,7 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    if (Stmt *S = Elem.dyn_cast<Stmt*>()) {
+    if (auto *S = Elem.dyn_cast<Stmt*>()) {
       if (Stmt *S2 = doIt(S))
         Elem = S2;
       else

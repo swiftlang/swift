@@ -320,9 +320,8 @@ extension AffineTransform : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ x: NSAffineTransform?) -> AffineTransform {
-        var result: AffineTransform?
-        _forceBridgeFromObjectiveC(x!, result: &result)
-        return result!
+        guard let src = x else { return AffineTransform.identity }
+        return AffineTransform(reference: src)
     }
 }
 

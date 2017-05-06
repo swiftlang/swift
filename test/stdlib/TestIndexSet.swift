@@ -819,6 +819,10 @@ class TestIndexSet : TestIndexSetSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(IndexSet(), IndexSet._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -844,6 +848,7 @@ IndexSetTests.test("test_findIndex") { TestIndexSet().test_findIndex() }
 // IndexSetTests.test("testIndexingPerformance") { TestIndexSet().testIndexingPerformance() }
 IndexSetTests.test("test_AnyHashableContainingIndexSet") { TestIndexSet().test_AnyHashableContainingIndexSet() }
 IndexSetTests.test("test_AnyHashableCreatedFromNSIndexSet") { TestIndexSet().test_AnyHashableCreatedFromNSIndexSet() }
+IndexSetTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexSet().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif
 

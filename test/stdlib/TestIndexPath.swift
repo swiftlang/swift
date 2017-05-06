@@ -705,6 +705,10 @@ class TestIndexPath: TestIndexPathSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(IndexPath(), IndexPath._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -755,5 +759,6 @@ IndexPathTests.test("testUnconditionalBridgeFromObjC") { TestIndexPath().testUnc
 IndexPathTests.test("testObjcBridgeType") { TestIndexPath().testObjcBridgeType() }
 IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().test_AnyHashableContainingIndexPath() }
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
+IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif

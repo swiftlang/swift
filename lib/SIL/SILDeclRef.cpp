@@ -297,21 +297,21 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
  : isDirectReference(0), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
-  if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
-    if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
+  if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
+    if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
       loc = fd;
       kind = Kind::Func;
       naturalUncurryLevel = getFuncNaturalUncurryLevel(fd);
     }
     // Map ConstructorDecls to the Allocator SILDeclRef of the constructor.
-    else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(vd)) {
+    else if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
       loc = cd;
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
     }
     // Map EnumElementDecls to the EnumElement SILDeclRef of the element.
-    else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
+    else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
       loc = ed;
       kind = Kind::EnumElement;
       naturalUncurryLevel = ed->getArgumentInterfaceType() ? 1 : 0;

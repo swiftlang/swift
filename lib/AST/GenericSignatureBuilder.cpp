@@ -1750,8 +1750,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                       PointerUnion<AssociatedTypeDecl *, TypeAliasDecl *> type,
                       NestedTypeUpdate kind) {
-  AssociatedTypeDecl *assocType = type.dyn_cast<AssociatedTypeDecl *>();
-  TypeAliasDecl *typealias = type.dyn_cast<TypeAliasDecl *>();
+  auto *assocType = type.dyn_cast<AssociatedTypeDecl *>();
+  auto *typealias = type.dyn_cast<TypeAliasDecl *>();
   if (!assocType && !typealias)
     return nullptr;
 
@@ -2888,7 +2888,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   if (!constraintType->isExistentialType() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
-      Type subjectType = subject.dyn_cast<Type>();
+      auto subjectType = subject.dyn_cast<Type>();
       if (!subjectType)
         subjectType = subject.get<PotentialArchetype *>()
                         ->getDependentType(Impl->GenericParams,

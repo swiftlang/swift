@@ -54,7 +54,7 @@ public:
       for (auto InstIt = BB.begin(), End = BB.end(); InstIt != End;) {
         auto *CurInst = &*InstIt;
         ++InstIt;
-        CondFailInst *CFI = dyn_cast<CondFailInst>(CurInst);
+        auto *CFI = dyn_cast<CondFailInst>(CurInst);
 
         // Stop merging at side-effects or reads from memory.
         if (!CFI && (CurInst->mayHaveSideEffects() ||
