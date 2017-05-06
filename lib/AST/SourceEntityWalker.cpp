@@ -18,6 +18,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -97,7 +98,30 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     if (VD->hasName() && !VD->isImplicit())
       NameLen = VD->getName().getLength();
 
-  } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    auto ReportParamList = [&](ParameterList *PL) {
+      for (auto *PD : *PL) {
+        auto Loc = PD->getArgumentNameLoc();
+        if (Loc.isInvalid())
+          continue;
+        if (!SEWalker.visitDeclarationArgumentName(PD->getArgumentName(), Loc,
+                                                   VD)) {
+          Cancelled = true;
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
+      for (auto *PL : AF->getParameterLists())
+        if (ReportParamList(PL))
+          return false;
+    }
+    if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
+      if (ReportParamList(SD->getIndices()))
+        return false;
+    }
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
@@ -554,6 +578,11 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
 bool SourceEntityWalker::visitCallArgName(Identifier Name,
                                           CharSourceRange Range,
                                           ValueDecl *D) {
+  return true;
+}
+
+bool SourceEntityWalker::
+visitDeclarationArgumentName(Identifier Name, SourceLoc Start, ValueDecl *D) {
   return true;
 }
 
