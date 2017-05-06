@@ -250,7 +250,7 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
 bool DiagnosticEngine::finishProcessing() {
   bool hadError = false;
   for (auto &Consumer : Consumers) {
-    hadError =  Consumer->finishProcessing() || hadError;
+    hadError |= Consumer->finishProcessing();
   }
   return hadError;
 }

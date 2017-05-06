@@ -341,7 +341,7 @@ private:
       DiagnosticEngine DE(dummyMgr);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
-      DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,
+      DE.diagnose(SourceLoc(), diag::cannot_open_file,
                   FixitsOutputPath, EC.message());
       return true;
     }
