@@ -3670,6 +3670,47 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   }
 }
 
+// FIXME(ABI) (Conditional Conformance):
+// DoubleWidth should conform to SignedInteger where Base : SignedInteger
+extension DoubleWidth where Base : SignedInteger {
+  /// Returns the additive inverse of the specified value.
+  ///
+  /// The negation operator (prefix `-`) returns the additive inverse of its
+  /// argument.
+  ///
+  ///     let x = 21 as DoubleWidth<Int>
+  ///     let y = -x
+  ///     // y == -21
+  ///
+  /// The resulting value must be representable in the same type as the
+  /// argument. In particular, negating a signed, fixed-width integer type's
+  /// minimum results in a value that cannot be represented.
+  ///
+  ///     let z = -DoubleWidth<Int>.min
+  ///     // Overflow error
+  ///
+  /// - Returns: The additive inverse of this value.
+  ///
+  /// - SeeAlso: `negate()`
+  public static prefix func - (_ operand: DoubleWidth) -> DoubleWidth {
+    return 0 - operand
+  }
+  
+  /// Replaces this value with its additive inverse.
+  ///
+  /// The following example uses the `negate()` method to negate the value of
+  /// an integer `x`:
+  ///
+  ///     var x = 21 as DoubleWidth<Int>
+  ///     x.negate()
+  ///     // x == -21
+  ///
+  /// - SeeAlso: The unary minus operator (`-`).
+  public mutating func negate() {
+    self = 0 - self
+  }
+}
+
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
