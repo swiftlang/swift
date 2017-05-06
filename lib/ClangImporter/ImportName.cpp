@@ -497,7 +497,7 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
     submodule = m;
   } else if (auto m = clangSema.getPreprocessor().getCurrentModule()) {
     submodule = m;
-  } else if (auto m = clangSema.getPreprocessor().getCurrentSubmodule()) {
+  } else if (auto m = clangSema.getPreprocessor().getCurrentLexerSubmodule()) {
     submodule = m;
   } else {
     return false;
