@@ -6,4 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
+// XFAIL: *
 {struct Q<T{struct g:Collection}struct B<T:T.E

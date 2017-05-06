@@ -6,6 +6,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
+// XFAIL: *
 class B}struct B<T struct S<T{struct S<T let:{<T
 protocol c
 struct S<g{class A

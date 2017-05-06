@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift %s -swift-version 4 -g -Onone -o %T/UnicodeDecoders
+// RUN: %target-build-swift %s -swift-version 3 -g -Onone -o %T/UnicodeDecoders
 // RUN: %target-run %T/UnicodeDecoders
 // REQUIRES: executable_test
 
@@ -39,7 +39,8 @@ extension Unicode {
   struct DefaultScalarView<
     CodeUnits: BidirectionalCollection,
     Encoding: Unicode.Encoding
-  > where CodeUnits.Element == Encoding.CodeUnit {
+  > where CodeUnits.Element == Encoding.CodeUnit, 
+          CodeUnits._Element == CodeUnits.Element {
     var codeUnits: CodeUnits
     init(
       _ codeUnits: CodeUnits,
@@ -218,7 +219,7 @@ func checkStringProtocol<S : StringProtocol, Encoding: Unicode.Encoding>(
   }
 }
 
-func checkDecodeUTF<Codec : UnicodeCodec & Unicode.Encoding>(
+func checkDecodeUTF<Codec : UnicodeCodec>(
   _ codec: Codec.Type, _ expectedHead: [UInt32],
   _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {

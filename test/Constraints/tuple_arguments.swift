@@ -1461,7 +1461,7 @@ let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = Muta
 // SR-4745
 let sr4745 = [1, 2]
 let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
-// expected-error@-1 {{closure tuple parameter '(offset: Int, element: Int)' does not support destructuring}} {{35-51=(arg) -> <#Result#>}} {{55-55=let (count, element) = arg; return }}
+// expected-error@-1 {{closure tuple parameter '(offset: Int, element: (Int))' does not support destructuring}} {{35-51=(arg) -> <#Result#>}} {{55-55=let (count, element) = arg; return }}
 
 // SR-4738
 
