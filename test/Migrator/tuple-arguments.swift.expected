@@ -1,4 +1,4 @@
-// FIXME: Figure out why this is not working on linux
+// rdar://problem/32025974
 // XFAIL: linux
 
 // RUN: %target-swift-frontend -typecheck %s -swift-version 3
