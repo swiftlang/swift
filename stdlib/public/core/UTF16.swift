@@ -37,7 +37,7 @@ extension _Unicode.UTF16 : UnicodeEncoding {
     return UnicodeScalar(_unchecked: value)
   }
 
-  public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
+  public static func encode(_ source: UnicodeScalar) -> EncodedScalar? {
     let x = source.value
     if _fastPath(x < (1 << 16)) {
       return EncodedScalar(_storage: x, _bitCount: 16)

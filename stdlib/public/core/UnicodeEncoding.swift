@@ -24,8 +24,9 @@ public protocol _UnicodeEncoding {
   /// Converts from encoded to encoding-independent representation
   static func decode(_ content: EncodedScalar) -> UnicodeScalar
 
-  /// Converts from encoding-independent to encoded representation
-  static func encode(_ content: UnicodeScalar) -> EncodedScalar
+  /// Converts from encoding-independent to encoded representation, returning
+  /// `nil` if the scalar can't be represented in this encoding.
+  static func encode(_ content: UnicodeScalar) -> EncodedScalar?
 
   associatedtype ForwardParser : UnicodeParser
   associatedtype ReverseParser : UnicodeParser

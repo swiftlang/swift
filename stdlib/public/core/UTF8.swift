@@ -58,7 +58,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   
   @inline(__always)
   @_inlineable
-  public static func encode(_ source: UnicodeScalar) -> EncodedScalar {
+  public static func encode(_ source: UnicodeScalar) -> EncodedScalar? {
     var c = source.value
     if _fastPath(c < (1&<<7)) {
       return EncodedScalar(_storage: c, _bitCount: 8)
