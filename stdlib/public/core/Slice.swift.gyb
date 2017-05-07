@@ -232,7 +232,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public init<S>(_ elements: S)
     where
     S : Sequence,
-    S.Iterator.Element == Base._Element {
+    S.Element == Base._Element {
 
     self._base = Base(elements)
     self._startIndex = _base.startIndex
@@ -243,7 +243,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     _ subRange: Range<Index>, with newElements: C
   ) where
     C : Collection,
-    C.Iterator.Element == Base._Element {
+    C.Element == Base._Element {
 
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -311,7 +311,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
     where
     S : Collection,
-    S.Iterator.Element == Base._Element {
+    S.Element == Base._Element {
 
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
