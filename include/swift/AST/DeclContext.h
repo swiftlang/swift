@@ -363,6 +363,9 @@ public:
     return ParentAndKind.getPointer();
   }
 
+  /// Returns the semantic parent for purposes of name lookup.
+  DeclContext *getParentForLookup() const;
+
   /// Return true if this is a child of the specified other decl context.
   bool isChildContextOf(const DeclContext *Other) const {
     if (this == Other) return false;

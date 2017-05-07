@@ -3,6 +3,23 @@
 // Generic class locally defined in non-generic function (rdar://problem/20116710)
 func f3() {
   class B<T> {}
+
+  class C : B<Int> {}
+
+  _ = B<Int>()
+  _ = C()
+}
+
+// Type defined inside a closure (rdar://problem/31803589)
+func hasAClosure() {
+  _ = {
+    enum E<T> { case a(T) }
+
+    let _ = E.a("hi")
+    let _ = E<String>.a("hi")
+    let _: E = .a("hi")
+    let _: E<String> = .a("hi")
+  }
 }
 
 protocol Racoon {
