@@ -2806,7 +2806,8 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getDeclaredTypeOfContext()->isEqual(instanceTy)) {
+        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
+            instanceTy->getAnyNominal()) {
           if (propertyInitializer)
             CS->TC.diagnose(nameLoc, diag::instance_member_in_initializer,
                             memberName);
@@ -4930,6 +4931,115 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
   return false;
 }
 
+// It is a somewhat common error to try to access an instance method as a
+// curried member on the type, instead of using an instance, e.g. the user
+// wrote:
+//
+//   Foo.doThing(42, b: 19)
+//
+// instead of:
+//
+//   myFoo.doThing(42, b: 19)
+//
+// Check for this situation and handle it gracefully.
+static bool
+diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
+                                            Expr *fnExpr, Expr *argExpr) {
+  for (auto &candidate : CCI.candidates) {
+    auto argTy = candidate.getArgumentType();
+    if (!argTy)
+      return false;
+
+    auto *decl = candidate.getDecl();
+    if (!decl)
+      return false;
+
+    // If this is an exact match at the level 1 of the parameters, but
+    // there is still something wrong with the expression nevertheless
+    // it might be worth while to check if it's instance method as curried
+    // member of type problem.
+    if (CCI.closeness == CC_ExactMatch &&
+        (decl->isInstanceMember() && candidate.level == 1))
+      continue;
+
+    auto params = decomposeParamType(argTy, decl, candidate.level);
+    // If one of the candidates is an instance method with a single parameter
+    // at the level 0, this might be viable situation for calling instance
+    // method as curried member of type problem.
+    if (params.size() != 1 || !decl->isInstanceMember() || candidate.level > 0)
+      return false;
+  }
+
+  auto &TC = CCI.CS->TC;
+
+  if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+    auto baseExpr = UDE->getBase();
+    auto baseType = baseExpr->getType();
+    if (auto *MT = baseType->getAs<MetatypeType>()) {
+      auto DC = CCI.CS->DC;
+      auto instanceType = MT->getInstanceType();
+
+      // If the base is an implicit self type reference, and we're in a
+      // an initializer, then the user wrote something like:
+      //
+      //   class Foo { let val = initFn() }
+      // or
+      //   class Bar { func something(x: Int = initFn()) }
+      //
+      // which runs in type context, not instance context.  Produce a tailored
+      // diagnostic since this comes up and is otherwise non-obvious what is
+      // going on.
+      if (baseExpr->isImplicit() && isa<Initializer>(DC)) {
+        auto *TypeDC = DC->getParent();
+        bool propertyInitializer = true;
+        // If the parent context is not a type context, we expect it
+        // to be a defaulted parameter in a function declaration.
+        if (!TypeDC->isTypeContext()) {
+          assert(TypeDC->getContextKind() ==
+                     DeclContextKind::AbstractFunctionDecl &&
+                 "Expected function decl context for initializer!");
+          TypeDC = TypeDC->getParent();
+          propertyInitializer = false;
+        }
+        assert(TypeDC->isTypeContext() && "Expected type decl context!");
+
+        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
+            instanceType->getAnyNominal()) {
+          if (propertyInitializer)
+            TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
+                        UDE->getName());
+          else
+            TC.diagnose(UDE->getLoc(),
+                        diag::instance_member_in_default_parameter,
+                        UDE->getName());
+          return true;
+        }
+      }
+
+      // If this is a situation like this `self.foo(A())()` and self != A
+      // let's say that `self` is not convertible to A.
+      if (auto nominalType = argExpr->getType()->getAs<NominalType>()) {
+        if (!instanceType->isEqual(nominalType)) {
+          TC.diagnose(argExpr->getStartLoc(), diag::types_not_convertible,
+                      false, nominalType, instanceType);
+          return true;
+        }
+      }
+
+      // Otherwise, complain about use of instance value on type.
+      auto diagnostic = isa<TypeExpr>(baseExpr)
+                            ? diag::instance_member_use_on_type
+                            : diag::could_not_use_instance_member_on_type;
+
+      TC.diagnose(UDE->getLoc(), diagnostic, instanceType, UDE->getName())
+          .highlight(baseExpr->getSourceRange());
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Emit a class of diagnostics that we only know how to generate when there is
 /// exactly one candidate we know about.  Return true if an error is emitted.
 static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
@@ -4947,69 +5057,6 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
   auto params = decomposeParamType(argTy, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(argExpr->getType(), argLabels);
-
-  // It is a somewhat common error to try to access an instance method as a
-  // curried member on the type, instead of using an instance, e.g. the user
-  // wrote:
-  //
-  //   Foo.doThing(42, b: 19)
-  //
-  // instead of:
-  //
-  //   myFoo.doThing(42, b: 19)
-  //
-  // Check for this situation and handle it gracefully.
-  if (params.size() == 1 && candidate.getDecl() &&
-      candidate.getDecl()->isInstanceMember() &&
-      candidate.level == 0) {
-    if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
-      if (isa<TypeExpr>(UDE->getBase())) {
-        auto baseType = candidate.getArgumentType();
-        auto DC = CCI.CS->DC;
-
-        // If the base is an implicit self type reference, and we're in a
-        // an initializer, then the user wrote something like:
-        //
-        //   class Foo { let val = initFn() }
-        // or
-        //   class Bar { func something(x: Int = initFn()) }
-        //
-        // which runs in type context, not instance context.  Produce a tailored
-        // diagnostic since this comes up and is otherwise non-obvious what is
-        // going on.
-        if (UDE->getBase()->isImplicit() && isa<Initializer>(DC)) {
-          auto *TypeDC = DC->getParent();
-          bool propertyInitializer = true;
-          // If the parent context is not a type context, we expect it
-          // to be a defaulted parameter in a function declaration.
-          if (!TypeDC->isTypeContext()) {
-            assert(TypeDC->getContextKind() ==
-                       DeclContextKind::AbstractFunctionDecl &&
-                   "Expected function decl context for initializer!");
-            TypeDC = TypeDC->getParent();
-            propertyInitializer = false;
-          }
-          assert(TypeDC->isTypeContext() && "Expected type decl context!");
-
-          if (TypeDC->getDeclaredTypeOfContext()->isEqual(baseType)) {
-            if (propertyInitializer)
-              TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
-                          UDE->getName());
-            else
-              TC.diagnose(UDE->getLoc(),
-                          diag::instance_member_in_default_parameter,
-                          UDE->getName());
-            return true;
-          }
-        }
-
-        // Otherwise, complain about use of instance value on type.
-        TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
-                    baseType, UDE->getName())
-          .highlight(UDE->getBase()->getSourceRange());
-        return true;
-      }
-  }
 
   // Check the case where a raw-representable type is constructed from an
   // argument with the same type:
@@ -5350,6 +5397,9 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
 
   // Try to diagnose errors related to the use of implicit self reference.
   if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels, CS))
+    return true;
+
+  if (diagnoseInstanceMethodAsCurriedMemberOnType(CCI, fnExpr, argExpr))
     return true;
 
   // Do all the stuff that we only have implemented when there is a single
