@@ -196,14 +196,9 @@ public protocol _MutableIndexable : _Indexable {
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : _MutableIndexable, Collection {
-  // FIXME(ABI)#181: should be constrained to MutableCollection
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
-  /// A collection that represents a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence : Collection /*: MutableCollection*/
-    = MutableSlice<Self>
+public protocol MutableCollection : _MutableIndexable, Collection
+where SubSequence: MutableCollection {
+  associatedtype SubSequence = MutableSlice<Self>
 
   /// Accesses the element at the specified position.
   ///
