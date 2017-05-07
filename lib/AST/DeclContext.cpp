@@ -406,6 +406,16 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
   return nullptr;
 }
 
+DeclContext *DeclContext::getParentForLookup() const {
+  if (isa<ProtocolDecl>(this) || isa<ExtensionDecl>(this)) {
+    // If we are inside a protocol or an extension, skip directly
+    // to the module scope context, without looking at any (invalid)
+    // outer types.
+    return getModuleScopeContext();
+  }
+  return getParent();
+}
+
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())

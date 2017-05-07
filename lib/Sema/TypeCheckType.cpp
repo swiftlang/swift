@@ -330,11 +330,6 @@ findDeclContextForType(TypeChecker &TC,
     }
 
     // We're going to check the next parent context.
-
-    // FIXME: Horrible hack. Don't allow us to reference a generic parameter
-    // from a context outside a ProtocolDecl.
-    if (isa<ProtocolDecl>(parentDC) && isa<GenericTypeParamDecl>(typeDecl))
-      return std::make_tuple(Type(), false);
   }
 
   // If we didn't find the member in an immediate parent context and
@@ -447,11 +442,6 @@ findDeclContextForType(TypeChecker &TC,
       // If not, walk into the refined protocols, if any.
       pushRefined(protoDecl);
     }
-
-    // FIXME: Horrible hack. Don't allow us to reference a generic parameter
-    // or associated type from a context outside a ProtocolDecl.
-    if (isa<ProtocolDecl>(parentDC) && isa<AbstractTypeParamDecl>(typeDecl))
-      return std::make_tuple(Type(), false);
   }
 
   assert(false && "Should have found context by now");
@@ -943,7 +933,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     // Try ignoring access control.
     DeclContext *lookupDC = dc;
     if (options.contains(TR_GenericSignature))
-      lookupDC = dc->getParent();
+      lookupDC = dc->getParentForLookup();
 
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
@@ -1232,8 +1222,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (!DC->isCascadingContextForLookup(/*excludeFunctions*/false))
       options |= TR_KnownNonCascadingDependency;
 
-    // The remaining lookups will be in the parent context.
-    lookupDC = DC->getParent();
+    lookupDC = DC->getParentForLookup();
   }
 
   // We need to be able to perform unqualified lookup into the given
