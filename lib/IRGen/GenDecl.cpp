@@ -1514,12 +1514,12 @@ llvm::Function *swift::irgen::createFunction(IRGenModule &IGM,
     IGM.Module.getFunctionList().push_back(fn);
  }
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(
-      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, initialAttrs);
-  if (!updatedAttrs.isEmpty())
-    fn->setAttributes(updatedAttrs);
+  if (!attrs.isEmpty())
+    fn->setAttributes(attrs);
+  // Merge initial attributes with attrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fn->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.

@@ -902,6 +902,7 @@ public:
   /// invalid.
   bool finalize();
 
+  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);

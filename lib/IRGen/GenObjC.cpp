@@ -774,11 +774,11 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setCallingConv(
       expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(
-      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(attrs);
+  // Merge initial attributes with attrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
   
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
