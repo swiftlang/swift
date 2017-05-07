@@ -84,14 +84,22 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
-// This is temporarily a warning during staging to make it easier to evaluate.
-// The intent is to change it to an error before turning it on by default.
-WARNING(exclusivity_access_required,none,
+WARNING(exclusivity_access_required_swift3,none,
         "simultaneous accesses to %0 %1; "
         "%select{initialization|read|modification|deinitialization}2 requires "
         "exclusive access", (DescriptiveDeclKind, Identifier, unsigned))
 
-WARNING(exclusivity_access_required_unknown_decl,none,
+ERROR(exclusivity_access_required,none,
+      "simultaneous accesses to %0 %1; "
+      "%select{initialization|read|modification|deinitialization}2 requires "
+      "exclusive access", (DescriptiveDeclKind, Identifier, unsigned))
+
+ERROR(exclusivity_access_required_unknown_decl,none,
+        "simultaneous accesses; "
+        "%select{initialization|read|modification|deinitialization}0 requires "
+        "exclusive access", (unsigned))
+
+WARNING(exclusivity_access_required_unknown_decl_swift3,none,
         "simultaneous accesses; "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access", (unsigned))
