@@ -644,8 +644,7 @@ public struct IndexingIterator<
 /// an O(*n*) operation.
 public protocol Collection : _Indexable, Sequence 
 where SubSequence: Collection, Indices: Collection,
-      SubSequence.Index == Index, 
-      SubSequence.Iterator.Element == Iterator.Element 
+      SubSequence.Index == Index
 {
   /// A type that represents the number of steps between a pair of
   /// indices.
