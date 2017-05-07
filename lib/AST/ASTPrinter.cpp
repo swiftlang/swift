@@ -2874,8 +2874,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     Printer << "}";
   } else {
     printDocumentationComment(decl);
-    printAttributes(decl);
-    printAccessibility(decl);
 
     if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
       ASTContext &Ctx = decl->getASTContext();
@@ -2891,6 +2889,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
                                                  SourceRange(StartLoc, EndLoc));
       printSourceRange(Range, Ctx);
     } else {
+      printAttributes(decl);
+      printAccessibility(decl);
       if (!Options.SkipIntroducerKeywords) {
         if (decl->isStatic())
           printStaticKeyword(decl->getCorrectStaticSpelling());
