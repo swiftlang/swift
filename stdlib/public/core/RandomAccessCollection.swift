@@ -48,13 +48,11 @@ public protocol _RandomAccessIndexable : _BidirectionalIndexable {
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection :
   _RandomAccessIndexable, BidirectionalCollection
+  where SubSequence: RandomAccessCollection
 {
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : _RandomAccessIndexable, BidirectionalCollection
-    = RandomAccessSlice<Self>
-  // FIXME(ABI)#102 (Recursive Protocol Constraints):
-  // associatedtype SubSequence : RandomAccessCollection
+  associatedtype SubSequence = RandomAccessSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.

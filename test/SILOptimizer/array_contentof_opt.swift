@@ -32,7 +32,7 @@ public func testThreeInts(_ a: inout [Int]) {
 
 // CHECK-LABEL: sil @{{.*}}testTooManyInts
 // CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref @_T0Sa6appendyqd__10contentsOf_t8Iterator_7ElementQYd__Rszs8SequenceRd__lF
+// CHECK:        [[F:%[0-9]+]] = function_ref  @_T0Sa6appendyqd__10contentsOf_t7ElementQyd__Rszs8SequenceRd__lFSi_SaySiGTg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
 // CHECK-NOT: apply

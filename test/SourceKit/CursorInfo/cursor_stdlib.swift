@@ -36,27 +36,27 @@ func foo3(a: Float, b: Bool) {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:10 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-REPLACEMENT1 %s
 // CHECK-REPLACEMENT1: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT1: <Declaration>{{.*}}func sorted() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
+// CHECK-REPLACEMENT1: <Declaration>{{.*}}func sorted() -&gt; [(<Type usr="s:Si">Int</Type>)]</Declaration>
 // CHECK-REPLACEMENT1: RELATED BEGIN
-// CHECK-REPLACEMENT1: sorted(by: (Int, Int) throws -&gt; Bool) rethrows -&gt; [Int]</RelatedName>
-// CHECK-REPLACEMENT1: sorted() -&gt; [Int]</RelatedName>
-// CHECK-REPLACEMENT1: sorted(by: (Int, Int) throws -&gt; Bool) rethrows -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(by: ((Int), (Int)) throws -&gt; Bool) rethrows -&gt; [(Int)]</RelatedName>
+// CHECK-REPLACEMENT1: sorted() -&gt; [(Int)]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(by: ((Int), (Int)) throws -&gt; Bool) rethrows -&gt; [(Int)]</RelatedName>
 // CHECK-REPLACEMENT1: RELATED END
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
 // CHECK-REPLACEMENT2: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT2: <Declaration>{{.*}}mutating func append(_ newElement: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK-REPLACEMENT2: <Declaration>{{.*}}mutating func append(_ newElement: (<Type usr="s:Si">Int</Type>))</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=15:10 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-REPLACEMENT3 %s
 // CHECK-REPLACEMENT3: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT3: func sorted(by areInIncreasingOrder: (<Type usr="s:13cursor_stdlib2S1V">S1</Type>
-// CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
-// CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
-// CHECK-REPLACEMENT3: sorted(by: (S1, S1) throws -&gt; Bool) rethrows -&gt; [S1]</RelatedName>
+// CHECK-REPLACEMENT3: func sorted(by areInIncreasingOrder: ((<Type usr="s:13cursor_stdlib2S1V">S1</Type>)
+// CHECK-REPLACEMENT3: sorted() -&gt; [(S1)]</RelatedName>
+// CHECK-REPLACEMENT3: sorted() -&gt; [(S1)]</RelatedName>
+// CHECK-REPLACEMENT3: sorted(by: ((S1), (S1)) throws -&gt; Bool) rethrows -&gt; [(S1)]</RelatedName>
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
 // CHECK-REPLACEMENT4: <Group>Collection/Array</Group>
-// CHECK-REPLACEMENT4: <Declaration>{{.*}}mutating func append(_ newElement: <Type usr="s:13cursor_stdlib2S1V">S1</Type>)</Declaration>
+// CHECK-REPLACEMENT4: <Declaration>{{.*}}mutating func append(_ newElement: (<Type usr="s:13cursor_stdlib2S1V">S1</Type>))</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:10 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-MODULE-GROUP1 %s
 // CHECK-MODULE-GROUP1: MODULE GROUPS BEGIN

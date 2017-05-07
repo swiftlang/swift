@@ -196,14 +196,9 @@ public protocol _MutableIndexable : _Indexable {
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : _MutableIndexable, Collection {
-  // FIXME(ABI)#181: should be constrained to MutableCollection
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
-  /// A collection that represents a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence : Collection /*: MutableCollection*/
-    = MutableSlice<Self>
+public protocol MutableCollection : _MutableIndexable, Collection
+where SubSequence: MutableCollection {
+  associatedtype SubSequence = MutableSlice<Self>
 
   /// Accesses the element at the specified position.
   ///
@@ -223,7 +218,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  subscript(position: Index) -> Iterator.Element {get set}
+  subscript(position: Index) -> Element {get set}
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -286,7 +281,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   ///
   /// - Complexity: O(*n*)
   mutating func partition(
-    by belongsInSecondPartition: (Iterator.Element) throws -> Bool
+    by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index
 
   /// Exchange the values at indices `i` and `j`.
@@ -305,7 +300,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME(ABI)#53 (Type Checker): the signature should use
   // UnsafeMutableBufferPointer, but the compiler can't handle that.
@@ -319,7 +314,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
 extension MutableCollection {
   @_inlineable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }
