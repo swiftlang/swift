@@ -940,3 +940,29 @@ func ambiguousCall() -> Float {} // expected-note {{found this candidate}}
 func takesClosure(fn: () -> ()) {}
 
 takesClosure() { ambiguousCall() } // expected-error {{ambiguous use of 'ambiguousCall()'}}
+
+// SR-4692: Useless diagnostics calling non-static method
+
+class SR_4692_a {
+  private static func foo(x: Int, y: Bool) {
+    self.bar(x: x)
+    // expected-error@-1 {{instance member 'bar' cannot be used on type 'SR_4692_a'}}
+  }
+
+  private func bar(x: Int) {
+  }
+}
+
+class SR_4692_b {
+  static func a() {
+    self.f(x: 3, y: true)
+    // expected-error@-1 {{instance member 'f' cannot be used on type 'SR_4692_b'}}
+  }
+
+  private func f(a: Int, b: Bool, c: String) {
+    self.f(x: a, y: b)
+  }
+
+  private func f(x: Int, y: Bool) {
+  }
+}
