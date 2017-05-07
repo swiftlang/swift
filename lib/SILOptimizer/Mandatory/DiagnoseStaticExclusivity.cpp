@@ -230,7 +230,8 @@ public:
 
 /// Indicates whether a 'begin_access' requires exclusive access
 /// or allows shared access. This needs to be kept in sync with
-/// diag::exclusivity_access_required and diag::exclusivity_conflicting_access.
+/// diag::exclusivity_access_required, exclusivity_access_required_swift3,
+/// and diag::exclusivity_conflicting_access.
 enum class ExclusiveOrShared_t : unsigned {
   ExclusiveAccess = 0,
   SharedAccess = 1
@@ -382,15 +383,22 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
     AccessForMainDiagnostic->getLoc().getSourceRange();
 
   if (const ValueDecl *VD = Storage.getStorageDecl()) {
+    // We have a declaration, so mention the identifier in the diagnostic.
+    auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
+                         diag::exclusivity_access_required_swift3 :
+                         diag::exclusivity_access_required);
     diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-             diag::exclusivity_access_required,
+             DiagnosticID,
              VD->getDescriptiveKind(),
              VD->getName(),
              static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
         .highlight(rangeForMain);
   } else {
+    auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
+                         diag::exclusivity_access_required_unknown_decl_swift3 :
+                         diag::exclusivity_access_required_unknown_decl);
     diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-             diag::exclusivity_access_required_unknown_decl,
+             DiagnosticID,
              static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
         .highlight(rangeForMain);
   }
