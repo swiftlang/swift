@@ -16,7 +16,7 @@
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
-  associatedtype Indices : RandomAccessCollection = CountableRange<Int>
+  associatedtype Indices = CountableRange<Int>
 
   /// The type of elements stored in the buffer.
   associatedtype Element
