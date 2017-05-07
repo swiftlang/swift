@@ -6,8 +6,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol P{
-protocol
-P{typealias a{}struct B{extension{protocol P{
-func a:a
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol P{typealias a
+struct A{{}func a:a
+{
+}
+struct A{extension{var f=a

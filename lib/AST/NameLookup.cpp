@@ -857,7 +857,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           }
         }
 
-        DC = DC->getParent();
+        DC = DC->getParentForLookup();
       }
 
       if (!isCascadingUse.hasValue())

@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol A{{}struct A{typealias a:Self
-protocol P{extension{lazy var f=A.a
+// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol A{protocol A:A{class a{let c=a}typealias a
