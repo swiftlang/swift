@@ -28,6 +28,12 @@ public protocol _UnicodeEncoding {
   /// `nil` if the scalar can't be represented in this encoding.
   static func encode(_ content: UnicodeScalar) -> EncodedScalar?
 
+  /// Converts a scalar from another encoding's representation, returning
+  /// `nil` if the scalar can't be represented in this encoding.
+  static func transcode<FromEncoding : UnicodeEncoding>(
+    _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
+  ) -> EncodedScalar?
+
   associatedtype ForwardParser : UnicodeParser
   associatedtype ReverseParser : UnicodeParser
   
@@ -48,3 +54,10 @@ extension _UnicodeEncoding {
 public protocol UnicodeEncoding : _UnicodeEncoding
 where ForwardParser.Encoding == Self, ReverseParser.Encoding == Self {}
 
+extension _UnicodeEncoding {
+  public static func transcode<FromEncoding : UnicodeEncoding>(
+    _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
+  ) -> EncodedScalar? {
+    return encode(FromEncoding.decode(content))
+  }
+}

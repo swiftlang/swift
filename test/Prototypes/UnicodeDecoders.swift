@@ -304,6 +304,23 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
   }
   check(expected.reversed(), "reverse, repairing: true")
 
+  //===--- Transcoded Scalars ---------------------------------------------===//
+  for x in decoded.lazy.map({ UnicodeScalar($0)! }) {
+    expectEqualSequence(
+      UTF8.encode(x)!,
+      UTF8.transcode(Codec.encode(x)!, from: Codec.self)!
+    )
+    expectEqualSequence(
+      UTF16.encode(x)!,
+      UTF16.transcode(Codec.encode(x)!, from: Codec.self)!
+    )
+    expectEqualSequence(
+      UTF32.encode(x)!,
+      UTF32.transcode(Codec.encode(x)!, from: Codec.self)!
+    )
+  }
+  
+  //===--- Scalar View ----------------------------------------------------===//
   let scalars = _Unicode.DefaultScalarView(utfStr, fromEncoding: Codec.self)
   expectEqualSequence(expected, scalars.map { $0.value })
   expectEqualSequence(
@@ -319,6 +336,7 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
     }
     expectNil(x.next())
   }
+
   return result
 }
 
@@ -337,7 +355,6 @@ func checkDecodeUTF16(
       utf16Str)
 }
 
-/*
 func checkDecodeUTF32(
     _ expectedHead: [UInt32],
     _ expectedRepairedTail: [UInt32], _ utf32Str: [UInt32]
@@ -345,7 +362,6 @@ func checkDecodeUTF32(
   return checkDecodeUTF(UTF32.self, expectedHead, expectedRepairedTail,
       utf32Str)
 }
-*/
 
 func checkEncodeUTF8(_ expected: [UInt8],
                      _ scalars: [UInt32]) -> AssertionResult {
@@ -367,6 +383,147 @@ func checkEncodeUTF8(_ expected: [UInt8],
   }
 
   return assertionSuccess()
+}
+
+//===----------------------------------------------------------------------===//
+
+var UTF32Decoder = TestSuite("UTF32Decoder")
+
+UTF32Decoder.test("Empty") {
+  expectTrue(checkDecodeUTF32([], [], []))
+}
+
+UTF32Decoder.test("SmokeTest") {
+  // U+0041 LATIN CAPITAL LETTER A
+  expectTrue(checkDecodeUTF32([ 0x0041 ], [], [ 0x0000_0041 ]))
+
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  expectTrue(checkDecodeUTF32(
+      [ 0x0041, 0x0042 ], [],
+      [ 0x0000_0041, 0x0000_0042 ]))
+
+  // U+0000 NULL
+  // U+0041 LATIN CAPITAL LETTER A
+  // U+0042 LATIN CAPITAL LETTER B
+  // U+0000 NULL
+  expectTrue(checkDecodeUTF32(
+      [ 0x0000, 0x0041, 0x0042, 0x0000 ], [],
+      [ 0x0000_0000, 0x0000_0041, 0x0000_0042, 0x0000_0000 ]))
+
+  // U+0283 LATIN SMALL LETTER ESH
+  expectTrue(checkDecodeUTF32([ 0x0283 ], [], [ 0x0000_0283 ]))
+
+  // U+03BA GREEK SMALL LETTER KAPPA
+  // U+1F79 GREEK SMALL LETTER OMICRON WITH OXIA
+  // U+03C3 GREEK SMALL LETTER SIGMA
+  // U+03BC GREEK SMALL LETTER MU
+  // U+03B5 GREEK SMALL LETTER EPSILON
+  expectTrue(checkDecodeUTF32(
+      [ 0x03ba, 0x1f79, 0x03c3, 0x03bc, 0x03b5 ], [],
+      [ 0x0000_03ba, 0x0000_1f79, 0x0000_03c3, 0x0000_03bc, 0x0000_03b5 ]))
+
+  // U+4F8B CJK UNIFIED IDEOGRAPH-4F8B
+  // U+6587 CJK UNIFIED IDEOGRAPH-6587
+  expectTrue(checkDecodeUTF32(
+      [ 0x4f8b, 0x6587 ], [],
+      [ 0x0000_4f8b, 0x0000_6587 ]))
+
+  // U+D55C HANGUL SYLLABLE HAN
+  // U+AE00 HANGUL SYLLABLE GEUL
+  expectTrue(checkDecodeUTF32(
+      [ 0xd55c, 0xae00 ], [],
+      [ 0x0000_d55c, 0x0000_ae00 ]))
+
+  // U+1112 HANGUL CHOSEONG HIEUH
+  // U+1161 HANGUL JUNGSEONG A
+  // U+11AB HANGUL JONGSEONG NIEUN
+  // U+1100 HANGUL CHOSEONG KIYEOK
+  // U+1173 HANGUL JUNGSEONG EU
+  // U+11AF HANGUL JONGSEONG RIEUL
+  expectTrue(checkDecodeUTF32(
+      [ 0x1112, 0x1161, 0x11ab, 0x1100, 0x1173, 0x11af ], [],
+      [ 0x0000_1112, 0x0000_1161, 0x0000_11ab, 0x0000_1100, 0x0000_1173,
+        0x0000_11af ]))
+
+  // U+D7FF (unassigned)
+  expectTrue(checkDecodeUTF16([ 0xd7ff ], [], [ 0x0000_d7ff ]))
+
+  // U+E000 (private use)
+  expectTrue(checkDecodeUTF16([ 0xe000 ], [], [ 0x0000_e000 ]))
+
+  // U+FFFD REPLACEMENT CHARACTER
+  expectTrue(checkDecodeUTF16([ 0xfffd ], [], [ 0x0000_fffd ]))
+
+  // U+FFFF (noncharacter)
+  expectTrue(checkDecodeUTF16([ 0xffff ], [], [ 0x0000_ffff ]))
+
+  // U+10000 LINEAR B SYLLABLE B008 A
+  expectTrue(checkDecodeUTF32([ 0x00010000 ], [], [ 0x0001_0000 ]))
+
+  // U+10100 AEGEAN WORD SEPARATOR LINE
+  expectTrue(checkDecodeUTF32([ 0x00010100 ], [], [ 0x0001_0100 ]))
+
+  // U+103FF (unassigned)
+  expectTrue(checkDecodeUTF32([ 0x000103ff ], [], [ 0x0001_03ff ]))
+
+  // U+1D800 (unassigned)
+  expectTrue(checkDecodeUTF32([ 0x0001d800 ], [], [ 0x0001_d800 ]))
+
+
+  // U+E0000 (unassigned)
+  expectTrue(checkDecodeUTF32([ 0x000e0000 ], [], [ 0x000e_0000 ]))
+
+  // U+E0100 VARIATION SELECTOR-17
+  expectTrue(checkDecodeUTF32([ 0x000e0100 ], [], [ 0x000e_0100 ]))
+
+  // U+E03FF (unassigned)
+  expectTrue(checkDecodeUTF32([ 0x000e03ff ], [], [ 0x000e_03ff ]))
+
+
+  // U+10FC00 (private use)
+  expectTrue(checkDecodeUTF32([ 0x0010fc00 ], [], [ 0x0010_fc00 ]))
+
+  // U+10FD00 (private use)
+  expectTrue(checkDecodeUTF32([ 0x0010fd00 ], [], [ 0x0010_fd00 ]))
+
+  // U+10FFFF (private use, noncharacter)
+  expectTrue(checkDecodeUTF32([ 0x0010ffff ], [], [ 0x0010_ffff ]))
+}
+
+UTF32Decoder.test("IllFormed") {
+  // U+D800 (high-surrogate)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0000_d800 ]))
+
+  // U+DB40 (high-surrogate)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0000_db40 ]))
+
+  // U+DBFF (high-surrogate)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0000_dbff ]))
+
+  // U+DC00 (low-surrogate)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0000_dc00 ]))
+
+  // U+DD00 (low-surrogate)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0000_dd00 ]))
+
+  // U+DFFF (low-surrogate)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0000_dfff ]))
+
+  // U+110000 (invalid)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0011_0000 ]))
+
+  // U+1000000 (invalid)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x0100_0000 ]))
+
+  // U+80000000 (invalid)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0x8000_0000 ]))
+
+  // U+FFFF0000 (invalid)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0xffff_0000 ]))
+
+  // U+FFFFFFFF (invalid)
+  expectTrue(checkDecodeUTF32([], [ 0xfffd ], [ 0xffff_ffff ]))
 }
 
 var UTF8Decoder = TestSuite("UTF8Decoder")

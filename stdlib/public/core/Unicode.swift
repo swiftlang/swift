@@ -61,7 +61,7 @@ public enum UnicodeDecodingResult : Equatable {
 /// decoded Unicode scalar values.
 ///
 /// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `UnicodeScalar`
-public protocol UnicodeCodec {
+public protocol UnicodeCodec : UnicodeEncoding {
 
   /// A type that can hold code unit values for this encoding.
   associatedtype CodeUnit
@@ -591,12 +591,10 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
 ///
 /// Returns the index of the first unhandled code unit and the UTF-8 data
 /// that was encoded.
-internal func _transcodeSomeUTF16AsUTF8<Input>(
+internal func _transcodeSomeUTF16AsUTF8<Input : Collection>(
   _ input: Input, _ startIndex: Input.Index
 ) -> (Input.Index, _StringCore._UTF8Chunk)
-  where
-  Input : Collection,
-  Input.Iterator.Element == UInt16 {
+  where Input.Iterator.Element == UInt16 {
 
   typealias _UTF8Chunk = _StringCore._UTF8Chunk
 
@@ -965,12 +963,6 @@ extension UnicodeCodec where CodeUnit : UnsignedInteger {
       length += 1
     }
     return length
-  }
-}
-
-extension UnicodeCodec {
-  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
-    fatalError("_nullCodeUnitOffset(in:) implementation should be provided")
   }
 }
 
