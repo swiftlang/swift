@@ -228,7 +228,7 @@ class C0 {
 }
 
 class C1 {
-  final func %%%(lhs: C1, rhs: C1) -> C1 { return lhs }
+  final func %%%(lhs: C1, rhs: C1) -> C1 { return lhs } // expected-error{{operator '%%%' declared in type 'C1' must be 'static'}}{{3-3=static }}
 }
 
 final class C2 {

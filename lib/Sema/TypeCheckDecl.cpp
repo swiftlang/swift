@@ -4733,35 +4733,24 @@ public:
     // Check for static/final/class when we're in a type.
     auto dc = FD->getDeclContext();
     if (dc->isTypeContext()) {
-      // Within a class, operator functions must be 'static' or 'final'.
-      if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
-        // For a class, we also need the function or class to be 'final'.
-        if (!classDecl->isFinal() && !FD->isFinal() &&
-            FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
-          if (!FD->isStatic()) {
-            TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
-                        operatorName,
-                        dc->getDeclaredInterfaceType())
-              .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                           "static ");
-
-            FD->setStatic();
-          } else {
-            TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
-                        operatorName, dc->getDeclaredInterfaceType())
-              .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                           "final ");
-            FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
-          }
-        }
-      } else if (!FD->isStatic()) {
-        // Operator functions must be static.
-        TC.diagnose(FD, diag::nonstatic_operator_in_type,
+      if (!FD->isStatic()) {
+        TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
                     operatorName,
                     dc->getDeclaredInterfaceType())
           .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                        "static ");
+
         FD->setStatic();
+      } else if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+        // For a class, we also need the function or class to be 'final'.
+        if (!classDecl->isFinal() && !FD->isFinal() &&
+            FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
+          TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
+                      operatorName, dc->getDeclaredInterfaceType())
+            .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                         "final ");
+          FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+        }
       }
     } else if (!dc->isModuleScopeContext()) {
       TC.diagnose(FD, diag::operator_in_local_scope);
