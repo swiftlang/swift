@@ -259,33 +259,22 @@ findDeclContextForType(TypeChecker &TC,
 
   auto ownerDC = typeDecl->getDeclContext();
 
-  // If the type is declared at the top level, there's nothing we can learn from
-  // walking our parent contexts.
-  if (ownerDC->isModuleScopeContext())
+  // If the type is not nested in another type, there's nothing we can
+  // learn from walking parent contexts.
+  if (!ownerDC->isTypeContext() ||
+      isa<GenericTypeParamDecl>(typeDecl))
     return std::make_tuple(Type(), true);
 
-  // Workaround for issue where generic typealias generic parameters are
-  // looked up with the wrong 'fromDC'.
-  if (isa<TypeAliasDecl>(ownerDC)) {
-    assert(isa<GenericTypeParamDecl>(typeDecl));
-    return std::make_tuple(Type(), true);
-  }
-
-  bool needsBaseType = (ownerDC->isTypeContext() &&
-                        !isa<GenericTypeParamDecl>(typeDecl));
   NominalTypeDecl *ownerNominal =
       ownerDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // We might have an invalid extension that didn't resolve.
   //
   // FIXME: How did UnqualifiedLookup find the decl then?
-  if (needsBaseType && ownerNominal == nullptr)
+  if (ownerNominal == nullptr)
     return std::make_tuple(Type(), false);
 
   auto getSelfType = [&](DeclContext *DC) -> Type {
-    if (!needsBaseType)
-      return Type();
-
     // When looking up a nominal type declaration inside of a
     // protocol extension, always use the nominal type and
     // not the protocol 'Self' type.
@@ -330,13 +319,6 @@ findDeclContextForType(TypeChecker &TC,
     }
 
     // We're going to check the next parent context.
-  }
-
-  // If we didn't find the member in an immediate parent context and
-  // there is no base type, something went wrong.
-  if (!needsBaseType) {
-    assert(false && "Should have found non-type context by now");
-    return std::make_tuple(Type(), false);
   }
 
   // Now, search the supertypes or refined protocols of each parent
