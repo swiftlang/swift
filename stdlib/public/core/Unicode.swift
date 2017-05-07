@@ -61,7 +61,7 @@ public enum UnicodeDecodingResult : Equatable {
 /// decoded Unicode scalar values.
 ///
 /// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `UnicodeScalar`
-public protocol UnicodeCodec {
+public protocol UnicodeCodec : UnicodeEncoding {
 
   /// A type that can hold code unit values for this encoding.
   associatedtype CodeUnit
@@ -965,12 +965,6 @@ extension UnicodeCodec where CodeUnit : UnsignedInteger {
       length += 1
     }
     return length
-  }
-}
-
-extension UnicodeCodec {
-  public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
-    fatalError("_nullCodeUnitOffset(in:) implementation should be provided")
   }
 }
 
