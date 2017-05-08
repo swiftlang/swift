@@ -141,6 +141,7 @@ static sourcekitd_uid_t KeyArgNames;
 static sourcekitd_uid_t KeySelectorPieces;
 static sourcekitd_uid_t KeyNameKind;
 static sourcekitd_uid_t KeySwiftVersion;
+static sourcekitd_uid_t KeyCancelOnSubsequentRequest;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -273,6 +274,7 @@ static int skt_main(int argc, const char **argv) {
   KeyNameKind = sourcekitd_uid_get_from_cstr("key.namekind");
 
   KeySwiftVersion = sourcekitd_uid_get_from_cstr("key.swift_version");
+  KeyCancelOnSubsequentRequest = sourcekitd_uid_get_from_cstr("key.cancel_on_subsequent_request");
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
@@ -827,6 +829,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (!Opts.HeaderPath.empty()) {
     sourcekitd_request_dictionary_set_string(Req, KeyFilePath,
                                              Opts.HeaderPath.c_str());
+  }
+  if (Opts.CancelOnSubsequentRequest.hasValue()) {
+    sourcekitd_request_dictionary_set_int64(Req, KeyCancelOnSubsequentRequest,
+                                            *Opts.CancelOnSubsequentRequest);
   }
 
   if (Opts.SwiftVersion.hasValue()) {

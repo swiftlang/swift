@@ -125,6 +125,7 @@ extern SourceKit::UIdent KeyContainerTypeUsr;
 extern SourceKit::UIdent KeyModuleGroups;
 
 extern SourceKit::UIdent KeyRangeContent;
+extern SourceKit::UIdent KeyCancelOnSubsequentRequest;
 
 extern SourceKit::UIdent KeyBaseName;
 extern SourceKit::UIdent KeyArgNames;
