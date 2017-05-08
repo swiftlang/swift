@@ -324,6 +324,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
       IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
       for (auto &Entry : ICS->getActiveClauseElements()) {
+        if (Entry.is<Stmt*>() && isa<IfConfigStmt>(Entry.get<Stmt*>()))
+          continue;
         Entries.push_back(Entry);
         if (Entry.is<Decl*>()) {
           Entry.get<Decl*>()->setEscapedFromIfConfig(true);

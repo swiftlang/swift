@@ -2106,6 +2106,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
       Handler(ICD);
       // Copy the active members into the entries list.
       for (auto activeMember : ICD->getActiveMembers()) {
+        if (isa<IfConfigDecl>(activeMember))
+          continue;
         Handler(activeMember);
       }
     }
