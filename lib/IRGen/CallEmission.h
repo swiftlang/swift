@@ -36,7 +36,7 @@ public:
 
 private:
   /// The function attributes for the call.
-  llvm::AttributeSet Attrs;
+  llvm::AttributeList Attrs;
   
   /// The builtin/special arguments to pass to the call.
   SmallVector<llvm::Value*, 8> Args;
@@ -57,8 +57,8 @@ private:
   void emitToUnmappedExplosion(Explosion &out);
   llvm::CallSite emitCallSite();
   llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
-                            ArrayRef<llvm::Value*> args,
-                            const llvm::AttributeSet &attrs);
+                            ArrayRef<llvm::Value *> args,
+                            const llvm::AttributeList &attrs);
 
 public:
   CallEmission(IRGenFunction &IGF, const Callee &callee)

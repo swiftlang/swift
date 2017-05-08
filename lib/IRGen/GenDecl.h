@@ -22,7 +22,7 @@
 #include "IRGen.h"
 
 namespace llvm {
-  class AttributeSet;
+  class AttributeList;
   class Function;
   class FunctionType;
 }
@@ -35,7 +35,7 @@ namespace irgen {
                                  LinkInfo &linkInfo,
                                  llvm::FunctionType *fnType,
                                  llvm::CallingConv::ID cc,
-                                 const llvm::AttributeSet &attrs,
+                                 const llvm::AttributeList &attrs,
                                  llvm::Function *insertBefore = nullptr);
 
 

@@ -389,7 +389,6 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OCLEvent:
     case clang::BuiltinType::OCLClkEvent:
     case clang::BuiltinType::OCLQueue:
-    case clang::BuiltinType::OCLNDRange:
     case clang::BuiltinType::OCLReserveID:
       return OmissionTypeName();
 

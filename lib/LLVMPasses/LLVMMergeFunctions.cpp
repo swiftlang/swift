@@ -37,6 +37,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -1047,14 +1048,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
 
   for (CallInst *CI : Callers) {
     auto &Context = New->getContext();
-    auto NewFuncAttrs = New->getAttributes();
-    auto CallSiteAttrs = CI->getAttributes();
-
-    CallSiteAttrs = CallSiteAttrs.addAttributes(
-        Context, AttributeSet::ReturnIndex, NewFuncAttrs.getRetAttributes());
+    auto NewPAL = New->getAttributes();
 
     SmallVector<Type *, 8> OldParamTypes;
     SmallVector<Value *, 16> NewArgs;
+    SmallVector<AttributeSet, 8> NewArgAttrs;
     IRBuilder<> Builder(CI);
 
     FunctionType *NewFuncTy = New->getFunctionType();
@@ -1063,10 +1061,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     
     // Add the existing parameters.
     for (Value *OldArg : CI->arg_operands()) {
-      AttributeSet Attrs = NewFuncAttrs.getParamAttributes(ParamIdx);
-      if (Attrs.getNumSlots())
-        CallSiteAttrs = CallSiteAttrs.addAttributes(Context, ParamIdx, Attrs);
-
+      NewArgAttrs.push_back(NewPAL.getParamAttributes(ParamIdx));
       NewArgs.push_back(OldArg);
       OldParamTypes.push_back(OldArg->getType());
       ++ParamIdx;
@@ -1090,8 +1085,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     Value *Callee = ConstantExpr::getBitCast(New, FPtrType);
     CallInst *NewCI = Builder.CreateCall(Callee, NewArgs);
     NewCI->setCallingConv(CI->getCallingConv());
-    NewCI->setAttributes(CallSiteAttrs);
-
+    // Don't transfer attributes from the function to the callee. Function
+    // attributes typically aren't relevant to the calling convention or ABI.
+    NewCI->setAttributes(AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
+                                            NewPAL.getRetAttributes(),
+                                            NewArgAttrs));
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
   }

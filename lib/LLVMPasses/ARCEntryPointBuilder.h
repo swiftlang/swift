@@ -45,7 +45,7 @@ class ARCEntryPointBuilder {
   using CallInst = llvm::CallInst;
   using Value = llvm::Value;
   using Module = llvm::Module;
-  using AttributeSet = llvm::AttributeSet;
+  using AttributeList = llvm::AttributeList;
   using Attribute = llvm::Attribute;
   using APInt = llvm::APInt;
   
@@ -266,12 +266,12 @@ private:
     
     auto *ObjectPtrTy = getObjectPtrTy();
     auto &M = getModule();
-    auto AttrList = AttributeSet::get(M.getContext(), 1, Attribute::NoCapture);
+    auto AttrList = AttributeList::get(M.getContext(), 1, Attribute::NoCapture);
     AttrList = AttrList.addAttribute(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+        M.getContext(), AttributeList::FunctionIndex, Attribute::NoUnwind);
     CheckUnowned = M.getOrInsertFunction("swift_checkUnowned", AttrList,
                                          Type::getVoidTy(M.getContext()),
-                                         ObjectPtrTy, nullptr);
+                                         ObjectPtrTy);
     if (llvm::Triple(M.getTargetTriple()).isOSBinFormatCOFF() &&
         !llvm::Triple(M.getTargetTriple()).isOSCygMing())
       if (auto *F = llvm::dyn_cast<llvm::Function>(CheckUnowned.get()))

@@ -656,7 +656,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
          "objc method call must be to a func/initializer/getter/setter/dtor");
 
   ForeignFunctionInfo foreignInfo;
-  llvm::AttributeSet attrs;
+  llvm::AttributeList attrs;
   auto fnTy = IGF.IGM.getFunctionType(origFnType, attrs, &foreignInfo);
   bool indirectResult = foreignInfo.ClangInfo->getReturnInfo().isIndirect();
   if (kind != ObjCMessageKind::Normal)
@@ -762,8 +762,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
  
   assert(resultType->getRepresentation()
            == SILFunctionType::Representation::Thick);
- 
-  llvm::AttributeSet attrs;
+
+  llvm::AttributeList attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType, attrs);
   // FIXME: Give the thunk a real name.
   // FIXME: Maybe cache the thunk by function and closure types?
@@ -776,8 +776,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   auto initialAttrs = IGM.constructInitialAttributes();
   // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
+  auto updatedAttrs = attrs.addAttributes(
+      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, initialAttrs);
   fwd->setAttributes(updatedAttrs);
   
   IRGenFunction subIGF(IGM, fwd);
