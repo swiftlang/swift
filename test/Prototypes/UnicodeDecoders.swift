@@ -308,7 +308,8 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
   for x in decoded.lazy.map({ UnicodeScalar($0)! }) {
     expectEqualSequence(
       UTF8.encodeIfRepresentable(x)!,
-      UTF8.transcode(Codec.encodeIfRepresentable(x)!, from: Codec.self)!
+      UTF8.transcodeIfRepresentable(
+        Codec.encodeIfRepresentable(x)!, from: Codec.self)!
     )
     expectEqualSequence(
       UTF16.encodeIfRepresentable(x)!,
@@ -317,7 +318,8 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
     )
     expectEqualSequence(
       UTF32.encodeIfRepresentable(x)!,
-      UTF32.transcodeIfRepresentable(Codec.encode(x)!, from: Codec.self)!
+      UTF32.transcodeIfRepresentable(
+        Codec.encodeIfRepresentable(x)!, from: Codec.self)!
     )
   }
   

@@ -41,10 +41,10 @@ public protocol UnicodeParser {
 extension UnicodeParser {
   @inline(__always)
   @discardableResult
-  public static func decode<I: IteratorProtocol>(
+  public static func parse<I: IteratorProtocol>(
     _ input: inout I,
-    repairingIllFormedSequences makeRepairs: Bool,
-    into output: (UnicodeScalar)->Void
+    repairingIllFormedSequences makeRepairs: Bool = true,
+    into output: (Encoding.EncodedScalar)->Void
   ) -> Int
   where I.Element == Encoding.CodeUnit
   {
@@ -53,14 +53,28 @@ extension UnicodeParser {
     while true {
       switch d.parseScalar(from: &input) {
       case let .valid(scalarContent):
-        output(Encoding.decode(scalarContent))
+        output(scalarContent)
       case .invalid:
-        if !makeRepairs { return 1 }
+        if _slowPath(!makeRepairs) { return 1 }
         errorCount += 1
-        output(UnicodeScalar(_unchecked: 0xFFFD))
+        output(Encoding.encodedReplacementCharacter)
       case .emptyInput:
         return errorCount
       }
+    }
+  }
+
+  @inline(__always)
+  @discardableResult
+  public static func decode<I: IteratorProtocol>(
+    _ input: inout I,
+    repairingIllFormedSequences makeRepairs: Bool,
+    into output: (UnicodeScalar)->Void
+  ) -> Int
+  where I.Element == Encoding.CodeUnit
+  {
+    return parse(&input, repairingIllFormedSequences: makeRepairs) {
+      output(Encoding.decode($0))
     }
   }
 }

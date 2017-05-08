@@ -336,32 +336,60 @@ public struct _StringCore {
     }
   }
 
+  var _unmanagedASCII : UnsafeBufferPointer<_Unicode.ASCII.CodeUnit>? {
+    @inline(__always)
+    get {
+      guard _fastPath(_baseAddress != nil && elementWidth == 1) else {
+        return nil
+      }
+      return UnsafeBufferPointer(
+        start: _baseAddress!.assumingMemoryBound(
+          to: _Unicode.ASCII.CodeUnit.self),
+        count: count
+      )
+    }
+  }
+  
+  var _unmanagedUTF16 : UnsafeBufferPointer<UTF16.CodeUnit>? {
+    @inline(__always)
+    get {
+      guard _fastPath(_baseAddress != nil && elementWidth != 1) else {
+        return nil
+      }
+      return UnsafeBufferPointer(
+        start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
+        count: count
+      )
+    }
+  }
+  
   /// Write the string, in the given encoding, to output.
-  func encode<Encoding: UnicodeCodec>(
+  func encode<Encoding: UnicodeEncoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void)
   {
-    if _fastPath(_baseAddress != nil) {
-      if _fastPath(elementWidth == 1) {
-        for x in UnsafeBufferPointer(
-          start: _baseAddress!.assumingMemoryBound(to: UTF8.CodeUnit.self),
-          count: count
-        ) {
-          Encoding.encode(UnicodeScalar(x), into: processCodeUnit)
+    defer { _fixLifetime(self) }
+    if let bytes = _unmanagedASCII {
+      if encoding == _Unicode.ASCII.self
+      || encoding == _Unicode.UTF8.self
+      || encoding == _Unicode.UTF16.self
+      || encoding == _Unicode.UTF32.self {
+        bytes.forEach {
+          processCodeUnit(Encoding.CodeUnit(extendingOrTruncating: $0))
         }
       }
       else {
-        let hadError = transcode(
-          UnsafeBufferPointer(
-            start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
-            count: count
-          ).makeIterator(),
-          from: UTF16.self,
-          to: encoding,
-          stoppingOnError: true,
-          into: processCodeUnit
-        )
-        _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
+        // TODO: be sure tests exercise this code path.
+        for b in bytes {
+          Encoding.encode(
+            UnicodeScalar(_unchecked: UInt32(b))).forEach(processCodeUnit)
+        }
+      }
+    }
+    else if let content = _unmanagedUTF16 {
+    var i = content.makeIterator()
+      _Unicode.UTF16.ForwardParser.parse(&i) {
+        Encoding.transcode($0, from: UTF16.self).forEach(processCodeUnit)
       }
     }
     else if hasCocoaBuffer {
