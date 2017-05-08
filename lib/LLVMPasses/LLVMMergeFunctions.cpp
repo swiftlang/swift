@@ -600,10 +600,10 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     SmallVector<FunctionEntry *, 8> FuncsToMerge;
 
     // Insert all candidates into the Worklist.
-    for (std::vector<WeakVH>::iterator I = Worklist.begin(),
-           E = Worklist.end(); I != E; ++I) {
-      if (!*I) continue;
-      Function *F = cast<Function>(*I);
+    for (WeakVH &I : Worklist) {
+      if (!I)
+        continue;
+      Function *F = cast<Function>(I);
       FunctionEntry *FE = getEntry(F);
       assert(!isInEquivalenceClass(FE));
 
