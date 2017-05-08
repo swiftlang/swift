@@ -1668,11 +1668,14 @@ void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
 }
 
 void Remangler::mangleProtocolListWithClass(Node *node) {
-  Out << "<procotol-list-with-class>";
+  Out << "Xc";
+  mangleChildNode(node, 1);
+  mangleProtocolListWithoutPrefix(node->getChild(0));
 }
 
 void Remangler::mangleProtocolListWithAnyObject(Node *node) {
-  Out << "<procotol-list-with-any-object>";
+  Out << "Xl";
+  mangleProtocolListWithoutPrefix(node->getChild(0));
 }
 
 void Remangler::mangleVTableThunk(Node *node) {
