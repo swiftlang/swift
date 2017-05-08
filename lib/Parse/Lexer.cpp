@@ -29,6 +29,8 @@
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
+#include <limits>
+
 using namespace swift;
 
 // clang::isIdentifierHead and clang::isIdentifierBody are deliberately not in
@@ -1464,7 +1466,7 @@ static void validateMultilineIndents(const Token &Str,
   
   // The offset into the previous line where it experienced its first indentation 
   // error, or Indent.size() if every character matched.
-  size_t lastMistakeOffset = SIZE_T_MAX;
+  size_t lastMistakeOffset = std::numeric_limits<size_t>::max();
   // Offsets for each consecutive previous line with its first error at 
   // lastMatchLength.
   SmallVector<size_t, 4> linesWithLastMistakeOffset = {};
