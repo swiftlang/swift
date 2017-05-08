@@ -484,7 +484,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 ///
 /// We use this when Clang code generation might populate the list.
 static void collectGlobalList(IRGenModule &IGM,
-                              SmallVectorImpl<llvm::WeakVH> &list,
+                              SmallVectorImpl<llvm::WeakTrackingVH> &list,
                               StringRef name) {
   if (auto *existing = IGM.Module.getGlobalVariable(name)) {
     auto *globals = cast<llvm::ConstantArray>(existing->getInitializer());
@@ -496,7 +496,7 @@ static void collectGlobalList(IRGenModule &IGM,
   }
 
   std::for_each(list.begin(), list.end(),
-                [](const llvm::WeakVH &global) {
+                [](const llvm::WeakTrackingVH &global) {
     assert(!isa<llvm::GlobalValue>(global) ||
            !cast<llvm::GlobalValue>(global)->isDeclaration() &&
            "all globals in the 'used' list must be definitions");
@@ -507,7 +507,7 @@ static void collectGlobalList(IRGenModule &IGM,
 /// list of values.  Generally these lists are for various LLVM
 /// metadata or runtime purposes.
 static llvm::GlobalVariable *
-emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakVH> handles,
+emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                StringRef name, StringRef section,
                llvm::GlobalValue::LinkageTypes linkage,
                llvm::Type *eltTy,
@@ -648,7 +648,7 @@ void IRGenModule::emitRuntimeRegistration() {
       }
     }
     
-    for (llvm::WeakVH &ObjCClass : ObjCClasses) {
+    for (llvm::WeakTrackingVH &ObjCClass : ObjCClasses) {
       RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), {ObjCClass});
     }
       

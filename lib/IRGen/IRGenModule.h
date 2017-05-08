@@ -713,7 +713,7 @@ private:
   /// present in the object file; bitcast to i8*. This is used for
   /// forcing visibility of symbols which may otherwise be optimized
   /// out.
-  SmallVector<llvm::WeakVH, 4> LLVMUsed;
+  SmallVector<llvm::WeakTrackingVH, 4> LLVMUsed;
 
   /// LLVMCompilerUsed - List of global values which are required to be
   /// present in the object file; bitcast to i8*. This is used for
@@ -721,7 +721,7 @@ private:
   /// out.
   ///
   /// Similar to LLVMUsed, but emitted as llvm.compiler.used.
-  SmallVector<llvm::WeakVH, 4> LLVMCompilerUsed;
+  SmallVector<llvm::WeakTrackingVH, 4> LLVMCompilerUsed;
 
   /// Metadata nodes for autolinking info.
   ///
@@ -730,12 +730,12 @@ private:
   SmallVector<llvm::Metadata *, 32> AutolinkEntries;
 
   /// List of Objective-C classes, bitcast to i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCClasses;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;
   /// List of Objective-C classes that require nonlazy realization, bitcast to
   /// i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCNonLazyClasses;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
-  SmallVector<llvm::WeakVH, 4> ObjCCategories;
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
   /// List of protocol conformances to generate records for.
   SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
@@ -748,10 +748,10 @@ private:
   /// The interesting global variables relating to an ObjC protocol.
   struct ObjCProtocolPair {
     /// The global variable that contains the protocol record.
-    llvm::WeakVH record;
+    llvm::WeakTrackingVH record;
     /// The global variable that contains the indirect reference to the
     /// protocol record.
-    llvm::WeakVH ref;
+    llvm::WeakTrackingVH ref;
   };
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
