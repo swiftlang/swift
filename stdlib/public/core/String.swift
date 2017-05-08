@@ -344,23 +344,22 @@ public struct String {
 
 extension String {
   public // @testable
-  static func _fromWellFormedCodeUnitSequence<Encoding, Input>(
+  static func _fromWellFormedCodeUnitSequence<
+    Encoding : UnicodeEncoding, Input : Collection
+  >(
     _ encoding: Encoding.Type, input: Input
   ) -> String
-    where
-    Encoding: UnicodeCodec,
-    Input: Collection,
-    Input.Iterator.Element == Encoding.CodeUnit {
+    where  Input.Iterator.Element == Encoding.CodeUnit {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
   public // @testable
-  static func _fromCodeUnitSequence<Encoding, Input>(
+  static func _fromCodeUnitSequence<
+    Encoding : UnicodeEncoding, Input : Collection
+  >(
     _ encoding: Encoding.Type, input: Input
   ) -> String?
     where
-    Encoding: UnicodeCodec,
-    Input: Collection,
     Input.Iterator.Element == Encoding.CodeUnit {
     let (stringBufferOptional, _) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
@@ -369,12 +368,12 @@ extension String {
   }
 
   public // @testable
-  static func _fromCodeUnitSequenceWithRepair<Encoding, Input>(
+  static func _fromCodeUnitSequenceWithRepair<
+    Encoding : UnicodeEncoding, Input : Collection
+  >(
     _ encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool)
     where
-    Encoding: UnicodeCodec,
-    Input: Collection,
     Input.Iterator.Element == Encoding.CodeUnit {
 
     let (stringBuffer, hadError) =
@@ -485,23 +484,21 @@ extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
   func _encodedLength<
-    Encoding: UnicodeCodec
+    Encoding: UnicodeEncoding
   >(_ encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     self._encode(encoding, into: { _ in codeUnitCount += 1 })
     return codeUnitCount
   }
 
-  // FIXME: this function does not handle the case when a wrapped NSString
+  // FIXME: this function may not handle the case when a wrapped NSString
   // contains unpaired surrogates.  Fix this before exposing this function as a
   // public API.  But it is unclear if it is valid to have such an NSString in
   // the first place.  If it is not, we should not be crashing in an obscure
   // way -- add a test for that.
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
-  func _encode<
-    Encoding: UnicodeCodec
-  >(
+  func _encode<Encoding: UnicodeEncoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {

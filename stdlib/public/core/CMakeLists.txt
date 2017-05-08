@@ -25,6 +25,7 @@ set(SWIFTLIB_ESSENTIAL
   ArrayCast.swift
   Arrays.swift.gyb
   ArrayType.swift
+  ASCII.swift
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
