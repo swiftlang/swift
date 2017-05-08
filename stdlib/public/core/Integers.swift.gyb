@@ -3537,18 +3537,6 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   }
 % end
 
-  public static func <<(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
-    var result = lhs
-    result <<= rhs
-    return result
-  }
-  
-  public static func >>(lhs: DoubleWidth, rhs: DoubleWidth) -> DoubleWidth {
-    var result = lhs
-    result >>= rhs
-    return result
-  }
-
   public static func <<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
     if rhs < DoubleWidth((0, 0)) {
       lhs >>= DoubleWidth((0, 0)) - rhs
@@ -3566,6 +3554,34 @@ public struct DoubleWidth<Base : FixedWidthInteger>
       return
     }
     
+    lhs &<<= rhs
+  }
+  
+  public static func >>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    if rhs < DoubleWidth((0, 0)) {
+      lhs <<= DoubleWidth((0, 0)) - rhs
+      return
+    }
+
+    // Shift is larger than this type's bit width.
+    if rhs._storage.high != 0 as High || rhs._storage.low >= DoubleWidth.bitWidth {
+      lhs = lhs < 0 ? ~0 : 0
+      return
+    }
+    
+    // Shift is exactly the width of `Base`, so high -> low.
+    if rhs._storage.low == numericCast(Base.bitWidth) {
+      lhs = DoubleWidth(
+        (lhs < 0 ? ~0 : 0, Low(extendingOrTruncating: lhs._storage.high)))
+      return
+    }
+
+    lhs &>>= rhs
+  }
+  
+  public static func &<<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth - 1)
+
     lhs._storage.high <<= High(rhs._storage.low)
     if Base.bitWidth > rhs._storage.low {
       lhs._storage.high |= High(extendingOrTruncating: lhs._storage.low >>
@@ -3577,24 +3593,8 @@ public struct DoubleWidth<Base : FixedWidthInteger>
     lhs._storage.low <<= rhs._storage.low
   }
   
-  public static func >>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    if rhs < DoubleWidth((0, 0)) {
-      lhs <<= DoubleWidth((0, 0)) - rhs
-      return
-    }
-
-    // Shift is larger than this type's bit width.
-    if rhs._storage.high != 0 as High || rhs._storage.low >= DoubleWidth.bitWidth {
-      // FIXME: lhs < 0 ? -1 : 0
-      lhs = lhs < DoubleWidth((0, 0)) ? DoubleWidth((~0, ~0)) : DoubleWidth((0, 0))
-      return
-    }
-    
-    // Shift is exactly the width of `Base`, so high -> low.
-    if rhs._storage.low == numericCast(Base.bitWidth) {
-      lhs = DoubleWidth((High(0), Low(extendingOrTruncating: lhs._storage.high)))
-      return
-    }
+  public static func &>>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let rhs = rhs & DoubleWidth(DoubleWidth.bitWidth - 1)
 
     lhs._storage.low >>= rhs._storage.low
     if Base.bitWidth > rhs._storage.low {
