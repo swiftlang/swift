@@ -87,7 +87,7 @@
 // PRINT-NEXT:  let Notification: String
 // PRINT-NEXT:  let swiftNamedNotification: String
 //
-// PRINT-LABEL: struct CFNewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-LABEL: struct CFNewType : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
@@ -101,7 +101,7 @@
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
 //
-// PRINT-NEXT:  struct MyABINewType : RawRepresentable, _SwiftNewtypeWrapper {
+// PRINT-LABEL: struct MyABINewType : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
@@ -118,7 +118,7 @@
 // PRINT-NEXT:  func takeMyABIOldType(_: MyABIOldType!)
 // PRINT-NEXT:  func takeMyABINewTypeNonNull(_: MyABINewType)
 // PRINT-NEXT:  func takeMyABIOldTypeNonNull(_: MyABIOldType)
-// PRINT-NEXT:  struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
+// PRINT-LABEL: struct MyABINewTypeNS : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, _ObjectiveCBridgeable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
