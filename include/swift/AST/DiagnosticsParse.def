@@ -131,12 +131,17 @@ ERROR(lex_invalid_unicode_scalar,none,
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
 ERROR(lex_illegal_multiline_string_start,none,
-      "invalid start of multi-line string literal", ())
+      "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,
-      "invalid end of multi-line string literal", ())
-ERROR(lex_ambiguous_string_indent,none,
-      "invalid mix of multi-line string literal indentation", ())
-
+      "multi-line string literal closing delimiter must begin on a new line", ())
+ERROR(lex_multiline_string_indent_inconsistent,none,
+      "%select{unexpected space in|unexpected tab in|insufficient}2 indentation of "
+      "%select{line|next %1 lines}0 in multi-line string literal", 
+      (bool, unsigned, unsigned))
+NOTE(lex_multiline_string_indent_should_match_here,none,
+      "should match %select{space|tab}0 here", (unsigned))
+NOTE(lex_multiline_string_indent_change_line,none,
+      "change indentation of %select{this line|these lines}0 to match closing delimiter", (bool))
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
