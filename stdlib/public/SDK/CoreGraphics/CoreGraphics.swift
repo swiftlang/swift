@@ -46,11 +46,6 @@ extension CGColor {
 #endif
 }
 
-extension CGColor: Equatable {}
-public func ==(lhs: CGColor, rhs: CGColor) -> Bool {
-  return lhs.__equalTo(rhs)
-}
-
 
 //===----------------------------------------------------------------------===//
 // CGColorSpace
@@ -474,11 +469,6 @@ extension CGPath {
     return self.__containsPoint(transform: [transform],
      point: point, eoFill: (rule == .evenOdd))
   }
-}
-
-extension CGPath: Equatable {}
-public func ==(lhs: CGPath, rhs: CGPath) -> Bool {
-  return lhs.__equalTo(rhs)
 }
 
 extension CGMutablePath {
