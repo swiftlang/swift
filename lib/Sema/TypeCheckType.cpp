@@ -3242,6 +3242,12 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
+  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
+    auto superclassTy = getSuperClassOf(parenTy->getUnderlyingType());
+    if (!superclassTy)
+      return Type();
+    return ParenType::get(Context, superclassTy);
+  }
   return type->getSuperclass();
 }
 
