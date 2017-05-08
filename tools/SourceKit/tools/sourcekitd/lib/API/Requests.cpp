@@ -192,6 +192,7 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
+                              bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               ResponseReceiver Rec);
 
@@ -758,6 +759,11 @@ handleSemanticRequest(RequestDict Req,
   if (ReqUID == RequestCursorInfo) {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
 
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
     int64_t Offset;
     if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
       int64_t Length = 0;
@@ -765,12 +771,12 @@ handleSemanticRequest(RequestDict Req,
       int64_t Actionables = false;
       Req.getInt64(KeyActionable, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
-          *SourceFile, Offset, Length, Actionables, Args,
-          [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
+          *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
+          Args, [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
     }
     if (auto USR = Req.getString(KeyUSR)) {
       return Lang.getCursorInfoFromUSR(
-          *SourceFile, *USR, Args,
+          *SourceFile, *USR, CancelOnSubsequentRequest, Args,
           [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
     }
 
@@ -782,9 +788,14 @@ handleSemanticRequest(RequestDict Req,
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     int64_t Offset;
     int64_t Length;
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
     if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
       if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
-        return Lang.getRangeInfo(*SourceFile, Offset, Length, Args,
+        return Lang.getRangeInfo(*SourceFile, Offset, Length,
+                                 CancelOnSubsequentRequest, Args,
           [Rec](const RangeInfo &Info) { reportRangeInfo(Info, Rec); });
       }
     }
@@ -835,7 +846,14 @@ handleSemanticRequest(RequestDict Req,
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return findRelatedIdents(*SourceFile, Offset, Args, Rec);
+
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
+    return findRelatedIdents(*SourceFile, Offset, CancelOnSubsequentRequest,
+                             Args, Rec);
   }
 
   {
@@ -1514,11 +1532,12 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
+                              bool CancelOnSubsequentRequest,
                               ArrayRef<const char *> Args,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.findRelatedIdentifiersInFile(Filename, Offset, Args,
-                                    [Rec](const RelatedIdentsInfo &Info) {
+  Lang.findRelatedIdentifiersInFile(Filename, Offset, CancelOnSubsequentRequest,
+                                    Args, [Rec](const RelatedIdentsInfo &Info) {
     if (Info.IsCancelled)
       return Rec(createErrorRequestCancelled());
 

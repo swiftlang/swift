@@ -124,6 +124,7 @@ UIdent sourcekitd::KeyUnpopular("key.unpopular");
 UIdent sourcekitd::KeyHide("key.hide");
 UIdent sourcekitd::KeySimplified("key.simplified");
 UIdent sourcekitd::KeyRangeContent("key.rangecontent");
+UIdent sourcekitd::KeyCancelOnSubsequentRequest("key.cancel_on_subsequent_request");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
