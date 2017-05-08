@@ -407,7 +407,7 @@ private:
         if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
           return {
             RS->hasResult() ? resolveNodeType(RS->getResult(),
-              RangeKind::SingleExpression).getPointer() : nullptr,
+              RangeKind::SingleExpression).getPointer() : VoidTy,
             true
           };
         }
