@@ -221,12 +221,12 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
     decoded.append(scalar)
     expectEqual(
       UnicodeScalar(scalar),
-      Codec.decode(Codec.encode(UnicodeScalar(scalar)!)!))
+      Codec.decode(Codec.encodeIfRepresentable(UnicodeScalar(scalar)!)!))
   }
   
   func output1(_ scalar: UnicodeScalar) {
     decoded.append(scalar.value)
-    expectEqual(scalar, Codec.decode(Codec.encode(scalar)!))
+    expectEqual(scalar, Codec.decode(Codec.encodeIfRepresentable(scalar)!))
   }
   
   var result = assertionSuccess()
@@ -307,16 +307,19 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
   //===--- Transcoded Scalars ---------------------------------------------===//
   for x in decoded.lazy.map({ UnicodeScalar($0)! }) {
     expectEqualSequence(
-      UTF8.encode(x)!,
-      UTF8.transcode(Codec.encode(x)!, from: Codec.self)!
+      UTF8.encodeIfRepresentable(x)!,
+      UTF8.transcodeIfRepresentable(
+        Codec.encodeIfRepresentable(x)!, from: Codec.self)!
     )
     expectEqualSequence(
-      UTF16.encode(x)!,
-      UTF16.transcode(Codec.encode(x)!, from: Codec.self)!
+      UTF16.encodeIfRepresentable(x)!,
+      UTF16.transcodeIfRepresentable(
+        Codec.encodeIfRepresentable(x)!, from: Codec.self)!
     )
     expectEqualSequence(
-      UTF32.encode(x)!,
-      UTF32.transcode(Codec.encode(x)!, from: Codec.self)!
+      UTF32.encodeIfRepresentable(x)!,
+      UTF32.transcodeIfRepresentable(
+        Codec.encodeIfRepresentable(x)!, from: Codec.self)!
     )
   }
   
