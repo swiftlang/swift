@@ -24,6 +24,24 @@
 
 using namespace swift;
 
+extern llvm::cl::opt<bool> EnableSILInliningOfGenerics;
+
+namespace swift {
+
+// Controls the decision to inline functions with @_semantics, @effect and
+// global_init attributes.
+enum class InlineSelection {
+  Everything,
+  NoGlobalInit, // and no availability semantics calls
+  NoSemanticsAndGlobalInit
+};
+
+// Returns the callee of an apply_inst if it is basically inlineable.
+SILFunction *getEligibleFunction(FullApplySite AI,
+                                 InlineSelection WhatToInline);
+
+} // end swift namespace
+
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
 //===----------------------------------------------------------------------===//

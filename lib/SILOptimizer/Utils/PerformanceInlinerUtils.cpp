@@ -534,3 +534,160 @@ void ShortestPathAnalysis::Weight::updateBenefit(int &Benefit,
   if (newBenefit > Benefit)
     Benefit = newBenefit;
 }
+
+// Return true if the callee has self-recursive calls.
+static bool calleeIsSelfRecursive(SILFunction *Callee) {
+  for (auto &BB : *Callee)
+    for (auto &I : BB)
+      if (auto Apply = FullApplySite::isa(&I))
+        if (Apply.getReferencedFunction() == Callee)
+          return true;
+  return false;
+}
+
+// Returns true if the callee contains a partial apply instruction,
+// whose substitutions list would contain opened existentials after
+// inlining.
+static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
+  if (!AI.hasSubstitutions())
+    return false;
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  auto Subs = AI.getSubstitutions();
+
+  // Bail if there are no open existentials in the list of substitutions.
+  bool HasNoOpenedExistentials = true;
+  for (auto Sub : Subs) {
+    if (Sub.getReplacement()->hasOpenedExistential()) {
+      HasNoOpenedExistentials = false;
+      break;
+    }
+  }
+
+  if (HasNoOpenedExistentials)
+    return false;
+
+  auto SubsMap = Callee->getLoweredFunctionType()
+    ->getGenericSignature()->getSubstitutionMap(Subs);
+
+  for (auto &BB : *Callee) {
+    for (auto &I : BB) {
+      if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
+        auto PAISubs = PAI->getSubstitutions();
+        if (PAISubs.empty())
+          continue;
+
+        // Check if any of substitutions would contain open existentials
+        // after inlining.
+        auto PAISubMap = PAI->getOrigCalleeType()
+          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        PAISubMap = PAISubMap.subst(SubsMap);
+        if (PAISubMap.hasOpenedExistential())
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Returns the callee of an apply_inst if it is basically inlineable.
+SILFunction *swift::getEligibleFunction(FullApplySite AI,
+                                        InlineSelection WhatToInline) {
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *EligibleCallee = nullptr;
+
+  if (!Callee) {
+    return nullptr;
+  }
+
+  // Don't inline functions that are marked with the @_semantics or @effects
+  // attribute if the inliner is asked not to inline them.
+  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
+    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
+      ArraySemanticsCall ASC(AI.getInstruction());
+      if (!ASC.canInlineEarly())
+        return nullptr;
+    }
+    // The "availability" semantics attribute is treated like global-init.
+    if (Callee->hasSemanticsAttrs() &&
+        WhatToInline != InlineSelection::Everything &&
+        Callee->hasSemanticsAttrThatStartsWith("availability")) {
+      return nullptr;
+    }
+  } else if (Callee->isGlobalInit()) {
+    if (WhatToInline != InlineSelection::Everything) {
+      return nullptr;
+    }
+  }
+
+  // We can't inline external declarations.
+  if (Callee->empty() || Callee->isExternalDeclaration()) {
+    return nullptr;
+  }
+
+  // Explicitly disabled inlining.
+  if (Callee->getInlineStrategy() == NoInline) {
+    return nullptr;
+  }
+
+  if (!Callee->shouldOptimize()) {
+    return nullptr;
+  }
+
+  SILFunction *Caller = AI.getFunction();
+
+  // We don't support inlining a function that binds dynamic self because we
+  // have no mechanism to preserve the original function's local self metadata.
+  if (mayBindDynamicSelf(Callee)) {
+    // Check if passed Self is the same as the Self of the caller.
+    // In this case, it is safe to inline because both functions
+    // use the same Self.
+    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
+      auto CalleeSelf = stripCasts(AI.getSelfArgument());
+      auto CallerSelf = Caller->getSelfArgument();
+      if (CalleeSelf != SILValue(CallerSelf))
+        return nullptr;
+    } else
+      return nullptr;
+  }
+
+  // Detect self-recursive calls.
+  if (Caller == Callee) {
+    return nullptr;
+  }
+
+  // A non-fragile function may not be inlined into a fragile function.
+  if (Caller->isSerialized() &&
+      !Callee->hasValidLinkageForFragileInline()) {
+    if (!Callee->hasValidLinkageForFragileRef()) {
+      llvm::errs() << "caller: " << Caller->getName() << "\n";
+      llvm::errs() << "callee: " << Callee->getName() << "\n";
+      llvm_unreachable("Should never be inlining a resilient function into "
+                       "a fragile function");
+    }
+    return nullptr;
+  }
+
+  // Inlining self-recursive functions into other functions can result
+  // in excessive code duplication since we run the inliner multiple
+  // times in our pipeline
+  if (calleeIsSelfRecursive(Callee)) {
+    return nullptr;
+  }
+
+  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
+    // Inlining of generics is not allowed.
+    return nullptr;
+  }
+
+  // IRGen cannot handle partial_applies containing opened_existentials
+  // in its substitutions list.
+  if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
+    return nullptr;
+  }
+
+  EligibleCallee = Callee;
+  return EligibleCallee;
+}
