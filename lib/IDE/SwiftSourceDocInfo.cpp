@@ -406,8 +406,8 @@ private:
       if (N.is<Stmt*>()) {
         if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
           return {
-            resolveNodeType(RS->getResult(),
-                            RangeKind::SingleExpression).getPointer(),
+            RS->hasResult() ? resolveNodeType(RS->getResult(),
+              RangeKind::SingleExpression).getPointer() : nullptr,
             true
           };
         }
