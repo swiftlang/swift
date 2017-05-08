@@ -249,6 +249,9 @@ static SILType getNewOptionalFunctionType(GenericEnvironment *GenericEnv,
         auto newType = OptionalType::get(optKind, currCanType);
         CanType newCanType = newType->getCanonicalType();
         newSILType = SILType::getPrimitiveObjectType(newCanType);
+        if (storageType.isAddress()) {
+          newSILType = newSILType.getAddressType();
+        }
       }
     }
   }
@@ -276,6 +279,9 @@ getNewArgTys(GenericEnvironment *GenericEnv, ArrayRef<SILParameterInfo> params,
                                 currSILFunctionType->getParameters(), Mod)) {
         SILType newSILType =
             getNewSILFunctionType(GenericEnv, currSILFunctionType, Mod);
+        if (storageType.isAddress()) {
+          newSILType = newSILType.getAddressType();
+        }
         auto newParam = SILParameterInfo(newSILType.getSwiftRValueType(),
                                          param.getConvention());
         newArgTys.push_back(newParam);
@@ -311,6 +317,9 @@ static SILType getNewSILType(GenericEnvironment *GenericEnv,
     if (containsLargeLoadable(GenericEnv, currSILFunctionType->getParameters(),
                               Mod)) {
       newSILType = getNewSILFunctionType(GenericEnv, currSILFunctionType, Mod);
+      if (storageType.isAddress()) {
+        newSILType = newSILType.getAddressType();
+      }
     }
   } else if (isLargeLoadableType(GenericEnv, storageType, Mod)) {
     newSILType = storageType.getAddressType();
@@ -427,6 +436,7 @@ void LargeValueVisitor::mapValueStorage() {
       case ValueKind::StructElementAddrInst:
       case ValueKind::RefTailAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::BeginAccessInst:
       case ValueKind::EnumInst: {
         // TODO Any more instructions to add here?
         visitResultTyInst(currIns);
@@ -1315,6 +1325,9 @@ static void castTupleInstr(SILInstruction *instr, IRGenModule &Mod) {
     genEnv = getGenericEnvironment(instr->getModule(), canFuncType);
   }
   SILType newSILType = getNewSILFunctionType(genEnv, funcType, Mod);
+  if (currSILType.isAddress()) {
+    newSILType = newSILType.getAddressType();
+  }
   auto II = instr->getIterator();
   ++II;
   SILBuilder castBuilder(II);
@@ -1592,6 +1605,13 @@ static void rewriteFunction(StructLoweringState &pass,
       newInstr = resultTyBuilder.createRefElementAddr(
           Loc, convInstr->getOperand(), convInstr->getField(),
           newSILType.getAddressType());
+      break;
+    }
+    case ValueKind::BeginAccessInst: {
+      auto *convInstr = dyn_cast<BeginAccessInst>(instr);
+      newInstr = resultTyBuilder.createBeginAccess(Loc, convInstr->getOperand(),
+                                                   convInstr->getAccessKind(),
+                                                   convInstr->getEnforcement());
       break;
     }
     case ValueKind::EnumInst: {
