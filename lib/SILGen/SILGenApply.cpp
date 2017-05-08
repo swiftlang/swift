@@ -185,10 +185,8 @@ public:
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
 private:
-  union {
-    ManagedValue IndirectValue;
-    SILDeclRef Constant;
-  };
+  ManagedValue IndirectValue;
+  SILDeclRef Constant;
   SILValue SelfValue;
   CanAnyFunctionType OrigFormalInterfaceType;
   CanFunctionType SubstFormalInterfaceType;
@@ -354,7 +352,7 @@ public:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
-      return Constant.uncurryLevel;
+      return Constant.getUncurryLevel();
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
@@ -372,18 +370,27 @@ public:
     ApplyOptions options = ApplyOptions::None;
     Optional<SILDeclRef> constant = None;
 
+    if (!Constant) {
+      assert(level == 0 && "can't curry indirect function");
+    } else {
+      unsigned uncurryLevel = Constant.getUncurryLevel();
+      assert(level <= uncurryLevel
+             && "uncurrying past natural uncurry level of standalone function");
+      if (level < uncurryLevel) {
+        assert(level == 0);
+        constant = Constant.asCurried();
+      } else {
+        constant = Constant;
+      }
+    }
+
     switch (kind) {
     case Kind::IndirectValue:
-      assert(level == 0 && "can't curry indirect function");
       mv = IndirectValue;
       assert(Substitutions.empty());
       break;
 
     case Kind::StandaloneFunction: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of standalone function");
-      constant = Constant.atUncurryLevel(level);
-
       // If we're currying a direct reference to a class-dispatched method,
       // make sure we emit the right set of thunks.
       if (constant->isCurried && Constant.hasDecl())
@@ -397,9 +404,6 @@ public:
       break;
     }
     case Kind::EnumElement: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of enum constructor");
-      constant = Constant.atUncurryLevel(level);
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       // We should not end up here if the enum constructor call is fully
@@ -411,13 +415,10 @@ public:
       break;
     }
     case Kind::ClassMethod: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      constant = Constant.atUncurryLevel(level);
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
-      if (level < Constant.uncurryLevel) {
+      if (constant->isCurried) {
         SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
@@ -434,12 +435,7 @@ public:
       break;
     }
     case Kind::SuperMethod: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      assert(level == getNaturalUncurryLevel() &&
-             "Currying the self parameter of super method calls should've been emitted");
-
-      constant = Constant.atUncurryLevel(level);
+      assert(!constant->isCurried);
 
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
@@ -453,13 +449,10 @@ public:
       break;
     }
     case Kind::WitnessMethod: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      constant = Constant.atUncurryLevel(level);
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
-      if (level < Constant.uncurryLevel) {
+      if (constant->isCurried) {
         SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
@@ -480,12 +473,8 @@ public:
       break;
     }
     case Kind::DynamicMethod: {
-      assert(level >= 1
-             && "currying 'self' of dynamic method dispatch not yet supported");
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
+      assert(!constant->isCurried);
 
-      constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
       auto substFormalType = getSubstFormalType();

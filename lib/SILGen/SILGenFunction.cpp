@@ -301,9 +301,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
   auto hasCaptures = SGM.Types.hasLoweredLocalCaptures(closure);
-  assert(((constant.uncurryLevel == 1 && hasCaptures) ||
-          (constant.uncurryLevel == 0 && !hasCaptures)) &&
-         "curried local functions not yet supported");
 
   auto constantInfo = getConstantInfo(constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);

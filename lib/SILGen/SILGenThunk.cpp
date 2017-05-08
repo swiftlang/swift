@@ -129,17 +129,15 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 }
 
 void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
-  auto *vd = thunk.getDecl();
+  assert(thunk.isCurried);
 
-#ifndef NDEBUG
-  assert(thunk.uncurryLevel == 0
-         && "currying function at level other than one?!");
+  auto *vd = thunk.getDecl();
 
   if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
     assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
            "methods cannot have captures");
+    (void) fd;
   }
-#endif
 
   auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
     ->getInput();
@@ -174,7 +172,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
 }
 
 void SILGenModule::emitCurryThunk(SILDeclRef constant) {
-  assert(constant.uncurryLevel == 0);
+  assert(constant.isCurried);
 
   // Thunks are always emitted by need, so don't need delayed emission.
   SILFunction *f = getFunction(constant, ForDefinition);

@@ -549,18 +549,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   IsFreeFunctionWitness_t isFree,
                                   Witness witness) {
   auto requirementInfo = Types.getConstantInfo(requirement);
-  unsigned witnessUncurryLevel = witnessRef.uncurryLevel;
-
-  // If the witness is a free function, consider the self argument
-  // uncurry level.
-  if (isFree)
-    ++witnessUncurryLevel;
-
-  // The SIL witness thunk has the type of the AST-level witness with
-  // witness substitutions applied, at the abstraction level of the
-  // original protocol requirement.
-  assert(requirement.uncurryLevel == witnessUncurryLevel &&
-         "uncurry level of requirement and witness do not match");
 
   GenericEnvironment *genericEnv = nullptr;
 
