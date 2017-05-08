@@ -384,3 +384,11 @@ func getContainerForPanda() -> AnimalContainer<Animal> {
 func getContainerForFungiblePanda() -> FungibleAnimalContainer<Animal & Fungible> {
   return Panda.getFungibleContainer()
 }
+
+// rdar://problem/30832766 - Infinite recursion while checking conformance
+// to AnyObject
+let third: Third! = Third()
+
+func useThird() {
+  _ = third.description
+}
