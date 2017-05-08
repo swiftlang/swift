@@ -156,15 +156,6 @@ void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
       if (access->getEnforcement() == SILAccessEnforcement::Unknown)
         Accesses.push_back(access);
     }
-
-    // FIXME: We should distinguish between escapes via arguments to escaping
-    // closures (which must propagate to to all reachable blocks because they
-    // could access the address at any later point in the program) and
-    // non-escaping closures (which only force dynamic enforcement for
-    // accesses that are in progress at the time of the escape).
-    if (auto partialApply = dyn_cast<PartialApplyInst>(user)) {
-      noteEscapingUse(partialApply);
-    }
   }
 }
 
@@ -378,19 +369,15 @@ struct AccessEnforcementSelection : SILFunctionTransform {
     if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
       switch (arg->getArgumentConvention()) {
       case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
         // `inout` arguments are checked on the caller side, either statically
         // or dynamically if necessary. The @inout does not alias and cannot
         // escape within the callee, so static enforcement is always sufficient.
-        setStaticEnforcement(access);
-        break;
-      case SILArgumentConvention::Indirect_InoutAliasable:
-        // `inout_aliasable` are not enforced on the caller side. Dynamic
-        // enforcement is required unless we have special knowledge of how this
-        // closure is used at its call-site.
         //
-        // TODO: optimize closures passed to call sites in which the captured
-        // variable is not modified by any closure passed to the same call.
-        setDynamicEnforcement(access);
+        // FIXME: `inout_aliasable` are not currently enforced on the caller
+        // side. Consequenctly, using static enforcement for noescape closures
+        // may fails to diagnose certain violations.
+        setStaticEnforcement(access);
         break;
       default:
         // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or

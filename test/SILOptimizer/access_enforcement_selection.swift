@@ -29,14 +29,10 @@ public func captureStack() -> Int {
 // Dynamic access for `return x`. Since the closure is non-escaping, using
 // dynamic enforcement here is more conservative than it needs to be -- static
 // is sufficient here.
-// CHECK: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
-// The access inside the closure is dynamic, until we have the logic necessary to
-// prove that no other closures are passed to `takeClosure` that may write to
-// `x`.
-//
 // CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection12captureStackSiyFSiycfU_
-// CHECK: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
 
 // Generate an alloc_stack that does not escape into a closure.
@@ -60,15 +56,13 @@ public func captureStackWithInoutInProgress() -> Int {
   return x
 }
 // CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection31captureStackWithInoutInProgressSiyF
-// Dynamic access for `&x`. This must be dynamic so that we catch the conflict
-// in the closure.
-// CHECK-DAG: Dynamic Access: %{{.*}} = begin_access [modify] [dynamic] %{{.*}} : $*Int
-// Dynamic access for `return x`. This is more conservative than it needs
-// to be; it can be static.
-// CHECK-DAG: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// Static access for `&x`.
+// CHECK-DAG: Static Access: %{{.*}} = begin_access [modify] [static] %{{.*}} : $*Int
+// Static access for `return x`.
+// CHECK-DAG: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 //
 // CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection31captureStackWithInoutInProgressSiyFSiycfU_
-// CHECK: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
 // Generate an alloc_box that escapes into a closure.
 public func captureBox() -> Int {
@@ -90,17 +84,15 @@ public func recaptureStack() -> Int {
 }
 // CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection14recaptureStackSiyF
 //
-// Dynamic access for `return x`. This is more conservative than it needs
-// to be; static is sufficient.
-// CHECK: Dynamic Access:   %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// Static access for `return x`.
+// CHECK: Static Access:   %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
 
 // CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection14recaptureStackSiyFSiycfU_
 //
-// The first [modify] access inside the closure must be dynamic. It enforces the
+// The first [modify] access inside the closure is static. It enforces the
 // @inout argument.
-// CHECK: Dynamic Access: %{{.*}} = begin_access [modify] [dynamic] %{{.*}} : $*Int
+// CHECK: Static Access: %{{.*}} = begin_access [modify] [static] %{{.*}} : $*Int
 //
-// The second [read] access is only dynamic because the analysis isn't strong
-// enough to prove otherwise. Same as `captureStack` above.
+// The second [read] access is static. Same as `captureStack` above.
 //
-// CHECK: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
