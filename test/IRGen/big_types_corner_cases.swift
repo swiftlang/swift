@@ -12,6 +12,32 @@ public struct BigStruct {
   var i8 : Int32 = 8
 }
 
+func takeClosure(execute block: () -> Void) {
+}
+
+class OptionalInoutFuncType {
+  private var lp :  BigStruct?
+  private var _handler : ((BigStruct?, Error?) -> ())?
+
+  func execute(_ error: Error?) {
+    var p : BigStruct?
+    var handler: ((BigStruct?, Error?) -> ())?
+    
+    takeClosure {
+      p = self.lp
+      handler = self._handler
+      self._handler = nil
+    }
+
+    handler?(p, error)
+  }
+}
+
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIxcx_Sg* nocapture dereferenceable({{.*}})
+// CHECK: call void @_T0SqWy
+// CHECK: call void @_T0SqWe
+// CHECK: ret void
+
 public func f1_returns_BigType(_ x: BigStruct) -> BigStruct {
   return x
 }
