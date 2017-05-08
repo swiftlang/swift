@@ -105,6 +105,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift
   Runtime.swift.gyb
   SipHash.swift.gyb
+  SentinelCollection.swift
   Sequence.swift
   SequenceAlgorithms.swift.gyb
   SequenceWrapper.swift
