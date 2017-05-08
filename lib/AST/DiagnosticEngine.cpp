@@ -247,6 +247,14 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
+bool DiagnosticEngine::finishProcessing() {
+  bool hadError = false;
+  for (auto &Consumer : Consumers) {
+    hadError |= Consumer->finishProcessing();
+  }
+  return hadError;
+}
+
 /// \brief Skip forward to one of the given delimiters.
 ///
 /// \param Text The text to search through, which will be updated to point
