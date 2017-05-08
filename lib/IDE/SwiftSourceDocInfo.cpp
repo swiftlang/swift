@@ -227,10 +227,15 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   OS << "</Kind>\n";
 
   OS << "<Content>" << Content << "</Content>\n";
-  if (Ty) {
+
+  if (auto Ty = ExitInfo.getPointer()) {
     OS << "<Type>";
     Ty->print(OS);
-    OS << "</Type>\n";
+    OS << "</Type>";
+    if (ExitInfo.getInt()) {
+      OS << "<Exit>true</Exit>";
+    }
+    OS << "\n";
   }
 
   if (RangeContext) {
@@ -382,10 +387,10 @@ private:
   std::vector<ASTNode> ContainedASTNodes;
 
   /// Collect the type that an ASTNode should be evaluated to.
-  Type resolveNodeType(ASTNode N, RangeKind Kind) {
-    auto VoidTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
+  ReturnTyAndWhetherExit resolveNodeType(ASTNode N, RangeKind Kind) {
+    auto *VoidTy = Ctx.getVoidDecl()->getDeclaredInterfaceType().getPointer();
     if (N.isNull())
-        return VoidTy;
+      return {VoidTy, false};
     switch(Kind) {
     case RangeKind::Invalid:
     case RangeKind::SingleDecl:
@@ -393,14 +398,18 @@ private:
 
     // For a single expression, its type is apparent.
     case RangeKind::SingleExpression:
-      return N.get<Expr*>()->getType();
+      return {N.get<Expr*>()->getType().getPointer(), false};
 
     // For statements, we either resolve to the returning type or Void.
     case RangeKind::SingleStatement:
     case RangeKind::MultiStatement: {
       if (N.is<Stmt*>()) {
         if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
-          return resolveNodeType(RS->getResult(), RangeKind::SingleExpression);
+          return {
+            resolveNodeType(RS->hasResult() ? RS->getResult() : nullptr,
+              RangeKind::SingleExpression).getPointer(),
+            true
+          };
         }
 
         // Unbox the brace statement to find its type.
@@ -419,15 +428,16 @@ private:
                                         RangeKind::SingleStatement);
 
           // If two branches agree on the return type, return that type.
-          if (ThenTy->isEqual(ElseTy))
+          if (ThenTy.getPointer()->isEqual(ElseTy.getPointer()) &&
+              ThenTy.getInt() == ElseTy.getInt())
             return ThenTy;
 
           // Otherwise, return the error type.
-          return Ctx.TheErrorType;
+          return {Ctx.TheErrorType.getPointer(), false};
         }
       }
       // For other statements, the type should be void.
-      return VoidTy;
+      return {VoidTy, false};
     }
     }
   }
@@ -458,7 +468,7 @@ private:
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
-      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
+      return ResolvedRangeInfo(RangeKind::SingleDecl, {nullptr, false}, Content,
                                getImmediateContext(), SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
