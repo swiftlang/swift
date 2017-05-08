@@ -376,6 +376,9 @@ private:
 
   /// Collect the type that an ASTNode should be evaluated to.
   Type resolveNodeType(ASTNode N, RangeKind Kind) {
+    auto VoidTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
+    if (N.isNull())
+        return VoidTy;
     switch(Kind) {
     case RangeKind::Invalid:
     case RangeKind::SingleDecl:
@@ -400,9 +403,24 @@ private:
                                    RangeKind::SingleStatement);
           }
         }
+
+        // Unbox the if statement to find its type.
+        if (auto *IS = dyn_cast<IfStmt>(N.get<Stmt*>())) {
+          auto ThenTy = resolveNodeType(IS->getThenStmt(),
+                                        RangeKind::SingleStatement);
+          auto ElseTy = resolveNodeType(IS->getElseStmt(),
+                                        RangeKind::SingleStatement);
+
+          // If two branches agree on the return type, return that type.
+          if (ThenTy->isEqual(ElseTy))
+            return ThenTy;
+
+          // Otherwise, return the error type.
+          return Ctx.TheErrorType;
+        }
       }
       // For other statements, the type should be void.
-      return Ctx.getVoidDecl()->getDeclaredInterfaceType();
+      return VoidTy;
     }
     }
   }
