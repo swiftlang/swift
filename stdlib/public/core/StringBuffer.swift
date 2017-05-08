@@ -97,7 +97,7 @@ public struct _StringBuffer {
   ) -> (_StringBuffer?, hadError: Bool)
     where
     Input : Collection, // Sequence?
-    Encoding : UnicodeCodec,
+    Encoding : UnicodeEncoding,
     Input.Iterator.Element == Encoding.CodeUnit {
     // Determine how many UTF-16 code units we'll need
     let inputStream = input.makeIterator()

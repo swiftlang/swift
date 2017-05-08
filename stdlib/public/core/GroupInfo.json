@@ -4,6 +4,7 @@
     "AssertCommon.swift"
   ],
   "String": [
+    "ASCII.swift",
     "CString.swift",
     "Character.swift",
     "StaticString.swift",
