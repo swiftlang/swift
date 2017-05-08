@@ -104,6 +104,8 @@ def main():
                              "--build-dir is specified, none otherwise)")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="run test with verbose output")
+    parser.add_argument("-n", "--no-execute", action="store_true",
+                        help="print test scripts, but do not execute them ")
     parser.add_argument("--build-dir", type=os.path.realpath, metavar="PATH",
                         help="Swift build directory")
     parser.add_argument("--build",
@@ -226,8 +228,10 @@ def main():
             shutil.rmtree(args.result_dir)
         os.makedirs(args.result_dir)
 
-    if args.verbose:
+    if args.verbose or args.no_execute:
         test_args = ["-a"]
+        if args.no_execute:
+            test_args += ["--no-execute"]
     else:
         test_args = ["-sv"]
 
