@@ -265,7 +265,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var s = encode(input)!._storage
+    var s = encodeIfRepresentable(input)!._storage
     processCodeUnit(UInt8(extendingOrTruncating: s))
     s &>>= 8
     if _fastPath(s == 0) { return }
@@ -414,7 +414,7 @@ extension _Unicode.UTF16 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var s = encode(input)!._storage
+    var s = encodeIfRepresentable(input)!._storage
     processCodeUnit(UInt16(extendingOrTruncating: s))
     s &>>= 16
     if _fastPath(s == 0) { return }
