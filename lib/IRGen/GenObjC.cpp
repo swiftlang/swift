@@ -1004,13 +1004,8 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  // FIXME: Explosion level
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-
-  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func,
-                                 expansion,
-                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                 /*foreign*/ true);
+  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, getter);
 }
@@ -1028,11 +1023,8 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   assert(property->isSettable(property->getDeclContext()) &&
          "property is not settable?!");
   
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func,
-                                 expansion,
-                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                 /*foreign*/ true);
+  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, setter);
 }
@@ -1047,11 +1039,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(method->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,
-                                  expansion,
-                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                  /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, declRef);
 }
@@ -1066,11 +1055,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(constructor->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer,
-                                  expansion,
-                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                  /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, declRef);
 }
@@ -1081,11 +1067,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                             DestructorDecl *destructor) {
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator,
-                                  expansion,
-                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                  /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, declRef);
 }

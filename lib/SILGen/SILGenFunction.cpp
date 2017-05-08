@@ -465,9 +465,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
     assert(results.size() == 1 && "more than one UIApplicationMain?");
 
-    SILDeclRef mainRef{results.front(), ResilienceExpansion::Minimal,
-                       SILDeclRef::ConstructAtNaturalUncurryLevel,
-                       /*isForeign*/true};
+    auto mainRef = SILDeclRef(results.front()).asForeign();
     auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
                                                          NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();

@@ -255,12 +255,8 @@ public:
   }
 
   void addConstructor(ConstructorDecl *cd, Witness witness) {
-    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator,
-                              ResilienceExpansion::Minimal);
-
-    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator,
-                          SILDeclRef::ConstructAtBestResilienceExpansion,
-                          requirementRef.uncurryLevel);
+    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator);
+    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator);
 
     asDerived().addMethod(requirementRef, witnessRef, IsNotFreeFunctionWitness,
                           witness);
@@ -283,20 +279,11 @@ public:
 
 private:
   void addMethod(FuncDecl *fd, ValueDecl *witnessDecl, Witness witness) {
-
-    // TODO: multiple resilience expansions?
-    // TODO: multiple uncurry levels?
-    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func,
-                              ResilienceExpansion::Minimal);
+    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);
     // Free function witnesses have an implicit uncurry layer imposed on them by
     // the inserted metatype argument.
     auto isFree = isFreeFunctionWitness(fd, witnessDecl);
-    unsigned witnessUncurryLevel = isFree ? requirementRef.uncurryLevel - 1
-                                          : requirementRef.uncurryLevel;
-
-    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func,
-                          SILDeclRef::ConstructAtBestResilienceExpansion,
-                          witnessUncurryLevel);
+    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func);
 
     asDerived().addMethod(requirementRef, witnessRef, isFree, witness);
   }
