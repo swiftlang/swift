@@ -278,6 +278,8 @@ struct ResolvedRangeInfo {
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
+  bool exit() const { return ExitInfo.getInt(); }
+  Type getType() const { return ExitInfo.getPointer(); }
 };
 
 class RangeResolver : public SourceEntityWalker {
