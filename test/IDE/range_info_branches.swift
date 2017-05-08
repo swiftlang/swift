@@ -10,7 +10,7 @@ func foo(_ a: Bool) -> Int{
   }
 }
 
-func foo(_ a: Bool) {
+func foo1(_ a: Bool) {
   if a {}
   if a {}
   else {}
