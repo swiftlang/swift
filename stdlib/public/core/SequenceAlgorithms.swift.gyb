@@ -729,13 +729,6 @@ extension Sequence {
     }
     return result
   }
-
-  @available(*, deprecated, message: "This call uses implicit promotion to optional. Please use map instead.")
-  public func flatMap<T>(
-    _ transform: (${GElement}) throws -> T
-  ) rethrows -> [T] {
-    return try map(transform)
-  }
 }
 
 extension Sequence {
