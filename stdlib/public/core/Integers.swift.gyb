@@ -1339,7 +1339,9 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable {
+  Hashable, Numeric, CustomStringConvertible, Strideable
+  where Magnitude : BinaryInteger, Magnitude.Magnitude == Magnitude
+{
   // FIXME(ABI) (Recursive Protocol Constraints): should add:
   // where Magnitude : BinaryInteger
 
@@ -2023,7 +2025,9 @@ public enum ArithmeticOverflow {
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations {
+public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations
+  where Magnitude : FixedWidthInteger
+{
   // FIXME(ABI) (Recursive Protocol Constraints): should add:
   // where Magnitude : FixedWidthInteger
 
@@ -2397,8 +2401,7 @@ ${operatorComment('&' + x.operator, True)}
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent only nonnegative values.
-public protocol UnsignedInteger : BinaryInteger
-  where Magnitude : BinaryInteger { }
+public protocol UnsignedInteger : BinaryInteger { }
 
 extension UnsignedInteger {
   /// The magnitude of this value.
@@ -2504,8 +2507,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent both positive and negative values.
-public protocol SignedInteger : BinaryInteger, SignedNumeric
-    where Magnitude : BinaryInteger {
+public protocol SignedInteger : BinaryInteger, SignedNumeric {
   // These requirements are for the source code compatibility with Swift 3
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
@@ -3162,11 +3164,8 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
 //===--- DoubleWidth ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public struct DoubleWidth<Base : FixedWidthInteger>
-  : FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral
-  where
-  Base.Magnitude : FixedWidthInteger,
-  Base.Magnitude.Magnitude == Base.Magnitude {
+public struct DoubleWidth<Base : FixedWidthInteger> :
+  FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral {
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
@@ -3229,32 +3228,15 @@ public struct DoubleWidth<Base : FixedWidthInteger>
   // we have recursive constraints, and BinaryInteger.Magnitude : BinaryInteger
   // then the constrained versions can replace these stubs.
   public init?<T : BinaryInteger>(exactly source: T) {
-    guard let low = Low(exactly: source) else {
-      print("Couldn't create a DW<\(Base.self)> from \(source)")
-      return nil
-    }
-    self.init((0, low))
-  }
-    
-  public init<T : BinaryInteger>(_ source: T) where T.Magnitude: BinaryInteger {
-    self.init(exactly: source)!
-  }
-    
-  public init?<T : BinaryInteger>(exactly source: T)
-    where T.Magnitude: BinaryInteger
-    // FIXME: This makes this init *too* specific somehow, but we would need it
-    // to write DoubleWidth(DoubleWidth...)
-    // T.Magnitude == T.Magnitude.Magnitude
-  {
     // Can't represent a negative 'source' if Base is unsigned
     guard source >= 0 || DoubleWidth<Base>.isSigned else { return nil }
     
     // Is 'source' is entirely representable in Low?
     if let low = Low(exactly: source.magnitude) {
       if source < 0 {
-          self.init((~0, ~low + 1))
+        self.init((~0, ~low + 1))
       } else {
-          self.init((0, low))
+        self.init((0, low))
       }
     } else {
       // At this point we know source's bitWidth > Base.bitWidth, or else
