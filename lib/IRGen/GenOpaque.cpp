@@ -352,16 +352,12 @@ static void setHelperAttributesForAggResult(llvm::CallInst *call,
   auto attrs = llvm::AttributeList::get(call->getContext(),
                                         llvm::AttributeList::FunctionIndex,
                                         llvm::Attribute::NoUnwind);
-
-  attrs = attrs.addAttribute(call->getContext(), 1, llvm::Attribute::NoAlias);
+  call->setAttributes(attrs);
+  call->addParamAttr(0, llvm::Attribute::NoAlias);
 
   // Only set 'sret' if this is also the formal result.
-  if (isFormalResult) {
-    attrs = attrs.addAttribute(call->getContext(), 1,
-                               llvm::Attribute::StructRet);
-  }
-
-  call->setAttributes(attrs);
+  if (isFormalResult)
+    call->addParamAttr(0, llvm::Attribute::StructRet);
 }
 
 /// Given a call to a helper function, set attributes appropriately.

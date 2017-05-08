@@ -367,7 +367,7 @@ private:
 
   /// A work queue of functions that may have been modified and should be
   /// analyzed again.
-  std::vector<WeakVH> Deferred;
+  std::vector<WeakTrackingVH> Deferred;
 
   /// The set of all distinct functions. Use the insert() and remove() methods
   /// to modify it. The map allows efficient lookup and deferring of Functions.
@@ -390,7 +390,7 @@ private:
 
   /// Checks the rules of order relation introduced among functions set.
   /// Returns true, if sanity check has been passed, and false if failed.
-  bool doSanityCheck(std::vector<WeakVH> &Worklist);
+  bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence
   /// class containing \p FE by \p Delta.
@@ -435,7 +435,7 @@ llvm::ModulePass *swift::createSwiftMergeFunctionsPass() {
   return new SwiftMergeFunctions();
 }
 
-bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
+bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
   if (const unsigned Max = NumFunctionsForSanityCheck) {
     unsigned TripleNumber = 0;
     bool Valid = true;
@@ -443,10 +443,12 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
     dbgs() << "MERGEFUNC-SANITY: Started for first " << Max << " functions.\n";
 
     unsigned i = 0;
-    for (std::vector<WeakVH>::iterator I = Worklist.begin(), E = Worklist.end();
+    for (std::vector<WeakTrackingVH>::iterator I = Worklist.begin(),
+                                               E = Worklist.end();
          I != E && i < Max; ++I, ++i) {
       unsigned j = i;
-      for (std::vector<WeakVH>::iterator J = I; J != E && j < Max; ++J, ++j) {
+      for (std::vector<WeakTrackingVH>::iterator J = I; J != E && j < Max;
+           ++J, ++j) {
         Function *F1 = cast<Function>(*I);
         Function *F2 = cast<Function>(*J);
         int Res1 = SwiftFunctionComparator(F1, F2, &GlobalNumbers).
@@ -467,7 +469,7 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
           continue;
 
         unsigned k = j;
-        for (std::vector<WeakVH>::iterator K = J; K != E && k < Max;
+        for (std::vector<WeakTrackingVH>::iterator K = J; K != E && k < Max;
              ++k, ++K, ++TripleNumber) {
           if (K == J)
             continue;
@@ -585,12 +587,12 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     // consider merging it. Otherwise it is dropped and never considered again.
     if ((I != S && std::prev(I)->first == I->first) ||
         (std::next(I) != IE && std::next(I)->first == I->first) ) {
-      Deferred.push_back(WeakVH(F));
+      Deferred.push_back(WeakTrackingVH(F));
     }
   }
 
   do {
-    std::vector<WeakVH> Worklist;
+    std::vector<WeakTrackingVH> Worklist;
     Deferred.swap(Worklist);
 
     DEBUG(dbgs() << "======\nbuild tree: worklist-size=" << Worklist.size() <<
@@ -600,10 +602,10 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     SmallVector<FunctionEntry *, 8> FuncsToMerge;
 
     // Insert all candidates into the Worklist.
-    for (std::vector<WeakVH>::iterator I = Worklist.begin(),
-           E = Worklist.end(); I != E; ++I) {
-      if (!*I) continue;
-      Function *F = cast<Function>(*I);
+    for (WeakTrackingVH &I : Worklist) {
+      if (!I)
+        continue;
+      Function *F = cast<Function>(I);
       FunctionEntry *FE = getEntry(F);
       assert(!isInEquivalenceClass(FE));
 

@@ -86,8 +86,8 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, argIndex + 1, b);
-  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
+  attrs = attrs.addAttributes(IGM.LLVMContext,
+                              argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
 static void addInoutParameterAttributes(IRGenModule &IGM,
@@ -102,8 +102,8 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, argIndex + 1, b);
-  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
+  attrs = attrs.addAttributes(IGM.LLVMContext,
+                              argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
@@ -134,32 +134,24 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
                                         unsigned paramIndex, bool allowSRet) {
-  static const llvm::Attribute::AttrKind attrKindsWithSRet[] = {
-    llvm::Attribute::StructRet,
-    llvm::Attribute::NoAlias,
-    llvm::Attribute::NoCapture,
-  };
-  static const llvm::Attribute::AttrKind attrKindsWithoutSRet[] = {
-    llvm::Attribute::NoAlias,
-    llvm::Attribute::NoCapture,
-  };
-  auto resultAttrs = llvm::AttributeList::get(
-      IGM.LLVMContext, paramIndex + 1,
-      (allowSRet ? makeArrayRef(attrKindsWithSRet)
-                 : makeArrayRef(attrKindsWithoutSRet)));
-  attrs = attrs.addAttributes(IGM.LLVMContext, paramIndex + 1, resultAttrs);
+  llvm::AttrBuilder b;
+  b.addAttribute(llvm::Attribute::NoAlias);
+  b.addAttribute(llvm::Attribute::NoCapture);
+  if (allowSRet)
+    b.addAttribute(llvm::Attribute::StructRet);
+  attrs = attrs.addAttributes(IGM.LLVMContext,
+                              paramIndex + llvm::AttributeList::FirstArgIndex,
+                              b);
 }
 
 void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   if (!UseSwiftCC)
     return;
-  static const llvm::Attribute::AttrKind attrKinds[] = {
-    llvm::Attribute::SwiftSelf,
-  };
-  auto argAttrs =
-      llvm::AttributeList::get(this->LLVMContext, argIndex + 1, attrKinds);
-  attrs = attrs.addAttributes(this->LLVMContext, argIndex + 1, argAttrs);
+  llvm::AttrBuilder b;
+  b.addAttribute(llvm::Attribute::SwiftSelf);
+  attrs = attrs.addAttributes(this->LLVMContext,
+                              argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
@@ -171,12 +163,10 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   if (!UseSwiftCC || !this->IsSwiftErrorInRegister)
     return;
 
-  static const llvm::Attribute::AttrKind attrKinds[] = {
-    llvm::Attribute::SwiftError,
-  };
-  auto argAttrs =
-      llvm::AttributeList::get(this->LLVMContext, argIndex + 1, attrKinds);
-  attrs = attrs.addAttributes(this->LLVMContext, argIndex + 1, argAttrs);
+  llvm::AttrBuilder b;
+  b.addAttribute(llvm::Attribute::SwiftError);
+  attrs = attrs.addAttributes(this->LLVMContext,
+                              argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -186,10 +176,8 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
   b.addAttribute(llvm::Attribute::ByVal);
   b.addAttribute(llvm::Attribute::getWithAlignment(IGM.LLVMContext,
                                                    align.getValue()));
-  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, argIndex + 1, b);
   attrs = attrs.addAttributes(IGM.LLVMContext,
-                              argIndex+1,
-                              resultAttrs);
+                              argIndex + llvm::AttributeList::FirstArgIndex, b);
 }
 
 void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
@@ -199,8 +187,7 @@ void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
     b.addAttribute(llvm::Attribute::SExt);
   else
     b.addAttribute(llvm::Attribute::ZExt);
-  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, index, b);
-  attrs = attrs.addAttributes(IGM.LLVMContext, index, resultAttrs);
+  attrs = attrs.addAttributes(IGM.LLVMContext, index, b);
 }
 
 namespace {
@@ -928,7 +915,8 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
-      addExtendAttribute(IGM, Attrs, getCurParamIndex()+1, signExt);
+      addExtendAttribute(IGM, Attrs, getCurParamIndex() +
+                         llvm::AttributeList::FirstArgIndex, signExt);
       LLVM_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct: {
@@ -1489,7 +1477,8 @@ void CallEmission::setFromCallee() {
     // TODO: Add swift_error attribute.
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = errorResultSlot.getAddress();
-    addAttribute(LastArgWritten + 1, llvm::Attribute::NoCapture);
+    addAttribute(LastArgWritten + llvm::AttributeList::FirstArgIndex,
+                 llvm::Attribute::NoCapture);
     IGF.IGM.addSwiftErrorAttributes(Attrs, LastArgWritten);
 
     // Fill in the context pointer if necessary.

@@ -461,16 +461,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     }
     // FIXME: getting attributes here without setting them does
     // nothing. This cannot be fixed until the attributes are correctly specified.
-    fn->getAttributes().addAttributes(
-        Module.getContext(), llvm::AttributeList::FunctionIndex,
-        llvm::AttributeList::get(Module.getContext(),
-                                 llvm::AttributeList::FunctionIndex,
-                                 buildFnAttr));
-    fn->getAttributes().addAttributes(
-        Module.getContext(), llvm::AttributeList::ReturnIndex,
-        llvm::AttributeList::get(Module.getContext(),
-                                 llvm::AttributeList::ReturnIndex,
-                                 buildRetAttr));
+    fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
+    fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
   }
 
   return cache;
@@ -759,21 +751,14 @@ llvm::AttributeList IRGenModule::getAllocAttrs() {
   return AllocAttrs;
 }
 
-/// Construct initial attributes from options.
-llvm::AttributeList IRGenModule::constructInitialAttributes() {
-  llvm::AttributeList attrsUpdated;
+/// Construct initial function attributes from options.
+void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
   // Add DisableFPElim. 
   if (!IRGen.Opts.DisableFPElim) {
-    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                                             llvm::AttributeList::FunctionIndex,
-                                             "no-frame-pointer-elim", "false");
+    Attrs.addAttribute("no-frame-pointer-elim", "false");
   } else {
-    attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeList::FunctionIndex,
-        "no-frame-pointer-elim", "true");
-    attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeList::FunctionIndex,
-        "no-frame-pointer-elim-non-leaf");
+    Attrs.addAttribute("no-frame-pointer-elim", "true");
+    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
   }
 
   // Add target-cpu and target-features if they are non-null.
@@ -782,8 +767,7 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
 
   std::string &CPU = ClangOpts.CPU;
   if (CPU != "")
-    attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeList::FunctionIndex, "target-cpu", CPU);
+    Attrs.addAttribute("target-cpu", CPU);
 
   std::vector<std::string> &Features = ClangOpts.Features;
   if (!Features.empty()) {
@@ -793,11 +777,15 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
     }, [&]{
       allFeatures.push_back(',');
     });
-    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeList::FunctionIndex, "target-features",
-                     allFeatures);
+    Attrs.addAttribute("target-features", allFeatures);
   }
-  return attrsUpdated;
+}
+
+llvm::AttributeList IRGenModule::constructInitialAttributes() {
+  llvm::AttrBuilder b;
+  constructInitialFnAttributes(b);
+  return llvm::AttributeList::get(LLVMContext,
+                                  llvm::AttributeList::FunctionIndex, b);
 }
 
 llvm::Constant *IRGenModule::getSize(Size size) {

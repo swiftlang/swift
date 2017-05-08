@@ -651,7 +651,9 @@ static DtorKind analyzeDestructor(Value *P) {
 
       // Okay, the function has some side effects, if it doesn't capture the
       // object argument, at least that is something.
-      return DtorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
+      return DtorFn->hasAttribute(llvm::AttributeList::ReturnIndex,
+                                  llvm::Attribute::NoCapture) ?
+        DtorKind::NoEscape : DtorKind::Unknown;
     }
   }
 

@@ -728,11 +728,11 @@ static llvm::Function *emitPartialApplicationForwarder(
   fwd->setCallingConv(
       expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
 
-  auto initialAttrs = IGM.constructInitialAttributes();
-  // Merge initialAttrs with outAttrs.
-  auto updatedAttrs = outAttrs.addAttributes(
-      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, initialAttrs);
-  fwd->setAttributes(updatedAttrs);
+  fwd->setAttributes(outAttrs);
+  // Merge initial attributes with outAttrs.
+  llvm::AttrBuilder b;
+  IGM.constructInitialFnAttributes(b);
+  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
