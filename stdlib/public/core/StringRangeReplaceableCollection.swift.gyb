@@ -41,8 +41,8 @@ extension String : StringProtocol {
   // - init<S>(_ characters: S) where S : Sequence, S.Iterator.Element == Character
   // Cannot simply do init(_: String) as that would itself be ambiguous with
   // init?(_ description: String)
-  public init<T : StringProtocol>(_ other: T) {
-    self.init(other.characters)
+  public init(_ other: String) {
+    self.init(other._core)
   }
 
   /// The position of the first character in a nonempty string.
