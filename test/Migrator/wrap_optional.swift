@@ -12,13 +12,14 @@ class MyCities : Cities {
   override func mooloolaba(x: Cities, y: Cities?) {}
   override func toowoomba(x: [Cities], y: [Cities]?) {}
   override func mareeba(x: [String : Cities?], y: [String : Cities]?) {}
+  override func maroochy(x: (Int)?, y: Int?) {}
 }
 
 class MySubCities : MyCities {}
 
 class MySubSubCities : MySubCities {
   override func yandina(x: [[String : Cities]]!) {}
-  override func buderim() -> Cities? { return Cities(x: 1) }
+  override func buderim() -> Cities? { return nil }
   override func noosa() -> [[String : Cities]?] { return [] }
 }
 
