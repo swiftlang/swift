@@ -420,7 +420,7 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(0, result._isNegative, "0 * -1")
     }
 
-    func test_Normalise() {
+    func test_Normalize() {
         var one = Decimal(1)
         var ten = Decimal(-10)
         expectEqual(.noError, NSDecimalNormalize(&one, &ten, .plain))
@@ -598,7 +598,7 @@ DecimalTests.test("test_Misc") { TestDecimal().test_Misc() }
 DecimalTests.test("test_MultiplicationOverflow") { TestDecimal().test_MultiplicationOverflow() }
 DecimalTests.test("test_NaNInput") { TestDecimal().test_NaNInput() }
 DecimalTests.test("test_NegativeAndZeroMultiplication") { TestDecimal().test_NegativeAndZeroMultiplication() }
-DecimalTests.test("test_Normalise") { TestDecimal().test_Normalise() }
+DecimalTests.test("test_Normalize") { TestDecimal().test_Normalize() }
 DecimalTests.test("test_NSDecimal") { TestDecimal().test_NSDecimal() }
 DecimalTests.test("test_RepeatingDivision") { TestDecimal().test_RepeatingDivision() }
 DecimalTests.test("test_Round") { TestDecimal().test_Round() }
