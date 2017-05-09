@@ -235,6 +235,23 @@ class Subclass: Foo {
   dynamic override func overriddenByDynamic() {}
 }
 
+class SubclassWithInheritedInits: Foo {
+  // CHECK-LABEL: sil hidden @_T07dynamic26SubclassWithInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         super_method [volatile] {{%.*}} : $SubclassWithInheritedInits, #Foo.init!initializer.1.foreign :
+}
+class GrandchildWithInheritedInits: SubclassWithInheritedInits {
+  // CHECK-LABEL: sil hidden @_T07dynamic28GrandchildWithInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         super_method [volatile] {{%.*}} : $GrandchildWithInheritedInits, #SubclassWithInheritedInits.init!initializer.1.foreign :
+}
+class GrandchildOfInheritedInits: SubclassWithInheritedInits {
+  // Dynamic methods are super-dispatched by objc_msgSend
+  override init(dynamic: Int) {
+    super.init(dynamic: dynamic)
+  }
+  // CHECK-LABEL: sil hidden @_T07dynamic26GrandchildOfInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         super_method [volatile] {{%.*}} : $GrandchildOfInheritedInits, #SubclassWithInheritedInits.init!initializer.1.foreign :
+}
+
 // CHECK-LABEL: sil hidden @_T07dynamic20nativeMethodDispatchyyF : $@convention(thin) () -> ()
 func nativeMethodDispatch() {
   // CHECK: function_ref @_T07dynamic3{{[_0-9a-zA-Z]*}}fC
@@ -506,6 +523,25 @@ public class ConcreteDerived : GenericBase<Int> {
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
 // CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK: }
+
+// Check vtables for implicitly-inherited initializers
+// CHECK-LABEL: sil_vtable SubclassWithInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
+// CHECK-LABEL: sil_vtable GrandchildWithInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
+// CHECK-LABEL: sil_vtable GrandchildOfInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
 // CHECK: }
 
 // No vtable entry for override of @objc extension property
