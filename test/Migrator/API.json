@@ -207,12 +207,12 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "UnwrapOptional",
-    "ChildIndex": "0",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
     "LeftUsr": "s:6CitiesAAC7buderimABSgyF",
     "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "Cities & ExtraCities",
     "ModuleName": "Cities"
   },
   {
@@ -389,6 +389,28 @@
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "setZooLocationNew(newX:newY:newZ:)",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:6CitiesAAC8maroochyySiSg1x_AD1ytF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "(Int) -> Int",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "s:6CitiesAAC8maroochyySiSg1x_AD1ytF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "(Int) -> Int",
     "ModuleName": "Cities"
   }
 ]
