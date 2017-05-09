@@ -26,7 +26,8 @@ project--while not accidentally revealing entities to clients of a framework
 module.
 
 .. warning:: This document has not yet been updated for SE-0117, which adds the
-  "open" level of access.
+  "open" level of access, or SE-0169 which shares the private scope between
+  extensions and the declaration inside the same file.
 
 
 .. contents:: :local:
