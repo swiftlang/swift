@@ -148,37 +148,6 @@ extension _Unicode.DefaultScalarView : Collection {
   }
 }
 
-/// An iterator that can be much faster than the iterator of a reversed slice.
-// TODO: See about using this in more places
-@_fixed_layout
-public struct _ReverseIndexingIterator<
-  Elements : BidirectionalCollection
-> : IteratorProtocol, Sequence {
-
-  @_inlineable
-  @inline(__always)
-  /// Creates an iterator over the given collection.
-  public /// @testable
-  init(_elements: Elements, _position: Elements.Index) {
-    self._elements = _elements
-    self._position = _position
-  }
-  
-  @_inlineable
-  @inline(__always)
-  public mutating func next() -> Elements._Element? {
-    guard _fastPath(_position != _elements.startIndex) else { return nil }
-    _position = _elements.index(before: _position)
-    return _elements[_position]
-  }
-  
-  @_versioned
-  internal let _elements: Elements
-  @_versioned
-  internal var _position: Elements.Index
-}
-
-
 extension _Unicode.DefaultScalarView : BidirectionalCollection {
   @inline(__always)
   public func index(before i: Index) -> Index {
@@ -210,9 +179,47 @@ extension _Unicode.DefaultScalarView : BidirectionalCollection {
 import StdlibUnittest
 import SwiftPrivate
 
+func utf32<S : StringProtocol>(_ s: S) -> [UInt32] {
+  return s.unicodeScalars.map { $0.value }
+}
+
+func checkStringProtocol<S : StringProtocol, Encoding: UnicodeEncoding>(
+  _ s: S,
+  _ utfStr: [Encoding.CodeUnit],
+  encodedAs: Encoding.Type,
+  expectingUTF32 expected: [UInt32]
+) {
+  expectEqualSequence(
+    expected, utf32(s), "\(S.self) init(codeUnits:encoding:)")
+
+  if !utfStr.contains(0) {
+    if Encoding.self == UTF8.self {
+      var ntbs = utfStr.map { CChar(extendingOrTruncating: $0) }
+      ntbs.append(0)
+      expectEqualSequence(
+        expected, utf32(S(cString: ntbs)), "\(S.self) init(cString:)")
+    }
+    
+    var ntbs = Array(utfStr); ntbs.append(0)
+    expectEqualSequence(
+      expected, utf32(S(cString: ntbs, encoding: Encoding.self)),
+      "\(S.self) init(cString:encoding:)"
+    )
+
+    s.withCString {
+      expectEqual(s, S(cString: $0), "\(S.self) withCString(_:)")
+    }
+    
+    s.withCString(encoding: Encoding.self) {
+      expectEqual(s, S(cString: $0, encoding: Encoding.self),
+        "\(S.self) withCString(encoding:_:)")
+    }
+  }
+}
+
 func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
-    _ codec: Codec.Type, _ expectedHead: [UInt32],
-    _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
+  _ codec: Codec.Type, _ expectedHead: [UInt32],
+  _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {
   var decoded = [UInt32]()
   var expected = expectedHead
@@ -303,6 +310,20 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
     else { expectNotEqual(0, errorCount) }
   }
   check(expected.reversed(), "reverse, repairing: true")
+  
+  //===--- String/Substring Construction and C-String interop -------------===//
+  do {
+    let s = String(codeUnits: utfStr, encoding: Codec.self)
+    checkStringProtocol(
+      s, utfStr, encodedAs: Codec.self, expectingUTF32: expected)
+  }
+  
+  do {
+    let s0 = "\n" + String(codeUnits: utfStr, encoding: Codec.self) + "\n"
+    checkStringProtocol(
+      s0.dropFirst().dropLast(),
+      utfStr, encodedAs: Codec.self, expectingUTF32: expected)
+  }
 
   //===--- Transcoded Scalars ---------------------------------------------===//
   for x in decoded.lazy.map({ UnicodeScalar($0)! }) {
