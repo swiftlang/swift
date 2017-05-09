@@ -103,9 +103,9 @@ public struct Substring : StringProtocol {
 % end
 
   public init<C: Collection, Encoding: UnicodeEncoding>(
-    codeUnits: C, encoding: Encoding.Type
+    decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
-    self.init(String(codeUnits: codeUnits, encoding: encoding))
+    self.init(String(decoding: codeUnits, as: sourceEncoding))
   }
 
   public init(cString nulTerminatedUTF8: UnsafePointer<CChar>) {
@@ -119,9 +119,11 @@ public struct Substring : StringProtocol {
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
   public init<Encoding: UnicodeEncoding>(
-    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    encoding: Encoding.Type) {
-    self.init(String(cString: nulTerminatedCodeUnits, encoding: encoding))
+    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as targetEncoding: Encoding.Type
+  ) {
+    self.init(
+      String(decodingCString: nulTerminatedCodeUnits, as: targetEncoding))
   }
     
   /// Invokes the given closure on the contents of the string, represented as a
@@ -140,7 +142,7 @@ public struct Substring : StringProtocol {
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of code units in the given encoding.
   public func withCString<Result, TargetEncoding: UnicodeEncoding>(
-    encoding targetEncoding: TargetEncoding.Type,
+    encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
     return try _slice._base._core._withCSubstring(
