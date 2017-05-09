@@ -198,7 +198,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
 
     switch parser.parseScalar(from: &input) {
     case .valid(let s): return .scalarValue(UTF8.decode(s))
-    case .invalid: return .error
+    case .error: return .error
     case .emptyInput: return .emptyInput
     }
   }
@@ -236,7 +236,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
       return (
         result: UTF8.decode(s).value,
         length: UInt8(extendingOrTruncating: s.count))
-    case .invalid(let l):
+    case .error(let l):
       return (result: nil, length: UInt8(extendingOrTruncating: l))
     case .emptyInput: Builtin.unreachable()
     }
@@ -262,7 +262,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var s = encodeIfRepresentable(input)!._storage
+    var s = encode(input)!._storage
     processCodeUnit(UInt8(extendingOrTruncating: s))
     s &>>= 8
     if _fastPath(s == 0) { return }
@@ -366,7 +366,7 @@ extension _Unicode.UTF16 : UnicodeCodec {
     defer { self = ._swift3Buffer(parser) }
     switch parser.parseScalar(from: &input) {
     case .valid(let s): return .scalarValue(UTF16.decode(s))
-    case .invalid: return .error
+    case .error: return .error
     case .emptyInput: return .emptyInput
     }
   }
@@ -411,7 +411,7 @@ extension _Unicode.UTF16 : UnicodeCodec {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var s = encodeIfRepresentable(input)!._storage
+    var s = encode(input)!._storage
     processCodeUnit(UInt16(extendingOrTruncating: s))
     s &>>= 16
     if _fastPath(s == 0) { return }
@@ -480,7 +480,7 @@ extension _Unicode.UTF32 : UnicodeCodec {
     
     switch parser.parseScalar(from: &input) {
     case .valid(let s): return .scalarValue(UTF32.decode(s))
-    case .invalid:      return .error
+    case .error:      return .error
     case .emptyInput:   return .emptyInput
     }
   }
@@ -570,13 +570,13 @@ public func transcode<
   while true {
     switch p.parseScalar(from: &input) {
     case .valid(let s):
-      let t = OutputEncoding.transcodeIfRepresentable(s, from: inputEncoding)
+      let t = OutputEncoding.transcode(s, from: inputEncoding)
       guard _fastPath(t != nil), let s = t else { break }
       s.forEach(processCodeUnit)
       continue loop
     case .emptyInput:
       return hadError
-    case .invalid:
+    case .error:
       if _slowPath(stopOnError) { return true }
       hadError = true
     }
@@ -914,14 +914,13 @@ extension UTF16 {
     var i = input
     var isASCII = true
     var count = 0
-    let errorCount = Encoding.ForwardParser.parse(
+    let errorCount = Encoding.ForwardParser._parse(
       &i, repairingIllFormedSequences: repairingIllFormedSequences
     ) {
       if isASCII {
-        isASCII = _Unicode.ASCII.transcodeIfRepresentable(
-          $0, from: Encoding.self) != nil
+        isASCII = _Unicode.ASCII.transcode($0, from: Encoding.self) != nil
       }
-      count += numericCast(self.transcode($0, from: Encoding.self).count)
+      count += numericCast(self._transcode($0, from: Encoding.self).count)
     }
     
     if _fastPath(errorCount == 0 || repairingIllFormedSequences) {

@@ -58,7 +58,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   
   @inline(__always)
   @_inlineable
-  public static func encodeIfRepresentable(
+  public static func encode(
     _ source: UnicodeScalar
   ) -> EncodedScalar? {
     var c = source.value
@@ -88,7 +88,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func transcodeIfRepresentable<FromEncoding : UnicodeEncoding>(
+  public static func transcode<FromEncoding : UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -118,7 +118,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
     else if _fastPath(FromEncoding.self == UTF8.self) {
       return unsafeBitCast(content, to: UTF8.EncodedScalar.self)
     }
-    return encodeIfRepresentable(FromEncoding.decode(content))
+    return encode(FromEncoding.decode(content))
   }
 
   @_fixed_layout
