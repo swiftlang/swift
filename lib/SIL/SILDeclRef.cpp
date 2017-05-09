@@ -421,6 +421,12 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   }
 
+  // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
+  // declaration not a definition.
+  auto maybeAddExternal = [&](SILLinkage linkage) {
+    return forDefinition ? linkage : addExternalToLinkage(linkage);
+  };
+
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
@@ -442,9 +448,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
     case Accessibility::FilePrivate:
-      return (forDefinition
-              ? SILLinkage::Private
-              : SILLinkage::PrivateExternal);
+      return maybeAddExternal(SILLinkage::Private);
 
     default:
       return SILLinkage::Shared;
@@ -468,13 +472,13 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   switch (d->getEffectiveAccess()) {
     case Accessibility::Private:
     case Accessibility::FilePrivate:
-      return (forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+      return maybeAddExternal(SILLinkage::Private);
 
     case Accessibility::Internal:
-      return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
+      return maybeAddExternal(SILLinkage::Hidden);
 
     default:
-      return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+      return maybeAddExternal(SILLinkage::Public);
   }
 }
 
