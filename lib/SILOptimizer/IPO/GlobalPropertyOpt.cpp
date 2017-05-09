@@ -122,7 +122,7 @@ class GlobalPropertyOpt {
   /// Returns true if the type is a tuple which contains at least one array
   /// (we don't check for arrays in nested tuples).
   bool isTupleWithArray(CanType type) {
-    if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+    if (auto tuple = dyn_cast<TupleType>(type)) {
       for (Type subType : tuple->getElementTypes()) {
         if (CanType(subType).getNominalOrBoundGenericNominal() == ArrayType)
           return true;
