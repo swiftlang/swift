@@ -178,6 +178,12 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
+  /// func ^= (inout Int, Int) -> Void
+  FuncDecl *MutatingXorIntDecl = nullptr;
+
+  /// func _mixInt(Int -> Int
+  FuncDecl *MixIntDecl = nullptr;
+  
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -932,6 +938,75 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
     }
   }
   return nullptr;
+}
+
+FuncDecl *ASTContext::getMutatingXorIntDecl() const {
+  if (Impl.MutatingXorIntDecl)
+    return Impl.MutatingXorIntDecl;
+
+  auto intType = getIntDecl()->getDeclaredType();
+  auto inoutIntType = InOutType::get(intType);
+  SmallVector<ValueDecl *, 30> xorFuncs;
+  lookupInSwiftModule("^=", xorFuncs);
+  
+  // Find the overload for Int.
+  for (ValueDecl *vd : xorFuncs) {
+    // All "^=" decls should be functions, but who knows...
+    auto *funcDecl = dyn_cast<FuncDecl>(vd);
+    if (!funcDecl)
+      continue;
+    
+    if (funcDecl->getDeclContext()->isTypeContext()) {
+      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
+      if (!contextTy->isEqual(intType)) continue;
+    }
+    
+    if (auto resolver = getLazyResolver())
+      resolver->resolveDeclSignature(funcDecl);
+    
+    Type input, resultType;
+    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
+                               resultType))
+      continue;
+    
+    // Check for the signature: (inout Int, Int) -> Int
+    auto tupleType = dyn_cast<TupleType>(input.getPointer());
+    assert(tupleType);
+    if (tupleType->getNumElements() != 2)
+      continue;
+    
+    auto argType1 = tupleType->getElementType(0);
+    auto argType2 = tupleType->getElementType(1);
+    if (argType1->isEqual(inoutIntType) &&
+        argType2->isEqual(intType) &&
+        resultType->isVoid()) {
+      Impl.MutatingXorIntDecl = funcDecl;
+      return funcDecl;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getMixIntDecl() const {
+  if (Impl.MixIntDecl)
+    return Impl.MixIntDecl;
+  
+  auto resolver = getLazyResolver();
+  auto intType = getIntDecl()->getDeclaredType();
+
+  // Look for the function.
+  Type input, output;
+  auto decl = findLibraryIntrinsic(*this, "_mixInt", resolver);
+  if (!decl ||
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+    return nullptr;
+  
+  // Input and output must both be Int.
+  if (!input->isEqual(intType) || !output->isEqual(intType))
+    return nullptr;
+  
+  Impl.MixIntDecl = decl;
+  return decl;
 }
 
 FuncDecl *ASTContext::getArrayAppendElementDecl() const {
