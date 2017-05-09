@@ -6576,7 +6576,9 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // in either case, we want to produce nice and clear diagnostics.
     unsigned actualArgCount = params->size();
     unsigned inferredArgCount = 1;
-    if (auto *argTupleTy = inferredArgType->getAs<TupleType>())
+    // Don't try to desugar ParenType which is going to result in incorrect
+    // inferred argument count.
+    if (auto *argTupleTy = dyn_cast<TupleType>(inferredArgType.getPointer()))
       inferredArgCount = argTupleTy->getNumElements();
     
     // If the actual argument count is 1, it can match a tuple as a whole.
@@ -6608,7 +6610,144 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
         }
         return true;
       }
-      
+
+      if (inferredArgCount == 1 && actualArgCount > 1) {
+        // Let's see if inferred argument is actually a tuple inside of Paren.
+        if (auto *argTupleTy = inferredArgType->getAs<TupleType>()) {
+          // Looks like the number of closure parameters matches number
+          // of inferred arguments, which means we can we can emit an
+          // error about an attempt to make use of tuple splat or tuple
+          // destructuring and provide a proper fix-it.
+          if (argTupleTy->getNumElements() == actualArgCount) {
+            // In case of implicit parameters e.g. $0, $1 we
+            // can't really provide good fix-it because
+            // structure of parameter type itself is unclear.
+            for (auto *param : params->getArray()) {
+              if (param->isImplicit()) {
+                diagnose(params->getStartLoc(),
+                         diag::closure_tuple_parameter_destructuring_implicit,
+                         argTupleTy);
+                return true;
+              }
+            }
+
+            auto diag = diagnose(params->getStartLoc(),
+                                 diag::closure_tuple_parameter_destructuring,
+                                 argTupleTy);
+            Type actualArgType;
+            if (auto *actualFnType = CE->getType()->getAs<AnyFunctionType>())
+              actualArgType = actualFnType->getInput();
+
+            auto *closureBody = CE->getBody();
+            if (!closureBody)
+              return true;
+
+            auto &sourceMgr = CS->getASTContext().SourceMgr;
+            auto bodyStmts = closureBody->getElements();
+
+            SourceLoc bodyLoc;
+            // If the body is empty let's put the cursor
+            // right after "in", otherwise make it start
+            // location of the first statement in the body.
+            if (bodyStmts.empty())
+              bodyLoc = Lexer::getLocForEndOfToken(sourceMgr, CE->getInLoc());
+            else
+              bodyLoc = bodyStmts.front().getStartLoc();
+
+            SmallString<64> fixIt;
+            llvm::raw_svector_ostream OS(fixIt);
+
+            // If this is multi-line closure we'd have to insert new lines
+            // in the suggested 'let' to keep the structure of the code intact,
+            // otherwise just use ';' to keep everything on the same line.
+            auto inLine = sourceMgr.getLineNumber(CE->getInLoc());
+            auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
+            auto isMultiLineClosure = bodyLine > inLine;
+            auto indent = bodyStmts.empty() ? "" : Lexer::getIndentationForLine(
+                                                       sourceMgr, bodyLoc);
+
+            SmallString<16> parameter;
+            llvm::raw_svector_ostream parameterOS(parameter);
+
+            parameterOS << "(";
+            interleave(params->getArray(),
+                       [&](const ParamDecl *param) {
+                         parameterOS << param->getNameStr();
+                       },
+                       [&] { parameterOS << ", "; });
+            parameterOS << ")";
+
+            // Check if there are any explicit types associated
+            // with parameters, if there are, we'll have to add
+            // type information to the replacement argument.
+            bool explicitTypes = false;
+            for (auto *param : params->getArray()) {
+              if (param->getTypeLoc().getTypeRepr()) {
+                explicitTypes = true;
+                break;
+              }
+            }
+
+            if (isMultiLineClosure)
+              OS << '\n' << indent;
+
+            // Let's form 'let <name> : [<type>]? = arg' expression.
+            OS << "let " << parameterOS.str() << " = arg"
+               << (isMultiLineClosure ? "\n" + indent : "; ");
+
+            SmallString<64> argName;
+            llvm::raw_svector_ostream nameOS(argName);
+            if (explicitTypes) {
+              nameOS << "(arg: " << argTupleTy->getString() << ")";
+            } else {
+              nameOS << "(arg)";
+            }
+
+            if (CE->hasSingleExpressionBody()) {
+              // Let's see if we need to add result type to the argument/fix-it:
+              //  - if the there is a result type associated with the closure;
+              //  - and it's not a void type;
+              //  - and it hasn't been explicitly written.
+              auto resultType = CE->getResultType();
+              auto hasResult = [](Type resultType) -> bool {
+                return resultType && !resultType->isVoid();
+              };
+
+              auto isValidType = [](Type resultType) -> bool {
+                return resultType && !resultType->hasUnresolvedType() &&
+                       !resultType->hasTypeVariable();
+              };
+
+              // If there an expected result type but it hasn't been explictly
+              // provided, let's add it to the argument.
+              if (hasResult(resultType) && !CE->hasExplicitResultType()) {
+                nameOS << " -> ";
+                if (isValidType(resultType))
+                  nameOS << resultType->getString();
+                else
+                  nameOS << "<#Result#>";
+              }
+
+              if (auto stmt = bodyStmts.front().get<Stmt *>()) {
+                // If the body is a single expression with implicit return.
+                if (isa<ReturnStmt>(stmt) && stmt->isImplicit()) {
+                  // And there is non-void expected result type,
+                  // because we add 'let' expression to the body
+                  // we need to make such 'return' explicit.
+                  if (hasResult(resultType))
+                    OS << "return ";
+                }
+              }
+            }
+
+            diag.fixItReplace(params->getSourceRange(), nameOS.str())
+                .fixItInsert(bodyLoc, OS.str());
+
+            return true;
+          }
+        }
+      }
+
       // Okay, the wrong number of arguments was used, complain about that.
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
