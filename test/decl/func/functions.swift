@@ -104,7 +104,7 @@ _ = nullaryClosure(0)
 // parameter labels, and they are thus not in scope in the body of the function.
 // expected-error@+1{{unnamed parameters must be written}} {{27-27=_: }}
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
-  return result  // expected-error {{use of unresolved identifier 'result'}}
+  return result
 }
 
 // The former is the same as this:

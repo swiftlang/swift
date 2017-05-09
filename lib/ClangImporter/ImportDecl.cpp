@@ -5423,7 +5423,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
                                  FinalAttr(/*IsImplicit=*/true));
 
   // Import the getter.
-  FuncDecl *swiftGetter = dyn_cast_or_null<FuncDecl>(
+  auto *swiftGetter = dyn_cast_or_null<FuncDecl>(
       importFunctionDecl(getter, getterName, None, property));
   if (!swiftGetter)
     return nullptr;

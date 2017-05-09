@@ -8,7 +8,11 @@
 // Each FIXME line is a case that the current implementation misses.
 // The model is currently being refined, so this isn't set in stone.
 //
-// TODO: Ensure that each of these cases is covered by
+// TODO: Move all static cases (search for // Error:) into
+// a set of -verify tests (noescape_static_diagnostics.swift).
+// and a set of separate SILGen-only tests to check [unknown] markers.
+//
+// TODO: Ensure that each dynamic case is covered by
 // Interpreter/enforce_exclusive_access.swift.
 
 // Helper
@@ -22,12 +26,6 @@ func doTwo(_: ()->(), _: ()->()) {}
 // Helper
 func doOneInout(_: ()->(), _: inout Int) {}
 
-// Helper
-struct Frob {
-  mutating func outerMut() { doOne { innerMut() } }
-  mutating func innerMut() {}
-}
-
 // FIXME: statically prohibit a call to a non-escaping closure
 // parameter using another non-escaping closure parameter as an argument.
 func reentrantNoescape(fn: (() -> ()) -> ()) {
@@ -39,6 +37,12 @@ func reentrantNoescape(fn: (() -> ()) -> ()) {
 //   let c = { fn {} }
 //   fn(c)
 // }
+
+// Helper
+struct Frob {
+  mutating func outerMut() { doOne { innerMut() } }
+  mutating func innerMut() {}
+}
 
 // Allow nested mutable access via closures.
 func nestedNoEscape(f: inout Frob) {
@@ -296,7 +300,7 @@ func readWriteBox() {
 //   doTwo({ _ = x }, c)
 // }
 
-// Error on noescape read + write inout.
+// Error: noescape read + write inout.
 func readWriteInout() {
   var x = 3
   // Around the call: [read] [dynamic]
@@ -321,7 +325,7 @@ func readWriteInout() {
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape14readWriteInoutyyFyycfU_'
 
-// Error on noescape read + write inout of an inout.
+// Error: noescape read + write inout of an inout.
 func inoutReadWriteInout(x: inout Int) {
   // Around the call: [read] [static]
   // Around the call: [modify] [static] // Error
@@ -345,7 +349,7 @@ func inoutReadWriteInout(x: inout Int) {
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape19inoutReadWriteInoutySiz1x_tFyycfU_'
 
-// Error: cannout capture inout.
+// Trap on boxed read + write inout.
 func readBoxWriteInout() {
   var x = 3
   let c = { _ = x }
@@ -478,7 +482,7 @@ func writeWriteBox() {
 //   doTwo({ x = 42 }, c)
 // }
 
-/// Error on noescape write + write inout.
+/// Error: on noescape write + write inout.
 func writeWriteInout() {
   var x = 3
   // Around the call: [modify] [dynamic]
@@ -502,7 +506,7 @@ func writeWriteInout() {
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape15writeWriteInoutyyFyycfU_'
 
-// Error on noescape write + write inout.
+// Error: on noescape write + write inout.
 func inoutWriteWriteInout(x: inout Int) {
   // Around the call: [modify] [static]
   // Around the call: [modify] [static] // Error

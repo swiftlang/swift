@@ -711,22 +711,73 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
-  return clang::ASTReader::isAcceptableASTFile(PCHFilename,
-    Impl.Instance->getFileManager(),
-    Impl.Instance->getPCHContainerReader(),
-    Impl.Instance->getLangOpts(),
-    Impl.Instance->getTargetOpts(),
-    Impl.Instance->getPreprocessorOpts(),
-    Impl.Instance->getSpecificModuleCachePath());
+  if (!llvm::sys::fs::exists(PCHFilename))
+    return false;
+
+  // FIXME: The following attempts to do an initial ReadAST invocation to verify
+  // the PCH, without affecting the existing CompilerInstance.
+  // Look into combining creating the ASTReader along with verification + update
+  // if necesary, so that we can create and use one ASTReader in the common case
+  // when there is no need for update.
+
+  CompilerInstance &CI = *Impl.Instance;
+  auto clangDiags = CompilerInstance::createDiagnostics(
+                                              new clang::DiagnosticOptions());
+  clang::SourceManager clangSrcMgr(*clangDiags, CI.getFileManager());
+  auto FID = clangSrcMgr.createFileID(
+                        llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
+  clangSrcMgr.setMainFileID(FID);
+  clang::Preprocessor PP(CI.getInvocation().getPreprocessorOptsPtr(),
+                         *clangDiags,
+                         CI.getLangOpts(),
+                         clangSrcMgr,
+                         CI.getPCMCache(),
+                         CI.getPreprocessor().getHeaderSearchInfo(), CI,
+                         /*IILookup=*/nullptr,
+                         /*OwnsHeaderSearch=*/false);
+  PP.Initialize(CI.getTarget());
+  clang::ASTContext ctx(CI.getLangOpts(), clangSrcMgr,
+                        PP.getIdentifierTable(), PP.getSelectorTable(),
+                        PP.getBuiltinInfo());
+
+  std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
+      PP, ctx, CI.getPCHContainerReader(),
+      CI.getFrontendOpts().ModuleFileExtensions,
+      CI.getHeaderSearchOpts().Sysroot,
+      /*DisableValidation*/ false,
+      /*AllowPCHWithCompilerErrors*/ false,
+      /*AllowConfigurationMismatch*/ false,
+      /*ValidateSystemInputs*/ true));
+  ctx.InitBuiltinTypes(CI.getTarget());
+
+  auto result = Reader->ReadAST(PCHFilename,
+                  clang::serialization::MK_PCH,
+                  clang::SourceLocation(),
+                  clang::ASTReader::ARR_None);
+  switch (result) {
+  case clang::ASTReader::Success:
+    return true;
+  case clang::ASTReader::Failure:
+  case clang::ASTReader::Missing:
+  case clang::ASTReader::OutOfDate:
+  case clang::ASTReader::VersionMismatch:
+    return false;
+  case clang::ASTReader::ConfigurationMismatch:
+  case clang::ASTReader::HadErrors:
+    assert(0 && "unexpected ASTReader failure for PCH validation");
+    return false;
+  }
 }
 
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                              const std::string &SwiftPCHHash) {
+                              StringRef SwiftPCHHash, bool &isExplicit) {
   if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
         .endswith(PCH_EXTENSION)) {
+    isExplicit = true;
     return ImporterOptions.BridgingHeader;
   }
+  isExplicit = false;
 
   const auto &BridgingHeader = ImporterOptions.BridgingHeader;
   const auto &PCHOutputDir = ImporterOptions.PrecompiledHeaderOutputDir;
@@ -749,18 +800,27 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
 
 Optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              const std::string &SwiftPCHHash) {
-  auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash);
+                              StringRef SwiftPCHHash) {
+  bool isExplicit;
+  auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
+                                    isExplicit);
   if (!PCHFilename.hasValue()) {
     return None;
   }
-  if (!canReadPCH(PCHFilename.getValue())) {
+  if (!isExplicit && !canReadPCH(PCHFilename.getValue())) {
     SmallString<256> Message;
     llvm::raw_svector_ostream OS(Message);
     auto Diags = new clang::TextDiagnosticPrinter {
       llvm::errs(),
       &Impl.Instance->getDiagnosticOpts()
     };
+    StringRef parentDir = llvm::sys::path::parent_path(PCHFilename.getValue());
+    std::error_code EC = llvm::sys::fs::create_directories(parentDir);
+    if (EC) {
+      llvm::errs() << "failed to create directory '" << parentDir << "': "
+        << EC.message();
+      return None;
+    }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
                                         PCHFilename.getValue(),
                                         Diags);

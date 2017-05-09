@@ -228,11 +228,9 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
   auto superclassDtorDecl = superclass->getDestructor();
-  SILDeclRef superclassDtor(superclassDtorDecl,
-                            SILDeclRef::Kind::Deallocator,
-                            SILDeclRef::ConstructAtBestResilienceExpansion,
-                            SILDeclRef::ConstructAtNaturalUncurryLevel,
-                            /*isForeign=*/true);
+  auto superclassDtor = SILDeclRef(superclassDtorDecl,
+                                   SILDeclRef::Kind::Deallocator)
+    .asForeign();
   auto superclassDtorType = SGM.getConstantType(superclassDtor);
   SILValue superclassDtorValue = B.createSuperMethod(
                                    cleanupLoc, selfValue, superclassDtor,

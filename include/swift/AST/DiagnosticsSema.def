@@ -2830,6 +2830,11 @@ ERROR(closure_argument_list_tuple,none,
 ERROR(closure_argument_list_missing,none,
       "contextual type for closure argument list expects %0 argument%s0, "
       "which cannot be implicitly ignored", (unsigned))
+ERROR(closure_tuple_parameter_destructuring,none,
+      "closure tuple parameter %0 does not support destructuring", (Type))
+ERROR(closure_tuple_parameter_destructuring_implicit,none,
+      "closure tuple parameter %0 does not support destructuring "
+      "with implicit parameters", (Type))
 
 ERROR(tuple_pattern_length_mismatch,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))

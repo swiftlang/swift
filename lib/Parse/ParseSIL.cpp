@@ -1185,7 +1185,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, expansion, uncurryLevel, IsObjC);
+    Result = SILDeclRef(VD, Kind, expansion, /*isCurried=*/false, IsObjC);
+    if (uncurryLevel < Result.getUncurryLevel())
+      Result = Result.asCurried();
     return false;
   }
 
@@ -1274,7 +1276,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, expansion, uncurryLevel, IsObjC);
+  Result = SILDeclRef(VD, Kind, expansion, /*isCurried=*/false, IsObjC);
+  if (uncurryLevel < Result.getUncurryLevel())
+    Result = Result.asCurried();
   return false;
 }
 

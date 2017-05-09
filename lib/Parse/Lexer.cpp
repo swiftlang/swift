@@ -1351,7 +1351,7 @@ static StringRef getStringLiteralContent(const Token &Str) {
 
 static size_t commonPrefixLength(StringRef shorter, StringRef longer) {
   size_t offset = 0;
-  while(offset < shorter.size() && offset < longer.size() && shorter[offset] == longer[offset]) {
+  while (offset < shorter.size() && offset < longer.size() && shorter[offset] == longer[offset]) {
     offset++;
   }
   
@@ -1447,7 +1447,7 @@ static void diagnoseInvalidMultilineIndents(
   assert(ExpectedIndent.substr(0, MistakeOffset) == 
          ActualIndent.substr(0, MistakeOffset));
   
-  for(auto line : LineStarts) {
+  for (auto line : LineStarts) {
     fix.fixItReplaceChars(getLoc(line + MistakeOffset), 
                           getLoc(line + ActualIndent.size()),
                           ExpectedIndent.substr(MistakeOffset));
