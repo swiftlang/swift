@@ -2493,6 +2493,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   ClassDeclBits.HasDestructorDecl = 0;
   ObjCKind = 0;
   HasMissingDesignatedInitializers = 0;
+  HasMissingVTableEntries = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2508,6 +2509,11 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
   (void)mutableThis->lookupDirect(getASTContext().Id_init,
                                   /*ignoreNewExtensions*/true);
   return HasMissingDesignatedInitializers;
+}
+
+bool ClassDecl::hasMissingVTableEntries() const {
+  (void)getMembers();
+  return HasMissingVTableEntries;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {

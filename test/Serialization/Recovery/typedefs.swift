@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules %s | %FileCheck -check-prefix CHECK-VTABLE %s
+// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
@@ -52,17 +52,19 @@ let _ = unwrapped // okay
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
 _ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
 
-public class UserSub: User {
+public class UserDynamicSub: UserDynamic {
   override init() {}
 }
 // FIXME: Bad error message; really it's that the convenience init hasn't been
 // inherited.
-_ = UserSub(conveniently: 0) // expected-error {{argument passed to call that takes no arguments}}
+_ = UserDynamicSub(conveniently: 0) // expected-error {{argument passed to call that takes no arguments}}
 
-public class UserConvenienceSub: UserConvenience {
+public class UserDynamicConvenienceSub: UserDynamicConvenience {
   override init() {}
 }
-_ = UserConvenienceSub(conveniently: 0)
+_ = UserDynamicConvenienceSub(conveniently: 0)
+
+public class UserSub : User {} // expected-error {{cannot inherit from class 'User' in Swift 3.2 mode because it has overridable members that cannot be loaded}}
 
 #endif // VERIFY
 
@@ -150,6 +152,42 @@ open class UserConvenience {
   // CHECK: convenience init(conveniently: Int)
   // CHECK-RECOVERY: convenience init(conveniently: Int)
   public convenience init(conveniently: Int) { self.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
+// CHECK-LABEL: class UserDynamic
+// CHECK-RECOVERY-LABEL: class UserDynamic
+open class UserDynamic {
+  // CHECK: init()
+  // CHECK-RECOVERY: init()
+  @objc public dynamic init() {}
+
+  // CHECK: init(wrapped: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  @objc public dynamic init(wrapped: WrappedInt) {}
+
+  // CHECK: convenience init(conveniently: Int)
+  // CHECK-RECOVERY: convenience init(conveniently: Int)
+  @objc public dynamic convenience init(conveniently: Int) { self.init() }
+}
+// CHECK: {{^}$}}
+// CHECK-RECOVERY: {{^}$}}
+
+// CHECK-LABEL: class UserDynamicConvenience
+// CHECK-RECOVERY-LABEL: class UserDynamicConvenience
+open class UserDynamicConvenience {
+  // CHECK: init()
+  // CHECK-RECOVERY: init()
+  @objc public dynamic init() {}
+
+  // CHECK: convenience init(wrapped: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  @objc public dynamic convenience init(wrapped: WrappedInt) { self.init() }
+
+  // CHECK: convenience init(conveniently: Int)
+  // CHECK-RECOVERY: convenience init(conveniently: Int)
+  @objc public dynamic convenience init(conveniently: Int) { self.init() }
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}

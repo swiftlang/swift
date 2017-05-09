@@ -4572,6 +4572,14 @@ public:
                       Super->getName());
         }
 
+        if (Super->hasMissingVTableEntries()) {
+          TC.diagnose(CD,
+                      diag::inheritance_from_class_with_missing_vtable_entries,
+                      Super->getName(),
+                      TC.Context.LangOpts.EffectiveLanguageVersion);
+          isInvalidSuperclass = true;
+        }
+
         switch (Super->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
           break;

@@ -3215,6 +3215,7 @@ class ClassDecl : public NominalTypeDecl {
   unsigned ObjCKind : 3;
 
   unsigned HasMissingDesignatedInitializers : 1;
+  unsigned HasMissingVTableEntries : 1;
 
   friend class IterativeTypeChecker;
 
@@ -3309,6 +3310,16 @@ public:
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
     HasMissingDesignatedInitializers = newValue;
+  }
+
+  /// Returns true if the class has missing members that require vtable entries.
+  ///
+  /// In this case, the class cannot be subclassed, because we cannot construct
+  /// the vtable for the subclass.
+  bool hasMissingVTableEntries() const;
+
+  void setHasMissingVTableEntries(bool newValue = true) {
+    HasMissingVTableEntries = newValue;
   }
 
   /// Find a method of a class that overrides a given method.

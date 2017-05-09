@@ -1908,6 +1908,10 @@ ERROR(inheritance_from_final_class,none,
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
       "inheritance from a generic Objective-C class %0 must bind "
       "type parameters of %0 to specific concrete types", (Identifier))
+ERROR(inheritance_from_class_with_missing_vtable_entries,none,
+      "cannot inherit from class %0 in Swift %1 mode because it has "
+      "overridable members that cannot be loaded",
+      (Identifier, clang::VersionTuple))
 ERROR(inheritance_from_cf_class,none,
       "cannot inherit from Core Foundation type %0", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
