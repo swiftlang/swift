@@ -2879,16 +2879,17 @@ ${assignmentOperatorComment(x.operator, True)}
   // FIXME(integers): tests
   public func multipliedFullWidth(by other: ${Self})
   -> (high: ${Self}, low: ${Self}.Magnitude) {
-    // FIXME(integers): properly replace rhs and lhs with self and other
-    let lhs = self
-    let rhs = other
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
-    // FIXME(integers): implement
-    fatalError("Operation is not supported")
+%   #if word_bits == 32 and bits == 64:
+%   if bits == 64:
+    let lhs_ = DoubleWidth<${Self}>(self)
+    let rhs_ = DoubleWidth<${Self}>(other)
+    let result = lhs_ * rhs_
+
+    return (result.high, result.low)
 %   else:
-    let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs._value)
-    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(rhs._value)
+    let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
+    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
 
     let res = Builtin.mul_Int${dbits}(lhs_, rhs_)
     let low = ${Self}.Magnitude(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(res))
@@ -2903,23 +2904,24 @@ ${assignmentOperatorComment(x.operator, True)}
   public func dividingFullWidth(
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
-    // FIXME(integers): properly rename lhs to dividend and rhs to self.
-    let lhs = dividend
-    let rhs = self
-
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
-    // FIXME(integers): implement
-    fatalError("Operation is not supported")
+%   #if word_bits == 32 and bits == 64:
+%   if bits == 64:
+    let lhs = DoubleWidth<${Self}>(dividend)
+    let rhs = DoubleWidth<${Self}>(self)
+
+    let (quotient, remainder) = lhs.quotientAndRemainder(dividingBy: rhs)
+    // FIXME(integers): check for high words in quotient and remainder
+    return (${Self}(quotient.low), ${Self}(remainder.low))
 %   else:
     // FIXME(integers): handle division by zero and overflows
-    _precondition(rhs != 0, "Division by zero")
-    let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(lhs.high._value)
+    _precondition(self != 0, "Division by zero")
+    let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(dividend.high._value)
     let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
     let lhsHighShifted = Builtin.shl_Int${dbits}(lhsHigh, shift)
-    let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(lhs.low._value)
+    let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(dividend.low._value)
     let lhs_ = Builtin.or_Int${dbits}(lhsHighShifted, lhsLow)
-    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(rhs._value)
+    let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
 
     let quotient_ = Builtin.${u}div_Int${dbits}(lhs_, rhs_)
     let remainder_ = Builtin.${u}rem_Int${dbits}(lhs_, rhs_)
@@ -3427,7 +3429,12 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   public func dividingFullWidth(
     _ dividend: (high: DoubleWidth, low: DoubleWidth.Magnitude)
   ) -> (quotient: DoubleWidth, remainder: DoubleWidth) {
-    fatalError()
+    let lhs = DoubleWidth<DoubleWidth<Base>>(dividend)
+    let rhs = DoubleWidth<DoubleWidth<Base>>(self)
+    let (quotient, remainder) = lhs.quotientAndRemainder(dividingBy: rhs)
+
+    // FIXME(integers): check for overflow of quotient and remainder
+    return (DoubleWidth(quotient.low), DoubleWidth(remainder.low))
   }
 
 % for x in binaryBitwise:
