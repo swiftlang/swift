@@ -73,7 +73,7 @@ class ModuleFile : public LazyMemberLoader {
   StringRef TargetTriple;
 
   /// The Swift compatibility version in use when this module was built.
-  StringRef CompatibilityVersion;
+  version::Version CompatibilityVersion;
 
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
