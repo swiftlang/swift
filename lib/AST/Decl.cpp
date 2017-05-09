@@ -2165,8 +2165,14 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     // Hashable conformance.
     case KnownProtocolKind::Equatable:
     case KnownProtocolKind::Hashable:
-      return enumDecl->hasCases()
-          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+      // FIXME: This is too lenient; we can only promise to provide a witness
+      // for enums where all associated values conform to the protocol.
+      // Unfortunately, figuring this out requires a TypeChecker and resolving
+      // the argument type of each enum element. Instead, we let
+      // DerivedConformance::derive{Equatable,Hashable} perform the full check
+      // and it outputs its own diagnostics if conformance cannot be
+      // synthesized.
+      return enumDecl->hasCases();
 
     // @objc enums can explicitly derive their _BridgedNSError conformance.
     case KnownProtocolKind::BridgedNSError:
