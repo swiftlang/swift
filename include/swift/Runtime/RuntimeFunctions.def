@@ -1092,7 +1092,7 @@ FUNCTION(RegisterTypeMetadataRecords,
 // void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
 FUNCTION(BeginAccess, swift_beginAccess, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy),
+         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // void swift_endAccess(ValueBuffer *scratch);
