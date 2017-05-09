@@ -1425,22 +1425,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
 
-        // Equal constraints allow mixed LValue/RValue bindings.
+        // Equal constraints allow mixed LValue/RValue bindings, but
+        // if we bind a type to a type variable that can bind to
+        // LValues as part of simplifying the Equal constraint we may
+        // later block a binding of the opposite "LValue-ness" to the
+        // same type variable that happens as part of simplifying
+        // another constraint.
         if (kind == ConstraintKind::Equal) {
-          // If we could bind an LValue to the type variable, but the
-          // type that is already bound is not an LValue, defer
-          // simplifying the constraint since we may come along at a
-          // later time and attempt to bind the LValue type to this
-          // type variable.
-          if (typeVar1->getImpl().canBindToLValue()) {
-            if (!type2->isLValueType()) {
-              return formUnsolvedResult();
-            }
-          } else {
-            // If the type variable does not allow LValue bindings,
-            // get the RValue type.
-            type2 = type2->getRValueType();
-          }
+          if (typeVar1->getImpl().canBindToLValue())
+            return formUnsolvedResult();
+
+          type2 = type2->getRValueType();
         }
 
         // If the left-hand type variable cannot bind to an lvalue,
@@ -1480,22 +1475,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVarOccursInType(typeVar2, type1))
         return formUnsolvedResult();
 
-      // Equal constraints allow mixed LValue/RValue bindings.
+      // Equal constraints allow mixed LValue/RValue bindings, but
+      // if we bind a type to a type variable that can bind to
+      // LValues as part of simplifying the Equal constraint we may
+      // later block a binding of the opposite "LValue-ness" to the
+      // same type variable that happens as part of simplifying
+      // another constraint.
       if (kind == ConstraintKind::Equal) {
-        // If we could bind an LValue to the type variable, but the
-        // type that is already bound is not an LValue, defer
-        // simplifying the constraint since we may come along at a
-        // later time and attempt to bind the LValue type to this
-        // type variable.
-        if (typeVar2->getImpl().canBindToLValue()) {
-          if (!type1->isLValueType()) {
-            return formUnsolvedResult();
-          }
-        } else {
-          // If the type variable does not allow LValue bindings,
-          // get the RValue type.
-          type1 = type1->getRValueType();
-        }
+        if (typeVar2->getImpl().canBindToLValue())
+          return formUnsolvedResult();
+
+        type1 = type1->getRValueType();
       }
 
       if (!typeVar2->getImpl().canBindToLValue() &&
