@@ -105,8 +105,11 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
     STRINGS FALSE "NOT-MERGED" "MERGED")
 
-set(SWIFT_VERSION "4.0" CACHE STRING
-    "The user-visible version of the Swift compiler")
+# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
+# can be reused when a new version of Swift comes out (assuming the user hasn't
+# manually set it as part of their own CMake configuration).
+set(SWIFT_VERSION "4.0")
+
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
