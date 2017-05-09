@@ -639,9 +639,8 @@ dwTests.test("Arithmetic/unsigned") {
   expectTrue(x - x == 0)
   expectTrue(y - x == 111)
   
-  // multiplication triggers an inlining error
-  // expectTrue(x * 7 == 7000)
-  // expectTrue(y * 7 == 7777)
+  expectTrue(x * 7 == 7000)
+  expectTrue(y * 7 == 7777)
   
   expectTrue(x / 3 == 333)
   expectTrue(x / x == 1)
@@ -663,11 +662,10 @@ dwTests.test("Arithmetic/signed") {
   expectTrue(x + y == -111)
   expectTrue(x - y == 2111)
   
-  // multiplication triggers an inlining error
-  // expectTrue(x * 7 == 7000)
-  // expectTrue(y * 7 == -7777)
-  // expectTrue(x * -7 == -7000)
-  // expectTrue(y * -7 == 7777)
+  expectTrue(x * 7 == 7000)
+  expectTrue(y * 7 == -7777)
+  expectTrue(x * -7 == -7000)
+  expectTrue(y * -7 == 7777)
 
   expectTrue(x / 3 == 333)
   expectTrue(x / x == 1)
@@ -679,6 +677,40 @@ dwTests.test("Arithmetic/signed") {
   
   expectTrue(-y == 1111)
   expectTrue(-x == -1000)
+}
+
+dwTests.test("Nested") {
+  typealias UInt128 = DoubleWidth<UInt64>
+  typealias UInt256 = DoubleWidth<UInt128>
+  typealias UInt512 = DoubleWidth<UInt256>
+  typealias UInt1024 = DoubleWidth<UInt512>
+
+  do {
+    let x = UInt1024.max
+    let (y, o) = x.addingReportingOverflow(1)
+    expectEqual(y, 0)
+    expectTrue(y == (0 as Int))
+    expectTrue(o == .overflow)
+  }
+
+  typealias Int128 = DoubleWidth<Int64>
+  typealias Int256 = DoubleWidth<Int128>
+  typealias Int512 = DoubleWidth<Int256>
+  typealias Int1024 = DoubleWidth<Int512>
+
+  do {
+    let x = Int1024.max
+    let (y, o) = x.addingReportingOverflow(1)
+    expectEqual(y, Int1024.min)
+    expectLT(y, 0)
+    expectTrue(y < (0 as Int))
+    expectTrue(o == .overflow)
+  }
+
+  expectFalse(UInt1024.isSigned)
+  expectEqual(UInt1024.bitWidth, 1024)
+  expectTrue(Int1024.isSigned)
+  expectEqual(Int1024.bitWidth, 1024)
 }
 
 // FIXME: Need more tests of DoubleWidth
