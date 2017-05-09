@@ -537,7 +537,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     // If there is a store (that must come after the phi), use its value.
     BlockToInstMap::iterator it = LastStoreInBlock.find(BB);
     if (it != LastStoreInBlock.end())
-      if (StoreInst *St = dyn_cast_or_null<StoreInst>(it->second)) {
+      if (auto *St = dyn_cast_or_null<StoreInst>(it->second)) {
         DEBUG(llvm::dbgs() << "*** Found Store def " << *St->getSrc());
         return St->getSrc();
       }

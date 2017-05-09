@@ -200,7 +200,7 @@ public:
 
       if (ParentLineAndColumn.first != LineAndColumn.first) {
         // The start line is not the same, see if this is at the 'else' clause.
-        if (IfStmt *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt())) {
+        if (auto *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt())) {
           SourceLoc ElseLoc = If->getElseLoc();
           // If we're at 'else', take the indent of 'if' and continue.
           if (ElseLoc.isValid() &&
@@ -268,7 +268,7 @@ public:
     }
 
     // Handle switch / case, indent unless at a case label.
-    if (CaseStmt *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
+    if (auto *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
       auto LabelItems = Case->getCaseLabelItems();
       SourceLoc Loc;
       if (!LabelItems.empty())
