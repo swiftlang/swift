@@ -308,10 +308,12 @@ public:
 
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                 const std::string &SwiftPCHHash);
+                 StringRef SwiftPCHHash);
   Optional<std::string>
+  /// \param isExplicit true if the PCH filename was passed directly
+  /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                 const std::string &SwiftPCHHash);
+                 StringRef SwiftPCHHash, bool &isExplicit);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

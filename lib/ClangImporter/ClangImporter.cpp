@@ -771,11 +771,13 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                              const std::string &SwiftPCHHash) {
+                              StringRef SwiftPCHHash, bool &isExplicit) {
   if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
         .endswith(PCH_EXTENSION)) {
+    isExplicit = true;
     return ImporterOptions.BridgingHeader;
   }
+  isExplicit = false;
 
   const auto &BridgingHeader = ImporterOptions.BridgingHeader;
   const auto &PCHOutputDir = ImporterOptions.PrecompiledHeaderOutputDir;
@@ -798,12 +800,14 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
 
 Optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              const std::string &SwiftPCHHash) {
-  auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash);
+                              StringRef SwiftPCHHash) {
+  bool isExplicit;
+  auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
+                                    isExplicit);
   if (!PCHFilename.hasValue()) {
     return None;
   }
-  if (!canReadPCH(PCHFilename.getValue())) {
+  if (!isExplicit && !canReadPCH(PCHFilename.getValue())) {
     SmallString<256> Message;
     llvm::raw_svector_ostream OS(Message);
     auto Diags = new clang::TextDiagnosticPrinter {
