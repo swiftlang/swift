@@ -381,15 +381,15 @@ public struct _StringCore {
       else {
         // TODO: be sure tests exercise this code path.
         for b in bytes {
-          Encoding.encode(
+          Encoding._encode(
             UnicodeScalar(_unchecked: UInt32(b))).forEach(processCodeUnit)
         }
       }
     }
     else if let content = _unmanagedUTF16 {
       var i = content.makeIterator()
-      _Unicode.UTF16.ForwardParser.parse(&i) {
-        Encoding.transcode($0, from: UTF16.self).forEach(processCodeUnit)
+      _Unicode.UTF16.ForwardParser._parse(&i) {
+        Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
       }
     }
     else if hasCocoaBuffer {
