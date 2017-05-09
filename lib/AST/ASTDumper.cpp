@@ -1522,9 +1522,12 @@ public:
   void visitSwitchStmt(SwitchStmt *S) {
     printCommon(S, "switch_stmt") << '\n';
     printRec(S->getSubjectExpr());
-    for (CaseStmt *C : S->getCases()) {
+    for (auto N : S->getRawCases()) {
       OS << '\n';
-      printRec(C);
+      if (N.is<Stmt*>())
+        printRec(N.get<Stmt*>());
+      else
+        printRec(N.get<Decl*>());
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

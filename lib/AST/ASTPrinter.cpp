@@ -3359,8 +3359,11 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   // FIXME: print subject
   Printer << "{";
   Printer.printNewline();
-  for (CaseStmt *C : stmt->getCases()) {
-    visit(C);
+  for (auto N : stmt->getRawCases()) {
+    if (N.is<Stmt*>())
+      visit(cast<CaseStmt>(N.get<Stmt*>()));
+    else
+      visit(cast<IfConfigDecl>(N.get<Decl*>()));
   }
   Printer.printNewline();
   indent();

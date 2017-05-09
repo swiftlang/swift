@@ -271,7 +271,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
     body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                              SourceLoc());
   } else {
-    SmallVector<CaseStmt *, 4> cases;
+    SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
       auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                              SourceLoc(), SourceLoc(),
@@ -336,7 +336,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
   }
 
   auto *selfRef = createSelfDeclRef(initDecl);
-  SmallVector<CaseStmt *, 4> cases;
+  SmallVector<ASTNode, 4> cases;
   for (auto *elt : elements) {
     auto *litExpr = new (C) StringLiteralExpr(elt->getNameStr(), SourceRange(),
                                               /*Implicit=*/true);

@@ -917,8 +917,7 @@ namespace {
       bool sawDowngradablePattern = false;
       bool sawRedundantPattern = false;
       SmallVector<Space, 4> spaces;
-      for (unsigned i = 0, e = Switch->getCases().size(); i < e; ++i) {
-        auto *caseBlock = Switch->getCases()[i];
+      for (auto *caseBlock : Switch->getCases()) {
         for (auto &caseItem : caseBlock->getCaseLabelItems()) {
           // 'where'-clauses on cases mean the case does not contribute to
           // the exhaustiveness of the pattern.
