@@ -8,6 +8,7 @@
     "CString.swift",
     "Character.swift",
     "CharacterUnicodeScalars.swift",
+    "ICU.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
