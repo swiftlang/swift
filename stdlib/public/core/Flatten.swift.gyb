@@ -133,10 +133,7 @@ extension Sequence where Iterator.Element : Sequence {
   }
 }
 
-extension LazySequenceProtocol
-  where
-  Elements.Iterator.Element == Iterator.Element,
-  Iterator.Element : Sequence {
+extension LazySequenceProtocol where Iterator.Element : Sequence {
 
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
@@ -418,8 +415,8 @@ extension LazyCollectionProtocol
   Self : ${collectionForTraversal(traversal)},
   Elements : ${collectionForTraversal(traversal)},
 %   end
-  ${constraints % {'Base': 'Elements.'}},
-  Iterator.Element == Elements.Iterator.Element {
+  ${constraints % {'Base': 'Elements.'}}
+{
   /// A concatenation of the elements of `self`.
   public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy

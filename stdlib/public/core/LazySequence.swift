@@ -133,6 +133,7 @@ public protocol LazySequenceProtocol : Sequence {
   ///
   /// - See also: `elements`
   associatedtype Elements : Sequence = Self
+  where Elements.Iterator.Element == Iterator.Element
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
