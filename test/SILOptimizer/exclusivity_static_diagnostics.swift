@@ -11,7 +11,7 @@ func simpleInoutDiagnostic() {
   // turned on by default.
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{simultaneous accesses to var 'i'; modification requires exclusive access}}
+  // expected-error@+2{{simultaneous accesses to var 'i', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&i, &i)
 }
@@ -19,7 +19,7 @@ func simpleInoutDiagnostic() {
 func inoutOnInoutParameter(p: inout Int) {
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{simultaneous accesses to parameter 'p'; modification requires exclusive access}}
+  // expected-error@+2{{simultaneous accesses to parameter 'p', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&p, &p)
 }
@@ -27,7 +27,7 @@ func inoutOnInoutParameter(p: inout Int) {
 func swapNoSuppression(_ i: Int, _ j: Int) {
   var a: [Int] = [1, 2, 3]
 
-  // expected-error@+2{{simultaneous accesses to var 'a'; modification requires exclusive access}}
+  // expected-error@+2{{simultaneous accesses to var 'a', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   swap(&a[i], &a[j]) // no-warning
 }
@@ -42,13 +42,13 @@ struct StructWithMutatingMethodThatTakesSelfInout {
   mutating func callMutatingMethodThatTakesSelfInout() {
     // expected-error@+4{{inout arguments are not allowed to alias each other}}
     // expected-note@+3{{previous aliasing argument}}
-    // expected-error@+2{{simultaneous accesses to parameter 'self'; modification requires exclusive access}}
+    // expected-error@+2{{simultaneous accesses to parameter 'self', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     mutate(&self)
   }
 
   mutating func callMutatingMethodThatTakesSelfStoredPropInout() {
-    // expected-error@+2{{simultaneous accesses to parameter 'self'; modification requires exclusive access}}
+    // expected-error@+2{{simultaneous accesses to parameter 'self', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     mutate(&self.f)
   }
@@ -56,7 +56,7 @@ struct StructWithMutatingMethodThatTakesSelfInout {
 
 var globalStruct1 = StructWithMutatingMethodThatTakesSelfInout()
 func callMutatingMethodThatTakesGlobalStoredPropInout() {
-  // expected-error@+2{{simultaneous accesses to var 'globalStruct1'; modification requires exclusive access}}
+  // expected-error@+2{{simultaneous accesses to var 'globalStruct1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   globalStruct1.mutate(&globalStruct1.f)
 }
@@ -68,13 +68,13 @@ class ClassWithFinalStoredProp {
   func callMutatingMethodThatTakesClassStoredPropInout() {
     s1.mutate(&s2.f) // no-warning
 
-    // expected-error@+2{{simultaneous accesses to var 's1'; modification requires exclusive access}}
+    // expected-error@+2{{simultaneous accesses to var 's1', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     s1.mutate(&s1.f)
 
     let local1 = self
 
-    // expected-error@+2{{simultaneous accesses to var 's1'; modification requires exclusive access}}
+    // expected-error@+2{{simultaneous accesses to var 's1', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     local1.s1.mutate(&local1.s1.f)
   }
@@ -84,7 +84,7 @@ func violationWithGenericType<T>(_ p: T) {
   var local = p
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{simultaneous accesses to var 'local'; modification requires exclusive access}}
+  // expected-error@+2{{simultaneous accesses to var 'local', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&local, &local)
 }
