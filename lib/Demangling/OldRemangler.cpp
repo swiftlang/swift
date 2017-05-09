@@ -285,7 +285,8 @@ namespace {
     void mangleNominalType(Node *node, char basicKind, EntityContext &ctx);
 
     void mangleProtocolWithoutPrefix(Node *node);
-    void mangleProtocolListWithoutPrefix(Node *node);
+    void mangleProtocolListWithoutPrefix(Node *node,
+                                         Node *additionalProto = nullptr);
 
     void mangleEntityContext(Node *node, EntityContext &ctx);
     void mangleEntityType(Node *node, EntityContext &ctx);
@@ -1215,13 +1216,17 @@ void Remangler::mangleProtocolList(Node *node) {
   mangleProtocolListWithoutPrefix(node);
 }
 
-void Remangler::mangleProtocolListWithoutPrefix(Node *node) {
+void Remangler::mangleProtocolListWithoutPrefix(Node *node,
+                                                Node *additionalProto) {
   assert(node->getKind() == Node::Kind::ProtocolList);
   assert(node->getNumChildren() == 1);
   auto typeList = node->begin()[0];
   assert(typeList->getKind() == Node::Kind::TypeList);
   for (auto &child : *typeList) {
     mangleProtocolWithoutPrefix(child);
+  }
+  if (additionalProto) {
+    mangleProtocolWithoutPrefix(additionalProto);
   }
   Out << '_';
 }
@@ -1674,8 +1679,11 @@ void Remangler::mangleProtocolListWithClass(Node *node) {
 }
 
 void Remangler::mangleProtocolListWithAnyObject(Node *node) {
-  Out << "Xl";
-  mangleProtocolListWithoutPrefix(node->getChild(0));
+  Node *P = Factory.createNode(Node::Kind::Protocol);
+  P->addChild(Factory.createNode(Node::Kind::Module, "Swift"), Factory);
+  P->addChild(Factory.createNode(Node::Kind::Identifier, "AnyObject"), Factory);
+  Out << "P";
+  mangleProtocolListWithoutPrefix(node->getChild(0), /*additionalProto*/ P);
 }
 
 void Remangler::mangleVTableThunk(Node *node) {
