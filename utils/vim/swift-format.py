@@ -33,6 +33,7 @@ import difflib
 import platform
 import subprocess
 import sys
+
 import vim
 
 binary = 'swift-format'
