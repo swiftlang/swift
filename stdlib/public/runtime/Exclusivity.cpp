@@ -58,31 +58,29 @@ namespace {
 /// A single access that we're tracking.
 struct Access {
   void *Pointer;
-  uintptr_t HereAndAction;
-  Access *Next;
+  uintptr_t NextAndAction;
 
   enum : uintptr_t {
     ActionMask = (uintptr_t)ExclusivityFlags::ActionMask,
-    HereMask = ~ActionMask
+    NextMask = ~ActionMask
   };
 
-  Access **getHere() const {
-    return reinterpret_cast<Access**>(HereAndAction & HereMask);
+  Access *getNext() const {
+    return reinterpret_cast<Access*>(NextAndAction & NextMask);
   }
 
-  void setHere(Access **newHere) {
-    HereAndAction = reinterpret_cast<uintptr_t>(newHere) | uintptr_t(getAccessAction());
+  void setNext(Access *next) {
+    NextAndAction =
+      reinterpret_cast<uintptr_t>(next) | (NextAndAction & NextMask);
   }
 
   ExclusivityFlags getAccessAction() const {
-    return ExclusivityFlags(HereAndAction & ActionMask);
+    return ExclusivityFlags(NextAndAction & ActionMask);
   }
 
-  void initialize(void *pointer, Access **here, ExclusivityFlags action) {
-    assert(*here == nullptr && "not inserting to end of list");
+  void initialize(void *pointer, Access *next, ExclusivityFlags action) {
     Pointer = pointer;
-    HereAndAction = reinterpret_cast<uintptr_t>(here) | uintptr_t(action);
-    Next = nullptr;
+    NextAndAction = reinterpret_cast<uintptr_t>(next) | uintptr_t(action);
   }
 };
 
@@ -99,8 +97,7 @@ public:
   void insert(Access *access, void *pointer, ExclusivityFlags flags) {
     auto action = getAccessAction(flags);
 
-    Access **curP = &Head;
-    for (Access *cur = *curP; cur != nullptr; curP = &cur->Next, cur = *curP) {
+    for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
       // Ignore accesses to different values.
       if (cur->Pointer != pointer)
         continue;
@@ -118,15 +115,27 @@ public:
                  pointer);
     }
 
-    access->initialize(pointer, curP, action);
-    *curP = access;
+    // Insert to the front of the array so that remove tends to find it faster.
+    access->initialize(pointer, Head, action);
+    Head = access;
   }
 
-  static void remove(Access *access) {
-    Access **here = access->getHere();
-    *here = access->Next;
-    if (access->Next != nullptr)
-      access->Next->setHere(here);
+  void remove(Access *access) {
+    auto cur = Head;
+    // Fast path: stack discipline.
+    if (cur == access) {
+      Head = cur->getNext();
+      return;
+    }
+
+    for (Access *last = cur; cur != nullptr; last = cur, cur = cur->getNext()) {
+      if (last == access) {
+        last->setNext(cur->getNext());
+        return;
+      }
+    }
+
+    swift_runtime_unreachable("access not found in set");
   }
 };
 
@@ -231,5 +240,5 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
     return;
   }
 
-  AccessSet::remove(access);
+  getAccessSet(pointer).remove(access);
 }
