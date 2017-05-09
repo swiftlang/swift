@@ -495,7 +495,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
         return { witnessType, nullptr };
     }
 
-    // Otherwise, we fail; this is the only case in which we can retturn a
+    // Otherwise, we fail; this is the only case in which we can return a
     // null type.
     return { Type(), nullptr };
   }

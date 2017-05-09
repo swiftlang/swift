@@ -191,7 +191,7 @@ private:
   /// The callback used by the SILLoader.
   std::unique_ptr<SerializationCallback> Callback;
 
-  // Callbacks registered by the SIL optimizer to run on each deserializaed
+  // Callbacks registered by the SIL optimizer to run on each deserialized
   // function body. This is intentionally a stateless type because the
   // ModuleDecl and SILFunction should be sufficient context.
   typedef void (*SILFunctionBodyCallback)(ModuleDecl *, SILFunction *F);

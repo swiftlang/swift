@@ -552,9 +552,9 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     bool unusedHasBindOptional = false;
 
     // Inside a keypath's path, the period always behaves normally: the key path
-    // behaviour is only the separation between type and path.
+    // behavior is only the separation between type and path.
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
-                                        /*periodHasKeyPathBehaviour=*/false,
+                                        /*periodHasKeyPathBehavior=*/false,
                                         unusedHasBindOptional);
     if (pathResult.isParseError() || pathResult.hasCodeCompletion())
       return pathResult;
@@ -1062,7 +1062,7 @@ static bool canParseTypeOf(Parser &P) {
 
 ParserResult<Expr>
 Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
-                               bool periodHasKeyPathBehaviour,
+                               bool periodHasKeyPathBehavior,
                                bool &hasBindOptional) {
   hasBindOptional = false;
 
@@ -1078,7 +1078,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       // A key path is special, because it allows .[, unlike anywhere else. The
       // period itself should be left in the token stream. (.? and .! end up
       // being operators, and so aren't handled here.)
-      if (periodHasKeyPathBehaviour && peekToken().is(tok::l_square)) {
+      if (periodHasKeyPathBehavior && peekToken().is(tok::l_square)) {
         break;
       }
 
@@ -1259,7 +1259,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Tok.is(tok::oper_postfix)) {
       // KeyPaths are more restricted in what can go after a ., and so we treat
       // them specially.
-      if (periodHasKeyPathBehaviour && startsWithSymbol(Tok, '.'))
+      if (periodHasKeyPathBehavior && startsWithSymbol(Tok, '.'))
         break;
 
       Expr *oper = parseExprOperator();
@@ -1738,7 +1738,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
   bool hasBindOptional = false;
   Result = parseExprPostfixSuffix(Result, isExprBasic,
-                                  /*periodHasKeyPathBehaviour=*/InSwiftKeyPath,
+                                  /*periodHasKeyPathBehavior=*/InSwiftKeyPath,
                                   hasBindOptional);
   if (Result.isParseError() || Result.hasCodeCompletion())
     return Result;

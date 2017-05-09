@@ -2538,7 +2538,7 @@ bool ConstraintSystem::solveSimplified(
 
   // Select a disjunction based on a few factors, prioritizing
   // coercions and initializer disjunctions, followed by bind overload
-  // disjunctions with with fewest unbound argument types.
+  // disjunctions with fewest unbound argument types.
   Optional<Constraint *> selection;
   Optional<unsigned> lowestUnbound;
   Optional<unsigned> lowestActive;

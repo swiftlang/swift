@@ -4858,7 +4858,7 @@ public:
   }
 };
 
-/// Represents the unusual behaviour of a . in a \ keypath expression, such as
+/// Represents the unusual behavior of a . in a \ keypath expression, such as
 /// \.[0] and \Foo.?.
 class KeyPathDotExpr : public Expr {
   SourceLoc DotLoc;

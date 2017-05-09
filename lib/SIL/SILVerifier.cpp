@@ -833,7 +833,7 @@ public:
         if (!A)
           return;
         require(isArchetypeValidInFunction(A, &F),
-                "Replacment type of a substitution contains an ArchetypeType "
+                "Replacement type of a substitution contains an ArchetypeType "
                 "that does not exist in the Caller's generic param list.");
       });
     }
