@@ -70,11 +70,17 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   IRGenModule &IGM;
 
   /// Used for caching SILDebugScopes without inline information.
-  typedef std::pair<const void *, void *> LocalScopeHash;
+  typedef std::pair<const void *, const void *> LocalScopeHash;
   struct LocalScope : public LocalScopeHash {
     LocalScope(const SILDebugScope *DS)
-        : LocalScopeHash(
-              {DS->Loc.getOpaquePointerValue(), DS->Parent.getOpaqueValue()}) {}
+        : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
+                          // If there is no parent SIL function use the scope
+                          // pointer as a unique id instead. This is safe
+                          // because such a function could also never have been
+                          // SIL-inlined.
+                          DS->Parent.getOpaqueValue()
+                              ? DS->Parent.getOpaqueValue()
+                              : DS}) {}
   };
 
   /// Various caches.
