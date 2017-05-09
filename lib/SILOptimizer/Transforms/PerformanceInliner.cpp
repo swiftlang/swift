@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -48,6 +49,7 @@ class SILPerformanceInliner {
 
   DominanceAnalysis *DA;
   SILLoopAnalysis *LA;
+  SideEffectAnalysis *SEA;
 
   // For keys of SILFunction and SILLoop.
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
@@ -144,8 +146,8 @@ class SILPerformanceInliner {
 
 public:
   SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
-                        SILLoopAnalysis *LA)
-      : WhatToInline(WhatToInline), DA(DA), LA(LA), CBI(DA) {}
+                        SILLoopAnalysis *LA, SideEffectAnalysis *SEA)
+      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -171,8 +173,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
-  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions()))
-    return false;
+  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
+    return isPureCall(AI, SEA);
+  }
 
   SILLoopInfo *LI = LA->get(Callee);
   ShortestPathAnalysis *SPA = getSPA(Callee, LI);
@@ -315,8 +318,9 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   if (AI.getFunction()->isThunk()) {
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
-    if (CalleeCost > TrivialFunctionThreshold)
-      return false;
+    if (CalleeCost > TrivialFunctionThreshold) {
+      return isPureCall(AI, SEA);
+    }
 
     DEBUG(
       dumpCaller(AI.getFunction());
@@ -336,7 +340,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
-    return false;
+    return isPureCall(AI, SEA);
   }
 
   NumCallerBlocks += Callee->size();
@@ -679,12 +683,13 @@ public:
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
     if (getOptions().InlineThreshold == 0) {
       return;
     }
 
-    SILPerformanceInliner Inliner(WhatToInline, DA, LA);
+    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

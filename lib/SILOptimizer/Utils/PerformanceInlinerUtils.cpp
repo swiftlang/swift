@@ -691,3 +691,47 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   EligibleCallee = Callee;
   return EligibleCallee;
 }
+
+/// Returns true if a given value is constant.
+/// The value is considered to be constant if it is:
+/// - a literal
+/// - a tuple or a struct whose fields are all constants
+static bool isConstantValue(SILValue V) {
+  if (isa<LiteralInst>(V))
+    return true;
+  if (auto *TI = dyn_cast<TupleInst>(V)) {
+    for (auto E : TI->getElements()) {
+      if (!isConstantValue(E))
+        return false;
+    }
+    return true;
+  }
+  if (auto *SI = dyn_cast<StructInst>(V)) {
+    for (auto E : SI->getElements()) {
+      if (!isConstantValue(E))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+
+bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
+  // If a call has only constant arguments and the call is pure, i.e. has
+  // no side effects, then we should always inline it.
+  SideEffectAnalysis::FunctionEffects ApplyEffects;
+  SEA->getEffects(ApplyEffects, AI);
+  auto GE = ApplyEffects.getGlobalEffects();
+  if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
+    return false;
+  // Check if all parameters are constant.
+  auto Args = AI.getArgumentsWithoutIndirectResults();
+  bool allArgsConstant = true;
+  for (auto Arg : Args) {
+    if (!isConstantValue(Arg)) {
+      return false;
+    }
+  }
+  return true;
+}
