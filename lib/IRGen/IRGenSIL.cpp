@@ -3992,8 +3992,9 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy);
     llvm::Value *flags =
       llvm::ConstantInt::get(IGM.SizeTy, uint64_t(getExclusivityFlags(access)));
+    llvm::Value *pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     auto call = Builder.CreateCall(IGM.getBeginAccessFn(),
-                                   { pointer, scratch, flags });
+                                   { pointer, scratch, flags, pc });
     call->setDoesNotThrow();
 
     setLoweredDynamicallyEnforcedAddress(access, addr, scratch);
@@ -4001,6 +4002,11 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
   }
   }
   llvm_unreachable("bad access enforcement");
+}
+
+static bool hasBeenInlined(BeginUnpairedAccessInst *access) {
+  // Check to see if the buffer is defined locally.
+  return isa<AllocStackInst>(access->getBuffer());
 }
 
 void IRGenSILFunction::visitBeginUnpairedAccessInst(
@@ -4022,8 +4028,26 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
       Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy);
     llvm::Value *flags =
       llvm::ConstantInt::get(IGM.SizeTy, uint64_t(getExclusivityFlags(access)));
+
+    // Compute the effective PC of the access.
+    // Since begin_unpaired_access is designed for materializeForSet, our
+    // heuristic here is as well: we've either been inlined, in which case
+    // we should use the current PC (i.e. pass null), or we haven't,
+    // in which case we should use the caller, which is generally ok because
+    // materializeForSet can't usually be thunked.
+    llvm::Value *pc;
+    if (hasBeenInlined(access)) {
+      pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    } else {
+      auto retAddrFn =
+        llvm::Intrinsic::getDeclaration(IGM.getModule(),
+                                        llvm::Intrinsic::returnaddress);
+      pc = Builder.CreateCall(retAddrFn,
+                              { llvm::ConstantInt::get(IGM.Int32Ty, 0) });
+    }
+
     auto call = Builder.CreateCall(IGM.getBeginAccessFn(),
-                                   { pointer, scratch, flags });
+                                   { pointer, scratch, flags, pc });
     call->setDoesNotThrow();
     return;
   }

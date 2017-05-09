@@ -41,6 +41,18 @@
 #include <stdio.h>
 #endif
 
+// Pick a return-address strategy
+#if __GNUC__
+#define get_return_address() __builtin_return_address(0)
+#elif _MSC_VER
+#include <intrin.h>
+#define get_return_address() _ReturnAddress()
+#else
+#error missing implementation for get_return_address
+#define get_return_address() ((void*) 0)
+#endif
+
+
 using namespace swift;
 
 bool swift::_swift_disableExclusivityChecking = false;
@@ -58,6 +70,7 @@ namespace {
 /// A single access that we're tracking.
 struct Access {
   void *Pointer;
+  void *PC;
   uintptr_t NextAndAction;
 
   enum : uintptr_t {
@@ -78,8 +91,10 @@ struct Access {
     return ExclusivityFlags(NextAndAction & ActionMask);
   }
 
-  void initialize(void *pointer, Access *next, ExclusivityFlags action) {
+  void initialize(void *pc, void *pointer, Access *next,
+                  ExclusivityFlags action) {
     Pointer = pointer;
+    PC = pc;
     NextAndAction = reinterpret_cast<uintptr_t>(next) | uintptr_t(action);
   }
 };
@@ -94,7 +109,7 @@ class AccessSet {
 public:
   constexpr AccessSet() {}
 
-  void insert(Access *access, void *pointer, ExclusivityFlags flags) {
+  void insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
     auto action = getAccessAction(flags);
 
     for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
@@ -110,13 +125,15 @@ public:
       // Otherwise, it's a conflict.
       // TODO: try to recover source-location information from the return
       // address.
-      fatalError(0, "%s/%s access conflict detected on address %p, aborting\n",
-                 getAccessName(action), getAccessName(cur->getAccessAction()),
+      fatalError(0, "%s(%p) / %s(%p) access conflict detected on address %p,"
+                 " aborting\n",
+                 getAccessName(cur->getAccessAction()), cur->PC,
+                 getAccessName(action), pc,
                  pointer);
     }
 
     // Insert to the front of the array so that remove tends to find it faster.
-    access->initialize(pointer, Head, action);
+    access->initialize(pc, pointer, Head, action);
     Head = access;
   }
 
@@ -214,7 +231,7 @@ static AccessSet &getAccessSet(void *pointer) {
 /// This may cause a runtime failure if an incompatible access is
 /// already underway.
 void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
-                              ExclusivityFlags flags) {
+                              ExclusivityFlags flags, void *pc) {
   assert(pointer && "beginning an access on a null pointer?");
 
   Access *access = reinterpret_cast<Access*>(buffer);
@@ -226,7 +243,9 @@ void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
     return;
   }
 
-  getAccessSet(pointer).insert(access, pointer, flags);
+  if (!pc) pc = get_return_address();
+
+  getAccessSet(pointer).insert(access, pc, pointer, flags);
 }
 
 /// End tracking a dynamic access.
