@@ -1470,6 +1470,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
+                                 Args.filtered_end())) {
+    StringRef Opt = A->getValue();
+    if (Opt.startswith("-D") || Opt.startswith("-U"))
+      Opts.ClangDefines.push_back(Opt);
+  }
+
+
   for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
                                  Args.filtered_end())) {
     LibraryKind Kind;
