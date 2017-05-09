@@ -2105,10 +2105,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // The IfConfigDecl is ahead of its members in source order.
       Handler(ICD);
       // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveMembers()) {
-        if (isa<IfConfigDecl>(activeMember))
+      for (auto activeMember : ICD->getActiveClauseElements()) {
+        auto *D = activeMember.get<Decl*>();
+        if (isa<IfConfigDecl>(D))
+          // Don't hoist nested '#if'.
           continue;
-        Handler(activeMember);
+        Handler(D);
       }
     }
     return IfConfigResult;

@@ -551,11 +551,11 @@ static bool isVersionIfConfigCondition(Expr *Condition) {
 
 /// Parse and populate a list of #if/#elseif/#else/#endif clauses.
 /// Delegate callback function to parse elements in the blocks.
-template <typename ElemTy, unsigned N>
+template <unsigned N>
 static ParserStatus parseIfConfig(
-    Parser &P, SmallVectorImpl<IfConfigClause<ElemTy>> &Clauses,
+    Parser &P, SmallVectorImpl<IfConfigClause> &Clauses,
     SourceLoc &EndLoc, bool HadMissingEnd,
-    llvm::function_ref<void(SmallVectorImpl<ElemTy> &, bool)> parseElements) {
+    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
   Parser::StructureMarkerRAII ParsingDecl(
       P, P.Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
@@ -597,7 +597,7 @@ static ParserStatus parseIfConfig(
     }
 
     // Parse elements
-    SmallVector<ElemTy, N> Elements;
+    SmallVector<ASTNode, N> Elements;
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
     } else {
@@ -606,9 +606,8 @@ static ParserStatus parseIfConfig(
       DT.abort();
     }
 
-    Clauses.push_back(IfConfigClause<ElemTy>(ClauseLoc, Condition,
-                                             P.Context.AllocateCopy(Elements),
-                                             isActive));
+    Clauses.emplace_back(ClauseLoc, Condition,
+                         P.Context.AllocateCopy(Elements), isActive);
 
     if (P.Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
@@ -623,12 +622,12 @@ static ParserStatus parseIfConfig(
 
 /// Parse #if ... #endif in declarations position.
 ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
-  SmallVector<IfConfigClause<Decl *>, 4> Clauses;
+  SmallVector<IfConfigClause, 4> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd = false;
-  auto Status = parseIfConfig<Decl *, 8>(
+  auto Status = parseIfConfig<8>(
       *this, Clauses, EndLoc, HadMissingEnd,
-      [&](SmallVectorImpl<Decl *> &Decls, bool IsActive) {
+      [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
     Optional<Scope> scope;
     if (!IsActive)
       scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
@@ -647,7 +646,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
         break;
       }
       Status |= parseDeclItem(PreviousHadSemi, Flags,
-                              [&](Decl *D) {Decls.push_back(D);});
+                              [&](Decl *D) {Decls.emplace_back(D);});
     }
   });
   if (Status.isError())
@@ -660,11 +659,11 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 }
 
 /// Parse #if ... #endif in statements position.
-ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
-  SmallVector<IfConfigClause<ASTNode>, 4> Clauses;
+ParserResult<IfConfigDecl> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
+  SmallVector<IfConfigClause, 4> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd = false;
-  auto Status = parseIfConfig<ASTNode, 16>(
+  auto Status = parseIfConfig<16>(
       *this, Clauses, EndLoc, HadMissingEnd,
       [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
     parseBraceItems(Elements, Kind, IsActive
@@ -672,9 +671,10 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
                       : BraceItemListKind::InactiveConditionalBlock);
   });
   if (Status.isError())
-    return makeParserErrorResult<Stmt>();
+    return makeParserErrorResult<IfConfigDecl>();
 
-  auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
+  auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
+                                         Context.AllocateCopy(Clauses),
                                          EndLoc, HadMissingEnd);
-  return makeParserResult(ICS);
+  return makeParserResult(ICD);
 }

@@ -293,10 +293,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         Entries.push_back(D);
       TmpDecls.clear();
     } else if (Tok.is(tok::pound_if)) {
-      SourceLoc StartLoc = Tok.getLoc();
-      
-      // We'll want to parse the #if block, but not wrap it in a top-level
-      // code declaration immediately.
       auto IfConfigResult = parseStmtIfConfig(Kind);
       
       if (IfConfigResult.isParseError()) {
@@ -311,20 +307,13 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         continue;
       }
 
-      // Add the #if block itself as a TLCD if necessary
-      if (Kind == BraceItemListKind::TopLevelCode) {
-        auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-        auto Brace = BraceStmt::create(Context, StartLoc,
-                                       {Result}, PreviousLoc);
-        TLCD->setBody(Brace);
-        Entries.push_back(TLCD);
-      } else {
-        Entries.push_back(Result);
-      }
+      // Add the #if block itself
+      Entries.push_back(Result);
 
-      IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
-      for (auto &Entry : ICS->getActiveClauseElements()) {
-        if (Entry.is<Stmt*>() && isa<IfConfigStmt>(Entry.get<Stmt*>()))
+      IfConfigDecl *ICD = cast<IfConfigDecl>(Result.get<Decl*>());
+      for (auto &Entry : ICD->getActiveClauseElements()) {
+        if (Entry.is<Decl*>() && isa<IfConfigDecl>(Entry.get<Decl*>()))
+          // Don't hoist nested '#if'.
           continue;
         Entries.push_back(Entry);
         if (Entry.is<Decl*>()) {

@@ -599,13 +599,6 @@ LegacyASTTransformer::visitFallthroughStmt(FallthroughStmt *S,
 }
 
 RC<SyntaxData>
-LegacyASTTransformer::visitIfConfigStmt(IfConfigStmt *S,
-                                        const SyntaxData *Parent,
-                                        const CursorIndex IndexInParent) {
-  return getUnknownStmt(S);
-}
-
-RC<SyntaxData>
 LegacyASTTransformer::visitFailStmt(FailStmt *S,
                                     const SyntaxData *Parent,
                                     const CursorIndex IndexInParent) {

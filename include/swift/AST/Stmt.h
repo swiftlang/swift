@@ -655,46 +655,6 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
 };
 
-/// IfConfigStmt - This class models the statement-side representation of
-/// #if/#else/#endif blocks.
-class IfConfigStmt : public Stmt {
-  /// An array of clauses controlling each of the #if/#elseif/#else conditions.
-  /// The array is ASTContext allocated.
-  ArrayRef<IfConfigClause<ASTNode>> Clauses;
-  SourceLoc EndLoc;
-  bool HadMissingEnd;
-
-public:
-  IfConfigStmt(ArrayRef<IfConfigClause<ASTNode>> Clauses, SourceLoc EndLoc,
-               bool HadMissingEnd)
-  : Stmt(StmtKind::IfConfig, /*implicit=*/false),
-    Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
-  
-  SourceLoc getIfLoc() const { return Clauses[0].Loc; }
-
-  SourceLoc getStartLoc() const { return getIfLoc(); }
-  SourceLoc getEndLoc() const { return EndLoc; }
-
-  bool hadMissingEnd() const { return HadMissingEnd; }
-  
-  const ArrayRef<IfConfigClause<ASTNode>> &getClauses() const {
-    return Clauses;
-  }
-
-  ArrayRef<ASTNode> getActiveClauseElements() const {
-    for (auto &Clause : Clauses)
-      if (Clause.isActive)
-        return Clause.Elements;
-    return ArrayRef<ASTNode>();
-  }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::IfConfig;
-  }
-};
-
-  
 /// WhileStmt - while statement. After type-checking, the condition is of
 /// type Builtin.Int1.
 class WhileStmt : public LabeledConditionalStmt {

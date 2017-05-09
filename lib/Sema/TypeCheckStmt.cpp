@@ -512,14 +512,6 @@ public:
     return GS;
   }
 
-  Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {
-    
-    // Active members are attached to the enclosing declaration, so there's no
-    // need to walk anything within.
-    
-    return ICS;
-  }
-
   Stmt *visitDoStmt(DoStmt *DS) {
     AddLabeledStmt loopNest(*this, DS);
     Stmt *S = DS->getBody();

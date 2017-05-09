@@ -279,7 +279,7 @@ struct PrintOptions {
   /// Print all decls that have at least this level of access.
   Accessibility AccessibilityFilter = Accessibility::Private;
 
-  /// Print IfConfigDecls and IfConfigStmts.
+  /// Print IfConfigDecls.
   bool PrintIfConfig = true;
 
   /// Whether we are printing for sil.

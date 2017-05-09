@@ -188,22 +188,9 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   llvm_unreachable("Unhandled ContinuationKind in switch.");
 }
 
-/// Determine whether this is a top-level code declaration that isn't just
-/// wrapping an #if.
+/// Determine whether this is a top-level code declaration.
 static bool isRealTopLevelCodeDecl(Decl *decl) {
-  auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
-  if (!topLevelCode) return false;
-
-  // Drop top-level statements containing just an IfConfigStmt.
-  // FIXME: The modeling of IfConfig is weird.
-  auto braceStmt = topLevelCode->getBody();
-  auto elements = braceStmt->getElements();
-  if (elements.size() == 1 &&
-      elements[0].is<Stmt *>() &&
-      isa<IfConfigStmt>(elements[0].get<Stmt *>()))
-    return false;
-
-  return true;
+  return isa<TopLevelCodeDecl>(decl);
 }
 
 void ASTScope::expand() const {
@@ -1153,7 +1140,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::Break:
   case StmtKind::Continue:
   case StmtKind::Fallthrough:
-  case StmtKind::IfConfig:
   case StmtKind::Fail:
   case StmtKind::Throw:
     // Nothing to do for these statements.
