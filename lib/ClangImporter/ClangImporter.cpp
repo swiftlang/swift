@@ -724,18 +724,15 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   auto clangDiags = CompilerInstance::createDiagnostics(
                                               new clang::DiagnosticOptions());
   clang::SourceManager clangSrcMgr(*clangDiags, CI.getFileManager());
-  clang::HeaderSearch headerInfo(CI.getHeaderSearchOptsPtr(),
-                          clangSrcMgr,
-                          *clangDiags,
-                          CI.getLangOpts(),
-                          /*Target=*/nullptr);
-  headerInfo.setModuleCachePath(CI.getSpecificModuleCachePath());
+  auto FID = clangSrcMgr.createFileID(
+                        llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
+  clangSrcMgr.setMainFileID(FID);
   clang::Preprocessor PP(CI.getInvocation().getPreprocessorOptsPtr(),
                          *clangDiags,
                          CI.getLangOpts(),
                          clangSrcMgr,
                          CI.getPCMCache(),
-                         headerInfo, CI,
+                         CI.getPreprocessor().getHeaderSearchInfo(), CI,
                          /*IILookup=*/nullptr,
                          /*OwnsHeaderSearch=*/false);
   PP.Initialize(CI.getTarget());
