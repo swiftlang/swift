@@ -3952,7 +3952,7 @@ void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
   }
 }
 
-static ExclusivityFlags getExclusivityFlags(SILAccessKind kind) {
+static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
   switch (kind) {
   case SILAccessKind::Read:
     return ExclusivityFlags::Read;
@@ -3965,9 +3965,20 @@ static ExclusivityFlags getExclusivityFlags(SILAccessKind kind) {
   llvm_unreachable("bad access kind");
 }
 
+static ExclusivityFlags getExclusivityFlags(SILModule &M,
+                                            SILAccessKind kind) {
+  auto flags = getExclusivityAction(kind);
+
+  // In old Swift compatibility modes, downgrade this to a warning.
+  if (M.getASTContext().LangOpts.isSwiftVersion3())
+    flags |= ExclusivityFlags::WarningOnly;
+
+  return flags;
+}
+
 template <class Inst>
 static ExclusivityFlags getExclusivityFlags(Inst *i) {
-  return getExclusivityFlags(i->getAccessKind());
+  return getExclusivityFlags(i->getModule(), i->getAccessKind());
 }
 
 void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
