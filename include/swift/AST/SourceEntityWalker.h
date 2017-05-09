@@ -126,7 +126,7 @@ public:
 
   /// This method is called for each external argument name in function-like
   /// declarations like constructor, function and subscript. The function is
-  /// called only when a external argument label is specifically specified,
+  /// called only when an external argument label is specifically specified,
   /// like func foo(External Internal: Int) {}.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.

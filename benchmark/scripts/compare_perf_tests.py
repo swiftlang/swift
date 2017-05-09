@@ -250,7 +250,7 @@ class ReportFormatter:
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <style>
         body {{ font-family: -apple-system, sans-serif; font-size: 14px; }}
-        table {{ border-spacing: 2px; border-color: grey; border-spacing: 0;
+        table {{ border-spacing: 2px; border-color: gray; border-spacing: 0;
                 border-collapse: collapse; }}
         table tr {{ background-color: #fff; border-top: 1px solid #c6cbd1; }}
         table th, table td {{ padding: 6px 13px; border: 1px solid #dfe2e5; }}
