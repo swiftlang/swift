@@ -188,11 +188,6 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   llvm_unreachable("Unhandled ContinuationKind in switch.");
 }
 
-/// Determine whether this is a top-level code declaration.
-static bool isRealTopLevelCodeDecl(Decl *decl) {
-  return isa<TopLevelCodeDecl>(decl);
-}
-
 void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
@@ -300,7 +295,7 @@ void ASTScope::expand() const {
 
         // If the declaration is a top-level code declaration, turn the source
         // file into a continuation. We're done.
-        if (isRealTopLevelCodeDecl(decl)) {
+        if (isa<TopLevelCodeDecl>(decl)) {
           addActiveContinuation(this);
           break;
         }
@@ -937,7 +932,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   }
 
   case DeclKind::TopLevelCode:
-    if (!isRealTopLevelCodeDecl(decl)) return nullptr;
     return new (ctx) ASTScope(parent, cast<TopLevelCodeDecl>(decl));
 
   case DeclKind::Protocol:
