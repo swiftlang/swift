@@ -998,15 +998,6 @@ namespace {
         OS << "_for=" << ASD->getFullName();
       }
 
-      for (auto VD: FD->getSatisfiedProtocolRequirements()) {
-        OS << '\n';
-        OS.indent(Indent+2);
-        PrintWithColorRAII(OS, ParenthesisColor) << '(';
-        OS << "conformance ";
-        VD->dumpRef(OS);
-        PrintWithColorRAII(OS, ParenthesisColor) << ')';
-      }
-
       printAbstractFunctionDecl(FD);
 
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
