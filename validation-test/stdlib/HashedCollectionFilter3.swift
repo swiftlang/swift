@@ -17,5 +17,19 @@ FilterTestSuite.test("Set.filter(_:) -> [Element]") {
   expectTrue(f is [Int])
 }
 
+FilterTestSuite.test("Dictionary.keys -> LazyMapCollection") {
+  let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
+  // .keys should produce a LazyMapCollection in Swift 3
+  let f: Any = d.keys
+  expectEqual(4, f.count)
+}
+
+FilterTestSuite.test("Dictionary.values -> LazyMapCollection") {
+  let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
+  // .values should produce a LazyMapCollection in Swift 3
+  let f: Any = d.values
+  expectEqual(4, f.count)
+}
+
 runAllTests()
 

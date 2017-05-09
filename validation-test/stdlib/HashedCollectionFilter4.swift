@@ -37,5 +37,19 @@ FilterTestSuite.test("Set.filter(_:) -> [Element] available") {
   expectEqual(2, f.count)
 }
 
+FilterTestSuite.test("Dictionary.keys -> Keys") {
+  let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
+  // .keys should produce a Dictionary.Keys in Swift 4
+  let f: Any = d.keys
+  expectTrue(f is Dictionary<Int, Int>.Keys)
+}
+
+FilterTestSuite.test("Dictionary.values -> Values") {
+  let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
+  // .values should produce a Dictionary.Values in Swift 4
+  let f: Any = d.values
+  expectTrue(f is Dictionary<Int, Int>.Values)
+}
+
 runAllTests()
 
