@@ -2028,9 +2028,6 @@ public enum ArithmeticOverflow {
 public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations
   where Magnitude : FixedWidthInteger
 {
-  // FIXME(ABI) (Recursive Protocol Constraints): should add:
-  // where Magnitude : FixedWidthInteger
-
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -3197,7 +3194,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   //
   public var magnitude: DoubleWidth<Low> {
     if Base.isSigned && _storage.high < 0 {
-        return (0 - self).magnitude
+      return self == .min
+        ? DoubleWidth.max.magnitude &+ 1
+        : (0 - self).magnitude
     }
     return DoubleWidth<Low>((
       _storage.high.magnitude, _storage.low.magnitude))
@@ -3226,9 +3225,6 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     self.init(exactly: source)!
   }
 
-  // These unconstrained versions are required by BinaryInteger. Once
-  // we have recursive constraints, and BinaryInteger.Magnitude : BinaryInteger
-  // then the constrained versions can replace these stubs.
   public init?<T : BinaryInteger>(exactly source: T) {
     // Can't represent a negative 'source' if Base is unsigned
     guard source >= 0 || DoubleWidth<Base>.isSigned else { return nil }
