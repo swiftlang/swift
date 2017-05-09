@@ -94,6 +94,8 @@ protected:
         maybeAddMethod(fd);
       else if (auto *cd = dyn_cast<ConstructorDecl>(member))
         maybeAddConstructor(cd);
+      else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
+        asDerived().addPlaceholder(placeholder);
     }
   }
 };
