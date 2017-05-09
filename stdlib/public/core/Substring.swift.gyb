@@ -32,7 +32,9 @@ public struct Substring : StringProtocol {
     _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
   }
 
-  internal init<R: RangeExpression>(_base base: String, _ bounds: R) where R.Bound == Index {
+  internal init<R: RangeExpression>(
+    _base base: String, _ bounds: R
+  ) where R.Bound == Index {
     self.init(_base: base, bounds.relative(to: base))
   }
 
@@ -99,6 +101,52 @@ public struct Substring : StringProtocol {
   }
 
 % end
+
+  public init<C: Collection, Encoding: UnicodeEncoding>(
+    codeUnits: C, encoding: Encoding.Type
+  ) where C.Iterator.Element == Encoding.CodeUnit {
+    self.init(String(codeUnits: codeUnits, encoding: encoding))
+  }
+
+  public init(cString nulTerminatedUTF8: UnsafePointer<CChar>) {
+    self.init(String(cString: nulTerminatedUTF8))
+  }
+  
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  public init<Encoding: UnicodeEncoding>(
+    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    encoding: Encoding.Type) {
+    self.init(String(cString: nulTerminatedCodeUnits, encoding: encoding))
+  }
+    
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  public func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+    return try _slice._base._core._withCSubstringAndLength(
+      in: startIndex._base._position..<endIndex._base._position,
+      encoding: UTF8.self) {
+      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
+        try body($0)
+      }
+    }
+  }
+
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of code units in the given encoding.
+  public func withCString<Result, TargetEncoding: UnicodeEncoding>(
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result {
+    return try _slice._base._core._withCSubstring(
+      in: startIndex._base._position..<endIndex._base._position,
+      encoding: targetEncoding, body)
+  }
 }
 
 
@@ -127,8 +175,8 @@ extension Substring : CustomDebugStringConvertible {
 }
 
 extension Substring : LosslessStringConvertible {
-  public init?(_ description: String) {
-    self.init(_base: description, description.startIndex ..< description.endIndex)
+  public init(_ content: String) {
+    self.init(_base: content, content.startIndex ..< content.endIndex)
   }
 }
 

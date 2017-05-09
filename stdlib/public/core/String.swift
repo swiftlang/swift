@@ -37,6 +37,45 @@ public protocol StringProtocol
 
   func lowercased() -> String
   func uppercased() -> String
+
+  /// Constructs a `String` having the same contents as `codeUnits`.
+  ///
+  /// - Parameter codeUnits: a collection of code units in
+  ///   the given `encoding`.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  init<C: Collection, Encoding: UnicodeEncoding>(
+    codeUnits: C, encoding: Encoding.Type
+  )
+    where C.Iterator.Element == Encoding.CodeUnit
+
+  /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
+  ///
+  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
+  ///   bytes ending just before the first zero byte (NUL character).
+  init(cString nulTerminatedUTF8: UnsafePointer<CChar>)
+  
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  init<Encoding: UnicodeEncoding>(
+    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    encoding: Encoding.Type)
+    
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result
+
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of code units in the given encoding.
+  func withCString<Result, Encoding: UnicodeEncoding>(
+    encoding: Encoding.Type,
+    _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result
 }
 
 extension StringProtocol /* : LosslessStringConvertible */ {
@@ -45,7 +84,141 @@ extension StringProtocol /* : LosslessStringConvertible */ {
   }
 }
 
-// FIXME: complexity documentation for most of methods on String is ought to be
+/// Call body with a pointer to zero-terminated sequence of
+/// `TargetEncoding.CodeUnit` representing the same string as `source`, when
+/// `source` is interpreted as being encoded with `SourceEncoding`.
+internal func _withCString<
+  Source : Collection,
+  SourceEncoding : UnicodeEncoding, 
+  TargetEncoding : UnicodeEncoding, 
+  Result
+>(
+  encodedAs targetEncoding: TargetEncoding.Type,
+  from source: Source,
+  encodedAs sourceEncoding: SourceEncoding.Type,
+  execute body : (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+) rethrows -> Result
+where Source.Iterator.Element == SourceEncoding.CodeUnit {
+  return try _withCStringAndLength(
+    encodedAs: targetEncoding,
+    from: source,
+    encodedAs: sourceEncoding) { p, _ in try body(p) }
+}
+
+internal func _withCStringAndLength<
+  Source : Collection,
+  SourceEncoding : UnicodeEncoding, 
+  TargetEncoding : UnicodeEncoding, 
+  Result
+>(
+  encodedAs targetEncoding: TargetEncoding.Type,
+  from source: Source,
+  encodedAs sourceEncoding: SourceEncoding.Type,
+  execute body : (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
+) rethrows -> Result
+where Source.Iterator.Element == SourceEncoding.CodeUnit {
+  var targetLength = 0 // nul terminator
+  var i = source.makeIterator()
+  SourceEncoding.ForwardParser.parse(&i) {
+    targetLength += numericCast(
+      targetEncoding.transcode($0, from: SourceEncoding.self).count)
+  }
+  var a: [TargetEncoding.CodeUnit] = []
+  a.reserveCapacity(targetLength + 1)
+  i = source.makeIterator()
+  SourceEncoding.ForwardParser.parse(&i) {
+    a.append(
+      contentsOf: targetEncoding.transcode($0, from: SourceEncoding.self))
+  }
+  a.append(0)
+  return try body(a, targetLength)
+}
+
+extension _StringCore {
+  /// Invokes `body` on a null-terminated sequence of code units in the given
+  /// encoding corresponding to the substring in `bounds`.
+  internal func _withCSubstring<Result, TargetEncoding: UnicodeEncoding>(
+    in bounds: Range<Index>,
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result {
+    return try _withCSubstringAndLength(in: bounds, encoding: targetEncoding) {
+      p,_ in try body(p)
+    }
+  }
+
+  internal func _withCSubstringAndLength<
+    Result, TargetEncoding: UnicodeEncoding
+  >(
+    in bounds: Range<Index>,
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
+  ) rethrows -> Result {
+    if _fastPath(hasContiguousStorage) {
+      defer { _fixLifetime(self) }
+      if isASCII {
+        return try Swift._withCStringAndLength(
+          encodedAs: targetEncoding,
+          from: UnsafeBufferPointer(start: startASCII, count: count)[bounds],
+          encodedAs: _Unicode.ASCII.self,
+          execute: body
+        )
+      }
+      else {
+        return try Swift._withCStringAndLength(
+          encodedAs: targetEncoding,
+          from: UnsafeBufferPointer(start: startUTF16, count: count)[bounds],
+          encodedAs: _Unicode.UTF16.self,
+          execute: body
+        )
+      }
+    }
+    return try Swift._withCStringAndLength(
+      encodedAs: targetEncoding,
+      from: self[bounds],
+      encodedAs: _Unicode.UTF16.self,
+      execute: body
+    )
+  }
+}
+
+extension String {
+  public init<C: Collection, Encoding: UnicodeEncoding>(
+    codeUnits: C, encoding: Encoding.Type
+  ) where C.Iterator.Element == Encoding.CodeUnit {
+    let (b,_) = _StringBuffer.fromCodeUnits(
+      codeUnits, encoding: encoding, repairIllFormedSequences: true)
+    self = String(_StringCore(b!))
+  }
+
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  public init<Encoding: UnicodeEncoding>(
+    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    encoding: Encoding.Type) {
+
+    let codeUnits = _SentinelCollection(
+      UnsafeBufferPointer(_unboundedStartingAt: nulTerminatedCodeUnits),
+      until: _IsZero()
+    )
+    self.init(codeUnits: codeUnits, encoding: encoding)
+  }
+
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of code units in the given encoding.
+  public func withCString<Result, TargetEncoding: UnicodeEncoding>(
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result {
+    return try _core._withCSubstring(
+      in: _core.startIndex..<_core.endIndex, encoding: targetEncoding, body)
+  }
+}
+// FIXME: complexity documentation for most of methods on String ought to be
 // qualified with "amortized" at least, as Characters are variable-length.
 
 /// A Unicode string value.

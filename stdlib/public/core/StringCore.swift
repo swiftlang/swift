@@ -387,7 +387,7 @@ public struct _StringCore {
       }
     }
     else if let content = _unmanagedUTF16 {
-    var i = content.makeIterator()
+      var i = content.makeIterator()
       _Unicode.UTF16.ForwardParser.parse(&i) {
         Encoding.transcode($0, from: UTF16.self).forEach(processCodeUnit)
       }
