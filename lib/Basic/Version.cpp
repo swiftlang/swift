@@ -226,6 +226,11 @@ Optional<Version> Version::parseVersionString(StringRef VersionString,
   return isValidVersion ? Optional<Version>(TheVersion) : None;
 }
 
+Version::Version(StringRef VersionString,
+                 SourceLoc Loc,
+                 DiagnosticEngine *Diags)
+  : Version(*parseVersionString(VersionString, Loc, Diags))
+{}
 
 Version Version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION

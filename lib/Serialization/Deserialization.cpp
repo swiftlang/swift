@@ -165,13 +165,20 @@ void ModuleFile::fatal(llvm::Error error) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
 
     if (!CompatibilityVersion.empty()) {
-      SmallString<16> buffer;
-      llvm::raw_svector_ostream out(buffer);
-      out << getContext().LangOpts.EffectiveLanguageVersion;
-      if (out.str() != CompatibilityVersion) {
+      if (getContext().LangOpts.EffectiveLanguageVersion
+            != CompatibilityVersion) {
+        SmallString<16> effectiveVersionBuffer, compatVersionBuffer;
+        {
+          llvm::raw_svector_ostream out(effectiveVersionBuffer);
+          out << getContext().LangOpts.EffectiveLanguageVersion;
+        }
+        {
+          llvm::raw_svector_ostream out(compatVersionBuffer);
+          out << CompatibilityVersion;
+        }
         getContext().Diags.diagnose(
             SourceLoc(), diag::serialization_compatibility_version_mismatch,
-            out.str(), Name, CompatibilityVersion);
+            effectiveVersionBuffer, Name, compatVersionBuffer);
       }
     }
   }
@@ -4467,20 +4474,69 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
+  // An imported requirement may have changed type between Swift versions.
+  // In this situation we need to do a post-pass to fill in missing
+  // requirements with opaque witnesses.
+  bool needToFillInOpaqueValueWitnesses = false;
   while (valueCount--) {
-    auto req = cast<ValueDecl>(getDecl(*rawIDIter++));
-    auto witness = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
-    assert(witness ||
+    ValueDecl *req;
+    
+    auto trySetWitness = [&](Witness w) {
+      if (req)
+        conformance->setWitness(req, w);
+    };
+    
+    auto deserializedReq = getDeclChecked(*rawIDIter++);
+    if (deserializedReq) {
+      req = cast<ValueDecl>(*deserializedReq);
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
+      consumeError(deserializedReq.takeError());
+      req = nullptr;
+      needToFillInOpaqueValueWitnesses = true;
+    } else {
+      fatal(deserializedReq.takeError());
+    }
+    
+    bool isOpaque = false;
+    ValueDecl *witness;
+    auto deserializedWitness = getDeclChecked(*rawIDIter++);
+    if (deserializedWitness) {
+      witness = cast<ValueDecl>(*deserializedWitness);
+    // Across language compatibility versions, the witnessing decl may have
+    // changed its signature as seen by the current compatibility version.
+    // In that case, we want the conformance to still be available, but
+    // we can't make use of the relationship to the underlying decl.
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
+      consumeError(deserializedWitness.takeError());
+      isOpaque = true;
+      witness = nullptr;
+    } else {
+      fatal(deserializedWitness.takeError());
+    }
+    
+    assert(!req || isOpaque || witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
            req->getAttrs().isUnavailable(getContext()));
-    if (!witness) {
-      conformance->setWitness(req, Witness());
+    if (!witness && !isOpaque) {
+      trySetWitness(Witness());
       continue;
     }
 
     // Generic signature and environment.
     GenericSignature *syntheticSig = nullptr;
     GenericEnvironment *syntheticEnv = nullptr;
+    
+    auto trySetOpaqueWitness = [&]{
+      if (!req)
+        return;
+      
+      // We shouldn't yet need to worry about generic requirements, since
+      // an imported ObjC method should never be generic.
+      assert(syntheticSig == nullptr && syntheticEnv == nullptr &&
+             "opaque witness shouldn't be generic yet. when this is "
+             "possible, it should use forwarding substitutions");
+      conformance->setWitness(req, Witness::forOpaque(req));
+    };
 
     // Requirement -> synthetic map.
     SmallVector<Substitution, 4> reqToSyntheticSubs;
@@ -4521,16 +4577,22 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       }
     }
 
+    // Handle opaque witnesses that couldn't be deserialized.
+    if (isOpaque) {
+      trySetOpaqueWitness();
+      continue;
+    }
+
     // Handle simple witnesses.
     if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
         reqToSyntheticSubs.empty()) {
-      conformance->setWitness(req, Witness(witness));
+      trySetWitness(Witness(witness));
       continue;
     }
 
     // Set the witness.
-    conformance->setWitness(req, Witness(witness, witnessSubstitutions,
-                                         syntheticEnv, reqToSyntheticSubs));
+    trySetWitness(Witness(witness, witnessSubstitutions,
+                          syntheticEnv, reqToSyntheticSubs));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
@@ -4560,6 +4622,20 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   for (auto typeWitness : typeWitnesses) {
     conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
                                 typeWitness.second.second);
+  }
+  
+  // Fill in opaque value witnesses if we need to.
+  if (needToFillInOpaqueValueWitnesses) {
+    for (auto member : proto->getMembers()) {
+      // We only care about non-associated-type requirements.
+      auto valueMember = dyn_cast<ValueDecl>(member);
+      if (!valueMember || !valueMember->isProtocolRequirement()
+          || isa<AssociatedTypeDecl>(valueMember))
+        continue;
+      
+      if (!conformance->hasWitness(valueMember))
+        conformance->setWitness(valueMember, Witness::forOpaque(valueMember));
+    }
   }
 }
 
