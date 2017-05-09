@@ -768,11 +768,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
-  bool hasLocalCaptures = false;
-  if (auto *fd = dyn_cast<FuncDecl>(decl))
-    hasLocalCaptures = SGM.M.Types.hasLoweredLocalCaptures(fd);
-
-  if (silDeclRef.getUncurryLevel() > 0 && !hasLocalCaptures)
+  if (silDeclRef.getUncurryLevel() > 0)
     silDeclRef = silDeclRef.asCurried();
 
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,

@@ -4074,14 +4074,7 @@ namespace {
         : SGF(SGF), callee(std::move(callee)),
           initialWritebackScope(std::move(writebackScope)),
           uncurries(callee.getNaturalUncurryLevel() + 1), applied(false),
-          assumedPlusZeroSelf(assumedPlusZeroSelf) {
-      // Subtract an uncurry level for captures, if any.
-      // TODO: Encapsulate this better in Callee.
-      if (this->callee.hasCaptures()) {
-        assert(uncurries > 0 && "captures w/o uncurry level?");
-        --uncurries;
-      }
-    }
+          assumedPlusZeroSelf(assumedPlusZeroSelf) {}
 
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
@@ -4232,10 +4225,6 @@ namespace {
 
     AbstractionPattern
     getUncurriedOrigFormalType(AbstractionPattern origFormalType) {
-      if (callee.hasCaptures()) {
-        claimNextParamClause(origFormalType);
-      }
-
       for (unsigned i = 0, e = uncurriedSites.size(); i < e; ++i) {
         claimNextParamClause(origFormalType);
       }
@@ -4587,12 +4576,7 @@ void CallEmission::emitArgumentsForNormalApply(
 
     // Collect the captures, if any.
     if (callee.hasCaptures()) {
-      // The captures are represented as a placeholder curry level in the
-      // formal type.
-      // TODO: Remove this hack.
       (void)paramLowering.claimCaptureParams(callee.getCaptures());
-      claimNextParamClause(origFormalType);
-      claimNextParamClause(formalType);
       args.push_back({});
       args.back().append(callee.getCaptures().begin(),
                          callee.getCaptures().end());
@@ -5355,7 +5339,6 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
-  bool hasCaptures = getter.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
@@ -5363,9 +5346,6 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5396,7 +5376,6 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
-  bool hasCaptures = setter.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
@@ -5404,9 +5383,6 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
@@ -5448,7 +5424,6 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                                      materializeForSet,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
-  bool hasCaptures = callee.hasCaptures();
   bool hasSelf = (bool)selfValue;
   auto accessType = callee.getSubstFormalType();
 
@@ -5456,9 +5431,6 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<FunctionType>(accessType.getResult());
   }
 
@@ -5536,7 +5508,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,
                                        substitutions, selfValue,
                                        isSuper, isDirectUse);
-  bool hasCaptures = callee.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
@@ -5544,9 +5515,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.

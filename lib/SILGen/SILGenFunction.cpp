@@ -367,21 +367,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   //  - the original type
   auto origLoweredFormalType =
       AbstractionPattern(constantInfo.LoweredInterfaceType);
-  if (hasCaptures) {
-    // Get the unlowered formal type of the constant, stripping off
-    // the first level of function application, which applies captures.
-    origLoweredFormalType =
-      AbstractionPattern(constantInfo.FormalInterfaceType)
-          .getFunctionResultType();
-
-    // Lower it, being careful to use the right generic signature.
-    origLoweredFormalType =
-      AbstractionPattern(
-          origLoweredFormalType.getGenericSignature(),
-          SGM.Types.getLoweredASTFunctionType(
-              cast<FunctionType>(origLoweredFormalType.getType()),
-              0, constant));
-  }
 
   // - the substituted type
   auto substFormalType = cast<FunctionType>(expectedType);

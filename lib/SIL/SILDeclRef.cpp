@@ -227,14 +227,7 @@ static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
 
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
   assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
-  unsigned Level = AFR.getParameterLists().size() - 1;
-  // Functions with captures have an extra uncurry level for the capture
-  // context.
-  llvm::DenseSet<AnyFunctionRef> visited;
-  visited.insert(AFR);
-  if (hasLoweredLocalCaptures(AFR, visited))
-    Level += 1;
-  return Level;
+  return AFR.getParameterLists().size() - 1;
 }
 
 unsigned swift::getNaturalUncurryLevel(ValueDecl *vd) {
