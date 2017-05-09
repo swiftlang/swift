@@ -396,10 +396,6 @@ public:
     FIND_OR_CREATE_TYPEREF(A, ProtocolTypeRef, MangledName);
   }
 
-  bool isAnyObject() const {
-    return MangledName == "s9AnyObject_p";
-  }
-
   bool isError() const {
     return MangledName == "s5Error_p";
   }

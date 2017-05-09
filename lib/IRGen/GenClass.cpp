@@ -798,10 +798,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
   }
 
   // Check whether the SIL module defines it.  (We need a type for it.)
-  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func,
-                   ResilienceExpansion::Minimal,
-                   /*uncurryLevel*/ 1,
-                   /*foreign*/ false);
+  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func);
   SILFunction *silFn = IGF.getSILModule().lookUpFunction(fnRef);
   if (!silFn)
     return false;
@@ -1475,10 +1472,8 @@ namespace {
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
-      SILDeclRef dtorRef(destructor, SILDeclRef::Kind::Deallocator,
-                         ResilienceExpansion::Minimal,
-                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         /*isForeign=*/true);
+      auto dtorRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator)
+        .asForeign();
       if (auto silFn = IGM.getSILModule().lookUpFunction(dtorRef))
         return silFn->isDefinition();
 

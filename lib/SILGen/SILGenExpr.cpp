@@ -767,18 +767,9 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
-
-  // If the referenced decl is a local func with context, then the SILDeclRef
-  // uncurry level is one deeper (for the context vars).
-  bool hasLocalCaptures = false;
-  unsigned uncurryLevel = 0;
-  if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    hasLocalCaptures = SGM.M.Types.hasLoweredLocalCaptures(fd);
-    if (hasLocalCaptures)
-      ++uncurryLevel;
-  }
-
-  auto silDeclRef = SILDeclRef(decl, ResilienceExpansion::Minimal, uncurryLevel);
+  SILDeclRef silDeclRef(decl);
+  if (silDeclRef.getUncurryLevel() > 0)
+    silDeclRef = silDeclRef.asCurried();
 
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
                                          declRef.getSubstitutions());

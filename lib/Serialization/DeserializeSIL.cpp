@@ -698,7 +698,9 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
   SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
                   (ResilienceExpansion)ListOfValues[NextIdx+2],
-                  ListOfValues[NextIdx+3], ListOfValues[NextIdx+4] > 0);
+                  /*isCurried=*/false, ListOfValues[NextIdx+4] > 0);
+  if (ListOfValues[NextIdx+3] < DRef.getUncurryLevel())
+    DRef = DRef.asCurried();
   NextIdx += 5;
   return DRef;
 }

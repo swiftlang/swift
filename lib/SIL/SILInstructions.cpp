@@ -2106,7 +2106,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
         auto declRef = id.getDeclRef();
         ID.AddPointer(declRef.loc.getOpaqueValue());
         ID.AddInteger((unsigned)declRef.kind);
-        ID.AddInteger(declRef.uncurryLevel);
+        ID.AddInteger(declRef.isCurried);
         ID.AddBoolean(declRef.Expansion);
         ID.AddBoolean(declRef.isCurried);
         ID.AddBoolean(declRef.isForeign);

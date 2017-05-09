@@ -2811,12 +2811,11 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                             bool isDestroyer,
                             bool isForeign,
                             ForDefinition_t forDefinition) {
-  SILDeclRef silRef(cd, 
-                    isDestroyer? SILDeclRef::Kind::IVarDestroyer
-                               : SILDeclRef::Kind::IVarInitializer, 
-                    ResilienceExpansion::Minimal,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel, 
-                    isForeign);
+  auto silRef = SILDeclRef(cd,
+                           isDestroyer
+                           ? SILDeclRef::Kind::IVarDestroyer
+                           : SILDeclRef::Kind::IVarInitializer)
+    .asForeign(isForeign);
 
   // Find the SILFunction for the ivar initializer or destroyer.
   if (auto silFn = getSILModule().lookUpFunction(silRef)) {

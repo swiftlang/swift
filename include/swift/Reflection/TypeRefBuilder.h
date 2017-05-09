@@ -312,9 +312,6 @@ public:
                     const TypeRef *Protocol);
 
   const TypeRef *
-  lookupSuperclass(const std::string &MangledTypeName);
-
-  const TypeRef *
   lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.

@@ -486,12 +486,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer. Always use the Swift entry point, which will be a
   // bridging thunk if we're calling ObjC.
-  SILDeclRef initConstant =
-    SILDeclRef(ctor,
-               SILDeclRef::Kind::Initializer,
-               SILDeclRef::ConstructAtBestResilienceExpansion,
-               SILDeclRef::ConstructAtNaturalUncurryLevel,
-               /*isObjC=*/false);
+  auto initConstant = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
 
   ManagedValue initVal;
   SILType initTy;

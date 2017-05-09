@@ -275,13 +275,6 @@ public:
       Invalid(false) {}
 
   void addProtocol(const ProtocolTypeRef *P) {
-    // FIXME: AnyObject should go away
-    if (P->isAnyObject()) {
-      Representation = ExistentialTypeRepresentation::Class;
-      // No extra witness table for AnyObject
-      return;
-    }
-
     Protocols.push_back(P);
   }
 
