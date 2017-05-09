@@ -426,14 +426,11 @@ internal class _AnyRandomAccessCollectionBox<Element>
 @_fixed_layout
 @_versioned
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
+%  if Kind == 'Sequence':
   where
   S.SubSequence : ${Kind},
-%  if Kind == 'Sequence':
   S.SubSequence.Iterator.Element == S.Iterator.Element,
   S.SubSequence.SubSequence == S.SubSequence
-%  else:
-  S.SubSequence.Indices : ${Kind},
-  S.Indices : ${Kind}
 %  end
 {
   internal typealias Element = S.Iterator.Element
@@ -1040,10 +1037,7 @@ public struct ${Self}<Element>
     where
     // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
-    C.SubSequence : ${SubProtocol},
-    C.SubSequence.Iterator.Element == Element,
-    C.SubSequence.Indices : ${SubProtocol},
-    C.Indices : ${SubProtocol}
+    C.SubSequence.Iterator.Element == Element
      {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
