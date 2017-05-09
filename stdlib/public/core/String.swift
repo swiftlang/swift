@@ -21,11 +21,6 @@ public protocol StringProtocol
   Hashable
   where Iterator.Element == Character {
 
-  // this should be just <T : StringProtocol>
-  init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T) where T.Iterator.Element == Character
-
   associatedtype UTF8Index
   var utf8: String.UTF8View { get }
   associatedtype UTF16Index
@@ -81,14 +76,6 @@ public protocol StringProtocol
     encodedAs: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
-}
-
-extension StringProtocol {
-  public init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T) where T.Iterator.Element == Character {
-    self.init(other.description.characters)
-  }
 }
 
 /// Call body with a pointer to zero-terminated sequence of
