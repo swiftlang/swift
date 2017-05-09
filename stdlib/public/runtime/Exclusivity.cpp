@@ -19,6 +19,7 @@
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/Metadata.h"
 #include <memory>
+#include <stdio.h>
 
 // Pick an implementation strategy.
 #ifndef SWIFT_EXCLUSIVITY_USE_THREADLOCAL
@@ -61,8 +62,37 @@ static const char *getAccessName(ExclusivityFlags flags) {
   switch (flags) {
   case ExclusivityFlags::Read: return "read";
   case ExclusivityFlags::Modify: return "modify";
+  default: return "unknown";
   }
-  return "unknown";
+}
+
+static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
+                                      ExclusivityFlags newFlags, void *newPC,
+                                      void *pointer) {
+  // TODO: print something about where the pointer came from?
+  // TODO: if we do something more computationally intense here,
+  //   suppress warnings if the total warning count exceeds some limit
+
+  if (isWarningOnly(newFlags)) {
+    fprintf(stderr,
+            "WARNING: %s/%s access conflict detected on address %p\n"
+            "  first access started at PC=%p\n"
+            "  second access started at PC=%p\n",
+            getAccessName(oldAction),
+            getAccessName(getAccessAction(newFlags)),
+            pointer, oldPC, newPC);
+    return;
+  }
+
+  // TODO: try to recover source-location information from the return
+  // address.
+  fatalError(0,
+             "%s/%s access conflict detected on address %p, aborting\n"
+             "  first access started at PC=%p\n"
+             "  second access started at PC=%p\n",
+             getAccessName(oldAction),
+             getAccessName(getAccessAction(newFlags)),
+             pointer, oldPC, newPC);
 }
 
 namespace {
@@ -123,13 +153,11 @@ public:
         continue;
 
       // Otherwise, it's a conflict.
-      // TODO: try to recover source-location information from the return
-      // address.
-      fatalError(0, "%s(%p) / %s(%p) access conflict detected on address %p,"
-                 " aborting\n",
-                 getAccessName(cur->getAccessAction()), cur->PC,
-                 getAccessName(action), pc,
-                 pointer);
+      reportExclusivityConflict(cur->getAccessAction(), cur->PC,
+                                flags, pc, pointer);
+
+      // If we're only warning, don't report multiple conflicts.
+      break;
     }
 
     // Insert to the front of the array so that remove tends to find it faster.
