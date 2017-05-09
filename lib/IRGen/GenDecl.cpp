@@ -167,7 +167,7 @@ public:
     // We'll visit nested types separately if necessary.
   }
 
-  void visitVTablePlaceholderDecl(VTablePlaceholderDecl *placeholder) {}
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
   
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
@@ -381,7 +381,7 @@ public:
     // We'll visit nested types separately if necessary.
   }
 
-  void visitVTablePlaceholderDecl(VTablePlaceholderDecl *placeholder) {}
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     llvm::Constant *name, *imp, *types;
@@ -1672,8 +1672,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Destructor:
     llvm_unreachable("there are no global destructor");
 
-  case DeclKind::VTablePlaceholder:
-    llvm_unreachable("there are no global vtable placeholders");
+  case DeclKind::MissingMember:
+    llvm_unreachable("there are no global member placeholders");
 
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
@@ -2934,7 +2934,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Destructor:
     case DeclKind::EnumCase:
     case DeclKind::EnumElement:
-    case DeclKind::VTablePlaceholder:
+    case DeclKind::MissingMember:
       // Skip non-type members.
       continue;
 

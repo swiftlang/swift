@@ -238,8 +238,8 @@ struct PrintOptions {
   /// Whether to skip parameter type attributes
   bool SkipParameterTypeAttributes = false;
 
-  /// Whether to skip vtable placeholder members.
-  bool SkipVTablePlaceholders = true;
+  /// Whether to skip placeholder members.
+  bool SkipMissingMemberPlaceholders = true;
 
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
@@ -492,7 +492,7 @@ struct PrintOptions {
     result.AbstractAccessors = false;
     result.PrintAccessibility = true;
     result.SkipEmptyExtensionDecls = false;
-    result.SkipVTablePlaceholders = false;
+    result.SkipMissingMemberPlaceholders = false;
     return result;
   }
 

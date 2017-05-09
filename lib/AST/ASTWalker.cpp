@@ -260,7 +260,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return doIt(SD->getElementTypeLoc());
   }
 
-  bool visitVTablePlaceholderDecl(VTablePlaceholderDecl *ID) {
+  bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
     return false;
   }
 

@@ -1111,10 +1111,10 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void visitVTablePlaceholderDecl(VTablePlaceholderDecl *VTPD) {
-      printCommon(VTPD, "vtable_placeholder_decl ");
+    void visitMissingMemberDecl(MissingMemberDecl *MMD) {
+      printCommon(MMD, "missing_member_decl ");
       PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << VTPD->getFullName() << '\"';
+          << '\"' << MMD->getFullName() << '\"';
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };

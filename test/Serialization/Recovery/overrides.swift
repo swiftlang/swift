@@ -294,7 +294,6 @@ open class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
 // CHECK-RECOVERY-LABEL: class D8_UnknownInitDisappearsRequired : UnknownInitDisappearsBase {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
-// CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 open class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappearsRequired {

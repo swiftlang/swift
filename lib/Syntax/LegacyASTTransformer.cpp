@@ -280,8 +280,8 @@ LegacyASTTransformer::visitPostfixOperatorDecl(
 
 
 RC<SyntaxData>
-LegacyASTTransformer::visitVTablePlaceholderDecl(
-    VTablePlaceholderDecl *D,
+LegacyASTTransformer::visitMissingMemberDecl(
+    MissingMemberDecl *D,
     const SyntaxData *Parent,
     const CursorIndex IndexInParent) {
   return getUnknownDecl(D);

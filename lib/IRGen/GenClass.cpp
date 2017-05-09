@@ -1491,9 +1491,8 @@ namespace {
       }
     }
 
-    void visitVTablePlaceholderDecl(VTablePlaceholderDecl *placeholder) {
-      // FIXME
-      IGM.fatal_unimplemented(SourceLoc(), "vtable placeholder");
+    void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+      llvm_unreachable("should not IRGen classes with missing members");
     }
 
     void addIVarInitializer() {

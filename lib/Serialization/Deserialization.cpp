@@ -4451,24 +4451,23 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
       // Drop the member if it had a problem.
       // FIXME: Handle overridable members in class extensions too, someday.
       if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
-        auto handleMissingDesignatedInit =
+        auto handleMissingClassMember =
             [&](const DeclDeserializationError &error) {
           if (error.isDesignatedInitializer())
             containingClass->setHasMissingDesignatedInitializers();
-          if (error.needsAllocatingVTableEntry()) {
-            auto placeholder =
-                new (getContext()) VTablePlaceholderDecl(containingClass,
-                                                         error.getName());
-            members.push_back(placeholder);
+          if (error.getName().getBaseName() == getContext().Id_init) {
+            members.push_back(MissingMemberDecl::forInitializer(
+                getContext(), containingClass, error.getName(),
+                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
+          } else if (error.needsVTableEntry()) {
+            members.push_back(MissingMemberDecl::forMethod(
+                getContext(), containingClass, error.getName(),
+                error.needsVTableEntry()));
           }
-          if (error.needsVTableEntry()) {
-            auto placeholder =
-                new (getContext()) VTablePlaceholderDecl(containingClass,
-                                                         error.getName());
-            members.push_back(placeholder);
-          }
+          // FIXME: Handle other kinds of missing members: properties,
+          // subscripts, and methods that don't need vtable entries.
         };
-        llvm::handleAllErrors(next.takeError(), handleMissingDesignatedInit);
+        llvm::handleAllErrors(next.takeError(), handleMissingClassMember);
       } else {
         llvm::consumeError(next.takeError());
       }

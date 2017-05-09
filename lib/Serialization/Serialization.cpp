@@ -1526,8 +1526,8 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::PrecedenceGroup:
     llvm_unreachable("decl should never be a member");
 
-  case DeclKind::VTablePlaceholder:
-    llvm_unreachable("should never need to reserialize a vtable placeholder");
+  case DeclKind::MissingMember:
+    llvm_unreachable("should never need to reserialize a member placeholder");
 
   case DeclKind::IfConfig:
     return false;
@@ -2508,8 +2508,8 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
-  case DeclKind::VTablePlaceholder:
-    llvm_unreachable("vtable placeholders shouldn't be serialized");
+  case DeclKind::MissingMember:
+    llvm_unreachable("member placeholders shouldn't be serialized");
 
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);

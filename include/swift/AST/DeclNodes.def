@@ -93,7 +93,7 @@ DECL(EnumCase, Decl)
 CONTEXT_DECL(TopLevelCode, Decl)
 DECL(IfConfig, Decl)
 DECL(PrecedenceGroup, Decl)
-DECL(VTablePlaceholder, Decl)
+DECL(MissingMember, Decl)
 
 ABSTRACT_DECL(Operator, Decl)
   OPERATOR_DECL(InfixOperator, OperatorDecl)

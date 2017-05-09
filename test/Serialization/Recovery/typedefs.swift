@@ -128,7 +128,6 @@ open class UserSub : User {
 
   // CHECK: required init(wrappedRequired: WrappedInt?)
   // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
   public required init(wrappedRequired: WrappedInt?) { super.init() }
 }
 // CHECK: {{^}$}}
