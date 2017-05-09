@@ -413,7 +413,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           auto ArgLoc = PD->getArgumentNameLoc();
 
           // If the argument name is not specified, add the argument name before
-          // the paramter name.
+          // the parameter name.
           if (ArgLoc.isInvalid())
             Editor.insertBefore(PD->getNameLoc(),
                                 (llvm::Twine(NewArg) + " ").str());

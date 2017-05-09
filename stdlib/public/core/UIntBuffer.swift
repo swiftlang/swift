@@ -1,4 +1,4 @@
-//===--- UIntBuffer.swift - Bounded Collection of Unisigned Integer -------===//
+//===--- UIntBuffer.swift - Bounded Collection of Unsigned Integer --------===//
 //
 // This source file is part of the Swift.org open source project
 //

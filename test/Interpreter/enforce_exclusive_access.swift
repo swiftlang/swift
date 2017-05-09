@@ -21,7 +21,7 @@ func readAndPerform<T>(_ _: UnsafePointer<T>, closure: () ->()) {
   closure()
 }
 
-/// Begin a modify access to the first paraemter and call the closure inside it.
+/// Begin a modify access to the first parameter and call the closure inside it.
 func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
   closure()
 }

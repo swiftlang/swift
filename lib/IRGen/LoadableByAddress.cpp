@@ -1,5 +1,4 @@
-//===--- LoadableByAddress.cpp - Lower SIL address-only types.
-//--------------===//
+//===--- LoadableByAddress.cpp - Lower SIL address-only types. ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -211,7 +210,7 @@ static SILType getNewSILFunctionType(GenericEnvironment *GenericEnv,
   return newSILType;
 }
 
-// Get the funciton type or the optional function type
+// Get the function type or the optional function type
 static SILFunctionType *getInnerFunctionType(SILType storageType) {
   CanType currCanType = storageType.getSwiftRValueType();
   if (SILFunctionType *currSILFunctionType =
@@ -982,19 +981,19 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
 
 void LoadableStorageAllocation::allocateLoadableStorage() {
   if (modifiableFunction(pass.F->getLoweredFunctionType())) {
-    // Turn by-vlaue function args to by-address ones
+    // Turn by-value function args to by-address ones
     convertIndirectFunctionArgs();
   } else {
     convertIndirectFunctionPointerArgsForUnmodifiable();
   }
 
-  // Turn by-vlaue BB args to by-address ones
+  // Turn by-value BB args to by-address ones
   convertIndirectBasicBlockArgs();
 
   // Populate the pass' data structs
   LargeValueVisitor(pass).mapValueStorage();
 
-  // Create an AllocStack for every used large loadble type in the function.
+  // Create an AllocStack for every used large loadable type in the function.
   for (auto &argToAlloc : pass.argsToLoadedValueMap) {
     assert(argToAlloc.first == argToAlloc.second);
     allocateForArg(argToAlloc.first);
@@ -1234,7 +1233,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
                                              SILInstruction *applyInst) {
   assert(value->getType().isObject());
   auto *arg = dyn_cast<SILArgument>(value);
-  assert(arg && "non-instr operand must be an argmuent");
+  assert(arg && "non-instr operand must be an argument");
 
   SILBuilder allocBuilder(pass.F->begin()->begin());
   AllocStackInst *allocInstr =
@@ -1318,7 +1317,7 @@ static void castTupleInstr(SILInstruction *instr, IRGenModule &Mod) {
   SILType currSILType = instr->getType().getObjectType();
   CanType currCanType = currSILType.getSwiftRValueType();
   SILFunctionType *funcType = dyn_cast<SILFunctionType>(currCanType);
-  assert(funcType && "Expcted SILFunctionType as tuple's return");
+  assert(funcType && "Expected SILFunctionType as tuple's return");
   CanSILFunctionType canFuncType = CanSILFunctionType(funcType);
   GenericEnvironment *genEnv = instr->getFunction()->getGenericEnvironment();
   if (!genEnv && canFuncType->isPolymorphic()) {
@@ -1975,7 +1974,7 @@ void LoadableByAddress::recreateConvInstrs() {
       break;
     }
     default:
-      llvm_unreachable("Unexected conversion instruction");
+      llvm_unreachable("Unexpected conversion instruction");
     }
     convInstr->replaceAllUsesWith(newInstr);
     convInstr->getParent()->erase(convInstr);
@@ -2012,7 +2011,7 @@ void LoadableByAddress::run() {
     return;
   }
 
-  // Scan the module for all refrences of the modified functions:
+  // Scan the module for all references of the modified functions:
   llvm::SetVector<FunctionRefInst *> funcRefs;
   for (SILFunction &CurrF : *getModule()) {
     for (SILBasicBlock &BB : CurrF) {
@@ -2090,7 +2089,7 @@ void LoadableByAddress::run() {
     updateLoweredTypes(F);
   }
 
-  // Update all refrences:
+  // Update all references:
   // Note: We don't need to update the witness tables and vtables
   // They just contain a pointer to the function
   // The pointer does not change

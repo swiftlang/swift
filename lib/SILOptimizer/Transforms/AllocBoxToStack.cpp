@@ -435,7 +435,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
-      // This may result in an alloc_stack being used by begin_access [dymaic].
+      // This may result in an alloc_stack being used by begin_access [dynamic].
       PBI->replaceAllUsesWith(StackBox);
       continue;
     }

@@ -559,7 +559,7 @@ namespace {
               return *this;
             }
 
-            // If one constructor parameter doens't cover the other then we've
+            // If one constructor parameter doesn't cover the other then we've
             // got to report the uncovered cases in a user-friendly way.
             if (!s1.isSubspace(s2, TC)) {
               foundBad = true;

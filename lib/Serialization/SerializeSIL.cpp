@@ -1888,7 +1888,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues.push_back(
                       addSILFunctionRef(component.getComputedPropertyGetter()));
         assert(component.getComputedPropertyIndices().empty()
-               && "indices not implemnted");
+               && "indices not implemented");
         break;
       case KeyPathPatternComponent::Kind::SettableProperty:
         handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
@@ -1898,7 +1898,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues.push_back(
                       addSILFunctionRef(component.getComputedPropertySetter()));
         assert(component.getComputedPropertyIndices().empty()
-               && "indices not implemnted");
+               && "indices not implemented");
         break;
       }
     }

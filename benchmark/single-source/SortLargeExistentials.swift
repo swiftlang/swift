@@ -19,7 +19,7 @@ protocol LetterKind {
   func lessthan(_ rhs: LetterKind) -> Bool
 }
 
-// A struct which exeeds the size of the existential inline buffer.
+// A struct which exceeds the size of the existential inline buffer.
 struct Letter : LetterKind {
   let value: String
 
