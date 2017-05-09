@@ -3309,7 +3309,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let (high, highOverflow) =
       _storage.high.${x.name}ReportingOverflow(rhs._storage.high)
     let isLowOverflow = lowOverflow == .overflow
-    let result = (high ${x.operator} (isLowOverflow ? High(1) : High(0)), low)
+    let result = (high &${x.operator} (isLowOverflow ? High(1) : High(0)), low)
     let overflow = ArithmeticOverflow(
       highOverflow == .overflow ||
       high == ${highAffectedByLowOverflow} && isLowOverflow
@@ -3323,7 +3323,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     by rhs: DoubleWidth
   ) -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
     let (carry, product) = multipliedFullWidth(by: rhs)
-    let result = DoubleWidth(product)
+    let result = DoubleWidth(extendingOrTruncating: product)
     
     let isNegative = (self < 0) != (rhs < 0)
     let overflow = isNegative
