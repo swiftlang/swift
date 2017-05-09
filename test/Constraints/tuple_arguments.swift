@@ -1338,17 +1338,17 @@ do {
   s.takesClosureTuple({ _ = $0 })
   s.takesClosureTuple({ x in })
   s.takesClosureTuple({ (x: (Double, Double)) in })
-  s.takesClosureTuple({ _ = $0; _ = $1 }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
-  s.takesClosureTuple({ (x, y) in }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
-  s.takesClosureTuple({ (x: Double, y:Double) in }) // expected-error {{cannot convert value of type '(Double, Double) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+  s.takesClosureTuple({ _ = $0; _ = $1 }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring with implicit parameters}}
+  s.takesClosureTuple({ (x, y) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{25-31=(arg)}} {{34-34=let (x, y) = arg; }}
+  s.takesClosureTuple({ (x: Double, y:Double) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{25-46=(arg: (Double, Double))}} {{49-49=let (x, y) = arg; }}
 
   let sTwo = GenericConforms<(Double, Double)>()
   sTwo.takesClosure({ _ = $0 })
   sTwo.takesClosure({ x in })
   sTwo.takesClosure({ (x: (Double, Double)) in })
-  sTwo.takesClosure({ _ = $0; _ = $1 }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
-  sTwo.takesClosure({ (x, y) in }) // expected-error {{cannot convert value of type '(_, _) -> ()' to expected argument type '((Double, Double)) -> ()'}}
-  sTwo.takesClosure({ (x: Double, y: Double) in }) // expected-error {{cannot convert value of type '(Double, Double) -> ()' to expected argument type '((Double, Double)) -> ()'}}
+  sTwo.takesClosure({ _ = $0; _ = $1 }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring with implicit parameters}}
+  sTwo.takesClosure({ (x, y) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{23-29=(arg)}} {{32-32=let (x, y) = arg; }}
+  sTwo.takesClosure({ (x: Double, y: Double) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{23-45=(arg: (Double, Double))}} {{48-48=let (x, y) = arg; }}
 }
 
 do {
@@ -1356,8 +1356,8 @@ do {
   let _: ((Int, Int)) -> () = { _ = ($0.0, $0.1) }
   let _: ((Int, Int)) -> () = { t in _ = (t.0, t.1) }
 
-  let _: ((Int, Int)) -> () = { _ = ($0, $1) } // expected-error {{cannot convert value of type '(_, _) -> ()' to specified type '((Int, Int)) -> ()'}}
-  let _: ((Int, Int)) -> () = { t, u in _ = (t, u) } // expected-error {{cannot convert value of type '(_, _) -> ()' to specified type '((Int, Int)) -> ()'}}
+  let _: ((Int, Int)) -> () = { _ = ($0, $1) } // expected-error {{closure tuple parameter '(Int, Int)' does not support destructuring}}
+  let _: ((Int, Int)) -> () = { t, u in _ = (t, u) } // expected-error {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{33-37=(arg)}} {{41-41=let (t, u) = arg; }}
 
   let _: (Int, Int) -> () = { _ = $0 } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
   let _: (Int, Int) -> () = { _ = ($0.0, $0.1) } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
@@ -1457,3 +1457,45 @@ let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = Muta
     data: DataSourcePage<Int>.notLoaded,
     totalCount: 0
 ))
+
+// SR-4745
+let sr4745 = [1, 2]
+let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
+// expected-error@-1 {{closure tuple parameter '(offset: Int, element: Int)' does not support destructuring}} {{35-51=(arg) -> <#Result#>}} {{55-55=let (count, element) = arg; return }}
+
+// SR-4738
+
+let sr4738 = (1, (2, 3))
+[sr4738].map { (x, (y, z)) -> Int in x + y + z } // expected-error {{use of undeclared type 'y'}}
+// expected-error@-1 {{closure tuple parameter does not support destructuring}} {{20-26=arg1}} {{38-38=let (y, z) = arg1; }}
+
+// rdar://problem/31892961
+let r31892961_1 = [1: 1, 2: 2]
+r31892961_1.forEach { (k, v) in print(k + v) }
+// expected-error@-1 {{closure tuple parameter '(key: Int, value: Int)' does not support destructuring}} {{23-29=(arg)}} {{33-33=let (k, v) = arg; }}
+
+let r31892961_2 = [1, 2, 3]
+let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
+  // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
+  // expected-error@-2 {{use of undeclared type 'index'}}
+  val + 1
+}
+
+let r31892961_3 = (x: 1, y: 42)
+[r31892961_3].map { (x: Int, y: Int) in x + y }
+// expected-error@-1 {{closure tuple parameter '(x: Int, y: Int)' does not support destructuring}} {{21-37=(arg: (x: Int, y: Int)) -> <#Result#>}} {{41-41=let (x, y) = arg; return }}
+
+[r31892961_3].map { (x, y: Int) in x + y }
+// expected-error@-1 {{closure tuple parameter '(x: Int, y: Int)' does not support destructuring}} {{21-32=(arg: (x: Int, y: Int)) -> <#Result#>}} {{36-36=let (x, y) = arg; return }}
+
+let r31892961_4 = (1, 2)
+[r31892961_4].map { x, y in x + y }
+// expected-error@-1 {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{21-25=(arg) -> <#Result#>}} {{29-29=let (x, y) = arg; return }}
+
+let r31892961_5 = (x: 1, (y: 2, (w: 3, z: 4)))
+[r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y }
+// expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-56=arg1}} {{61-61=let (y, (w, z)) = arg1; }}
+
+let r31892961_6 = (x: 1, (y: 2, z: 4))
+[r31892961_6].map { (x: Int, (y: Int, z: Int)) in x + y }
+// expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-46=arg1}} {{51-51=let (y, z) = arg1; }}
