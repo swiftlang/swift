@@ -8,6 +8,7 @@ open class Cities {
   open func yandina(x: [[String : Cities]]!) {}
   open func buderim() -> Cities? { return Cities(x: 1) }
   open func noosa() -> [[String : Cities]?] { return [] }
+  open func maroochy(x: Int?, y: Int?) {}
 }
 
 public protocol ExtraCities {

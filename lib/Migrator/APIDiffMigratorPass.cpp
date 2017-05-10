@@ -37,19 +37,22 @@ namespace {
 
 struct FoundResult {
   SourceRange TokenRange;
-  bool Optional; // Range has a trailing ? or ! included
+  bool Optional; // Range includes a trailing ? or !, e.g. [SomeType!]
   bool Suffixable; // No need to wrap parens when adding optionality
+  bool Suffixed; // Range is followed by a trailing ? or !, e.g. [SomeType]!
   bool isValid() const { return TokenRange.isValid(); }
 };
 
 class ChildIndexFinder : public TypeReprVisitor<ChildIndexFinder, FoundResult> {
   ArrayRef<uint8_t> ChildIndices;
+  bool ParentIsOptional;
 
 public:
   ChildIndexFinder(ArrayRef<uint8_t> ChildIndices) :
     ChildIndices(ChildIndices) {}
 
   FoundResult findChild(AbstractFunctionDecl *Parent) {
+    ParentIsOptional = false;
     auto NextIndex = consumeNext();
     if (!NextIndex) {
       if (auto Func = dyn_cast<FuncDecl>(Parent))
@@ -60,9 +63,9 @@ public:
         if (!Optional)
           End = Init->getNameLoc();
         return {SourceRange(Init->getNameLoc(), End), Optional,
-          /*suffixable=*/true};
+          /*suffixable=*/true, /*suffixed=*/false};
       }
-      return {SourceRange(), false, false};
+      return {SourceRange(), false, false, false};
     }
 
     for (auto *Params: Parent->getParameterLists()) {
@@ -100,7 +103,7 @@ private:
 
   FoundResult findChild(TypeLoc Loc) {
     if (!Loc.hasLocation())
-      return {SourceRange(), false, false};
+      return {SourceRange(), false, false, false};
     return visit(Loc.getTypeRepr());
   }
 
@@ -110,12 +113,16 @@ public:
   FoundResult handleParent(TypeRepr *Parent, const ArrayRef<T> Children,
                            bool Optional = false, bool Suffixable = true) {
     if (!hasNextIndex())
-      return {Parent->getSourceRange(), Optional, Suffixable};
+      return {
+        Parent->getSourceRange(),
+        Optional, Suffixable, /*Suffixed=*/ParentIsOptional
+      };
     auto NextIndex = consumeNext();
     if (isUserTypeAlias(Parent))
-      return {SourceRange(), false, false};
+      return {SourceRange(), false, false, false};
     assert(NextIndex < Children.size());
     TypeRepr *Child = Children[NextIndex];
+    ParentIsOptional = Optional;
     return visit(Child);
   }
 
@@ -137,7 +144,7 @@ public:
   }
 
   FoundResult visitErrorTypeRepr(ErrorTypeRepr *T) {
-    return {SourceRange(), false, false};
+    return {SourceRange(), false, false, false};
   }
 
   FoundResult visitAttributedTypeRepr(AttributedTypeRepr *T) {
@@ -159,8 +166,10 @@ public:
   FoundResult visitTupleTypeRepr(TupleTypeRepr *T) {
     // Single element TupleTypeReprs may be arbitrarily nested so don't count
     // as their own index level
-    if (T->getNumElements() == 1)
+    if (T->getNumElements() == 1) {
+      ParentIsOptional = false;
       return visit(T->getElement(0));
+    }
     return handleParent(T, T->getElements());
   }
 
@@ -425,6 +434,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  bool typeReplacementMayNeedParens(StringRef Replacement) const {
+    return Replacement.contains('&') || Replacement.contains("->");
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (D->isImplicit())
       return true;
@@ -465,6 +478,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
             break;
           case ide::api::NodeAnnotation::TypeRewritten:
             Editor.replace(Result.TokenRange, DiffItem->RightComment);
+            if (Result.Suffixed && typeReplacementMayNeedParens(DiffItem->RightComment)) {
+              Editor.insertBefore(Result.TokenRange.Start, "(");
+              Editor.insertAfterToken(Result.TokenRange.End, ")");
+            }
             break;
           default:
             break;
