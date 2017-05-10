@@ -408,19 +408,24 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
 
 ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
                              SubstitutionList Subs, ArrayRef<SILValue> Args,
-                             bool isNonThrowing, SILFunction &F,
+                             bool isNonThrowing,
+                             Optional<SILModuleConventions> ModuleConventions,
+                             SILFunction &F,
                              SILOpenedArchetypesState &OpenedArchetypes) {
-  SILType SubstCalleeTy =
+  SILType SubstCalleeSILTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
-  SILFunctionConventions Conv(SubstCalleeTy.getAs<SILFunctionType>(),
-                              F.getModule());
+  auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
+  SILFunctionConventions Conv(SubstCalleeTy,
+                              ModuleConventions.hasValue()
+                                  ? ModuleConventions.getValue()
+                                  : SILModuleConventions(F.getModule()));
   SILType Result = Conv.getSILResultType();
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeTy.getSwiftRValueType(), Subs);
+                               SubstCalleeSILTy.getSwiftRValueType(), Subs);
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
-  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
+  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
                                  TypeDependentOperands, isNonThrowing);
 }
