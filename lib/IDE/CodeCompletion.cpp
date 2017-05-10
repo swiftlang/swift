@@ -321,6 +321,7 @@ static bool KeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
 static bool SwiftKeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
   switch(decl->getKind()){
   case DeclKind::Var:
+  case DeclKind::Subscript:
     return true;
   default:
     return false;
@@ -2613,8 +2614,14 @@ public:
     }
   }
 
+  bool shouldAddSubscriptCall() {
+    if (IsSwiftKeyPathExpr)
+      return true;
+    return !HaveDot;
+  }
+
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    assert(!HaveDot && "cannot add a subscript after a dot");
+    assert(shouldAddSubscriptCall() && "cannot add a subscript after a dot");
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2933,14 +2940,13 @@ public:
         addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
       }
 
-      if (HaveDot)
-        return;
-
-      if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-        if (ExprType->is<AnyMetatypeType>())
-          return;
-        addSubscriptCall(SD, Reason);
-        return;
+      // Swift key path allows .[0]
+      if (shouldAddSubscriptCall()) {
+        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+          if (ExprType->is<AnyMetatypeType>())
+            return;
+          addSubscriptCall(SD, Reason);
+        }
       }
       return;
 

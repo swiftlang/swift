@@ -5,6 +5,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_5 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_6 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_7 | %FileCheck %s -check-prefix=PERSON-MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_8 | %FileCheck %s -check-prefix=PERSON-MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_9 | %FileCheck %s -check-prefix=PERSON-MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_10 | %FileCheck %s -check-prefix=PERSON-MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_11 | %FileCheck %s -check-prefix=PERSON-MEMBER
 
 class Person {
     var name: String
@@ -14,6 +18,7 @@ class Person {
         self.name = name
     }
     func getName() -> String { return name }
+    subscript(_ index: Int) -> Int { get { return 1} }
 }
 
 let keyPath1 = \Person.#^PART_1^#
@@ -24,12 +29,21 @@ let keyPath5 = \Person.friends.[0].friends[0].friends[0].#^PART_5^#
 let keyPath6 = \[Person].[0].#^PART_6^#
 let keyPath7 = \[Person].[0].friends[0].#^PART_7^#
 
-// PERSON-MEMBER: Begin completions, 3 items
+func foo1(_ p : Person) {
+  _ = p[keyPath:\Person.#^PART_8^#]
+  _ = p[keyPath:\Person.friends[0].#^PART_9^#]
+  _ = p[keyPath:\[Person].[0].#^PART_10^#]
+  _ = p[keyPath:\Person.friends.[0].friends[0].friends[0].#^PART_11^#]
+}
+
+// PERSON-MEMBER: Begin completions, 4 items
 // PERSON-MEMBER-NEXT: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
 // PERSON-MEMBER-NEXT: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
 // PERSON-MEMBER-NEXT: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend 
+// PERSON-MEMBER-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
 
-// PERSON-MEMBER-OPT: Begin completions, 6 items
+// PERSON-MEMBER-OPT: Begin completions, 7 items
 // PERSON-MEMBER-OPT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.name[#String#]; name=name
 // PERSON-MEMBER-OPT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.friends[#[Person]#]; name=friends
 // PERSON-MEMBER-OPT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.bestFriend[#Person?#]; name=bestFriend
+// PERSON-MEMBER-OPT-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
