@@ -1379,6 +1379,10 @@ ERROR(objc_runtime_visible_cannot_conform_to_objc_protocol,none,
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
+ERROR(protocol_has_missing_requirements_versioned,none,
+      "type %0 cannot conform to protocol %1 (compiled with Swift %2) because "
+      "it has requirements that could not be loaded in Swift %3",
+      (Type, Type, clang::VersionTuple, clang::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",

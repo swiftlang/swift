@@ -17,6 +17,7 @@ func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
 class Sub: Base {} // okay
+class Impl: Proto {} // expected-error {{type 'Impl' does not conform to protocol 'Proto'}}
 
 #else // TEST
 
@@ -89,6 +90,9 @@ public class C_RelyOnConformanceImpl: C_RelyOnConformance {
 
 open class Base {
   public init(wrapped: NewlyWrappedTypedef) {}
+}
+public protocol Proto {
+  func useWrapped(_ wrapped: NewlyWrappedTypedef)
 }
 
 #endif

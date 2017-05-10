@@ -38,6 +38,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
@@ -2063,8 +2064,23 @@ namespace {
     // If the protocol contains missing requirements, it can't be conformed to
     // at all.
     if (Proto->hasMissingRequirements()) {
-      TC.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
-                  T, Proto->getDeclaredType());
+      bool hasDiagnosed = false;
+      auto *protoFile = Proto->getModuleScopeContext();
+      if (auto *serialized = dyn_cast<SerializedASTFile>(protoFile)) {
+        if (serialized->getLanguageVersionBuiltWith() !=
+            TC.getLangOpts().EffectiveLanguageVersion) {
+          TC.diagnose(ComplainLoc,
+                      diag::protocol_has_missing_requirements_versioned,
+                      T, Proto->getDeclaredType(),
+                      serialized->getLanguageVersionBuiltWith(),
+                      TC.getLangOpts().EffectiveLanguageVersion);
+          hasDiagnosed = true;
+        }
+      }
+      if (!hasDiagnosed) {
+        TC.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
+                    T, Proto->getDeclaredType());
+      }
       conformance->setInvalid();
       return conformance;
     }
