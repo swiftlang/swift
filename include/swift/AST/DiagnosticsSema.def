@@ -1231,7 +1231,7 @@ NOTE(unstable_mangled_name_add_nskeyedarchivelegacy,none,
      "for compatibility with existing archives, use '@NSKeyedArchiveLegacy' "
      "to record the Swift 3 mangled name", ())
 NOTE(add_nskeyedarchivesubclassesonly_attr,none,
-     "generic classes should not be archived directly; "
+     "generic class %0 should not be archived directly; "
      "add @NSKeyedArchiveSubclassesOnly "
      "and only archive specific subclasses of this class", (Type))
 
