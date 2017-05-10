@@ -2866,8 +2866,11 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // first.
     auto accessor = getDeclChecked(accessorStorageDeclID);
-    if (!accessor)
-      return accessor.takeError();
+    if (!accessor) {
+      // FIXME: "TypeError" isn't exactly correct for this.
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(accessor.takeError()), errorFlags);
+    }
 
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
@@ -4468,6 +4471,26 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
           // subscripts, and methods that don't need vtable entries.
         };
         llvm::handleAllErrors(next.takeError(), handleMissingClassMember);
+      } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+        auto handleMissingProtocolMember =
+            [&](const DeclDeserializationError &error) {
+          assert(!error.needsAllocatingVTableEntry());
+          if (error.needsVTableEntry())
+            containingProto->setHasMissingRequirements(true);
+
+          if (error.getName().getBaseName() == getContext().Id_init) {
+            members.push_back(MissingMemberDecl::forInitializer(
+                getContext(), containingProto, error.getName(),
+                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
+          } else if (error.needsVTableEntry()) {
+            members.push_back(MissingMemberDecl::forMethod(
+                getContext(), containingProto, error.getName(),
+                error.needsVTableEntry()));
+          }
+          // FIXME: Handle other kinds of missing members: properties,
+          // subscripts, and methods that don't need vtable entries.
+        };
+        llvm::handleAllErrors(next.takeError(), handleMissingProtocolMember);
       } else {
         llvm::consumeError(next.takeError());
       }

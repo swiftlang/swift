@@ -9,6 +9,8 @@
 
 // RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery -DVERIFY %s -verify
 // RUN: %target-swift-frontend -emit-silgen -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery %s | %FileCheck -check-prefix CHECK-SIL %s
+
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST -enable-experimental-deserialization-recovery %s | %FileCheck -check-prefix CHECK-IR %s
 
 #if TEST
@@ -27,11 +29,11 @@ func testSymbols() {
 
 // CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuildingy3Lib4UserC4user_tF
 public func testVTableBuilding(user: User) {
-  // The important thing in this CHECK line is the "i64 23", which is the offset
+  // The important thing in this CHECK line is the "i64 24", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
-  // changes, please check that offset 23 is still correct.
+  // changes, please check that offset 24 is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, i64 23
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, i64 24
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 
@@ -77,6 +79,7 @@ open class User {
   // CHECK: var wrappedProp: WrappedInt?
   // CHECK-RECOVERY: /* placeholder for _ */
   // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for _ */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
@@ -114,22 +117,22 @@ open class User {
 // This is mostly to check when changes are necessary for the CHECK-IR lines
 // above.
 // CHECK-VTABLE-LABEL: sil_vtable User {
-// (8 words of normal class metadata)
-// 9 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
-// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:
-// 12 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
-// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
-// 15 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
-// 16 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
-// 17 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 18 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// (10 words of normal class metadata)
+// 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
+// 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:
+// 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
+// 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
+// 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
+// 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
+// 18 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
 // 19 CHECK-VTABLE-NEXT: #User.init!initializer.1:
 // 20 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 21 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 22 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 23 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 21 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 23 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 24 CHECK-VTABLE-NEXT: #User.lastMethod!1:
 // CHECK-VTABLE: }
 
 

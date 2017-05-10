@@ -393,6 +393,10 @@ public:
     super::addConstructor(cd, witness);
   }
 
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
+  }
+
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
@@ -725,6 +729,10 @@ public:
     }
 
     super::addConstructor(cd, witness);
+  }
+
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
   }
 
   void addMethod(SILDeclRef requirementRef,
