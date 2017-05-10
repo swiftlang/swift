@@ -1,29 +1,36 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %utils/split_file.py -o %t %s
-// RUN: %target-swift-frontend -swift-version 4 -typecheck %t/declarations.swift %t/other_file_extensions.swift -verify
+// RUN: not %target-swift-frontend -swift-version 4 -typecheck %t/declarations.swift %t/other_file_extensions.swift 2>&1 | %FileCheck -check-prefixes=DECLARED,OTHER %s
+// RUN: not %target-swift-frontend -swift-version 4 -typecheck -primary-file %t/declarations.swift %t/other_file_extensions.swift 2>&1 | %FileCheck -check-prefixes=DECLARED %s
+// RUN: not %target-swift-frontend -swift-version 4 -typecheck %t/declarations.swift -primary-file %t/other_file_extensions.swift 2>&1 | %FileCheck -check-prefixes=OTHER %s
 
+
+
+// Padded to start on line 10 to make @LINE-10 work
 // BEGIN declarations.swift
 struct PrivateMembers  {
-  private var privateCounter: Int = 0 // expected-note 2 {{declared here}}
-  private func privateMethod() {} // expected-note 2 {{declared here}}
-  private struct PrivateInner { // expected-note 3 {{declared here}}
-    private struct Invisible {} // expected-note {{declared here}}
+  private var privateCounter: Int = 0
+  private func privateMethod() {}
+  private struct PrivateInner {
+    private struct Invisible {}
   }
 }
+
 extension PrivateMembers {
-  private func usePrivate() { // expected-note 2 {{declared here}}
+  private func usePrivate() {
     print(privateCounter)
     privateMethod()
     _ = PrivateInner()
-    _ = PrivateInner.Invisible() // expected-error {{'Invisible' is inaccessible due to 'private' protection level}}
+    _ = PrivateInner.Invisible() // DECLARED: :[[@LINE-10]]:{{[^:]+}}: error: 'Invisible' is inaccessible due to 'private' protection level
   }
 }
+
 func using(_ obj: PrivateMembers) {
-  print(obj.privateCounter) // expected-error {{'privateCounter' is inaccessible due to 'private' protection level}}
-  obj.privateMethod() // expected-error {{'privateMethod' is inaccessible due to 'private' protection level}}
-  obj.usePrivate() // expected-error {{'usePrivate' is inaccessible due to 'private' protection level}}
-  _ = PrivateMembers.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
-  _ = PrivateMembers.PrivateInner.Invisible() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
+  print(obj.privateCounter) // DECLARED: :[[@LINE-10]]:{{[^:]+}}: error: 'privateCounter' is inaccessible due to 'private' protection level
+  obj.privateMethod() // DECLARED: :[[@LINE-10]]:{{[^:]+}}: error: 'privateMethod' is inaccessible due to 'private' protection level
+  obj.usePrivate() // DECLARED: :[[@LINE-10]]:{{[^:]+}}: error: 'usePrivate' is inaccessible due to 'private' protection level
+  _ = PrivateMembers.PrivateInner() // DECLARED: :[[@LINE-10]]:{{[^:]+}}: error: 'PrivateInner' is inaccessible due to 'private' protection level
+  _ = PrivateMembers.PrivateInner.Invisible() // DECLARED: :[[@LINE-10]]:{{[^:]+}}: error: 'PrivateInner' is inaccessible due to 'private' protection level
 }
 
 struct Outer {
@@ -44,13 +51,14 @@ extension Outer.Middle.Inner {
   }
 }
 
+// Padded to start on line 55 to make @LINE-55 work
 // BEGIN other_file_extensions.swift
 extension PrivateMembers {
   private func useDeclarationPrivate() {
-    print(privateCounter) // expected-error {{'privateCounter' is inaccessible due to 'private' protection level}}
-    privateMethod() // expected-error {{'privateMethod' is inaccessible due to 'private' protection level}}
-    usePrivate() // expected-error {{'usePrivate' is inaccessible due to 'private' protection level}}
-    _ = PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
+    print(privateCounter) // OTHER: :[[@LINE-55]]:{{[^:]+}}: error: 'privateCounter' is inaccessible due to 'private' protection level
+    privateMethod() // OTHER: :[[@LINE-55]]:{{[^:]+}}: error: 'privateMethod' is inaccessible due to 'private' protection level
+    usePrivate() // OTHER: :[[@LINE-55]]:{{[^:]+}}: error: 'usePrivate' is inaccessible due to 'private' protection level
+    _ = PrivateInner() // OTHER: :[[@LINE-55]]:{{[^:]+}}: error: 'PrivateInner' is inaccessible due to 'private' protection level
   }
 }
 
@@ -62,7 +70,7 @@ extension PrivateMembers {
 
 extension Outer {
   private struct MiddleExtension {
-    private static func privateDeclaration() {} // expected-note {{declared here}}
+    private static func privateDeclaration() {}
   }
   private static func outerExtension() {}
 }
@@ -71,6 +79,6 @@ extension Outer.Middle.Inner {
   func useParentExtensionPrivate() {
     Outer.outerExtension()
     _ = Outer.MiddleExtension()
-    Outer.MiddleExtension.privateDeclaration() // expected-error {{'privateDeclaration' is inaccessible due to 'private' protection level}}
+    Outer.MiddleExtension.privateDeclaration() // OTHER: :[[@LINE-55]]:{{[^:]+}}: error: 'privateDeclaration' is inaccessible due to 'private' protection level
   }
 }
