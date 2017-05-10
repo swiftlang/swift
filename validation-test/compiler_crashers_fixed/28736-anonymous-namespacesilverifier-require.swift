@@ -4,7 +4,7 @@
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-// RUN: not --crash %target-swift-frontend -primary-file %s -emit-ir -O
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -O
 // non-fuzz (@dusek)
 
 func f<T>(_ a:T)->Void{f(nil as[Any]?)}
