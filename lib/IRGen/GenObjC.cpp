@@ -581,6 +581,11 @@ namespace {
   };
 } // end anonymous namespace
 
+llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(SILDeclRef method) {
+  assert(method.isForeign);
+  return getAddrOfObjCSelectorRef(Selector(method).str());
+}
+
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,
                               Explosion &selfValues,
