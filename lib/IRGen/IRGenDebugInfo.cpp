@@ -329,19 +329,6 @@ private:
     }
     return true;
   }
-
-  bool lineNumberIsSane(IRBuilder &Builder, unsigned Line) {
-    if (IGM.IRGen.Opts.Optimize)
-      return true;
-
-    // Assert monotonically increasing line numbers within the same basic block;
-    llvm::BasicBlock *CurBasicBlock = Builder.GetInsertBlock();
-    if (CurBasicBlock == LastBasicBlock) {
-      return Line >= LastDebugLoc.Line;
-    }
-    LastBasicBlock = CurBasicBlock;
-    return true;
-  }
 #endif
 
   llvm::DIFile *getOrCreateFile(StringRef Filename) {
