@@ -199,6 +199,9 @@ CharacterTests.test("CR-LF") {
 }
 
 CharacterTests.test("Unicode 9 grapheme breaking") {
+  // Only run it on ObjC platforms. Supported Linux versions do not have a
+  // recent enough ICU for Unicode 9 support.
+#if _runtime(_ObjC)
   let flags = "🇺🇸🇨🇦🇩🇰🏳️‍🌈"
   expectEqual(4, flags.count)
   expectEqual(flags.reversed().count, flags.count)
@@ -210,6 +213,7 @@ CharacterTests.test("Unicode 9 grapheme breaking") {
   let skinTone = "👋👋🏻👋🏼👋🏽👋🏾👋🏿"
   expectEqual(6, skinTone.count)
   expectEqual(skinTone.reversed().count, skinTone.count)
+#endif
 }
 
 /// Test that a given `String` can be transformed into a `Character` and back
