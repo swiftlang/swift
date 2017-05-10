@@ -16,6 +16,7 @@ import Lib
 func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
+class Sub: Base {} // expected-error {{cannot inherit from class 'Base' (compiled with Swift 4.0) because it has overridable members that could not be loaded in Swift 3.2}}
 
 #else // TEST
 
@@ -60,6 +61,10 @@ public protocol C_RelyOnConformance {
 
 public class C_RelyOnConformanceImpl: C_RelyOnConformance {
   public typealias Assoc = RenamedClass
+}
+
+open class Base {
+  public init(wrapped: NewlyWrappedTypedef) {}
 }
 
 #endif

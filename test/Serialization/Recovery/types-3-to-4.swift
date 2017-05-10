@@ -16,6 +16,7 @@ import Lib
 func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
+class Sub: Base {} // okay
 
 #else // TEST
 
@@ -84,6 +85,10 @@ public protocol C_RelyOnConformance {
 
 public class C_RelyOnConformanceImpl: C_RelyOnConformance {
   public typealias Assoc = Swift3RenamedClass
+}
+
+open class Base {
+  public init(wrapped: NewlyWrappedTypedef) {}
 }
 
 #endif

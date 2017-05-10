@@ -64,7 +64,7 @@ public class UserDynamicConvenienceSub: UserDynamicConvenience {
 }
 _ = UserDynamicConvenienceSub(conveniently: 0)
 
-public class UserSub : User {} // expected-error {{cannot inherit from class 'User' in Swift 3.2 mode because it has overridable members that cannot be loaded}}
+public class UserSub : User {} // expected-error {{cannot inherit from class 'User' because it has overridable members that could not be loaded}}
 
 #endif // VERIFY
 

@@ -1925,3 +1925,7 @@ ClassDecl *SerializedASTFile::getMainClass() const {
   assert(hasEntryPoint());
   return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
 }
+
+const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
+  return File.CompatibilityVersion;
+}
