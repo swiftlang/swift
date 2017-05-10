@@ -899,7 +899,8 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     Type selfTy;
     if (i == e-1 && hasSelf) {
-      selfTy = func->computeInterfaceSelfType();
+      selfTy = ParenType::get(Context, func->computeInterfaceSelfType());
+
       // Substitute in our own 'self' parameter.
 
       argTy = selfTy;
