@@ -170,11 +170,8 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
         
         let sine = CGFloat(sin(α))
         let cosine = CGFloat(cos(α))
-
-        m11 = cosine
-        m12 = sine
-        m21 = -sine
-        m22 = cosine
+        
+        append(AffineTransform(m11: cosine, m12: sine, m21: -sine, m22: cosine, tX: 0, tY: 0))
     }
     
     /**
