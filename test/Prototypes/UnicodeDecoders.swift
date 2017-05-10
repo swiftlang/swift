@@ -35,7 +35,7 @@ extension UnicodeScalar {
 }
 //===----------------------------------------------------------------------===//
 
-extension _Unicode {
+extension Unicode {
   struct DefaultScalarView<
     CodeUnits: BidirectionalCollection,
     Encoding: UnicodeEncoding
@@ -49,28 +49,28 @@ extension _Unicode {
   }
 }
 
-extension _Unicode.DefaultScalarView : Sequence {
+extension Unicode.DefaultScalarView : Sequence {
   struct Iterator {
-    var parsing: _Unicode._ParsingIterator<
+    var parsing: Unicode._ParsingIterator<
       CodeUnits.Iterator, Encoding.ForwardParser>
   }
   
   func makeIterator() -> Iterator {
     return Iterator(
-      parsing: _Unicode._ParsingIterator(
+      parsing: Unicode._ParsingIterator(
         codeUnits: codeUnits.makeIterator(),
         parser: Encoding.ForwardParser()
       ))
   }
 }
 
-extension _Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
+extension Unicode.DefaultScalarView.Iterator : IteratorProtocol, Sequence {
   mutating func next() -> UnicodeScalar? {
     return parsing.next().map { Encoding.decode($0) }
   }
 }
 
-extension _Unicode.DefaultScalarView {
+extension Unicode.DefaultScalarView {
   struct Index {
     var codeUnitIndex: CodeUnits.Index
     var scalar: UnicodeScalar
@@ -78,25 +78,25 @@ extension _Unicode.DefaultScalarView {
   }
 }
 
-extension _Unicode.DefaultScalarView.Index : Comparable {
+extension Unicode.DefaultScalarView.Index : Comparable {
   @inline(__always)
   public static func < (
-    lhs: _Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
-    rhs: _Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
+    lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
+    rhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
   ) -> Bool {
     return lhs.codeUnitIndex < rhs.codeUnitIndex
   }
   
   @inline(__always)
   public static func == (
-    lhs: _Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
-    rhs: _Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
+    lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
+    rhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index
   ) -> Bool {
     return lhs.codeUnitIndex == rhs.codeUnitIndex
   }
 }
 
-extension _Unicode.DefaultScalarView : Collection {
+extension Unicode.DefaultScalarView : Collection {
   public var startIndex: Index {
     @inline(__always)
     get {
@@ -148,7 +148,7 @@ extension _Unicode.DefaultScalarView : Collection {
   }
 }
 
-extension _Unicode.DefaultScalarView : BidirectionalCollection {
+extension Unicode.DefaultScalarView : BidirectionalCollection {
   @inline(__always)
   public func index(before i: Index) -> Index {
     var parser = Encoding.ReverseParser()
@@ -348,7 +348,7 @@ func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
   }
   
   //===--- Scalar View ----------------------------------------------------===//
-  let scalars = _Unicode.DefaultScalarView(utfStr, fromEncoding: Codec.self)
+  let scalars = Unicode.DefaultScalarView(utfStr, fromEncoding: Codec.self)
   expectEqualSequence(expected, scalars.map { $0.value })
   expectEqualSequence(
     expected.reversed(),
@@ -2442,18 +2442,18 @@ public func run_UTF8Decode(_ N: Int) {
       typealias D = UTF8.ReverseParser
       D.decode(&it, repairingIllFormedSequences: true) { total = total &+ $0.value }
   #elseif SEQUENCE
-      for s in _Unicode.DefaultScalarView(string, fromEncoding: UTF8.self) {
+      for s in Unicode.DefaultScalarView(string, fromEncoding: UTF8.self) {
         total = total &+ s.value
       }
   #elseif COLLECTION
-      let scalars = _Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
+      let scalars = Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
       var i = scalars.startIndex
       while i != scalars.endIndex {
         total = total &+ scalars[i].value
         i = scalars.index(after: i)
       }
 #elseif REVERSE_COLLECTION
-      let scalars = _Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
+      let scalars = Unicode.DefaultScalarView(string, fromEncoding: UTF8.self)
       var i = scalars.endIndex
       while i != scalars.startIndex {
         i = scalars.index(before: i)

@@ -31,7 +31,7 @@ where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
   @inline(__always)
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
-  ) -> _Unicode.ParseResult<Encoding.EncodedScalar>
+  ) -> Unicode.ParseResult<Encoding.EncodedScalar>
     where I.Element == Encoding.CodeUnit {
 
     // Bufferless single-scalar fastpath.

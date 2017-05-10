@@ -9,13 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension _Unicode {
+extension Unicode {
   public enum UTF16 {
-  case _swift3Buffer(_Unicode.UTF16.ForwardParser)
+  case _swift3Buffer(Unicode.UTF16.ForwardParser)
   }
 }
 
-extension _Unicode.UTF16 : UnicodeEncoding {
+extension Unicode.UTF16 : UnicodeEncoding {
   public typealias CodeUnit = UInt16
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
@@ -108,7 +108,7 @@ extension _Unicode.UTF16 : UnicodeEncoding {
 }
 
 extension UTF16.ReverseParser : UnicodeParser, _UTFParser {
-  public typealias Encoding = _Unicode.UTF16
+  public typealias Encoding = Unicode.UTF16
 
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(  // this case handled elsewhere
@@ -128,8 +128,8 @@ extension UTF16.ReverseParser : UnicodeParser, _UTFParser {
   }
 }
 
-extension _Unicode.UTF16.ForwardParser : UnicodeParser, _UTFParser {
-  public typealias Encoding = _Unicode.UTF16
+extension Unicode.UTF16.ForwardParser : UnicodeParser, _UTFParser {
+  public typealias Encoding = Unicode.UTF16
   
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(  // this case handled elsewhere

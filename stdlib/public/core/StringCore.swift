@@ -336,7 +336,7 @@ public struct _StringCore {
     }
   }
 
-  var _unmanagedASCII : UnsafeBufferPointer<_Unicode.ASCII.CodeUnit>? {
+  var _unmanagedASCII : UnsafeBufferPointer<Unicode.ASCII.CodeUnit>? {
     @inline(__always)
     get {
       guard _fastPath(_baseAddress != nil && elementWidth == 1) else {
@@ -344,7 +344,7 @@ public struct _StringCore {
       }
       return UnsafeBufferPointer(
         start: _baseAddress!.assumingMemoryBound(
-          to: _Unicode.ASCII.CodeUnit.self),
+          to: Unicode.ASCII.CodeUnit.self),
         count: count
       )
     }
@@ -370,10 +370,10 @@ public struct _StringCore {
   {
     defer { _fixLifetime(self) }
     if let bytes = _unmanagedASCII {
-      if encoding == _Unicode.ASCII.self
-      || encoding == _Unicode.UTF8.self
-      || encoding == _Unicode.UTF16.self
-      || encoding == _Unicode.UTF32.self {
+      if encoding == Unicode.ASCII.self
+      || encoding == Unicode.UTF8.self
+      || encoding == Unicode.UTF16.self
+      || encoding == Unicode.UTF32.self {
         bytes.forEach {
           processCodeUnit(Encoding.CodeUnit(extendingOrTruncating: $0))
         }
@@ -388,7 +388,7 @@ public struct _StringCore {
     }
     else if let content = _unmanagedUTF16 {
       var i = content.makeIterator()
-      _Unicode.UTF16.ForwardParser._parse(&i) {
+      Unicode.UTF16.ForwardParser._parse(&i) {
         Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
       }
     }
