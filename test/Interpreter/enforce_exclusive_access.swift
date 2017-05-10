@@ -101,8 +101,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
   globalX = X() // no-trap
 }
 
-// FIXME: This should be a static diagnostics.
-// Once this radar is fixed, conirm that a it is covered by a static diagnostic
+// FIXME: This should be covered by static diagnostics.
+// Once this radar is fixed, confirm that a it is covered by a static diagnostic
 // (-verify) test in exclusivity_static_diagnostics.sil.
 // <rdar://problem/32061282> Enforce exclusive access in noescape closures.
 //
@@ -120,8 +120,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //  }
 //}
 
-// FIXME: This should be a static diagnostics.
-// Once this radar is fixed, conirm that a it is covered by a static diagnostic
+// FIXME: This should be covered by static diagnostics.
+// Once this radar is fixed, confirm that a it is covered by a static diagnostic
 // (-verify) test in exclusivity_static_diagnostics.sil.
 // <rdar://problem/32061282> Enforce exclusive access in noescape closures.
 //
@@ -139,8 +139,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //  }
 //}
 
-// FIXME: This should be a static diagnostics.
-// Once this radar is fixed, conirm that a it is covered by a static diagnostic
+// FIXME: This should be covered by static diagnostics.
+// Once this radar is fixed, confirm that a it is covered by a static diagnostic
 // (-verify) test in exclusivity_static_diagnostics.sil.
 // <rdar://problem/32061282> Enforce exclusive access in noescape closures.
 //
