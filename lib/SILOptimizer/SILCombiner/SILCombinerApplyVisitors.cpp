@@ -297,8 +297,6 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   }
 
   auto Callee = PAI->getCallee();
-  auto FnType = PAI->getSubstCalleeSILType();
-  SILType ResultTy = PAI->getSubstCalleeConv().getSILResultType();
   SubstitutionList Subs = PAI->getSubstitutions();
 
   // The partial_apply might be substituting in an open existential type.
@@ -448,7 +446,6 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     }
   }
 
-  SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
   // Create the new apply inst.
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
@@ -1172,7 +1169,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     }
     // The type of the substitution is the source type of the thin to thick
     // instruction.
-    SILType substTy = TTTFI->getOperand()->getType();
     Builder.addOpenedArchetypeOperands(AI);
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
                                       AI->getSubstitutions(), Arguments,
@@ -1304,7 +1300,6 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     }
     // The type of the substitution is the source type of the thin to thick
     // instruction.
-    SILType substTy = TTTFI->getOperand()->getType();
     auto *NewAI = Builder.createTryApply(AI->getLoc(), TTTFI->getOperand(),
                                          AI->getSubstitutions(), Arguments,
                                          AI->getNormalBB(), AI->getErrorBB());

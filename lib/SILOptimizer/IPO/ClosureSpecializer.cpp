@@ -351,9 +351,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     }
   }
 
-  SILType LoweredType = NewF->getLoweredType();
   auto loweredConv = NewF->getConventions();
-  SILType ResultType = loweredConv.getSILResultType();
   Builder.setInsertionPoint(AI.getInstruction());
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {

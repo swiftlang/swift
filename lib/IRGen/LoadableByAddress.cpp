@@ -1782,13 +1782,9 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   }
   SILFunctionType *newSILFunctionType =
       getNewSILFunctionTypePtr(genEnv, origSILFunctionType, *currIRMod);
-  SILType newSubType =
-      getNewSILFunctionType(genEnv, origSILFunctionType, *currIRMod);
   CanSILFunctionType newCanSILFuncType(newSILFunctionType);
   SILFunctionConventions newSILFunctionConventions(newCanSILFuncType,
                                                    *getModule());
-  SILType resultType = newSILFunctionConventions.getSILResultType();
-
   SmallVector<Substitution, 4> newSubs;
   for (Substitution sub : applySite.getSubstitutions()) {
     Type origType = sub.getReplacement();
@@ -1836,8 +1832,6 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     // Change the type of the Closure
     SILFunctionType *origClosureType =
         castedApply->getType().castTo<SILFunctionType>();
-    SILType newSILType =
-        getNewSILFunctionType(genEnv, origClosureType, *currIRMod);
     auto partialApplyConvention = castedApply->getType()
                                       .getSwiftRValueType()
                                       ->getAs<SILFunctionType>()

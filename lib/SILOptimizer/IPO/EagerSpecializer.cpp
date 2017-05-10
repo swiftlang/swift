@@ -563,11 +563,6 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
   Builder.emitBlock(IsClassCheckBB);
 
   auto *FRI = Builder.createFunctionRef(Loc, IsClassF);
-  auto CanFnTy = IsClassF->getLoweredFunctionType()->substGenericArgs(
-      Builder.getModule(), {Sub});
-  auto SILFnTy = SILType::getPrimitiveObjectType(CanFnTy);
-  SILFunctionConventions fnConv(CanFnTy, Builder.getModule());
-  auto SILResultTy = fnConv.getSILResultType();
   auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, {Sub}, {GenericMT},
                                                  /* isNonThrowing */ false);
   // Extract the i1 from the Bool struct.
