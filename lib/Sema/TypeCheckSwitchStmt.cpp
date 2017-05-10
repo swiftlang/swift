@@ -1071,8 +1071,25 @@ namespace {
         auto *BP = cast<BoolPattern>(item);
         return Space(BP->getValue());
       }
+      case PatternKind::Is: {
+        auto *IP = cast<IsPattern>(item);
+        switch (IP->getCastKind()) {
+        case CheckedCastKind::Coercion:
+        case CheckedCastKind::BridgingCoercion:
+          // These coercions are irrefutable.  Project with the original type
+          // instead of the cast's target type to maintain consistency with the
+          // scrutinee's type.
+          return Space(IP->getType());
+        case CheckedCastKind::Unresolved:
+        case CheckedCastKind::ValueCast:
+        case CheckedCastKind::ArrayDowncast:
+        case CheckedCastKind::DictionaryDowncast:
+        case CheckedCastKind::SetDowncast:
+        case CheckedCastKind::Swift3BridgingDowncast:
+            return Space();
+        }
+      }
       case PatternKind::Typed:
-      case PatternKind::Is:
       case PatternKind::Expr:
         return Space();
       case PatternKind::Var: {
