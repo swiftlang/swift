@@ -266,10 +266,18 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status |= type;
         param.Type = type.getPtrOrNull();
 
-        // Unnamed parameters must be written as "_: Type".
+        // If this is a closure declaration, what is going
+        // on is most likely argument destructuring, we are going
+        // to diagnose that after all of the parameters are parsed.
         if (param.Type) {
-          diagnose(typeStartLoc, diag::parameter_unnamed)
-            .fixItInsert(typeStartLoc, "_: ");
+          // Mark current parameter as invalid so it is possible
+          // to diagnose it as destructuring of the closure parameter list.
+          param.isInvalid = true;
+          if (!isClosure) {
+            // Unnamed parameters must be written as "_: Type".
+            diagnose(typeStartLoc, diag::parameter_unnamed)
+                .fixItInsert(typeStartLoc, "_: ");
+          }
         }
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
