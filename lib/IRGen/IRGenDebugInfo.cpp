@@ -99,6 +99,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
+  SmallString<0> ConfigMacros;          /// User-provided -D macro definitions.
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
   llvm::DIModule *MainModule = nullptr; /// The current module.
@@ -588,13 +589,13 @@ private:
   }
 
   llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
-                                    StringRef Name, StringRef IncludePath) {
+                                    StringRef Name, StringRef IncludePath,
+                                    StringRef ConfigMacros = StringRef()) {
     // Look in the cache first.
     auto Val = DIModuleCache.find(Key);
     if (Val != DIModuleCache.end())
       return cast<llvm::DIModule>(Val->second);
 
-    StringRef ConfigMacros;
     StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
     auto M =
         DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
@@ -612,11 +613,12 @@ private:
         Parent = getOrCreateModule(PM);
       }
       return getOrCreateModule(ClangModule->getFullModuleName(), Parent,
-                               Desc.getModuleName(), Desc.getPath());
+                               Desc.getModuleName(), Desc.getPath(),
+                               ConfigMacros);
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile(), nullptr, Desc.getModuleName(),
-                             Desc.getPath());
+                             Desc.getPath(), ConfigMacros);
   };
 
   TypeAliasDecl *getMetadataType() {
@@ -1540,6 +1542,24 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   MainModule =
       getOrCreateModule(Opts.ModuleName, TheCU, Opts.ModuleName, AbsMainFile);
   DBuilder.createImportedModule(MainFile, MainModule, 1);
+
+  // Macro definitions that were defined by the user with "-Xcc -D" on the
+  // command line. This does not include any macros defined by ClangImporter.
+  llvm::raw_svector_ostream OS(ConfigMacros);
+  unsigned I = 0;
+  // Translate the macro definitions back into a commmand line.
+  for (auto &Macro : Opts.ClangDefines) {
+    if (++I > 1)
+      OS << ' ';
+    OS << '"';
+    for (char c : Macro)
+      switch (c) {
+      case '\\': OS << "\\\\"; break;
+      case '"':  OS << "\\\""; break;
+      default: OS << c;
+      }
+    OS << '"';
+  }
 }
 
 void IRGenDebugInfoImpl::finalize() {
