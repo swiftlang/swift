@@ -18,6 +18,8 @@
 #else
 #include <unistd.h>
 #endif
+#include <pthread.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -123,11 +125,6 @@ int swift::_swift_stdlib_pthread_setspecific(
   __swift_pthread_key_t key, const void * _Nullable value
 ) {
   return pthread_setspecific(key, value);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_pthread_key_t _swift_stdlib_PTHREAD_KEYS_MAX(void) {
-  return PTHREAD_KEYS_MAX;
 }
 
 #if defined(__APPLE__)
