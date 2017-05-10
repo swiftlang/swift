@@ -1077,7 +1077,6 @@ namespace {
 
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, substitutions);
-        auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
         auto metatypeType =
             SGF.getSILType(substCallbackFnType->getParameters().back());
 

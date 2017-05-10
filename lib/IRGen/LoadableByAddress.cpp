@@ -1829,8 +1829,6 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     assert(castedApply &&
            "ValueKind is PartialApplyInst but cast to it failed");
     // Change the type of the Closure
-    SILFunctionType *origClosureType =
-        castedApply->getType().castTo<SILFunctionType>();
     auto partialApplyConvention = castedApply->getType()
                                       .getSwiftRValueType()
                                       ->getAs<SILFunctionType>()

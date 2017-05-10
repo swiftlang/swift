@@ -1237,8 +1237,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     ++NumCapturesPromoted;
   }
 
-  auto SubstFnTy = FnTy.substGenericArgs(M, PAI->getSubstitutions());
-
   // Create a new partial apply with the new arguments.
   auto *NewPAI = B.createPartialApply(
       PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
