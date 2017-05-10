@@ -707,6 +707,11 @@ ParserResult<Expr> Parser::parseExprSelector() {
     selectorContext = ObjCSelectorContext::MethodSelector;
   }
 
+  // Ignore DisabledVars in Selector.
+  SmallVector<VarDecl *, 4> Vars;
+  llvm::SaveAndRestore<decltype(DisabledVars)>
+  RestoreCurVars(DisabledVars, Vars);
+
   // Parse the subexpression.
   CodeCompletionCallbacks::InObjCSelectorExprRAII
     InObjCSelectorExpr(CodeCompletion, selectorContext);

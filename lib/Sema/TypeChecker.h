@@ -253,6 +253,8 @@ enum class NameLookupFlags {
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessibility = 0x10,
+  // Whether to ignore local variables for this lookup
+  IgnoreLocalVariables = 0x20,
 };
 
 /// A set of options that control name lookup.
@@ -913,7 +915,7 @@ public:
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
   /// for the lookup.
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context, bool ignoreLocalVariables = false);
 
   /// \brief Validate the given type.
   ///

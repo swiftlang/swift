@@ -402,7 +402,7 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
 Expr *TypeChecker::
-resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
+resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC, bool ignoreLocalVariables) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -411,6 +411,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+  if (ignoreLocalVariables)
+    lookupOptions |= NameLookupFlags::IgnoreLocalVariables;
   auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
   if (!Lookup) {
@@ -811,6 +813,15 @@ namespace {
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TC.checkForForbiddenPrefix(unresolved);
         return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
+      }
+
+      if (auto selector = dyn_cast<ObjCSelectorExpr>(expr)) {
+        if (selector->isMethodSelector()) {
+          if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(selector->getSubExpr())) {
+            TC.checkForForbiddenPrefix(unresolved);
+            return finish(true, TC.resolveDeclRefExpr(unresolved, DC, /*ignoreLocalVariables=*/true));
+          }
+        }
       }
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {

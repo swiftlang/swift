@@ -146,3 +146,19 @@ case #selector(SR1827.bar)?:
 default:
   break
 }
+
+// SR-3174
+
+class Hello {
+  func test() {
+    let cancel = #selector(cancel) // expected-warning {{initialization of immutable value 'cancel' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  func cancel() { }
+}
+
+func testVariableWithinItsOwnInitialValue() {
+    let cancel = #selector(cancel) // expected-warning {{initialization of immutable value 'cancel' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+func cancel() {}

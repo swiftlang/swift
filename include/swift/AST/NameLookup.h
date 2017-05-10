@@ -94,7 +94,8 @@ public:
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false,
                     bool AllowProtocolMembers = false,
-                    bool IgnoreAccessControl = false);
+                    bool IgnoreAccessControl = false,
+                    bool IgnoreLocalVariables = false);
 
   SmallVector<UnqualifiedLookupResult, 4> Results;
 

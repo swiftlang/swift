@@ -437,7 +437,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      bool IsKnownNonCascading,
                                      SourceLoc Loc, bool IsTypeLookup,
                                      bool AllowProtocolMembers,
-                                     bool IgnoreAccessControl) {
+                                     bool IgnoreAccessControl,
+                                     bool IgnoreLocalVariables) {
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
@@ -667,14 +668,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                   !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
             }
 
-            namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-            localVal.visit(AFD->getBody());
-            if (!Results.empty())
-              return;
-            for (auto *PL : AFD->getParameterLists())
-              localVal.checkParameterList(PL);
-            if (!Results.empty())
-              return;
+            if (!IgnoreLocalVariables) {
+              namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+              localVal.visit(AFD->getBody());
+              if (!Results.empty())
+                return;
+              for (auto *PL : AFD->getParameterLists())
+                localVal.checkParameterList(PL);
+              if (!Results.empty())
+                return;
+            }
           }
           if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
             isCascadingUse = AFD->isCascadingContextForLookup(false);
@@ -708,13 +711,15 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // for us, but it can't do the right thing inside local types.
           if (Loc.isValid()) {
             if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-              namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-              localVal.visit(CE->getBody());
-              if (!Results.empty())
-                return;
-              localVal.checkParameterList(CE->getParameters());
-              if (!Results.empty())
-                return;
+              if (!IgnoreLocalVariables) {
+                namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+                localVal.visit(CE->getBody());
+                if (!Results.empty())
+                  return;
+                localVal.checkParameterList(CE->getParameters());
+                if (!Results.empty())
+                  return;
+              }
             }
           }
           if (!isCascadingUse.hasValue())
@@ -749,7 +754,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (GenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
-
           if (!Results.empty())
             return;
         }
@@ -869,10 +873,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Look for local variables in top-level code; normally, the parser
         // resolves these for us, but it can't do the right thing for
         // local types.
-        namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-        localVal.checkSourceFile(*SF);
-        if (!Results.empty())
-          return;
+        if (!IgnoreLocalVariables) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkSourceFile(*SF);
+          if (!Results.empty())
+            return;
+        }
       }
     }
   }

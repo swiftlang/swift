@@ -178,7 +178,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       loc,
       /*IsTypeLookup=*/false,
       options.contains(NameLookupFlags::ProtocolMembers),
-      options.contains(NameLookupFlags::IgnoreAccessibility));
+      options.contains(NameLookupFlags::IgnoreAccessibility),
+      options.contains(NameLookupFlags::IgnoreLocalVariables));
 
   LookupResult result;
   LookupResultBuilder builder(*this, result, dc, options,
@@ -203,7 +204,6 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       }
       assert(foundInType && "bogus base declaration?");
     }
-
     builder.add(found.getValueDecl(), found.getBaseDecl(), foundInType);
   }
   return result;
