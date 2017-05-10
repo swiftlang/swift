@@ -278,7 +278,7 @@ DECL_ATTR(NSKeyedArchiveLegacy, NSKeyedArchiveLegacy,
           /*Not serialized */ 68)
 
 SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
-                 OnClass | NotSerialized | LongAttribute | UserInaccessible,
+                 OnClass | NotSerialized | LongAttribute | RejectByParser,
                  /*Not serialized */ 69)
 
 SIMPLE_DECL_ATTR(NSKeyedArchiveSubclassesOnly,
