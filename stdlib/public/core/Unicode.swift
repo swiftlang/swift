@@ -142,7 +142,7 @@ public protocol UnicodeCodec : UnicodeEncoding {
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
 /// units.
-extension _Unicode.UTF8 : UnicodeCodec {
+extension Unicode.UTF8 : UnicodeCodec {
   /// Creates an instance of the UTF-8 codec.
   public init() { self = ._swift3Buffer(ForwardParser()) }
 
@@ -308,11 +308,11 @@ extension _Unicode.UTF8 : UnicodeCodec {
     return Int(_swift_stdlib_strlen(input))
   }
 }
-public typealias UTF8 = _Unicode.UTF8
+public typealias UTF8 = Unicode.UTF8
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
-extension _Unicode.UTF16 : UnicodeCodec {
+extension Unicode.UTF16 : UnicodeCodec {
   /// Creates an instance of the UTF-16 codec.
   public init() { self = ._swift3Buffer(ForwardParser()) }
 
@@ -418,11 +418,11 @@ extension _Unicode.UTF16 : UnicodeCodec {
     processCodeUnit(UInt16(extendingOrTruncating: s))
   }
 }
-public typealias UTF16 = _Unicode.UTF16
+public typealias UTF16 = Unicode.UTF16
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
-extension _Unicode.UTF32 : UnicodeCodec {
+extension Unicode.UTF32 : UnicodeCodec {
   /// Creates an instance of the UTF-32 codec.
   public init() { self = ._swift3Codec }
 
@@ -508,7 +508,7 @@ extension _Unicode.UTF32 : UnicodeCodec {
     processCodeUnit(UInt32(input))
   }
 }
-public typealias UTF32 = _Unicode.UTF32
+public typealias UTF32 = Unicode.UTF32
 
 /// Translates the given input from one Unicode encoding to another by calling
 /// the given closure.
@@ -918,7 +918,7 @@ extension UTF16 {
       &i, repairingIllFormedSequences: repairingIllFormedSequences
     ) {
       if isASCII {
-        isASCII = _Unicode.ASCII.transcode($0, from: Encoding.self) != nil
+        isASCII = Unicode.ASCII.transcode($0, from: Encoding.self) != nil
       }
       count += numericCast(self._transcode($0, from: Encoding.self).count)
     }
@@ -996,5 +996,5 @@ extension UTF16 {
 }
 
 /// A namespace for Unicode utilities.
-public enum _Unicode {}
+public enum Unicode {}
 

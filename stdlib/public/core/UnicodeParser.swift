@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension _Unicode {
+extension Unicode {
   /// The result of attempting to parse a `T` from some input.
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
@@ -40,7 +40,7 @@ public protocol UnicodeParser {
   /// Parses a single Unicode scalar value from `input`.
   mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
-  ) -> _Unicode.ParseResult<Encoding.EncodedScalar>
+  ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit
 }
 
@@ -86,7 +86,7 @@ extension UnicodeParser {
   }
 }
 
-extension _Unicode {
+extension Unicode {
   @_fixed_layout
   public // @testable
   struct _ParsingIterator<
@@ -104,7 +104,7 @@ extension _Unicode {
   }
 }
 
-extension _Unicode._ParsingIterator : IteratorProtocol, Sequence {
+extension Unicode._ParsingIterator : IteratorProtocol, Sequence {
   @inline(__always)
   @_inlineable
   public mutating func next() -> Parser.Encoding.EncodedScalar? {

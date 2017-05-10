@@ -9,14 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension _Unicode {
+extension Unicode {
   @_fixed_layout
   public enum UTF8 {
-  case _swift3Buffer(_Unicode.UTF8.ForwardParser)
+  case _swift3Buffer(Unicode.UTF8.ForwardParser)
   }
 }
 
-extension _Unicode.UTF8 : UnicodeEncoding {
+extension Unicode.UTF8 : UnicodeEncoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt8>
 
@@ -141,7 +141,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
 }
 
 extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
-  public typealias Encoding = _Unicode.UTF8
+  public typealias Encoding = Unicode.UTF8
   @inline(__always)
   @_inlineable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
@@ -217,8 +217,8 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   }
 }
 
-extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
-  public typealias Encoding = _Unicode.UTF8
+extension Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
+  public typealias Encoding = Unicode.UTF8
 
   @inline(__always)
   @_inlineable
