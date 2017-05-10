@@ -384,7 +384,8 @@ func test_is_as_patterns() {
   switch 4 {
   case is Int: break        // expected-warning {{'is' test is always true}}
   case _ as Int: break  // expected-warning {{'as' test is always true}}
-  case _: break
+  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
   }
 }
 
