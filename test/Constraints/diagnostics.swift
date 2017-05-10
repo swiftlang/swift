@@ -931,3 +931,29 @@ let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{bin
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+
+// SR-4692: Useless diagnostics calling non-static method
+
+class SR_4692_a {
+  private static func foo(x: Int, y: Bool) {
+    self.bar(x: x)
+    // expected-error@-1 {{instance member 'bar' cannot be used on type 'SR_4692_a'}}
+  }
+
+  private func bar(x: Int) {
+  }
+}
+
+class SR_4692_b {
+  static func a() {
+    self.f(x: 3, y: true)
+    // expected-error@-1 {{instance member 'f' cannot be used on type 'SR_4692_b'}}
+  }
+
+  private func f(a: Int, b: Bool, c: String) {
+    self.f(x: a, y: b)
+  }
+
+  private func f(x: Int, y: Bool) {
+  }
+}
