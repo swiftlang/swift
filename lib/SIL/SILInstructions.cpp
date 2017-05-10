@@ -407,16 +407,25 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
 }
 
 ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                             SILType SubstCalleeTy, SILType Result,
-                             SubstitutionList Subs,
-                             ArrayRef<SILValue> Args, bool isNonThrowing,
+                             SubstitutionList Subs, ArrayRef<SILValue> Args,
+                             bool isNonThrowing,
+                             Optional<SILModuleConventions> ModuleConventions,
                              SILFunction &F,
                              SILOpenedArchetypesState &OpenedArchetypes) {
+  SILType SubstCalleeSILTy =
+      Callee->getType().substGenericArgs(F.getModule(), Subs);
+  auto SubstCalleeTy = SubstCalleeSILTy.getAs<SILFunctionType>();
+  SILFunctionConventions Conv(SubstCalleeTy,
+                              ModuleConventions.hasValue()
+                                  ? ModuleConventions.getValue()
+                                  : SILModuleConventions(F.getModule()));
+  SILType Result = Conv.getSILResultType();
+
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeTy.getSwiftRValueType(), Subs);
+                               SubstCalleeSILTy.getSwiftRValueType(), Subs);
   void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
-  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
+  return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
                                  TypeDependentOperands, isNonThrowing);
 }
@@ -447,10 +456,14 @@ PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
 
 PartialApplyInst *
 PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                         SILType SubstCalleeTy, SubstitutionList Subs,
-                         ArrayRef<SILValue> Args, SILType ClosureType,
-                         SILFunction &F,
+                         ArrayRef<SILValue> Args, SubstitutionList Subs,
+                         ParameterConvention CalleeConvention, SILFunction &F,
                          SILOpenedArchetypesState &OpenedArchetypes) {
+  SILType SubstCalleeTy =
+      Callee->getType().substGenericArgs(F.getModule(), Subs);
+  SILType ClosureType = SILBuilder::getPartialApplyResultType(
+      SubstCalleeTy, Args.size(), F.getModule(), {}, CalleeConvention);
+
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeTy.getSwiftRValueType(), Subs);
@@ -473,14 +486,15 @@ TryApplyInst::TryApplyInst(SILDebugLocation Loc, SILValue callee,
     : ApplyInstBase(ValueKind::TryApplyInst, Loc, callee, substCalleeTy, subs,
                     args, TypeDependentOperands, normalBB, errorBB) {}
 
-
 TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
-                                   SILType substCalleeTy,
                                    SubstitutionList subs,
                                    ArrayRef<SILValue> args,
                                    SILBasicBlock *normalBB,
                                    SILBasicBlock *errorBB, SILFunction &F,
-                                SILOpenedArchetypesState &OpenedArchetypes) {
+                                   SILOpenedArchetypesState &OpenedArchetypes) {
+  SILType substCalleeTy =
+      callee->getType().substGenericArgs(F.getModule(), subs);
+
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                substCalleeTy.getSwiftRValueType(), subs);

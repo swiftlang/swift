@@ -1077,7 +1077,6 @@ namespace {
 
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, substitutions);
-        auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
         auto metatypeType =
             SGF.getSILType(substCallbackFnType->getParameters().back());
 
@@ -1119,8 +1118,8 @@ namespace {
                                        rawPointerTy);
 
         // Apply the callback.
-        SGF.B.createApply(loc, callback, substCallbackType,
-                          emptyTupleTy, substitutions, {
+        SGF.B.createApply(loc, callback,
+                          substitutions, {
                             temporaryPointer,
                             materialized.callbackStorage,
                             baseAddress,

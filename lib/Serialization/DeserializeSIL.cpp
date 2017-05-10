@@ -1083,10 +1083,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal =
-        Builder.createApply(Loc, getLocalValue(ValID, FnTy), SubstFnTy,
-                            substConventions.getSILResultType(), Substitutions,
-                            Args, IsNonThrowingApply != 0);
+    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
+                                    Substitutions, Args,
+                                    IsNonThrowingApply != 0);
     break;
   }
   case ValueKind::TryApplyInst: {
@@ -1121,10 +1120,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createTryApply(Loc,
-                                       getLocalValue(ValID, FnTy),
-                                       SubstFnTy, Substitutions, Args,
-                                       normalBB, errorBB);
+    ResultVal = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
+                                       Substitutions, Args, normalBB, errorBB);
     break;
   }
   case ValueKind::PartialApplyInst: {
@@ -1159,9 +1156,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
           ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
-                                           Substitutions, Args,
-                                           closureTy);
+    ResultVal = Builder.createPartialApply(
+        Loc, FnVal, Substitutions, Args,
+        closureTy.getAs<SILFunctionType>()->getCalleeConvention());
     break;
   }
   case ValueKind::BuiltinInst: {

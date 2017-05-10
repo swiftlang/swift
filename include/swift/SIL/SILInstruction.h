@@ -1298,9 +1298,9 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
             bool isNonThrowing);
 
   static ApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
-                           SILType SubstCalleeType, SILType ReturnType,
                            SubstitutionList Substitutions,
                            ArrayRef<SILValue> Args, bool isNonThrowing,
+                           Optional<SILModuleConventions> ModuleConventions,
                            SILFunction &F,
                            SILOpenedArchetypesState &OpenedArchetypes);
 
@@ -1330,9 +1330,9 @@ class PartialApplyInst
                    SILType ClosureType);
 
   static PartialApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
-                                  SILType SubstCalleeType,
+                                  ArrayRef<SILValue> Args,
                                   SubstitutionList Substitutions,
-                                  ArrayRef<SILValue> Args, SILType ClosureType,
+                                  ParameterConvention CalleeConvention,
                                   SILFunction &F,
                                   SILOpenedArchetypesState &OpenedArchetypes);
 
@@ -6236,7 +6236,6 @@ class TryApplyInst
                SILBasicBlock *normalBB, SILBasicBlock *errorBB);
 
   static TryApplyInst *create(SILDebugLocation DebugLoc, SILValue callee,
-                              SILType substCalleeType,
                               SubstitutionList substitutions,
                               ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                               SILBasicBlock *errorBB, SILFunction &F,
