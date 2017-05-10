@@ -196,7 +196,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     case CaptureKind::Constant: {
       // let declarations.
-      auto Entry = VarLocs[vd];
+      auto found = VarLocs.find(vd);
+      assert(found != VarLocs.end());
+      auto Entry = found->second;
 
       auto *var = cast<VarDecl>(vd);
       auto &tl = getTypeLowering(var->getType()->getReferenceStorageReferent());
