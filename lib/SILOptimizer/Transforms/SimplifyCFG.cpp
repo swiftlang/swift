@@ -2026,8 +2026,6 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
-                                           CalleeType,
-                                           ResultTy,
                                            TAI->getSubstitutions(),
                                            Args, CalleeFnTy->hasErrorResult());
 

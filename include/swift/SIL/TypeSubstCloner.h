@@ -132,7 +132,6 @@ protected:
 
     ApplyInst *N = Builder.createApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
-        getOpType(Inst->getSubstCalleeSILType()), getOpType(Inst->getType()),
         TempSubstList, Args, Inst->isNonThrowing());
     doPostProcess(Inst, N);
   }
@@ -165,11 +164,9 @@ protected:
         SubstitutionList Subs = TempSubstList;
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                         &Builder.getFunction());
-        Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
-                                   getOpType(Inst->getSubstCalleeSILType()),
-                                   Subs,
-                                   Args,
-                                   getOpType(Inst->getType()));
+        Builder.createPartialApply(
+            getOpLocation(Inst->getLoc()), FRI, Subs, Args,
+            Inst->getType().getAs<SILFunctionType>()->getCalleeConvention());
         return;
       }
     }
@@ -179,9 +176,8 @@ protected:
     }
 
     Builder.createPartialApply(
-      getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
-        getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
-        getOpType(Inst->getType()));
+        getOpLocation(Inst->getLoc()), getOpValue(CalleeVal), TempSubstList,
+        Args, Inst->getType().getAs<SILFunctionType>()->getCalleeConvention());
   }
 
   /// Attempt to simplify a conditional checked cast.

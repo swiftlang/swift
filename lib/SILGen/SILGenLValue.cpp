@@ -1119,8 +1119,8 @@ namespace {
                                        rawPointerTy);
 
         // Apply the callback.
-        SGF.B.createApply(loc, callback, substCallbackType,
-                          emptyTupleTy, substitutions, {
+        SGF.B.createApply(loc, callback,
+                          substitutions, {
                             temporaryPointer,
                             materialized.callbackStorage,
                             baseAddress,

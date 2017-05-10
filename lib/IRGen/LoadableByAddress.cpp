@@ -1815,8 +1815,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   case ValueKind::ApplyInst: {
     ApplyInst *castedApply = dyn_cast<ApplyInst>(applyInst);
     assert(castedApply && "ValueKind is ApplyInst but cast to it failed");
-    newApply = applyBuilder.createApply(castedApply->getLoc(), callee,
-                                        newSubType, resultType, newSubs,
+    newApply = applyBuilder.createApply(castedApply->getLoc(), callee, newSubs,
                                         callArgs, castedApply->isNonThrowing());
     applyInst->replaceAllUsesWith(newApply);
     break;
@@ -1825,7 +1824,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     TryApplyInst *castedApply = dyn_cast<TryApplyInst>(applyInst);
     assert(castedApply && "ValueKind is TryApplyInst but cast to it failed");
     newApply = applyBuilder.createTryApply(
-        castedApply->getLoc(), callee, newSubType, newSubs, callArgs,
+        castedApply->getLoc(), callee, newSubs, callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB());
     applyInst->replaceAllUsesWith(newApply);
     break;
@@ -1839,10 +1838,14 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
         castedApply->getType().castTo<SILFunctionType>();
     SILType newSILType =
         getNewSILFunctionType(genEnv, origClosureType, *currIRMod);
+    auto partialApplyConvention = castedApply->getType()
+                                      .getSwiftRValueType()
+                                      ->getAs<SILFunctionType>()
+                                      ->getCalleeConvention();
 
     newApply = applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                               newSubType, newSubs, callArgs,
-                                               newSILType);
+                                               newSubs, callArgs,
+                                               partialApplyConvention);
     applyInst->replaceAllUsesWith(newApply);
     break;
   }

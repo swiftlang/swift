@@ -841,10 +841,10 @@ specializePartialApply(PartialApplyInst *PartialApply,
   CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
   CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
-  return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
-                                 SILType::getPrimitiveObjectType(SubstCalleeTy),
-                                    PartialApply->getSubstitutions(), Args,
-                                    PartialApply->getType());
+  return Builder.createPartialApply(
+      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
+      Args,
+      PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }
 
 static void
