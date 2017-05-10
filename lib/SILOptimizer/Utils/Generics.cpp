@@ -1805,11 +1805,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     return NewAI;
   }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    CanSILFunctionType NewPAType = ReInfo.createSpecializedType(
-        PAI->getFunctionType(), Builder.getModule());
     // SILType PTy =
     // SILType::getPrimitiveObjectType(ReInfo.getSpecializedType());
-    SILType PTy = CalleeSILSubstFnTy;
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
@@ -1941,11 +1938,7 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILFunction *Thunk = &Builder.getFunction();
   auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
   auto Subs = Thunk->getForwardingSubstitutions();
-  auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
-  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   auto specConv = SpecializedFunc->getConventions();
-  auto SILResultTy =
-      SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType());
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
     return Builder.createApply(Loc, FRI, Subs, Arguments, false);
   }
@@ -2166,8 +2159,6 @@ void swift::trySpecializeApplyOfGeneric(
       Arguments.push_back(Op.get());
     }
     auto Subs = ReInfo.getCallerParamSubstitutions();
-    auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
-    auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
     auto *NewPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments,
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());

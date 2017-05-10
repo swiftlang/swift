@@ -149,9 +149,6 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
 
   DeallocType = DeallocType->substGenericArgs(M, AllocSubMap);
 
-  SILType ReturnType = Dealloc->getConventions().getSILResultType();
-  SILType DeallocSILType = SILType::getPrimitiveObjectType(DeallocType);
-
   SILBuilder B(ReleaseInst);
   if (object->getType() != AllocType)
     object = B.createUncheckedRefCast(ReleaseInst->getLoc(), object, AllocType);

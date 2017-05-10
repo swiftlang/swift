@@ -613,8 +613,6 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SILType ResultTy = substConv.getSILResultType();
 
-  SILType SubstCalleeSILType =
-    SILType::getPrimitiveObjectType(SubstCalleeType);
   FullApplySite NewAI;
 
   SILBasicBlock *ResultBB = nullptr;
@@ -880,8 +878,6 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   SILLocation Loc = AI.getLoc();
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
-  auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
-  auto ResultSILType = substConv.getSILResultType();
   ApplySite SAI;
 
   SmallVector<Substitution, 4> NewSubs;
@@ -905,9 +901,6 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
                                       .getSwiftRValueType()
                                       ->getAs<SILFunctionType>()
                                       ->getCalleeConvention();
-    auto PAIResultType = SILBuilder::getPartialApplyResultType(
-        SubstCalleeSILType, Arguments.size(), Module, {},
-        PartialApplyConvention);
     auto *NewPAI = Builder.createPartialApply(
         Loc, FRI, NewSubs, Arguments, PartialApplyConvention);
     // Check if any casting is required for the return value.
