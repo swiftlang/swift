@@ -21,3 +21,18 @@ func existentialConversion(fn: @escaping (Refined) -> ()) {
   let _: (Base) -> () = fn
   let _: (Derived) -> () = fn
 }
+
+// rdar://problem/31725325
+
+func a<b>(_: [(String, (b) -> () -> Void)]) {}
+func a<b>(_: [(String, (b) -> () throws -> Void)]) {}
+
+class c {
+  func e() {}
+  static var d = [("", e)]
+}
+a(c.d)
+
+func b<T>(_: (T) -> () -> ()) {}
+
+b(c.e)
