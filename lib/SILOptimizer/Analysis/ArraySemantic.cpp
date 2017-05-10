@@ -734,10 +734,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
       Builder.createIntegerLiteral(Loc, BuiltinIntTy, Vals.size());
     StructInst *Capacity = Builder.createStruct(Loc,
         SILType::getPrimitiveObjectType(CanType(IntType)), {CapacityLiteral});
-    Builder.createApply(Loc, ReserveFnRef,
-                        ReserveFnRef->getType().substGenericArgs(M, Subs),
-                        ReserveFnTy->getAllResultsType(), Subs,
-                        {Capacity, ArrRef}, false);
+    Builder.createApply(Loc, ReserveFnRef, Subs, {Capacity, ArrRef}, false);
   }
 
   for (SILValue V : Vals) {
@@ -750,9 +747,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
                                 IsInitialization_t::IsInitialization);
 
     SILValue Args[] = {AllocStackInst, ArrRef};
-    Builder.createApply(Loc, FnRef, FnTy.substGenericArgs(M, Subs),
-                        FnTy.castTo<SILFunctionType>()->getAllResultsType(), Subs,
-                        Args, false);
+    Builder.createApply(Loc, FnRef, Subs, Args, false);
     Builder.createDeallocStack(Loc, AllocStackInst);
     if (!isConsumedParameter(AppendFnTy->getParameters()[0].getConvention())) {
       ValLowering.emitDestroyValue(Builder, Loc, CopiedVal);

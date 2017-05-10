@@ -1014,7 +1014,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
                                 Builder.getModule());
   auto ResTy = fnConv.getSILResultType();
 
-  ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI, FnTy, ResTy,
+  ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
                                        ToAI->getSubstitutions(), Args,
                                        ToAI->isNonThrowing());
   FromAI->replaceAllUsesWith(NAI);

@@ -306,13 +306,11 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 
   FullApplySite NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI =
-      Builder.createTryApply(AI.getLoc(), Callee, FnType, Subs, Args,
-                              TAI->getNormalBB(), TAI->getErrorBB());
+    NAI = Builder.createTryApply(AI.getLoc(), Callee, Subs, Args,
+                                 TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NAI =
-      Builder.createApply(AI.getLoc(), Callee, FnType, ResultTy, Subs, Args,
-                          cast<ApplyInst>(AI)->isNonThrowing());
+    NAI = Builder.createApply(AI.getLoc(), Callee, Subs, Args,
+                              cast<ApplyInst>(AI)->isNonThrowing());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
@@ -454,13 +452,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // Create the new apply inst.
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI = Builder.createTryApply(AI.getLoc(), FRI, CCSILTy,
+    NAI = Builder.createTryApply(AI.getLoc(), FRI, 
                                  SubstitutionList(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NAI = Builder.createApply(
-        AI.getLoc(), FRI, CCSILTy, convertConventions.getSILResultType(),
-        SubstitutionList(), Args, cast<ApplyInst>(AI)->isNonThrowing());
+    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
+                              cast<ApplyInst>(AI)->isNonThrowing());
   return NAI;
 }
 
@@ -734,15 +731,11 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   Builder.addOpenedArchetypeOperands(AI.getInstruction());
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
-                                    NewSubstCalleeType,
-                                    Substitutions, Args,
-                                    TAI->getNormalBB(), TAI->getErrorBB());
+    NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(), Substitutions,
+                                   Args, TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
-                                 NewSubstCalleeType,
-                                 AI.getType(), Substitutions, Args,
-                                 cast<ApplyInst>(AI)->isNonThrowing());
+    NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(), Substitutions,
+                                Args, cast<ApplyInst>(AI)->isNonThrowing());
 
   if (isa<ApplyInst>(NewAI))
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
@@ -1182,7 +1175,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     SILType substTy = TTTFI->getOperand()->getType();
     Builder.addOpenedArchetypeOperands(AI);
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
-                                      substTy, AI->getType(),
                                       AI->getSubstitutions(), Arguments,
                                       AI->isNonThrowing());
     return NewAI;
@@ -1314,7 +1306,6 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     // instruction.
     SILType substTy = TTTFI->getOperand()->getType();
     auto *NewAI = Builder.createTryApply(AI->getLoc(), TTTFI->getOperand(),
-                                         substTy,
                                          AI->getSubstitutions(), Arguments,
                                          AI->getNormalBB(), AI->getErrorBB());
     return NewAI;

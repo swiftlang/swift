@@ -4501,9 +4501,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
-    ResultVal =
-        B.createApply(InstLoc, FnVal, FnTy, substConv.getSILResultType(), subs,
-                      Args, IsNonThrowingApply);
+    ResultVal = B.createApply(InstLoc, FnVal, subs, Args, IsNonThrowingApply);
     break;
   }
   case ValueKind::PartialApplyInst: {
@@ -4528,8 +4526,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs,
                                             PartialApplyConvention);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
-                                     subs, Args, closureTy);
+    ResultVal = B.createPartialApply(InstLoc, FnVal, subs, Args,
+                                     PartialApplyConvention);
     break;
   }
   case ValueKind::TryApplyInst: {
@@ -4561,8 +4559,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     SILBasicBlock *normalBB = getBBForReference(normalBBName, normalBBLoc);
     SILBasicBlock *errorBB = getBBForReference(errorBBName, errorBBLoc);
-    ResultVal = B.createTryApply(InstLoc, FnVal, FnTy,
-                                 subs, args, normalBB, errorBB);
+    ResultVal = B.createTryApply(InstLoc, FnVal, subs, args, normalBB, errorBB);
     break;
   }
   }
