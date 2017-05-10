@@ -161,14 +161,10 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     auto proto_list = Dem.createNode(Node::Kind::ProtocolList);
     proto_list->addChild(type_list, Dem);
 
-    // Sort the protocols by their mangled names.
-    // The ordering in the existential type metadata is by metadata pointer,
-    // which isn't necessarily stable across invocations.
-    std::sort(protocols.begin(), protocols.end(),
-          [](const ProtocolDescriptor *a, const ProtocolDescriptor *b) -> bool {
-            return strcmp(a->Name, b->Name) < 0;
-          });
-    
+    // The protocol descriptors should be pre-sorted since the compiler will
+    // only ever make a swift_getExistentialTypeMetadata invocation using
+    // its canonical ordering of protocols.
+
     for (auto *protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
       StringRef ProtoName(protocol->Name);
