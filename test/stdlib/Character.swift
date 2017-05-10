@@ -196,7 +196,20 @@ CharacterTests.test("CR-LF") {
   let finalAlphaCharacters = unicodeAlphabetString.characters[unicodeAlphabetString.characters.index(unicodeAlphabetString.characters.endIndex, offsetBy: -3)..<unicodeAlphabetString.characters.endIndex]
   expectEqualSequence(finalAlphaCharacters, unicodeAlphabetString_final.characters)
   expectEqualSequence(finalAlphaCharacters.reversed(), unicodeAlphabetString_final_rev.characters)
+}
 
+CharacterTests.test("Unicode 9 grapheme breaking") {
+  let flags = "🇺🇸🇨🇦🇩🇰🏳️‍🌈"
+  expectEqual(4, flags.count)
+  expectEqual(flags.reversed().count, flags.count)
+
+  let family = "👪👨‍👧‍👧👩‍👩‍👧‍👦👨‍👨‍👦‍👦👨‍👧👩‍👦‍👦"
+  expectEqual(6, family.count)
+  expectEqual(family.reversed().count, family.count)
+
+  let skinTone = "👋👋🏻👋🏼👋🏽👋🏾👋🏿"
+  expectEqual(6, skinTone.count)
+  expectEqual(skinTone.reversed().count, skinTone.count)
 }
 
 /// Test that a given `String` can be transformed into a `Character` and back
