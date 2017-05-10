@@ -715,7 +715,6 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   SILBuilderWithScope Builder(SemanticsCall);
   auto Loc = SemanticsCall->getLoc();
   auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
-  auto FnTy = FnRef->getType();
 
   if (Vals.size() > 1) {
     // Create a call to reserveCapacityForAppend() to reserve space for multiple

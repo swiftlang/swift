@@ -351,7 +351,6 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     }
   }
 
-  auto loweredConv = NewF->getConventions();
   Builder.setInsertionPoint(AI.getInstruction());
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
