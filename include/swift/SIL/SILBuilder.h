@@ -316,10 +316,14 @@ public:
         &F, OpenedArchetypes));
   }
 
-  ApplyInst *createApply(SILLocation Loc, SILValue Fn, SubstitutionList Subs,
-                         ArrayRef<SILValue> Args, bool isNonThrowing) {
+  ApplyInst *
+  createApply(SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+              ArrayRef<SILValue> Args, bool isNonThrowing,
+              Optional<SILModuleConventions> ModuleConventions = None) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn,
-                                    Subs, Args, isNonThrowing, F,
+                                    Subs, Args, isNonThrowing,
+                                    ModuleConventions,
+                                    F,
                                     OpenedArchetypes));
   }
 

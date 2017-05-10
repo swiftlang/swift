@@ -1300,6 +1300,7 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
   static ApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
                            SubstitutionList Substitutions,
                            ArrayRef<SILValue> Args, bool isNonThrowing,
+                           Optional<SILModuleConventions> ModuleConventions,
                            SILFunction &F,
                            SILOpenedArchetypesState &OpenedArchetypes);
 
