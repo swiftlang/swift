@@ -1640,7 +1640,7 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
       llvm::SmallString<128> authoredDataPath(ResourcePath);
       llvm::sys::path::append(authoredDataPath, "overlay.json");
       // Add authored list first to take higher priority.
-      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str())
+      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
     }
   }
