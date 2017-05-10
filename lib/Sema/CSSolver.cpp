@@ -546,6 +546,9 @@ namespace {
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;
 
+    /// The location of the type associated with the binding.
+    ConstraintLocator *Locator;
+
     /// The defaulted protocol associated with this binding.
     Optional<ProtocolDecl *> DefaultedProtocol;
 
@@ -554,10 +557,12 @@ namespace {
     ConstraintLocator *DefaultableBinding = nullptr;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
+                     ConstraintLocator *locator,
                      Optional<ProtocolDecl *> defaultedProtocol = None,
                      ConstraintLocator *defaultableBinding = nullptr)
-      : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
-        DefaultableBinding(defaultableBinding) { }
+        : BindingType(type), Kind(kind), Locator(locator),
+          DefaultedProtocol(defaultedProtocol),
+          DefaultableBinding(defaultableBinding) {}
 
     bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
   };
@@ -895,6 +900,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
         result.foundLiteralBinding(constraint->getProtocol());
         addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                             constraint->getLocator(),
                              constraint->getProtocol()});
         continue;
       }
@@ -922,6 +928,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
         result.foundLiteralBinding(constraint->getProtocol());
         exactTypes.insert(defaultType->getCanonicalType());
         addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                             constraint->getLocator(),
                              constraint->getProtocol()});
       }
 
@@ -1102,10 +1109,12 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      addPotentialBinding({type, kind, None}, /*allowJoinMeet=*/!adjustedIUO);
+      addPotentialBinding({type, kind, constraint->getLocator(), None},
+                          /*allowJoinMeet=*/!adjustedIUO);
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
-      addPotentialBinding({alternateType, kind, None}, /*allowJoinMeet=*/false);
+      addPotentialBinding({alternateType, kind, constraint->getLocator(), None},
+                          /*allowJoinMeet=*/false);
   }
 
   // If we have any literal constraints, check whether there is already a
@@ -1183,8 +1192,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
 
     ++result.NumDefaultableBindings;
-    addPotentialBinding({type, AllowedBindingKind::Exact, None,
-                         constraint->getLocator()});
+    auto *locator = constraint->getLocator();
+    addPotentialBinding(
+        {type, AllowedBindingKind::Exact, locator, None, locator});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -1301,8 +1311,30 @@ static bool tryTypeVariableBindings(
       if (!typeVar->getImpl().canBindToLValue())
         type = type->getRValueType();
 
-      // Remove parentheses. They're insignificant here.
-      type = type->getWithoutParens();
+      bool removeParentheses = true;
+      // Don't remove parentheses if this is a function argument
+      // in Swift >= 4 mode, because after SE-0110 parentheses play
+      // a role in function argument matching, e.g.
+      //
+      // T0 bound to (((Int, Int)) -> Int) -> [Int];
+      // T0 conv (T5) -> Int
+      //
+      // If (after SE-0110) we remove parentheses from binding:
+      // T5 bond to (((Int, Int)) -> Int)
+
+      if (!cs.getASTContext().isSwiftVersion3()) {
+        if (auto *locator = binding.Locator) {
+          auto path = locator->getPath();
+          if (!path.empty()) {
+            auto &elt = path.back();
+            if (elt.getKind() == ConstraintLocator::FunctionArgument)
+              removeParentheses = false;
+          }
+        }
+      }
+
+      if (removeParentheses)
+        type = type->getWithoutParens();
 
       // If we've already tried this binding, move on.
       if (!boundTypes.insert(type.getPointer()).second)
@@ -1398,8 +1430,8 @@ static bool tryTypeVariableBindings(
           = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
         for (auto altType : cs.getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(altType->getCanonicalType()).second)
-            newBindings.push_back({altType, AllowedBindingKind::Subtypes, 
-                                   binding.DefaultedProtocol});
+            newBindings.push_back({altType, AllowedBindingKind::Subtypes,
+                                   binding.Locator, binding.DefaultedProtocol});
         }
       }
 
@@ -1411,7 +1443,7 @@ static bool tryTypeVariableBindings(
         // Try lvalue qualification in addition to rvalue qualification.
         auto subtype = LValueType::get(type);
         if (exploredTypes.insert(subtype->getCanonicalType()).second)
-          newBindings.push_back({subtype, binding.Kind, None});
+          newBindings.push_back({subtype, binding.Kind, binding.Locator, None});
       }
 
       if (binding.Kind == AllowedBindingKind::Subtypes) {
@@ -1420,7 +1452,8 @@ static bool tryTypeVariableBindings(
           if (scalarIdx >= 0) {
             auto eltType = tupleTy->getElementType(scalarIdx);
             if (exploredTypes.insert(eltType->getCanonicalType()).second)
-              newBindings.push_back({eltType, binding.Kind, None});
+              newBindings.push_back(
+                  {eltType, binding.Kind, binding.Locator, None});
           }
         }
 
@@ -1434,10 +1467,12 @@ static bool tryTypeVariableBindings(
             if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
               if (typeVar->getImpl().canBindToLValue() ==
                   otherTypeVar->getImpl().canBindToLValue()) {
-                newBindings.push_back({objTy, binding.Kind, None});
+                newBindings.push_back(
+                    {objTy, binding.Kind, binding.Locator, None});
               }
             } else {
-              newBindings.push_back({objTy, binding.Kind, None});
+              newBindings.push_back(
+                  {objTy, binding.Kind, binding.Locator, None});
             }
           }
         }
@@ -1455,7 +1490,8 @@ static bool tryTypeVariableBindings(
 
         // If we haven't seen this supertype, add it.
         if (exploredTypes.insert((*simpleSuper)->getCanonicalType()).second)
-          newBindings.push_back({*simpleSuper, binding.Kind, None});
+          newBindings.push_back(
+              {*simpleSuper, binding.Kind, binding.Locator, None});
       }
     }
 
