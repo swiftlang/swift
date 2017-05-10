@@ -2012,12 +2012,12 @@ public struct Dictionary<Key : Hashable, Value> :
   @_inlineable
   @available(swift, introduced: 4.0)
   public func filter(
-    _ isIncluded: (Key, Value) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
     var result = Dictionary()
-    for (key, value) in self {
-      if try isIncluded(key, value) {
-        result[key] = value
+    for el in self {
+      if try isIncluded(el) {
+        result[el.key] = el.value
       }
     }
     return result
