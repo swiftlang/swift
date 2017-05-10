@@ -475,6 +475,7 @@ public:
 
   virtual void getCursorInfo(StringRef Filename, unsigned Offset,
                              unsigned Length, bool Actionables,
+                             bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
 
@@ -485,16 +486,19 @@ public:
                 std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
+                            bool CancelOnSubsequentRequest,
                             ArrayRef<const char *> Args,
                             std::function<void(const RangeInfo&)> Receiver) = 0;
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
+                       bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
                        std::function<void(const CursorInfo &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
+                                            bool CancelOnSubsequentRequest,
                                             ArrayRef<const char *> Args,
                    std::function<void(const RelatedIdentsInfo &)> Receiver) = 0;
 

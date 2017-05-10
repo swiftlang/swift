@@ -292,6 +292,15 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ObjCSelector = InputArg->getValue();
       break;
 
+    case OPT_cancel_on_subsequent_request:
+      unsigned Cancel;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Cancel)) {
+        llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";
+        return true;
+      }
+      CancelOnSubsequentRequest = Cancel;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

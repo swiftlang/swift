@@ -1031,6 +1031,8 @@ private:
   SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
 protected:
+  bool CancelOnSubsequentRequest;
+protected:
   ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
     return llvm::makeArrayRef(PreviousASTSnaps);
   }
@@ -1038,9 +1040,10 @@ protected:
 public:
   CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                          bool TryExistingAST)
+                          bool TryExistingAST, bool CancelOnSubsequentRequest)
     : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
-      Length(Length), TryExistingAST(TryExistingAST) { }
+      Length(Length), TryExistingAST(TryExistingAST),
+      CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 
   bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
     if (!TryExistingAST) {
@@ -1101,6 +1104,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
                           unsigned Length, bool Actionables,
                           SwiftInvocationRef Invok,
                           bool TryExistingAST,
+                          bool CancelOnSubsequentRequest,
                           std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
@@ -1114,9 +1118,11 @@ static void resolveCursor(SwiftLangSupport &Lang,
                        SwiftLangSupport &Lang,
                        SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
+                       bool CancelOnSubsequentRequest,
                        std::function<void(const CursorInfo &)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                              TryExistingAST), Actionables(Actionables),
+                              TryExistingAST, CancelOnSubsequentRequest),
+      Actionables(Actionables),
       Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
@@ -1167,7 +1173,8 @@ static void resolveCursor(SwiftLangSupport &Lang,
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursor(Lang, InputFile, Offset, Length, Actionables, ASTInvok,
-                          /*TryExistingAST=*/false, Receiver);
+                          /*TryExistingAST=*/false, CancelOnSubsequentRequest,
+                          Receiver);
           } else {
             Receiver({});
           }
@@ -1198,11 +1205,16 @@ static void resolveCursor(SwiftLangSupport &Lang,
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
     InputFile, Offset, Length, Actionables, Lang, Invok, TryExistingAST,
-    Receiver);
+    CancelOnSubsequentRequest, Receiver);
+
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+  static const char OncePerASTTokenWithActionables = 0;
+  const void *Once = nullptr;
+  if (CancelOnSubsequentRequest)
+    Once = Actionables ? &OncePerASTTokenWithActionables : &OncePerASTToken;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
@@ -1222,8 +1234,9 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
                      bool TryExistingAST, NameTranslatingInfo Input,
                      std::function<void(const NameTranslatingInfo &)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, 0, Lang, ASTInvok,
-                              TryExistingAST), Input(std::move(Input)),
-      Receiver(std::move(Receiver)){ }
+                              TryExistingAST,
+                              /*CancelOnSubsequentRequest=*/false),
+      Input(std::move(Input)), Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
@@ -1296,17 +1309,13 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
   auto Consumer = std::make_shared<NameInfoConsumer>(
     InputFile, Offset, Lang, Invok, TryExistingAST, Input, Receiver);
 
-  /// FIXME: When request cancellation is implemented and Xcode adopts it,
-  /// don't use 'OncePerASTToken'.
-  static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
-                                       &OncePerASTToken);
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), nullptr);
 }
 
 static void resolveRange(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftInvocationRef Invok,
-                          bool TryExistingAST,
+                          bool TryExistingAST, bool CancelOnSubsequentRequest,
                           std::function<void(const RangeInfo&)> Receiver) {
   assert(Invok);
 
@@ -1316,10 +1325,11 @@ static void resolveRange(SwiftLangSupport &Lang,
   public:
     RangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                       bool TryExistingAST,
+                       bool TryExistingAST, bool CancelOnSubsequentRequest,
                        std::function<void(const RangeInfo&)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
-                              TryExistingAST), Receiver(std::move(Receiver)){ }
+                              TryExistingAST, CancelOnSubsequentRequest),
+      Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       if (trace::enabled()) {
@@ -1352,7 +1362,8 @@ static void resolveRange(SwiftLangSupport &Lang,
         if (!getPreviousASTSnaps().empty()) {
           // Attempt again using the up-to-date AST.
           resolveRange(Lang, InputFile, Offset, Length, ASTInvok,
-                      /*TryExistingAST=*/false, Receiver);
+                      /*TryExistingAST=*/false, CancelOnSubsequentRequest,
+                      Receiver);
         } else {
           Receiver(Result);
         }
@@ -1373,17 +1384,18 @@ static void resolveRange(SwiftLangSupport &Lang,
   };
 
   auto Consumer = std::make_shared<RangeInfoConsumer>(
-    InputFile, Offset, Length, Lang, Invok, TryExistingAST, Receiver);
+    InputFile, Offset, Length, Lang, Invok, TryExistingAST,
+    CancelOnSubsequentRequest, Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
-                                       &OncePerASTToken);
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
-    ArrayRef<const char *> Args,
+    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
     std::function<void(const CursorInfo &)> Receiver) {
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
@@ -1433,12 +1445,12 @@ void SwiftLangSupport::getCursorInfo(
   }
 
   resolveCursor(*this, InputFile, Offset, Length, Actionables, Invok,
-                /*TryExistingAST=*/true, Receiver);
+                /*TryExistingAST=*/true, CancelOnSubsequentRequest, Receiver);
 }
 
 void SwiftLangSupport::
 getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
-             ArrayRef<const char *> Args,
+             bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
              std::function<void(const RangeInfo&)> Receiver) {
   if (IFaceGenContexts.get(InputFile)) {
     // FIXME: return range info for generated interfaces.
@@ -1458,7 +1470,7 @@ getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
     return;
   }
   resolveRange(*this, InputFile, Offset, Length, Invok, /*TryExistingAST=*/true,
-                Receiver);
+               CancelOnSubsequentRequest, Receiver);
 }
 
 void SwiftLangSupport::
@@ -1517,6 +1529,7 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
 static void
 resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
                      SwiftInvocationRef Invok, bool TryExistingAST,
+                     bool CancelOnSubsequentRequest,
                      std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
@@ -1526,16 +1539,18 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
     SwiftLangSupport &Lang;
     SwiftInvocationRef ASTInvok;
     const bool TryExistingAST;
+    bool CancelOnSubsequentRequest;
     std::function<void(const CursorInfo &)> Receiver;
     SmallVector<ImmutableTextSnapshotRef, 4> PreviousASTSnaps;
 
   public:
     CursorInfoConsumer(StringRef InputFile, StringRef USR,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-                       bool TryExistingAST,
+                       bool TryExistingAST, bool CancelOnSubsequentRequest,
                        std::function<void(const CursorInfo &)> Receiver)
         : InputFile(InputFile), USR(USR), Lang(Lang),
           ASTInvok(std::move(ASTInvok)), TryExistingAST(TryExistingAST),
+          CancelOnSubsequentRequest(CancelOnSubsequentRequest),
           Receiver(std::move(Receiver)) {}
 
     bool canUseASTWithSnapshots(
@@ -1607,7 +1622,8 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursorFromUSR(Lang, InputFile, USR, ASTInvok,
-                                 /*TryExistingAST=*/false, Receiver);
+                                 /*TryExistingAST=*/false,
+                                 CancelOnSubsequentRequest, Receiver);
           } else {
             Receiver({});
           }
@@ -1628,16 +1644,18 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
   };
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
-      InputFile, USR, Lang, Invok, TryExistingAST, Receiver);
+      InputFile, USR, Lang, Invok, TryExistingAST, CancelOnSubsequentRequest,
+      Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
-                                       &OncePerASTToken);
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 void SwiftLangSupport::getCursorInfoFromUSR(
-    StringRef filename, StringRef USR, ArrayRef<const char *> args,
+    StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> args,
     std::function<void(const CursorInfo &)> receiver) {
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
@@ -1655,7 +1673,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   }
 
   resolveCursorFromUSR(*this, filename, USR, invok, /*TryExistingAST=*/true,
-                       receiver);
+                       CancelOnSubsequentRequest, receiver);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1724,6 +1742,7 @@ private:
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef InputFile, unsigned Offset,
+    bool CancelOnSubsequentRequest,
     ArrayRef<const char *> Args,
     std::function<void(const RelatedIdentsInfo &)> Receiver) {
 
@@ -1820,5 +1839,6 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  ASTMgr->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  ASTMgr->processASTAsync(Invok, std::move(Consumer), Once);
 }
