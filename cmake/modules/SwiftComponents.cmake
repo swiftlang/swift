@@ -53,6 +53,7 @@
 # * clang-resource-dir-symlink -- install a symlink to the Clang resource
 #   directory (which contains builtin headers) under 'lib/swift/clang'.  This is
 #   useful when Clang and Swift are installed side-by-side.
+# * llvm-resource-dir-symlink -- install a symlink to the LLVM resource directory.
 # * stdlib -- the Swift standard library.
 # * stdlib-experimental -- the Swift standard library module for experimental
 #   APIs.
@@ -65,7 +66,7 @@
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;llvm-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
