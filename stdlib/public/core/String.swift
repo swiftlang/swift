@@ -50,7 +50,7 @@ public protocol StringProtocol
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
   init<C: Collection, Encoding: UnicodeEncoding>(
-    codeUnits: C, encoding: Encoding.Type
+    decoding codeUnits: C, as encoding: Encoding.Type
   )
     where C.Iterator.Element == Encoding.CodeUnit
 
@@ -67,8 +67,8 @@ public protocol StringProtocol
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
   init<Encoding: UnicodeEncoding>(
-    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    encoding: Encoding.Type)
+    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as: Encoding.Type)
     
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of UTF-8 code units.
@@ -78,7 +78,7 @@ public protocol StringProtocol
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of code units in the given encoding.
   func withCString<Result, Encoding: UnicodeEncoding>(
-    encoding: Encoding.Type,
+    encodedAs: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
 }
@@ -126,16 +126,16 @@ internal func _withCStringAndLength<
 where Source.Iterator.Element == SourceEncoding.CodeUnit {
   var targetLength = 0 // nul terminator
   var i = source.makeIterator()
-  SourceEncoding.ForwardParser.parse(&i) {
+  SourceEncoding.ForwardParser._parse(&i) {
     targetLength += numericCast(
-      targetEncoding.transcode($0, from: SourceEncoding.self).count)
+      targetEncoding._transcode($0, from: SourceEncoding.self).count)
   }
   var a: [TargetEncoding.CodeUnit] = []
   a.reserveCapacity(targetLength + 1)
   i = source.makeIterator()
-  SourceEncoding.ForwardParser.parse(&i) {
+  SourceEncoding.ForwardParser._parse(&i) {
     a.append(
-      contentsOf: targetEncoding.transcode($0, from: SourceEncoding.self))
+      contentsOf: targetEncoding._transcode($0, from: SourceEncoding.self))
   }
   a.append(0)
   return try body(a, targetLength)
@@ -191,10 +191,10 @@ extension _StringCore {
 
 extension String {
   public init<C: Collection, Encoding: UnicodeEncoding>(
-    codeUnits: C, encoding: Encoding.Type
+    decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
     let (b,_) = _StringBuffer.fromCodeUnits(
-      codeUnits, encoding: encoding, repairIllFormedSequences: true)
+      codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)
     self = String(_StringCore(b!))
   }
 
@@ -205,20 +205,20 @@ extension String {
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
   public init<Encoding: UnicodeEncoding>(
-    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    encoding: Encoding.Type) {
+    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as sourceEncoding: Encoding.Type) {
 
     let codeUnits = _SentinelCollection(
       UnsafeBufferPointer(_unboundedStartingAt: nulTerminatedCodeUnits),
       until: _IsZero()
     )
-    self.init(codeUnits: codeUnits, encoding: encoding)
+    self.init(decoding: codeUnits, as: sourceEncoding)
   }
 
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of code units in the given encoding.
   public func withCString<Result, TargetEncoding: UnicodeEncoding>(
-    encoding targetEncoding: TargetEncoding.Type,
+    encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
     return try _core._withCSubstring(
