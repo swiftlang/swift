@@ -525,6 +525,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 ParserResult<Expr> Parser::parseExprKeyPath() {
   // Consume '\'.
   SourceLoc backslashLoc = consumeToken(tok::backslash);
+  llvm::SaveAndRestore<SourceLoc> slashLoc(SwiftKeyPathSlashLoc, backslashLoc);
 
   // FIXME: diagnostics
   ParserResult<Expr> rootResult, pathResult;
@@ -1139,12 +1140,15 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
         if (CodeCompletion && Result.isNonNull()) {
-          Expr *E = Result.get();
           if (InSwiftKeyPath)
-            E = new (Context) KeyPathExpr(SourceLoc(), E, nullptr);
+            Result = makeParserResult(
+              new (Context) KeyPathExpr(SwiftKeyPathSlashLoc, Result.get(),
+                                        nullptr));
           else if (SwiftKeyPathRoot)
-            E = new (Context) KeyPathExpr(SourceLoc(), SwiftKeyPathRoot, E);
-          CodeCompletion->completeDotExpr(E, /*DotLoc=*/TokLoc);
+            Result = makeParserResult(
+              new (Context) KeyPathExpr(SwiftKeyPathSlashLoc, SwiftKeyPathRoot,
+                                        Result.get()));
+          CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
         }
         // Eat the code completion token because we handled it.
         consumeToken(tok::code_complete);
