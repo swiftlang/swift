@@ -539,7 +539,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   }
 
   if (startsWithSymbol(Tok, '.')) {
-    llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.get());
+    llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.getPtrOrNull());
 
     // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
     // make sure the . is there, but parsing the ? in \.? as .? doesn't make
