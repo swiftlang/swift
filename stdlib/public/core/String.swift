@@ -39,11 +39,9 @@ public protocol StringProtocol
   func uppercased() -> String
 }
 
-extension StringProtocol {
-  public init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T) where T.Iterator.Element == Character {
-    self.init(other.description.characters)
+extension StringProtocol /* : LosslessStringConvertible */ {
+  public init?(_ description: String) {
+    self.init(description.characters)
   }
 }
 
