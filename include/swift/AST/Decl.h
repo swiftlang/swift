@@ -2171,9 +2171,6 @@ public:
   /// features that affect formal access such as \c \@testable are
   /// taken into account.
   ///
-  /// \invariant
-  /// <code>value.isAccessibleFrom(value.getFormalAccessScope())</code>
-  ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
   AccessScope
@@ -4110,6 +4107,18 @@ public:
   }
 
   void overwriteSetterAccessibility(Accessibility accessLevel);
+
+  /// Returns the access level for the setter specified explicitly by the user,
+  /// or provided by default according to language rules.
+  ///
+  /// If \p useDC is provided (the location where the value is being used),
+  /// features that affect formal access such as \c \@testable are taken into
+  /// account.
+  ///
+  /// \sa getFormalAccessScope
+  /// \sa isAccessibleFrom
+  /// \sa isSetterAccessibleFrom
+  Accessibility getFormalSetterAccess(const DeclContext *DC) const;
 
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.

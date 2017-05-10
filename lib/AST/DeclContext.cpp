@@ -953,32 +953,89 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 /// last extension in the source file. If the context does not refer to a
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
-getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+getPrivateDeclContext(const DeclContext *DC, const SourceFile *SF) {
+  assert(!DC->getASTContext().isSwiftVersion3());
   auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return DC;
 
   // use the type declaration as the private scope if it is in the same
   // file as useSF. This occurs for both extensions and declarations.
-  if (NTD->getParentSourceFile() == useSF)
+  if (NTD->getParentSourceFile() == SF)
     return NTD;
 
   // Otherwise use the last extension declaration in the same file.
   const DeclContext *lastExtension = nullptr;
   for (ExtensionDecl *ED : NTD->getExtensions())
-    if (ED->getParentSourceFile() == useSF)
+    if (ED->getParentSourceFile() == SF)
       lastExtension = ED;
 
   // If there's no last extension, return the supplied context.
   return lastExtension ? lastExtension : DC;
 }
 
+AccessScope
+DeclContext::getAccessScope(const DeclContext *useDC,
+                            Accessibility access,
+                            bool useNominalTypeAccessibility) const {
+  const DeclContext *DC = this;
+  // Iterate up the declarations until a private context or a module scope
+  // context is found.
+  while (!DC->isModuleScopeContext()) {
+    if (DC->getContextKind() == DeclContextKind::TopLevelCodeDecl ||
+        DC->getContextKind() == DeclContextKind::AbstractClosureExpr) {
+      // Skip declaration kinds that are not a valid for access comparison.
+    }
+
+    else if (DC->isLocalContext() || access == Accessibility::Private) {
+      if (this->getASTContext().isSwiftVersion3()) {
+        return AccessScope(DC, true);
+      }
+      else {
+        auto SF = DC->getParentSourceFile();
+        return AccessScope(getPrivateDeclContext(DC, SF), true);
+      }
+
+    } else if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(DC)) {
+      access = std::min(access, enclosingNominal->getFormalAccess(useDC));
+
+    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(DC)) {
+      if (useNominalTypeAccessibility) {
+        // Just check the base type. If it's a constrained extension, Sema should
+        // have already enforced access more strictly.
+        if (auto extendedTy = enclosingExt->getExtendedType()) {
+          if (auto nominal = extendedTy->getAnyNominal()) {
+            access = std::min(access, nominal->getFormalAccess(useDC));
+          }
+        }
+      }
+    } else {
+      llvm_unreachable("unknown DeclContext kind");
+    }
+
+    DC = DC->getParent();
+  }
+
+  switch (access) {
+  case Accessibility::Private:
+    // A 'private extension' is equivalent to fileprivate for scoping purposes
+    // but not for diagnostic purposes.
+    LLVM_FALLTHROUGH;
+  case Accessibility::FilePrivate:
+    assert(DC->isModuleScopeContext());
+    return AccessScope(DC, access == Accessibility::Private);
+  case Accessibility::Internal:
+    return AccessScope(DC->getParentModule());
+  case Accessibility::Public:
+  case Accessibility::Open:
+    return AccessScope::getPublic();
+  }
+
+  llvm_unreachable("unknown accessibility level");
+}
+
 AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
     : Value(DC, isPrivate) {
-  if (isPrivate && !DC->getASTContext().isSwiftVersion3()) {
-    DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
-    Value.setPointer(DC);
-  }
   if (!DC || isa<ModuleDecl>(DC))
     assert(!isPrivate && "public or internal scope can't be private");
 }
@@ -1000,39 +1057,51 @@ Accessibility AccessScope::accessibilityForDiagnostics() const {
   return Accessibility::Private;
 }
 
-bool AccessScope::allowsAccess(const DeclContext *useDC, const DeclContext *sourceDC) {
+bool
+AccessScope::isAccessibleFrom(const DeclContext *DC) const {
+  auto sourceDC = getDeclContext();
+  if (!sourceDC || sourceDC == DC)
+    return true;
+  return DC->isAccessibleChildOf(sourceDC);
+}
+
+bool DeclContext::isAccessibleChildOf(const swift::DeclContext *Other) const {
   // Check the lexical scope.
-  if (useDC->isChildContextOf(sourceDC))
+  if (isChildContextOf(Other))
     return true;
 
-  // Only check lexical scope in Swift 3 mode
-  if (useDC->getASTContext().isSwiftVersion3())
+  // In Swift 3 mode the lexical scope is all that needs to be checked to see if
+  // it is an accessible child. When not in Swift 3 mode, perform additional 
+  // checks to to extend the private scope between declarations and extensions 
+  // in the same file.
+  if (getASTContext().isSwiftVersion3())
     return false;
 
   // Do not allow access if the sourceDC is in a different file
-  auto useSF = useDC->getParentSourceFile();
-  if (useSF != sourceDC->getParentSourceFile())
+  auto SF = getParentSourceFile();
+  if (SF != Other->getParentSourceFile())
     return false;
 
   // Do not allow access if the sourceDC does not represent a type.
-  auto sourceNTD = sourceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto sourceNTD = Other->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!sourceNTD)
     return false;
 
   // Compare the private scopes and iterate over the parent types.
-  sourceDC = getPrivateDeclContext(sourceDC, useSF);
-  while (!useDC->isModuleContext()) {
-    useDC = getPrivateDeclContext(useDC, useSF);
-    if (useDC == sourceDC)
+  Other = getPrivateDeclContext(Other, SF);
+  const DeclContext *CurContext = this;
+  while (!CurContext->isModuleContext()) {
+    CurContext = getPrivateDeclContext(CurContext, SF);
+    if (CurContext == Other)
       return true;
 
     // Get the parent type. If the context represents a type, look at the types
     // declaring context instead of the contexts parent. This will crawl up
     // the type hierarchy in nested extensions correctly.
-    if (auto NTD = useDC->getAsNominalTypeOrNominalTypeExtensionContext())
-      useDC = NTD->getDeclContext();
+    if (auto NTD = CurContext->getAsNominalTypeOrNominalTypeExtensionContext())
+      CurContext = NTD->getDeclContext();
     else
-      useDC = useDC->getParent();
+      CurContext = CurContext->getParent();
   }
 
   return false;

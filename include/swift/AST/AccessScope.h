@@ -31,11 +31,6 @@ public:
 
   static AccessScope getPublic() { return AccessScope(nullptr); }
 
-  /// Check if private access is allowed. This is a lexical scope check in Swift
-  /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
-  /// also allow access.
-  static bool allowsAccess(const DeclContext *useDC, const DeclContext *sourceDC);
-
   /// Returns nullptr if access scope is public.
   const DeclContext *getDeclContext() const { return Value.getPointer(); }
 
@@ -52,11 +47,14 @@ public:
   /// Returns true if this is a child scope of the specified other access scope.
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
-      return allowsAccess(getDeclContext(), AS.getDeclContext());
+      return getDeclContext()->isAccessibleChildOf(AS.getDeclContext());
     if (isPublic() && AS.isPublic())
       return false;
     return AS.isPublic();
   }
+
+  /// Check if the decl context is equal to or an accessible child of the DC.
+  bool isAccessibleFrom(const DeclContext *DC) const;
 
   /// Returns the associated access level for diagnostic purposes.
   Accessibility accessibilityForDiagnostics() const;

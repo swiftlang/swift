@@ -1253,38 +1253,15 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-static bool checkAccessibility(const DeclContext *useDC,
-                               const DeclContext *sourceDC,
-                               Accessibility access) {
-  if (!useDC)
+bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
+  auto access = getFormalAccess(DC);
+  if (!DC)
     return access >= Accessibility::Public;
 
-  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
-  switch (access) {
-  case Accessibility::Private:
-    return (useDC == sourceDC ||
-            AccessScope::allowsAccess(useDC, sourceDC));
-  case Accessibility::FilePrivate:
-    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
-  case Accessibility::Internal: {
-    const ModuleDecl *sourceModule = sourceDC->getParentModule();
-    const DeclContext *useFile = useDC->getModuleScopeContext();
-    if (useFile->getParentModule() == sourceModule)
-      return true;
-    if (auto *useSF = dyn_cast<SourceFile>(useFile))
-      if (useSF->hasTestableImport(sourceModule))
-        return true;
-    return false;
-  }
-  case Accessibility::Public:
-  case Accessibility::Open:
-    return true;
-  }
-  llvm_unreachable("bad Accessibility");
-}
+  auto scope = getDeclContext()->getAccessScope(DC, access,
+    /* useNominalTypeAccessibility */ false);
 
-bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccessibility(DC, getDeclContext(), getFormalAccess());
+  return scope.isAccessibleFrom(DC);
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
@@ -1295,8 +1272,15 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   // accessibility, it is not set.
   if (hasStorage() && !isSettable(nullptr))
     return true;
-  
-  return checkAccessibility(DC, getDeclContext(), getSetterAccessibility());
+
+  auto setterAccess = getFormalSetterAccess(DC);
+  if (!DC)
+    return setterAccess >= Accessibility::Public;
+
+  auto scope = getDeclContext()->getAccessScope(DC, setterAccess,
+    /* useNominalTypeAccessibility */ false);
+
+  return scope.isAccessibleFrom(DC);
 }
 
 bool DeclContext::lookupQualified(Type type,

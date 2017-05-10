@@ -1963,46 +1963,20 @@ Accessibility ValueDecl::getFormalAccess(const DeclContext *useDC) const {
   return result;
 }
 
+Accessibility AbstractStorageDecl::getFormalSetterAccess(const DeclContext *useDC) const {
+  assert(hasAccessibility());
+  assert(GetSetInfo.getInt().hasValue());
+  Accessibility result = GetSetInfo.getInt().getValue();
+  if (useDC && (result == Accessibility::Internal ||
+                result == Accessibility::Public))
+    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+      if (useSF->hasTestableImport(getModuleContext()))
+        return getTestableAccess(this);
+  return result;
+}
+
 AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
-  const DeclContext *result = getDeclContext();
-  Accessibility access = getFormalAccess(useDC);
-
-  while (!result->isModuleScopeContext()) {
-    if (result->isLocalContext() || access == Accessibility::Private)
-      return AccessScope(result, true);
-
-    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
-      access = std::min(access, enclosingNominal->getFormalAccess(useDC));
-
-    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
-      // Just check the base type. If it's a constrained extension, Sema should
-      // have already enforced access more strictly.
-      if (auto extendedTy = enclosingExt->getExtendedType()) {
-        if (auto nominal = extendedTy->getAnyNominal()) {
-          access = std::min(access, nominal->getFormalAccess(useDC));
-        }
-      }
-
-    } else {
-      llvm_unreachable("unknown DeclContext kind");
-    }
-
-    result = result->getParent();
-  }
-
-  switch (access) {
-  case Accessibility::Private:
-  case Accessibility::FilePrivate:
-    assert(result->isModuleScopeContext());
-    return AccessScope(result, access == Accessibility::Private);
-  case Accessibility::Internal:
-    return AccessScope(result->getParentModule());
-  case Accessibility::Public:
-  case Accessibility::Open:
-    return AccessScope::getPublic();
-  }
-
-  llvm_unreachable("unknown accessibility level");
+  return getDeclContext()->getAccessScope(useDC, getFormalAccess(useDC));
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

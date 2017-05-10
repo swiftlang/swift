@@ -19,6 +19,7 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -35,6 +36,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class AccessScope;
   class GenericEnvironment;
   class ASTContext;
   class ASTWalker;
@@ -373,6 +375,27 @@ public:
         return true;
     return false;
   }
+
+  /// Return true if this context is an accessible child of the specified
+  /// \p Other decl context. This will perform an isChildContextOf check, and
+  /// when not in Swift 3 mode, the private scope is extended to include
+  /// declarations and extensions in the same file.
+  ///
+  /// \sa isChildContextOf
+  bool isAccessibleChildOf(const DeclContext *Other) const;
+
+  /// Returns the AccessScope from which the first declaration can be accessed.
+  ///
+  /// If \p useDC is provided (the location where the value is being used),
+  /// features that affect formal access such as \c \@testable are
+  /// taken into account.
+  ///
+  /// \p accessibility specifies the starting access level.
+  /// \p useNominalTypeAccessibility specifies if the nominal type associated
+  /// with extensions should alter the access scope.
+  AccessScope getAccessScope(const DeclContext *useDC,
+                             Accessibility accessibility,
+                             bool useNominalTypeAccessibility = true) const;
 
   /// Returns the module context that contains this context.
   ModuleDecl *getParentModule() const;

@@ -6575,26 +6575,7 @@ public:
       TC.computeDefaultAccessibility(ED);
       if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>()) {
         const auto access = AA->getAccess();
-        AccessScope desiredAccessScope = AccessScope::getPublic();
-        switch (access) {
-        case Accessibility::Private:
-          assert((ED->isInvalid() ||
-                  ED->getDeclContext()->isModuleScopeContext()) &&
-                 "non-top-level extensions make 'private' != 'fileprivate'");
-          LLVM_FALLTHROUGH;
-        case Accessibility::FilePrivate: {
-          const DeclContext *DC = ED->getModuleScopeContext();
-          bool isPrivate = access == Accessibility::Private;
-          desiredAccessScope = AccessScope(DC, isPrivate);
-          break;
-        }
-        case Accessibility::Internal:
-          desiredAccessScope = AccessScope(ED->getModuleContext());
-          break;
-        case Accessibility::Public:
-        case Accessibility::Open:
-          break;
-        }
+        AccessScope desiredAccessScope = ED->getAccessScope(nullptr, access);
         checkGenericParamAccessibility(TC, ED->getGenericParams(), ED,
                                        desiredAccessScope, access);
       }
