@@ -6049,6 +6049,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           auto insertionLoc =
             classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
           if (isFixable) {
+            // Note: this is intentionally using the Swift 3 mangling,
+            // to provide compatibility with archives created in the Swift 3
+            // time frame.
             Mangle::ASTMangler mangler;
             diagnose(classDecl, diag::unstable_mangled_name_add_objc)
               .fixItInsert(insertionLoc,
