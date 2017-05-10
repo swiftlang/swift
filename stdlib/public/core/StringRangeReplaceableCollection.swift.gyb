@@ -383,6 +383,18 @@ extension String {
   }
 }
 
+extension Sequence where Iterator.Element == String {
+  // This overload is only here to make code like:
+  //   ["hello"].flatMap { $0 }
+  // return an array of strings without any type context in Swift 3 mode.
+  @available(swift, obsoleted: 4)
+  public func flatMap(
+    _ transform: (Iterator.Element) throws -> String
+  ) rethrows -> [String] {
+    return try map(transform)
+  }
+}
+
 extension String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
   public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
