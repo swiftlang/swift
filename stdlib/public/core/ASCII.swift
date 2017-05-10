@@ -37,7 +37,7 @@ extension _Unicode.ASCII : UnicodeEncoding {
   
   @inline(__always)
   @_inlineable
-  public static func encodeIfRepresentable(
+  public static func encode(
     _ source: UnicodeScalar
   ) -> EncodedScalar? {
     guard source.value < (1&<<7) else { return nil }
@@ -45,7 +45,7 @@ extension _Unicode.ASCII : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func transcodeIfRepresentable<FromEncoding : UnicodeEncoding>(
+  public static func transcode<FromEncoding : UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -58,7 +58,7 @@ extension _Unicode.ASCII : UnicodeEncoding {
       guard (c._storage & 0x80 == 0) else { return nil }
       return EncodedScalar(CodeUnit(c._storage & 0x7f))
     }
-    return encodeIfRepresentable(FromEncoding.decode(content))
+    return encode(FromEncoding.decode(content))
   }
 
   public struct Parser {
@@ -80,7 +80,7 @@ extension _Unicode.ASCII.Parser : UnicodeParser {
     let n = input.next()
     if _fastPath(n != nil), let x = n {
       guard _fastPath(Int8(extendingOrTruncating: x) >= 0)
-      else { return .invalid(length: 1) }
+      else { return .error(length: 1) }
       return .valid(_Unicode.ASCII.EncodedScalar(x))
     }
     return .emptyInput

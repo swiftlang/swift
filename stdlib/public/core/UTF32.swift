@@ -34,7 +34,7 @@ extension _Unicode.UTF32 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func encodeIfRepresentable(
+  public static func encode(
     _ source: UnicodeScalar
   ) -> EncodedScalar? {
     return EncodedScalar(source.value)
@@ -60,7 +60,7 @@ extension UTF32.Parser : UnicodeParser {
     if _fastPath(n != nil), let x = n {
       // Check code unit is valid: not surrogate-reserved and within range.
       guard _fastPath((x &>> 11) != 0b1101_1 && x <= 0x10ffff)
-      else { return .invalid(length: 1) }
+      else { return .error(length: 1) }
       
       // x is a valid scalar.
       return .valid(UTF32.EncodedScalar(x))

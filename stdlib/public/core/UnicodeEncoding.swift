@@ -18,7 +18,11 @@ public protocol _UnicodeEncoding {
   associatedtype EncodedScalar : BidirectionalCollection
     where EncodedScalar.Iterator.Element == CodeUnit
 
-  /// The replacement character U+FFFD as represented in this encoding
+  /// A unicode scalar value to be used when repairing
+  /// encoding/decoding errors, as represented in this encoding.
+  ///
+  /// If the Unicode replacement character U+FFFD is representable in this
+  /// encoding, `encodedReplacementCharacter` encodes that scalar value.
   static var encodedReplacementCharacter : EncodedScalar { get }
 
   /// Converts from encoded to encoding-independent representation
@@ -26,17 +30,27 @@ public protocol _UnicodeEncoding {
 
   /// Converts from encoding-independent to encoded representation, returning
   /// `nil` if the scalar can't be represented in this encoding.
-  static func encodeIfRepresentable(_ content: UnicodeScalar) -> EncodedScalar?
+  static func encode(_ content: UnicodeScalar) -> EncodedScalar?
 
   /// Converts a scalar from another encoding's representation, returning
   /// `nil` if the scalar can't be represented in this encoding.
-  static func transcodeIfRepresentable<FromEncoding : UnicodeEncoding>(
+  ///
+  /// A default implementation of this method will be provided 
+  /// automatically for any conforming type that does not implement one.
+  static func transcode<FromEncoding : UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar?
 
+  /// A type that can be used to parse `CodeUnits` into
+  /// `EncodedScalar`s.
   associatedtype ForwardParser : UnicodeParser
-  associatedtype ReverseParser : UnicodeParser
+  // where ForwardParser.Encoding == Self
   
+  /// A type that can be used to parse a reversed sequence of
+  /// `CodeUnits` into `EncodedScalar`s.
+  associatedtype ReverseParser : UnicodeParser
+  // where ReverseParser.Encoding == Self
+
   //===--------------------------------------------------------------------===//
   // FIXME: this requirement shouldn't be here and is mitigated by the default
   // implementation below.  Compiler bugs prevent it from being expressed in an
@@ -55,25 +69,25 @@ public protocol UnicodeEncoding : _UnicodeEncoding
 where ForwardParser.Encoding == Self, ReverseParser.Encoding == Self {}
 
 extension _UnicodeEncoding {
-  public static func transcodeIfRepresentable<FromEncoding : UnicodeEncoding>(
+  public static func transcode<FromEncoding : UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
-    return encodeIfRepresentable(FromEncoding.decode(content))
+    return encode(FromEncoding.decode(content))
   }
 
   /// Converts from encoding-independent to encoded representation, returning
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
-  public static func encode(_ content: UnicodeScalar) -> EncodedScalar {
-    return encodeIfRepresentable(content) ?? encodedReplacementCharacter
+  internal static func _encode(_ content: UnicodeScalar) -> EncodedScalar {
+    return encode(content) ?? encodedReplacementCharacter
   }
 
   /// Converts a scalar from another encoding's representation, returning
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
-  public static func transcode<FromEncoding : UnicodeEncoding>(
+  internal static func _transcode<FromEncoding : UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar {
-    return encode(FromEncoding.decode(content))
+    return _encode(FromEncoding.decode(content))
   }
 }

@@ -81,7 +81,7 @@ where Encoding.EncodedScalar == _UIntBuffer<UInt32, Encoding.CodeUnit> {
     if _fastPath(isValid) {
       return .valid(encodedScalar)
     }
-    return .invalid(
+    return .error(
       length: Int(scalarBitCount / numericCast(Encoding.CodeUnit.bitWidth)))
   }
 }
