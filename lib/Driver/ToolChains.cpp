@@ -1175,6 +1175,24 @@ addLinkSanitizerLibArgsForLinux(const ArgList &Args,
 	
 }
 
+static void
+addLinkFuzzerLibArgsForDarwin(const ArgList &Args,
+                       ArgStringList &Arguments,
+                       const ToolChain &TC) {
+
+  // libFuzzer requires C++.
+  Arguments.push_back("-lc++");
+
+  // Link libfuzzer.
+  SmallString<128> Dir;
+  getRuntimeLibraryPath(Dir, Args, TC);
+  llvm::sys::path::remove_filename(Dir);
+  llvm::sys::path::append(Dir, "llvm", "libLLVMFuzzer.a");
+  SmallString<128> P(Dir);
+
+  Arguments.push_back(Args.MakeArgString(P));
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const {
@@ -1305,11 +1323,14 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // Linking sanitizers will add rpaths, which might negatively interact when
   // other rpaths are involved, so we should make sure we add the rpaths after
   // all user-specified rpaths.
-  if (context.OI.SelectedSanitizer == SanitizerKind::Address)
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
 
-  if (context.OI.SelectedSanitizer == SanitizerKind::Thread)
+  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+
+  if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
+    addLinkFuzzerLibArgsForDarwin(context.Args, Arguments, *this);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {

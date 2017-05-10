@@ -1320,16 +1320,21 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   OI.SelectedSanitizer = SanitizerKind::None;
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ))
-    OI.SelectedSanitizer = parseSanitizerArgValues(
+    OI.SelectedSanitizers = parseSanitizerArgValues(
         A, TC.getTriple(), Diags,
         [&](StringRef sanitizerName) {
           return TC.sanitizerRuntimeLibExists(Args, sanitizerName);
         });
 
-  // Check that the sanitizer coverage flags are supported if supplied.
-  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ))
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
+
+    // Check that the sanitizer coverage flags are supported if supplied.
+    // Dismiss the output, as we will grab the value later.
     (void)parseSanitizerCoverageArgValue(A, TC.getTriple(), Diags,
-                                         OI.SelectedSanitizer);
+                                         OI.SelectedSanitizers);
+
+  }
+
 }
 
 static void

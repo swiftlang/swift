@@ -1094,7 +1094,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // current LLVM ARM backend.
   auto load = IGF.Builder.CreateLoad(cache);
   // Make this barrier explicit when building for TSan to avoid false positives.
-  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
     load->setOrdering(llvm::AtomicOrdering::Acquire);
 
 
@@ -1208,7 +1208,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
 
   // Skip instrumentation when building for TSan to avoid false positives.
   // The synchronization for this happens in the Runtime and we do not see it.
-  if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
     fn->removeFnAttr(llvm::Attribute::SanitizeThread);
 
   // Emit the initialization.
@@ -1268,7 +1268,7 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   Address cacheAddr = Address(cacheVariable, IGF.IGM.getPointerAlignment());
   llvm::LoadInst *relocatedMetadata = IGF.Builder.CreateLoad(cacheAddr);
   // Make this barrier explicit when building for TSan to avoid false positives.
-  if (IGF.IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+  if (IGF.IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
     relocatedMetadata->setOrdering(llvm::AtomicOrdering::Acquire);
 
   // emitLazyCacheAccessFunction will see that the value was loaded from
@@ -2859,7 +2859,7 @@ namespace {
 
       // Skip instrumentation when building for TSan to avoid false positives.
       // The synchronization for this happens in the Runtime and we do not see it.
-      if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread)
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
         f->removeFnAttr(llvm::Attribute::SanitizeThread);
 
       if (IGM.DebugInfo)

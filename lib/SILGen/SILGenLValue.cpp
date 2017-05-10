@@ -3121,7 +3121,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
   }
 
   if (!SGF.getASTContext().LangOpts.DisableTsanInoutInstrumentation &&
-      SGF.getModule().getOptions().Sanitize == SanitizerKind::Thread &&
+      (SGF.getModule().getOptions().Sanitizers & SanitizerKind::Thread) &&
       tsanKind == TSanKind::InoutAccess && !isRValue) {
     emitTsanInoutAccess(SGF, loc, addr);
   }
