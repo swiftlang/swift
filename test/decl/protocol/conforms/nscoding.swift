@@ -139,6 +139,10 @@ extension CodingB {
 // Inference of @_staticInitializeObjCMetadata.
 class SubclassOfCodingE : CodingE<Int> { }
 
+// But don't allow one to write @_staticInitializeObjCMetadata!
+@_staticInitializeObjCMetadata // expected-error{{unknown attribute '_staticInitializeObjCMetadata'}}
+class DontAllowStaticInits { }
+
 // CHECK-NOT: class_decl "CodingA"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
