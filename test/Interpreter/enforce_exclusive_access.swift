@@ -47,7 +47,7 @@ ExclusiveAccessTestSuite.test("ModifyInsideRead")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("modify/read access conflict detected on address")
+  .crashOutputMatches("read/modify access conflict detected on address")
   .code
 {
   readAndPerform(&globalX) {
@@ -60,7 +60,7 @@ ExclusiveAccessTestSuite.test("ReadInsideModify")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("read/modify access conflict detected on address")
+  .crashOutputMatches("modify/read access conflict detected on address")
   .code
 {
   modifyAndPerform(&globalX) {
@@ -119,7 +119,7 @@ ExclusiveAccessTestSuite.test("ClosureCaptureReadModify")
 .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("read/modify access conflict detected on address")
+  .crashOutputMatches("modify/read access conflict detected on address")
   .code
 {
   var x = X()
@@ -133,7 +133,7 @@ ExclusiveAccessTestSuite.test("ClosureCaptureModifyRead")
 .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("modify/read access conflict detected on address")
+  .crashOutputMatches("read/modify access conflict detected on address")
   .code
 {
   var x = X()
