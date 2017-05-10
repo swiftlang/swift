@@ -84,7 +84,7 @@ extension TextOutputStream {
 /// Instances of types that conform to the `TextOutputStreamable` protocol can
 /// write their value to instances of any type that conforms to the
 /// `TextOutputStream` protocol. The Swift standard library's text-related
-/// types, `String`, `Character`, and `UnicodeScalar`, all conform to
+/// types, `String`, `Character`, and `Unicode.Scalar`, all conform to
 /// `TextOutputStreamable`.
 ///
 /// Conforming to the TextOutputStreamable Protocol
@@ -561,7 +561,7 @@ extension Character : TextOutputStreamable {
   }
 }
 
-extension UnicodeScalar : TextOutputStreamable {
+extension Unicode.Scalar : TextOutputStreamable {
   /// Writes the textual representation of the Unicode scalar into the given
   /// output stream.
   ///

@@ -30,15 +30,15 @@ extension Unicode.ASCII : UnicodeEncoding {
 
   @inline(__always)
   @_inlineable
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
-    return UnicodeScalar(_unchecked: UInt32(
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
+    return Unicode.Scalar(_unchecked: UInt32(
         source.first._unsafelyUnwrappedUnchecked))
   }
   
   @inline(__always)
   @_inlineable
   public static func encode(
-    _ source: UnicodeScalar
+    _ source: Unicode.Scalar
   ) -> EncodedScalar? {
     guard source.value < (1&<<7) else { return nil }
     return EncodedScalar(UInt8(extendingOrTruncating: source.value))

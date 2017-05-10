@@ -382,7 +382,7 @@ public struct _StringCore {
         // TODO: be sure tests exercise this code path.
         for b in bytes {
           Encoding._encode(
-            UnicodeScalar(_unchecked: UInt32(b))).forEach(processCodeUnit)
+            Unicode.Scalar(_unchecked: UInt32(b))).forEach(processCodeUnit)
         }
       }
     }
@@ -515,7 +515,7 @@ public struct _StringCore {
   ///
   /// - Complexity: O(1) when amortized over repeated appends of equal
   ///   character values.
-  mutating func append(_ c: UnicodeScalar) {
+  mutating func append(_ c: Unicode.Scalar) {
     let width = UTF16.width(c)
     append(
       width == 2 ? UTF16.leadSurrogate(c) : UTF16.CodeUnit(c.value),

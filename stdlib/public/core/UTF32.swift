@@ -29,13 +29,13 @@ extension Unicode.UTF32 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
-    return UnicodeScalar(_unchecked: source.first!)
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
+    return Unicode.Scalar(_unchecked: source.first!)
   }
 
   @inline(__always)
   public static func encode(
-    _ source: UnicodeScalar
+    _ source: Unicode.Scalar
   ) -> EncodedScalar? {
     return EncodedScalar(source.value)
   }
