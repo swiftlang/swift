@@ -113,8 +113,11 @@ double _swift_stdlib_squareRoot(double _self) {
 
 // TLS - thread local storage
 
-// FIXME: multi-platform
+#if defined(__linux__)
+typedef unsigned int __swift_pthread_key_t;
+#else
 typedef unsigned long __swift_pthread_key_t;
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_pthread_key_create(
