@@ -251,8 +251,23 @@ namespace {
 
           // Special Case: A constructor pattern may include the head but not
           // the payload patterns.  In that case the space is covered.
+          // This also acts to short-circuit comparisons with payload-less
+          // constructors.
           if (other.getSpaces().empty()) {
             return true;
+          }
+
+          // If 'this' constructor pattern has no payload and the other space
+          // does, then 'this' covers more of the space only if the other
+          // constructor isn't the explicit form.
+          //
+          // .case <= .case(_, _, _, ...)
+          if (this->getSpaces().empty()) {
+            return std::accumulate(other.getSpaces().begin(),
+                                   other.getSpaces().end(),
+                                   true, [](bool acc, const Space sp){
+              return acc && sp.getKind() == SpaceKind::Type;
+            });
           }
 
           // H(a1, ..., an) <= H(b1, ..., bn) iff a1 <= b1 && ... && an <= bn
