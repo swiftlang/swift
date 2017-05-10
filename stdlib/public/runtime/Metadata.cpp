@@ -2501,8 +2501,9 @@ swift::swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                         const ProtocolDescriptor **protocols)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
 
-  // Sort the protocol set.
-  std::sort(protocols, protocols + numProtocols);
+  // We entrust that the compiler emitting the call to
+  // swift_getExistentialTypeMetadata always sorts the `protocols` array using
+  // a globally stable ordering that's consistent across modules.
 
   ExistentialCacheEntry::Key key = {
     superclassConstraint, classConstraint, numProtocols, protocols

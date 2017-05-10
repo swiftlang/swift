@@ -449,41 +449,6 @@ TEST(MetadataTest, getExistentialMetadata) {
       return b;
     });
 
-  // protocol compositions are order-invariant
-  RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
-    [&]() -> const ExistentialTypeMetadata * {
-
-      const ProtocolDescriptor *protoList4[] = {
-        &ProtocolA,
-        &ProtocolB
-      };
-
-      const ProtocolDescriptor *protoList5[] = {
-        &ProtocolB,
-        &ProtocolA
-      };
-
-      auto ab = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
-                                                /*superclass=*/nullptr,
-                                                2, protoList4);
-      auto ba = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
-                                                /*superclass=*/nullptr,
-                                                2, protoList5);
-      EXPECT_EQ(ab, ba);
-      EXPECT_EQ(MetadataKind::Existential, ab->getKind());
-      EXPECT_EQ(2U, ab->Flags.getNumWitnessTables());
-      EXPECT_EQ(ProtocolClassConstraint::Any, ab->Flags.getClassConstraint());
-      EXPECT_EQ(2U, ab->Protocols.NumProtocols);
-      EXPECT_TRUE(
-           (ab->Protocols[0]==&ProtocolA && ab->Protocols[1]==&ProtocolB)
-        || (ab->Protocols[0]==&ProtocolB && ab->Protocols[1]==&ProtocolA));
-      EXPECT_EQ(SpecialProtocol::None,
-                ab->Flags.getSpecialProtocol());
-      EXPECT_EQ(nullptr,
-                ab->getSuperclassConstraint());
-      return ab;
-    });
-
   const ProtocolDescriptor *protoList6[] = {
     &ProtocolClassConstrained,
   };
@@ -865,10 +830,8 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
       EXPECT_EQ(ProtocolClassConstraint::Class,
                 ex2->Flags.getClassConstraint());
       EXPECT_EQ(2U, ex2->Protocols.NumProtocols);
-      EXPECT_TRUE((ex2->Protocols[0] == &OpaqueProto1 &&
-                   ex2->Protocols[1] == &ClassProto1) ||
-                  (ex2->Protocols[0] == &ClassProto1 &&
-                   ex2->Protocols[1] == &OpaqueProto1));
+      EXPECT_TRUE(ex2->Protocols[0] == &OpaqueProto1 &&
+                  ex2->Protocols[1] == &ClassProto1);
       EXPECT_EQ(&MetadataTest2, ex2->getSuperclassConstraint());
       return ex2;
     });
