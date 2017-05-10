@@ -27,18 +27,15 @@ bb0(%0 : $Builtin.Int32):
   return %2 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @non_trivial(%T019copy_value_destroy_B03FooV* noalias nocapture dereferenceable(36))
-// CHECK: call void @llvm.memcpy
-// CHECK: [[GEP1:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %1, i32 0, i32 2
+// CHECK: define{{( protected)?}} swiftcc void @non_trivial(
+// CHECK: [[GEP1:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %0, i32 0, i32 2
 // CHECK: [[VAL1:%.*]] = load %swift.refcounted*, %swift.refcounted** [[GEP1]], align 8
-// CHECK: [[GEP2:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %1, i32 0, i32 5
+// CHECK: [[GEP2:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %0, i32 0, i32 5
 // CHECK: [[VAL2:%.*]] = load %swift.refcounted*, %swift.refcounted** [[GEP2]], align 8
 // CHECK: call void @swift_rt_swift_retain(%swift.refcounted* [[VAL1]])
 // CHECK: call void @swift_rt_swift_retain(%swift.refcounted* [[VAL2]])
 // CHECK: call void @swift_rt_swift_release(%swift.refcounted* [[VAL1]])
 // CHECK: call void @swift_rt_swift_release(%swift.refcounted* [[VAL2]])
-// CHECK: ret void
-// CHECK-LABEL: }
 sil @non_trivial : $@convention(thin) (Foo) -> () {
 bb0(%0 : $Foo):
   %1 = copy_value %0 : $Foo
