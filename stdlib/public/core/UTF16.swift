@@ -27,18 +27,18 @@ extension Unicode.UTF16 : UnicodeEncoding {
     return x & 0xf800 != 0xd800
   }
 
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     let bits = source._storage
     if _fastPath(source._bitCount == 16) {
-      return UnicodeScalar(_unchecked: bits & 0xffff)
+      return Unicode.Scalar(_unchecked: bits & 0xffff)
     }
     _sanityCheck(source._bitCount == 32)
     let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
-    return UnicodeScalar(_unchecked: value)
+    return Unicode.Scalar(_unchecked: value)
   }
 
   public static func encode(
-    _ source: UnicodeScalar
+    _ source: Unicode.Scalar
   ) -> EncodedScalar? {
     let x = source.value
     if _fastPath(x < (1 << 16)) {
@@ -86,7 +86,7 @@ extension Unicode.UTF16 : UnicodeEncoding {
       s &>>= 8
       r |= s & 0b0__11_1111
       r &= (1 &<< 21) - 1
-      return encode(UnicodeScalar(_unchecked: r))
+      return encode(Unicode.Scalar(_unchecked: r))
     }
     else if _fastPath(FromEncoding.self == UTF16.self) {
       return unsafeBitCast(content, to: UTF16.EncodedScalar.self)
