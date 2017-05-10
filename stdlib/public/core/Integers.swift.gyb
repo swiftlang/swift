@@ -3335,20 +3335,31 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let isNegative = (self < 0) != (other < 0)
 
     let rhs = other.magnitude
-    let one = 1 as Magnitude
-
     var q = self.magnitude
-    var r = 0 as Magnitude
 
-    for _ in 0..<DoubleWidth.bitWidth {
-      r <<= one
-      if q.leadingZeroBitCount == 0 {
-        r += one
+    // Bail if |other| > |self|
+    if rhs.leadingZeroBitCount < q.leadingZeroBitCount {
+      return (0, self)
+    }
+    
+    // Calculate the number of bits before q and rhs line up,
+    // we can skip that many bits of iteration.
+    let initialOffset = q.leadingZeroBitCount + (DoubleWidth.bitWidth - rhs.leadingZeroBitCount) - 1
+
+    // Start with remainder capturing the high bits of q.
+    var r = q >> Magnitude(DoubleWidth.bitWidth - initialOffset)
+    q <<= Magnitude(initialOffset)
+
+    let highBit = ~(~0 >> 1) as Magnitude
+    for _ in initialOffset..<DoubleWidth.bitWidth {
+      r <<= 1
+      if q & highBit != 0 {
+        r += 1 as Magnitude
       }
-      q <<= one
+      q <<= 1
 
       if r >= rhs {
-        q |= one
+        q |= 1
         r -= rhs
       }
     }
