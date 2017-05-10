@@ -1805,8 +1805,6 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     return NewAI;
   }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    // SILType PTy =
-    // SILType::getPrimitiveObjectType(ReInfo.getSpecializedType());
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
