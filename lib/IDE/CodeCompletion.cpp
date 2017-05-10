@@ -320,7 +320,6 @@ static bool KeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
 
 static bool SwiftKeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
   switch(decl->getKind()){
-  case DeclKind::Subscript:
   case DeclKind::Var:
     return true;
   default:
