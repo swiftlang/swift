@@ -21,6 +21,23 @@ CHANGELOG
 Swift 4.0
 ---------
 
+* [SE-0161][] is partially implemented. Swift now natively supports key path
+  objects for properties. Similar to KVC key path strings in Cocoa, key path
+  objects allow a property to be referenced independently of accessing it
+  from a value:
+
+    ```swift
+    struct Point {
+      var x, y: Double
+    }
+    let x = \Point.x
+    let y = \Point.y
+
+    let p = Point(x: 3, y: 4)
+    p[keyPath: x] // gives 3
+    p[keyPath: y] // gives 4
+    ```
+
 * [SE-0156][]
 
   Protocol composition types can now contain one or more class type terms,
