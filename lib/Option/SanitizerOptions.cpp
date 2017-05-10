@@ -19,6 +19,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -133,6 +134,18 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() + toStringRef(pKind)).toStringRef(b),
       Triple.getTriple());
+  }
+
+  // Address and thread sanitizers can not be enabled concurrently.
+  if ((sanitizerSet & SanitizerKind::Thread)
+        && (sanitizerSet & SanitizerKind::Address)) {
+    SmallString<128> b1;
+    SmallString<128> b2;
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+        (A->getOption().getPrefixedName()
+            + toStringRef(SanitizerKind::Address)).toStringRef(b1),
+        (A->getOption().getPrefixedName()
+            + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
   }
 
   // Thread Sanitizer only works on OS X and the simulators. It's only supported
