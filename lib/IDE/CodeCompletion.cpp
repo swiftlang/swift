@@ -318,6 +318,16 @@ static bool KeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
 }
 
+static bool SwiftKeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
+  switch(decl->getKind()){
+  case DeclKind::Subscript:
+  case DeclKind::Var:
+    return true;
+  default:
+    return false;
+  }
+}
+
 std::string swift::ide::removeCodeCompletionTokens(
     StringRef Input, StringRef TokenName, unsigned *CompletionOffset) {
   assert(TokenName.size() >= 1);
@@ -1600,6 +1610,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool IsSuperRefExpr = false;
   bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
+  bool IsSwiftKeyPathExpr = false;
   bool IsDynamicLookup = false;
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
@@ -1763,6 +1774,10 @@ public:
 
   void setIsKeyPathExpr() {
     IsKeyPathExpr = true;
+  }
+
+  void setIsSwiftKeyPathExpr() {
+    IsSwiftKeyPathExpr = true;
   }
 
   void setIsDynamicLookup() {
@@ -2797,6 +2812,9 @@ public:
       return;
 
     if (IsKeyPathExpr && !KeyPathFilter(D, Reason))
+      return;
+
+    if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
       return;
         
     if (!D->hasInterfaceType())
@@ -4392,6 +4410,8 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     return;
 
   Kind = CompletionKind::DotExpr;
+  if (E->getKind() == ExprKind::KeyPath)
+    Kind = CompletionKind::SwiftKeyPath;
   if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
     CompleteExprSelectorContext = ParseExprSelectorContext;
@@ -4784,6 +4804,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExpr:
   case CompletionKind::KeyPathExprDot:
+  case CompletionKind::SwiftKeyPath:
     break;
 
   case CompletionKind::StmtOrExpr:
@@ -5123,6 +5144,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setExpectedTypes(PossibleTypes);
     }
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
+    break;
+  }
+
+  case CompletionKind::SwiftKeyPath: {
+    Lookup.setHaveDot(DotLoc);
+    Lookup.setIsSwiftKeyPathExpr();
+    Lookup.getValueExprCompletions((*ExprType)->getAs<BoundGenericType>()->
+      getGenericArgs()[1]);
     break;
   }
 

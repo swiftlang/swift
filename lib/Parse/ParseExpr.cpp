@@ -538,6 +538,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   }
 
   if (startsWithSymbol(Tok, '.')) {
+    llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.get());
+
     // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
     // make sure the . is there, but parsing the ? in \.? as .? doesn't make
     // sense. This is all made more complicated by .?. being considered an
@@ -1136,8 +1138,14 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion && Result.isNonNull())
-          CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
+        if (CodeCompletion && Result.isNonNull()) {
+          Expr *E = Result.get();
+          if (InSwiftKeyPath)
+            E = new (Context) KeyPathExpr(SourceLoc(), E, nullptr);
+          else if (SwiftKeyPathRoot)
+            E = new (Context) KeyPathExpr(SourceLoc(), SwiftKeyPathRoot, E);
+          CodeCompletion->completeDotExpr(E, /*DotLoc=*/TokLoc);
+        }
         // Eat the code completion token because we handled it.
         consumeToken(tok::code_complete);
         Result.setHasCodeCompletion();
