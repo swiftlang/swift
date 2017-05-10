@@ -133,10 +133,6 @@ int _swift_stdlib_pthread_setspecific(
   __swift_pthread_key_t key, const void * _Nullable value
 );
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_pthread_key_t _swift_stdlib_PTHREAD_KEYS_MAX(void);
-
-
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
 static inline SWIFT_ALWAYS_INLINE
