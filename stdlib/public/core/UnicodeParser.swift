@@ -10,18 +10,31 @@
 //
 //===----------------------------------------------------------------------===//
 extension _Unicode {
+  /// The result of attempting to parse a `T` from some input.
   public enum ParseResult<T> {
+  /// A `T` was parsed successfully
   case valid(T)
+  
+  /// The input was entirely consumed.
   case emptyInput
+  
+  /// An encoding error was detected.
+  ///
+  /// `length` is the number of underlying code units consumed by this
+  /// error (the length of the longest prefix of a valid encoding
+  /// sequence that could be recognized).
   case error(length: Int)
   }
 }
 
-/// Types that separate streams of code units into encoded unicode scalar values
+/// Types that separate streams of code units into encoded Unicode
+/// scalar values.
 public protocol UnicodeParser {
   /// The encoding with which this parser is associated
   associatedtype Encoding : _UnicodeEncoding
 
+  /// Constructs an instance that can be used to begin parsing `CodeUnit`s at
+  /// any Unicode scalar boundary.
   init()
 
   /// Parses a single Unicode scalar value from `input`.
