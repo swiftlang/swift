@@ -4,6 +4,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_4 | %FileCheck %s -check-prefix=PERSON-MEMBER-OPT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_5 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_6 | %FileCheck %s -check-prefix=PERSON-MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_7 | %FileCheck %s -check-prefix=PERSON-MEMBER
 
 class Person {
     var name: String
@@ -20,7 +21,8 @@ let keyPath2 = \Person.friends[0].#^PART_2^#
 let keyPath3 = \Person.friends[0].friends[0].friends[0].#^PART_3^#
 let keyPath4 = \Person.bestFriend?.#^PART_4^#
 let keyPath5 = \Person.friends.[0].friends[0].friends[0].#^PART_5^#
-let keyPath6 = \Person.friends.[0].friends.[0].friends.[0].#^PART_6^#
+let keyPath6 = \[Person].[0].#^PART_6^#
+let keyPath7 = \[Person].[0].friends[0].#^PART_7^#
 
 // PERSON-MEMBER: Begin completions, 3 items
 // PERSON-MEMBER-NEXT: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
