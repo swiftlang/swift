@@ -1851,6 +1851,12 @@ for host in "${ALL_HOSTS[@]}"; do
             -DDARWIN_TOOLCHAIN_VERSION="${DARWIN_TOOLCHAIN_VERSION}"
         )
     fi
+    if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DDARWIN_TOOLCHAIN_VERSION="${DARWIN_TOOLCHAIN_VERSION}"
+        )
+    fi
 
     if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
