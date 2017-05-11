@@ -2335,68 +2335,50 @@ namespace {
         if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
           outputTy = fnType->getResult();
         }
-      } else if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
-        if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
+      } else if (auto OSR = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+        // Determine if the overloads are all functions that share a common
+        // return type.
+        Type commonType;
+        for (auto OD : OSR->getDecls()) {
+          auto OFD = dyn_cast<AbstractFunctionDecl>(OD);
+          if (!OFD) {
+            commonType = Type();
+            break;
+          }
 
-          // If we've already agreed upon an overloaded return type, use it.
-          if (FD->getHaveSearchedForCommonOverloadReturnType()) {
-            
-            if (FD->getHaveFoundCommonOverloadReturnType()) {
-              outputTy = FD->getInterfaceType()->getAs<AnyFunctionType>()
-                  ->getResult();
-              outputTy = FD->mapTypeIntoContext(outputTy);
-            }
-            
-          } else {
-          
-            // Determine if the overloads all share a common return type.
-            Type commonType;
-            Type resultType;
-            
-            for (auto OD : OSR->getDecls()) {
-              
-              if (auto OFD = dyn_cast<FuncDecl>(OD)) {
-                auto OFT = OFD->getInterfaceType()->getAs<AnyFunctionType>();
-                
-                if (!OFT) {
-                  commonType = Type();
-                  break;
-                }
-                
-                resultType = OFT->getResult();
-                resultType = OFD->mapTypeIntoContext(resultType);
-                
-                if (commonType.isNull()) {
-                  commonType = resultType;
-                } else if (!commonType->isEqual(resultType)) {
-                  commonType = Type();
-                  break;
-                }
-              } else {
-                // TODO: unreachable?
-                commonType = Type();
-                break;
-              }
-            }
-            
-            // TODO: For now, disallow tyvar, archetype and function types.
-            if (!(commonType.isNull() ||
-                  commonType->getAs<TypeVariableType>() ||
-                  commonType->getAs<ArchetypeType>() ||
-                  commonType->getAs<AnyFunctionType>())) {
-              outputTy = commonType;
-            }
-            
-            // Set the search bits appropriately.
-            for (auto OD : OSR->getDecls()) {
-              if (auto OFD = dyn_cast<FuncDecl>(OD)) {
-                OFD->setHaveSearchedForCommonOverloadReturnType();
-                
-                if (!outputTy.isNull())
-                  OFD->setHaveFoundCommonOverloadReturnType();
-              }
+          auto OFT = OFD->getInterfaceType()->getAs<AnyFunctionType>();
+          if (!OFT) {
+            commonType = Type();
+            break;
+          }
+
+          // Look past the self parameter.
+          if (OFD->getDeclContext()->isTypeContext()) {
+            OFT = OFT->getResult()->getAs<AnyFunctionType>();
+            if (!OFT) {
+              commonType = Type();
+              break;
             }
           }
+
+          Type resultType = OFT->getResult();
+
+          // If there are any type parameters in the result,
+          if (resultType->hasTypeParameter()) {
+            commonType = Type();
+            break;
+          }
+
+          if (commonType.isNull()) {
+            commonType = resultType;
+          } else if (!commonType->isEqual(resultType)) {
+            commonType = Type();
+            break;
+          }
+        }
+
+        if (commonType) {
+          outputTy = commonType;
         }
       }
       

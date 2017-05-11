@@ -5057,12 +5057,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// If this declaration is part of an overload set, determine if we've
-  /// searched for a common overload amongst all overloads, or if we've found
-  /// one.
-  unsigned HaveSearchedForCommonOverloadReturnType : 1;
-  unsigned HaveFoundCommonOverloadReturnType : 1;
-
   /// Whether we are statically dispatched even if overridable
   unsigned ForcedStaticDispatch : 1;
 
@@ -5103,8 +5097,6 @@ class FuncDecl final : public AbstractFunctionDecl,
     Mutating = false;
     HasDynamicSelf = false;
     ForcedStaticDispatch = false;
-    HaveSearchedForCommonOverloadReturnType = false;
-    HaveFoundCommonOverloadReturnType = false;
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -5177,20 +5169,6 @@ public:
     return getParameterLists()[i];
   }
   
-
-  bool getHaveSearchedForCommonOverloadReturnType() {
-    return HaveSearchedForCommonOverloadReturnType;
-  }
-  void setHaveSearchedForCommonOverloadReturnType(bool b = true) {
-    HaveSearchedForCommonOverloadReturnType = b;
-  }
-  bool getHaveFoundCommonOverloadReturnType() {
-    return HaveFoundCommonOverloadReturnType;
-  }
-  void setHaveFoundCommonOverloadReturnType(bool b = true) {
-    HaveFoundCommonOverloadReturnType = b;
-  }
-
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
