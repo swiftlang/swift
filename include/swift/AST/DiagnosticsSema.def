@@ -3171,6 +3171,8 @@ ERROR(objc_convention_invalid,none,
       " with '@convention(%1)'", (Type, StringRef))
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
+WARNING(paren_void_probably_void,none,
+      "(Void) type is now (()), did you mean '()'?", ())
 NOTE(not_objc_empty_protocol_composition,none,
      "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,

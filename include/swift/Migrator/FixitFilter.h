@@ -120,7 +120,8 @@ struct FixitFilter {
         Info.ID == diag::override_swift3_objc_inference.ID ||
         Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
         Info.ID == diag::missing_several_cases.ID ||
-        Info.ID == diag::missing_particular_case.ID)
+        Info.ID == diag::missing_particular_case.ID ||
+        Info.ID == diag::paren_void_probably_void.ID)
       return true;
 
     return false;
