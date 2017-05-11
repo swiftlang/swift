@@ -274,3 +274,23 @@ func sr2421() {
   let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
   x = 42
 }
+
+// Tests fix to SR-964
+func sr964() {
+  var noOpSetter: String {
+    get { return "" }
+    set { } // No warning
+  }
+  var suspiciousSetter: String {
+    get { return "" }
+    set { print(suspiciousSetter) } // expected-warning {{setter argument 'newValue' was never used, but the getter was accessed; consider using 'newValue' or removing 'suspiciousSetter'}}
+  }
+  var namedSuspiciousSetter: String {
+    get { return "" }
+    set(parameter) { print(namedSuspiciousSetter) } // expected-warning {{setter argument 'parameter' was never used, but the getter was accessed; consider using 'parameter' or removing 'namedSuspiciousSetter'}}
+  }
+  var okSetter: String {
+    get { return "" }
+    set { print(newValue) } // No warning
+  }
+}
