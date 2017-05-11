@@ -6117,13 +6117,15 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     auto extendedNominal =
       diag.ExistingDC->getAsNominalTypeOrNominalTypeExtensionContext();
     if (existingModule != dc->getParentModule() &&
-        (existingModule == extendedNominal->getParentModule() ||
+        (existingModule->getName() ==
+           extendedNominal->getParentModule()->getName() ||
          existingModule == diag.Protocol->getParentModule())) {
       // Warn about the conformance.
       diagnose(diag.Loc, diag::redundant_conformance_adhoc,
                dc->getDeclaredInterfaceType(),
                diag.Protocol->getName(),
-               existingModule == extendedNominal->getParentModule(),
+               existingModule->getName() ==
+                 extendedNominal->getParentModule()->getName(),
                existingModule->getName());
 
       // Complain about any declarations in this extension whose names match
