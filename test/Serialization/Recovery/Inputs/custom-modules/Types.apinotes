@@ -25,6 +25,8 @@ SwiftVersions:
   Typedefs:
   - Name: RenamedTypedef
     SwiftName: Swift3RenamedTypedef
+  - Name: NewlyWrappedTypedef
+    SwiftWrapper: none
   Tags:
   - Name: RenamedStruct
     SwiftName: Swift3RenamedStruct

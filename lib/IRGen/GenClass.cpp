@@ -1505,6 +1505,10 @@ namespace {
       }
     }
 
+    void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+      llvm_unreachable("should not IRGen classes with missing members");
+    }
+
     void addIVarInitializer() {
       if (auto fn = IGM.getAddrOfIVarInitDestroy(getClass(),
                                                  /*destroy*/ false,

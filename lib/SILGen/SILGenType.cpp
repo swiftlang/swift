@@ -203,6 +203,8 @@ public:
     assert(result.second);
     (void) result;
   }
+
+  void addPlaceholder(MissingMemberDecl *) {}
 };
 
 } // end anonymous namespace
@@ -402,6 +404,10 @@ public:
   void addConstructor(ConstructorDecl *cd) {
     Witness witness = Conformance->getWitness(cd, nullptr);
     super::addConstructor(cd, witness);
+  }
+
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
   }
 
   void addMethod(SILDeclRef requirementRef,
@@ -750,6 +756,10 @@ public:
     super::addConstructor(cd, witness);
   }
 
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
+  }
+
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
@@ -848,6 +858,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -947,6 +958,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
