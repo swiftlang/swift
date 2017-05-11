@@ -1180,10 +1180,12 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   assert(d1.values[i] == 1010)
   assert(d1[i] == (10, 1010))
   
+#if swift(>=4.0)
   d2.values[i] += 1
   assert(d2.values[i] == 1011)
   assert(d2[10]! == 1011)
   assert(identity1 != d2._rawIdentifier())
+#endif
   
   assert(d1[10]! == 1010)
   assert(identity1 == d1._rawIdentifier())
@@ -1242,8 +1244,10 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     // keys.index(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     let l = d2.keys.index(of: lastKey)!
+#if swift(>=4.0)
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
-    
+#endif
+
     expectEqual(j, k)
     expectEqual(k, l)
   }
