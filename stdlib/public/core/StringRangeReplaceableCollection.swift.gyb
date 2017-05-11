@@ -380,6 +380,35 @@ extension String {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// The following overloads of flatMap are carefully crafted to allow the code
+// like the following:
+//   ["hello"].flatMap { $0 }
+// return an array of strings without any type context in Swift 3 mode, at the
+// same time allowing the following code snippet to compile:
+//   [0, 1].flatMap { x in
+//     if String(x) == "foo" { return "bar" } else { return nil }
+//   }
+// Note that the second overload is delcared on a more specific protocol.
+// See: test/stdlib/StringFlatMap.swift for tests.
+extension Sequence {
+  @available(swift, obsoleted: 4)
+  public func flatMap(
+    _ transform: (Iterator.Element) throws -> String
+  ) rethrows -> [String] {
+    return try map(transform)
+  }
+}
+
+extension Collection {
+  public func flatMap(
+    _ transform: (Iterator.Element) throws -> String?
+  ) rethrows -> [String] {
+    return try _flatMap(transform)
+  }
+}
+//===----------------------------------------------------------------------===//
+
 extension String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
   public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
