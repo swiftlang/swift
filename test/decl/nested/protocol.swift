@@ -71,8 +71,6 @@ class OuterClass {
 }
 
 class OtherGenericClass<T> {
-  // FIXME: The diagnostic is misleading -- OuterClass is in fact a class type
   protocol InnerProtocol : OtherGenericClass { }
-  // expected-error@-1{{inheritance from non-protocol, non-class type 'OtherGenericClass<T>'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }
