@@ -5156,10 +5156,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setHaveDot(DotLoc);
     Lookup.setIsSwiftKeyPathExpr();
     if (auto BGT = (*ExprType)->getAs<BoundGenericType>()) {
-      if (BGT->getGenericArgs().size() == 2) {
+      auto AllArgs = BGT->getGenericArgs();
+      if (AllArgs.size() == 2) {
         // The second generic type argument of KeyPath<Root, Value> should be
         // the value we pull code completion results from.
-        Lookup.getValueExprCompletions(BGT->getGenericArgs()[1]);
+        Lookup.getValueExprCompletions(AllArgs[1]);
       }
     }
     break;
