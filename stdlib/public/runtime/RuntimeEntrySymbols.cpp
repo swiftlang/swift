@@ -36,6 +36,7 @@
 // implementations.
 #define FOR_CONV_DefaultCC(...)
 #define FOR_CONV_C_CC(...)
+#define FOR_CONV_SwiftCC(...)
 // Entry points using the new calling convention require global symbols
 // referring to their implementations.
 #define FOR_CONV_RegisterPreservingCC(x) x

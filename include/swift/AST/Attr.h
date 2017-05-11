@@ -1158,6 +1158,24 @@ public:
   }
 };
 
+/// Defines the @NSKeyedArchiveLegacyAttr attribute.
+class NSKeyedArchiveLegacyAttr : public DeclAttribute {
+public:
+  NSKeyedArchiveLegacyAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_NSKeyedArchiveLegacy, AtLoc, Range, Implicit),
+      Name(Name) {}
+
+  NSKeyedArchiveLegacyAttr(StringRef Name, bool Implicit)
+    : NSKeyedArchiveLegacyAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+
+  /// The legacy mangled name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_NSKeyedArchiveLegacy;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
