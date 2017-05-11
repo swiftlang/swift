@@ -39,6 +39,9 @@ class JobStats:
     def is_driver_job(self):
         return self.jobkind == 'driver'
 
+    def is_frontend_job(self):
+        return self.jobkind == 'frontend'
+
     def driver_jobs_ran(self):
         assert(self.is_driver_job())
         return self.stats.get("Driver.NumDriverJobsRun", 0)
@@ -209,6 +212,37 @@ def show_incrementality(args):
                                   incrementality=pct))
 
 
+def compare_frontend_stats(args):
+    assert(len(args.remainder) == 2)
+    (olddir, newdir) = args.remainder
+
+    fieldnames = ["name", "old", "new", "delta_pct"]
+    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out.writeheader()
+
+    old_stats = load_stats_dir(olddir)
+    new_stats = load_stats_dir(newdir)
+    old_merged = merge_all_jobstats([x for x in old_stats
+                                     if x.is_frontend_job()])
+    new_merged = merge_all_jobstats([x for x in new_stats
+                                     if x.is_frontend_job()])
+    if old_merged is None or new_merged is None:
+        return
+    for stat_name in sorted(old_merged.stats.keys()):
+        if stat_name in new_merged.stats:
+            old = float(old_merged.stats[stat_name])
+            new = float(new_merged.stats[stat_name])
+            delta = (new - old)
+            delta_pct = 0
+            if old != 0:
+                delta_pct = -100.0
+            if new != 0:
+                delta_pct = (delta / new) * 100.0
+            if abs(delta_pct) >= args.delta_pct_thresh:
+                out.writerow(dict(name=stat_name, old=old, new=new,
+                                  delta_pct=delta_pct))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true",
@@ -218,11 +252,15 @@ def main():
                         help="Write output to file")
     parser.add_argument("--paired", action="store_true",
                         help="Process two dirs-of-stats-dirs, pairwise")
+    parser.add_argument("--delta-pct-thresh", type=float, default=0.0,
+                        help="Percentage change required to report")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
     modes.add_argument("--incrementality", action="store_true",
                        help="summarize the 'incrementality' of a build")
+    modes.add_argument("--compare-frontend-stats", action="store_true",
+                       help="Compare frontend stats from two stats-dirs")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -232,6 +270,8 @@ def main():
         sys.exit(1)
     if args.catapult:
         write_catapult_trace(args)
+    elif args.compare_frontend_stats:
+        compare_frontend_stats(args)
     elif args.incrementality:
         if args.paired:
             show_paired_incrementality(args)
