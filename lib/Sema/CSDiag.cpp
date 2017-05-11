@@ -7644,6 +7644,40 @@ FailureDiagnosis::validateContextualType(Type contextualType,
     if (FT->isAutoClosure())
       contextualType = FT->getResult();
 
+  // Since some of the contextual types might be tuples e.g. subscript argument
+  // is a tuple or paren wrapping a tuple, it's required to recursively check
+  // its elements to determine nullability of the contextual type, because it
+  // might contain archetypes.
+  std::function<bool(Type)> shouldNullifyType = [&](Type type) -> bool {
+    switch (type->getDesugaredType()->getKind()) {
+    case TypeKind::Archetype:
+    case TypeKind::Unresolved:
+      return true;
+
+    case TypeKind::BoundGenericEnum:
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericStruct:
+    case TypeKind::UnboundGeneric:
+    case TypeKind::GenericFunction:
+    case TypeKind::Metatype:
+      return type->hasUnresolvedType();
+
+    case TypeKind::Tuple: {
+      auto tupleType = type->getAs<TupleType>();
+      for (auto &element : tupleType->getElements()) {
+        if (shouldNullifyType(element.getType()))
+            return true;
+      }
+      break;
+    }
+
+    default:
+      return false;
+    }
+
+    return false;
+  };
+
   bool shouldNullify = false;
   if (auto objectType = contextualType->getLValueOrInOutObjectType()) {
     // Note that simply checking for `objectType->hasUnresolvedType()` is not
@@ -7655,25 +7689,7 @@ FailureDiagnosis::validateContextualType(Type contextualType,
     // sub-expression solver a chance to try and compute type as it sees fit
     // and higher level code would have a chance to check it, which avoids
     // diagnostic messages like `cannot convert (_) -> _ to (Int) -> Void`.
-    switch (objectType->getDesugaredType()->getKind()) {
-    case TypeKind::Archetype:
-    case TypeKind::Unresolved:
-      shouldNullify = true;
-      break;
-
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericStruct:
-    case TypeKind::UnboundGeneric:
-    case TypeKind::GenericFunction:
-    case TypeKind::Metatype:
-      shouldNullify = objectType->hasUnresolvedType();
-      break;
-
-    default:
-      shouldNullify = false;
-      break;
-    }
+    shouldNullify = shouldNullifyType(objectType);
   }
 
   // If the conversion type contains no info, drop it.
