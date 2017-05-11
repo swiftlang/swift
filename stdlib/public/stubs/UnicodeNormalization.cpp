@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <mutex>
 #include <assert.h>
-#endif
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -31,13 +30,11 @@
 #include <unicode/ucol.h>
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
-#include <unicode/ubrk.h>
 
 #pragma clang diagnostic pop
 
 #include "../SwiftShims/UnicodeShims.h"
 
-#if !defined(__APPLE__)
 static const UCollator *MakeRootCollator() {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   UCollator *root = ucol_open("", &ErrorCode);
@@ -294,42 +291,3 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
 swift::Lazy<ASCIICollation> ASCIICollation::theTable;
 #endif
 
-namespace {
-template <typename T, typename U> T *ptr_cast(U *p) {
-  return static_cast<T *>(static_cast<void *>(p));
-}
-template <typename T, typename U> const T *ptr_cast(const U *p) {
-  return static_cast<const T *>(static_cast<const void *>(p));
-}
-}
-
-void swift::__swift_stdlib_ubrk_close(
-    swift::__swift_stdlib_UBreakIterator *bi) {
-  ubrk_close(ptr_cast<UBreakIterator>(bi));
-}
-
-swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
-    swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
-    const UChar *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
-  return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
-      ubrk_open(static_cast<UBreakIteratorType>(type), locale, text, textLength,
-                ptr_cast<UErrorCode>(status)));
-}
-
-int32_t
-swift::__swift_stdlib_ubrk_preceding(swift::__swift_stdlib_UBreakIterator *bi,
-                                     int32_t offset) {
-  return ubrk_preceding(ptr_cast<UBreakIterator>(bi), offset);
-}
-
-int32_t
-swift::__swift_stdlib_ubrk_following(swift::__swift_stdlib_UBreakIterator *bi,
-                                     int32_t offset) {
-  return ubrk_following(ptr_cast<UBreakIterator>(bi), offset);
-}
-void swift::__swift_stdlib_ubrk_setText(
-    swift::__swift_stdlib_UBreakIterator *bi, const __swift_stdlib_UChar *text,
-    __swift_int32_t textLength, __swift_stdlib_UErrorCode *status) {
-  return ubrk_setText(ptr_cast<UBreakIterator>(bi), ptr_cast<UChar>(text),
-                      textLength, ptr_cast<UErrorCode>(status));
-}

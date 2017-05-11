@@ -22,8 +22,6 @@
 internal let _CR: UInt8 = 0x0d
 internal let _LF: UInt8 = 0x0a
 
-import SwiftShims
-
 extension String {
   /// A view of a string's contents as a collection of characters.
   ///
@@ -277,34 +275,29 @@ extension String.CharacterView : BidirectionalCollection {
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
+    var start = start
     let end = unicodeScalars.endIndex
     if start == end {
       return 0
     }
 
-    // Our relative position (offset). If our _core is not a substring, this is
-    // the same as start._position.
-    let relativeOffset = start._position - _coreOffset
-
     // Grapheme breaking is much simpler if known ASCII
     if _core.isASCII {
       _onFastPath() // Please aggressively inline
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      let pos = start._position - _coreOffset
 
       // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
       // for that one exception.
       if _slowPath(
-        asciiBuffer[relativeOffset] == _CR &&
-        relativeOffset+1 < asciiBuffer.endIndex &&
-        asciiBuffer[relativeOffset+1] == _LF
+        asciiBuffer[pos] == _CR &&
+        pos+1 < asciiBuffer.endIndex &&
+        asciiBuffer[pos+1] == _LF
       ) {
         return 2
       }
 
       return 1
-    } else {
-      // TODO: Check for (potentially non-contiguous) ASCII NSStrings,
-      // especially small tagged pointers.
     }
     
     let startIndexUTF16 = start._position
@@ -316,49 +309,15 @@ extension String.CharacterView : BidirectionalCollection {
 
     // Perform a quick single-code-unit grapheme check
     if _core._baseAddress != nil {
+      let pos = start._position - _coreOffset
       if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core._nthContiguous(relativeOffset),
-        _core._nthContiguous(relativeOffset+1)
+        _core._nthContiguous(pos),
+        _core._nthContiguous(pos+1)
       ) {
         return 1
       }
-    } else {
-      // TODO: Check for (potentially non-contiguous) UTF16 NSStrings,
-      // especially small tagged pointers
     }
 
-    if _core._baseAddress != nil {
-      _onFastPath() // Please aggressively inline
-      let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
-      let ubrkFollowing = __swift_stdlib_ubrk_following(
-        breakIterator, Int32(relativeOffset)
-      )
-      // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
-      // string.
-      let nextPosition =
-        ubrkFollowing == -1 ? end._position : Int(ubrkFollowing)
-      return nextPosition - relativeOffset
-    } else {
-      // TODO: See if we can get fast character contents.
-    }
-
-    // FIXME: Need to handle the general case correctly with Unicode 9+
-    // semantics, as opposed to this legacy Unicode 8 path. This gets hit for
-    // e.g. non-contiguous NSStrings. In such cases, there may be an alternative
-    // CFString API available, or worst case we can map over it via UTextFuncs.
-
-    return legacyGraphemeForward(
-      start: start, end: end, startIndexUTF16: startIndexUTF16
-    )
-  }
-
-  @inline(never)
-  func legacyGraphemeForward(
-    start: UnicodeScalarView.Index,
-    end: UnicodeScalarView.Index,
-    startIndexUTF16: Int
-  ) -> Int {
-    var start = start
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
@@ -400,25 +359,21 @@ extension String.CharacterView : BidirectionalCollection {
       return 0
     }
 
-    // The relative position (offset) to the last code unit.
-    let lastOffset = end._position - _coreOffset - 1
-    // The relative position (offset) that is one-past-the-last
-    let endOffset = lastOffset + 1
-
     // Grapheme breaking is much simpler if known ASCII
     if _core.isASCII {
       _onFastPath() // Please aggressively inline
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      let pos = end._position - _coreOffset - 1
       _sanityCheck(
-        lastOffset >= asciiBuffer.startIndex,
+        pos >= asciiBuffer.startIndex,
         "should of been caught in earlier start-of-scalars check")
 
       // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
       // for that one exception.
       if _slowPath(
-        asciiBuffer[lastOffset] == _LF &&
-        lastOffset-1 >= asciiBuffer.startIndex &&
-        asciiBuffer[lastOffset-1] == _CR
+        asciiBuffer[pos] == _LF &&
+        pos-1 >= asciiBuffer.startIndex &&
+        asciiBuffer[pos-1] == _CR
       ) {
         return 2
       }
@@ -435,45 +390,15 @@ extension String.CharacterView : BidirectionalCollection {
 
     // Perform a quick single-code-unit grapheme check
     if _core._baseAddress != nil {
+      let pos = end._position - _coreOffset - 1
       if String.CharacterView._quickCheckGraphemeBreakBetween(
-        _core._nthContiguous(lastOffset-1),
-        _core._nthContiguous(lastOffset)
+        _core._nthContiguous(pos-1),
+        _core._nthContiguous(pos)
       ) {
         return 1
       }
     }
 
-    if _core._baseAddress != nil {
-      _onFastPath() // Please aggressively inline
-      let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
-      let ubrkPreceding = __swift_stdlib_ubrk_preceding(
-        breakIterator, Int32(endOffset)
-      )
-      // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
-      // string.
-      let priorPosition =
-        ubrkPreceding == -1 ? start._position : Int(ubrkPreceding)
-      return endOffset - priorPosition
-    } else {
-      // TODO: See if we can get fast character contents.
-    }
-
-    // FIXME: Need to handle the general case correctly with Unicode 9+
-    // semantics, as opposed to this legacy Unicode 8 path. This gets hit for
-    // e.g. non-contiguous NSStrings. In such cases, there may be an alternative
-    // CFString API available, or worst case we can map over it via UTextFuncs.
-
-    return legacyGraphemeBackward(
-      start: start, end: end, endIndexUTF16: endIndexUTF16
-    )
-  }
-
-  @inline(never)
-  func legacyGraphemeBackward(
-    start: UnicodeScalarView.Index,
-    end: UnicodeScalarView.Index,
-    endIndexUTF16: Int
-  ) -> Int {
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
