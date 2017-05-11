@@ -639,9 +639,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   for (auto tyR : genericArgs)
     args.push_back(tyR);
 
-  auto argumentOptions = options - TR_NonEnumInheritanceClauseOuterLayer;
   auto result = applyUnboundGenericArguments(unboundType, genericDecl, loc,
-                                             dc, args, argumentOptions,
+                                             dc, args, options,
                                              resolver, unsatisfiedDependency);
   if (!result)
     return result;
@@ -1245,19 +1244,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (type->is<ErrorType>())
       return type;
 
-    if (options & TR_NonEnumInheritanceClauseOuterLayer) {
-      auto protocolOrClass =
-        (type->is<ProtocolType>() ||
-         type->is<ClassType>() ||
-         type->isAnyObject());
-      if (!protocolOrClass) {
-        TC.diagnose(comp->getIdLoc(),
-                    diag::inheritance_from_non_protocol_or_class,
-                    type);
-        return ErrorType::get(type);
-      }
-    }
-
     // If this is the first result we found, record it.
     if (current.isNull()) {
       current = type;
@@ -1503,18 +1489,6 @@ static Type resolveNestedIdentTypeComponent(
     }
   }
 
-  if (options & TR_NonEnumInheritanceClauseOuterLayer) {
-    auto protocolOrClass =
-        memberType->is<ProtocolType>() ||
-        memberType->is<ClassType>() ||
-        memberType->isAnyObject();
-    if (!protocolOrClass) {
-      TC.diagnose(comp->getIdLoc(),
-                  diag::inheritance_from_non_protocol_or_class, memberType);
-      return ErrorType::get(memberType);
-    }
-  }
-
   // If there are generic arguments, apply them now.
   if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
     memberType = TC.applyGenericArguments(
@@ -1561,9 +1535,8 @@ static Type resolveIdentTypeComponent(
 
   // All remaining components use qualified lookup.
 
-  auto parentOptions = options - TR_NonEnumInheritanceClauseOuterLayer;
   // Resolve the parent type.
-  Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, parentOptions,
+  Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
                                             diagnoseErrors, resolver,
                                             unsatisfiedDependency);
   if (!parentTy || parentTy->hasError()) return parentTy;
