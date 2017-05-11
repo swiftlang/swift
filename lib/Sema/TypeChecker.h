@@ -484,13 +484,8 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we are checking the outermost type of a computed property setter's newValue
   TR_ImmediateSetterNewValue = 0x1000000,
 
-  /// Whether we are checking the outermost layer of types in an inheritance
-  /// clause on something other than an enum (i.e. V, but not U or W, in class
-  /// T: U.V<W>)
-  TR_NonEnumInheritanceClauseOuterLayer = 0x2000000,
-
   /// Whether we are checking the underlying type of a typealias.
-  TR_TypeAliasUnderlyingType = 0x4000000,
+  TR_TypeAliasUnderlyingType = 0x2000000,
 };
 
 /// Option set describing how type resolution should work.
