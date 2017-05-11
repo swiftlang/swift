@@ -28,5 +28,16 @@ Tests.test("ExplicitTypeContext") {
     ["hello", "world"].flatMap { $0 } as [Character])
 }
 
+Tests.test("inference") {
+  let result = [1, 2].flatMap { x in
+    if String(x) == "foo" {
+      return "bar"
+    } else {
+      return nil
+    }
+  }
+  expectEqualSequence([], result)
+}
+
 
 runAllTests()
