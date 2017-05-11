@@ -172,10 +172,10 @@ def merge_all_jobstats(jobstats):
 
 
 def show_paired_incrementality(args):
-    fieldnames = ["name",
-                  "old_pct", "old_skip",
+    fieldnames = ["old_pct", "old_skip",
                   "new_pct", "new_skip",
-                  "delta_pct", "delta_skip"]
+                  "delta_pct", "delta_skip",
+                  "name"]
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
@@ -199,7 +199,7 @@ def show_paired_incrementality(args):
 
 
 def show_incrementality(args):
-    fieldnames = ["name", "incrementality"]
+    fieldnames = ["incrementality", "name"]
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
@@ -216,7 +216,7 @@ def compare_frontend_stats(args):
     assert(len(args.remainder) == 2)
     (olddir, newdir) = args.remainder
 
-    fieldnames = ["name", "old", "new", "delta_pct"]
+    fieldnames = ["old", "new", "delta_pct", "name"]
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
 
