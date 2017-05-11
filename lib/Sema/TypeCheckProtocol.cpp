@@ -5930,7 +5930,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
     if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
-      if (isNSCoding(conformance->getProtocol())) {
+      if (Context.LangOpts.EnableObjCInterop &&
+          isNSCoding(conformance->getProtocol())) {
         // Note: these 'kind' values are synchronized with
         // diag::nscoding_unstable_mangled_name.
         Optional<unsigned> kind;
