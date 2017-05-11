@@ -102,7 +102,7 @@ public struct Substring : StringProtocol {
 
 % end
 
-  public init<C: Collection, Encoding: UnicodeEncoding>(
+  public init<C: Collection, Encoding: _UnicodeEncoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
     self.init(String(decoding: codeUnits, as: sourceEncoding))
@@ -118,7 +118,7 @@ public struct Substring : StringProtocol {
   ///   the given `encoding`, ending just before the first zero code unit.
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
-  public init<Encoding: UnicodeEncoding>(
+  public init<Encoding: _UnicodeEncoding>(
     decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as targetEncoding: Encoding.Type
   ) {
@@ -141,7 +141,7 @@ public struct Substring : StringProtocol {
 
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of code units in the given encoding.
-  public func withCString<Result, TargetEncoding: UnicodeEncoding>(
+  public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {

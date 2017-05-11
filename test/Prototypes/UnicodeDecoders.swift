@@ -38,7 +38,7 @@ extension Unicode.Scalar {
 extension Unicode {
   struct DefaultScalarView<
     CodeUnits: BidirectionalCollection,
-    Encoding: UnicodeEncoding
+    Encoding: Unicode.Encoding
   > where CodeUnits.Iterator.Element == Encoding.CodeUnit {
     var codeUnits: CodeUnits
     init(
@@ -183,7 +183,7 @@ func utf32<S : StringProtocol>(_ s: S) -> [UInt32] {
   return s.unicodeScalars.map { $0.value }
 }
 
-func checkStringProtocol<S : StringProtocol, Encoding: UnicodeEncoding>(
+func checkStringProtocol<S : StringProtocol, Encoding: Unicode.Encoding>(
   _ s: S,
   _ utfStr: [Encoding.CodeUnit],
   encodedAs: Encoding.Type,
@@ -218,7 +218,7 @@ func checkStringProtocol<S : StringProtocol, Encoding: UnicodeEncoding>(
   }
 }
 
-func checkDecodeUTF<Codec : UnicodeCodec & UnicodeEncoding>(
+func checkDecodeUTF<Codec : UnicodeCodec & Unicode.Encoding>(
   _ codec: Codec.Type, _ expectedHead: [UInt32],
   _ expectedRepairedTail: [UInt32], _ utfStr: [Codec.CodeUnit]
 ) -> AssertionResult {

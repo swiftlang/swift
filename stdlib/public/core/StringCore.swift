@@ -364,7 +364,7 @@ public struct _StringCore {
   }
   
   /// Write the string, in the given encoding, to output.
-  func encode<Encoding: UnicodeEncoding>(
+  func encode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void)
   {

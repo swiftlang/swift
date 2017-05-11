@@ -15,7 +15,7 @@ extension Unicode {
   }
 }
 
-extension Unicode.UTF16 : UnicodeEncoding {
+extension Unicode.UTF16 : Unicode.Encoding {
   public typealias CodeUnit = UInt16
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
@@ -52,7 +52,7 @@ extension Unicode.UTF16 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func transcode<FromEncoding : UnicodeEncoding>(
+  public static func transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF8.self) {
@@ -107,7 +107,7 @@ extension Unicode.UTF16 : UnicodeEncoding {
   }
 }
 
-extension UTF16.ReverseParser : UnicodeParser, _UTFParser {
+extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
 
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
@@ -128,7 +128,7 @@ extension UTF16.ReverseParser : UnicodeParser, _UTFParser {
   }
 }
 
-extension Unicode.UTF16.ForwardParser : UnicodeParser, _UTFParser {
+extension Unicode.UTF16.ForwardParser : Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
   
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
