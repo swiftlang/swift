@@ -226,6 +226,8 @@ class TestIndexPath: TestIndexPathSuper {
         let ip2: IndexPath = [1, 1, 1]
         
         expectNotEqual(ip1.hashValue, ip2.hashValue)
+
+        IndexPath(indexes: [Int.max >> 8, 2, Int.max >> 36]).hashValue // this should not cause an overflow crash
     }
     
     func testEquality() {
