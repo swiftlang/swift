@@ -1418,7 +1418,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       // Provide a fixed type for the type variable.
-      bool wantRvalue = kind == ConstraintKind::Equal;
       if (typeVar1) {
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
@@ -1426,9 +1425,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
 
-        // If we want an rvalue, get the rvalue.
-        if (wantRvalue)
+        // Equal constraints allow mixed LValue/RValue bindings, but
+        // if we bind a type to a type variable that can bind to
+        // LValues as part of simplifying the Equal constraint we may
+        // later block a binding of the opposite "LValue-ness" to the
+        // same type variable that happens as part of simplifying
+        // another constraint.
+        if (kind == ConstraintKind::Equal) {
+          if (typeVar1->getImpl().canBindToLValue())
+            return formUnsolvedResult();
+
           type2 = type2->getRValueType();
+        }
 
         // If the left-hand type variable cannot bind to an lvalue,
         // but we still have an lvalue, fail.
@@ -1467,9 +1475,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVarOccursInType(typeVar2, type1))
         return formUnsolvedResult();
 
-      // If we want an rvalue, get the rvalue.
-      if (wantRvalue)
+      // Equal constraints allow mixed LValue/RValue bindings, but
+      // if we bind a type to a type variable that can bind to
+      // LValues as part of simplifying the Equal constraint we may
+      // later block a binding of the opposite "LValue-ness" to the
+      // same type variable that happens as part of simplifying
+      // another constraint.
+      if (kind == ConstraintKind::Equal) {
+        if (typeVar2->getImpl().canBindToLValue())
+          return formUnsolvedResult();
+
         type1 = type1->getRValueType();
+      }
 
       if (!typeVar2->getImpl().canBindToLValue() &&
           type1->isLValueType()) {

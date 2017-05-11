@@ -23,6 +23,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -5929,7 +5930,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
     if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
-      if (isNSCoding(conformance->getProtocol())) {
+      if (Context.LangOpts.EnableObjCInterop &&
+          isNSCoding(conformance->getProtocol())) {
         // Note: these 'kind' values are synchronized with
         // diag::nscoding_unstable_mangled_name.
         Optional<unsigned> kind;
@@ -5977,13 +5979,19 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           auto insertionLoc =
             classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
           if (isFixable) {
+            // Note: this is intentionally using the Swift 3 mangling,
+            // to provide compatibility with archives created in the Swift 3
+            // time frame.
+            Mangle::ASTMangler mangler;
             diagnose(classDecl, diag::unstable_mangled_name_add_objc)
               .fixItInsert(insertionLoc,
                            "@objc(<#Objective-C class name#>)");
             diagnose(classDecl,
                      diag::unstable_mangled_name_add_nskeyedarchivelegacy)
               .fixItInsert(insertionLoc,
-                           "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
+                           "@NSKeyedArchiveLegacy(\"" +
+                           mangler.mangleObjCRuntimeName(classDecl) +
+                           "\")");
           } else {
             diagnose(classDecl, diag::add_nskeyedarchivesubclassesonly_attr,
                      classDecl->getDeclaredInterfaceType())
