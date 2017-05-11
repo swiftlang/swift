@@ -1192,7 +1192,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // closure.
   SILBuilderWithScope B(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
-  SILType FnTy = FnVal->getType();
 
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.

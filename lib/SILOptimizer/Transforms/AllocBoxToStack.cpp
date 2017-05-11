@@ -838,7 +838,6 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    ClonedFn);
-  auto const &Subs = PartialApply->getSubstitutions();
   return Builder.createPartialApply(
       PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
       Args,

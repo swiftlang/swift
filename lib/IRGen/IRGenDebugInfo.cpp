@@ -110,8 +110,6 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
   SILLocation::DebugLoc LastDebugLoc; /// The last location that was emitted.
   const SILDebugScope *LastScope;     /// The scope of that last location.
-  /// The basic block where the location was last changed.
-  llvm::BasicBlock *LastBasicBlock;
 
   /// Used by pushLoc.
   SmallVector<std::pair<SILLocation::DebugLoc, const SILDebugScope *>, 8>
