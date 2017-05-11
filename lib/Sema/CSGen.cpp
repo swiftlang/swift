@@ -678,56 +678,6 @@ namespace {
     }
   }
   
-  /// Determine whether or not a given NominalTypeDecl has a failable
-  /// initializer member.
-  bool hasFailableInits(NominalTypeDecl *NTD,
-                        ConstraintSystem *CS) {
-    
-    // TODO: Note that we search manually, rather than invoking lookupMember
-    // on the ConstraintSystem object. Because this is a hot path, this keeps
-    // the overhead of the check low, and is twice as fast.
-    if (!NTD->getSearchedForFailableInits()) {
-      // Set flag before recursing to catch circularity.
-      NTD->setSearchedForFailableInits();
-      
-      for (auto member : NTD->getMembers()) {
-        if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-          if (CD->getFailability()) {
-            NTD->setHasFailableInits();
-            break;
-          }
-        }
-      }
-      
-      if (!NTD->getHasFailableInits()) {
-        for (auto extension : NTD->getExtensions()) {
-          for (auto member : extension->getMembers()) {
-            if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-              if (CD->getFailability()) {
-                NTD->setHasFailableInits();
-                break;
-              }
-            }
-          }
-        }
-        
-        if (!NTD->getHasFailableInits()) {
-          for (auto parentTyLoc : NTD->getInherited()) {
-            if (auto nominalType =
-                parentTyLoc.getType()->getAs<NominalType>()) {
-              if (hasFailableInits(nominalType->getDecl(), CS)) {
-                NTD->setHasFailableInits();
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    return NTD->getHasFailableInits();
-  }
-  
   size_t getOperandCount(Type t) {
     size_t nOperands = 0;
     
@@ -2385,25 +2335,6 @@ namespace {
         if (auto fnType = CS.getType(fnExpr)->getAs<AnyFunctionType>()) {
           outputTy = fnType->getResult();
         }
-      } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
-        outputTy = CS.getInstanceType(TE);
-        NominalTypeDecl *NTD = nullptr;
-        
-        if (auto nominalType = outputTy->getAs<NominalType>()) {
-          NTD = nominalType->getDecl();
-        } else if (auto bgT = outputTy->getAs<BoundGenericType>()) {
-          NTD = bgT->getDecl();
-        }
-        
-        if (NTD) {
-          if (!(isa<ClassDecl>(NTD) || isa<StructDecl>(NTD)) ||
-              hasFailableInits(NTD, &CS)) {
-            outputTy = Type();
-          }
-        } else {
-          outputTy = Type();
-        }
-        
       } else if (auto OSR = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
         if (auto FD = dyn_cast<FuncDecl>(OSR->getDecls()[0])) {
 
