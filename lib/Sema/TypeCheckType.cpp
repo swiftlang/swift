@@ -4139,13 +4139,8 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
-  // Global type aliases are okay.
-  if (isa<TypeAliasDecl>(decl) &&
-      decl->getDeclContext()->isModuleScopeContext())
-    return;
-
-  // Non-typealias type declarations are okay.
-  if (isa<TypeDecl>(decl) && !isa<TypeAliasDecl>(decl))
+  // Type declarations are okay.
+  if (isa<TypeDecl>(decl))
     return;
 
   // Extensions are okay.
