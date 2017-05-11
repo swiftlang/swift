@@ -725,7 +725,7 @@ extension Sequence {
   // overloads.
   @inline(__always)
   public func _flatMap<ElementOfResult>(
-    _ transform: (${GElement}) throws -> ElementOfResult?
+    _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     var result: [ElementOfResult] = []
     for element in self {
