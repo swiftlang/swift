@@ -115,6 +115,7 @@ IDENTIFIER_WITH_NAME(NativeClassLayout, "_NativeClass")
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 IDENTIFIER_WITH_NAME(derived_enum_equals, "__derived_enum_equals")
+IDENTIFIER_WITH_NAME(derived_struct_equals, "__derived_struct_equals")
 
 // Precedence groups
 IDENTIFIER(AssignmentPrecedence)
