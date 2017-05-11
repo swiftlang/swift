@@ -222,6 +222,10 @@ func cast41<T>(_ t: T, _ mt: T.Type) -> Bool {
 	return typ is AnyClass
 }
 
+func cast42(_ p: P) -> Bool {
+  return type(of: p as Any) is AnyClass
+}
+
 // CHECK-LABEL: sil hidden [noinline] @_T012cast_folding5test0SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
@@ -934,6 +938,16 @@ public func test40d(_ a: Any) -> Bool {
 @inline(never)
 public func test41() -> Bool {
     return cast41(A(), P.self)
+}
+
+// CHECK-LABEL: sil [noinline] @_T012cast_folding6test42{{.*}}F
+// CHECK: bb0
+// CHECK-NOT: return:
+// CHECK: checked_cast
+// CHECK: //{{.*}}_T012cast_folding6test42{{.*}}F
+@inline(never)
+public func test42(_ p: P) -> Bool {
+    return cast42(p)
 }
 
 print("test0=\(test0())")
