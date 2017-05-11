@@ -570,11 +570,27 @@ public:
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
   Modify           = 0x1,
-  ActionMask       = 0x1
+  // Leave space for other actions.
+  // Don't rely on ActionMask in stable ABI.
+  ActionMask       = 0x1,
+
+  // Downgrade exclusivity failures to a warning.
+  WarningOnly      = 0x10
 };
+static inline ExclusivityFlags operator|(ExclusivityFlags lhs,
+                                         ExclusivityFlags rhs) {
+  return ExclusivityFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline ExclusivityFlags &operator|=(ExclusivityFlags &lhs,
+                                           ExclusivityFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
 static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
   return ExclusivityFlags(uintptr_t(flags)
                         & uintptr_t(ExclusivityFlags::ActionMask));
+}
+static inline bool isWarningOnly(ExclusivityFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 
 } // end namespace swift
