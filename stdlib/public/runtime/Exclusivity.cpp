@@ -39,7 +39,6 @@
 
 #if SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC
 #include <pthread.h>
-#include <stdio.h>
 #endif
 
 // Pick a return-address strategy
