@@ -4587,6 +4587,27 @@ public:
           break;
         }
 
+        if (!isInvalidSuperclass && Super->hasMissingVTableEntries()) {
+          auto *superFile = Super->getModuleScopeContext();
+          if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
+            if (serialized->getLanguageVersionBuiltWith() !=
+                TC.getLangOpts().EffectiveLanguageVersion) {
+              TC.diagnose(CD,
+                          diag::inheritance_from_class_with_missing_vtable_entries_versioned,
+                          Super->getName(),
+                          serialized->getLanguageVersionBuiltWith(),
+                          TC.getLangOpts().EffectiveLanguageVersion);
+              isInvalidSuperclass = true;
+            }
+          }
+          if (!isInvalidSuperclass) {
+            TC.diagnose(
+                CD, diag::inheritance_from_class_with_missing_vtable_entries,
+                Super->getName());
+            isInvalidSuperclass = true;
+          }
+        }
+
         // Require the superclass to be open if this is outside its
         // defining module.  But don't emit another diagnostic if we
         // already complained about the class being inherently

@@ -4458,6 +4458,9 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
             [&](const DeclDeserializationError &error) {
           if (error.isDesignatedInitializer())
             containingClass->setHasMissingDesignatedInitializers();
+          if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
+            containingClass->setHasMissingVTableEntries();
+
           if (error.getName().getBaseName() == getContext().Id_init) {
             members.push_back(MissingMemberDecl::forInitializer(
                 getContext(), containingClass, error.getName(),
