@@ -23,6 +23,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -37,6 +38,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
@@ -2062,8 +2064,23 @@ namespace {
     // If the protocol contains missing requirements, it can't be conformed to
     // at all.
     if (Proto->hasMissingRequirements()) {
-      TC.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
-                  T, Proto->getDeclaredType());
+      bool hasDiagnosed = false;
+      auto *protoFile = Proto->getModuleScopeContext();
+      if (auto *serialized = dyn_cast<SerializedASTFile>(protoFile)) {
+        if (serialized->getLanguageVersionBuiltWith() !=
+            TC.getLangOpts().EffectiveLanguageVersion) {
+          TC.diagnose(ComplainLoc,
+                      diag::protocol_has_missing_requirements_versioned,
+                      T, Proto->getDeclaredType(),
+                      serialized->getLanguageVersionBuiltWith(),
+                      TC.getLangOpts().EffectiveLanguageVersion);
+          hasDiagnosed = true;
+        }
+      }
+      if (!hasDiagnosed) {
+        TC.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
+                    T, Proto->getDeclaredType());
+      }
       conformance->setInvalid();
       return conformance;
     }
@@ -6000,7 +6017,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
     // have unstable archival names.
     if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
-      if (isNSCoding(conformance->getProtocol())) {
+      if (Context.LangOpts.EnableObjCInterop &&
+          isNSCoding(conformance->getProtocol())) {
         // Note: these 'kind' values are synchronized with
         // diag::nscoding_unstable_mangled_name.
         Optional<unsigned> kind;
@@ -6048,13 +6066,19 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           auto insertionLoc =
             classDecl->getAttributeInsertionLoc(/*forModifier=*/false);
           if (isFixable) {
+            // Note: this is intentionally using the Swift 3 mangling,
+            // to provide compatibility with archives created in the Swift 3
+            // time frame.
+            Mangle::ASTMangler mangler;
             diagnose(classDecl, diag::unstable_mangled_name_add_objc)
               .fixItInsert(insertionLoc,
                            "@objc(<#Objective-C class name#>)");
             diagnose(classDecl,
                      diag::unstable_mangled_name_add_nskeyedarchivelegacy)
               .fixItInsert(insertionLoc,
-                           "@NSKeyedArchiveLegacy(\"<#class archival name#>\")");
+                           "@NSKeyedArchiveLegacy(\"" +
+                           mangler.mangleObjCRuntimeName(classDecl) +
+                           "\")");
           } else {
             diagnose(classDecl, diag::add_nskeyedarchivesubclassesonly_attr,
                      classDecl->getDeclaredInterfaceType())

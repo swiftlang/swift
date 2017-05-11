@@ -373,7 +373,9 @@ namespace {
           cast<GenericTypeParamType>(genericParam->getCanonicalType()));
         
         if (known == replacements.end())
-          return cs.createTypeVariable(nullptr, TVO_PrefersSubtypeBinding);
+          return cs.createTypeVariable(nullptr,
+                                       TVO_PrefersSubtypeBinding |
+                                       TVO_MustBeMaterializable);
         
         return known->second;
       }

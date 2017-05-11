@@ -2012,12 +2012,12 @@ public struct Dictionary<Key : Hashable, Value> :
   @_inlineable
   @available(swift, introduced: 4.0)
   public func filter(
-    _ isIncluded: (Key, Value) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
     var result = Dictionary()
-    for (key, value) in self {
-      if try isIncluded(key, value) {
-        result[key] = value
+    for el in self {
+      if try isIncluded(el) {
+        result[el.key] = el.value
       }
     }
     return result
@@ -2291,6 +2291,26 @@ public struct Dictionary<Key : Hashable, Value> :
   // API itself.
   //
 
+  //
+  // Collection conformance
+  //
+  
+  /// A Boolean value that indicates whether the dictionary is empty.
+  ///
+  /// Dictionaries are empty when created with an initializer or an empty
+  /// dictionary literal.
+  ///
+  ///     var frequencies: [String: Int] = [:]
+  ///     print(frequencies.isEmpty)
+  ///     // Prints "true"
+  public var isEmpty: Bool {
+    return count == 0
+  }
+}
+
+// Maintain old `keys` and `values` types in Swift 3 mode.
+
+extension Dictionary {
   /// A collection containing just the keys of the dictionary.
   ///
   /// When iterated over, keys appear in this collection in the same order as
@@ -2307,6 +2327,50 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // Prints "BR"
   ///     // Prints "JP"
   ///     // Prints "GH"
+  @available(swift, obsoleted: 4.0)
+  public var keys: LazyMapCollection<[Key: Value], Key> {
+    return self.lazy.map { $0.key }
+  }
+  
+  /// A collection containing just the values of the dictionary.
+  ///
+  /// When iterated over, values appear in this collection in the same order as
+  /// they occur in the dictionary's key-value pairs.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  ///     for v in countryCodes.values {
+  ///         print(v)
+  ///     }
+  ///     // Prints "Brazil"
+  ///     // Prints "Japan"
+  ///     // Prints "Ghana"
+  @available(swift, obsoleted: 4.0)
+  public var values: LazyMapCollection<[Key: Value], Value> {
+    return self.lazy.map { $0.value }
+  }
+}
+
+extension Dictionary {
+  /// A collection containing just the keys of the dictionary.
+  ///
+  /// When iterated over, keys appear in this collection in the same order as
+  /// they occur in the dictionary's key-value pairs. Each key in the keys
+  /// collection has a unique value.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  ///     for k in countryCodes.keys {
+  ///         print(k)
+  ///     }
+  ///     // Prints "BR"
+  ///     // Prints "JP"
+  ///     // Prints "GH"
+  @available(swift, introduced: 4.0)
   public var keys: Keys {
     return Keys(self)
   }
@@ -2326,6 +2390,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // Prints "Brazil"
   ///     // Prints "Japan"
   ///     // Prints "Ghana"
+  @available(swift, introduced: 4.0)
   public var values: Values {
     get {
       return Values(self)
@@ -2333,22 +2398,6 @@ public struct Dictionary<Key : Hashable, Value> :
     set {
       self = Dictionary(_variantBuffer: newValue._variantBuffer)
     }
-  }
-
-  //
-  // Collection conformance
-  //
-
-  /// A Boolean value that indicates whether the dictionary is empty.
-  ///
-  /// Dictionaries are empty when created with an initializer or an empty
-  /// dictionary literal.
-  ///
-  ///     var frequencies: [String: Int] = [:]
-  ///     print(frequencies.isEmpty)
-  ///     // Prints "true"
-  public var isEmpty: Bool {
-    return count == 0
   }
 
   /// A view of a dictionary's keys.

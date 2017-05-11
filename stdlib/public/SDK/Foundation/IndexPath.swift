@@ -658,7 +658,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             let totalBits = MemoryLayout<Int>.size * 8
             let lengthBits = 8
             let firstIndexBits = (totalBits - lengthBits) / 2
-            return count + (first << lengthBits) + (last << (lengthBits + firstIndexBits))
+            return count &+ (first << lengthBits) &+ (last << (lengthBits + firstIndexBits))
         }
 
         switch _indexes {

@@ -1279,8 +1279,52 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     return nullptr;
   }
 
+  auto getXRefDeclNameForError = [&]() -> DeclName {
+    DeclName result = pathTrace.getLastName();
+    while (--pathLen) {
+      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        return Identifier();
+
+      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                    &blobData);
+      switch (recordID) {
+      case XREF_TYPE_PATH_PIECE: {
+        IdentifierID IID;
+        XRefTypePathPieceLayout::readRecord(scratch, IID, None);
+        result = getIdentifier(IID);
+        break;
+      }
+      case XREF_VALUE_PATH_PIECE: {
+        IdentifierID IID;
+        XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None);
+        result = getIdentifier(IID);
+        break;
+      }
+      case XREF_INITIALIZER_PATH_PIECE:
+        result = getContext().Id_init;
+        break;
+
+      case XREF_EXTENSION_PATH_PIECE:
+      case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE:
+        break;
+
+      case XREF_GENERIC_PARAM_PATH_PIECE:
+        // Can't get the name without deserializing.
+        result = Identifier();
+        break;
+
+      default:
+        // Unknown encoding.
+        return Identifier();
+      }
+    }
+    return result;
+  };
+
   if (values.empty()) {
-    return llvm::make_error<XRefError>("top-level value not found", pathTrace);
+    return llvm::make_error<XRefError>("top-level value not found", pathTrace,
+                                       getXRefDeclNameForError());
   }
 
   // Filters for values discovered in the remaining path pieces.
@@ -1400,7 +1444,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
 
       if (values.size() != 1) {
         return llvm::make_error<XRefError>("multiple matching base values",
-                                           pathTrace);
+                                           pathTrace,
+                                           getXRefDeclNameForError());
       }
 
       auto nominal = dyn_cast<NominalTypeDecl>(values.front());
@@ -1408,7 +1453,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
 
       if (!nominal) {
         return llvm::make_error<XRefError>("base is not a nominal type",
-                                           pathTrace);
+                                           pathTrace,
+                                           getXRefDeclNameForError());
       }
 
       auto members = nominal->lookupDirect(memberName);
@@ -1498,7 +1544,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     case XREF_GENERIC_PARAM_PATH_PIECE: {
       if (values.size() != 1) {
         return llvm::make_error<XRefError>("multiple matching base values",
-                                           pathTrace);
+                                           pathTrace,
+                                           getXRefDeclNameForError());
       }
 
       uint32_t paramIndex;
@@ -1534,12 +1581,12 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
       if (!paramList) {
         return llvm::make_error<XRefError>(
             "cross-reference to generic param for non-generic type",
-            pathTrace);
+            pathTrace, getXRefDeclNameForError());
       }
       if (paramIndex >= paramList->size()) {
         return llvm::make_error<XRefError>(
             "generic argument index out of bounds",
-            pathTrace);
+            pathTrace, getXRefDeclNameForError());
       }
 
       values.clear();
@@ -1563,7 +1610,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     }
 
     if (values.empty()) {
-      return llvm::make_error<XRefError>("result not found", pathTrace);
+      return llvm::make_error<XRefError>("result not found", pathTrace,
+                                         getXRefDeclNameForError());
     }
 
     // Reset the module filter.
@@ -2043,6 +2091,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ctx.Stats->getFrontendCounters().NumDeclsDeserialized++;
 
   // Read the attributes (if any).
+  // This isn't just using DeclAttributes because that would result in the
+  // attributes getting reversed.
+  // FIXME: If we reverse them at serialization time we could get rid of this.
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
   auto AddAttribute = [&](DeclAttribute *Attr) {
@@ -2520,11 +2571,12 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclContextID contextID;
     uint8_t rawFailability;
-    bool isImplicit, isObjC, hasStubImplementation, throws, needsNewVTableEntry;
+    bool isImplicit, isObjC, hasStubImplementation, throws;
     GenericEnvironmentID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
     TypeID interfaceID, canonicalTypeID;
     DeclID overriddenID;
+    bool needsNewVTableEntry, firstTimeRequired;
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
@@ -2534,7 +2586,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                genericEnvID, interfaceID,
                                                canonicalTypeID, overriddenID,
                                                rawAccessLevel,
-                                               needsNewVTableEntry, argNameIDs);
+                                               needsNewVTableEntry,
+                                               firstTimeRequired,
+                                               argNameIDs);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2545,20 +2599,29 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     Optional<swift::CtorInitializerKind> initKind =
         getActualCtorInitializerKind(storedInitKind);
 
-    auto errorKind = DeclDeserializationError::Normal;
+    DeclDeserializationError::Flags errorFlags;
     if (initKind == CtorInitializerKind::Designated)
-      errorKind = DeclDeserializationError::DesignatedInitializer;
+      errorFlags |= DeclDeserializationError::DesignatedInitializer;
+    if (needsNewVTableEntry) {
+      errorFlags |= DeclDeserializationError::NeedsVTableEntry;
+      DeclAttributes attrs;
+      attrs.setRawAttributeChain(DAttrs);
+      if (attrs.hasAttribute<RequiredAttr>())
+        errorFlags |= DeclDeserializationError::NeedsAllocatingVTableEntry;
+    }
+    if (firstTimeRequired)
+      errorFlags |= DeclDeserializationError::NeedsAllocatingVTableEntry;
 
     auto overridden = getDeclChecked(overriddenID);
     if (!overridden) {
       llvm::consumeError(overridden.takeError());
-      return llvm::make_error<OverrideError>(name, errorKind);
+      return llvm::make_error<OverrideError>(name, errorFlags);
     }
 
     auto canonicalType = getTypeChecked(canonicalTypeID);
     if (!canonicalType) {
       return llvm::make_error<TypeError>(
-          name, takeErrorInfo(canonicalType.takeError()), errorKind);
+          name, takeErrorInfo(canonicalType.takeError()), errorFlags);
     }
 
     auto parent = getDeclContext(contextID);
@@ -2780,16 +2843,20 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
         name = DeclName(names[0]);
     }
 
+    DeclDeserializationError::Flags errorFlags;
+    if (needsNewVTableEntry)
+      errorFlags |= DeclDeserializationError::NeedsVTableEntry;
+
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
       llvm::consumeError(overridden.takeError());
-      return llvm::make_error<OverrideError>(name);
+      return llvm::make_error<OverrideError>(name, errorFlags);
     }
 
     auto canonicalType = getTypeChecked(canonicalTypeID);
     if (!canonicalType) {
       return llvm::make_error<TypeError>(
-          name, takeErrorInfo(canonicalType.takeError()));
+          name, takeErrorInfo(canonicalType.takeError()), errorFlags);
     }
 
     auto DC = getDeclContext(contextID);
@@ -2799,8 +2866,11 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // first.
     auto accessor = getDeclChecked(accessorStorageDeclID);
-    if (!accessor)
-      return accessor.takeError();
+    if (!accessor) {
+      // FIXME: "TypeError" isn't exactly correct for this.
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(accessor.takeError()), errorFlags);
+    }
 
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
@@ -3699,9 +3769,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
     if (!nominal) {
       XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-      tinyTrace.addValue(cast<ValueDecl>(nominalOrError.get())->getName());
+      DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getFullName();
+      tinyTrace.addValue(fullName.getBaseName());
       return llvm::make_error<XRefError>("declaration is not a nominal type",
-                                         tinyTrace);
+                                         tinyTrace, fullName);
     }
     typeOrOffset = NominalType::get(nominal, parentTy.get(), ctx);
 
@@ -4381,17 +4452,48 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
         fatal(next.takeError());
 
       // Drop the member if it had a problem.
-      // FIXME: If this was a non-final, non-dynamic, non-@objc-overriding
-      // member, it's going to affect the vtable layout, and /every single call/
-      // will be wrong.
+      // FIXME: Handle overridable members in class extensions too, someday.
       if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
-        auto handleMissingDesignatedInit =
-            [containingClass](const DeclDeserializationError &error) {
-          if (error.getKind() != OverrideError::DesignatedInitializer)
-            return;
-          containingClass->setHasMissingDesignatedInitializers();
+        auto handleMissingClassMember =
+            [&](const DeclDeserializationError &error) {
+          if (error.isDesignatedInitializer())
+            containingClass->setHasMissingDesignatedInitializers();
+          if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
+            containingClass->setHasMissingVTableEntries();
+
+          if (error.getName().getBaseName() == getContext().Id_init) {
+            members.push_back(MissingMemberDecl::forInitializer(
+                getContext(), containingClass, error.getName(),
+                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
+          } else if (error.needsVTableEntry()) {
+            members.push_back(MissingMemberDecl::forMethod(
+                getContext(), containingClass, error.getName(),
+                error.needsVTableEntry()));
+          }
+          // FIXME: Handle other kinds of missing members: properties,
+          // subscripts, and methods that don't need vtable entries.
         };
-        llvm::handleAllErrors(next.takeError(), handleMissingDesignatedInit);
+        llvm::handleAllErrors(next.takeError(), handleMissingClassMember);
+      } else if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
+        auto handleMissingProtocolMember =
+            [&](const DeclDeserializationError &error) {
+          assert(!error.needsAllocatingVTableEntry());
+          if (error.needsVTableEntry())
+            containingProto->setHasMissingRequirements(true);
+
+          if (error.getName().getBaseName() == getContext().Id_init) {
+            members.push_back(MissingMemberDecl::forInitializer(
+                getContext(), containingProto, error.getName(),
+                error.needsVTableEntry(), error.needsAllocatingVTableEntry()));
+          } else if (error.needsVTableEntry()) {
+            members.push_back(MissingMemberDecl::forMethod(
+                getContext(), containingProto, error.getName(),
+                error.needsVTableEntry()));
+          }
+          // FIXME: Handle other kinds of missing members: properties,
+          // subscripts, and methods that don't need vtable entries.
+        };
+        llvm::handleAllErrors(next.takeError(), handleMissingProtocolMember);
       } else {
         llvm::consumeError(next.takeError());
       }

@@ -375,7 +375,7 @@ struct AccessEnforcementSelection : SILFunctionTransform {
         // escape within the callee, so static enforcement is always sufficient.
         //
         // FIXME: `inout_aliasable` are not currently enforced on the caller
-        // side. Consequenctly, using static enforcement for noescape closures
+        // side. Consequently, using static enforcement for noescape closures
         // may fails to diagnose certain violations.
         setStaticEnforcement(access);
         break;

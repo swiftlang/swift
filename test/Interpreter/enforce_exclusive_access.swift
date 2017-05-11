@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out -enforce-exclusivity=checked -Onone
+// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -47,7 +47,7 @@ ExclusiveAccessTestSuite.test("ModifyInsideRead")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("modify/read access conflict detected on address")
+  .crashOutputMatches("read/modify access conflict detected on address")
   .code
 {
   readAndPerform(&globalX) {
@@ -60,7 +60,7 @@ ExclusiveAccessTestSuite.test("ReadInsideModify")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("read/modify access conflict detected on address")
+  .crashOutputMatches("modify/read access conflict detected on address")
   .code
 {
   modifyAndPerform(&globalX) {
@@ -101,8 +101,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
   globalX = X() // no-trap
 }
 
-// FIXME: This should be a static diagnostics.
-// Once this radar is fixed, conirm that a it is covered by a static diagnostic
+// FIXME: This should be covered by static diagnostics.
+// Once this radar is fixed, confirm that a it is covered by a static diagnostic
 // (-verify) test in exclusivity_static_diagnostics.sil.
 // <rdar://problem/32061282> Enforce exclusive access in noescape closures.
 //
@@ -120,8 +120,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //  }
 //}
 
-// FIXME: This should be a static diagnostics.
-// Once this radar is fixed, conirm that a it is covered by a static diagnostic
+// FIXME: This should be covered by static diagnostics.
+// Once this radar is fixed, confirm that a it is covered by a static diagnostic
 // (-verify) test in exclusivity_static_diagnostics.sil.
 // <rdar://problem/32061282> Enforce exclusive access in noescape closures.
 //
@@ -129,7 +129,7 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //.skip(.custom(
 //    { _isFastAssertConfiguration() },
 //    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("read/modify access conflict detected on address")
+//  .crashOutputMatches("modify/read access conflict detected on address")
 //  .code
 //{
 //  var x = X()
@@ -139,8 +139,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //  }
 //}
 
-// FIXME: This should be a static diagnostics.
-// Once this radar is fixed, conirm that a it is covered by a static diagnostic
+// FIXME: This should be covered by static diagnostics.
+// Once this radar is fixed, confirm that a it is covered by a static diagnostic
 // (-verify) test in exclusivity_static_diagnostics.sil.
 // <rdar://problem/32061282> Enforce exclusive access in noescape closures.
 //
@@ -148,7 +148,7 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //.skip(.custom(
 //    { _isFastAssertConfiguration() },
 //    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("modify/read access conflict detected on address")
+//  .crashOutputMatches("read/modify access conflict detected on address")
 //  .code
 //{
 //  var x = X()

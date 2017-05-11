@@ -254,7 +254,13 @@ struct SILDeclRef {
   bool isStoredPropertyInitializer() const {
     return kind == Kind::StoredPropertyInitializer;
   }
-  
+
+  /// True if the SILDeclRef references the ivar initializer or deinitializer of
+  /// a class.
+  bool isIVarInitializerOrDestroyer() const {
+    return kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer;
+  }
+
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
   /// \brief True if the function should have its body serialized.

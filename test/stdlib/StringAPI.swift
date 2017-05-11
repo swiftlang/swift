@@ -362,8 +362,11 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
 }
 
 StringTests.test("String.init(_:String)") {
-  let _: String = String("" as String) // should compile without ambiguities
+  var s = String("")
+  expectType(String.self, &s)
+  var _ = String("") as String? // should also compile, but not be the default
 }
+
 
 StringTests.test("[String].joined() -> String") {
   let s = ["hello", "world"].joined()

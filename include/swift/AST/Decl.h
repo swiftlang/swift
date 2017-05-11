@@ -140,6 +140,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DidSet,
   EnumElement,
   Module,
+  MissingMember,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -445,17 +446,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
 
-    /// \brief Whether or not this declaration has a failable initializer member,
-    /// and whether or not we've actually searched for one.
-    unsigned HasFailableInits : 1;
-
-    /// Whether we have already searched for failable initializers.
-    unsigned SearchedForFailableInits : 1;
-
     /// Whether there is are lazily-loaded conformances for this nominal type.
     unsigned HasLazyConformances : 1;
   };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 5 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 3 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -602,6 +596,15 @@ class alignas(1 << DeclAlignInBits) Decl {
   enum { NumIfConfigDeclBits = NumDeclBits + 1 };
   static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
 
+  class MissingMemberDeclBitfields {
+    friend class MissingMemberDecl;
+    unsigned : NumDeclBits;
+
+    unsigned NumberOfVTableEntries : 2;
+  };
+  enum { NumMissingMemberDeclBits = NumDeclBits + 2 };
+  static_assert(NumMissingMemberDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
@@ -626,6 +629,7 @@ protected:
     ImportDeclBitfields ImportDeclBits;
     ExtensionDeclBitfields ExtensionDeclBits;
     IfConfigDeclBitfields IfConfigDeclBits;
+    MissingMemberDeclBitfields MissingMemberDeclBits;
     uint32_t OpaqueBits;
   };
 
@@ -2744,8 +2748,6 @@ protected:
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
-    NominalTypeDeclBits.SearchedForFailableInits = false;
-    NominalTypeDeclBits.HasFailableInits = false;
     NominalTypeDeclBits.HasLazyConformances = false;
   }
 
@@ -2795,19 +2797,6 @@ public:
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
               
-  bool getHasFailableInits() const {
-    return NominalTypeDeclBits.HasFailableInits;
-  }
-  void setHasFailableInits(bool failable = true) {
-    NominalTypeDeclBits.HasFailableInits = failable;
-  }
-  void setSearchedForFailableInits(bool searched = true) {
-    NominalTypeDeclBits.SearchedForFailableInits = searched;
-  }
-  bool getSearchedForFailableInits() const {
-    return NominalTypeDeclBits.SearchedForFailableInits;
-  }
-
   /// Compute the type of this nominal type.
   void computeType();
 
@@ -3204,6 +3193,7 @@ class ClassDecl : public NominalTypeDecl {
   unsigned ObjCKind : 3;
 
   unsigned HasMissingDesignatedInitializers : 1;
+  unsigned HasMissingVTableEntries : 1;
 
   friend class IterativeTypeChecker;
 
@@ -3298,6 +3288,16 @@ public:
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
     HasMissingDesignatedInitializers = newValue;
+  }
+
+  /// Returns true if the class has missing members that require vtable entries.
+  ///
+  /// In this case, the class cannot be subclassed, because we cannot construct
+  /// the vtable for the subclass.
+  bool hasMissingVTableEntries() const;
+
+  void setHasMissingVTableEntries(bool newValue = true) {
+    HasMissingVTableEntries = newValue;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -5057,12 +5057,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// If this declaration is part of an overload set, determine if we've
-  /// searched for a common overload amongst all overloads, or if we've found
-  /// one.
-  unsigned HaveSearchedForCommonOverloadReturnType : 1;
-  unsigned HaveFoundCommonOverloadReturnType : 1;
-
   /// Whether we are statically dispatched even if overridable
   unsigned ForcedStaticDispatch : 1;
 
@@ -5103,8 +5097,6 @@ class FuncDecl final : public AbstractFunctionDecl,
     Mutating = false;
     HasDynamicSelf = false;
     ForcedStaticDispatch = false;
-    HaveSearchedForCommonOverloadReturnType = false;
-    HaveFoundCommonOverloadReturnType = false;
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -5177,20 +5169,6 @@ public:
     return getParameterLists()[i];
   }
   
-
-  bool getHaveSearchedForCommonOverloadReturnType() {
-    return HaveSearchedForCommonOverloadReturnType;
-  }
-  void setHaveSearchedForCommonOverloadReturnType(bool b = true) {
-    HaveSearchedForCommonOverloadReturnType = b;
-  }
-  bool getHaveFoundCommonOverloadReturnType() {
-    return HaveFoundCommonOverloadReturnType;
-  }
-  void setHaveFoundCommonOverloadReturnType(bool b = true) {
-    HaveFoundCommonOverloadReturnType = b;
-  }
-
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
@@ -6129,6 +6107,55 @@ public:
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PostfixOperator;
+  }
+};
+
+/// Represents a hole where a declaration should have been.
+///
+/// Among other things, these are used to keep vtable layout consistent.
+class MissingMemberDecl : public Decl {
+  DeclName Name;
+
+  MissingMemberDecl(DeclContext *DC, DeclName name, unsigned vtableEntries)
+      : Decl(DeclKind::MissingMember, DC), Name(name) {
+    MissingMemberDeclBits.NumberOfVTableEntries = vtableEntries;
+    assert(getNumberOfVTableEntries() == vtableEntries && "not enough bits");
+    setImplicit();
+  }
+public:
+  static MissingMemberDecl *
+  forMethod(ASTContext &ctx, DeclContext *DC, DeclName name,
+            bool hasNormalVTableEntry) {
+    assert(!name || name.isCompoundName());
+    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry);
+  }
+
+  static MissingMemberDecl *
+  forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
+                 bool hasNormalVTableEntry,
+                 bool hasAllocatingVTableEntry) {
+    unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
+    return new (ctx) MissingMemberDecl(DC, name, entries);
+  }
+
+  DeclName getFullName() const {
+    return Name;
+  }
+
+  unsigned getNumberOfVTableEntries() const {
+    return MissingMemberDeclBits.NumberOfVTableEntries;
+  }
+
+  SourceLoc getLoc() const {
+    return SourceLoc();
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::MissingMember;
   }
 };
 

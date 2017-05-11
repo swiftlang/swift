@@ -75,7 +75,7 @@ class PerformanceTestResult:
     # (name, min value, max value, mean value, max_rss)
     def values(self):
         return (self.name, str(self.min), str(self.max), str(int(self.mean)),
-                str(self.max_rss) if self.max_rss else '—')
+                str(self.max_rss) if self.max_rss else '-')
 
 
 class ResultComparison:

@@ -1231,7 +1231,7 @@ NOTE(unstable_mangled_name_add_nskeyedarchivelegacy,none,
      "for compatibility with existing archives, use '@NSKeyedArchiveLegacy' "
      "to record the Swift 3 mangled name", ())
 NOTE(add_nskeyedarchivesubclassesonly_attr,none,
-     "generic classes should not be archived directly; "
+     "generic class %0 should not be archived directly; "
      "add @NSKeyedArchiveSubclassesOnly "
      "and only archive specific subclasses of this class", (Type))
 
@@ -1379,6 +1379,10 @@ ERROR(objc_runtime_visible_cannot_conform_to_objc_protocol,none,
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
+ERROR(protocol_has_missing_requirements_versioned,none,
+      "type %0 cannot conform to protocol %1 (compiled with Swift %2) because "
+      "it has requirements that could not be loaded in Swift %3",
+      (Type, Type, clang::VersionTuple, clang::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
@@ -1908,6 +1912,14 @@ ERROR(inheritance_from_final_class,none,
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
       "inheritance from a generic Objective-C class %0 must bind "
       "type parameters of %0 to specific concrete types", (Identifier))
+ERROR(inheritance_from_class_with_missing_vtable_entries,none,
+      "cannot inherit from class %0 because it has overridable members that "
+      "could not be loaded",
+      (Identifier))
+ERROR(inheritance_from_class_with_missing_vtable_entries_versioned,none,
+      "cannot inherit from class %0 (compiled with Swift %1) because it has "
+      "overridable members that could not be loaded in Swift %2",
+      (Identifier, clang::VersionTuple, clang::VersionTuple))
 ERROR(inheritance_from_cf_class,none,
       "cannot inherit from Core Foundation type %0", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,

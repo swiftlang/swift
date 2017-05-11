@@ -1764,9 +1764,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     SILBasicBlock *ResultBB = TAI->getNormalBB();
     assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
-    auto *NewTAI =
-        Builder.createTryApply(Loc, Callee, CalleeSILSubstFnTy, Subs, Arguments,
-                               ResultBB, TAI->getErrorBB());
+    auto *NewTAI = Builder.createTryApply(Loc, Callee, Subs, Arguments,
+                                          ResultBB, TAI->getErrorBB());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
       // The original normal result of the try_apply is an empty tuple.
@@ -1784,9 +1783,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     return NewTAI;
   }
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI = Builder.createApply(Loc, Callee, CalleeSILSubstFnTy,
-                                      substConv.getSILResultType(), Subs,
-                                      Arguments, A->isNonThrowing());
+    auto *NewAI = Builder.createApply(Loc, Callee, Subs, Arguments,
+                                      A->isNonThrowing());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
       if (!CalleeSILSubstFnTy.isNoReturnFunction()) {
@@ -1807,14 +1805,9 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     return NewAI;
   }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    CanSILFunctionType NewPAType = ReInfo.createSpecializedType(
-        PAI->getFunctionType(), Builder.getModule());
-    // SILType PTy =
-    // SILType::getPrimitiveObjectType(ReInfo.getSpecializedType());
-    SILType PTy = CalleeSILSubstFnTy;
-    auto *NewPAI =
-        Builder.createPartialApply(Loc, Callee, PTy, Subs, Arguments,
-                                   SILType::getPrimitiveObjectType(NewPAType));
+    auto *NewPAI = Builder.createPartialApply(
+        Loc, Callee, Subs, Arguments,
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
     PAI->replaceAllUsesWith(NewPAI);
     return NewPAI;
   }
@@ -1943,21 +1936,14 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILFunction *Thunk = &Builder.getFunction();
   auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
   auto Subs = Thunk->getForwardingSubstitutions();
-  auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
-  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   auto specConv = SpecializedFunc->getConventions();
-  auto SILResultTy =
-      SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType());
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
-    return Builder.createApply(Loc, FRI, CalleeSILSubstFnTy,
-                               SILResultTy, Subs, Arguments,
-                               false);
+    return Builder.createApply(Loc, FRI, Subs, Arguments, false);
   }
   // Create the logic for calling a throwing function.
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
-  Builder.createTryApply(Loc, FRI, CalleeSILSubstFnTy, Subs,
-                         Arguments, NormalBB, ErrorBB);
+  Builder.createTryApply(Loc, FRI, Subs, Arguments, NormalBB, ErrorBB);
   auto *ErrorVal = ErrorBB->createPHIArgument(
       SpecializedFunc->mapTypeIntoContext(specConv.getSILErrorType()),
       ValueOwnershipKind::Owned);
@@ -2171,11 +2157,9 @@ void swift::trySpecializeApplyOfGeneric(
       Arguments.push_back(Op.get());
     }
     auto Subs = ReInfo.getCallerParamSubstitutions();
-    auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
-    auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
-    auto *NewPAI = Builder.createPartialApply(PAI->getLoc(), FRI,
-                                              CalleeSILSubstFnTy, Subs,
-                                              Arguments, PAI->getType());
+    auto *NewPAI = Builder.createPartialApply(
+        PAI->getLoc(), FRI, Subs, Arguments,
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
     PAI->replaceAllUsesWith(NewPAI);
     DeadApplies.insert(PAI);
     return;

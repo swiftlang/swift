@@ -21,11 +21,6 @@ public protocol StringProtocol
   Hashable
   where Iterator.Element == Character {
 
-  // this should be just <T : StringProtocol>
-  init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T) where T.Iterator.Element == Character
-
   associatedtype UTF8Index
   var utf8: String.UTF8View { get }
   associatedtype UTF16Index
@@ -83,11 +78,9 @@ public protocol StringProtocol
   ) rethrows -> Result
 }
 
-extension StringProtocol {
-  public init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T) where T.Iterator.Element == Character {
-    self.init(other.description.characters)
+extension StringProtocol /* : LosslessStringConvertible */ {
+  public init?(_ description: String) {
+    self.init(description.characters)
   }
 }
 
@@ -1033,12 +1026,6 @@ extension String {
 extension String : CustomStringConvertible {
   public var description: String {
     return self
-  }
-}
-
-extension String : LosslessStringConvertible {
-  public init?(_ description: String) {
-    self = description
   }
 }
 

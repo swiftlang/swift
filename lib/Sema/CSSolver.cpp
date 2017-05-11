@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -2480,6 +2481,28 @@ static bool isGenericOperatorOrUnavailable(Constraint *constraint) {
     decl->getAttrs().isUnavailable(ctx);
 }
 
+/// Whether this constraint refers to a symmetric operator.
+static bool isSymmetricOperator(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::BindOverload ||
+      constraint->getOverloadChoice().getKind() != OverloadChoiceKind::Decl ||
+      !constraint->getOverloadChoice().getDecl()->isOperator())
+    return false;
+
+  // If it's a binary operator, check that the types on both sides are the
+  // same. Otherwise, don't perform this optimization.
+  auto func = dyn_cast<FuncDecl>(constraint->getOverloadChoice().getDecl());
+  auto paramList =
+  func->getParameterList(func->getDeclContext()->isTypeContext());
+  if (paramList->size() != 2)
+    return true;
+
+  auto firstType =
+    paramList->get(0)->getInterfaceType()->getLValueOrInOutObjectType();
+  auto secondType =
+    paramList->get(1)->getInterfaceType()->getLValueOrInOutObjectType();
+  return firstType->isEqual(secondType);
+}
+
 bool ConstraintSystem::solveSimplified(
     SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -2694,7 +2717,8 @@ bool ConstraintSystem::solveSimplified(
 
     if (!solveRec(solutions, allowFreeTypeVariables)) {
       if (!firstNonGenericOperatorSolution &&
-          !isGenericOperatorOrUnavailable(constraint))
+          !isGenericOperatorOrUnavailable(constraint) &&
+          isSymmetricOperator(constraint))
         firstNonGenericOperatorSolution = constraint;
 
       firstSolvedConstraint = constraint;
