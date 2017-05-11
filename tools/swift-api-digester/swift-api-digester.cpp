@@ -3002,7 +3002,8 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // index, old printed name)
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(), constructFullTypeName(rightParent),
-        right->getPrintedName(), findSelfIndex(right), left->getPrintedName()};
+        right->getPrintedName(), findSelfIndex(right), None,
+        left->getPrintedName()};
     out.emplace_back(item);
     Detector.workOn(left, right);
   }

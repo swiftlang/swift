@@ -259,13 +259,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return DeclNameViewer();
   }
 
+
   bool isSimpleReplacement(APIDiffItem *Item, std::string &Text) {
     if (auto *MD = dyn_cast<TypeMemberDiffItem>(Item)) {
-      // We need to pull the self if self index is set.
-      if (MD->selfIndex.hasValue())
-        return false;
-      Text = (llvm::Twine(MD->newTypeName) + "." + MD->newPrintedName).str();
-      return true;
+      if (MD->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement) {
+        Text = (llvm::Twine(MD->newTypeName) + "." + MD->getNewName().base()).
+          str();
+        return true;
+      }
     }
 
     // Simple rename.
@@ -319,6 +320,26 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   };
 
+  void emitRenameLabelChanges(Expr *Arg, DeclNameViewer NewName,
+                              llvm::ArrayRef<unsigned> IgnoreArgIndex) {
+    unsigned Idx = 0;
+    auto Ranges = getCallArgLabelRanges(SM, Arg,
+                                        LabelRangeEndAt::LabelNameOnly);
+    for (unsigned I = 0; I < Ranges.size(); I ++) {
+      if (std::any_of(IgnoreArgIndex.begin(), IgnoreArgIndex.end(),
+                      [I](unsigned Ig) { return Ig == I; }))
+        continue;
+      auto LR = Ranges[I];
+      if (Idx < NewName.argSize()) {
+        auto Label = NewName.args()[Idx++];
+
+        // FIXME: We update only when args are consistently valid.
+        if (Label != "_" && LR.getByteLength())
+          Editor.replace(LR, Label);
+      }
+    }
+  }
+
   void handleFuncRename(ValueDecl *FD, Expr* FuncRefContainer, Expr *Arg) {
     bool IgnoreBase = false;
     if (auto View = getFuncRename(FD, IgnoreBase)) {
@@ -327,18 +348,37 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         Walker.walk(FuncRefContainer);
         Editor.replace(Walker.Result, View.base());
       }
-      unsigned Idx = 0;
-      for (auto LR :getCallArgLabelRanges(SM, Arg,
-                                          LabelRangeEndAt::LabelNameOnly)) {
-        if (Idx < View.argSize()) {
-          auto Label = View.args()[Idx++];
-
-          // FIXME: We update only when args are consistently valid.
-          if (Label != "_" && LR.getByteLength())
-            Editor.replace(LR, Label);
-        }
-      }
+      emitRenameLabelChanges(Arg, View, {});
     }
+  }
+
+  bool handleTypeHoist(ValueDecl *FD, CallExpr* Call, Expr *Arg) {
+    TypeMemberDiffItem *Item = nullptr;
+    for (auto *I: getRelatedDiffItems(FD)) {
+      Item = dyn_cast<TypeMemberDiffItem>(I);
+      if (Item)
+        break;
+    }
+    if (!Item)
+      return false;
+    if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement)
+      return false;
+    if (*Item->selfIndex)
+      return false;
+    std::vector<CallArgInfo> AllArgs =
+      getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
+    if (!AllArgs.size())
+      return false;
+    DeclNameViewer NewName = Item->getNewName();
+    llvm::SmallVector<unsigned, 2> IgnoredArgIndices;
+    IgnoredArgIndices.push_back(*Item->selfIndex);
+    if (auto RI = Item->removedIndex)
+      IgnoredArgIndices.push_back(*RI);
+    emitRenameLabelChanges(Arg, NewName, IgnoredArgIndices);
+    Editor.remove(CharSourceRange(SM, Call->getStartLoc(),
+                                  AllArgs[0].ArgExp->getStartLoc()));
+
+    return true;
   }
 
   void handleFunctionCallToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,

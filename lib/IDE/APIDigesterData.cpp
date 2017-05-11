@@ -105,6 +105,39 @@ StringRef swift::ide::api::TypeMemberDiffItem::head() {
   return "SDK_CHANGE_TYPE_MEMBER";
 }
 
+TypeMemberDiffItemSubKind
+swift::ide::api::TypeMemberDiffItem::getSubKind() const {
+  DeclNameViewer OldName = getOldName();
+  DeclNameViewer NewName = getNewName();
+  if(!OldName.isFunction()) {
+    assert(!NewName.isFunction());
+    return TypeMemberDiffItemSubKind::SimpleReplacement;
+  }
+  assert(OldName.isFunction());
+  bool ToProperty = !NewName.isFunction();
+  if (selfIndex) {
+    if (removedIndex) {
+      if (ToProperty)
+        llvm_unreachable("unknown situation");
+      else {
+        assert(NewName.argSize() + 2 == OldName.argSize());
+        return TypeMemberDiffItemSubKind::HoistSelfAndRemoveParam;
+      }
+    } else if (ToProperty) {
+      assert(OldName.argSize() == 1);
+      return TypeMemberDiffItemSubKind::HoistSelfAndUseProperty;
+    } else {
+      assert(NewName.argSize() + 1 == OldName.argSize());
+      return TypeMemberDiffItemSubKind::HoistSelfOnly;
+    }
+  } else if (ToProperty) {
+    llvm_unreachable("unknown situation");
+  } else {
+    assert(NewName.argSize() == OldName.argSize());
+    return TypeMemberDiffItemSubKind::SimpleReplacement;
+  }
+}
+
 void swift::ide::api::TypeMemberDiffItem::describe(llvm::raw_ostream &os) {
   os << "#ifndef " << head() << "\n";
   os << "#define " << head() << "(USR, NEW_TYPE_NAME, NEW_PRINTED_NAME, "
@@ -274,11 +307,14 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
     Optional<uint8_t> SelfIndexShort;
+    Optional<uint8_t> RemovedIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.getValue();
+    if (RemovedIndex)
+      RemovedIndexShort = RemovedIndex.getValue();
     return new (Alloc.Allocate<TypeMemberDiffItem>())
       TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName, SelfIndexShort,
-                         OldPrintedName);
+                         RemovedIndexShort, OldPrintedName);
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     return new (Alloc.Allocate<NoEscapeFuncParam>())
