@@ -220,6 +220,7 @@ def compare_frontend_stats(args):
     assert(len(args.remainder) == 2)
     (olddir, newdir) = args.remainder
 
+    regressions = 0
     fieldnames = ["old", "new", "delta_pct", "name"]
     out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
     out.writeheader()
@@ -231,7 +232,7 @@ def compare_frontend_stats(args):
     new_merged = merge_all_jobstats([x for x in new_stats
                                      if x.is_frontend_job()])
     if old_merged is None or new_merged is None:
-        return
+        return regressions
     for stat_name in sorted(old_merged.stats.keys()):
         if stat_name in new_merged.stats:
             old = old_merged.stats[stat_name]
@@ -247,6 +248,9 @@ def compare_frontend_stats(args):
                 continue
             out.writerow(dict(name=stat_name, old=old, new=new,
                               delta_pct=delta_pct))
+            if delta > 0:
+                regressions += 1
+    return regressions
 
 
 def main():
@@ -275,15 +279,16 @@ def main():
     args = parser.parse_args()
     if len(args.remainder) == 0:
         parser.print_help()
-        sys.exit(1)
+        return 1
     if args.catapult:
         write_catapult_trace(args)
     elif args.compare_frontend_stats:
-        compare_frontend_stats(args)
+        return compare_frontend_stats(args)
     elif args.incrementality:
         if args.paired:
             show_paired_incrementality(args)
         else:
             show_incrementality(args)
+    return None
 
-main()
+sys.exit(main())
