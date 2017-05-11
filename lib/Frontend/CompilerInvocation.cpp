@@ -1629,7 +1629,7 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
   }
 
   if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
-    Opts.APIDigesterDataStorePath = DataPath->getValue();
+    Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
   } else {
     bool Supported = true;
     llvm::SmallString<128> dataPath(ResourcePath);
@@ -1644,8 +1644,14 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
       llvm::sys::path::append(dataPath, "watchos.json");
     else
       Supported = false;
-    if (Supported)
-      Opts.APIDigesterDataStorePath = dataPath.str();
+    if (Supported) {
+      llvm::SmallString<128> authoredDataPath(ResourcePath);
+      llvm::sys::path::append(authoredDataPath, "migrator");
+      llvm::sys::path::append(authoredDataPath, "overlay.json");
+      // Add authored list first to take higher priority.
+      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
+      Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
+    }
   }
 
   return false;
