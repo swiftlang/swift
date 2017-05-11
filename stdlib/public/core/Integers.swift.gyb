@@ -1574,9 +1574,7 @@ extension BinaryInteger {
 
   @_transparent
   public func signum() -> Self {
-    if self < (0 as Self) { return -1 }
-    if self > (0 as Self) { return 1 }
-    return 0
+    return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
   }
 
   /// The number of words used for the current binary representation of this
@@ -3035,6 +3033,13 @@ ${operatorComment(x.operator, True)}
 
   @available(swift, obsoleted: 4)
   public static var _sizeInBytes: ${Self} { return ${bits}/8 }
+
+  @inline(__always)
+  public func signum() -> ${Self} {
+    let isPositive = ${Self}(Builtin.zext_Int1_Int${bits}(
+      (self > (0 as ${Self}))._value))
+    return isPositive | (self &>> ${bits - 1})
+  }
 }
 %# end of concrete type: ${Self}
 

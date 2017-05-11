@@ -11,6 +11,10 @@ N: David Abrahams
 E: dabrahams@apple.com
 D: Swift standard library
 
+N: Erik Eckstein
+E: eeckstein@apple.com
+D: SILOptimizer
+
 N: David Farler
 E: dfarler@apple.com
 D: Markup, lib/Syntax, Swift Linux port
@@ -38,10 +42,6 @@ D: Demangler, IRGen, Runtime
 N: Jordan Rose
 E: jordan_rose@apple.com
 D: ClangImporter, Serialization, (Objective-)C printer, Driver
-
-N: Erik Eckstein
-E: eeckstein@apple.com
-D: SILOptimizer
 
 N: Anna Zaks
 E: ganna@apple.com

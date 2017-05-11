@@ -6,7 +6,7 @@
 // In ideal world, all those testNN functions should be simplified down to a single basic block
 // which returns either true or false, i.e. all type checks should folded statically.
 
-protocol P {}
+public protocol P {}
 
 protocol Q: P {}
 
@@ -215,6 +215,15 @@ func cast39<T>(_ t: T) -> Bool {
 
 func cast40<T>(_ t: T) -> Bool {
   return t is (x: Int, y: A)
+}
+
+func cast41<T>(_ t: T, _ mt: T.Type) -> Bool {
+	let typ = type(of: t as Any)
+	return typ is AnyClass
+}
+
+func cast42(_ p: P) -> Bool {
+  return type(of: p as Any) is AnyClass
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_T012cast_folding5test0SbyF : $@convention(thin) () -> Bool
@@ -918,6 +927,27 @@ public func test40c() -> Bool {
 @inline(never)
 public func test40d(_ a: Any) -> Bool {
   return cast40((1, a))
+}
+
+// CHECK-LABEL: sil [noinline] @_T012cast_folding6test41SbyF
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: checked_cast_br
+// CHECK: //{{.*}}_T012cast_folding6test41{{.*}}F
+@inline(never)
+public func test41() -> Bool {
+    return cast41(A(), P.self)
+}
+
+// CHECK-LABEL: sil [noinline] @_T012cast_folding6test42{{.*}}F
+// CHECK: bb0
+// CHECK-NOT: return:
+// CHECK: checked_cast
+// CHECK: //{{.*}}_T012cast_folding6test42{{.*}}F
+@inline(never)
+public func test42(_ p: P) -> Bool {
+    return cast42(p)
 }
 
 print("test0=\(test0())")
