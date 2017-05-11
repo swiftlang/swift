@@ -2082,7 +2082,8 @@ class VarDeclUsageChecker : public ASTWalker {
     RK_Read        = 1,      ///< Whether it was ever read.
     RK_Written     = 2,      ///< Whether it was ever written or passed inout.
     
-    RK_CaptureList = 4       ///< Var is an entry in a capture list.
+    RK_CaptureList = 4,      ///< Var is an entry in a capture list.
+    RK_DoNotReport = 8       ///< Var is being tracked, but do not report.
   };
   
   /// These are all of the variables that we are tracking.  VarDecls get added
@@ -2105,12 +2106,18 @@ class VarDeclUsageChecker : public ASTWalker {
 
 public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : Diags(TC.Diags) {
-    // Track the parameters of the function.
-    for (auto PL : AFD->getParameterLists())
-      for (auto param : *PL)
-        if (shouldTrackVarDecl(param))
-          VarDecls[param] = 0;
-    
+    // If this AFD is a setter, track the parameter and the getter for
+    // the containing property so if newValue isn't used but the getter is used
+    // an error can be reported.
+    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+      if (FD->getAccessorKind() == AccessorKind::IsSetter) {
+        if (auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl())) {
+          auto arguments = FD->getParameterLists().back();
+          VarDecls[arguments->get(0)] = 0;
+          VarDecls[getter] = RK_DoNotReport;
+        }
+      }
+    }
   }
 
   VarDeclUsageChecker(DiagnosticEngine &Diags) : Diags(Diags) {}
@@ -2151,18 +2158,7 @@ public:
     return (VarDecls[VD] & RK_Written) != 0;
   }
 
-  bool isImplicitNewValueInSetter(VarDecl *VD) {
-    auto FD = dyn_cast<FuncDecl>(VD->getDeclContext());
-
-    return (VD->isImplicit() && VD->getName().str() == "newValue" &&
-        FD && FD->getAccessorKind() == AccessorKind::IsSetter);
-  }
-
   bool shouldTrackVarDecl(VarDecl *VD) {
-    // Track implicit newValue properties in setters.
-    if (isImplicitNewValueInSetter(VD))
-      return true;
-
     // If the variable is implicit, ignore it.
     if (VD->isImplicit() || VD->getLoc().isInvalid())
       return false;
@@ -2268,7 +2264,6 @@ public:
       }
     }
 
-    
     // Note that we ignore the initialization behavior of PatternBindingDecls,
     // but we do want to walk into them, because we want to see any uses or
     // other things going on in the initializer expressions.
@@ -2332,20 +2327,25 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (var->isInOut())
       continue;    
     
-    // Consider most parameters to always have been read.  It is common to name
-    // a parameter and not use it (e.g. because you are an override or want the
-    // named keyword, etc).  Warning to rewrite it to _ is more annoying than
-    // it is useful. The one exception to this rule is the implicit `newValue`
-    // parameter added to property setters. If this value is not used, it is
-    // frequently a programmer error.
+    // Skip any VarDecl flagged with RK_DoNotReport
+    if (access & RK_DoNotReport)
+      continue;
+
+    // If the setter parameter is not used, but the property is read, report
+    // a warning. Otherwise, parameters should not generate usage warnings. It
+    // is common to name a parameter and not use it (e.g. because you are an
+    // override or want the named keyword, etc).  Warning to rewrite it to _ is
+    // more annoying than it is useful.
     if (auto param = dyn_cast<ParamDecl>(var)) {
-      if (isImplicitNewValueInSetter(param) && (access & RK_Read) == 0) {
-        Diags.diagnose(var->getLoc(), diag::unused_implicit_setter_newvalue);
-        continue;
+      auto FD = dyn_cast<FuncDecl>(param->getDeclContext());
+      if (FD && FD->getAccessorKind() == AccessorKind::IsSetter) {
+        auto getter = dyn_cast<VarDecl>(FD->getAccessorStorageDecl());
+        if ((access & RK_Read) == 0 && (VarDecls[getter] & RK_Read) != 0) {
+          Diags.diagnose(var->getLoc(), diag::unused_setter_newvalue,
+                         var->getName(), getter->getName());
+        }
       }
-      else {
-        access |= RK_Read;
-      }
+      continue;
     }
     
     // Diagnose variables that were never used (other than their
