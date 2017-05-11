@@ -181,6 +181,12 @@ public:
                               ClassDecl *forClass) {
     addPointer();
   }
+  void addPlaceholder(MissingMemberDecl *MMD) {
+    for (auto i : range(MMD->getNumberOfVTableEntries())) {
+      (void)i;
+      addPointer();
+    }
+  }
 
 private:
   // Our layout here assumes that there will never be unclaimed space

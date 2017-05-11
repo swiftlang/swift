@@ -260,6 +260,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return doIt(SD->getElementTypeLoc());
   }
 
+  bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
+    return false;
+  }
+
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);

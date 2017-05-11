@@ -1921,6 +1921,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
   case DeclKind::Param:
   case DeclKind::GenericTypeParam:
+  case DeclKind::MissingMember:
     llvm_unreachable("does not have accessibility");
 
   case DeclKind::IfConfig:
@@ -3917,6 +3918,10 @@ public:
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TC.validateDecl(PGD);
+  }
+
+  void visitMissingMemberDecl(MissingMemberDecl *MMD) {
+    llvm_unreachable("should always be type-checked already");
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -7065,6 +7070,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
   case DeclKind::Module:
@@ -7504,6 +7510,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
+  case DeclKind::MissingMember:
     llvm_unreachable("not a value decl");
 
   case DeclKind::Module:
