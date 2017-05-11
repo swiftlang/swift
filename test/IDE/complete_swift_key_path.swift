@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_1 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_2 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_3 | %FileCheck %s -check-prefix=PERSON-MEMBER
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_4 | %FileCheck %s -check-prefix=PERSON-MEMBER-OPT
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_5 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_6 | %FileCheck %s -check-prefix=PERSON-MEMBER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PART_7 | %FileCheck %s -check-prefix=PERSON-MEMBER
@@ -41,9 +41,3 @@ func foo1(_ p : Person) {
 // PERSON-MEMBER-NEXT: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
 // PERSON-MEMBER-NEXT: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend 
 // PERSON-MEMBER-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
-
-// PERSON-MEMBER-OPT: Begin completions, 7 items
-// PERSON-MEMBER-OPT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.name[#String#]; name=name
-// PERSON-MEMBER-OPT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.friends[#[Person]#]; name=friends
-// PERSON-MEMBER-OPT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.bestFriend[#Person?#]; name=bestFriend
-// PERSON-MEMBER-OPT-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]

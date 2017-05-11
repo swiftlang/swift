@@ -1140,14 +1140,15 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
         if (CodeCompletion && Result.isNonNull()) {
-          if (InSwiftKeyPath)
+          if (InSwiftKeyPath) {
             Result = makeParserResult(
               new (Context) KeyPathExpr(SwiftKeyPathSlashLoc, Result.get(),
                                         nullptr));
-          else if (SwiftKeyPathRoot)
+          } else if (SwiftKeyPathRoot) {
             Result = makeParserResult(
               new (Context) KeyPathExpr(SwiftKeyPathSlashLoc, SwiftKeyPathRoot,
                                         Result.get()));
+          }
           CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
         }
         // Eat the code completion token because we handled it.
