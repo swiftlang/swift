@@ -41,6 +41,9 @@
 using namespace swift;
 using llvm::DenseMap;
 
+/// Define this to 1 to enable expensive assertions.
+#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
+
 namespace {
   typedef GenericSignatureBuilder::RequirementSource RequirementSource;
   typedef GenericSignatureBuilder::FloatingRequirementSource
@@ -1526,7 +1529,7 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
       anchor = pa;
   }
 
-#ifndef NDEBUG
+#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : anchor->getEquivalenceClassMembers()) {
     assert((pa == anchor || compareDependentTypes(&anchor, &pa) < 0) &&
