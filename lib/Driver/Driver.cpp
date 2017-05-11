@@ -1757,9 +1757,10 @@ static StringRef getOutputFilename(Compilation &C,
   // use the -o arg) even though, based on ownership considerations within the
   // driver, it is stored as a "top level" JobAction.
   if (auto *PCHAct = dyn_cast<GeneratePCHJobAction>(JA)) {
-    // For a persistent PCH use the PCH output directory as the -o arg.
+    // For a persistent PCH we don't use an output, the frontend determines
+    // the filename to use for the PCH.
     if (PCHAct->isPersistentPCH())
-      return PCHAct->getPersistentPCHDir();
+      return StringRef();
     AtTopLevel = false;
   }
 

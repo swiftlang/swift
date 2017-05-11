@@ -823,7 +823,7 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
     Arguments.push_back("-emit-pch");
     Arguments.push_back("-pch-output-dir");
     Arguments.push_back(
-      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+      context.Args.MakeArgString(job.getPersistentPCHDir()));
   } else {
     Arguments.push_back("-emit-pch");
     Arguments.push_back("-o");
