@@ -1119,6 +1119,13 @@ namespace {
       printCommon(MD, "module");
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+
+    void visitMissingMemberDecl(MissingMemberDecl *MMD) {
+      printCommon(MMD, "missing_member_decl ");
+      PrintWithColorRAII(OS, IdentifierColor)
+          << '\"' << MMD->getFullName() << '\"';
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
   };
 } // end anonymous namespace
 

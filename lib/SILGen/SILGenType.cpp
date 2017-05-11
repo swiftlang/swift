@@ -203,6 +203,8 @@ public:
     assert(result.second);
     (void) result;
   }
+
+  void addPlaceholder(MissingMemberDecl *) {}
 };
 
 } // end anonymous namespace
@@ -848,6 +850,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -947,6 +950,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }

@@ -1526,6 +1526,9 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::PrecedenceGroup:
     llvm_unreachable("decl should never be a member");
 
+  case DeclKind::MissingMember:
+    llvm_unreachable("should never need to reserialize a member placeholder");
+
   case DeclKind::IfConfig:
     return false;
 
@@ -2505,6 +2508,9 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
+  case DeclKind::MissingMember:
+    llvm_unreachable("member placeholders shouldn't be serialized");
+
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
     verifyAttrSerializable(op);
@@ -2958,6 +2964,11 @@ void Serializer::writeDecl(const Decl *D) {
       getRawStableAccessibility(ctor->getFormalAccess());
     Type ty = ctor->getInterfaceType();
 
+    bool firstTimeRequired = ctor->isRequired();
+    if (auto *overridden = ctor->getOverriddenDecl())
+      if (firstTimeRequired && overridden->isRequired())
+        firstTimeRequired = false;
+
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
@@ -2976,6 +2987,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
+                                  firstTimeRequired,
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams());
