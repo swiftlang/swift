@@ -7303,7 +7303,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   if (!swiftDecl)
     return nullptr;
 
-  if (auto nominal = dyn_cast<NominalTypeDecl>(swiftDecl))
+  if (auto nominal = dynCastIgnoringCompatibilityAlias<NominalTypeDecl>(swiftDecl))
     return nominal;
   if (auto extension = dyn_cast<ExtensionDecl>(swiftDecl))
     return extension;
