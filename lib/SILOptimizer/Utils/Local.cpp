@@ -1705,12 +1705,13 @@ optimizeBridgedCasts(SILInstruction *Inst,
 
   auto &M = Inst->getModule();
 
-  // To apply the bridged optimizations, we should
-  // ensure that types are not existential,
-  // and that one of the types is a class and another
-  // one is a struct.
+  // To apply the bridged optimizations, we should ensure that types are not
+  // existential (and keep in mind that generic parameters can be existentials),
+  // and that one of the types is a class and another one is a struct.
   if (source.isAnyExistentialType() ||
       target.isAnyExistentialType() ||
+      source->is<ArchetypeType>() ||
+      target->is<ArchetypeType>() ||
       (source.getClassOrBoundGenericClass() &&
        !target.getStructOrBoundGenericStruct()) ||
       (target.getClassOrBoundGenericClass() &&
@@ -2219,7 +2220,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the type used to initialize the existential.
         auto LoweredConcreteTy = FoundIEI->getLoweredConcreteType();
-        if (LoweredConcreteTy.isAnyExistentialType())
+        // We don't know enough at compile time about existential
+        // and generic type parameters.
+        if (LoweredConcreteTy.isAnyExistentialType() ||
+            LoweredConcreteTy.is<ArchetypeType>())
           return nullptr;
         // Get the metatype of this type.
         auto EMT = EmiTy.castTo<AnyMetatypeType>();
@@ -2275,7 +2279,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the type used to initialize the existential.
         auto ConcreteTy = FoundIERI->getFormalConcreteType();
-        if (ConcreteTy.isAnyExistentialType())
+        // We don't know enough at compile time about existential
+        // and generic type parameters.
+        if (ConcreteTy.isAnyExistentialType() ||
+            ConcreteTy->is<ArchetypeType>())
           return nullptr;
         // Get the SIL metatype of this type.
         auto EMT = EMI->getType().castTo<AnyMetatypeType>();
