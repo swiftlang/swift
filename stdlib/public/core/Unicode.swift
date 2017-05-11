@@ -61,7 +61,7 @@ public enum UnicodeDecodingResult : Equatable {
 /// decoded Unicode scalar values.
 ///
 /// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `Unicode.Scalar`
-public protocol UnicodeCodec : UnicodeEncoding {
+public protocol UnicodeCodec : Unicode.Encoding {
 
   /// Creates an instance of the codec.
   init()
@@ -552,8 +552,8 @@ public typealias UTF32 = Unicode.UTF32
 @inline(__always)
 public func transcode<
   Input : IteratorProtocol,
-  InputEncoding : UnicodeEncoding,
-  OutputEncoding : UnicodeEncoding
+  InputEncoding : Unicode.Encoding,
+  OutputEncoding : Unicode.Encoding
 >(
   _ input: Input,
   from inputEncoding: InputEncoding.Type,
@@ -907,7 +907,7 @@ extension UTF16 {
   ///   `nil`.
   public static func transcodedLength<
     Input : IteratorProtocol,
-    Encoding : UnicodeEncoding
+    Encoding : Unicode.Encoding
   >(
     of input: Input,
     decodedAs sourceEncoding: Encoding.Type,

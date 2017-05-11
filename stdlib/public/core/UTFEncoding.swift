@@ -17,7 +17,7 @@
 
 
 public protocol _UTFParser {
-  associatedtype Encoding : _UnicodeEncoding
+  associatedtype Encoding : _UnicodeEncoding_
 
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   func _bufferedScalar(bitCount: UInt8) -> _UIntBuffer<UInt32, Encoding.CodeUnit>

@@ -44,7 +44,7 @@ public protocol StringProtocol
   ///   the given `encoding`.
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
-  init<C: Collection, Encoding: UnicodeEncoding>(
+  init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as encoding: Encoding.Type
   )
     where C.Iterator.Element == Encoding.CodeUnit
@@ -61,7 +61,7 @@ public protocol StringProtocol
   ///   the given `encoding`, ending just before the first zero code unit.
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
-  init<Encoding: UnicodeEncoding>(
+  init<Encoding: Unicode.Encoding>(
     decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as: Encoding.Type)
     
@@ -72,7 +72,7 @@ public protocol StringProtocol
 
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of code units in the given encoding.
-  func withCString<Result, Encoding: UnicodeEncoding>(
+  func withCString<Result, Encoding: Unicode.Encoding>(
     encodedAs: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
@@ -89,8 +89,8 @@ extension StringProtocol /* : LosslessStringConvertible */ {
 /// `source` is interpreted as being encoded with `SourceEncoding`.
 internal func _withCString<
   Source : Collection,
-  SourceEncoding : UnicodeEncoding, 
-  TargetEncoding : UnicodeEncoding, 
+  SourceEncoding : Unicode.Encoding, 
+  TargetEncoding : Unicode.Encoding, 
   Result
 >(
   encodedAs targetEncoding: TargetEncoding.Type,
@@ -107,8 +107,8 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
 
 internal func _withCStringAndLength<
   Source : Collection,
-  SourceEncoding : UnicodeEncoding, 
-  TargetEncoding : UnicodeEncoding, 
+  SourceEncoding : Unicode.Encoding, 
+  TargetEncoding : Unicode.Encoding, 
   Result
 >(
   encodedAs targetEncoding: TargetEncoding.Type,
@@ -137,7 +137,7 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
 extension _StringCore {
   /// Invokes `body` on a null-terminated sequence of code units in the given
   /// encoding corresponding to the substring in `bounds`.
-  internal func _withCSubstring<Result, TargetEncoding: UnicodeEncoding>(
+  internal func _withCSubstring<Result, TargetEncoding: Unicode.Encoding>(
     in bounds: Range<Index>,
     encoding targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
@@ -148,7 +148,7 @@ extension _StringCore {
   }
 
   internal func _withCSubstringAndLength<
-    Result, TargetEncoding: UnicodeEncoding
+    Result, TargetEncoding: Unicode.Encoding
   >(
     in bounds: Range<Index>,
     encoding targetEncoding: TargetEncoding.Type,
@@ -183,7 +183,7 @@ extension _StringCore {
 }
 
 extension String {
-  public init<C: Collection, Encoding: UnicodeEncoding>(
+  public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
     let (b,_) = _StringBuffer.fromCodeUnits(
@@ -197,7 +197,7 @@ extension String {
   ///   the given `encoding`, ending just before the first zero code unit.
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
-  public init<Encoding: UnicodeEncoding>(
+  public init<Encoding: Unicode.Encoding>(
     decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type) {
 
@@ -210,7 +210,7 @@ extension String {
 
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of code units in the given encoding.
-  public func withCString<Result, TargetEncoding: UnicodeEncoding>(
+  public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
@@ -511,7 +511,7 @@ public struct String {
 extension String {
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
-    Encoding : UnicodeEncoding, Input : Collection
+    Encoding : Unicode.Encoding, Input : Collection
   >(
     _ encoding: Encoding.Type, input: Input
   ) -> String
@@ -521,7 +521,7 @@ extension String {
 
   public // @testable
   static func _fromCodeUnitSequence<
-    Encoding : UnicodeEncoding, Input : Collection
+    Encoding : Unicode.Encoding, Input : Collection
   >(
     _ encoding: Encoding.Type, input: Input
   ) -> String?
@@ -535,7 +535,7 @@ extension String {
 
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
-    Encoding : UnicodeEncoding, Input : Collection
+    Encoding : Unicode.Encoding, Input : Collection
   >(
     _ encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool)
@@ -650,7 +650,7 @@ extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
   func _encodedLength<
-    Encoding: UnicodeEncoding
+    Encoding: Unicode.Encoding
   >(_ encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     self._encode(encoding, into: { _ in codeUnitCount += 1 })
@@ -664,7 +664,7 @@ extension String {
   // way -- add a test for that.
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
-  func _encode<Encoding: UnicodeEncoding>(
+  func _encode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {

@@ -14,7 +14,7 @@ extension Unicode {
   public enum ASCII {}
 }
 
-extension Unicode.ASCII : UnicodeEncoding {
+extension Unicode.ASCII : Unicode.Encoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = CollectionOfOne<CodeUnit>
 
@@ -45,7 +45,7 @@ extension Unicode.ASCII : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func transcode<FromEncoding : UnicodeEncoding>(
+  public static func transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -69,7 +69,7 @@ extension Unicode.ASCII : UnicodeEncoding {
   public typealias ReverseParser = Parser
 }
 
-extension Unicode.ASCII.Parser : UnicodeParser {
+extension Unicode.ASCII.Parser : Unicode.Parser {
   public typealias Encoding = Unicode.ASCII
 
   /// Parses a single Unicode scalar value from `input`.

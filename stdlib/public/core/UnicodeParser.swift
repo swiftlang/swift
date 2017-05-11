@@ -29,9 +29,9 @@ extension Unicode {
 
 /// Types that separate streams of code units into encoded Unicode
 /// scalar values.
-public protocol UnicodeParser {
+public protocol _UnicodeParser {
   /// The encoding with which this parser is associated
-  associatedtype Encoding : _UnicodeEncoding
+  associatedtype Encoding : _UnicodeEncoding_
 
   /// Constructs an instance that can be used to begin parsing `CodeUnit`s at
   /// any Unicode scalar boundary.
@@ -44,7 +44,7 @@ public protocol UnicodeParser {
   where I.Element == Encoding.CodeUnit
 }
 
-extension UnicodeParser {
+extension _UnicodeParser {
   @_versioned
   @inline(__always)
   @discardableResult
@@ -87,11 +87,15 @@ extension UnicodeParser {
 }
 
 extension Unicode {
+  public typealias Parser = _UnicodeParser
+}
+
+extension Unicode {
   @_fixed_layout
   public // @testable
   struct _ParsingIterator<
     CodeUnitIterator : IteratorProtocol, 
-    Parser: UnicodeParser
+    Parser: Unicode.Parser
   > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
     @inline(__always)
     @_inlineable
