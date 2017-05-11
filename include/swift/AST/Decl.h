@@ -445,17 +445,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
 
-    /// \brief Whether or not this declaration has a failable initializer member,
-    /// and whether or not we've actually searched for one.
-    unsigned HasFailableInits : 1;
-
-    /// Whether we have already searched for failable initializers.
-    unsigned SearchedForFailableInits : 1;
-
     /// Whether there is are lazily-loaded conformances for this nominal type.
     unsigned HasLazyConformances : 1;
   };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 5 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 3 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -2744,8 +2737,6 @@ protected:
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
-    NominalTypeDeclBits.SearchedForFailableInits = false;
-    NominalTypeDeclBits.HasFailableInits = false;
     NominalTypeDeclBits.HasLazyConformances = false;
   }
 
@@ -2795,19 +2786,6 @@ public:
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
               
-  bool getHasFailableInits() const {
-    return NominalTypeDeclBits.HasFailableInits;
-  }
-  void setHasFailableInits(bool failable = true) {
-    NominalTypeDeclBits.HasFailableInits = failable;
-  }
-  void setSearchedForFailableInits(bool searched = true) {
-    NominalTypeDeclBits.SearchedForFailableInits = searched;
-  }
-  bool getSearchedForFailableInits() const {
-    return NominalTypeDeclBits.SearchedForFailableInits;
-  }
-
   /// Compute the type of this nominal type.
   void computeType();
 

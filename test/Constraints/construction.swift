@@ -139,3 +139,16 @@ Int(i32 - 2 + 1) // expected-warning{{unused}}
 let xx: UInt64 = 100
 let yy = ((xx + 10) - 5) / 5
 let zy = (xx + (10 - 5)) / 5
+
+// rdar://problem/30588177
+struct S3 {
+  init() { }
+}
+
+let s3a = S3()
+
+extension S3 {
+  init?(maybe: S3) { return nil }
+}
+
+let s3b = S3(maybe: s3a)
