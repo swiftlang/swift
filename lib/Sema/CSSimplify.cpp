@@ -1418,7 +1418,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       // Provide a fixed type for the type variable.
-      bool wantRvalue = kind == ConstraintKind::Equal;
       if (typeVar1) {
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
@@ -1426,9 +1425,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
 
-        // If we want an rvalue, get the rvalue.
-        if (wantRvalue)
-          type2 = type2->getRValueType();
+        // Equal constraints allow mixed LValue/RValue bindings.
+        if (kind == ConstraintKind::Equal) {
+          // If we could bind an LValue to the type variable, but the
+          // type that is already bound is not an LValue, defer
+          // simplifying the constraint since we may come along at a
+          // later time and attempt to bind the LValue type to this
+          // type variable.
+          if (typeVar1->getImpl().canBindToLValue()) {
+            if (!type2->isLValueType()) {
+              return formUnsolvedResult();
+            }
+          } else {
+            // If the type variable does not allow LValue bindings,
+            // get the RValue type.
+            type2 = type2->getRValueType();
+          }
+        }
 
         // If the left-hand type variable cannot bind to an lvalue,
         // but we still have an lvalue, fail.
@@ -1467,9 +1480,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVarOccursInType(typeVar2, type1))
         return formUnsolvedResult();
 
-      // If we want an rvalue, get the rvalue.
-      if (wantRvalue)
-        type1 = type1->getRValueType();
+      // Equal constraints allow mixed LValue/RValue bindings.
+      if (kind == ConstraintKind::Equal) {
+        // If we could bind an LValue to the type variable, but the
+        // type that is already bound is not an LValue, defer
+        // simplifying the constraint since we may come along at a
+        // later time and attempt to bind the LValue type to this
+        // type variable.
+        if (typeVar2->getImpl().canBindToLValue()) {
+          if (!type1->isLValueType()) {
+            return formUnsolvedResult();
+          }
+        } else {
+          // If the type variable does not allow LValue bindings,
+          // get the RValue type.
+          type1 = type1->getRValueType();
+        }
+      }
 
       if (!typeVar2->getImpl().canBindToLValue() &&
           type1->isLValueType()) {
