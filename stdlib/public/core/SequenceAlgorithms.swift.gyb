@@ -721,6 +721,16 @@ extension Sequence {
   public func flatMap<ElementOfResult>(
     _ transform: (${GElement}) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
+    return try _flatMap(transform)
+  }
+
+  // The implementation of flatMap accepting a closure with an optional result.
+  // Factored out into a separate functions in order to be used in multiple
+  // overloads.
+  @inline(__always)
+  public func _flatMap<ElementOfResult>(
+    _ transform: (${GElement}) throws -> ElementOfResult?
+  ) rethrows -> [ElementOfResult] {
     var result: [ElementOfResult] = []
     for element in self {
       if let newElement = try transform(element) {
