@@ -93,6 +93,7 @@ func localComputedProperties() {
       return localProperty // expected-warning{{attempting to access 'localProperty' within its own getter}}
     }
     set {
+      _ = newValue
       print(localProperty)
     }
   }
