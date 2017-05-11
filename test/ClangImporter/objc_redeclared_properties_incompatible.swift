@@ -5,6 +5,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-pch -F %S/Inputs/frameworks -o %t.pch %t.h
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -import-objc-header %t.pch %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/frameworks -import-objc-header %t.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PRIVATE %s
 
 // REQUIRES: objc_interop
 

@@ -247,6 +247,9 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 
+def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
+  HelpText<"Disable validating the persistent PCH">;
+
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
