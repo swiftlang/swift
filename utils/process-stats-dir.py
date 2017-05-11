@@ -16,12 +16,12 @@
 # `swiftc -stats-output-dir` and emits summary data, traces etc. for analysis.
 
 import argparse
+import csv
 import json
 import os
 import random
 import re
 import sys
-import csv
 
 
 class JobStats:
@@ -76,7 +76,7 @@ class JobStats:
         assert(self.is_driver_job())
         ran = self.driver_jobs_ran()
         total = self.driver_jobs_total()
-        return (float(ran) / float(total)) * 100.0
+        return round((float(ran) / float(total)) * 100.0, 2)
 
     # Return a JSON-formattable object of the form preferred by google chrome's
     # 'catapult' trace-viewer.
@@ -112,22 +112,26 @@ def load_stats_dir(path):
                 patstr = (r"time\.swift-" + jobkind +
                           r"\.(?P<module>[^\.]+)(?P<filename>.*)\.wall$")
                 pat = re.compile(patstr)
+                stats = dict()
                 for (k, v) in j.items():
+                    if k.startswith("time."):
+                        v = int(1000000.0 * float(v))
+                    stats[k] = v
                     tm = re.match(pat, k)
                     if tm:
                         tmg = tm.groupdict()
-                        dur_usec = int(1000000.0 * float(v))
+                        dur_usec = v
                         module = tmg['module']
                         if 'filename' in tmg:
                             ff = tmg['filename']
                             if ff.startswith('.'):
                                 ff = ff[1:]
                             jobargs = [ff]
-                        break
+
                 e = JobStats(jobkind=jobkind, jobid=jobid,
                              module=module, start_usec=start_usec,
                              dur_usec=dur_usec, jobargs=jobargs,
-                             stats=j)
+                             stats=stats)
                 jobstats.append(e)
     return jobstats
 
@@ -230,17 +234,19 @@ def compare_frontend_stats(args):
         return
     for stat_name in sorted(old_merged.stats.keys()):
         if stat_name in new_merged.stats:
-            old = float(old_merged.stats[stat_name])
-            new = float(new_merged.stats[stat_name])
+            old = old_merged.stats[stat_name]
+            new = new_merged.stats.get(stat_name, 0)
+            if old == 0 or new == 0:
+                continue
             delta = (new - old)
-            delta_pct = 0
-            if old != 0:
-                delta_pct = -100.0
-            if new != 0:
-                delta_pct = (delta / new) * 100.0
-            if abs(delta_pct) >= args.delta_pct_thresh:
-                out.writerow(dict(name=stat_name, old=old, new=new,
-                                  delta_pct=delta_pct))
+            delta_pct = round((float(delta) / float(new)) * 100.0, 2)
+            if (stat_name.startswith("time.") and
+               abs(delta) < args.delta_usec_thresh):
+                continue
+            if abs(delta_pct) < args.delta_pct_thresh:
+                continue
+            out.writerow(dict(name=stat_name, old=old, new=new,
+                              delta_pct=delta_pct))
 
 
 def main():
@@ -252,8 +258,10 @@ def main():
                         help="Write output to file")
     parser.add_argument("--paired", action="store_true",
                         help="Process two dirs-of-stats-dirs, pairwise")
-    parser.add_argument("--delta-pct-thresh", type=float, default=0.0,
+    parser.add_argument("--delta-pct-thresh", type=float, default=0.01,
                         help="Percentage change required to report")
+    parser.add_argument("--delta-usec-thresh", type=int, default=100000,
+                        help="Absolute delta on times required to report")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
