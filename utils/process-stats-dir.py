@@ -21,6 +21,7 @@ import os
 import random
 import re
 import sys
+import csv
 
 
 class JobStats:
@@ -168,6 +169,13 @@ def merge_all_jobstats(jobstats):
 
 
 def show_paired_incrementality(args):
+    fieldnames = ["name",
+                  "old_pct", "old_skip",
+                  "new_pct", "new_skip",
+                  "delta_pct", "delta_skip"]
+    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out.writeheader()
+
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
         olddriver = merge_all_jobstats([x for x in oldstats
                                         if x.is_driver_job()])
@@ -175,32 +183,30 @@ def show_paired_incrementality(args):
                                         if x.is_driver_job()])
         if olddriver is None or newdriver is None:
             continue
-        if args.csv:
-            args.output.write("'%s',%d,%d\n" % (name,
-                              olddriver.driver_jobs_ran(),
-                              newdriver.driver_jobs_ran()))
-        else:
-            oldpct = olddriver.incrementality_percentage()
-            newpct = newdriver.incrementality_percentage()
-            deltapct = newpct - oldpct
-            oldskip = olddriver.driver_jobs_skipped()
-            newskip = newdriver.driver_jobs_skipped()
-            deltaskip = newskip - oldskip
-            fmt = "{}:\t" + "\t".join([lab + ":{:>3.0f}% ({} skipped)" for
-                                       lab in ['old', 'new', 'delta']]) + "\n"
-            args.output.write(fmt.format(name,
-                                         oldpct, oldskip,
-                                         newpct, newskip,
-                                         deltapct, deltaskip))
+        oldpct = olddriver.incrementality_percentage()
+        newpct = newdriver.incrementality_percentage()
+        deltapct = newpct - oldpct
+        oldskip = olddriver.driver_jobs_skipped()
+        newskip = newdriver.driver_jobs_skipped()
+        deltaskip = newskip - oldskip
+        out.writerow(dict(name=name,
+                          old_pct=oldpct, old_skip=oldskip,
+                          new_pct=newpct, new_skip=newskip,
+                          delta_pct=deltapct, delta_skip=deltaskip))
 
 
 def show_incrementality(args):
+    fieldnames = ["name", "incrementality"]
+    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out.writeheader()
+
     for path in args.remainder:
         stats = load_stats_dir(path)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
-                args.output.write("%s: %f\n" % (os.path.basename(path), pct))
+                out.writerow(dict(name=os.path.basename(path),
+                                  incrementality=pct))
 
 
 def main():
@@ -212,8 +218,6 @@ def main():
                         help="Write output to file")
     parser.add_argument("--paired", action="store_true",
                         help="Process two dirs-of-stats-dirs, pairwise")
-    parser.add_argument("--csv", action="store_true",
-                        help="Write output as CSV")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
