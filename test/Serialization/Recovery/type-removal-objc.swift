@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
-// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery > %t.txt
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD > %t.txt
 // RUN: %FileCheck -check-prefix CHECK-RECOVERY %s < %t.txt
 // RUN: %FileCheck -check-prefix CHECK-RECOVERY-NEGATIVE %s < %t.txt
 

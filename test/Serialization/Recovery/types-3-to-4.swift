@@ -3,9 +3,9 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 3 | %FileCheck -check-prefix=CHECK-3 %s
 
-// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -enable-experimental-deserialization-recovery -swift-version 4 | %FileCheck -check-prefix=CHECK-4 %s
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 4 | %FileCheck -check-prefix=CHECK-4 %s
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 4 -enable-experimental-deserialization-recovery -D TEST -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 4 -D TEST -verify
 
 // REQUIRES: objc_interop
 

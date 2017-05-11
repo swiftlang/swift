@@ -920,8 +920,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
 
-  Opts.EnableDeserializationRecovery |=
-    Args.hasArg(OPT_enable_experimental_deserialization_recovery);
+  if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
+                               OPT_disable_deserialization_recovery)) {
+    Opts.EnableDeserializationRecovery
+      = A->getOption().matches(OPT_enable_deserialization_recovery);
+  }
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
