@@ -33,7 +33,7 @@ public func testVTableBuilding(user: User) {
   // for the vtable slot for 'lastMethod()'. If the layout here
   // changes, please check that offset 24 is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, i64 24
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 24|i32 27}}
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 
@@ -119,7 +119,7 @@ open class User {
 // This is mostly to check when changes are necessary for the CHECK-IR lines
 // above.
 // CHECK-VTABLE-LABEL: sil_vtable User {
-// (10 words of normal class metadata)
+// (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
 // 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
 // 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
 // 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:

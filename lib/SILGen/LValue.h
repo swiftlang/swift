@@ -506,6 +506,7 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
 
   void finishImpl(SILGenFunction &SGF) override {
     performWriteback(SGF, /*isFinal*/ true);
+    component.reset();
   }
 };
 
