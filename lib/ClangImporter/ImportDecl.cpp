@@ -2174,7 +2174,7 @@ namespace {
       if (Name.empty())
         return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(Decl, importedName,
@@ -2385,7 +2385,7 @@ namespace {
       if (!importedName)
         return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -2839,7 +2839,7 @@ namespace {
       if (!importedName)
         return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -3082,7 +3082,7 @@ namespace {
                                           /*static*/ false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-        // If this is a Swift 2 stub, mark it as such.
+        // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
           markAsVariant(result, *correctSwiftName);
 
@@ -3121,7 +3121,7 @@ namespace {
                                           /*static*/ false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-        // If this is a Swift 2 stub, mark it as such.
+        // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
           markAsVariant(result, *correctSwiftName);
 
@@ -3178,7 +3178,7 @@ namespace {
                        name, type, dc);
       result->setInterfaceType(type);
 
-      // If this is a Swift 2 stub, mark is as such.
+      // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3315,7 +3315,7 @@ namespace {
       result->setAccessibility(Accessibility::Public);
       finishFuncDecl(decl, result);
 
-      // If this is a Swift 2 stub, mark it as such.
+      // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3405,7 +3405,7 @@ namespace {
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
       // FIXME: Handle IBOutletCollection.
 
-      // If this is a Swift 2 stub, handle it as such.
+      // If this is a compatibility stub, handle it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3483,7 +3483,7 @@ namespace {
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
 
-      // If this is a Swift 2 stub, mark it as such.
+      // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -4113,7 +4113,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -4251,7 +4251,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -4580,7 +4580,7 @@ namespace {
             setter->setOverriddenDecl(parentSetter);
       }
 
-      // If this is a Swift 2 stub, mark it as such.
+      // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -5044,7 +5044,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
                                          const clang::EnumDecl *clangEnum,
                                          EnumDecl *theEnum,
-                                         Decl *swift3Decl) {
+                                         Decl *correctDecl) {
   auto &context = Impl.SwiftContext;
   Optional<ImportedName> correctSwiftName;
   auto name =
@@ -5053,25 +5053,22 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     return nullptr;
 
   if (correctSwiftName) {
-    // We're creating a Swift 2 stub. Treat it as an enum case alias.
-    if (!swift3Decl)
+    // We're creating a compatibility stub. Treat it as an enum case alias.
+    auto correctCase = dyn_cast_or_null<EnumElementDecl>(correctDecl);
+    if (!correctCase)
       return nullptr;
 
-    // If the Swift 3 declaration was unavailable, don't map to it.
+    // If the correct declaration was unavailable, don't map to it.
     // FIXME: This eliminates spurious errors, but affects QoI.
-    if (swift3Decl->getAttrs().isUnavailable(Impl.SwiftContext))
+    if (correctCase->getAttrs().isUnavailable(Impl.SwiftContext))
       return nullptr;
 
-    auto swift3Case = dyn_cast<EnumElementDecl>(swift3Decl);
-    if (!swift3Case)
-      return nullptr;
+    auto compatibilityCase =
+        importEnumCaseAlias(name, decl, correctCase, clangEnum, theEnum);
+    if (compatibilityCase)
+      markAsVariant(compatibilityCase, *correctSwiftName);
 
-    auto swift2Case =
-        importEnumCaseAlias(name, decl, swift3Case, clangEnum, theEnum);
-    if (swift2Case)
-      markAsVariant(swift2Case, *correctSwiftName);
-
-    return swift2Case;
+    return compatibilityCase;
   }
 
   // Use the constant's underlying value as its raw value in Swift.
@@ -5135,7 +5132,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
     CD->getAttrs().add(attr);
   }
 
-  // If this is a Swift 2 stub, mark it as such.
+  // If this is a compatibility stub, mark it as such.
   if (correctSwiftName)
     markAsVariant(CD, *correctSwiftName);
 
@@ -5578,7 +5575,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       importConstructor(objcMethod, dc, implicit, kind, required, selector,
                         importedName, params, variadic, redundant);
 
-  // If this is a Swift 2 stub, mark it as such.
+  // If this is a compatibility stub, mark it as such.
   if (result && correctSwiftName)
     markAsVariant(result, *correctSwiftName);
 
@@ -6494,7 +6491,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
     for (auto member : proto->getMembers()) {
-      // Skip Swift 2 stubs; there's no reason to mirror them.
+      // Skip compatibility stubs; there's no reason to mirror them.
       if (member->getAttrs().isUnavailableInSwiftVersion(languageVersion))
         continue;
 
@@ -6594,7 +6591,7 @@ void SwiftDeclConverter::importInheritedConstructors(
       if (!ctor)
         continue;
 
-      // Don't inherit Swift 2 stubs.
+      // Don't inherit compatibility stubs.
       if (ctor->getAttrs().isUnavailableInSwiftVersion(languageVersion))
         continue;
 
@@ -6639,7 +6636,7 @@ void SwiftDeclConverter::importInheritedConstructors(
                                   /*required=*/false, ctor->getObjCSelector(),
                                   importedName, objcMethod->parameters(),
                                   objcMethod->isVariadic(), redundant)) {
-          // If this is a Swift 2 stub, mark it as such.
+          // If this is a compatibility stub, mark it as such.
           if (correctSwiftName)
             markAsVariant(newCtor, *correctSwiftName);
 
