@@ -60,12 +60,16 @@ func testRenamedTopLevelDiags() {
   // CHECK-DIAGS-3-NOTE: versioned.swift:[[@LINE-1]]:
 
   // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE+1]]:
-  _ = InnerInSwift4()
-  // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:7: error: 'InnerInSwift4' has been renamed to 'Outer.Inner'
+  let s = InnerInSwift4()
+  // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:11: error: 'InnerInSwift4' has been renamed to 'Outer.Inner'
   // CHECK-DIAGS-4: note: 'InnerInSwift4' was obsoleted in Swift 4
+  _ = s.value
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE-1]]:
 
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
-  _ = Outer.Inner()
+  let t = Outer.Inner()
+  // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE-1]]:
+  _ = s.value
   // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE-1]]:
 }
 
