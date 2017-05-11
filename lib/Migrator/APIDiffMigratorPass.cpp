@@ -283,9 +283,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     : ASTMigratorPass(Editor, SF, Opts) {}
 
   void run() {
-    if (Opts.APIDigesterDataStorePath.empty())
+    if (Opts.APIDigesterDataStorePaths.empty())
       return;
-    DiffStore.addStorePath(Opts.APIDigesterDataStorePath);
+    for (auto Path : Opts.APIDigesterDataStorePaths)
+      DiffStore.addStorePath(Path);
     DiffStore.printIncomingUsr(Opts.DumpUsr);
     walk(SF);
   }
