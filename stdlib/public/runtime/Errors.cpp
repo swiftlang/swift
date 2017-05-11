@@ -14,6 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32)
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#else
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,11 +40,7 @@
 #include <cxxabi.h>
 #endif
 
-#ifndef SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
-#error "SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING must be defined"
-#endif
-
-#if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 // execinfo.h is not available on Android. Checks in this file ensure that
 // fatalError behaves as expected, but without stack traces.
 #include <execinfo.h>
@@ -56,7 +58,7 @@ enum: uint32_t {
 
 using namespace swift;
 
-#if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 
 static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -205,7 +207,7 @@ reportNow(uint32_t flags, const char *message)
 #ifdef __APPLE__
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #endif
-#if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
     constexpr unsigned maxSupportedStackDepth = 128;
