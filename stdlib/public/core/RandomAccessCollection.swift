@@ -48,15 +48,22 @@ public protocol _RandomAccessIndexable : _BidirectionalIndexable {
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection :
   _RandomAccessIndexable, BidirectionalCollection
-  where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
+// FIXME(ABI) (Revert Where Clauses): Restore this:
+// where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence = RandomAccessSlice<Self>
+  associatedtype SubSequence
+  // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
+   : _RandomAccessIndexable, BidirectionalCollection
+   = RandomAccessSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices = DefaultRandomAccessIndices<Self>
+  associatedtype Indices 
+  // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
+  : _RandomAccessIndexable, BidirectionalCollection
+  = DefaultRandomAccessIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
