@@ -7204,7 +7204,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     candidateInfo.suggestPotentialOverloads(E->getNameLoc().getBaseNameLoc());
     return true;
   }
-  
+
+  auto *argExpr = E->getArgument();
   auto candidateArgTy = candidateInfo[0].getArgumentType();
 
   // Depending on how we matched, produce tailored diagnostics.
@@ -7225,8 +7226,8 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
     // If we have an exact match, then we must have an argument list, check it.
     if (candidateArgTy) {
-      assert(E->getArgument() && "Exact match without argument?");
-      if (!typeCheckArgumentChildIndependently(E->getArgument(), candidateArgTy,
+      assert(argExpr && "Exact match without argument?");
+      if (!typeCheckArgumentChildIndependently(argExpr, candidateArgTy,
                                                candidateInfo))
         return true;
     }
@@ -7255,71 +7256,50 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_Inaccessible:
     // Diagnose some simple and common errors.
     return candidateInfo.diagnoseSimpleErrors(E);
-      
-  case CC_ArgumentLabelMismatch: { // Argument labels are not correct.
-    auto argExpr = typeCheckArgumentChildIndependently(E->getArgument(),
-                                                       candidateArgTy,
-                                                       candidateInfo);
-    if (!argExpr) return true;
 
-    // Construct the actual expected argument labels that our candidate
-    // expected.
-    assert(candidateArgTy &&
-           "Candidate must expect an argument to have a label mismatch");
-    SmallVector<Identifier, 2> argLabelsScratch;
-    auto arguments = decomposeArgType(candidateArgTy,
-                                      candidateInfo[0].getArgumentLabels(
-                                        argLabelsScratch));
-    
-    // TODO: This is probably wrong for varargs, e.g. calling "print" with the
-    // wrong label.
-    SmallVector<Identifier, 4> expectedNames;
-    for (auto &arg : arguments)
-      expectedNames.push_back(arg.Label);
-
-    return diagnoseArgumentLabelError(CS->TC, argExpr, expectedNames,
-                                      /*isSubscript*/false);
-  }
-    
-  case CC_GeneralMismatch:        // Something else is wrong.
-  case CC_ArgumentCountMismatch:  // This candidate has wrong # arguments.
+  case CC_ArgumentLabelMismatch:
+  case CC_ArgumentCountMismatch: {
     // If we have no argument, the candidates must have expected one.
-    if (!E->getArgument()) {
+    if (!argExpr) {
       if (!candidateArgTy)
         return false; // Candidate must be incorrect for some other reason.
-      
+
       // Pick one of the arguments that are expected as an exemplar.
       if (candidateArgTy->isVoid()) {
         // If this member is () -> T, suggest adding parentheses.
         diagnose(E->getNameLoc(), diag::expected_parens_in_contextual_member,
                  E->getName())
-          .fixItInsertAfter(E->getEndLoc(), "()");
+            .fixItInsertAfter(E->getEndLoc(), "()");
       } else {
         diagnose(E->getNameLoc(), diag::expected_argument_in_contextual_member,
                  E->getName(), candidateArgTy);
       }
       return true;
     }
-     
+
+    assert(argExpr && candidateArgTy && "Exact match without an argument?");
+    return diagnoseSingleCandidateFailures(candidateInfo, E, argExpr,
+                                           E->getArgumentLabels());
+  }
+
+  case CC_GeneralMismatch: { // Something else is wrong.
     // If an argument value was specified, but this member expects no arguments,
     // then we fail with a nice error message.
     if (!candidateArgTy) {
-      if (E->getArgument()->getType()->isVoid()) {
+      if (argExpr->getType()->isVoid()) {
         diagnose(E->getNameLoc(), diag::unexpected_parens_in_contextual_member,
                  E->getName())
-          .fixItRemove(E->getArgument()->getSourceRange());
+            .fixItRemove(E->getArgument()->getSourceRange());
       } else {
-        diagnose(E->getNameLoc(), diag::unexpected_argument_in_contextual_member,
-                 E->getName())
-          .highlight(E->getArgument()->getSourceRange());
+        diagnose(E->getNameLoc(),
+                 diag::unexpected_argument_in_contextual_member, E->getName())
+            .highlight(E->getArgument()->getSourceRange());
       }
       return true;
     }
 
-    assert(E->getArgument() && candidateArgTy &&
-           "Exact match without an argument?");
-    return !typeCheckArgumentChildIndependently(E->getArgument(), candidateArgTy,
-                                                candidateInfo);
+    return false;
+  }
   }
 
   llvm_unreachable("all cases should be handled");
@@ -7643,6 +7623,40 @@ FailureDiagnosis::validateContextualType(Type contextualType,
     if (FT->isAutoClosure())
       contextualType = FT->getResult();
 
+  // Since some of the contextual types might be tuples e.g. subscript argument
+  // is a tuple or paren wrapping a tuple, it's required to recursively check
+  // its elements to determine nullability of the contextual type, because it
+  // might contain archetypes.
+  std::function<bool(Type)> shouldNullifyType = [&](Type type) -> bool {
+    switch (type->getDesugaredType()->getKind()) {
+    case TypeKind::Archetype:
+    case TypeKind::Unresolved:
+      return true;
+
+    case TypeKind::BoundGenericEnum:
+    case TypeKind::BoundGenericClass:
+    case TypeKind::BoundGenericStruct:
+    case TypeKind::UnboundGeneric:
+    case TypeKind::GenericFunction:
+    case TypeKind::Metatype:
+      return type->hasUnresolvedType();
+
+    case TypeKind::Tuple: {
+      auto tupleType = type->getAs<TupleType>();
+      for (auto &element : tupleType->getElements()) {
+        if (shouldNullifyType(element.getType()))
+            return true;
+      }
+      break;
+    }
+
+    default:
+      return false;
+    }
+
+    return false;
+  };
+
   bool shouldNullify = false;
   if (auto objectType = contextualType->getLValueOrInOutObjectType()) {
     // Note that simply checking for `objectType->hasUnresolvedType()` is not
@@ -7654,25 +7668,7 @@ FailureDiagnosis::validateContextualType(Type contextualType,
     // sub-expression solver a chance to try and compute type as it sees fit
     // and higher level code would have a chance to check it, which avoids
     // diagnostic messages like `cannot convert (_) -> _ to (Int) -> Void`.
-    switch (objectType->getDesugaredType()->getKind()) {
-    case TypeKind::Archetype:
-    case TypeKind::Unresolved:
-      shouldNullify = true;
-      break;
-
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericStruct:
-    case TypeKind::UnboundGeneric:
-    case TypeKind::GenericFunction:
-    case TypeKind::Metatype:
-      shouldNullify = objectType->hasUnresolvedType();
-      break;
-
-    default:
-      shouldNullify = false;
-      break;
-    }
+    shouldNullify = shouldNullifyType(objectType);
   }
 
   // If the conversion type contains no info, drop it.

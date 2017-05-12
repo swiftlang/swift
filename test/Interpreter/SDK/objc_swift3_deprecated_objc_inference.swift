@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-build-swift -swift-version 4 -Xfrontend -enable-swift3-objc-inference %s -o %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_NOTHING
 // RUN: env SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=0 SIMCTL_CHILD_SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=0 %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_NOTHING
 

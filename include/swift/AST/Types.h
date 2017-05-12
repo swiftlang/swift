@@ -221,19 +221,22 @@ enum class TypeTraitResult {
 
 /// Specifies which normally-unsafe type mismatches should be accepted when
 /// checking overrides.
-enum class OverrideMatchMode {
-  /// Only accept overrides that are properly covariant.
-  Strict,
+enum class TypeMatchFlags {
+  /// Allow properly-covariant overrides.
+  AllowOverride = 1 << 0,
   /// Allow a parameter with IUO type to be overridden by a parameter with non-
   /// optional type.
-  AllowNonOptionalForIUOParam,
+  AllowNonOptionalForIUOParam = 1 << 1,
   /// Allow any mismatches of Optional or ImplicitlyUnwrappedOptional at the
   /// top level of a type.
   ///
   /// This includes function parameters and result types as well as tuple
   /// elements, but excludes generic parameters.
-  AllowTopLevelOptionalMismatch
+  AllowTopLevelOptionalMismatch = 1 << 2,
+  /// Allow any ABI-compatible types to be considered matching.
+  AllowABICompatible = 1 << 3,
 };
+using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
@@ -702,10 +705,9 @@ public:
   /// concrete types to form the argument type.
   bool isBindableTo(Type ty);
 
-  /// \brief Determines whether this type is permitted as a method override
-  /// of the \p other.
-  bool canOverride(Type other, OverrideMatchMode matchMode,
-                   LazyResolver *resolver);
+  /// \brief Determines whether this type is similar to \p other as defined by
+  /// \p matchOptions.
+  bool matches(Type other, TypeMatchOptions matchOptions, LazyResolver *resolver);
 
   /// \brief Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,

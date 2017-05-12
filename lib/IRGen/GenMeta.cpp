@@ -3502,6 +3502,10 @@ namespace {
       }
     }
 
+    void addPlaceholder(MissingMemberDecl *) {
+      llvm_unreachable("cannot generate metadata with placeholders in it");
+    }
+
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
 
     void addGenericArgument(CanType argTy, ClassDecl *forClass) {
@@ -5535,6 +5539,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
   case KnownProtocolKind::BridgedStoredNSError:
+  case KnownProtocolKind::CFObject:
   case KnownProtocolKind::ErrorCodeProtocol:
   case KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral:

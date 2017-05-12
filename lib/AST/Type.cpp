@@ -2325,13 +2325,42 @@ bool TypeBase::isTriviallyRepresentableIn(ForeignLanguage language,
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
-/// Is t1 not just a subtype of t2, but one such that its values are
-/// trivially convertible to values of the other?
-static bool canOverride(CanType t1, CanType t2,
-                        OverrideMatchMode matchMode,
-                        bool isParameter,
-                        bool insideOptional,
-                        LazyResolver *resolver) {
+static bool isABICompatibleEvenAddingOptional(CanType t1, CanType t2) {
+  // Classes, class-constrained archetypes, and pure-ObjC existential
+  // types all have single retainable pointer representation; optionality
+  // change is allowed.
+  // NOTE: This doesn't use isAnyClassReferenceType because we want it to
+  // return a conservative answer for dependent types. There's probably
+  // a better answer here, though.
+  if ((t1->mayHaveSuperclass() || t1->isObjCExistentialType()) &&
+      (t2->mayHaveSuperclass() || t2->isObjCExistentialType())) {
+    return true;
+  }
+
+  // Class metatypes are ABI-compatible even under optionality change.
+  if (auto metaTy1 = dyn_cast<MetatypeType>(t1)) {
+    if (auto metaTy2 = dyn_cast<MetatypeType>(t2)) {
+      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
+          metaTy2.getInstanceType().getClassOrBoundGenericClass()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+namespace {
+  enum class ParameterPosition {
+    NotParameter,
+    Parameter,
+    ParameterTupleElement
+  };
+} // end anonymous namespace
+
+static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
+                    ParameterPosition paramPosition, bool insideOptional,
+                    LazyResolver *resolver) {
   if (t1 == t2) return true;
 
   // First try unwrapping optionals.
@@ -2341,26 +2370,28 @@ static bool canOverride(CanType t1, CanType t2,
     if (auto obj2 = t2.getAnyOptionalObjectType()) {
       // Optional-to-optional.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
-        // Allow T? and T! to freely override one another.
-        return canOverride(obj1, obj2, matchMode,
-                           /*isParameter=*/false,
-                           /*insideOptional=*/true,
-                           resolver);
+        // Allow T? and T! to freely match one another.
+        return matches(obj1, obj2, matchMode, ParameterPosition::NotParameter,
+                       /*insideOptional=*/true, resolver);
       }
 
       // Value-to-optional.
-      return canOverride(t1, obj2, matchMode,
-                         /*isParameter=*/false,
-                         /*insideOptional=*/true,
-                         resolver);
+      if (matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+        if (isABICompatibleEvenAddingOptional(t1, obj2))
+          return true;
+      }
+      if (matchMode.contains(TypeMatchFlags::AllowOverride) ||
+          matchMode.contains(TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
+        return matches(t1, obj2, matchMode, ParameterPosition::NotParameter,
+                       /*insideOptional=*/true, resolver);
+      }
 
-    } else if (matchMode == OverrideMatchMode::AllowTopLevelOptionalMismatch) {
+    } else if (matchMode.contains(
+                 TypeMatchFlags::AllowTopLevelOptionalMismatch)) {
       // Optional-to-value, normally disallowed.
       if (auto obj1 = t1.getAnyOptionalObjectType()) {
-        return canOverride(obj1, t2, matchMode,
-                           /*isParameter=*/false,
-                           /*insideOptional=*/true,
-                           resolver);
+        return matches(obj1, t2, matchMode, ParameterPosition::NotParameter,
+                       /*insideOptional=*/true, resolver);
       }
     }
   }
@@ -2369,57 +2400,73 @@ static bool canOverride(CanType t1, CanType t2,
   if (auto tuple2 = dyn_cast<TupleType>(t2)) {
     // We only ever look into singleton tuples on the RHS if we're
     // certain that the LHS isn't also a singleton tuple.
+    ParameterPosition elementPosition;
+    switch (paramPosition) {
+    case ParameterPosition::NotParameter:
+    case ParameterPosition::ParameterTupleElement:
+      elementPosition = ParameterPosition::NotParameter;
+      break;
+    case ParameterPosition::Parameter:
+      elementPosition = ParameterPosition::ParameterTupleElement;
+      break;
+    }
+
     auto tuple1 = dyn_cast<TupleType>(t1);
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
-      if (tuple2->getNumElements() == 1)
-        return canOverride(t1, tuple2.getElementType(0),
-                           matchMode,
-                           isParameter,
-                           /*insideOptional=*/false,
-                           resolver);
+      if (tuple2->getNumElements() == 1) {
+        return matches(t1, tuple2.getElementType(0), matchMode, elementPosition,
+                       /*insideOptional=*/false, resolver);
+      }
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
-      if (!canOverride(tuple1.getElementType(i),
-                       tuple2.getElementType(i),
-                       matchMode,
-                       isParameter,
-                       /*insideOptional=*/false,
-                       resolver))
+      if (!matches(tuple1.getElementType(i), tuple2.getElementType(i),
+                   matchMode, elementPosition, /*insideOptional=*/false,
+                   resolver)){
         return false;
+      }
     }
     return true;
   }
 
-  // Function-to-function.  (Polymorphic functions?)
-  if (auto fn2 = dyn_cast<FunctionType>(t2)) {
-    auto fn1 = dyn_cast<FunctionType>(t1);
+  // Function-to-function.
+  if (auto fn2 = dyn_cast<AnyFunctionType>(t2)) {
+    auto fn1 = dyn_cast<AnyFunctionType>(t1);
     if (!fn1)
       return false;
 
-    // Allow the base type to be throwing even if the overriding type isn't
+    // FIXME: Handle generic functions in non-ABI matches.
+    if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
+      if (!isa<FunctionType>(t1) || !isa<FunctionType>(t2))
+        return false;
+    }
+
+    // When checking overrides, allow the base type to be throwing even if the
+    // overriding type isn't.
     auto ext1 = fn1->getExtInfo();
     auto ext2 = fn2->getExtInfo();
-    if (ext2.throws()) ext1 = ext1.withThrows(true);
+    if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
+      if (ext2.throws()) {
+        ext1 = ext1.withThrows(true);
+      }
+    }
     if (ext1 != ext2)
       return false;
 
     // Inputs are contravariant, results are covariant.
-    return (canOverride(fn2.getInput(), fn1.getInput(),
-                        matchMode,
-                        /*isParameter=*/true,
-                        /*insideOptional=*/false,
-                        resolver) &&
-            canOverride(fn1.getResult(), fn2.getResult(),
-                        matchMode,
-                        /*isParameter=*/false,
-                        /*insideOptional=*/false,
-                        resolver));
+    return (matches(fn2.getInput(), fn1.getInput(), matchMode,
+                    ParameterPosition::Parameter, /*insideOptional=*/false,
+                    resolver) &&
+            matches(fn1.getResult(), fn2.getResult(), matchMode,
+                    ParameterPosition::NotParameter, /*insideOptional=*/false,
+                    resolver));
   }
 
-  if (matchMode == OverrideMatchMode::AllowNonOptionalForIUOParam &&
-      isParameter && !insideOptional) {
+  if (matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam) &&
+      (paramPosition == ParameterPosition::Parameter ||
+       paramPosition == ParameterPosition::ParameterTupleElement) &&
+      !insideOptional) {
     // Allow T to override T! in certain cases.
     if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
@@ -2428,16 +2475,22 @@ static bool canOverride(CanType t1, CanType t2,
   }
 
   // Class-to-class.
-  return t2->isExactSuperclassOf(t1);
+  if (matchMode.contains(TypeMatchFlags::AllowOverride))
+    if (t2->isExactSuperclassOf(t1))
+      return true;
+
+  if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
+    if (isABICompatibleEvenAddingOptional(t1, t2))
+      return true;
+
+  return false;
 }
 
-bool TypeBase::canOverride(Type other, OverrideMatchMode matchMode,
-                           LazyResolver *resolver) {
-  return ::canOverride(getCanonicalType(), other->getCanonicalType(),
-                       matchMode,
-                       /*isParameter=*/false,
-                       /*insideOptional=*/false,
-                       resolver);
+bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
+                       LazyResolver *resolver) {
+  return ::matches(getCanonicalType(), other->getCanonicalType(), matchMode,
+                   ParameterPosition::NotParameter, /*insideOptional=*/false,
+                   resolver);
 }
 
 /// getNamedElementId - If this tuple has a field with the specified name,

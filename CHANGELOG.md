@@ -37,6 +37,11 @@ Swift 4.0
     p[keyPath: x] // gives 3
     p[keyPath: y] // gives 4
     ```
+* Core Foundation types implicitly conform to Hashable (and Equatable), using
+  CFHash and CFEqual as the implementation. This change applies even to "Swift
+  3 mode", so if you were previously adding this conformance yourself, use
+  `#if swift(>=3.2)` to restrict the extension to Swift 3.1 and below.
+  ([SR-2388](https://bugs.swift.org/browse/SR-2388))
 
 * [SE-0156][]
 

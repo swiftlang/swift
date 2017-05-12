@@ -1,4 +1,5 @@
 #import <Foundation.h>
+#import <CoreFoundation.h>
 @import Dispatch;
 #include "other-header.h"
 
@@ -29,3 +30,5 @@ void doSomethingInHead(int arg);
 @class Cake;
 struct Arkham;
 @protocol Soul;
+
+typedef struct __attribute__((objc_bridge(id))) __MyLittleCFType *MyLittleCFType;

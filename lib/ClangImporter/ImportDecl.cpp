@@ -1186,17 +1186,19 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   return constructor;
 }
 
-static void populateInheritedTypes(ClangImporter::Implementation &Impl,
-                                   NominalTypeDecl *nominal,
-                                   ArrayRef<ProtocolDecl *> protocols) {
+static void populateInheritedTypes(NominalTypeDecl *nominal,
+                                   ArrayRef<ProtocolDecl *> protocols,
+                                   Type superclass = Type()) {
   SmallVector<TypeLoc, 4> inheritedTypes;
-  inheritedTypes.resize(protocols.size());
-  for_each(MutableArrayRef<TypeLoc>(inheritedTypes),
-           ArrayRef<ProtocolDecl *>(protocols),
+  if (superclass)
+    inheritedTypes.push_back(TypeLoc::withoutLoc(superclass));
+  inheritedTypes.resize(protocols.size() + (superclass ? 1 : 0));
+  for_each(MutableArrayRef<TypeLoc>(inheritedTypes).drop_front(superclass?1:0),
+           protocols,
            [](TypeLoc &tl, ProtocolDecl *proto) {
              tl = TypeLoc::withoutLoc(proto->getDeclaredType());
            });
-  nominal->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+  nominal->setInherited(nominal->getASTContext().AllocateCopy(inheritedTypes));
   nominal->setCheckedInheritanceClause();
 }
 
@@ -1206,7 +1208,7 @@ addProtocolsToStruct(ClangImporter::Implementation &Impl,
                      StructDecl *structDecl,
                      ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
                      ArrayRef<ProtocolDecl *> protocols) {
-  populateInheritedTypes(Impl, structDecl, protocols);
+  populateInheritedTypes(structDecl, protocols);
 
   // Note synthesized protocols
   for (auto kind : synthesizedProtocolAttrs)
@@ -4693,9 +4695,14 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   addObjCAttribute(theClass, None);
   Impl.registerExternalDecl(theClass);
 
-  SmallVector<ProtocolDecl *, 4> protocols;
-  theClass->getImplicitProtocols(protocols);
-  addObjCProtocolConformances(theClass, protocols);
+  auto *cfObjectProto =
+      Impl.SwiftContext.getProtocol(KnownProtocolKind::CFObject);
+  if (cfObjectProto) {
+    populateInheritedTypes(theClass, cfObjectProto, superclass);
+    auto *attr = new (Impl.SwiftContext) SynthesizedProtocolAttr(
+        KnownProtocolKind::CFObject);
+    theClass->getAttrs().add(attr);
+  }
 
   // Look for bridging attributes on the clang record.  We can
   // just check the most recent redeclaration, which will inherit
