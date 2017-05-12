@@ -109,7 +109,7 @@ struct NSOptions : OptionSet {
 }
 @available(swift, obsoleted: 3, renamed: "__PrivCFType")
 typealias __PrivCFTypeRef = __PrivCFType
-class __PrivCFType {
+class __PrivCFType : _CFObject {
 }
 @available(swift, obsoleted: 3, renamed: "__PrivCFSub")
 typealias __PrivCFSubRef = __PrivCFSub
