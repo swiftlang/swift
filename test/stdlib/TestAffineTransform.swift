@@ -183,6 +183,10 @@ class TestAffineTransform : TestAffineTransformSuper {
         var reflectAboutOrigin = AffineTransform.identity
         reflectAboutOrigin.rotate(byRadians: .pi)
         checkPointTransformation(reflectAboutOrigin, point: point, expectedPoint: NSPoint(x: CGFloat(-10.0), y: CGFloat(-10.0)))
+        
+        var scaleThenRotate = AffineTransform(scale: 2)
+        scaleThenRotate.rotate(byRadians: .pi / 2)
+        checkPointTransformation(scaleThenRotate, point: point, expectedPoint: NSPoint(x: CGFloat(-20.0), y: CGFloat(20.0)))
     }
     
     func test_Inversion() {
