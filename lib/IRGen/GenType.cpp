@@ -1626,6 +1626,14 @@ bool IRGenModule::isPOD(SILType type, ResilienceExpansion expansion) {
   return getTypeInfo(type).isPOD(expansion);
 }
 
+/// Determine whether this type is known to be empty.
+bool IRGenModule::isKnownEmpty(SILType type, ResilienceExpansion expansion) {
+  if (auto tuple = type.getAs<TupleType>()) {
+    if (tuple->getNumElements() == 0)
+      return true;
+  }
+  return getTypeInfo(type).isKnownEmpty(expansion);
+}
 
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);

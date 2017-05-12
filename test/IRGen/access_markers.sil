@@ -105,6 +105,33 @@ bb0(%0 : $A, %1 : $*Builtin.UnsafeValueBuffer):
   return %20 : $()
 }
 
+sil @writeEmptyTuple : $(@inout ()) -> ()
+sil @readEmptyTuple : $(@in_guaranteed ()) -> ()
+
+// rdar://32039394 - Don't apply dynamic enforcement to empty types.
+// CHECK-LABEL: define {{.*}}void @testPairedBox(
+sil @testPairedBox : $(@guaranteed { var () }) -> () {
+bb0(%0 : ${ var () }):
+  // CHECK: entry:
+  %2 = project_box %0 : ${ var () }, 0
+
+  // CHECK-NEXT: call {{.*}}void @writeEmptyTuple(%swift.opaque* nocapture undef)
+  %3 = begin_access [modify] [dynamic] %2 : $*()
+  %write_fn = function_ref @writeEmptyTuple : $@convention(thin) (@inout ()) -> ()
+  apply %write_fn(%3) : $@convention(thin) (@inout ()) -> ()
+  %4 = end_access %3 : $*()
+
+  // CHECK-NEXT: call {{.*}}void @readEmptyTuple(%swift.opaque* noalias nocapture undef)
+  %5 = begin_access [read] [dynamic] %2 : $*()
+  %read_fn = function_ref @readEmptyTuple : $@convention(thin) (@in_guaranteed ()) -> ()
+  apply %read_fn(%5) : $@convention(thin) (@in_guaranteed ()) -> ()
+  %6 = end_access %5 : $*()
+
+  // CHECK-NEXT: ret void
+  %20 = tuple ()
+  return %20 : $()
+}
+
 // rdar://31964550
 // Just check that this doesn't crash.
 sil @testCopyAddr : $(@guaranteed A) -> () {
