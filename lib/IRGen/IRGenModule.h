@@ -620,6 +620,7 @@ public:
   ExplosionSchema getSchema(SILType T);
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
+  bool isKnownEmpty(SILType type, ResilienceExpansion expansion);
   bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
