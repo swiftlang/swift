@@ -1705,12 +1705,13 @@ optimizeBridgedCasts(SILInstruction *Inst,
 
   auto &M = Inst->getModule();
 
-  // To apply the bridged optimizations, we should
-  // ensure that types are not existential,
-  // and that one of the types is a class and another
-  // one is a struct.
+  // To apply the bridged optimizations, we should ensure that types are not
+  // existential (and keep in mind that generic parameters can be existentials),
+  // and that one of the types is a class and another one is a struct.
   if (source.isAnyExistentialType() ||
       target.isAnyExistentialType() ||
+      source->is<ArchetypeType>() ||
+      target->is<ArchetypeType>() ||
       (source.getClassOrBoundGenericClass() &&
        !target.getStructOrBoundGenericStruct()) ||
       (target.getClassOrBoundGenericClass() &&
@@ -2159,10 +2160,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   // %0 = metatype $A.Type
   // %1 = init_existential_metatype ..., %0: $A
-  // checked_cond_br %1, ....
+  // checked_cast_br %1, ....
   // ->
-  // %1 = metatype $A.Type
-  // checked_cond_br %1, ....
+  // %0 = metatype $A.Type
+  // checked_cast_br %0 to ...
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
       SILBuilderWithScope B(Inst);
@@ -2180,13 +2181,13 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto Op = EMI->getOperand();
     auto EmiTy = EMI->getType();
 
-    // %0 = alloc_stack ..
-    // %1 = init_existential_addr %0: $A
-    // %2 = existential_metatype %0, ...
-    // checked_cond_br %2, ....
+    // %0 = alloc_stack $T
+    // %1 = init_existential_addr %0: $*T, $A
+    // %2 = existential_metatype $T.Type, %0: $*T
+    // checked_cast_br %2 to ...
     // ->
     // %1 = metatype $A.Type
-    // checked_cond_br %1, ....
+    // checked_cast_br %1 to ...
 
     if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
       // Should be in the same BB.
@@ -2219,7 +2220,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the type used to initialize the existential.
         auto LoweredConcreteTy = FoundIEI->getLoweredConcreteType();
-        if (LoweredConcreteTy.isAnyExistentialType())
+        // We don't know enough at compile time about existential
+        // and generic type parameters.
+        if (LoweredConcreteTy.isAnyExistentialType() ||
+            LoweredConcreteTy.is<ArchetypeType>())
           return nullptr;
         // Get the metatype of this type.
         auto EMT = EmiTy.castTo<AnyMetatypeType>();
@@ -2228,6 +2232,8 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
         SILBuilderWithScope B(Inst);
+        B.getOpenedArchetypes().addOpenedArchetypeOperands(
+            FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
 
         auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
@@ -2242,10 +2248,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     // %0 = alloc_ref $A
     // %1 = init_existential_ref %0: $A, $...
     // %2 = existential_metatype ..., %1 :  ...
-    // checked_cond_br %2, ....
+    // checked_cast_br %2, ....
     // ->
     // %1 = metatype $A.Type
-    // checked_cond_br %1, ....
+    // checked_cast_br %1, ....
     if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
       auto *ASRI = dyn_cast<AllocRefInst>(FoundIERI->getOperand());
       if (!ASRI)
@@ -2275,7 +2281,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the type used to initialize the existential.
         auto ConcreteTy = FoundIERI->getFormalConcreteType();
-        if (ConcreteTy.isAnyExistentialType())
+        // We don't know enough at compile time about existential
+        // and generic type parameters.
+        if (ConcreteTy.isAnyExistentialType() ||
+            ConcreteTy->is<ArchetypeType>())
           return nullptr;
         // Get the SIL metatype of this type.
         auto EMT = EMI->getType().castTo<AnyMetatypeType>();
@@ -2283,6 +2292,8 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
         SILBuilderWithScope B(Inst);
+        B.getOpenedArchetypes().addOpenedArchetypeOperands(
+            FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
 
         auto *NewI = B.createCheckedCastBranch(Loc, /* isExact */ false, MI,
