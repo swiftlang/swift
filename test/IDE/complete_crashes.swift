@@ -196,3 +196,9 @@ struct S_RDAR_28991372 {
 
 S_RDAR_28991372(x: #^RDAR_28991372^#, y: <#T##Int#>)
 // RDAR_28991372: Begin completions
+
+// rdar://problem/31981486
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_31981486 | %FileCheck %s -check-prefix=RDAR_31981486
+
+protocol P where #^RDAR_31981486^#
+// RDAR_31981486: Begin completions
