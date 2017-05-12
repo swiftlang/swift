@@ -217,8 +217,8 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
       M->getASTContext().getProtocol(KnownProtocolKind::Error);
 
   if (errorTypeProto) {
-    // Find the conformance of the value type to _BridgedToObjectiveC.
-    // Check whether the type conforms to _BridgedToObjectiveC.
+    // Find the conformance of the value type to Error.
+    // Check whether the type conforms to Error.
     auto conformance = M->lookupConformance(Ty, errorTypeProto, nullptr);
     return conformance.hasValue();
   }
@@ -636,9 +636,15 @@ swift::classifyDynamicCast(ModuleDecl *M,
     if (Type ObjCTy = M->getASTContext().getBridgedToObjC(M, target)) {
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
-      return classifyDynamicCast(M, source,
+      auto canCastToBridgedType = classifyDynamicCast(M, source,
           ObjCTy->getCanonicalType(),
           /* isSourceTypeExact */ false, isWholeModuleOpts);
+      // Temper our enthusiasm if the bridge from the ObjC type to the target
+      // value type may fail.
+      if (canCastToBridgedType == DynamicCastFeasibility::WillSucceed
+          && M->getASTContext().isObjCClassWithMultipleSwiftBridgedTypes(ObjCTy))
+        return DynamicCastFeasibility::MaySucceed;
+      return canCastToBridgedType;
     }
     return DynamicCastFeasibility::MaySucceed;
   }

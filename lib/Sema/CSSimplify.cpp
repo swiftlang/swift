@@ -3559,7 +3559,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // We accepted these coercions in Swift 3 mode, so we have to live with
       // them (but give a warning) in that language mode.
       if (!TC.Context.LangOpts.isSwiftVersion3()
-          && TC.isObjCClassWithMultipleSwiftBridgedTypes(objcClass, DC))
+          && TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
         return SolutionKind::Error;
 
       // If the bridged value type is generic, the generic arguments
