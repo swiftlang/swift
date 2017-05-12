@@ -91,7 +91,7 @@ public struct _StringBuffer {
       = ((_storage._capacity() - capacityBump) &<< 1) + elementShift
   }
 
-  static func fromCodeUnits<Input : Sequence, Encoding : UnicodeEncoding>(
+  static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
     _ input: Input, encoding: Encoding.Type, repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
   ) -> (_StringBuffer?, hadError: Bool)

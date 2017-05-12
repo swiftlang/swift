@@ -216,7 +216,7 @@ extension String {
       }
 
       /// True iff the index is at the end of its view or if the next
-      /// byte begins a new UnicodeScalar.
+      /// byte begins a new Unicode.Scalar.
       internal func _isOnUnicodeScalarBoundary(in core: _StringCore) -> Bool {
         let buffer = UInt32(extendingOrTruncating: _buffer)
         let (codePoint, _) = UTF8._decodeOne(buffer)
