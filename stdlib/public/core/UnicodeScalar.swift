@@ -432,5 +432,5 @@ extension Unicode.Scalar {
   }
 }
 
-@available(swift, obsoleted: 4.0, renamed: "Unicode.Scalar")
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.Scalar")
 public typealias UnicodeScalar = Unicode.Scalar

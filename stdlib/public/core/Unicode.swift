@@ -309,7 +309,7 @@ extension Unicode.UTF8 : UnicodeCodec {
   }
 }
 
-@available(swift, obsoleted: 4.0, renamed: "Unicode.UTF8")
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF8")
 public typealias UTF8 = Unicode.UTF8
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
@@ -420,7 +420,7 @@ extension Unicode.UTF16 : UnicodeCodec {
     processCodeUnit(UInt16(extendingOrTruncating: s))
   }
 }
-@available(swift, obsoleted: 4.0, renamed: "Unicode.UTF16")
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF16")
 public typealias UTF16 = Unicode.UTF16
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
@@ -511,7 +511,7 @@ extension Unicode.UTF32 : UnicodeCodec {
     processCodeUnit(UInt32(input))
   }
 }
-@available(swift, obsoleted: 4.0, renamed: "Unicode.UTF32")
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF32")
 public typealias UTF32 = Unicode.UTF32
 
 /// Translates the given input from one Unicode encoding to another by calling
