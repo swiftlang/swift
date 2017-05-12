@@ -29,9 +29,10 @@ namespace {
                                   StringRef)> callback;
 
   public:
-    ClangDiagRenderer(const clang::ASTContext &ctx, decltype(callback) fn)
-       : DiagnosticNoteRenderer(ctx.getLangOpts(),
-                                &ctx.getDiagnostics().getDiagnosticOptions()),
+    ClangDiagRenderer(const clang::LangOptions &langOpts,
+                      clang::DiagnosticOptions *diagOpts,
+                      decltype(callback) fn)
+       : DiagnosticNoteRenderer(langOpts, diagOpts),
          callback(fn) {}
 
   private:
@@ -224,7 +225,9 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   } else {
     assert(clangDiag.hasSourceManager());
-    ClangDiagRenderer renderer(ImporterImpl.getClangASTContext(), emitDiag);
+    auto clangCI = ImporterImpl.getClangInstance();
+    ClangDiagRenderer renderer(clangCI->getLangOpts(),
+                               &clangCI->getDiagnosticOpts(), emitDiag);
     renderer.emitDiagnostic(clangDiag.getLocation(), clangDiagLevel, message,
                             clangDiag.getRanges(), clangDiag.getFixItHints(),
                             &clangDiag.getSourceManager());

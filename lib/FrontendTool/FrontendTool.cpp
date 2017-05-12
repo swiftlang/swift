@@ -459,6 +459,15 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::EmitPCH) {
     auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
+    auto &ImporterOpts = Invocation.getClangImporterOptions();
+    auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
+    if (!PCHOutDir.empty()) {
+      ImporterOpts.BridgingHeader = Invocation.getInputFilenames()[0];
+      // Create or validate a persistent PCH.
+      auto SwiftPCHHash = Invocation.getPCHHash();
+      auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
+      return !PCH.hasValue();
+    }
     return clangImporter->emitBridgingPCH(
       Invocation.getInputFilenames()[0],
       opts.getSingleOutputFilename());

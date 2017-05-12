@@ -1126,6 +1126,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
+    Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
   return false;
