@@ -122,8 +122,6 @@
     {
     "Integers": [
       "Integers.swift",
-      "IntegerArithmetic.swift",
-      "FixedPoint.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
