@@ -2694,7 +2694,12 @@ getIdForKeyPathComponentComputedProperty(SILGenFunction &SGF,
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
-    return SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func);
+    // Use the foreign selector if the decl is ObjC-imported, dynamic, or
+    // otherwise requires objc_msgSend for its ABI.
+    return SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func,
+                      ResilienceExpansion::Minimal,
+                      /*curried*/ false,
+                      /*foreign*/ property->requiresForeignGetterAndSetter());
   }
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("unpossible");
