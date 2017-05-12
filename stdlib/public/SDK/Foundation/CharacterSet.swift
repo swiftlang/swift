@@ -14,13 +14,13 @@
 import CoreFoundation
 import _SwiftCoreFoundationOverlayShims
 
-private func _utfRangeToCFRange(_ inRange : Range<UnicodeScalar>) -> CFRange {
+private func _utfRangeToCFRange(_ inRange : Range<Unicode.Scalar>) -> CFRange {
     return CFRange(
         location: Int(inRange.lowerBound.value),
         length: Int(inRange.upperBound.value - inRange.lowerBound.value))
 }
 
-private func _utfRangeToCFRange(_ inRange : ClosedRange<UnicodeScalar>) -> CFRange {
+private func _utfRangeToCFRange(_ inRange : ClosedRange<Unicode.Scalar>) -> CFRange {
     return CFRange(
         location: Int(inRange.lowerBound.value),
         length: Int(inRange.upperBound.value - inRange.lowerBound.value + 1))
@@ -104,7 +104,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
     
     // MARK: Mutable functions
     
-    fileprivate func insert(charactersIn range: Range<UnicodeScalar>) {
+    fileprivate func insert(charactersIn range: Range<Unicode.Scalar>) {
         switch _backing {
         case .immutable(let cs):
             let r = CFCharacterSetCreateMutableCopy(nil, cs)!
@@ -115,7 +115,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
         }
     }
     
-    fileprivate func insert(charactersIn range: ClosedRange<UnicodeScalar>) {
+    fileprivate func insert(charactersIn range: ClosedRange<Unicode.Scalar>) {
         switch _backing {
         case .immutable(let cs):
             let r = CFCharacterSetCreateMutableCopy(nil, cs)!
@@ -126,7 +126,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
         }
     }
     
-    fileprivate func remove(charactersIn range: Range<UnicodeScalar>) {
+    fileprivate func remove(charactersIn range: Range<Unicode.Scalar>) {
         switch _backing {
         case .immutable(let cs):
             let r = CFCharacterSetCreateMutableCopy(nil, cs)!
@@ -137,7 +137,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
         }
     }
     
-    fileprivate func remove(charactersIn range: ClosedRange<UnicodeScalar>) {
+    fileprivate func remove(charactersIn range: ClosedRange<Unicode.Scalar>) {
         switch _backing {
         case .immutable(let cs):
             let r = CFCharacterSetCreateMutableCopy(nil, cs)!
@@ -186,28 +186,28 @@ fileprivate final class _CharacterSetStorage : Hashable {
     // MARK: SetAlgebraType
     
     @discardableResult
-    fileprivate func insert(_ character: UnicodeScalar) -> (inserted: Bool, memberAfterInsert: UnicodeScalar) {
-        insert(charactersIn: character..<UnicodeScalar(character.value + 1)!)
+    fileprivate func insert(_ character: Unicode.Scalar) -> (inserted: Bool, memberAfterInsert: Unicode.Scalar) {
+        insert(charactersIn: character..<Unicode.Scalar(character.value + 1)!)
         // TODO: This should probably return the truth, but figuring it out requires two calls into NSCharacterSet
         return (true, character)
     }
     
     @discardableResult
-    fileprivate func update(with character: UnicodeScalar) -> UnicodeScalar? {
+    fileprivate func update(with character: Unicode.Scalar) -> Unicode.Scalar? {
         insert(character)
         // TODO: This should probably return the truth, but figuring it out requires two calls into NSCharacterSet
         return character
     }
     
     @discardableResult
-    fileprivate func remove(_ character: UnicodeScalar) -> UnicodeScalar? {
+    fileprivate func remove(_ character: Unicode.Scalar) -> Unicode.Scalar? {
         // TODO: Add method to CFCharacterSet to do this in one call
-        let result : UnicodeScalar? = contains(character) ? character : nil
-        remove(charactersIn: character..<UnicodeScalar(character.value + 1)!)
+        let result : Unicode.Scalar? = contains(character) ? character : nil
+        remove(charactersIn: character..<Unicode.Scalar(character.value + 1)!)
         return result
     }
     
-    fileprivate func contains(_ member: UnicodeScalar) -> Bool {
+    fileprivate func contains(_ member: Unicode.Scalar) -> Bool {
         switch _backing {
         case .immutable(let cs):
             return CFCharacterSetIsLongCharacterMember(cs, member.value)
@@ -374,15 +374,15 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Initialize with a range of integers.
     ///
-    /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
-    public init(charactersIn range: Range<UnicodeScalar>) {
+    /// It is the caller's responsibility to ensure that the values represent valid `Unicode.Scalar` values, if that is what is desired.
+    public init(charactersIn range: Range<Unicode.Scalar>) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInRange(nil, _utfRangeToCFRange(range)))
     }
 
     /// Initialize with a closed range of integers.
     ///
-    /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
-    public init(charactersIn range: ClosedRange<UnicodeScalar>) {
+    /// It is the caller's responsibility to ensure that the values represent valid `Unicode.Scalar` values, if that is what is desired.
+    public init(charactersIn range: ClosedRange<Unicode.Scalar>) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInRange(nil, _utfRangeToCFRange(range)))
     }
 
@@ -569,8 +569,8 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Insert a range of integer values in the `CharacterSet`.
     ///
-    /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
-    public mutating func insert(charactersIn range: Range<UnicodeScalar>) {
+    /// It is the caller's responsibility to ensure that the values represent valid `Unicode.Scalar` values, if that is what is desired.
+    public mutating func insert(charactersIn range: Range<Unicode.Scalar>) {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
@@ -579,8 +579,8 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     /// Insert a closed range of integer values in the `CharacterSet`.
     ///
-    /// It is the caller's responsibility to ensure that the values represent valid `UnicodeScalar` values, if that is what is desired.
-    public mutating func insert(charactersIn range: ClosedRange<UnicodeScalar>) {
+    /// It is the caller's responsibility to ensure that the values represent valid `Unicode.Scalar` values, if that is what is desired.
+    public mutating func insert(charactersIn range: ClosedRange<Unicode.Scalar>) {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
@@ -588,7 +588,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     }
 
     /// Remove a range of integer values from the `CharacterSet`.
-    public mutating func remove(charactersIn range: Range<UnicodeScalar>) {
+    public mutating func remove(charactersIn range: Range<Unicode.Scalar>) {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
@@ -596,7 +596,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     }
 
     /// Remove a closed range of integer values from the `CharacterSet`.
-    public mutating func remove(charactersIn range: ClosedRange<UnicodeScalar>) {
+    public mutating func remove(charactersIn range: ClosedRange<Unicode.Scalar>) {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
@@ -631,22 +631,22 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     // MARK: -
     // MARK: SetAlgebraType
     
-    /// Insert a `UnicodeScalar` representation of a character into the `CharacterSet`.
+    /// Insert a `Unicode.Scalar` representation of a character into the `CharacterSet`.
     ///
-    /// `UnicodeScalar` values are available on `Swift.String.UnicodeScalarView`.
+    /// `Unicode.Scalar` values are available on `Swift.String.UnicodeScalarView`.
     @discardableResult
-    public mutating func insert(_ character: UnicodeScalar) -> (inserted: Bool, memberAfterInsert: UnicodeScalar) {
+    public mutating func insert(_ character: Unicode.Scalar) -> (inserted: Bool, memberAfterInsert: Unicode.Scalar) {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
         return _storage.insert(character)
     }
 
-    /// Insert a `UnicodeScalar` representation of a character into the `CharacterSet`.
+    /// Insert a `Unicode.Scalar` representation of a character into the `CharacterSet`.
     ///
-    /// `UnicodeScalar` values are available on `Swift.String.UnicodeScalarView`.
+    /// `Unicode.Scalar` values are available on `Swift.String.UnicodeScalarView`.
     @discardableResult
-    public mutating func update(with character: UnicodeScalar) -> UnicodeScalar? {
+    public mutating func update(with character: Unicode.Scalar) -> Unicode.Scalar? {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
@@ -654,19 +654,19 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     }
 
     
-    /// Remove a `UnicodeScalar` representation of a character from the `CharacterSet`.
+    /// Remove a `Unicode.Scalar` representation of a character from the `CharacterSet`.
     ///
-    /// `UnicodeScalar` values are available on `Swift.String.UnicodeScalarView`.
+    /// `Unicode.Scalar` values are available on `Swift.String.UnicodeScalarView`.
     @discardableResult
-    public mutating func remove(_ character: UnicodeScalar) -> UnicodeScalar? {
+    public mutating func remove(_ character: Unicode.Scalar) -> Unicode.Scalar? {
         if !isKnownUniquelyReferenced(&_storage) {
             _storage = _storage.mutableCopy()
         }
         return _storage.remove(character)
     }
     
-    /// Test for membership of a particular `UnicodeScalar` in the `CharacterSet`.
-    public func contains(_ member: UnicodeScalar) -> Bool {
+    /// Test for membership of a particular `Unicode.Scalar` in the `CharacterSet`.
+    public func contains(_ member: Unicode.Scalar) -> Bool {
         return _storage.contains(member)
     }
     

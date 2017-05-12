@@ -9,13 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension _Unicode {
+extension Unicode {
   public enum UTF32 {
   case _swift3Codec
   }
 }
 
-extension _Unicode.UTF32 : UnicodeEncoding {
+extension Unicode.UTF32 : Unicode.Encoding {
   public typealias CodeUnit = UInt32
   public typealias EncodedScalar = CollectionOfOne<UInt32>
 
@@ -29,13 +29,13 @@ extension _Unicode.UTF32 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
-    return UnicodeScalar(_unchecked: source.first!)
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
+    return Unicode.Scalar(_unchecked: source.first!)
   }
 
   @inline(__always)
   public static func encode(
-    _ source: UnicodeScalar
+    _ source: Unicode.Scalar
   ) -> EncodedScalar? {
     return EncodedScalar(source.value)
   }
@@ -48,13 +48,13 @@ extension _Unicode.UTF32 : UnicodeEncoding {
   public typealias ReverseParser = Parser
 }
 
-extension UTF32.Parser : UnicodeParser {
-  public typealias Encoding = _Unicode.UTF32
+extension UTF32.Parser : Unicode.Parser {
+  public typealias Encoding = Unicode.UTF32
 
   /// Parses a single Unicode scalar value from `input`.
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
-  ) -> _Unicode.ParseResult<Encoding.EncodedScalar>
+  ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit {
     let n = input.next()
     if _fastPath(n != nil), let x = n {

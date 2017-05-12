@@ -19,11 +19,11 @@ extension String {
   /// For example, use this initializer to create a string with ten `"0"`
   /// scalars in a row.
   ///
-  ///     let zeroes = String("0" as UnicodeScalar, count: 10)
+  ///     let zeroes = String("0" as Unicode.Scalar, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
   @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
+  public init(repeating repeatedValue: Unicode.Scalar, count: Int) {
     Builtin.unreachable()
   }
 
@@ -61,7 +61,7 @@ extension String {
     return _split(separator: "\n")
   }
   
-  public func _split(separator: UnicodeScalar) -> [String] {
+  public func _split(separator: Unicode.Scalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
@@ -73,7 +73,7 @@ extension String {
 }
 
 extension String {
-  public init(_ _c: UnicodeScalar) {
+  public init(_ _c: Unicode.Scalar) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
       input: repeatElement(_c.value, count: 1))
@@ -420,7 +420,7 @@ extension String {
   }
 
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
+  public init(count: Int, repeatedValue c: Unicode.Scalar) {
     Builtin.unreachable()
   }
 }

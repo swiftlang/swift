@@ -75,11 +75,11 @@ public struct StaticString
   /// this property when `hasPointerRepresentation` is `true` triggers a
   /// runtime error.
   @_transparent
-  public var unicodeScalar: UnicodeScalar {
+  public var unicodeScalar: Unicode.Scalar {
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(UInt(_startPtrOrData)))!
+    return Unicode.Scalar(UInt32(UInt(_startPtrOrData)))!
   }
 
   /// The length in bytes of the static string's ASCII or UTF-8 representation.
@@ -183,7 +183,7 @@ public struct StaticString
   ) {
     self._startPtrOrData = UInt(UInt32(unicodeScalar))._builtinWordValue
     self._utf8CodeUnitCount = 0._builtinWordValue
-    self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
+    self._flags = Unicode.Scalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
   }

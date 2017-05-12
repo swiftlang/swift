@@ -25,7 +25,7 @@ public struct _FDInputStream {
 
   public mutating func getline() -> String? {
     if let newlineIndex =
-      _buffer[0..<_bufferUsed].index(of: UInt8(UnicodeScalar("\n").value)) {
+      _buffer[0..<_bufferUsed].index(of: UInt8(Unicode.Scalar("\n").value)) {
       let result = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: _buffer[0..<newlineIndex])
       _buffer.removeSubrange(0...newlineIndex)

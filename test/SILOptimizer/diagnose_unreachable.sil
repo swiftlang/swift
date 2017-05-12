@@ -293,7 +293,7 @@ b2:
   br bb1(%111 : $(Int, UnicodeScalar))
 
 // CHECK-LABEL: sil @constant_fold_switch_enum_with_payload
-// CHECK: bb0(%{{[0-9]+}} : $Int, %{{[0-9]+}} : $UnicodeScalar):
+// CHECK: bb0(%{{[0-9]+}} : $Int, %{{[0-9]+}} : $Unicode.Scalar):
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   return
