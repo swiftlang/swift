@@ -8,7 +8,7 @@
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
 
-// REQUIRES: runtime-dladdr-backtraces
+// REQUIRES: swift_stdlib_asserts
 // REQUIRES: executable_test
 
 // Backtraces are not emitted when optimizations are enabled. This test can not

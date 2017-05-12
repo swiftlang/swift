@@ -419,7 +419,6 @@ include(AddSwift)
 include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
-include(AddSwiftRuntime)
 
 # Configure swift include, install, build components.
 swift_configure_components()
@@ -790,17 +789,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
-swift_runtime_enable_backtrace_reporting(SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING_default)
-set(SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
-    ${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING_default}
-    CACHE BOOL "Enable simple backtrace printing using dladdr")
-set(SWIFT_RUNTIME_DLADDR_ALLOWED
-    ${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING_default}
-    CACHE BOOL "Is dladdr allowed to be used in the code base. Must be TRUE if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING is set to TRUE")
-if ("${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING}" AND NOT "${SWIFT_RUNTIME_DLADDR_ALLOWED}")
-  message(FATAL "Can not enable backtrace reporting without allowing dladdr to be used by the runtime")
-endif()
-
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
@@ -814,8 +802,6 @@ message(STATUS "")
 
 message(STATUS "Building Swift runtime with:")
 message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
-message(STATUS "  Backtraces:                         ${SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING}")
-message(STATUS "  DLAddr Allowed:                     ${SWIFT_RUNTIME_DLADDR_ALLOWED}")
 message(STATUS "")
 
 #

@@ -26,10 +26,6 @@
 #include <assert.h>
 #include <dlfcn.h>
 
-#ifndef SWIFT_RUNTIME_DLADDR_ALLOW
-#error "SWIFT_RUNTIME_DLADDR_ALLOW must be defined"
-#endif
-
 using namespace swift;
 
 namespace {
@@ -78,7 +74,6 @@ void swift::initializeTypeMetadataRecordLookup() {
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-#if SWIFT_RUNTIME_DLADDR_ALLOW
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
     return 0;
@@ -89,9 +84,6 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolName = dlinfo.dli_sname;
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
-#else
-  return 0;
-#endif
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__)

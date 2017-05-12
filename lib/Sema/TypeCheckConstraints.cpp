@@ -3466,7 +3466,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Context.LangOpts.isSwiftVersion3() && extraFromOptionals == 0) {
     // Do the check for a bridging conversion now that we deferred above.
     if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO) {
-      if (isObjCClassWithMultipleSwiftBridgedTypes(fromType, dc)) {
+      if (Context.isObjCClassWithMultipleSwiftBridgedTypes(fromType)) {
         return CheckedCastKind::Swift3BridgingDowncast;
       }
       return CheckedCastKind::BridgingCoercion;
