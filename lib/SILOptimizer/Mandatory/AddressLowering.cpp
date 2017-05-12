@@ -965,9 +965,9 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   switch (origCallInst->getKind()) {
   case ValueKind::ApplyInst:
     newCallInst = callBuilder.createApply(
-        loc, apply.getCallee(), apply.getSubstCalleeSILType(),
-        loweredCalleeConv.getSILResultType(), apply.getSubstitutions(),
-        newCallArgs, cast<ApplyInst>(origCallInst)->isNonThrowing());
+        loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
+        cast<ApplyInst>(origCallInst)->isNonThrowing(),
+        SILModuleConventions::getLoweredAddressConventions());
     break;
   case ValueKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.
