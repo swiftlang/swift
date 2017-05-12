@@ -52,7 +52,6 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
-#ifndef NDEBUG
 
 //===----------------------------------------------------------------------===//
 //                                SILVerifier
@@ -4182,7 +4181,6 @@ public:
 
 #undef require
 #undef requireObjectType
-#endif //NDEBUG
 
 //===----------------------------------------------------------------------===//
 //                     Out of Line Verifier Run Functions
@@ -4191,17 +4189,22 @@ public:
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
 void SILFunction::verify(bool SingleFunction) const {
-#ifndef NDEBUG
+#ifdef NDEBUG
+  if (!getModule().getOptions().VerifyAll)
+    return;
+#endif
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
   SILVerifier(*this, SingleFunction).verify();
-#endif
 }
 
 /// Verify that a vtable follows invariants.
 void SILVTable::verify(const SILModule &M) const {
-#ifndef NDEBUG
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
     assert(entry.Method.hasDecl() && "vtable entry is not a decl");
@@ -4254,12 +4257,14 @@ void SILVTable::verify(const SILModule &M) const {
               "vtable entry for " + baseName + " must be ABI-compatible");
     }
   }
-#endif
 }
 
 /// Verify that a witness table follows invariants.
 void SILWitnessTable::verify(const SILModule &M) const {
-#ifndef NDEBUG
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
   if (isDeclaration())
     assert(getEntries().size() == 0 &&
            "A witness table declaration should not have any entries.");
@@ -4292,7 +4297,6 @@ void SILWitnessTable::verify(const SILModule &M) const {
                "protocol.");
       }
     }
-#endif
 }
 
 /// Verify that a default witness table follows invariants.
@@ -4323,7 +4327,10 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
 
 /// Verify that a global variable follows invariants.
 void SILGlobalVariable::verify() const {
-#ifndef NDEBUG
+#ifdef NDEBUG
+  if (!getModule().getOptions().VerifyAll)
+    return;
+#endif
   assert(getLoweredType().isObject()
          && "global variable cannot have address type");
 
@@ -4331,12 +4338,14 @@ void SILGlobalVariable::verify() const {
   if (InitializerF)
     assert(SILGlobalVariable::canBeStaticInitializer(InitializerF) &&
            "illegal static initializer");
-#endif
 }
 
 /// Verify the module.
 void SILModule::verify() const {
-#ifndef NDEBUG
+#ifdef NDEBUG
+  if (!getOptions().VerifyAll)
+    return;
+#endif
   // Uniquing set to catch symbol name collisions.
   llvm::StringSet<> symbolNames;
 
@@ -4406,7 +4415,6 @@ void SILModule::verify() const {
     }
     wt.verify(*this);
   }
-#endif
 }
 
 #ifndef NDEBUG
