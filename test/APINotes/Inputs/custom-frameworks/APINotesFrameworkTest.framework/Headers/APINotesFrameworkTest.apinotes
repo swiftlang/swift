@@ -108,3 +108,15 @@ SwiftVersions:
         SwiftName: ImportantCAlias
       - Name: EnclosingStructIdentifier
         SwiftName: EnclosingStructIdentifier
+    Enumerators:
+      - Name: AnonymousEnumRenamed
+        SwiftName: AnonymousEnumRenamedSwift3
+      - Name: UnknownEnumRenamed
+        SwiftName: UnknownEnumRenamedSwift3
+      - Name: TrueEnumRenamed
+        SwiftName: renamedSwift3
+      - Name: TrueEnumAliasRenamed
+        SwiftName: aliasRenamedSwift3
+      - Name: OptionyEnumRenamed
+        SwiftName: renamedSwift3
+    
