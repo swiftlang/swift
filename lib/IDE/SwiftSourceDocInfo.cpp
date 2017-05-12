@@ -961,6 +961,12 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
                                        DeclarationLoc, Filename);
   }
 }
+
+CharSourceRange CallArgInfo::getEntireCharRange(const SourceManager &SM) const {
+  return CharSourceRange(SM, LabelRange.getStart(),
+                         Lexer::getLocForEndOfToken(SM, ArgExp->getEndLoc()));
+}
+
 std::vector<CallArgInfo> swift::ide::
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CallArgInfo> InfoVec;

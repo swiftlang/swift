@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -431,6 +432,7 @@ public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   bool PrintUsr;
   std::vector<APIDiffItem*> AllItems;
+  llvm::StringSet<> PrintedUsrs;
   void addStorePath(StringRef FileName) {
     llvm::MemoryBuffer *pMemBuffer = nullptr;
     {
@@ -464,8 +466,10 @@ public:
 
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getDiffItems(StringRef Key) const {
-  if (Impl.PrintUsr)
+  if (Impl.PrintUsr && !Impl.PrintedUsrs.count(Key)) {
     llvm::outs() << Key << "\n";
+    Impl.PrintedUsrs.insert(Key);
+  }
   return Impl.Data[Key];
 }
 

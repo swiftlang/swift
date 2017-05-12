@@ -420,6 +420,7 @@ enum class LabelRangeEndAt: int8_t {
 struct CallArgInfo {
   Expr *ArgExp;
   CharSourceRange LabelRange;
+  CharSourceRange getEntireCharRange(const SourceManager &SM) const;
 };
 
 std::vector<CallArgInfo>

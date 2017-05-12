@@ -334,8 +334,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         auto Label = NewName.args()[Idx++];
 
         // FIXME: We update only when args are consistently valid.
-        if (Label != "_" && LR.getByteLength())
-          Editor.replace(LR, Label);
+        if (Label != "_") {
+          if (LR.getByteLength())
+            Editor.replace(LR, Label);
+          else
+            Editor.insert(LR.getStart(), (llvm::Twine(Label) + ":").str());
+        }
       }
     }
   }
@@ -375,10 +379,50 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (auto RI = Item->removedIndex)
       IgnoredArgIndices.push_back(*RI);
     emitRenameLabelChanges(Arg, NewName, IgnoredArgIndices);
-    Editor.remove(CharSourceRange(SM, Call->getStartLoc(),
-                                  AllArgs[0].ArgExp->getStartLoc()));
+    auto *SelfExpr = AllArgs[0].ArgExp;
 
-    return true;
+    // Remove the global function name: "Foo(a, b..." to "a, b..."
+    Editor.remove(CharSourceRange(SM, Call->getStartLoc(),
+                                  SelfExpr->getStartLoc()));
+
+    std::string MemberFuncBase;
+    if (Item->Subkind == TypeMemberDiffItemSubKind::HoistSelfAndUseProperty)
+      MemberFuncBase = (llvm::Twine(".") + Item->getNewName().base()).str();
+    else
+      MemberFuncBase = (llvm::Twine(".") + Item->getNewName().base() + "(").str();
+
+    if (AllArgs.size() > 1) {
+      Editor.replace(CharSourceRange(SM, Lexer::getLocForEndOfToken(SM,
+        SelfExpr->getEndLoc()), AllArgs[1].LabelRange.getStart()),
+                     MemberFuncBase);
+    } else {
+      Editor.insert(Lexer::getLocForEndOfToken(SM, SelfExpr->getEndLoc()),
+                    MemberFuncBase);
+    }
+
+    switch (Item->Subkind) {
+    case TypeMemberDiffItemSubKind::SimpleReplacement:
+      llvm_unreachable("should be handled elsewhere");
+    case TypeMemberDiffItemSubKind::HoistSelfOnly:
+      // we are done here.
+      return true;
+    case TypeMemberDiffItemSubKind::HoistSelfAndRemoveParam: {
+      unsigned RI = *Item->removedIndex;
+      CallArgInfo &ToRemove = AllArgs[RI];
+      if (AllArgs.size() == RI + 1) {
+        Editor.remove(ToRemove.getEntireCharRange(SM));
+      } else {
+        CallArgInfo &AfterToRemove = AllArgs[RI + 1];
+        Editor.remove(CharSourceRange(SM, ToRemove.LabelRange.getStart(),
+                                      AfterToRemove.LabelRange.getStart()));
+      }
+      return true;
+    }
+    case TypeMemberDiffItemSubKind::HoistSelfAndUseProperty:
+      // Remove ).
+      Editor.remove(Arg->getEndLoc());
+      return true;
+    }
   }
 
   void handleFunctionCallToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,
@@ -420,8 +464,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       auto Args = CE->getArg();
       switch (Fn->getKind()) {
       case ExprKind::DeclRef: {
-        if (auto FD = Fn->getReferencedDecl().getDecl())
+        if (auto FD = Fn->getReferencedDecl().getDecl()) {
           handleFuncRename(FD, Fn, Args);
+          handleTypeHoist(FD, CE, Args);
+        }
         break;
       }
       case ExprKind::DotSyntaxCall: {
