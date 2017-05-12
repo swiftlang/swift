@@ -506,7 +506,7 @@ public struct IndexingIterator<
 /// collection can contain zero or more of the original collection's elements
 /// and shares the original collection's semantics.
 ///
-/// The following example, creates a `firstWord` constant by using the
+/// The following example creates a `firstWord` constant by using the
 /// `prefix(_:)` method to get a slice of the `text` string.
 ///
 ///     let firstWord = text.prefix(7)
@@ -565,10 +565,9 @@ public struct IndexingIterator<
 /// -----------------------------------
 ///
 /// A slice inherits the value or reference semantics of its base collection.
-/// That is, when working with a slice of a mutable
-/// collection that has value semantics, such as an array, mutating the
-/// original collection triggers a copy of that collection, and does not
-/// affect the contents of the slice.
+/// That is, when working with a slice of a mutable collection that has value
+/// semantics, such as an array, mutating the original collection triggers a
+/// copy of that collection, and does not affect the contents of the slice.
 ///
 /// For example, if you update the last element of the `absences` array from
 /// `0` to `2`, the `secondHalf` slice is unchanged.
