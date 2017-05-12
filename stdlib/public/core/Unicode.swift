@@ -25,7 +25,7 @@ import SwiftShims
 @_fixed_layout
 public enum UnicodeDecodingResult : Equatable {
   /// A decoded Unicode scalar value.
-  case scalarValue(UnicodeScalar)
+  case scalarValue(Unicode.Scalar)
   
   /// An indication that no more Unicode scalars are available in the input.
   case emptyInput
@@ -57,11 +57,11 @@ public enum UnicodeDecodingResult : Equatable {
 /// sequences into Unicode scalar values and encode Unicode scalar values
 /// into code unit sequences. The standard library implements codecs for the
 /// UTF-8, UTF-16, and UTF-32 encoding schemes as the `UTF8`, `UTF16`, and
-/// `UTF32` types, respectively. Use the `UnicodeScalar` type to work with
+/// `UTF32` types, respectively. Use the `Unicode.Scalar` type to work with
 /// decoded Unicode scalar values.
 ///
-/// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `UnicodeScalar`
-public protocol UnicodeCodec : UnicodeEncoding {
+/// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `Unicode.Scalar`
+public protocol UnicodeCodec : Unicode.Encoding {
 
   /// Creates an instance of the codec.
   init()
@@ -75,17 +75,17 @@ public protocol UnicodeCodec : UnicodeEncoding {
   /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the iterator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `Unicode.Scalar` or an error.
   ///
   /// The following example decodes the UTF-8 encoded bytes of a string into an
-  /// array of `UnicodeScalar` instances:
+  /// array of `Unicode.Scalar` instances:
   ///
   ///     let str = "✨Unicode✨"
   ///     print(Array(str.utf8))
   ///     // Prints "[226, 156, 168, 85, 110, 105, 99, 111, 100, 101, 226, 156, 168]"
   ///
   ///     var bytesIterator = str.utf8.makeIterator()
-  ///     var scalars: [UnicodeScalar] = []
+  ///     var scalars: [Unicode.Scalar] = []
   ///     var utf8Decoder = UTF8()
   ///     Decode: while true {
   ///         switch utf8Decoder.decode(&bytesIterator) {
@@ -128,7 +128,7 @@ public protocol UnicodeCodec : UnicodeEncoding {
   ///   - processCodeUnit: A closure that processes one code unit argument at a
   ///     time.
   static func encode(
-    _ input: UnicodeScalar,
+    _ input: Unicode.Scalar,
     into processCodeUnit: (CodeUnit) -> Void
   )
 
@@ -142,7 +142,7 @@ public protocol UnicodeCodec : UnicodeEncoding {
 
 /// A codec for translating between Unicode scalar values and UTF-8 code
 /// units.
-extension _Unicode.UTF8 : UnicodeCodec {
+extension Unicode.UTF8 : UnicodeCodec {
   /// Creates an instance of the UTF-8 codec.
   public init() { self = ._swift3Buffer(ForwardParser()) }
 
@@ -154,10 +154,10 @@ extension _Unicode.UTF8 : UnicodeCodec {
   /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the iterator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `Unicode.Scalar` or an error.
   ///
   /// The following example decodes the UTF-8 encoded bytes of a string into an
-  /// array of `UnicodeScalar` instances. This is a demonstration only---if
+  /// array of `Unicode.Scalar` instances. This is a demonstration only---if
   /// you need the Unicode scalar representation of a string, use its
   /// `unicodeScalars` view.
   ///
@@ -166,7 +166,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
   ///     // Prints "[226, 156, 168, 85, 110, 105, 99, 111, 100, 101, 226, 156, 168]"
   ///
   ///     var bytesIterator = str.utf8.makeIterator()
-  ///     var scalars: [UnicodeScalar] = []
+  ///     var scalars: [Unicode.Scalar] = []
   ///     var utf8Decoder = UTF8()
   ///     Decode: while true {
   ///         switch utf8Decoder.decode(&bytesIterator) {
@@ -259,7 +259,7 @@ extension _Unicode.UTF8 : UnicodeCodec {
   ///   - processCodeUnit: A closure that processes one code unit argument at a
   ///     time.
   public static func encode(
-    _ input: UnicodeScalar,
+    _ input: Unicode.Scalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
     var s = encode(input)!._storage
@@ -308,11 +308,13 @@ extension _Unicode.UTF8 : UnicodeCodec {
     return Int(_swift_stdlib_strlen(input))
   }
 }
-public typealias UTF8 = _Unicode.UTF8
+
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF8")
+public typealias UTF8 = Unicode.UTF8
 
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
-extension _Unicode.UTF16 : UnicodeCodec {
+extension Unicode.UTF16 : UnicodeCodec {
   /// Creates an instance of the UTF-16 codec.
   public init() { self = ._swift3Buffer(ForwardParser()) }
 
@@ -324,10 +326,10 @@ extension _Unicode.UTF16 : UnicodeCodec {
   /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the iterator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `Unicode.Scalar` or an error.
   ///
   /// The following example decodes the UTF-16 encoded bytes of a string into an
-  /// array of `UnicodeScalar` instances. This is a demonstration only---if
+  /// array of `Unicode.Scalar` instances. This is a demonstration only---if
   /// you need the Unicode scalar representation of a string, use its
   /// `unicodeScalars` view.
   ///
@@ -336,7 +338,7 @@ extension _Unicode.UTF16 : UnicodeCodec {
   ///     // Prints "[10024, 85, 110, 105, 99, 111, 100, 101, 10024]"
   ///
   ///     var codeUnitIterator = str.utf16.makeIterator()
-  ///     var scalars: [UnicodeScalar] = []
+  ///     var scalars: [Unicode.Scalar] = []
   ///     var utf16Decoder = UTF16()
   ///     Decode: while true {
   ///         switch utf16Decoder.decode(&codeUnitIterator) {
@@ -408,7 +410,7 @@ extension _Unicode.UTF16 : UnicodeCodec {
   ///   - processCodeUnit: A closure that processes one code unit argument at a
   ///     time.
   public static func encode(
-    _ input: UnicodeScalar,
+    _ input: Unicode.Scalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
     var s = encode(input)!._storage
@@ -418,11 +420,12 @@ extension _Unicode.UTF16 : UnicodeCodec {
     processCodeUnit(UInt16(extendingOrTruncating: s))
   }
 }
-public typealias UTF16 = _Unicode.UTF16
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF16")
+public typealias UTF16 = Unicode.UTF16
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
-extension _Unicode.UTF32 : UnicodeCodec {
+extension Unicode.UTF32 : UnicodeCodec {
   /// Creates an instance of the UTF-32 codec.
   public init() { self = ._swift3Codec }
 
@@ -434,10 +437,10 @@ extension _Unicode.UTF32 : UnicodeCodec {
   /// buffered data from the input iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the iterator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `Unicode.Scalar` or an error.
   ///
   /// The following example decodes the UTF-16 encoded bytes of a string
-  /// into an array of `UnicodeScalar` instances. This is a demonstration
+  /// into an array of `Unicode.Scalar` instances. This is a demonstration
   /// only---if you need the Unicode scalar representation of a string, use
   /// its `unicodeScalars` view.
   ///
@@ -446,7 +449,7 @@ extension _Unicode.UTF32 : UnicodeCodec {
   ///             [10024, 85, 110, 105, 99, 111, 100, 101, 10024]
   ///
   ///     var codeUnitIterator = codeUnits.makeIterator()
-  ///     var scalars: [UnicodeScalar] = []
+  ///     var scalars: [Unicode.Scalar] = []
   ///     var utf32Decoder = UTF32()
   ///     Decode: while true {
   ///         switch utf32Decoder.decode(&codeUnitIterator) {
@@ -502,13 +505,14 @@ extension _Unicode.UTF32 : UnicodeCodec {
   ///   - processCodeUnit: A closure that processes one code unit argument at a
   ///     time.
   public static func encode(
-    _ input: UnicodeScalar,
+    _ input: Unicode.Scalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }
 }
-public typealias UTF32 = _Unicode.UTF32
+// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF32")
+public typealias UTF32 = Unicode.UTF32
 
 /// Translates the given input from one Unicode encoding to another by calling
 /// the given closure.
@@ -548,8 +552,8 @@ public typealias UTF32 = _Unicode.UTF32
 @inline(__always)
 public func transcode<
   Input : IteratorProtocol,
-  InputEncoding : UnicodeEncoding,
-  OutputEncoding : UnicodeEncoding
+  InputEncoding : Unicode.Encoding,
+  OutputEncoding : Unicode.Encoding
 >(
   _ input: Input,
   from inputEncoding: InputEncoding.Type,
@@ -724,13 +728,13 @@ extension UTF16 {
   /// designated *leading* and *trailing* surrogates, make up a *surrogate
   /// pair*.
   ///
-  ///     let anA: UnicodeScalar = "A"
+  ///     let anA: Unicode.Scalar = "A"
   ///     print(anA.value)
   ///     // Prints "65"
   ///     print(UTF16.width(anA))
   ///     // Prints "1"
   ///
-  ///     let anApple: UnicodeScalar = "🍎"
+  ///     let anApple: Unicode.Scalar = "🍎"
   ///     print(anApple.value)
   ///     // Prints "127822"
   ///     print(UTF16.width(anApple))
@@ -738,7 +742,7 @@ extension UTF16 {
   ///
   /// - Parameter x: A Unicode scalar value.
   /// - Returns: The width of `x` when encoded in UTF-16, either `1` or `2`.
-  public static func width(_ x: UnicodeScalar) -> Int {
+  public static func width(_ x: Unicode.Scalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
 
@@ -751,7 +755,7 @@ extension UTF16 {
   /// designated *leading* and *trailing* surrogates, make up a *surrogate
   /// pair*.
   ///
-  ///     let apple: UnicodeScalar = "🍎"
+  ///     let apple: Unicode.Scalar = "🍎"
   ///     print(UTF16.leadSurrogate(apple)
   ///     // Prints "55356"
   ///
@@ -761,7 +765,7 @@ extension UTF16 {
   /// - Returns: The leading surrogate code unit of `x` when encoded in UTF-16.
   ///
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.trailSurrogate(_:)`
-  public static func leadSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
+  public static func leadSurrogate(_ x: Unicode.Scalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return 0xD800 + UTF16.CodeUnit(extendingOrTruncating:
       (x.value - 0x1_0000) &>> (10 as UInt32))
@@ -776,7 +780,7 @@ extension UTF16 {
   /// designated *leading* and *trailing* surrogates, make up a *surrogate
   /// pair*.
   ///
-  ///     let apple: UnicodeScalar = "🍎"
+  ///     let apple: Unicode.Scalar = "🍎"
   ///     print(UTF16.trailSurrogate(apple)
   ///     // Prints "57166"
   ///
@@ -786,7 +790,7 @@ extension UTF16 {
   /// - Returns: The trailing surrogate code unit of `x` when encoded in UTF-16.
   ///
   /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
-  public static func trailSurrogate(_ x: UnicodeScalar) -> UTF16.CodeUnit {
+  public static func trailSurrogate(_ x: Unicode.Scalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return 0xDC00 + UTF16.CodeUnit(extendingOrTruncating:
       (x.value - 0x1_0000) & (((1 as UInt32) &<< 10) - 1))
@@ -903,7 +907,7 @@ extension UTF16 {
   ///   `nil`.
   public static func transcodedLength<
     Input : IteratorProtocol,
-    Encoding : UnicodeEncoding
+    Encoding : Unicode.Encoding
   >(
     of input: Input,
     decodedAs sourceEncoding: Encoding.Type,
@@ -918,7 +922,7 @@ extension UTF16 {
       &i, repairingIllFormedSequences: repairingIllFormedSequences
     ) {
       if isASCII {
-        isASCII = _Unicode.ASCII.transcode($0, from: Encoding.self) != nil
+        isASCII = Unicode.ASCII.transcode($0, from: Encoding.self) != nil
       }
       count += numericCast(self._transcode($0, from: Encoding.self).count)
     }
@@ -932,7 +936,7 @@ extension UTF16 {
 
 // Unchecked init to avoid precondition branches in hot code paths where we
 // already know the value is a valid unicode scalar.
-extension UnicodeScalar {
+extension Unicode.Scalar {
   /// Create an instance with numeric value `value`, bypassing the regular
   /// precondition checks for code point validity.
   @_versioned
@@ -961,7 +965,7 @@ public typealias UnicodeCodecType = UnicodeCodec
 extension UnicodeCodec {
   @available(*, unavailable, renamed: "encode(_:into:)")
   public static func encode(
-    _ input: UnicodeScalar,
+    _ input: Unicode.Scalar,
     output put: (CodeUnit) -> Void
   ) {
     Builtin.unreachable()
@@ -996,5 +1000,5 @@ extension UTF16 {
 }
 
 /// A namespace for Unicode utilities.
-public enum _Unicode {}
+public enum Unicode {}
 

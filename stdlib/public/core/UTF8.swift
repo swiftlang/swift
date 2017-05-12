@@ -9,14 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension _Unicode {
+extension Unicode {
   @_fixed_layout
   public enum UTF8 {
-  case _swift3Buffer(_Unicode.UTF8.ForwardParser)
+  case _swift3Buffer(Unicode.UTF8.ForwardParser)
   }
 }
 
-extension _Unicode.UTF8 : UnicodeEncoding {
+extension Unicode.UTF8 : _UnicodeEncoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt8>
 
@@ -32,34 +32,34 @@ extension _Unicode.UTF8 : UnicodeEncoding {
 
   @inline(__always)
   @_inlineable
-  public static func decode(_ source: EncodedScalar) -> UnicodeScalar {
+  public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     let bits = source._storage
     switch source._bitCount {
     case 8:
-      return UnicodeScalar(_unchecked: bits)
+      return Unicode.Scalar(_unchecked: bits)
     case 16:
       var value = (bits & 0b0_______________________11_1111__0000_0000) &>> 8
       value    |= (bits & 0b0________________________________0001_1111) &<< 6
-      return UnicodeScalar(_unchecked: value)
+      return Unicode.Scalar(_unchecked: value)
     case 24:
       var value = (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 16
       value    |= (bits & 0b0_______________________11_1111__0000_0000) &>> 2
       value    |= (bits & 0b0________________________________0000_1111) &<< 12
-      return UnicodeScalar(_unchecked: value)
+      return Unicode.Scalar(_unchecked: value)
     default:
       _sanityCheck(source.count == 4)
       var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
       value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
       value    |= (bits & 0b0_______________________11_1111__0000_0000) &<< 4
       value    |= (bits & 0b0________________________________0000_0111) &<< 18
-      return UnicodeScalar(_unchecked: value)
+      return Unicode.Scalar(_unchecked: value)
     }
   }
   
   @inline(__always)
   @_inlineable
   public static func encode(
-    _ source: UnicodeScalar
+    _ source: Unicode.Scalar
   ) -> EncodedScalar? {
     var c = source.value
     if _fastPath(c < (1&<<7)) {
@@ -88,7 +88,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   }
 
   @inline(__always)
-  public static func transcode<FromEncoding : UnicodeEncoding>(
+  public static func transcode<FromEncoding : _UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -140,8 +140,8 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   }
 }
 
-extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
-  public typealias Encoding = _Unicode.UTF8
+extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
+  public typealias Encoding = Unicode.UTF8
   @inline(__always)
   @_inlineable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
@@ -217,8 +217,8 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   }
 }
 
-extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
-  public typealias Encoding = _Unicode.UTF8
+extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
+  public typealias Encoding = Unicode.UTF8
 
   @inline(__always)
   @_inlineable

@@ -83,6 +83,7 @@ set(SWIFTLIB_ESSENTIAL
   ManagedBuffer.swift
   Map.swift.gyb
   MemoryLayout.swift
+  UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
@@ -136,7 +137,6 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift.gyb
   UnicodeEncoding.swift
   UnicodeParser.swift
-  UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeBitMap.swift
