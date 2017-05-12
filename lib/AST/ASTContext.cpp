@@ -83,6 +83,11 @@ using AssociativityCacheType =
   llvm::DenseMap<std::pair<PrecedenceGroupDecl *, PrecedenceGroupDecl *>,
                  Associativity>;
 
+#define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
+  MACRO(NSError) \
+  MACRO(NSNumber) \
+  MACRO(NSValue)
+
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -153,8 +158,11 @@ struct ASTContext::Implementation {
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
-  /// The declaration of Foundation.NSError.
-  ClassDecl *NSErrorDecl = nullptr;
+#define CACHE_FOUNDATION_DECL(NAME) \
+  /** The declaration of Foundation.NAME. */ \
+  ClassDecl *NAME##Decl = nullptr;
+FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
+#undef CACHE_FOUNDATION_DECL
 
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -731,25 +739,30 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
   return Impl.ObjCBoolDecl;
 }
 
-ClassDecl *ASTContext::getNSErrorDecl() const {
-  if (!Impl.NSErrorDecl) {
-    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) {
-      // Note: use unqualified lookup so we find NSError regardless of
-      // whether it's defined in the Foundation module or the Clang
-      // Foundation module it imports.
-      UnqualifiedLookup lookup(getIdentifier("NSError"), M, nullptr);
-      if (auto type = lookup.getSingleTypeResult()) {
-        if (auto classDecl = dyn_cast<ClassDecl>(type)) {
-          if (classDecl->getGenericParams() == nullptr) {
-            Impl.NSErrorDecl = classDecl;
-          }
-        }
-      }
-    }
-  }
-
-  return Impl.NSErrorDecl;
+#define GET_FOUNDATION_DECL(NAME) \
+ClassDecl *ASTContext::get##NAME##Decl() const { \
+  if (!Impl.NAME##Decl) { \
+    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
+      /* Note: use unqualified lookup so we find NSError regardless of */ \
+      /* whether it's defined in the Foundation module or the Clang */ \
+      /* Foundation module it imports. */ \
+      UnqualifiedLookup lookup(getIdentifier(#NAME), M, nullptr); \
+      if (auto type = lookup.getSingleTypeResult()) { \
+        if (auto classDecl = dyn_cast<ClassDecl>(type)) { \
+          if (classDecl->getGenericParams() == nullptr) { \
+            Impl.NAME##Decl = classDecl; \
+          } \
+        } \
+      } \
+    } \
+  } \
+  \
+  return Impl.NAME##Decl; \
 }
+
+FOR_KNOWN_FOUNDATION_TYPES(GET_FOUNDATION_DECL)
+#undef GET_FOUNDATION_DECL
+#undef FOR_KNOWN_FOUNDATION_TYPES
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
@@ -4042,6 +4055,21 @@ bool ASTContext::isTypeBridgedInExternalModule(
           // gets upset if you don't use the NSValue subclasses its factory
           // methods instantiate.
           nominal->getParentModule()->getName() == Id_CoreMedia);
+}
+
+bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
+  auto clas = t->getClassOrBoundGenericClass();
+  if (!clas)
+    return false;
+  
+  if (clas == getNSErrorDecl())
+    return true;
+  if (clas == getNSNumberDecl())
+    return true;
+  if (clas == getNSValueDecl())
+    return true;
+  
+  return false;
 }
 
 Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
