@@ -133,6 +133,20 @@ public:
     assert(getKind() == UnresolvedContext);
     return StringRef(Unresolved.Data, UnresolvedLength);
   }
+
+  /// Compares two EffectiveClangContexts without resolving unresolved names.
+  bool equalsWithoutResolving(const EffectiveClangContext &other) const {
+    if (getKind() != other.getKind())
+      return false;
+    switch (getKind()) {
+    case DeclContext:
+      return DC == other.DC;
+    case TypedefContext:
+      return Typedef == other.Typedef;
+    case UnresolvedContext:
+      return getUnresolvedName() == other.getUnresolvedName();
+    }
+  }
 };
 
 #if LLVM_PTR_SIZE == 4

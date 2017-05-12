@@ -834,9 +834,11 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
     case EnumKind::Enum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
-      res = cast<clang::DeclContext>(enumDecl);
-      break;
-
+      if (version != ImportNameVersion::Raw) {
+        res = cast<clang::DeclContext>(enumDecl);
+        break;
+      }
+      LLVM_FALLTHROUGH;
     case EnumKind::Constants:
     case EnumKind::Unknown:
       // The enum constant goes into the redeclaration context of the
@@ -935,9 +937,9 @@ bool NameImporter::hasNamingConflict(const clang::NamedDecl *decl,
   return false;
 }
 
-bool NameImporter::shouldBeSwiftPrivate(const clang::NamedDecl *decl,
-                                        clang::Sema &clangSema) {
-
+static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
+                                 const clang::NamedDecl *decl,
+                                 ImportNameVersion version) {
   // Decl with the attribute are obviously private
   if (decl->hasAttr<clang::SwiftPrivateAttr>())
     return true;
@@ -946,7 +948,12 @@ bool NameImporter::shouldBeSwiftPrivate(const clang::NamedDecl *decl,
   // private if the parent enum is marked private.
   if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
     auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-    switch (getEnumKind(ED)) {
+    switch (nameImporter.getEnumKind(ED)) {
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      if (version != ImportNameVersion::Raw)
+        break;
+      LLVM_FALLTHROUGH;
     case EnumKind::Constants:
     case EnumKind::Unknown:
       if (ED->hasAttr<clang::SwiftPrivateAttr>())
@@ -954,10 +961,6 @@ bool NameImporter::shouldBeSwiftPrivate(const clang::NamedDecl *decl,
       if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
         if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
           return true;
-      break;
-
-    case EnumKind::Enum:
-    case EnumKind::Options:
       break;
     }
   }
@@ -1503,7 +1506,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // Enumeration constants may have common prefixes stripped.
   bool strippedPrefix = false;
-  if (isa<clang::EnumConstantDecl>(D)) {
+  if (version != ImportNameVersion::Raw && isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
     auto enumInfo = getEnumInfo(enumDecl);
 
@@ -1625,7 +1628,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
   SmallString<16> swiftPrivateScratch;
-  if (shouldBeSwiftPrivate(D, clangSema)) {
+  if (shouldBeSwiftPrivate(*this, D, version)) {
     // Special case: empty arg factory, "for historical reasons", is not private
     if (isInitializer && argumentNames.empty() &&
         (result.getInitKind() == CtorInitializerKind::Factory ||

@@ -22,6 +22,7 @@ __attribute__((objc_root_class))
 #endif // __OBJC__
 
 #import <APINotesFrameworkTest/Classes.h>
+#import <APINotesFrameworkTest/Enums.h>
 #import <APINotesFrameworkTest/ImportAsMember.h>
 #import <APINotesFrameworkTest/Properties.h>
 #import <APINotesFrameworkTest/Protocols.h>
