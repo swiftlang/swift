@@ -2153,12 +2153,18 @@ private:
                                            CalleeCandidateInfo &candidates,
                                            ArrayRef<Identifier> argLabels);
 
+  bool diagnoseMemberFailures(Expr *baseEpxr, ConstraintKind lookupKind,
+                              DeclName memberName, FunctionRefKind funcRefKind,
+                              ConstraintLocator *locator,
+                              bool includeInaccessibleMembers = true);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
   bool visitTupleExpr(TupleExpr *E);
   
   bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
+  bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
@@ -2323,9 +2329,6 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
 
 bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   assert(isMemberConstraint(constraint));
-  
-  auto memberName = constraint->getMember();
-  auto isInitializer = memberName.isSimpleName(CS->TC.Context.Id_init);
 
   // Get the referenced base expression from the failed constraint, along with
   // the SourceRange for the member ref.  In "x.y", this returns the expr for x
@@ -2338,7 +2341,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     if (locator->getAnchor())
       anchor = locator->getAnchor();
   }
-  
+
   // Check to see if this is a locator referring to something we cannot or do
   // here: in this case, we ignore paths that end on archetypes witnesses, or
   // associated types of the expression.
@@ -2347,190 +2350,10 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     // archetypes
     return false;
   }
-  
-  // Retypecheck the anchor type, which is the base of the member expression.
-  anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
-  if (!anchor) return true;
-  
-  auto baseTy = anchor->getType()->getLValueOrInOutObjectType();
-  auto baseObjTy = baseTy;
 
-  // If the base type is an IUO, look through it.  Odds are, the code is not
-  // trying to find a member of it.
-  if (auto objTy = CS->lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
-    baseTy = baseObjTy = objTy;
-
-  
-  if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
-    diagnose(anchor->getLoc(), diag::no_member_of_module,
-             moduleTy->getModule()->getName(), memberName)
-      .highlight(anchor->getSourceRange()).highlight(memberRange);
-    return true;
-  }
-  
-  // If the base of this property access is a function that takes an empty
-  // argument list, then the most likely problem is that the user wanted to
-  // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
-  // Produce a specific diagnostic + fixit for this situation.
-  if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
-    if (baseFTy->getInput()->isVoid() &&
-        (constraint->getKind() == ConstraintKind::ValueMember ||
-         constraint->getKind() == ConstraintKind::UnresolvedValueMember)) {
-      SourceLoc insertLoc = anchor->getEndLoc();
-    
-      if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
-        diagnose(anchor->getLoc(), diag::did_not_call_function,
-                 DRE->getDecl()->getName())
-          .fixItInsertAfter(insertLoc, "()");
-        return true;
-      }
-      
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(anchor))
-        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
-          diagnose(anchor->getLoc(), diag::did_not_call_method,
-                   DRE->getDecl()->getName())
-            .fixItInsertAfter(insertLoc, "()");
-          return true;
-        }
-      
-      diagnose(anchor->getLoc(), diag::did_not_call_function_value)
-      .fixItInsertAfter(insertLoc, "()");
-      return true;
-    }
-  }
-
-  // If this is a tuple, then the index needs to be valid.
-  if (auto tuple = baseObjTy->getAs<TupleType>()) {
-    StringRef nameStr = memberName.getBaseName().str();
-    int fieldIdx = -1;
-    // Resolve a number reference into the tuple type.
-    unsigned Value = 0;
-    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
-      fieldIdx = Value;
-    } else {
-      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
-    }
-
-    if (fieldIdx != -1)
-      return false;    // Lookup is valid.
-
-    diagnose(anchor->getLoc(), diag::could_not_find_tuple_member,
-             baseObjTy, memberName)
-      .highlight(anchor->getSourceRange()).highlight(memberRange);
-    return true;
-  }
-
-  // If this is initializer/constructor lookup we are dealing this.
-  if (isInitializer) {
-    // Let's check what is the base type we are trying to look it up on
-    // because only MetatypeType is viable to find constructor on, as per
-    // rules in ConstraintSystem::performMemberLookup.
-    if (!baseTy->is<AnyMetatypeType>()) {
-      baseTy = MetatypeType::get(baseTy, CS->getASTContext());
-    }
-  }
-
-  // If base type has unresolved generic parameters, such might mean
-  // that it's initializer with erroneous argument, otherwise this would
-  // be a simple ambiguous archetype case, neither can be diagnosed here.
-  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
-    return false;
-
-  MemberLookupResult result = CS->performMemberLookup(
-      constraint->getKind(), memberName, baseTy,
-      constraint->getFunctionRefKind(), constraint->getLocator(),
-      /*includeInaccessibleMembers*/ true);
-
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:      
-    // If we couldn't resolve a specific type for the base expression, then we
-    // cannot produce a specific diagnostic.
-    return false;
-
-  case MemberLookupResult::ErrorAlreadyDiagnosed:
-    // If an error was already emitted, then we're done, don't emit anything
-    // redundant.
-    return true;
-      
-  case MemberLookupResult::HasResults:
-    break;
-  }
-
-  // Since the lookup was allowing inaccessible members, let's check
-  // if it found anything of that sort, which is easy to diagnose.
-  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
-  bool allInaccessible = true;
-  for (auto &member : result.ViableCandidates) {
-    if (!member.isDecl()) {
-      // if there is no declaration, this choice is implicitly available.
-      allUnavailable = false;
-      continue;
-    }
-
-    auto decl = member.getDecl();
-    // Check availability of the found choice.
-    if (!decl->getAttrs().isUnavailable(CS->getASTContext()))
-      allUnavailable = false;
-
-    if (decl->isAccessibleFrom(CS->DC))
-      allInaccessible = false;
-  }
-  
-  // If no candidates were accessible, say so.
-  if (allInaccessible && !result.ViableCandidates.empty()) {
-    CS->TC.diagnose(anchor->getLoc(), diag::all_candidates_inaccessible,
-                    memberName);
-
-    for (auto &candidate : result.ViableCandidates) {
-      if (auto decl = candidate.getDecl()) {
-        CS->TC.diagnose(decl, diag::note_candidate_inaccessible,
-                        decl->getFullName(), decl->getFormalAccess());
-      }
-    }
-
-    return true;
-  }
-
-  if (result.UnviableCandidates.empty() && isInitializer &&
-      !baseObjTy->is<MetatypeType>()) {
-    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
-      // Diagnose 'super.init', which can only appear inside another
-      // initializer, specially.
-      if (isa<SuperRefExpr>(ctorRef->getBase())) {
-        diagnose(anchor->getLoc(), diag::super_initializer_not_in_initializer);
-        return true;
-      }
-
-      // Suggest inserting a call to 'type(of:)' to construct another object
-      // of the same dynamic type.
-      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-
-      // Surround the caller in `type(of:)`.
-      diagnose(anchor->getLoc(), diag::init_not_instance_member)
-          .fixItInsert(fixItRng.Start, "type(of: ")
-          .fixItInsertAfter(fixItRng.End, ")");
-      return true;
-    }
-  }
-
-  if (result.ViableCandidates.empty()) {
-    // FIXME: Dig out the property DeclNameLoc.
-    diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
-                                  DeclNameLoc(memberRange.Start),
-                                  anchor->getLoc());
-    return true;
-  }
-  
-  if (allUnavailable) {
-    auto firstDecl = result.ViableCandidates[0].getDecl();
-    // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
-    if (CS->TC.diagnoseExplicitUnavailability(firstDecl, anchor->getLoc(),
-                                              CS->DC, /*call*/nullptr))
-      return true;
-  }
-  
-  // Otherwise, we don't know why this failed.
-  return false;
+  return diagnoseMemberFailures(anchor, constraint->getKind(),
+                                constraint->getMember(),
+                                constraint->getFunctionRefKind(), locator);
 }
 
 void FailureDiagnosis::
@@ -2703,7 +2526,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     };
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (memberName.isSimpleName("subscript")) {
+    if (memberName.isSimpleName(CS->getASTContext().Id_subscript)) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
     } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
@@ -2720,6 +2543,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       }
       diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+    } else if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
+      diagnose(baseExpr->getLoc(), diag::no_member_of_module,
+               moduleTy->getModule()->getName(), memberName)
+          .highlight(baseRange)
+          .highlight(nameLoc.getSourceRange());
+      return;
     } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
@@ -5577,7 +5406,11 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
   auto subscriptName = CS->getASTContext().Id_subscript;
-  
+  if (diagnoseMemberFailures(baseExpr, ConstraintKind::ValueMember,
+                             subscriptName, FunctionRefKind::DoubleApply,
+                             locator))
+    return true;
+
   MemberLookupResult result =
     CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
                             baseType, FunctionRefKind::DoubleApply, locator,
@@ -5601,14 +5434,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   for (auto candidate : result.ViableCandidates)
     if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
       viableCandidatesToReport.push_back(candidate);
-  
-  // If we have unviable candidates (e.g. because of access control or some
-  // other problem) we should diagnose the problem.
-  if (viableCandidatesToReport.empty()) {
-    diagnoseUnviableLookupResults(result, baseType, baseExpr, subscriptName,
-                                  DeclNameLoc(SE->getLoc()), SE->getLoc());
-    return true;
-  }
 
   CalleeCandidateInfo calleeInfo(Type(), viableCandidatesToReport,
                                  SE->hasTrailingClosure(), CS,
@@ -7827,6 +7652,249 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   llvm_unreachable("all cases should be handled");
 }
 
+bool FailureDiagnosis::diagnoseMemberFailures(Expr *baseExpr,
+                                              ConstraintKind lookupKind,
+                                              DeclName memberName,
+                                              FunctionRefKind funcRefKind,
+                                              ConstraintLocator *locator,
+                                              bool includeInaccessibleMembers) {
+  auto isInitializer = memberName.isSimpleName(CS->TC.Context.Id_init);
+
+  // Get the referenced base expression from the failed constraint, along with
+  // the SourceRange for the member ref.  In "x.y", this returns the expr for x
+  // and the source range for y.
+  SourceRange memberRange = baseExpr->getSourceRange();
+  if (locator)
+    locator = simplifyLocator(*CS, locator, memberRange);
+
+  // Retypecheck the anchor type, which is the base of the member expression.
+  baseExpr = typeCheckArbitrarySubExprIndependently(baseExpr, TCC_AllowLValue);
+  if (!baseExpr)
+    return true;
+
+  auto baseTy = baseExpr->getType()->getLValueOrInOutObjectType();
+  auto baseObjTy = baseTy;
+
+  // If the base type is an IUO, look through it.  Odds are, the code is not
+  // trying to find a member of it.
+  if (auto objTy = CS->lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
+    baseTy = baseObjTy = objTy;
+
+  // If the base of this property access is a function that takes an empty
+  // argument list, then the most likely problem is that the user wanted to
+  // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
+  // Produce a specific diagnostic + fixit for this situation.
+  if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
+    if (baseFTy->getInput()->isVoid()) {
+      SourceLoc insertLoc = baseExpr->getEndLoc();
+
+      if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
+        diagnose(baseExpr->getLoc(), diag::did_not_call_function,
+                 DRE->getDecl()->getName())
+            .fixItInsertAfter(insertLoc, "()");
+        return true;
+      }
+
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr))
+        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+          diagnose(baseExpr->getLoc(), diag::did_not_call_method,
+                   DRE->getDecl()->getName())
+              .fixItInsertAfter(insertLoc, "()");
+          return true;
+        }
+
+      diagnose(baseExpr->getLoc(), diag::did_not_call_function_value)
+          .fixItInsertAfter(insertLoc, "()");
+      return true;
+    }
+  }
+
+  // If this is a tuple, then the index needs to be valid.
+  if (auto tuple = baseObjTy->getAs<TupleType>()) {
+    StringRef nameStr = memberName.getBaseName().str();
+    int fieldIdx = -1;
+    // Resolve a number reference into the tuple type.
+    unsigned Value = 0;
+    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
+      fieldIdx = Value;
+    } else {
+      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+    }
+
+    if (fieldIdx != -1)
+      return false; // Lookup is valid.
+
+    diagnose(baseExpr->getLoc(), diag::could_not_find_tuple_member, baseObjTy,
+             memberName)
+        .highlight(baseExpr->getSourceRange())
+        .highlight(memberRange);
+    return true;
+  }
+
+  // If this is initializer/constructor lookup we are dealing this.
+  if (isInitializer) {
+    // Let's check what is the base type we are trying to look it up on
+    // because only MetatypeType is viable to find constructor on, as per
+    // rules in ConstraintSystem::performMemberLookup.
+    if (!baseTy->is<AnyMetatypeType>()) {
+      baseTy = MetatypeType::get(baseTy, CS->getASTContext());
+    }
+  }
+
+  // If base type has unresolved generic parameters, such might mean
+  // that it's initializer with erroneous argument, otherwise this would
+  // be a simple ambiguous archetype case, neither can be diagnosed here.
+  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
+    return false;
+
+  MemberLookupResult result =
+      CS->performMemberLookup(lookupKind, memberName, baseTy, funcRefKind,
+                              locator, includeInaccessibleMembers);
+
+  switch (result.OverallResult) {
+  case MemberLookupResult::Unsolved:
+    // If we couldn't resolve a specific type for the base expression, then we
+    // cannot produce a specific diagnostic.
+    return false;
+
+  case MemberLookupResult::ErrorAlreadyDiagnosed:
+    // If an error was already emitted, then we're done, don't emit anything
+    // redundant.
+    return true;
+
+  case MemberLookupResult::HasResults:
+    break;
+  }
+
+  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
+  for (auto candidate : result.ViableCandidates)
+    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
+      viableCandidatesToReport.push_back(candidate);
+
+  // Since the lookup was allowing inaccessible members, let's check
+  // if it found anything of that sort, which is easy to diagnose.
+  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
+  bool allInaccessible = true;
+  for (auto &member : viableCandidatesToReport) {
+    if (!member.isDecl()) {
+      // if there is no declaration, this choice is implicitly available.
+      allUnavailable = false;
+      continue;
+    }
+
+    auto decl = member.getDecl();
+    // Check availability of the found choice.
+    if (!decl->getAttrs().isUnavailable(CS->getASTContext()))
+      allUnavailable = false;
+
+    if (decl->isAccessibleFrom(CS->DC))
+      allInaccessible = false;
+  }
+
+  // If no candidates were accessible, say so.
+  if (allInaccessible && !viableCandidatesToReport.empty()) {
+    CS->TC.diagnose(baseExpr->getLoc(), diag::all_candidates_inaccessible,
+                    memberName);
+
+    for (auto &candidate : result.ViableCandidates) {
+      if (!candidate.isDecl())
+        continue;
+
+      if (auto decl = candidate.getDecl()) {
+        CS->TC.diagnose(decl, diag::note_candidate_inaccessible,
+                        decl->getFullName(), decl->getFormalAccess());
+      }
+    }
+
+    return true;
+  }
+
+  if (result.UnviableCandidates.empty() && isInitializer &&
+      !baseObjTy->is<MetatypeType>()) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
+      // Diagnose 'super.init', which can only appear inside another
+      // initializer, specially.
+      if (isa<SuperRefExpr>(ctorRef->getBase())) {
+        diagnose(baseExpr->getLoc(),
+                 diag::super_initializer_not_in_initializer);
+        return true;
+      }
+
+      // Suggest inserting a call to 'type(of:)' to construct another object
+      // of the same dynamic type.
+      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+
+      // Surround the caller in `type(of:)`.
+      diagnose(baseExpr->getLoc(), diag::init_not_instance_member)
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
+      return true;
+    }
+  }
+
+  if (viableCandidatesToReport.empty()) {
+    // If this was an optional type let's check if the base type
+    // has requested member, if so - generate nice error saying that
+    // optional was not unwrapped, otherwise say that type value has
+    // no such member.
+    if (auto *OT = dyn_cast<OptionalType>(baseObjTy.getPointer())) {
+      auto optionalResult = CS->performMemberLookup(
+          lookupKind, memberName, OT->getBaseType(), funcRefKind, locator,
+          /*includeInaccessibleMembers*/ false);
+
+      switch (optionalResult.OverallResult) {
+      case MemberLookupResult::ErrorAlreadyDiagnosed:
+        // If an error was already emitted, then we're done, don't emit anything
+        // redundant.
+        return true;
+
+      case MemberLookupResult::Unsolved:
+      case MemberLookupResult::HasResults:
+        break;
+      }
+
+      if (!optionalResult.ViableCandidates.empty()) {
+        // By default we assume that the LHS type is not optional.
+        StringRef fixIt = "!";
+        auto contextualType = CS->getContextualType();
+        if (contextualType && isa<OptionalType>(contextualType.getPointer()))
+          fixIt = "?";
+
+        diagnose(baseExpr->getLoc(), diag::missing_unwrap_optional, baseObjTy)
+            .fixItInsertAfter(baseExpr->getEndLoc(), fixIt);
+        return true;
+      }
+    }
+
+    // FIXME: Dig out the property DeclNameLoc.
+    diagnoseUnviableLookupResults(result, baseObjTy, baseExpr, memberName,
+                                  DeclNameLoc(memberRange.Start),
+                                  baseExpr->getLoc());
+    return true;
+  }
+
+  if (allUnavailable) {
+    auto firstDecl = viableCandidatesToReport[0].getDecl();
+    // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
+    if (CS->TC.diagnoseExplicitUnavailability(firstDecl, baseExpr->getLoc(),
+                                              CS->DC, /*call*/ nullptr))
+      return true;
+  }
+
+  // Otherwise, we don't know why this failed.
+  return false;
+}
+
+bool FailureDiagnosis::visitUnresolvedDotExpr(UnresolvedDotExpr *UDE) {
+  auto *baseExpr = UDE->getBase();
+  auto *locator = CS->getConstraintLocator(UDE, ConstraintLocator::Member);
+  if (!locator)
+    return false;
+
+  return diagnoseMemberFailures(baseExpr, ConstraintKind::ValueMember,
+                                UDE->getName(), UDE->getFunctionRefKind(),
+                                locator);
+}
 
 /// A TupleExpr propagate contextual type information down to its children and
 /// can be erroneous when there is a label mismatch etc.

@@ -115,10 +115,7 @@ func testParseErrors3(_ c1: C1) {
 }
 
 func testParseErrors4() {
-  // Subscripts
-  // TODO: rdar://problem/31724211 -- improve diagnostic regression from
-  // global keypath subscripts
-  _ = #selector(C1.subscript) // expected-error{{}}
+  _ = #selector(C1.subscript) // expected-error{{type 'C1.Type' has no subscript members}}
 }
 
 // SR-1827
