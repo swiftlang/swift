@@ -244,6 +244,7 @@ extension String {
       ///
       /// - Precondition: `next()` has not been applied to a copy of `self`
       ///   since the copy was made.
+      @inline(__always)
       public mutating func next() -> UnicodeScalar? {
         var result: UnicodeDecodingResult
         if _baseSet {
@@ -269,11 +270,17 @@ extension String {
           return UnicodeScalar(0xfffd)
         }
       }
+      @_versioned
       internal var _decoder: UTF16 = UTF16()
+      @_versioned
       internal let _baseSet: Bool
+      @_versioned
       internal let _ascii: Bool
+      @_versioned
       internal var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
+      @_versioned
       internal var _base: UnsafeBufferPointerIterator<UInt16>!
+      @_versioned
       internal var _iterator: IndexingIterator<_StringCore>!
     }
 

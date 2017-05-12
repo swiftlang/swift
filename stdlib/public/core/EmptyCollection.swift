@@ -25,6 +25,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
   public init() {}
 
   /// Returns `nil`, indicating that there are no more elements.
+  @inline(__always)
   public mutating func next() -> Element? {
     return nil
   }

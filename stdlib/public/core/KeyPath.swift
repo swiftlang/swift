@@ -1062,6 +1062,7 @@ internal struct KeyPathBuffer {
     fatalError("TODO")
   }
   
+  @inline(__always)
   mutating func next() -> (RawKeyPathComponent, Any.Type?) {
     let header = pop(RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.

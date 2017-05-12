@@ -115,6 +115,7 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   }
 
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Bound? {
     let r = _nextResult
     if let x = r {

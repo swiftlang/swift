@@ -32,6 +32,7 @@ public struct LazyFilterIterator<
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
+  @inline(__always)
   public mutating func next() -> Base.Element? {
     while let n = _base.next() {
       if _predicate(n) {
@@ -54,10 +55,12 @@ public struct LazyFilterIterator<
   /// The underlying iterator whose elements are being filtered.
   public var base: Base { return _base }
 
+  @_versioned
   internal var _base: Base
 
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
+  @_versioned
   internal let _predicate: (Base.Element) -> Bool
 }
 

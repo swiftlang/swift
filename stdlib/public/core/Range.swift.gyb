@@ -801,6 +801,7 @@ extension CountablePartialRangeFrom: Sequence {
     @_inlineable
     public init(_current: Bound) { self._current = _current }
     @_inlineable
+    @inline(__always)
     public mutating func next() -> Bound? {
       defer { _current = _current.advanced(by: 1) }
       return _current

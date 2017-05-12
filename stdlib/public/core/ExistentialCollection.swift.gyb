@@ -103,6 +103,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   @_inlineable
+  @inline(__always)
   public func next() -> Element? {
     return _box.next()
   }
@@ -125,6 +126,7 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   }
   @_inlineable
   @_versioned
+  @inline(__always)
   internal func next() -> Element? { return _body() }
   @_versioned
   internal let _body: () -> Element?
@@ -140,6 +142,7 @@ internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
   ///
   /// - Note: Subclasses must override this method.
   @_versioned
+  @inline(__always)
   internal func next() -> Element? { _abstract() }
 }
 
@@ -153,6 +156,7 @@ internal final class _IteratorBox<
   internal init(_ base: Base) { self._base = base }
   @_inlineable
   @_versioned
+  @inline(__always)
   internal override func next() -> Base.Element? { return _base.next() }
   @_versioned
   internal var _base: Base

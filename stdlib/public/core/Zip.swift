@@ -63,6 +63,7 @@ public struct Zip2Iterator<
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
+  @inline(__always)
   public mutating func next() -> Element? {
     // The next() function needs to track if it has reached the end.  If we
     // didn't, and the first sequence is longer than the second, then when we
@@ -83,8 +84,11 @@ public struct Zip2Iterator<
     return (element1, element2)
   }
 
+  @_versioned
   internal var _baseStream1: Iterator1
+  @_versioned
   internal var _baseStream2: Iterator2
+  @_versioned
   internal var _reachedEnd: Bool = false
 }
 

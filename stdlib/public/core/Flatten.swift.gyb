@@ -41,6 +41,7 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
+  @inline(__always)
   public mutating func next() -> Base.Element.Iterator.Element? {
     repeat {
       if _fastPath(_inner != nil) {
@@ -58,7 +59,9 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
     while true
   }
 
+  @_versioned
   internal var _base: Base
+  @_versioned
   internal var _inner: Base.Element.Iterator?
 }
 

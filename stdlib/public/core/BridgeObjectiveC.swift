@@ -553,6 +553,7 @@ internal struct _CocoaFastEnumerationStackBuf {
   internal var _item15: UnsafeRawPointer?
 
   @_transparent
+  @_versioned
   internal var count: Int {
     return 16
   }

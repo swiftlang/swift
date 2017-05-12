@@ -105,6 +105,7 @@ public typealias UnfoldFirstSequence<T> = UnfoldSequence<T, (T?, Bool)>
 ///
 /// - SeeAlso: `sequence(first:next:)`, `sequence(state:next:)`
 public struct UnfoldSequence<Element, State> : Sequence, IteratorProtocol {
+  @inline(__always)
   public mutating func next() -> Element? {
     guard !_done else { return nil }
     if let elt = _next(&_state) {
@@ -120,7 +121,10 @@ public struct UnfoldSequence<Element, State> : Sequence, IteratorProtocol {
     self._next = _next
   }
 
+  @_versioned
   internal var _state: State
+  @_versioned
   internal let _next: (inout State) -> Element?
+  @_versioned
   internal var _done = false
 }

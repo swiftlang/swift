@@ -28,6 +28,7 @@ from gyb_stdlib_support import (
 public struct LazyDropWhileIterator<Base : IteratorProtocol> :
   IteratorProtocol, Sequence {
 
+  @inline(__always)
   public mutating func next() -> Base.Element? {
     // Once the predicate has failed for the first time, the base iterator
     // can be used for the rest of the elements.
@@ -51,8 +52,11 @@ public struct LazyDropWhileIterator<Base : IteratorProtocol> :
     self._predicate = predicate
   }
 
+  @_versioned
   internal var _predicateHasFailed = false
+  @_versioned
   internal var _base: Base
+  @_versioned
   internal let _predicate: (Base.Element) -> Bool
 }
 

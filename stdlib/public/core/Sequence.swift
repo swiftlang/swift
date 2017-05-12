@@ -671,6 +671,7 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
+  @inline(__always)
   internal func next() -> Base.Element? {
     while _dropped < _limit {
       if _iterator.next() == nil {
@@ -730,6 +731,7 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
+  @inline(__always)
   internal func next() -> Base.Element? {
     if _taken >= _maxLength { return nil }
     _taken += 1
@@ -793,6 +795,7 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
+  @inline(__always)
   internal func next() -> Base.Element? {
     guard _nextElement != nil else {
       return _iterator.next()
@@ -1468,6 +1471,7 @@ public struct IteratorSequence<
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Base.Element? {
     return _base.next()
   }
