@@ -1029,12 +1029,6 @@ extension String : CustomStringConvertible {
   }
 }
 
-extension String : LosslessStringConvertible {
-  public init?(_ description: String) {
-    self = description
-  }
-}
-
 extension String {
   @available(*, unavailable, renamed: "append(_:)")
   public mutating func appendContentsOf(_ other: String) {
