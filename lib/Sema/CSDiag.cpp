@@ -2153,10 +2153,11 @@ private:
                                            CalleeCandidateInfo &candidates,
                                            ArrayRef<Identifier> argLabels);
 
-  bool diagnoseMemberFailures(Expr *baseEpxr, ConstraintKind lookupKind,
-                              DeclName memberName, FunctionRefKind funcRefKind,
-                              ConstraintLocator *locator,
-                              bool includeInaccessibleMembers = true);
+  bool diagnoseMemberFailures(
+      Expr *baseEpxr, ConstraintKind lookupKind, DeclName memberName,
+      FunctionRefKind funcRefKind, ConstraintLocator *locator,
+      Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback = None,
+      bool includeInaccessibleMembers = true);
 
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
@@ -5395,147 +5396,125 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
   if (!baseExpr) return true;
   auto baseType = baseExpr->getType();
-  
+
   if (isa<NilLiteralExpr>(baseExpr)) {
     diagnose(baseExpr->getLoc(), diag::cannot_subscript_nil_literal)
       .highlight(baseExpr->getSourceRange());
     return true;
   }
 
+  std::function<bool(ArrayRef<OverloadChoice>)> callback =
+      [&](ArrayRef<OverloadChoice> candidates) -> bool {
+    CalleeCandidateInfo calleeInfo(Type(), candidates, SE->hasTrailingClosure(),
+                                   CS,
+                                   /*selfAlreadyApplied*/ false);
+
+    // We're about to typecheck the index list, which needs to be processed with
+    // self already applied.
+    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+      ++calleeInfo.candidates[i].level;
+
+    auto indexExpr =
+        typeCheckArgumentChildIndependently(SE->getIndex(), Type(), calleeInfo);
+    if (!indexExpr)
+      return true;
+
+    // Back to analyzing the candidate list with self applied.
+    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+      --calleeInfo.candidates[i].level;
+
+    ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
+    if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
+      return true;
+
+    auto indexType = indexExpr->getType();
+
+    auto decomposedBaseType = decomposeArgType(baseType, {Identifier()});
+    auto decomposedIndexType = decomposeArgType(indexType, argLabels);
+    calleeInfo.filterList(
+        [&](UncurriedCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
+          // Classify how close this match is.  Non-subscript decls don't match.
+          if (!dyn_cast_or_null<SubscriptDecl>(cand.getDecl()))
+            return {CC_GeneralMismatch, {}};
+
+          // Check whether the self type matches.
+          auto selfConstraint = CC_ExactMatch;
+          if (calleeInfo.evaluateCloseness(cand, decomposedBaseType).first !=
+              CC_ExactMatch)
+            selfConstraint = CC_SelfMismatch;
+
+          // Increase the uncurry level to look past the self argument to the
+          // indices.
+          cand.level++;
+
+          // Explode out multi-index subscripts to find the best match.
+          auto indexResult =
+              calleeInfo.evaluateCloseness(cand, decomposedIndexType);
+          if (selfConstraint > indexResult.first)
+            return {selfConstraint, {}};
+          return indexResult;
+        });
+
+    // If the closest matches all mismatch on self, we either have something
+    // that
+    // cannot be subscripted, or an ambiguity.
+    if (calleeInfo.closeness == CC_SelfMismatch) {
+      diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
+          .highlight(SE->getBase()->getSourceRange());
+      // FIXME: Should suggest overload set, but we're not ready for that until
+      // it points to candidates and identifies the self type in the diagnostic.
+      // calleeInfo.suggestPotentialOverloads(SE->getLoc());
+      return true;
+    }
+
+    // Any other failures relate to the index list.
+    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+      ++calleeInfo.candidates[i].level;
+
+    // TODO: Is there any reason to check for CC_NonLValueInOut here?
+
+    if (calleeInfo.closeness == CC_ExactMatch) {
+      // Otherwise, whatever the result type of the call happened to be must not
+      // have been what we were looking for.  Lets diagnose it as a conversion
+      // or ambiguity failure.
+      if (calleeInfo.size() == 1)
+        return false;
+
+      diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
+          .highlight(indexExpr->getSourceRange())
+          .highlight(baseExpr->getSourceRange());
+
+      // FIXME: suggestPotentialOverloads should do this.
+      // calleeInfo.suggestPotentialOverloads(SE->getLoc());
+      for (auto candidate : calleeInfo.candidates)
+        if (auto decl = candidate.getDecl())
+          diagnose(decl, diag::found_candidate);
+        else
+          diagnose(candidate.getExpr()->getLoc(), diag::found_candidate);
+
+      return true;
+    }
+
+    if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
+      return true;
+
+    // Diagnose some simple and common errors.
+    if (calleeInfo.diagnoseSimpleErrors(SE))
+      return true;
+
+    diagnose(SE->getLoc(), diag::cannot_subscript_with_index, baseType,
+             indexType);
+
+    calleeInfo.suggestPotentialOverloads(SE->getLoc());
+    return true;
+  };
+
   auto locator =
-    CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+      CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
-  auto subscriptName = CS->getASTContext().Id_subscript;
-  if (diagnoseMemberFailures(baseExpr, ConstraintKind::ValueMember,
-                             subscriptName, FunctionRefKind::DoubleApply,
-                             locator))
-    return true;
-
-  MemberLookupResult result =
-    CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
-                            baseType, FunctionRefKind::DoubleApply, locator,
-                            /*includeInaccessibleMembers*/true);
-
-  
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:
-    return false;
-  case MemberLookupResult::ErrorAlreadyDiagnosed:
-    // If an error was already emitted, then we're done, don't emit anything
-    // redundant.
-    return true;
-  case MemberLookupResult::HasResults:
-    break;    // Interesting case. :-)
-  }
-  
-  // Don't noise up diagnostics with key path application candidates, since they
-  // appear on every type.
-  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
-  for (auto candidate : result.ViableCandidates)
-    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
-      viableCandidatesToReport.push_back(candidate);
-
-  CalleeCandidateInfo calleeInfo(Type(), viableCandidatesToReport,
-                                 SE->hasTrailingClosure(), CS,
-                                 /*selfAlreadyApplied*/false);
-
-  // We're about to typecheck the index list, which needs to be processed with
-  // self already applied.
-  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-    ++calleeInfo.candidates[i].level;
-  
-  auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
-                                                       Type(), calleeInfo);
-  if (!indexExpr) return true;
-
-  // Back to analyzing the candidate list with self applied.
-  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-    --calleeInfo.candidates[i].level;
-
-  ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
-    return true;
-
-  auto indexType = indexExpr->getType();
-
-  auto decomposedBaseType = decomposeArgType(baseType, { Identifier() });
-  auto decomposedIndexType = decomposeArgType(indexType, argLabels);
-  calleeInfo.filterList([&](UncurriedCandidate cand) ->
-                                 CalleeCandidateInfo::ClosenessResultTy
-  {
-    // Classify how close this match is.  Non-subscript decls don't match.
-    if (!dyn_cast_or_null<SubscriptDecl>(cand.getDecl()))
-      return { CC_GeneralMismatch, {}};
-    
-    // Check whether the self type matches.
-    auto selfConstraint = CC_ExactMatch;
-    if (calleeInfo.evaluateCloseness(cand, decomposedBaseType)
-          .first != CC_ExactMatch)
-      selfConstraint = CC_SelfMismatch;
-    
-    // Increase the uncurry level to look past the self argument to the indices.
-    cand.level++;
-    
-    // Explode out multi-index subscripts to find the best match.
-    auto indexResult =
-      calleeInfo.evaluateCloseness(cand, decomposedIndexType);
-    if (selfConstraint > indexResult.first)
-      return {selfConstraint, {}};
-    return indexResult;
-  });
-
-  // If the closest matches all mismatch on self, we either have something that
-  // cannot be subscripted, or an ambiguity.
-  if (calleeInfo.closeness == CC_SelfMismatch) {
-    diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
-    .highlight(SE->getBase()->getSourceRange());
-    // FIXME: Should suggest overload set, but we're not ready for that until
-    // it points to candidates and identifies the self type in the diagnostic.
-    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
-    return true;
-  }
-
-  // Any other failures relate to the index list.
-  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-    ++calleeInfo.candidates[i].level;
-  
-  // TODO: Is there any reason to check for CC_NonLValueInOut here?
-  
-  if (calleeInfo.closeness == CC_ExactMatch) {
-    // Otherwise, whatever the result type of the call happened to be must not
-    // have been what we were looking for.  Lets diagnose it as a conversion
-    // or ambiguity failure.
-    if (calleeInfo.size() == 1)
-      return false;
-
-    diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
-      .highlight(indexExpr->getSourceRange())
-      .highlight(baseExpr->getSourceRange());
-    
-    // FIXME: suggestPotentialOverloads should do this.
-    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
-    for (auto candidate : calleeInfo.candidates)
-      if (auto decl = candidate.getDecl())
-        diagnose(decl, diag::found_candidate);
-      else
-        diagnose(candidate.getExpr()->getLoc(), diag::found_candidate);
-
-    return true;
-  }
-
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
-    return true;
-
-  // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(SE))
-    return true;
-
-
-  diagnose(SE->getLoc(), diag::cannot_subscript_with_index,
-           baseType, indexType);
-
-  calleeInfo.suggestPotentialOverloads(SE->getLoc());
-  return true;
+  return diagnoseMemberFailures(
+      baseExpr, ConstraintKind::ValueMember, CS->getASTContext().Id_subscript,
+      FunctionRefKind::DoubleApply, locator, callback);
 }
 
 
@@ -7652,12 +7631,11 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   llvm_unreachable("all cases should be handled");
 }
 
-bool FailureDiagnosis::diagnoseMemberFailures(Expr *baseExpr,
-                                              ConstraintKind lookupKind,
-                                              DeclName memberName,
-                                              FunctionRefKind funcRefKind,
-                                              ConstraintLocator *locator,
-                                              bool includeInaccessibleMembers) {
+bool FailureDiagnosis::diagnoseMemberFailures(
+    Expr *baseExpr, ConstraintKind lookupKind, DeclName memberName,
+    FunctionRefKind funcRefKind, ConstraintLocator *locator,
+    Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback,
+    bool includeInaccessibleMembers) {
   auto isInitializer = memberName.isSimpleName(CS->TC.Context.Id_init);
 
   // Get the referenced base expression from the failed constraint, along with
@@ -7881,8 +7859,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(Expr *baseExpr,
       return true;
   }
 
-  // Otherwise, we don't know why this failed.
-  return false;
+  return callback.hasValue() ? (*callback)(viableCandidatesToReport) : false;
 }
 
 bool FailureDiagnosis::visitUnresolvedDotExpr(UnresolvedDotExpr *UDE) {
