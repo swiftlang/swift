@@ -2209,6 +2209,15 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
       // its own diagnostics.
       return true;
     }
+
+    // Structs can explicitly derive Equatable and Hashable conformance.
+    if (isa<StructDecl>(this) &&
+        (*knownProtocol == KnownProtocolKind::Equatable ||
+         *knownProtocol == KnownProtocolKind::Hashable)) {
+      // FIXME: As above, this is too lenient but we let DerivedConformance do
+      // the full check.
+      return true;
+    }
   }
   return false;
 }
