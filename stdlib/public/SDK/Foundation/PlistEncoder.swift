@@ -106,16 +106,17 @@ fileprivate class _PlistEncoder : Encoder {
         self.codingPath = codingPath
     }
 
-    // MARK: - Coding Path Actions
+    // MARK: - Coding Path Operations
 
     /// Performs the given closure with the given key pushed onto the end of the current coding path.
     ///
     /// - parameter key: The key to push. May be nil for unkeyed containers.
     /// - parameter work: The work to perform with the key in the path.
-    func with(pushedKey key: CodingKey?, _ work: () throws -> ()) rethrows {
+    func with<T>(pushedKey key: CodingKey?, _ work: () throws -> T) rethrows -> T {
         self.codingPath.append(key)
-        try work()
+        let ret: T = try work()
         self.codingPath.removeLast()
+        return ret
     }
 
     /// Asserts that a new container can be requested at this coding path.
@@ -144,15 +145,15 @@ fileprivate class _PlistEncoder : Encoder {
     // MARK: - Encoder Methods
     func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
         assertCanRequestNewContainer()
-        let container = self.storage.pushKeyedContainer()
-        let wrapper = _PlistKeyedEncodingContainer<Key>(referencing: self, wrapping: container)
-        return KeyedEncodingContainer(wrapper)
+        let topContainer = self.storage.pushKeyedContainer()
+        let container = _PlistKeyedEncodingContainer<Key>(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
+        return KeyedEncodingContainer(container)
     }
 
     func unkeyedContainer() -> UnkeyedEncodingContainer {
         assertCanRequestNewContainer()
-        let container = self.storage.pushUnkeyedContainer()
-        return _PlistUnkeyedEncodingContainer(referencing: self, wrapping: container)
+        let topContainer = self.storage.pushUnkeyedContainer()
+        return _PlistUnkeyedEncodingContainer(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
     }
 
     func singleValueContainer() -> SingleValueEncodingContainer {
@@ -216,19 +217,32 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     /// A reference to the container we're writing to.
     let container: NSMutableDictionary
 
+    /// The path of coding keys taken to get to this point in encoding.
+    var codingPath: [CodingKey?]
+
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    init(referencing encoder: _PlistEncoder, wrapping container: NSMutableDictionary) {
+    init(referencing encoder: _PlistEncoder, codingPath: [CodingKey?], wrapping container: NSMutableDictionary) {
         self.encoder = encoder
+        self.codingPath = codingPath
         self.container = container
     }
 
-    // MARK: - KeyedEncodingContainerProtocol Methods
+    // MARK: - Coding Path Operations
 
-    var codingPath: [CodingKey?] {
-        return self.encoder.codingPath
+    /// Performs the given closure with the given key pushed onto the end of the current coding path.
+    ///
+    /// - parameter key: The key to push. May be nil for unkeyed containers.
+    /// - parameter work: The work to perform with the key in the path.
+    mutating func with<T>(pushedKey key: CodingKey?, _ work: () throws -> T) rethrows -> T {
+        self.codingPath.append(key)
+        let ret: T = try work()
+        self.codingPath.removeLast()
+        return ret
     }
+
+    // MARK: - KeyedEncodingContainerProtocol Methods
 
     mutating func encode(_ value: Bool?, forKey key: Key)   throws { self.container[key.stringValue] = self.encoder.box(value) }
     mutating func encode(_ value: Int?, forKey key: Key)    throws { self.container[key.stringValue] = self.encoder.box(value) }
@@ -252,24 +266,30 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
-        let container = self.encoder.storage.pushKeyedContainer()
-        self.container[key.stringValue] = container
-        let wrapper = _PlistKeyedEncodingContainer<NestedKey>(referencing: self.encoder, wrapping: container)
-        return KeyedEncodingContainer(wrapper)
+        let dictionary = NSMutableDictionary()
+        self.container[key.stringValue] = dictionary
+
+        return self.with(pushedKey: key) {
+            let container = _PlistKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary)
+            return KeyedEncodingContainer(container)
+        }
     }
 
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let container = self.encoder.storage.pushUnkeyedContainer()
-        self.container[key.stringValue] = container
-        return _PlistUnkeyedEncodingContainer(referencing: self.encoder, wrapping: container)
+        let array = self.encoder.storage.pushUnkeyedContainer()
+        self.container[key.stringValue] = array
+
+        return self.with(pushedKey: key) {
+            return _PlistUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: array)
+        }
     }
 
     mutating func superEncoder() -> Encoder {
-        return _PlistReferencingEncoder(referencing: self.encoder, wrapping: self.container, key: "super")
+        return _PlistReferencingEncoder(referencing: self.encoder, at: _PlistSuperKey.super, wrapping: self.container)
     }
 
     mutating func superEncoder(forKey key: Key) -> Encoder {
-        return _PlistReferencingEncoder(referencing: self.encoder, wrapping: self.container, key: key.stringValue)
+        return _PlistReferencingEncoder(referencing: self.encoder, at: key, wrapping: self.container)
     }
 }
 
@@ -282,19 +302,32 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     /// A reference to the container we're writing to.
     let container: NSMutableArray
 
+    /// The path of coding keys taken to get to this point in encoding.
+    var codingPath: [CodingKey?]
+
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    init(referencing encoder: _PlistEncoder, wrapping container: NSMutableArray) {
+    init(referencing encoder: _PlistEncoder, codingPath: [CodingKey?], wrapping container: NSMutableArray) {
         self.encoder = encoder
+        self.codingPath = codingPath
         self.container = container
     }
 
-    // MARK: - UnkeyedEncodingContainer Methods
+    // MARK: - Coding Path Operations
 
-    var codingPath: [CodingKey?] {
-        return self.encoder.codingPath
+    /// Performs the given closure with the given key pushed onto the end of the current coding path.
+    ///
+    /// - parameter key: The key to push. May be nil for unkeyed containers.
+    /// - parameter work: The work to perform with the key in the path.
+    mutating func with<T>(pushedKey key: CodingKey?, _ work: () throws -> T) rethrows -> T {
+        self.codingPath.append(key)
+        let ret: T = try work()
+        self.codingPath.removeLast()
+        return ret
     }
+
+    // MARK: - UnkeyedEncodingContainer Methods
 
     mutating func encode(_ value: Bool?)   throws { self.container.add(self.encoder.box(value)) }
     mutating func encode(_ value: Int?)    throws { self.container.add(self.encoder.box(value)) }
@@ -318,20 +351,26 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
-        let container = self.encoder.storage.pushKeyedContainer()
-        self.container.add(container)
-        let wrapper = _PlistKeyedEncodingContainer<NestedKey>(referencing: self.encoder, wrapping: container)
-        return KeyedEncodingContainer(wrapper)
+        let dictionary = NSMutableDictionary()
+        self.container.add(dictionary)
+
+        return self.with(pushedKey: nil) {
+            let container = _PlistKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary)
+            return KeyedEncodingContainer(container)
+        }
     }
 
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
-        let container = self.encoder.storage.pushUnkeyedContainer()
-        self.container.add(container)
-        return _PlistUnkeyedEncodingContainer(referencing: self.encoder, wrapping: container)
+        let array = NSMutableArray()
+        self.container.add(array)
+
+        return self.with(pushedKey: nil) {
+            return _PlistUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: array)
+        }
     }
 
     mutating func superEncoder() -> Encoder {
-        return _PlistReferencingEncoder(referencing: self.encoder, wrapping: self.container, at: self.container.count)
+        return _PlistReferencingEncoder(referencing: self.encoder, at: self.container.count, wrapping: self.container)
     }
 }
 
@@ -505,25 +544,30 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given array container in the given encoder.
-    init(referencing encoder: _PlistEncoder, wrapping array: NSMutableArray, at index: Int) {
+    init(referencing encoder: _PlistEncoder, at index: Int, wrapping array: NSMutableArray) {
         self.encoder = encoder
         self.reference = .array(array, index)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
+
+        self.codingPath.append(nil)
     }
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
-    init(referencing encoder: _PlistEncoder, wrapping dictionary: NSMutableDictionary, key: String) {
+    init(referencing encoder: _PlistEncoder, at key: CodingKey, wrapping dictionary: NSMutableDictionary) {
         self.encoder = encoder
-        self.reference = .dictionary(dictionary, key)
+        self.reference = .dictionary(dictionary, key.stringValue)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
+
+        self.codingPath.append(key)
     }
 
     // MARK: - Overridden Implementations
 
     /// Asserts that we can add a new container at this coding path. See _PlistEncoder.assertCanRequestNewContainer for the logic behind this.
-    /// This differs from super's implementation only in the condition: we need to account for the fact that we copied our reference's coding path, but not its list of containers, so the counts are mismatched.
     override func assertCanRequestNewContainer() {
-        guard self.storage.count == self.codingPath.count - self.encoder.codingPath.count else {
+        // We can push a new container given that we won't have two containers for the same coding path.
+        // We make sure of this by comparing the number of containers we already have to the length of our coding path (we can push 1 more container than the length of the path, since it starts off empty). Since we copied our reference's coding path (and pushed on the key we were created at), we need to account for that.
+        guard self.storage.count == self.codingPath.count - self.encoder.codingPath.count - 1 else {
             let previousContainerType: String
             if self.storage.containers.last is NSDictionary {
                 previousContainerType = "keyed"
@@ -541,8 +585,13 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
 
     // Finalizes `self` by writing the contents of our storage to the referenced encoder's storage.
     deinit {
-        // TODO: Ensure self.storage.count == 1, otherwise something went wrong.
-        let value = self.storage.popContainer()
+        let value: Any
+        switch self.storage.count {
+        case 0: value = NSDictionary()
+        case 1: value = self.storage.popContainer()
+        default: fatalError("Referencing encoder deallocated with multiple containers on stack.")
+        }
+
         switch self.reference {
         case .array(let array, let index):
             array.insert(value, at: index)
@@ -620,7 +669,7 @@ fileprivate class _PlistDecoder : Decoder {
     let options: PropertyListDecoder._Options
 
     /// The path to the current point in encoding.
-    var codingPath: [CodingKey?] = []
+    var codingPath: [CodingKey?]
 
     /// Contextual user-provided information for use during encoding.
     var userInfo: [CodingUserInfoKey : Any] {
@@ -630,13 +679,14 @@ fileprivate class _PlistDecoder : Decoder {
     // MARK: - Initialization
 
     /// Initializes `self` with the given top-level container and options.
-    init(referencing container: Any, options: PropertyListDecoder._Options) {
+    init(referencing container: Any, at codingPath: [CodingKey?] = [], options: PropertyListDecoder._Options) {
         self.storage = _PlistDecodingStorage()
         self.storage.push(container: container)
+        self.codingPath = codingPath
         self.options = options
     }
 
-    // MARK: - Coding Path Actions
+    // MARK: - Coding Path Operations
 
     /// Performs the given closure with the given key pushed onto the end of the current coding path.
     ///
@@ -658,12 +708,12 @@ fileprivate class _PlistDecoder : Decoder {
                                                       debugDescription: "Cannot get keyed decoding container -- found null value instead."))
         }
 
-        guard let container = self.storage.topContainer as? [String : Any] else {
+        guard let topContainer = self.storage.topContainer as? [String : Any] else {
             throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: self.storage.topContainer)
         }
 
-        let wrapper = _PlistKeyedDecodingContainer<Key>(referencing: self, wrapping: container)
-        return KeyedDecodingContainer(wrapper)
+        let container = _PlistKeyedDecodingContainer<Key>(referencing: self, wrapping: topContainer)
+        return KeyedDecodingContainer(container)
     }
 
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
@@ -673,12 +723,11 @@ fileprivate class _PlistDecoder : Decoder {
                                                       debugDescription: "Cannot get unkeyed decoding container -- found null value instead."))
         }
 
-        guard let container = self.storage.topContainer as? [Any] else {
+        guard let topContainer = self.storage.topContainer as? [Any] else {
             throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: self.storage.topContainer)
         }
 
-        let wrapper = _PlistUnkeyedDecodingContainer(referencing: self, wrapping: container)
-        return wrapper
+        return _PlistUnkeyedDecodingContainer(referencing: self, wrapping: topContainer)
     }
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
@@ -752,19 +801,19 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
     /// A reference to the container we're reading from.
     let container: [String : Any]
 
+    /// The path of coding keys taken to get to this point in decoding.
+    var codingPath: [CodingKey?]
+
     // MARK: - Initialization
 
     /// Initializes `self` by referencing the given decoder and container.
     init(referencing decoder: _PlistDecoder, wrapping container: [String : Any]) {
         self.decoder = decoder
         self.container = container
+        self.codingPath = decoder.codingPath
     }
 
     // MARK: - KeyedDecodingContainerProtocol Methods
-
-    var codingPath: [CodingKey?] {
-        return self.decoder.codingPath
-    }
 
     var allKeys: [Key] {
         return self.container.keys.flatMap { Key(stringValue: $0) }
@@ -878,12 +927,12 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
                                                           debugDescription: "Cannot get nested keyed container -- no value found for key \"\(key.stringValue)\""))
             }
 
-            guard let container = value as? [String : Any] else {
+            guard let dictionary = value as? [String : Any] else {
                 throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
 
-            let wrapper = _PlistKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
-            return KeyedDecodingContainer(wrapper)
+            let container = _PlistKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: dictionary)
+            return KeyedDecodingContainer(container)
         }
     }
 
@@ -895,11 +944,11 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
                                                           debugDescription: "Cannot get nested unkeyed container -- no value found for key \"\(key.stringValue)\""))
             }
 
-            guard let container = value as? [Any] else {
+            guard let array = value as? [Any] else {
                 throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
 
-            return _PlistUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
+            return _PlistUnkeyedDecodingContainer(referencing: self.decoder, wrapping: array)
         }
     }
 
@@ -911,30 +960,16 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
                                                           debugDescription: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\""))
             }
 
-            return _PlistDecoder(referencing: value, options: self.decoder.options)
+            return _PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
         }
     }
 
     func superDecoder() throws -> Decoder {
-        return try _superDecoder(forKey: _PlistDecodingSuperKey())
+        return try _superDecoder(forKey: _PlistSuperKey.super)
     }
 
     func superDecoder(forKey key: Key) throws -> Decoder {
         return try _superDecoder(forKey: key)
-    }
-}
-
-fileprivate struct _PlistDecodingSuperKey : CodingKey {
-    init() {}
-
-    var stringValue: String { return "super" }
-    init?(stringValue: String) {
-        guard stringValue == "super" else { return nil }
-    }
-
-    var intValue: Int? { return nil }
-    init?(intValue: Int) {
-        return nil
     }
 }
 
@@ -947,6 +982,9 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     /// A reference to the container we're reading from.
     let container: [Any]
 
+    /// The path of coding keys taken to get to this point in decoding.
+    var codingPath: [CodingKey?]
+
     /// The index of the element we're about to decode.
     var currentIndex: Int
 
@@ -956,14 +994,11 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     init(referencing decoder: _PlistDecoder, wrapping container: [Any]) {
         self.decoder = decoder
         self.container = container
+        self.codingPath = decoder.codingPath
         self.currentIndex = 0
     }
 
     // MARK: - UnkeyedDecodingContainer Methods
-
-    var codingPath: [CodingKey?] {
-        return self.decoder.codingPath
-    }
 
     var count: Int? {
         return self.container.count
@@ -1148,13 +1183,13 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
                                                           debugDescription: "Cannot get keyed decoding container -- found null value instead."))
             }
 
-            guard let container = value as? [String : Any] else {
+            guard let dictionary = value as? [String : Any] else {
                 throw DecodingError._typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
 
             self.currentIndex += 1
-            let wrapper = _PlistKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
-            return KeyedDecodingContainer(wrapper)
+            let container = _PlistKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: dictionary)
+            return KeyedDecodingContainer(container)
         }
     }
 
@@ -1173,12 +1208,12 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
                                                           debugDescription: "Cannot get keyed decoding container -- found null value instead."))
             }
 
-            guard let container = value as? [Any] else {
+            guard let array = value as? [Any] else {
                 throw DecodingError._typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
 
             self.currentIndex += 1
-            return _PlistUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
+            return _PlistUnkeyedDecodingContainer(referencing: self.decoder, wrapping: array)
         }
     }
 
@@ -1197,7 +1232,7 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
             }
 
             self.currentIndex += 1
-            return _PlistDecoder(referencing: value, options: self.decoder.options)
+            return _PlistDecoder(referencing: value, at: self.decoder.codingPath, options: self.decoder.options)
         }
     }
 }
@@ -1499,3 +1534,11 @@ extension _PlistDecoder {
 // Since plists do not support null values by default, we will encode them as "$null".
 fileprivate let _plistNull = "$null"
 fileprivate let _plistNullNSString = NSString(string: _plistNull)
+
+//===----------------------------------------------------------------------===//
+// Shared Super Key
+//===----------------------------------------------------------------------===//
+
+fileprivate enum _PlistSuperKey : String, CodingKey {
+    case `super`
+}
