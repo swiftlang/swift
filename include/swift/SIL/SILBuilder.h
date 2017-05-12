@@ -316,11 +316,14 @@ public:
         &F, OpenedArchetypes));
   }
 
-  ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-                         SILType Result, SubstitutionList Subs,
-                         ArrayRef<SILValue> Args, bool isNonThrowing) {
-    return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, SubstFnTy,
-                                    Result, Subs, Args, isNonThrowing, F,
+  ApplyInst *
+  createApply(SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+              ArrayRef<SILValue> Args, bool isNonThrowing,
+              Optional<SILModuleConventions> ModuleConventions = None) {
+    return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn,
+                                    Subs, Args, isNonThrowing,
+                                    ModuleConventions,
+                                    F,
                                     OpenedArchetypes));
   }
 
@@ -328,27 +331,25 @@ public:
                          bool isNonThrowing) {
     SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
                                        getModule());
-    return createApply(Loc, Fn, Fn->getType(), conventions.getSILResultType(),
-                       SubstitutionList(), Args, isNonThrowing);
+    return createApply(Loc, Fn, SubstitutionList(), Args, isNonThrowing);
   }
 
-  TryApplyInst *createTryApply(SILLocation Loc, SILValue fn, SILType substFnTy,
-                               SubstitutionList subs,
-                               ArrayRef<SILValue> args, SILBasicBlock *normalBB,
+  TryApplyInst *createTryApply(SILLocation Loc, SILValue fn,
+                               SubstitutionList subs, ArrayRef<SILValue> args,
+                               SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB) {
     return insertTerminator(TryApplyInst::create(getSILDebugLocation(Loc),
-                                                 fn, substFnTy, subs, args,
+                                                 fn, subs, args,
                                                  normalBB, errorBB, F,
                                                  OpenedArchetypes));
   }
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
-                                       SILType SubstFnTy,
                                        SubstitutionList Subs,
                                        ArrayRef<SILValue> Args,
-                                       SILType ClosureTy) {
+                                       ParameterConvention CalleeConvention) {
     return insert(PartialApplyInst::create(getSILDebugLocation(Loc), Fn,
-                                           SubstFnTy, Subs, Args, ClosureTy, F,
+                                           Args, Subs, CalleeConvention, F,
                                            OpenedArchetypes));
   }
 

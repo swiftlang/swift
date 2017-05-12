@@ -1526,6 +1526,9 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::PrecedenceGroup:
     llvm_unreachable("decl should never be a member");
 
+  case DeclKind::MissingMember:
+    llvm_unreachable("should never need to reserialize a member placeholder");
+
   case DeclKind::IfConfig:
     return false;
 
@@ -1948,6 +1951,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_SynthesizedProtocol:
   case DAK_Count:
   case DAK_Implements:
+  case DAK_NSKeyedArchiveLegacy:
     llvm_unreachable("cannot serialize attribute");
     return;
 
@@ -2314,6 +2318,8 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
+  PrettyStackTraceDecl trace("serializing", D);
+
   auto id = DeclAndTypeIDs[D].first;
   assert(id != 0 && "decl or type not referenced properly");
   (void)id;
@@ -2501,6 +2507,9 @@ void Serializer::writeDecl(const Decl *D) {
                                       relations);
     break;
   }
+
+  case DeclKind::MissingMember:
+    llvm_unreachable("member placeholders shouldn't be serialized");
 
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
@@ -2849,6 +2858,7 @@ void Serializer::writeDecl(const Decl *D) {
                            !fn->getFullName().isSimpleName(),
                            rawAddressorKind,
                            rawAccessLevel,
+                           fn->needsNewVTableEntry(),
                            nameComponents);
 
     writeGenericParams(fn->getGenericParams());
@@ -2954,6 +2964,11 @@ void Serializer::writeDecl(const Decl *D) {
       getRawStableAccessibility(ctor->getFormalAccess());
     Type ty = ctor->getInterfaceType();
 
+    bool firstTimeRequired = ctor->isRequired();
+    if (auto *overridden = ctor->getOverriddenDecl())
+      if (firstTimeRequired && overridden->isRequired())
+        firstTimeRequired = false;
+
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
@@ -2971,6 +2986,8 @@ void Serializer::writeDecl(const Decl *D) {
                                   addTypeRef(ty->getCanonicalType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
+                                  ctor->needsNewVTableEntry(),
+                                  firstTimeRequired,
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams());

@@ -960,6 +960,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   emitClassMetadata(*this, D,
                     classTI.getLayout(*this, selfType),
                     classTI.getClassLayout(*this, selfType));
+
+  IRGen.addClassForArchiveNameRegistration(D);
+
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
 }
@@ -1500,6 +1503,10 @@ namespace {
           hasObjCDeallocDefinition(destructor)) {
         InstanceMethods.push_back(destructor);
       }
+    }
+
+    void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+      llvm_unreachable("should not IRGen classes with missing members");
     }
 
     void addIVarInitializer() {

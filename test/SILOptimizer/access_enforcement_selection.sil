@@ -68,7 +68,7 @@ sil hidden @markFuncEscape : $@convention(thin) () -> () {
 sil @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
 sil @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
 
-// Test dynamic enforcement of box addresses that escape via closure
+// Test static enforcement of box addresses that escape via closure
 // partial_applys.
 // application.
 // CHECK-LABEL: sil hidden @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
@@ -78,7 +78,7 @@ sil @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Bui
 // CHECK:  [[FUNC:%.*]] = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
 // CHECK:  [[CLOSURE:%.*]] = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
 // CHECK:  [[PA:%.*]] = partial_apply [[CLOSURE]]([[ADR]]) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
-// CHECK:  [[MODIFY:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Builtin.Int64
+// CHECK:  [[MODIFY:%.*]] = begin_access [modify] [static] [[ADR]] : $*Builtin.Int64
 // CHECK:  %{{.*}} = apply [[FUNC]]([[MODIFY]], [[PA]]) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
 // CHECK:  end_access [[MODIFY]] : $*Builtin.Int64
 // CHECK:  destroy_value [[BOX]] : ${ var Builtin.Int64 }

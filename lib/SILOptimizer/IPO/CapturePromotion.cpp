@@ -636,8 +636,8 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
     // the loads get mapped to uses of the new object type argument.
     //
     // We assume that the value is already guaranteed.
-    assert(Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed
-           && "Expected argument value to be guaranteed");
+    assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
+           "Expected argument value to be guaranteed");
     ValueMap.insert(std::make_pair(LI, Val));
     return;
   }
@@ -678,8 +678,8 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
     // struct_extract of the new passed in value. The value should be borrowed
     // already.
     SILBuilderWithPostProcess<ClosureCloner, 1> B(this, LI);
-    assert(B.getFunction().hasUnqualifiedOwnership()
-           || Val.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+    assert(B.getFunction().hasUnqualifiedOwnership() ||
+           Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
     SILValue V =
         B.emitStructExtract(LI->getLoc(), Val, SEAI->getField(), LI->getType());
     ValueMap.insert(std::make_pair(LI, V));
@@ -1237,12 +1237,10 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     ++NumCapturesPromoted;
   }
 
-  auto SubstFnTy = FnTy.substGenericArgs(M, PAI->getSubstitutions());
-
   // Create a new partial apply with the new arguments.
-  auto *NewPAI = B.createPartialApply(PAI->getLoc(), FnVal, SubstFnTy,
-                                      PAI->getSubstitutions(), Args,
-                                      PAI->getType());
+  auto *NewPAI = B.createPartialApply(
+      PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
+      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {

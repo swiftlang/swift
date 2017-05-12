@@ -855,6 +855,8 @@ namespace {
 
     void visitClassDecl(ClassDecl *CD) {
       printCommon(CD, "class_decl");
+      if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
+        OS << " @_staticInitializeObjCMetadata";
       printInherited(CD->getInherited());
       for (Decl *D : CD->getMembers()) {
         OS << '\n';
@@ -1115,6 +1117,13 @@ namespace {
 
     void visitModuleDecl(ModuleDecl *MD) {
       printCommon(MD, "module");
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitMissingMemberDecl(MissingMemberDecl *MMD) {
+      printCommon(MMD, "missing_member_decl ");
+      PrintWithColorRAII(OS, IdentifierColor)
+          << '\"' << MMD->getFullName() << '\"';
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
   };

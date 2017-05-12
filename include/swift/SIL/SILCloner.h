@@ -572,8 +572,6 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createApply(getOpLocation(Inst->getLoc()),
                              getOpValue(Inst->getCallee()),
-                             getOpType(Inst->getSubstCalleeSILType()),
-                             getOpType(Inst->getType()),
                              getOpSubstitutions(Inst->getSubstitutions()),
                              Args,
                              Inst->isNonThrowing()));
@@ -587,7 +585,6 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createTryApply(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getCallee()),
-                                getOpType(Inst->getSubstCalleeSILType()),
                                 getOpSubstitutions(Inst->getSubstitutions()),
                                 Args,
                                 getOpBasicBlock(Inst->getNormalBB()),
@@ -600,12 +597,14 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-    getBuilder().createPartialApply(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getCallee()),
-                                    getOpType(Inst->getSubstCalleeSILType()),
-                                    getOpSubstitutions(Inst->getSubstitutions()),
-                                    Args,
-                                    getOpType(Inst->getType())));
+                getBuilder().createPartialApply(
+                    getOpLocation(Inst->getLoc()),
+                    getOpValue(Inst->getCallee()),
+                    getOpSubstitutions(Inst->getSubstitutions()), Args,
+                    Inst->getType()
+                        .getSwiftRValueType()
+                        ->getAs<SILFunctionType>()
+                        ->getCalleeConvention()));
 }
 
 template<typename ImplClass>

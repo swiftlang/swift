@@ -41,9 +41,11 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
@@ -164,6 +166,8 @@ public:
   void visitTypeDecl(TypeDecl *type) {
     // We'll visit nested types separately if necessary.
   }
+
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
   
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
@@ -376,6 +380,8 @@ public:
   void visitTypeDecl(TypeDecl *type) {
     // We'll visit nested types separately if necessary.
   }
+
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     llvm::Constant *name, *imp, *types;
@@ -945,6 +951,56 @@ void IRGenerator::emitLazyDefinitions() {
       IGM->emitSILFunction(f);
     }
   }
+}
+
+void IRGenerator::emitNSArchiveClassNameRegistration() {
+  if (ClassesForArchiveNameRegistration.empty())
+    return;
+
+  // Emit the register function in the primary module.
+  IRGenModule *IGM = getPrimaryIGM();
+
+  llvm::Function *RegisterFn = llvm::Function::Create(
+                                llvm::FunctionType::get(IGM->VoidTy, false),
+                                llvm::GlobalValue::InternalLinkage,
+                                "_swift_register_class_names_for_archives");
+  IRGenFunction RegisterIGF(*IGM, RegisterFn);
+  RegisterFn->setAttributes(IGM->constructInitialAttributes());
+  IGM->Module.getFunctionList().push_back(RegisterFn);
+  RegisterFn->setCallingConv(IGM->DefaultCC);
+
+  for (ClassDecl *CD : ClassesForArchiveNameRegistration) {
+    Type Ty = CD->getDeclaredType();
+    llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(getAsCanType(Ty));
+    if (auto *LegacyAttr = CD->getAttrs().
+          getAttribute<NSKeyedArchiveLegacyAttr>()) {
+      // Register the name for the class in the NSKeyed(Un)Archiver.
+      llvm::Value *NameStr = IGM->getAddrOfGlobalString(LegacyAttr->Name);
+      RegisterIGF.Builder.CreateCall(IGM->getRegisterClassNameForArchivingFn(),
+                                     {NameStr, MetaData});
+    } else {
+      assert(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>());
+
+      // In this case we don't add a name mapping, but just get the metadata
+      // to make sure that the class is registered. But: we need to add a use
+      // (empty inline asm instruction) for the metadata. Otherwise
+      // llvm would optimize the metadata accessor call away because it's
+      // defined as "readnone".
+      llvm::FunctionType *asmFnTy =
+        llvm::FunctionType::get(IGM->VoidTy, {MetaData->getType()},
+                                false /* = isVarArg */);
+      llvm::InlineAsm *inlineAsm =
+        llvm::InlineAsm::get(asmFnTy, "", "r", true /* = SideEffects */);
+      RegisterIGF.Builder.CreateCall(inlineAsm, MetaData);
+    }
+  }
+  RegisterIGF.Builder.CreateRetVoid();
+
+  // Add the registration function as a static initializer. We use a priority
+  // slightly lower than used for C++ global constructors, so that the code is
+  // executed before C++ global constructors (in case someone uses archives
+  // from a C++ global constructor).
+  llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
 }
 
 /// Emit symbols for eliminated dead methods, which can still be referenced
@@ -1620,6 +1676,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Destructor:
     llvm_unreachable("there are no global destructor");
+
+  case DeclKind::MissingMember:
+    llvm_unreachable("there are no global member placeholders");
 
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
@@ -2881,6 +2940,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Destructor:
     case DeclKind::EnumCase:
     case DeclKind::EnumElement:
+    case DeclKind::MissingMember:
       // Skip non-type members.
       continue;
 

@@ -17,6 +17,7 @@ struct A: Hashable {
 
   var property: Prop
   var optProperty: Prop?
+  let optLetProperty: Prop?
 
   subscript(sub: Sub) -> A { get { return self } set { } }
 
@@ -88,9 +89,7 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
 
   // FIXME crash let _: PartialKeyPath<A> = \[sub]
-  // FIXME should resolve: expected-error@+1{{}}
   let _: KeyPath<A, A> = \.[sub]
-  // FIXME should resolve: expected-error@+1{{}}
   let _: WritableKeyPath<A, A> = \.[sub]
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
@@ -109,10 +108,10 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<A, A?> = \.optProperty?[sub]
 
-  // FIXME should resolve: expected-error@+1{{}}
   let _: KeyPath<A, Prop> = \.optProperty!
-  // FIXME should resolve: expected-error@+1{{}}
-  let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty![sub]
+  let _: KeyPath<A, Prop> = \.optLetProperty!
+  let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty!
+  let _: KeyPath<A, A?> = \.property[optSub]?.optProperty![sub]
 
   // FIXME crash let _: PartialKeyPath<C<A>> = \.value
   let _: KeyPath<C<A>, A> = \.value
