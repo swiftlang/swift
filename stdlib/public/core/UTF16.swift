@@ -95,13 +95,13 @@ extension _Unicode.UTF16 : UnicodeEncoding {
   }
   
   public struct ForwardParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt16>
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
   
   public struct ReverseParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt16>
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }

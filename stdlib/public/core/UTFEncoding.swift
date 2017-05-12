@@ -22,7 +22,7 @@ public protocol _UTFParser {
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   func _bufferedScalar(bitCount: UInt8) -> _UIntBuffer<UInt32, Encoding.CodeUnit>
   
-  var _buffer: _UIntBuffer<UInt32, Encoding.CodeUnit> { get set }
+  var _buffer: _UIntBuffer<UInt64, Encoding.CodeUnit> { get set }
 }
 
 extension _UTFParser

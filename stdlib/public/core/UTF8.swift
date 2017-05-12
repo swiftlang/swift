@@ -123,7 +123,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
 
   @_fixed_layout
   public struct ForwardParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt8>
     @inline(__always)
     @_inlineable
     public init() { _buffer = _Buffer() }
@@ -132,7 +132,7 @@ extension _Unicode.UTF8 : UnicodeEncoding {
   
   @_fixed_layout
   public struct ReverseParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt8>
     @inline(__always)
     @_inlineable
     public init() { _buffer = _Buffer() }
