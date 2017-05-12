@@ -83,6 +83,8 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
         MangledName.endswith("To") ||  // swift-as-ObjC thunk
         MangledName.endswith("TO") ||  // ObjC-as-swift thunk
+        MangledName.endswith("TR") ||  // reabstraction thunk helper function
+        MangledName.endswith("Tr") ||  // reabstraction thunk
         MangledName.endswith("TW")) {  // protocol witness thunk
 
       // To avoid false positives, we need to fully demangle the symbol.
@@ -96,6 +98,8 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::NonObjCAttribute:
         case Node::Kind::PartialApplyObjCForwarder:
         case Node::Kind::PartialApplyForwarder:
+        case Node::Kind::ReabstractionThunkHelper:
+        case Node::Kind::ReabstractionThunk:
         case Node::Kind::ProtocolWitness:
           return true;
         default:
@@ -127,8 +131,10 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
       // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
       || MangledName.startswith("_S")) {
 
-    // The target of a protocol witness is not derivable from the mangling.
-    if (MangledName.endswith("TW"))
+    // The targets of those thunks not derivable from the mangling.
+    if (MangledName.endswith("TR") ||
+        MangledName.endswith("Tr") ||
+        MangledName.endswith("TW") )
       return std::string();
 
     return MangledName.substr(0, MangledName.size() - 2).str();
