@@ -52,7 +52,6 @@
 #define get_return_address() ((void*) 0)
 #endif
 
-
 using namespace swift;
 
 bool swift::_swift_disableExclusivityChecking = false;
@@ -60,38 +59,54 @@ bool swift::_swift_disableExclusivityChecking = false;
 static const char *getAccessName(ExclusivityFlags flags) {
   switch (flags) {
   case ExclusivityFlags::Read: return "read";
-  case ExclusivityFlags::Modify: return "modify";
+  case ExclusivityFlags::Modify: return "modification";
   default: return "unknown";
   }
 }
 
+LLVM_ATTRIBUTE_ALWAYS_INLINE
+static void printConflictDetails(const char *oldAccessName, void *oldPC,
+                                 const char *newAccessName, void *newPC) {
+  fprintf(stderr, "Previous access (a %s) started at ", oldAccessName);
+  if (oldPC) {
+    dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
+    fprintf(stderr, " (0x%lx).\n", (uintptr_t)oldPC);
+  } else {
+    fprintf(stderr, "<unknown>.\n");
+  }
+
+  fprintf(stderr, "Current access (a %s) started at:\n", newAccessName);
+  // The top frame is in swift_beginAccess, don't print it.
+  constexpr unsigned framesToSkip = 2;
+  printCurrentBacktrace(framesToSkip);
+}
+
+LLVM_ATTRIBUTE_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
-  // TODO: print something about where the pointer came from?
-  // TODO: if we do something more computationally intense here,
-  //   suppress warnings if the total warning count exceeds some limit
-
-  if (isWarningOnly(newFlags)) {
-    fprintf(stderr,
-            "WARNING: %s/%s access conflict detected on address %p\n"
-            "  first access started at PC=%p\n"
-            "  second access started at PC=%p\n",
-            getAccessName(oldAction),
-            getAccessName(getAccessAction(newFlags)),
-            pointer, oldPC, newPC);
+  static std::atomic<long> reportedConflicts{0};
+  constexpr unsigned maxReportedConflicts = 100;
+  // Don't report more that 100 conflicts. Hopefully, this will improve
+  // performance in case there are conflicts inside a tight loop.
+  if (reportedConflicts.fetch_add(1, std::memory_order_relaxed) >=
+      maxReportedConflicts) {
     return;
   }
 
-  // TODO: try to recover source-location information from the return
-  // address.
-  fatalError(0,
-             "%s/%s access conflict detected on address %p, aborting\n"
-             "  first access started at PC=%p\n"
-             "  second access started at PC=%p\n",
-             getAccessName(oldAction),
-             getAccessName(getAccessAction(newFlags)),
-             pointer, oldPC, newPC);
+  fprintf(stderr,
+          "Simultaneous accesses to 0x%lx, but modification requires exclusive "
+          "access.\n",
+          (uintptr_t)pointer);
+  printConflictDetails(getAccessName(oldAction), oldPC,
+                       getAccessName(getAccessAction(newFlags)), newPC);
+
+  if (isWarningOnly(newFlags)) {
+    return;
+  }
+
+  // 0 means no backtrace will be printed.
+  fatalError(0, "Fatal access conflict detected.\n");
 }
 
 namespace {

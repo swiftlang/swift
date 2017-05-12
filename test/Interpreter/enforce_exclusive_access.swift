@@ -47,7 +47,8 @@ ExclusiveAccessTestSuite.test("ModifyInsideRead")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("read/modify access conflict detected on address")
+  .crashOutputMatches("Previous access (a read) started at")
+  .crashOutputMatches("Current access (a modification) started at")
   .code
 {
   readAndPerform(&globalX) {
@@ -60,7 +61,8 @@ ExclusiveAccessTestSuite.test("ReadInsideModify")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("modify/read access conflict detected on address")
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a read) started at")
   .code
 {
   modifyAndPerform(&globalX) {
@@ -74,7 +76,8 @@ ExclusiveAccessTestSuite.test("ModifyInsideModify")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches("modify/modify access conflict detected on address")
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a modification) started at")
   .code
 {
   modifyAndPerform(&globalX) {
@@ -110,7 +113,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //.skip(.custom(
 //    { _isFastAssertConfiguration() },
 //    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("modify/modify access conflict detected on address")
+//  .crashOutputMatches("Previous access (a modification) started at")
+//  .crashOutputMatches("Current access (a modification) started at")
 //  .code
 //{
 //  var x = X()
@@ -129,7 +133,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //.skip(.custom(
 //    { _isFastAssertConfiguration() },
 //    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("modify/read access conflict detected on address")
+//  .crashOutputMatches("Previous access (a read) started at")
+//  .crashOutputMatches("Current access (a modification) started at")
 //  .code
 //{
 //  var x = X()
@@ -148,7 +153,8 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 //.skip(.custom(
 //    { _isFastAssertConfiguration() },
 //    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("read/modify access conflict detected on address")
+//  .crashOutputMatches("Previous access (a modification) started at")
+//  .crashOutputMatches("Current access (a read) started at")
 //  .code
 //{
 //  var x = X()
