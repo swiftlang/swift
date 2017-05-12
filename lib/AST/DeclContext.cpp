@@ -91,6 +91,10 @@ EnumDecl *DeclContext::getAsEnumOrEnumExtensionContext() const {
   return dyn_cast_or_null<EnumDecl>(getAsTypeOrTypeExtensionContext());
 }
 
+StructDecl *DeclContext::getAsStructOrStructExtensionContext() const {
+  return dyn_cast_or_null<StructDecl>(getAsTypeOrTypeExtensionContext());
+}
+
 ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
   return dyn_cast_or_null<ProtocolDecl>(getAsTypeOrTypeExtensionContext());
 }

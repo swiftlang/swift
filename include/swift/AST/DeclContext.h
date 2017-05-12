@@ -65,6 +65,7 @@ namespace swift {
   class SerializedPatternBindingInitializer;
   class SerializedDefaultArgumentInitializer;
   class SerializedTopLevelCodeDecl;
+  class StructDecl;
 
 enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
@@ -254,6 +255,10 @@ public:
   /// If this DeclContext is an enum, or an extension on an enum, return the
   /// EnumDecl, otherwise return null.
   EnumDecl *getAsEnumOrEnumExtensionContext() const;
+
+  /// If this DeclContext is a struct, or an extension on a struct, return the
+  /// StructDecl, otherwise return null.
+  StructDecl *getAsStructOrStructExtensionContext() const;
 
   /// If this DeclContext is a protocol, or an extension on a
   /// protocol, return the ProtocolDecl, otherwise return null.
