@@ -4417,11 +4417,9 @@ void SILModule::verify() const {
   }
 }
 
-#ifndef NDEBUG
 /// Determine whether an instruction may not have a SILDebugScope.
 bool swift::maybeScopeless(SILInstruction &I) {
   if (I.getFunction()->isBare())
     return true;
   return !isa<DebugValueInst>(I) && !isa<DebugValueAddrInst>(I);
 }
-#endif
