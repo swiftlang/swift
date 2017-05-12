@@ -6,6 +6,8 @@
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
+// REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: executable_test
 
 // This file just causes a crash in the runtime to check whether or not a stack
 // trace is produced from the runtime.
