@@ -3661,12 +3661,6 @@ namespace {
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), redundant);
 
-      if (auto rawDecl = Impl.importDecl(decl, ImportNameVersion::Raw)) {
-        // We expect the raw decl to always be a method.
-        assert(isa<FuncDecl>(rawDecl));
-        Impl.addAlternateDecl(result, cast<ValueDecl>(rawDecl));
-      }
-
       return result;
     }
 
@@ -3934,13 +3928,6 @@ namespace {
     Optional<GenericParamList *>
     importObjCGenericParams(const clang::ObjCInterfaceDecl *decl,
                             DeclContext *dc);
-
-    /// Import members of the given Objective-C container and add them to the
-    /// list of corresponding Swift members.
-    void importObjCMembers(const clang::ObjCContainerDecl *decl,
-                           DeclContext *swiftContext,
-                           llvm::SmallPtrSet<Decl *, 4> &knownMembers,
-                           SmallVectorImpl<Decl *> &members);
 
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
@@ -6421,37 +6408,6 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       genericParams, Impl.importSourceLoc(typeParamList->getRAngleLoc()));
 }
 
-void SwiftDeclConverter::importObjCMembers(
-    const clang::ObjCContainerDecl *decl, DeclContext *swiftContext,
-    llvm::SmallPtrSet<Decl *, 4> &knownMembers,
-    SmallVectorImpl<Decl *> &members) {
-  for (auto m = decl->decls_begin(), mEnd = decl->decls_end(); m != mEnd; ++m) {
-    auto nd = dyn_cast<clang::NamedDecl>(*m);
-    if (!nd || nd != nd->getCanonicalDecl())
-      continue;
-
-    auto member = Impl.importDecl(nd, getVersion());
-    if (!member)
-      continue;
-
-    if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-      // If there is are alternate declarations for this member, add it.
-      for (auto alternate : Impl.getAlternateDecls(member)) {
-        if (alternate->getDeclContext() == member->getDeclContext() &&
-            knownMembers.insert(alternate).second)
-          members.push_back(alternate);
-      }
-
-      // If this declaration shouldn't be visible, don't add it to
-      // the list.
-      if (shouldSuppressDeclImport(objcMethod))
-        continue;
-    }
-
-    members.push_back(member);
-  }
-}
-
 void SwiftDeclConverter::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
     ArrayRef<ProtocolDecl *> protocols, SmallVectorImpl<Decl *> &members,
@@ -7810,10 +7766,6 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  // TODO: accommodate deprecated versions as well
-  SwiftDeclConverter converter(*this, CurrentVersion);
-  SwiftDeclConverter swift2Converter(*this, ImportNameVersion::Swift2);
-
   DeclContext *DC;
   IterableDeclContext *IDC;
   SmallVector<ProtocolDecl *, 4> protos;
@@ -7848,9 +7800,36 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   ImportingEntityRAII Importing(*this);
 
   SmallVector<Decl *, 16> members;
-  llvm::SmallPtrSet<Decl *, 4> knownMembers;
-  converter.importObjCMembers(objcContainer, DC, knownMembers, members);
-  swift2Converter.importObjCMembers(objcContainer, DC, knownMembers, members);
+  llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
+  for (const clang::Decl *m : objcContainer->decls()) {
+    auto nd = dyn_cast<clang::NamedDecl>(m);
+    if (!nd || nd != nd->getCanonicalDecl())
+      continue;
+
+    forEachDistinctName(*this, nd,
+                        [&](ImportedName name, ImportNameVersion nameVersion) {
+      auto member = importDecl(nd, nameVersion);
+      if (!member)
+        return;
+
+      // If there are alternate declarations for this member, add them.
+      for (auto alternate : getAlternateDecls(member)) {
+        if (alternate->getDeclContext() == member->getDeclContext() &&
+            knownAlternateMembers.insert(alternate).second) {
+          members.push_back(alternate);
+        }
+      }
+
+      // If this declaration shouldn't be visible, don't add it to
+      // the list.
+      if (shouldSuppressDeclImport(nd))
+        return;
+
+      members.push_back(member);
+    });
+  }
+
+  SwiftDeclConverter converter(*this, CurrentVersion);
 
   protos = takeImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
@@ -7879,7 +7858,6 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   for (auto member : members) {
     IDC->addMember(member);
   }
-
 }
 
 void ClangImporter::Implementation::loadAllConformances(
