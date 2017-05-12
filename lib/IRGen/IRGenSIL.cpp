@@ -3976,6 +3976,26 @@ static ExclusivityFlags getExclusivityFlags(SILModule &M,
   return flags;
 }
 
+static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
+                                                    BeginAccessInst *access) {
+  auto enforcement = access->getEnforcement();
+
+  // Don't use dynamic enforcement for known-empty types; there's no
+  // actual memory there, and the address may not be valid and unique.
+  // This is really a hack; we don't necessarily know that all clients
+  // will agree whether a type is empty.  On the other hand, the situations
+  // where IRGen generates a meaningless address should always be a subset
+  // of cases where this triggers, because of the restrictions on abstracting
+  // over addresses and the fact that we use static enforcement on inouts.
+  if (enforcement == SILAccessEnforcement::Dynamic &&
+      IGF.IGM.isKnownEmpty(access->getSource()->getType(),
+                           ResilienceExpansion::Maximal)) {
+    enforcement = SILAccessEnforcement::Unsafe;
+  }
+
+  return enforcement;
+}
+
 template <class Inst>
 static ExclusivityFlags getExclusivityFlags(Inst *i) {
   return getExclusivityFlags(i->getModule(), i->getAccessKind());
@@ -3983,7 +4003,7 @@ static ExclusivityFlags getExclusivityFlags(Inst *i) {
 
 void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
   Address addr = getLoweredAddress(access->getOperand());
-  switch (access->getEnforcement()) {
+  switch (getEffectiveEnforcement(*this, access)) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("unknown access enforcement in IRGen!");
 
@@ -4068,7 +4088,7 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
 
 void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
   auto access = i->getBeginAccess();
-  switch (access->getEnforcement()) {
+  switch (getEffectiveEnforcement(*this, access)) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("unknown access enforcement in IRGen!");
 
