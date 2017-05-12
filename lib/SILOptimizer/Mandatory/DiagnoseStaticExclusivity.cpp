@@ -454,7 +454,7 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
 
     if (auto *REA = dyn_cast<RefElementAddrInst>(Iter)) {
       // Do a best-effort to find the identity of the object being projected
-      // from. It is OK to be unsound here (i.e. miss when two ref_element_addrs
+      // from. It is OK to unsound here (i.e., miss when two ref_element_addrs
       // actually refer the same address) because these will be dynamically
       // checked.
       SILValue Object = findUnderlyingObject(REA->getOperand());
@@ -463,27 +463,18 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
       return AccessedStorage(AccessedStorageKind::ClassProperty, OP);
     }
 
-    switch (Iter->getKind()) {
-    case ValueKind::AllocBoxInst:
-      // An AllocBox is a fully identified memory location.
-      LLVM_FALLTHROUGH;
-    case ValueKind::BeginAccessInst:
-      // The current access is nested within another access.
-      // View the outer access as a separate location because nested accesses do
-      // not conflict with each other.
-      LLVM_FALLTHROUGH;
-    case ValueKind::SILFunctionArgument:
-      // A function argument is effectively a nested access, enforced
-      // independently in the caller and callee.
-      LLVM_FALLTHROUGH;
-    case ValueKind::PointerToAddressInst:
-      // An addressor provides access to a global or class property via a
-      // RawPointer. Calling the address casts that raw pointer to an address.
+    if (isa<AllocBoxInst>(Iter) || isa<BeginAccessInst>(Iter) ||
+        isa<SILFunctionArgument>(Iter)) {
+      // Treat the instruction itself as the identity of the storage being
+      // being accessed.
       return AccessedStorage(Iter);
-    default:
-      DEBUG(llvm::dbgs() << "Bad memory access source: " << Iter);
-      llvm_unreachable("Unexpected access source.");
     }
+
+    // For now we're still allowing arbitrary addresses here. Once
+    // we start doing a best-effort static check for dynamically-enforced
+    // accesses we should lock this down to only recognized sources.
+    assert(Iter->getType().isAddress() || Iter->getType().is<SILBoxType>());
+    return AccessedStorage(Iter);
   }
 }
 
