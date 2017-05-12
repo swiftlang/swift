@@ -160,7 +160,7 @@ extension _StringCore {
         return try Swift._withCStringAndLength(
           encodedAs: targetEncoding,
           from: UnsafeBufferPointer(start: startASCII, count: count)[bounds],
-          encodedAs: _Unicode.ASCII.self,
+          encodedAs: Unicode.ASCII.self,
           execute: body
         )
       }
@@ -168,7 +168,7 @@ extension _StringCore {
         return try Swift._withCStringAndLength(
           encodedAs: targetEncoding,
           from: UnsafeBufferPointer(start: startUTF16, count: count)[bounds],
-          encodedAs: _Unicode.UTF16.self,
+          encodedAs: Unicode.UTF16.self,
           execute: body
         )
       }
@@ -176,7 +176,7 @@ extension _StringCore {
     return try Swift._withCStringAndLength(
       encodedAs: targetEncoding,
       from: self[bounds],
-      encodedAs: _Unicode.UTF16.self,
+      encodedAs: Unicode.UTF16.self,
       execute: body
     )
   }
@@ -324,7 +324,7 @@ extension String {
 ///
 /// A string's `unicodeScalars` property is a collection of Unicode scalar
 /// values, the 21-bit codes that are the basic unit of Unicode. Each scalar
-/// value is represented by a `UnicodeScalar` instance and is equivalent to a
+/// value is represented by a `Unicode.Scalar` instance and is equivalent to a
 /// UTF-32 code unit.
 ///
 ///     print(cafe.unicodeScalars.count)
@@ -701,7 +701,7 @@ extension String {
   /// - Complexity: Appending a Unicode scalar to a string averages to O(1)
   ///   over many additions.
   @available(*, unavailable, message: "Replaced by append(_: String)")
-  public mutating func append(_ x: UnicodeScalar) {
+  public mutating func append(_ x: Unicode.Scalar) {
     Builtin.unreachable()
   }
 

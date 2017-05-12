@@ -27,8 +27,8 @@ public struct UTFTest {
   public let string: String
   public let utf8: [UInt8]
   public let utf16: [UInt16]
-  public let unicodeScalars: [UnicodeScalar]
-  public let unicodeScalarsRepairedTail: [UnicodeScalar]
+  public let unicodeScalars: [Unicode.Scalar]
+  public let unicodeScalarsRepairedTail: [Unicode.Scalar]
   public let flags: Flags
   public let loc: SourceLoc
 
@@ -52,9 +52,9 @@ public struct UTFTest {
     self.string = string
     self.utf8 = utf8
     self.utf16 = utf16
-    self.unicodeScalars = scalars.map { UnicodeScalar($0)! }
+    self.unicodeScalars = scalars.map { Unicode.Scalar($0)! }
     self.unicodeScalarsRepairedTail =
-      scalarsRepairedTail.map { UnicodeScalar($0)! }
+      scalarsRepairedTail.map { Unicode.Scalar($0)! }
     self.flags = flags
     self.loc = SourceLoc(file, line, comment: "test data")
   }
