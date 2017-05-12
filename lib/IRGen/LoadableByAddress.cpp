@@ -54,12 +54,8 @@ static SILLocation getLocForValue(SILValue value) {
 
 static GenericEnvironment *getGenericEnvironment(SILModule &Mod,
                                                  CanSILFunctionType loweredTy) {
-  auto *SM = Mod.getSwiftModule();
-  auto &Ctx = loweredTy->getASTContext();
-  auto *GSB = Ctx.getOrCreateGenericSignatureBuilder(
-      loweredTy->getGenericSignature(), SM);
-  auto *GenericEnv = Ctx.getOrCreateCanonicalGenericEnvironment(GSB, *SM);
-  return GenericEnv;
+  return loweredTy->getGenericSignature()->createGenericEnvironment(
+                                                         *Mod.getSwiftModule());
 }
 
 /// Utility to determine if this is a large loadable type

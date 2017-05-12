@@ -33,12 +33,16 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace swift;
 using llvm::DenseMap;
+
+/// Define this to 1 to enable expensive assertions.
+#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
 namespace {
   typedef GenericSignatureBuilder::RequirementSource RequirementSource;
@@ -53,6 +57,18 @@ namespace {
   typedef EquivalenceClass::DerivedSameTypeComponent DerivedSameTypeComponent;
 
 } // end anonymous namespace
+
+#define DEBUG_TYPE "Generic signature builder"
+STATISTIC(NumPotentialArchetypes, "# of potential archetypes");
+STATISTIC(NumConformances, "# of conformances tracked");
+STATISTIC(NumConformanceConstraints, "# of conformance constraints tracked");
+STATISTIC(NumSameTypeConstraints, "# of same-type constraints tracked");
+STATISTIC(NumConcreteTypeConstraints,
+          "# of same-type-to-concrete constraints tracked");
+STATISTIC(NumSuperclassConstraints, "# of superclass constraints tracked");
+STATISTIC(NumLayoutConstraints, "# of layout constraints tracked");
+STATISTIC(NumSelfDerived, "# of self-derived constraints removed");
+STATISTIC(NumRecursive, "# of recursive types we bail out on");
 
 struct GenericSignatureBuilder::Implementation {
   /// Function used to look up conformances.
@@ -988,9 +1004,11 @@ bool FloatingRequirementSource::isRecursive(
                 ->getAffectedPotentialArchetype();
     while (auto parent = pa->getParent()) {
       if (pa->getNestedName() == nestedName) {
-        if (++grossCount > 4) return true;
+        if (++grossCount > 4) {
+          ++NumRecursive;
+          return true;
+        }
       }
-
 
       pa = parent;
     }
@@ -1000,6 +1018,8 @@ bool FloatingRequirementSource::isRecursive(
 }
 
 GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
+  ++NumPotentialArchetypes;
+
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
       if (pa != this)
@@ -1218,6 +1238,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   superclassSource =
     superclassSource->viaSuperclass(*this, conformance->getConcrete());
   paEquivClass->conformsTo[proto].push_back({pa, proto, superclassSource});
+  ++NumConformanceConstraints;
   return superclassSource;
 }
 
@@ -1295,11 +1316,14 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
   if (known != equivClass->conformsTo.end()) {
     // We already knew about this conformance; record this specific constraint.
     known->second.push_back({this, proto, source});
+    ++NumConformanceConstraints;
     return false;
   }
 
   // Add the conformance along with this constraint.
   equivClass->conformsTo[proto].push_back({this, proto, source});
+  ++NumConformanceConstraints;
+  ++NumConformances;
 
   // Determine whether there is a superclass constraint where the
   // superclass conforms to this protocol.
@@ -1505,7 +1529,7 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
       anchor = pa;
   }
 
-#ifndef NDEBUG
+#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : anchor->getEquivalenceClassMembers()) {
     assert((pa == anchor || compareDependentTypes(&anchor, &pa) < 0) &&
@@ -2716,6 +2740,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
 
   // Record this layout constraint.
   equivClass->layoutConstraints.push_back({PAT, Layout, Source});
+  ++NumLayoutConstraints;
 
   // Update the layout in the equivalence class, if we didn't have one already.
   if (!equivClass->layout)
@@ -2840,6 +2865,7 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
   // Record the constraint.
   T->getOrCreateEquivalenceClass()->superclassConstraints
     .push_back(ConcreteConstraint{T, superclass, source});
+  ++NumSuperclassConstraints;
 
   // Update the equivalence class with the constraint.
   updateSuperclass(T, superclass, source);
@@ -2976,11 +3002,13 @@ void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
   // Update the same-type constraints of this PA to reference the other PA.
   getOrCreateEquivalenceClass()->sameTypeConstraints[this]
     .push_back({this, otherPA, source});
+  ++NumSameTypeConstraints;
 
   if (this != otherPA) {
     // Update the same-type constraints of the other PA to reference this PA.
     otherPA->getOrCreateEquivalenceClass()->sameTypeConstraints[otherPA]
       .push_back({otherPA, this, source});
+    ++NumSameTypeConstraints;
   }
 }
 
@@ -3108,6 +3136,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   // Record the concrete type and its source.
   equivClass->concreteTypeConstraints.push_back(
                                       ConcreteConstraint{T, Concrete, Source});
+  ++NumConcreteTypeConstraints;
 
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
@@ -3151,6 +3180,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                                 ? conformance->getConcrete()
                                                 : nullptr);
     equivClass->conformsTo[protocol].push_back({T, protocol, concreteSource});
+    ++NumConformanceConstraints;
   }
 
   // Eagerly resolve any existing nested types to their concrete forms (others
@@ -4107,8 +4137,10 @@ namespace {
                      [&](const Constraint<T> &constraint) {
                        bool derivedViaConcrete;
                        if (constraint.source->isSelfDerivedSource(
-                                constraint.archetype, derivedViaConcrete))
+                                constraint.archetype, derivedViaConcrete)) {
+                         ++NumSelfDerived;
                          return true;
+                       }
 
                        if (!derivedViaConcrete)
                          return false;
@@ -4122,6 +4154,7 @@ namespace {
                        if (!remainingConcrete)
                          remainingConcrete = constraint;
 
+                       ++NumSelfDerived;
                        return true;
                      }),
       constraints.end());
@@ -4274,8 +4307,10 @@ void GenericSignatureBuilder::checkConformanceConstraints(
                        bool derivedViaConcrete;
                        if (constraint.source->isSelfDerivedConformance(
                                 constraint.archetype, entry.first,
-                                derivedViaConcrete))
+                                derivedViaConcrete)) {
+                         ++NumSelfDerived;
                          return true;
+                       }
 
                        if (!derivedViaConcrete)
                          return false;
@@ -4283,6 +4318,8 @@ void GenericSignatureBuilder::checkConformanceConstraints(
                        // Drop derived-via-concrete requirements.
                        if (!remainingConcrete)
                          remainingConcrete = constraint;
+
+                       ++NumSelfDerived;
                        return true;
                      }),
       entry.second.end());
