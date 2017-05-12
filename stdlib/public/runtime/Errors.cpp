@@ -225,6 +225,9 @@ reportNow(uint32_t flags, const char *message)
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
                               const char *message) {
+#if NDEBUG
+  flags &= ~FatalErrorFlags::ReportBacktrace;
+#endif
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }
