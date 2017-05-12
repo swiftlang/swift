@@ -89,6 +89,127 @@ func testAKA(structValue: ImportantCStruct, aliasValue: ImportantCAlias) {
   // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'Optional<ImportantCAlias>' (aka 'Optional<Int32>') to specified type 'Int'
 }
 
+func testRenamedEnumConstants() {
+  _ = AnonymousEnumValue // okay
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:7: error: 'AnonymousEnumRenamed' has been renamed to 'AnonymousEnumRenamedSwiftUnversioned'
+  _ = AnonymousEnumRenamed
+  // CHECK-DIAGS-3: [[@LINE-1]]:7: error: 'AnonymousEnumRenamed' has been renamed to 'AnonymousEnumRenamedSwift3'
+
+  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:7:
+  _ = AnonymousEnumRenamedSwiftUnversioned
+  // CHECK-DIAGS-3: [[@LINE-1]]:7: error: 'AnonymousEnumRenamedSwiftUnversioned' has been renamed to 'AnonymousEnumRenamedSwift3'
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:7: error: 'AnonymousEnumRenamedSwift3' has been renamed to 'AnonymousEnumRenamedSwiftUnversioned'
+  _ = AnonymousEnumRenamedSwift3
+  // CHECK-DIAGS-3-NOT: :[[@LINE-1]]:7:
+}
+
+func testRenamedUnknownEnum() {
+  _ = UnknownEnumValue // okay
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:7: error: 'UnknownEnumRenamed' has been renamed to 'UnknownEnumRenamedSwiftUnversioned'
+  _ = UnknownEnumRenamed
+  // CHECK-DIAGS-3: [[@LINE-1]]:7: error: 'UnknownEnumRenamed' has been renamed to 'UnknownEnumRenamedSwift3'
+
+  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:7:
+  _ = UnknownEnumRenamedSwiftUnversioned
+  // CHECK-DIAGS-3: [[@LINE-1]]:7: error: 'UnknownEnumRenamedSwiftUnversioned' has been renamed to 'UnknownEnumRenamedSwift3'
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:7: error: 'UnknownEnumRenamedSwift3' has been renamed to 'UnknownEnumRenamedSwiftUnversioned'
+  _ = UnknownEnumRenamedSwift3
+  // CHECK-DIAGS-3-NOT: :[[@LINE-1]]:7:
+}
+
+func testRenamedTrueEnum() {
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumValue'
+  _ = TrueEnumValue
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'TrueEnumValue'
+  _ = TrueEnum.TrueEnumValue
+
+  // CHECK-DIAGS: [[@LINE+1]]:16: error: 'Value' has been renamed to 'value'
+  _ = TrueEnum.Value
+
+  _ = TrueEnum.value // okay
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumRenamed'
+  _ = TrueEnumRenamed
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'TrueEnumRenamed'
+  _ = TrueEnum.TrueEnumRenamed
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:16: error: 'Renamed' has been renamed to 'renamedSwiftUnversioned'
+  _ = TrueEnum.Renamed
+  // CHECK-DIAGS-3: [[@LINE-1]]:16: error: 'Renamed' has been renamed to 'renamedSwift3'
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'renamed'
+  _ = TrueEnum.renamed
+
+  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:16:
+  _ = TrueEnum.renamedSwiftUnversioned
+  // CHECK-DIAGS-3: [[@LINE-1]]:16: error: 'renamedSwiftUnversioned' has been renamed to 'renamedSwift3'
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:16: error: 'renamedSwift3' has been renamed to 'renamedSwiftUnversioned'
+  _ = TrueEnum.renamedSwift3
+  // CHECK-DIAGS-3-NOT: :[[@LINE-1]]:16:
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'TrueEnumAliasRenamed'
+  _ = TrueEnumAliasRenamed
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'TrueEnumAliasRenamed'
+  _ = TrueEnum.TrueEnumAliasRenamed
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:16: error: 'AliasRenamed' has been renamed to 'aliasRenamedSwiftUnversioned'
+  _ = TrueEnum.AliasRenamed
+  // CHECK-DIAGS-3: [[@LINE-1]]:16: error: 'AliasRenamed' has been renamed to 'aliasRenamedSwift3'
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'TrueEnum' has no member 'aliasRenamed'
+  _ = TrueEnum.aliasRenamed
+
+  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:16:
+  _ = TrueEnum.aliasRenamedSwiftUnversioned
+  // CHECK-DIAGS-3: [[@LINE-1]]:16: error: 'aliasRenamedSwiftUnversioned' has been renamed to 'aliasRenamedSwift3'
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:16: error: 'aliasRenamedSwift3' has been renamed to 'aliasRenamedSwiftUnversioned'
+  _ = TrueEnum.aliasRenamedSwift3
+  // CHECK-DIAGS-3-NOT: :[[@LINE-1]]:16:
+}
+
+func testRenamedOptionyEnum() {
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'OptionyEnumValue'
+  _ = OptionyEnumValue
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'OptionyEnum' has no member 'OptionyEnumValue'
+  _ = OptionyEnum.OptionyEnumValue
+
+  // CHECK-DIAGS: [[@LINE+1]]:19: error: 'Value' has been renamed to 'value'
+  _ = OptionyEnum.Value
+
+  _ = OptionyEnum.value // okay
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: use of unresolved identifier 'OptionyEnumRenamed'
+  _ = OptionyEnumRenamed
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'OptionyEnum' has no member 'OptionyEnumRenamed'
+  _ = OptionyEnum.OptionyEnumRenamed
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:19: error: 'Renamed' has been renamed to 'renamedSwiftUnversioned'
+  _ = OptionyEnum.Renamed
+  // CHECK-DIAGS-3: [[@LINE-1]]:19: error: 'Renamed' has been renamed to 'renamedSwift3'
+
+  // CHECK-DIAGS: [[@LINE+1]]:7: error: type 'OptionyEnum' has no member 'renamed'
+  _ = OptionyEnum.renamed
+
+  // CHECK-DIAGS-4-NOT: :[[@LINE+1]]:19:
+  _ = OptionyEnum.renamedSwiftUnversioned
+  // CHECK-DIAGS-3: [[@LINE-1]]:19: error: 'renamedSwiftUnversioned' has been renamed to 'renamedSwift3'
+
+  // CHECK-DIAGS-4: [[@LINE+1]]:19: error: 'renamedSwift3' has been renamed to 'renamedSwiftUnversioned'
+  _ = OptionyEnum.renamedSwift3
+  // CHECK-DIAGS-3-NOT: :[[@LINE-1]]:19:
+}
+
 #endif
 
 #if !swift(>=4)

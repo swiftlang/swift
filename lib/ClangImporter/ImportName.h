@@ -363,9 +363,6 @@ private:
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  /// Whether we should import this as Swift Private
-  bool shouldBeSwiftPrivate(const clang::NamedDecl *, clang::Sema &clangSema);
-
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,
                                                   ImportNameVersion version);
