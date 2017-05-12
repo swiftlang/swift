@@ -16,6 +16,7 @@
 # `swiftc -stats-output-dir` and emits summary data, traces etc. for analysis.
 
 import argparse
+import csv
 import json
 import os
 import random
@@ -37,6 +38,9 @@ class JobStats:
 
     def is_driver_job(self):
         return self.jobkind == 'driver'
+
+    def is_frontend_job(self):
+        return self.jobkind == 'frontend'
 
     def driver_jobs_ran(self):
         assert(self.is_driver_job())
@@ -72,7 +76,7 @@ class JobStats:
         assert(self.is_driver_job())
         ran = self.driver_jobs_ran()
         total = self.driver_jobs_total()
-        return (float(ran) / float(total)) * 100.0
+        return round((float(ran) / float(total)) * 100.0, 2)
 
     # Return a JSON-formattable object of the form preferred by google chrome's
     # 'catapult' trace-viewer.
@@ -108,22 +112,26 @@ def load_stats_dir(path):
                 patstr = (r"time\.swift-" + jobkind +
                           r"\.(?P<module>[^\.]+)(?P<filename>.*)\.wall$")
                 pat = re.compile(patstr)
+                stats = dict()
                 for (k, v) in j.items():
+                    if k.startswith("time."):
+                        v = int(1000000.0 * float(v))
+                    stats[k] = v
                     tm = re.match(pat, k)
                     if tm:
                         tmg = tm.groupdict()
-                        dur_usec = int(1000000.0 * float(v))
+                        dur_usec = v
                         module = tmg['module']
                         if 'filename' in tmg:
                             ff = tmg['filename']
                             if ff.startswith('.'):
                                 ff = ff[1:]
                             jobargs = [ff]
-                        break
+
                 e = JobStats(jobkind=jobkind, jobid=jobid,
                              module=module, start_usec=start_usec,
                              dur_usec=dur_usec, jobargs=jobargs,
-                             stats=j)
+                             stats=stats)
                 jobstats.append(e)
     return jobstats
 
@@ -168,6 +176,13 @@ def merge_all_jobstats(jobstats):
 
 
 def show_paired_incrementality(args):
+    fieldnames = ["old_pct", "old_skip",
+                  "new_pct", "new_skip",
+                  "delta_pct", "delta_skip",
+                  "name"]
+    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out.writeheader()
+
     for (name, (oldstats, newstats)) in load_paired_stats_dirs(args):
         olddriver = merge_all_jobstats([x for x in oldstats
                                         if x.is_driver_job()])
@@ -175,32 +190,67 @@ def show_paired_incrementality(args):
                                         if x.is_driver_job()])
         if olddriver is None or newdriver is None:
             continue
-        if args.csv:
-            args.output.write("'%s',%d,%d\n" % (name,
-                              olddriver.driver_jobs_ran(),
-                              newdriver.driver_jobs_ran()))
-        else:
-            oldpct = olddriver.incrementality_percentage()
-            newpct = newdriver.incrementality_percentage()
-            deltapct = newpct - oldpct
-            oldskip = olddriver.driver_jobs_skipped()
-            newskip = newdriver.driver_jobs_skipped()
-            deltaskip = newskip - oldskip
-            fmt = "{}:\t" + "\t".join([lab + ":{:>3.0f}% ({} skipped)" for
-                                       lab in ['old', 'new', 'delta']]) + "\n"
-            args.output.write(fmt.format(name,
-                                         oldpct, oldskip,
-                                         newpct, newskip,
-                                         deltapct, deltaskip))
+        oldpct = olddriver.incrementality_percentage()
+        newpct = newdriver.incrementality_percentage()
+        deltapct = newpct - oldpct
+        oldskip = olddriver.driver_jobs_skipped()
+        newskip = newdriver.driver_jobs_skipped()
+        deltaskip = newskip - oldskip
+        out.writerow(dict(name=name,
+                          old_pct=oldpct, old_skip=oldskip,
+                          new_pct=newpct, new_skip=newskip,
+                          delta_pct=deltapct, delta_skip=deltaskip))
 
 
 def show_incrementality(args):
+    fieldnames = ["incrementality", "name"]
+    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out.writeheader()
+
     for path in args.remainder:
         stats = load_stats_dir(path)
         for s in stats:
             if s.is_driver_job():
                 pct = s.incrementality_percentage()
-                args.output.write("%s: %f\n" % (os.path.basename(path), pct))
+                out.writerow(dict(name=os.path.basename(path),
+                                  incrementality=pct))
+
+
+def compare_frontend_stats(args):
+    assert(len(args.remainder) == 2)
+    (olddir, newdir) = args.remainder
+
+    regressions = 0
+    fieldnames = ["old", "new", "delta_pct", "name"]
+    out = csv.DictWriter(args.output, fieldnames, dialect='excel-tab')
+    out.writeheader()
+
+    old_stats = load_stats_dir(olddir)
+    new_stats = load_stats_dir(newdir)
+    old_merged = merge_all_jobstats([x for x in old_stats
+                                     if x.is_frontend_job()])
+    new_merged = merge_all_jobstats([x for x in new_stats
+                                     if x.is_frontend_job()])
+    if old_merged is None or new_merged is None:
+        return regressions
+    for stat_name in sorted(old_merged.stats.keys()):
+        if stat_name in new_merged.stats:
+            old = old_merged.stats[stat_name]
+            new = new_merged.stats.get(stat_name, 0)
+            if old == 0 or new == 0:
+                continue
+            delta = (new - old)
+            delta_pct = round((float(delta) / float(new)) * 100.0, 2)
+            if (stat_name.startswith("time.") and
+               abs(delta) < args.delta_usec_thresh):
+                continue
+            if abs(delta_pct) < args.delta_pct_thresh:
+                continue
+            out.writerow(dict(name=stat_name, old=old, new=new,
+                              delta_pct=delta_pct))
+            if delta > 0:
+                regressions += 1
+    return regressions
 
 
 def main():
@@ -212,26 +262,33 @@ def main():
                         help="Write output to file")
     parser.add_argument("--paired", action="store_true",
                         help="Process two dirs-of-stats-dirs, pairwise")
-    parser.add_argument("--csv", action="store_true",
-                        help="Write output as CSV")
+    parser.add_argument("--delta-pct-thresh", type=float, default=0.01,
+                        help="Percentage change required to report")
+    parser.add_argument("--delta-usec-thresh", type=int, default=100000,
+                        help="Absolute delta on times required to report")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
     modes.add_argument("--incrementality", action="store_true",
                        help="summarize the 'incrementality' of a build")
+    modes.add_argument("--compare-frontend-stats", action="store_true",
+                       help="Compare frontend stats from two stats-dirs")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
     args = parser.parse_args()
     if len(args.remainder) == 0:
         parser.print_help()
-        sys.exit(1)
+        return 1
     if args.catapult:
         write_catapult_trace(args)
+    elif args.compare_frontend_stats:
+        return compare_frontend_stats(args)
     elif args.incrementality:
         if args.paired:
             show_paired_incrementality(args)
         else:
             show_incrementality(args)
+    return None
 
-main()
+sys.exit(main())

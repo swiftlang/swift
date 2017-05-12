@@ -36,11 +36,31 @@ makeFileName(StringRef ProcessName) {
   return stream.str();
 }
 
+// LLVM's statistics-reporting machinery is sensitive to filenames containing
+// YAML-quote-requiring characters, which occur surprisingly often in the wild;
+// we only need a recognizable and likely-unique name for a target here, not an
+// exact filename, so we go with a crude approximation.
+static std::string
+cleanTargetName(StringRef TargetName) {
+  std::string tmp;
+  for (auto c : TargetName) {
+    if (('a' <= c && c <= 'z') ||
+        ('A' <= c && c <= 'Z') ||
+        ('0' <= c && c <= '9') ||
+        (c == '-') || (c == '.') || (c == '/'))
+      tmp += c;
+    else
+      tmp += '_';
+  }
+  return tmp;
+}
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef TargetName,
                                            StringRef Directory)
   : Filename(Directory),
-    Timer(make_unique<NamedRegionTimer>(TargetName, "Building Target",
+    Timer(make_unique<NamedRegionTimer>(cleanTargetName(TargetName),
+                                        "Building Target",
                                         ProgramName, "Running Program"))
 {
   path::append(Filename, makeFileName(ProgramName));
