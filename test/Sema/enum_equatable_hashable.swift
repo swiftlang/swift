@@ -89,6 +89,60 @@ enum Complex {
 if Complex.A(1) == .B { } // expected-error{{binary operator '==' cannot be applied to operands of type 'Complex' and '_'}}
 // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
 
+// Enums with equatable payloads are equatable if they explicitly conform.
+enum EnumWithEquatablePayload: Equatable {
+  case A(Int)
+  case B(String, Int)
+  case C
+}
+
+if EnumWithEquatablePayload.A(1) == .B("x", 1) { }
+if EnumWithEquatablePayload.A(1) == .C { }
+if EnumWithEquatablePayload.B("x", 1) == .C { }
+
+// Enums with hashable payloads are hashable if they explicitly conform.
+enum EnumWithHashablePayload: Hashable {
+  case A(Int)
+  case B(String, Int)
+  case C
+}
+
+_ = EnumWithHashablePayload.A(1).hashValue
+_ = EnumWithHashablePayload.B("x", 1).hashValue
+_ = EnumWithHashablePayload.C.hashValue
+
+// ...and they should also inherit equatability from Hashable.
+
+if EnumWithHashablePayload.A(1) == .B("x", 1) { }
+if EnumWithHashablePayload.A(1) == .C { }
+if EnumWithHashablePayload.B("x", 1) == .C { }
+
+// Enums with non-hashable payloads don't derive conformance.
+struct NotHashable {}
+enum EnumWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
+  case A(NotHashable)
+}
+
+// Enums should be able to derive conformances based on the conformances of
+// their generic arguments.
+enum GenericHashable<T: Hashable>: Hashable {
+  case A(T)
+  case B
+}
+if GenericHashable<String>.A("a") == .B { }
+var genericHashableHash: Int = GenericHashable<String>.A("a").hashValue
+
+// But it should be an error if the generic argument doesn't have the necessary
+// constrants to satisfy the conditions for derivation.
+enum GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform}}
+  case A(T)
+  case B
+}
+if GenericNotHashable<String>.A("a") == .B { }
+var genericNotHashableHash: Int = GenericNotHashable<String>.A("a").hashValue // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hashValue'}}
+
+// An enum with no cases should not derive conformance.
+enum NoCases: Hashable {} // expected-error 2 {{does not conform}}
 
 // rdar://19773050
 private enum Bar<T> {
@@ -124,8 +178,14 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-mat
   return true
 }
 
-// No explicit conformance and cannot be derived
-extension Complex : Hashable {} // expected-error 2 {{does not conform}}
+// No explicit conformance, but it can be derived.
+extension Complex : Hashable {}
+
+// No explicit conformance and it cannot be derived.
+enum NotExplicitlyHashableAndCannotDerive {  // expected-error 2 {{does not conform}}
+  case A(NotHashable)
+}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
