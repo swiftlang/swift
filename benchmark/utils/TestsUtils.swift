@@ -49,11 +49,31 @@ public func Random() -> Int64 {
   return lfsrRandomGenerator.randInt()
 }
 
-public func CheckResults(_ resultsMatch: Bool, _ message: @autoclosure () -> String) {
-  guard resultsMatch else {
-    print(message())
-    abort()
-  }
+@inline(__always)
+public func CheckResults(
+    _ resultsMatch: Bool,
+    file: StaticString = #file,
+    function: StaticString = #function,
+    line: Int = #line
+    ) {
+    guard _fastPath(resultsMatch) else {
+        print("Incorrect result in \(function), \(file):\(line)")
+        abort()
+    }
+}
+
+// Due to potential overhead of passing closures around on the
+// performance measurements, this version is now deprecated
+@available(*, deprecated,
+  message: "For debugging test failures only! Use the version without message.")
+public func CheckResults(
+    _ resultsMatch: Bool,
+    _ message: @autoclosure () -> String
+    ) {
+    guard resultsMatch else {
+        print(message())
+        abort()
+    }
 }
 
 public func False() -> Bool { return false }
@@ -71,9 +91,3 @@ public func someProtocolFactory() -> SomeProtocol { return MyStruct() }
 // which are using it.
 public func blackHole<T>(_ x: T) {
 }
-
-@inline(__always)
-public func CheckResults(_ resultsMatch: Bool) {
-  guard _fastPath(resultsMatch) else { abort() }
-}
-
