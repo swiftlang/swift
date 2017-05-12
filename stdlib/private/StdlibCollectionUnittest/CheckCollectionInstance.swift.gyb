@@ -257,8 +257,7 @@ public func checkCollection<${genericParam}, C : Collection>(
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) where C.Iterator.Element == ${Element},
-  C.SubSequence : Collection {
+) where C.Iterator.Element == ${Element} {
 
   checkForwardCollection(expected, collection, message(),
     stackTrace: stackTrace, showFrame: showFrame, file: file, line: line,
@@ -278,7 +277,6 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Iterator.Element == ${Element},
-  C.SubSequence : ${TraversalCollection},
   ${Element} : Equatable {
 
   check${Traversal}Collection(
@@ -298,8 +296,7 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
-  C.Iterator.Element == ${Element},
-  C.SubSequence : ${TraversalCollection} {
+  C.Iterator.Element == ${Element} {
 
   checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
@@ -504,8 +501,7 @@ ${genericParam}, S : ${TraversalCollection}
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
-  S.Iterator.Element == ${Element},
-  S.SubSequence : ${TraversalCollection} {
+  S.Iterator.Element == ${Element} {
 
   let expectedArray = Array(expected)
 
