@@ -20,6 +20,8 @@ class Foo: NSObject {
 
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
+
+  dynamic var dynamic: Bar { fatalError() }
 }
 
 class Bar: NSObject {
@@ -68,6 +70,14 @@ testKVCStrings.test("KVC strings") {
     let foo_nonobjc_y = foo_nonobjc.appending(path: nonobjc_y)
     expectEqual(foo_nonobjc_y._kvcKeyPathString, nil)
   }
+}
+
+testKVCStrings.test("identification by selector") {
+  let foo_dynamic = \Foo.dynamic
+  let bar_foo = \Bar.foo
+  let foo_dynamic_foo = \Foo.dynamic.foo
+
+  expectEqual(foo_dynamic.appending(path: bar_foo), foo_dynamic_foo)
 }
 
 runAllTests()

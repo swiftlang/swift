@@ -623,8 +623,18 @@ internal struct RawKeyPathComponent {
     static var computedHasArgumentsFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
     }
-    static var computedUnresolvedIDFlag: UInt32 {
-      return _SwiftKeyPathComponentHeader_ComputedUnresolvedIDFlag
+
+    static var computedIDResolutionMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDResolutionMask
+    }
+    static var computedIDResolved: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDResolved
+    }
+    static var computedIDUnresolvedFieldOffset: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
+    }
+    static var computedIDUnresolvedIndirectPointer: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
     }
     
     var _value: UInt32
@@ -1733,16 +1743,29 @@ internal func _instantiateKeyPathBuffer(
       // property.
       var newHeader = header
       var id = patternBuffer.pop(Int.self)
-      if header.payload
-          & RawKeyPathComponent.Header.computedUnresolvedIDFlag != 0 {
+      switch header.payload
+                         & RawKeyPathComponent.Header.computedIDResolutionMask {
+      case RawKeyPathComponent.Header.computedIDResolved:
+        // Nothing to do.
+        break
+      case RawKeyPathComponent.Header.computedIDUnresolvedFieldOffset:
+        // The value in the pattern is an offset into the type metadata that
+        // points to the field offset for the stored property identifying the
+        // component.
         _sanityCheck(header.payload
             & RawKeyPathComponent.Header.computedIDByStoredPropertyFlag != 0,
-          "only stored property IDs should need resolution")
-        newHeader.payload &=
-          ~RawKeyPathComponent.Header.computedUnresolvedIDFlag
+          "only stored property IDs should need offset resolution")
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
         id = metadataPtr.load(fromByteOffset: id, as: Int.self)
+      case RawKeyPathComponent.Header.computedIDUnresolvedIndirectPointer:
+        // The value in the pattern is a pointer to the actual unique word-sized
+        // value in memory.
+        let idPtr = UnsafeRawPointer(bitPattern: id).unsafelyUnwrapped
+        id = idPtr.load(as: Int.self)
+      default:
+        _sanityCheckFailure("unpossible")
       }
+      newHeader.payload &= ~RawKeyPathComponent.Header.computedIDResolutionMask
       pushDest(newHeader)
       pushDest(id)
       // Carry over the accessors.
