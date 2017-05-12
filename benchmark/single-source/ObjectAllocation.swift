@@ -128,4 +128,3 @@ public func run_ObjectAllocation(_ N: Int) {
   CheckResults(ListResult == 48375)
   CheckResults(ArrayResult == 3000)
 }
-

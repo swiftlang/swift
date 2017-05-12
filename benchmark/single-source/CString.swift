@@ -65,7 +65,7 @@ let reference = 517492
 
 @inline(never)
 public func run_CStringShortAscii(_ N: Int) {
-  
+
   func DoOneIter(_ arr: [String]) -> Int {
     var r = 0
     for n in arr {
@@ -79,11 +79,10 @@ public func run_CStringShortAscii(_ N: Int) {
 
   var res = Int.max
   for _ in 1...100*N {
-    let strings = input.map { 
+    let strings = input.map {
       $0.withCString(String.init(cString:))
     }
     res = res & DoOneIter(strings)
   }
-  assert(res == reference)
+  CheckResults(res == reference)
 }
-
