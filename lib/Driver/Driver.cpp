@@ -1326,7 +1326,12 @@ void Driver::buildActions(const ToolChain &TC,
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == types::TY_ObjCHeader) {
           std::unique_ptr<Action> HeaderInput(new InputAction(*A, Ty));
-          PCH = new GeneratePCHJobAction(HeaderInput.release());
+          StringRef PersistentPCHDir;
+          if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
+            PersistentPCHDir = A->getValue();
+          }
+          PCH = new GeneratePCHJobAction(HeaderInput.release(),
+                                         PersistentPCHDir);
           Actions.push_back(PCH);
         }
       }
@@ -1751,7 +1756,11 @@ static StringRef getOutputFilename(Compilation &C,
   // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
   // use the -o arg) even though, based on ownership considerations within the
   // driver, it is stored as a "top level" JobAction.
-  if (isa<GeneratePCHJobAction>(JA)) {
+  if (auto *PCHAct = dyn_cast<GeneratePCHJobAction>(JA)) {
+    // For a persistent PCH we don't use an output, the frontend determines
+    // the filename to use for the PCH.
+    if (PCHAct->isPersistentPCH())
+      return StringRef();
     AtTopLevel = false;
   }
 

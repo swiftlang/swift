@@ -335,16 +335,33 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   // of any input PCH to the current action if one is present.
   if (context.Args.hasArgNoClaim(options::OPT_import_objc_header)) {
     bool ForwardAsIs = true;
-    for (auto *IJ : context.Inputs) {
-      if (!IJ->getOutput().getAnyOutputForType(types::TY_PCH).empty()) {
-        Arguments.push_back("-import-objc-header");
-        addInputsOfType(Arguments, context.Inputs, types::TY_PCH);
-        ForwardAsIs = false;
-        break;
+    bool bridgingPCHIsEnabled =
+        context.Args.hasFlag(options::OPT_enable_bridging_pch,
+                             options::OPT_disable_bridging_pch,
+                             true);
+    bool usePersistentPCH = bridgingPCHIsEnabled &&
+        context.Args.hasArg(options::OPT_pch_output_dir);
+    if (!usePersistentPCH) {
+      for (auto *IJ : context.Inputs) {
+        if (!IJ->getOutput().getAnyOutputForType(types::TY_PCH).empty()) {
+          Arguments.push_back("-import-objc-header");
+          addInputsOfType(Arguments, context.Inputs, types::TY_PCH);
+          ForwardAsIs = false;
+          break;
+        }
       }
     }
     if (ForwardAsIs) {
       context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+    }
+    if (usePersistentPCH) {
+      context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
+      if (context.OI.CompilerMode == OutputInfo::Mode::StandardCompile) {
+        // In the 'multiple invocations for each file' mode we don't need to
+        // validate the PCH every time, it has been validated with the initial
+        // -emit-pch invocation.
+        Arguments.push_back("-pch-disable-validation");
+      }
     }
   }
 
@@ -802,10 +819,17 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
 
   addInputsOfType(Arguments, context.InputActions, types::TY_ObjCHeader);
 
-  Arguments.push_back("-emit-pch");
-  Arguments.push_back("-o");
-  Arguments.push_back(
-    context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  if (job.isPersistentPCH()) {
+    Arguments.push_back("-emit-pch");
+    Arguments.push_back("-pch-output-dir");
+    Arguments.push_back(
+      context.Args.MakeArgString(job.getPersistentPCHDir()));
+  } else {
+    Arguments.push_back("-emit-pch");
+    Arguments.push_back("-o");
+    Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+  }
 
   return {SWIFT_EXECUTABLE_NAME, Arguments};
 }

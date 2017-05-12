@@ -7,6 +7,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-pch -F %t %S/Inputs/import-mixed-framework-with-forward.h -o %t/bridge.pch
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %t -import-objc-header %t/bridge.pch %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %t -import-objc-header %S/Inputs/import-mixed-framework-with-forward.h -pch-output-dir %t/pch %s -verify
 
 
 // REQUIRES: objc_interop
