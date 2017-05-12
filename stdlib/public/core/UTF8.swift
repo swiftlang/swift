@@ -210,8 +210,9 @@ extension UTF8.ReverseParser : UnicodeParser, _UTFParser {
   @inline(__always)
   @_inlineable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    let s = UInt32(extendingOrTruncating: _buffer._storage)
     return Encoding.EncodedScalar(
-      _storage: _buffer._storage.byteSwapped &>> (32 - bitCount),
+      _storage: s.byteSwapped &>> (32 - bitCount),
       _bitCount: bitCount
     )
   }
@@ -280,8 +281,9 @@ extension _Unicode.UTF8.ForwardParser : UnicodeParser, _UTFParser {
   }
   
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
-    var r = _buffer
-    r._bitCount = bitCount
+    let r = Encoding.EncodedScalar(
+      _storage: UInt32(extendingOrTruncating: _buffer._storage),
+      _bitCount: bitCount)
     return r
   }
 }

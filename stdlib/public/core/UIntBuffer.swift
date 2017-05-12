@@ -16,9 +16,12 @@
 //===----------------------------------------------------------------------===//
 @_fixed_layout
 public struct _UIntBuffer<
-  Storage: UnsignedInteger & FixedWidthInteger, 
-  Element: UnsignedInteger & FixedWidthInteger
+  Storage_: UnsignedInteger & FixedWidthInteger, 
+  Element_: UnsignedInteger & FixedWidthInteger
 > {
+  public typealias Storage = Storage_
+  public typealias Element = Element_
+  
   public var _storage: Storage
   public var _bitCount: UInt8
 
