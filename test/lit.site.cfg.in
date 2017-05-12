@@ -83,11 +83,6 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
-if "@SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING@" == "TRUE":
-    config.available_features.add('runtime-dladdr-backtraces')
-if "@SWIFT_RUNTIME_DLADDR_ALLOWED@" == "TRUE":
-    config.available_features.add('runtime-dladdr')
-
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
