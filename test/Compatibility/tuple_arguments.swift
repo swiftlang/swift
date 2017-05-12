@@ -1056,7 +1056,7 @@ struct GenericSubscriptLabeled<T> {
 }
 
 struct GenericSubscriptTwo<T> {
-  subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note {{'subscript' declared here}}
+  subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note 3 {{'subscript' declared here}}
 }
 
 struct GenericSubscriptTuple<T> {
@@ -1126,8 +1126,8 @@ do {
 
   var s2 = GenericSubscriptTwo<Double>()
   _ = s2[a, b]
-  _ = s2[(a, b)] // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type '(_, _)'}}
-  _ = s2[d] // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type '(_, _)'}}
+  _ = s2[(a, b)] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s2[d] // expected-error {{missing argument for parameter #2 in call}}
 
   var s3 = GenericSubscriptTuple<Double>()
   _ = s3[a, b] // expected-error {{extra argument in call}}
