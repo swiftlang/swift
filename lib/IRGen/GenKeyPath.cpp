@@ -271,26 +271,37 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       bool idResolved;
       switch (id.getKind()) {
       case KeyPathPatternComponent::ComputedPropertyId::Function:
-        idKind = KeyPathComponentHeader::Getter;
+        idKind = KeyPathComponentHeader::Pointer;
         idValue = getAddrOfSILFunction(id.getFunction(), NotForDefinition);
         idResolved = true;
         break;
       case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
-        idKind = KeyPathComponentHeader::VTableOffset;
         auto declRef = id.getDeclRef();
-        auto dc = declRef.getDecl()->getDeclContext();
-        if (isa<ClassDecl>(dc)) {
-          auto index = getVirtualMethodIndex(*this, declRef);
-          idValue = llvm::ConstantInt::get(SizeTy, index);
-          idResolved = true;
-        } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
-          auto &protoInfo = getProtocolInfo(methodProto);
-          auto index = protoInfo.getFunctionIndex(
-                                 cast<AbstractFunctionDecl>(declRef.getDecl()));
-          idValue = llvm::ConstantInt::get(SizeTy, -index.getValue());
-          idResolved = true;
+      
+        // Foreign method refs identify using a selector
+        // reference, which is doubly-indirected and filled in with a unique
+        // pointer by dyld.
+        if (declRef.isForeign) {
+          assert(ObjCInterop && "foreign keypath component w/o objc interop?!");
+          idKind = KeyPathComponentHeader::Pointer;
+          idValue = getAddrOfObjCSelectorRef(declRef);
+          idResolved = false;
         } else {
-          llvm_unreachable("neither a class nor protocol dynamic method?");
+          idKind = KeyPathComponentHeader::VTableOffset;
+          auto dc = declRef.getDecl()->getDeclContext();
+          if (isa<ClassDecl>(dc)) {
+            auto index = getVirtualMethodIndex(*this, declRef);
+            idValue = llvm::ConstantInt::get(SizeTy, index);
+            idResolved = true;
+          } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
+            auto &protoInfo = getProtocolInfo(methodProto);
+            auto index = protoInfo.getFunctionIndex(
+                                 cast<AbstractFunctionDecl>(declRef.getDecl()));
+            idValue = llvm::ConstantInt::get(SizeTy, -index.getValue());
+            idResolved = true;
+          } else {
+            llvm_unreachable("neither a class nor protocol dynamic method?");
+          }
         }
         break;
       }

@@ -192,4 +192,66 @@ keyPath.test("key path generic instantiation") {
   expectEqual(s_c_x_lt, s_c_x_lt2)
 }
 
+struct TestComputed {
+  static var numNonmutatingSets = 0
+  static var numMutatingSets = 0
+
+  static func resetCounts() {
+    numNonmutatingSets = 0
+    numMutatingSets = 0
+  }
+
+  var canary = LifetimeTracked(0)
+
+  var readonly: LifetimeTracked {
+    return LifetimeTracked(1)
+  }
+  var nonmutating: LifetimeTracked {
+    get {
+      return LifetimeTracked(2)
+    }
+    nonmutating set { TestComputed.numNonmutatingSets += 1 }
+  }
+  var mutating: LifetimeTracked {
+    get {
+      return LifetimeTracked(3)
+    }
+    set {
+      canary = newValue
+    }
+  }
+}
+
+keyPath.test("computed properties") {
+  var test = TestComputed()
+
+  do {
+    let tc_readonly = \TestComputed.readonly
+    expectTrue(test[keyPath: tc_readonly] !== test[keyPath: tc_readonly])
+    expectEqual(test[keyPath: tc_readonly].value,
+                test[keyPath: tc_readonly].value)
+  }
+
+  do {
+    let tc_nonmutating = \TestComputed.nonmutating
+    expectTrue(test[keyPath: tc_nonmutating] !== test[keyPath: tc_nonmutating])
+    expectEqual(test[keyPath: tc_nonmutating].value,
+                test[keyPath: tc_nonmutating].value)
+    TestComputed.resetCounts()
+    test[keyPath: tc_nonmutating] = LifetimeTracked(4)
+    expectEqual(TestComputed.numNonmutatingSets, 1)
+  }
+
+  do {
+    let tc_mutating = \TestComputed.mutating
+    TestComputed.resetCounts()
+    expectTrue(test[keyPath: tc_mutating] !== test[keyPath: tc_mutating])
+    expectEqual(test[keyPath: tc_mutating].value,
+                test[keyPath: tc_mutating].value)
+    let newObject = LifetimeTracked(5)
+    test[keyPath: tc_mutating] = newObject
+    expectTrue(test.canary === newObject)
+  }
+}
+
 runAllTests()
