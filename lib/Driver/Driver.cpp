@@ -1758,8 +1758,7 @@ static StringRef getOutputFilename(Compilation &C,
   if (auto *PCHAct = dyn_cast<GeneratePCHJobAction>(JA)) {
     // For a persistent PCH we don't use an output, the frontend determines
     // the filename to use for the PCH.
-    if (PCHAct->isPersistentPCH())
-      return StringRef();
+    assert(!PCHAct->isPersistentPCH());
     AtTopLevel = false;
   }
 
