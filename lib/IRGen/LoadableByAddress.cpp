@@ -107,8 +107,7 @@ static bool containsLargeLoadable(GenericEnvironment *GenericEnv,
                                 currSILFunctionType->getParameters(), Mod)) {
         return true;
       }
-    } else if (auto *currSILBlockType =
-                   dyn_cast<SILBlockStorageType>(currCanType.getPointer())) {
+    } else if (isa<SILBlockStorageType>(currCanType.getPointer())) {
       continue;
     } else {
       switch (param.getConvention()) {
@@ -303,8 +302,7 @@ static SILType getNewSILType(GenericEnvironment *GenericEnv,
     return newSILType;
   }
   CanType currCanType = storageType.getSwiftRValueType();
-  if (auto *currSILBlockType =
-          dyn_cast<SILBlockStorageType>(currCanType.getPointer())) {
+  if (isa<SILBlockStorageType>(currCanType.getPointer())) {
     return storageType;
   }
   if (SILFunctionType *currSILFunctionType =
@@ -693,14 +691,14 @@ void LargeValueVisitor::visitTupleInst(SILInstruction *instr) {
 
 void LargeValueVisitor::visitAllocStackInst(AllocStackInst *instr) {
   SILType currSILType = instr->getType().getObjectType();
-  if (auto *fType = getInnerFunctionType(currSILType)) {
+  if (getInnerFunctionType(currSILType)) {
     pass.allocStackInstsToMod.push_back(instr);
   }
 }
 
 void LargeValueVisitor::visitPointerToAddressInst(PointerToAddressInst *instr) {
   SILType currSILType = instr->getType().getObjectType();
-  if (auto *fType = getInnerFunctionType(currSILType)) {
+  if (getInnerFunctionType(currSILType)) {
     pass.pointerToAddrkInstsToMod.push_back(instr);
   }
 }
