@@ -56,7 +56,7 @@ extension Sequence {
   /// This example enumerates the characters of the string "Swift" and prints
   /// each character along with its place in the string.
   ///
-  ///     for (n, c) in "Swift".characters.enumerated() {
+  ///     for (n, c) in "Swift".enumerated() {
   ///         print("\(n): '\(c)'")
   ///     }
   ///     // Prints "0: 'S'"
@@ -79,7 +79,7 @@ extension Sequence {
   ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
   ///     var shorterIndices: [SetIndex<String>] = []
   ///     for (i, name) in zip(names.indices, names) {
-  ///         if name.characters.count <= 5 {
+  ///         if name.count <= 5 {
   ///             shorterIndices.append(i)
   ///         }
   ///     }
