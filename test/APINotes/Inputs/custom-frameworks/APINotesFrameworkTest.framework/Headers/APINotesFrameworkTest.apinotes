@@ -103,6 +103,9 @@ SwiftVersions:
           - Name: "importantClassProperty"
             PropertyKind: Class
             SwiftName: "swift3ClassProperty"
+          - Name: "importantInstanceProperty"
+            PropertyKind: Instance
+            SwiftName: "swift3InstanceProperty"
     Protocols:
       - Name: ProtoWithVersionedUnavailableMember
         Methods:

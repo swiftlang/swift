@@ -345,27 +345,15 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   return true;
 }
 
-/// Attempts to import the name of \p decl with each possible ImportNameVersion.
-/// \p action will be called with each unique name.
-///
-/// In this case, "unique" means either the full name is distinct or the
-/// effective context is distinct. This method does not attempt to handle
-/// "unresolved" contexts in any special way---if one name references a
-/// particular Clang declaration and the other has an unresolved context that
-/// will eventually reference that declaration, the contexts will still be
-/// considered distinct.
-///
-/// The names are generated in the same order as
-/// forEachImportNameVersionFromCurrent. The current name is always first.
-static void forEachDistinctName(
-    ClangImporter::Implementation &impl, const clang::NamedDecl *decl,
+void ClangImporter::Implementation::forEachDistinctName(
+    const clang::NamedDecl *decl,
     llvm::function_ref<void(ImportedName, ImportNameVersion)> action) {
   using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
   SmallVector<ImportNameKey, 8> seenNames;
-  forEachImportNameVersionFromCurrent(impl.CurrentVersion,
+  forEachImportNameVersionFromCurrent(CurrentVersion,
                                       [&](ImportNameVersion nameVersion) {
     // Check to see if the name is different.
-    ImportedName newName = impl.importFullName(decl, nameVersion);
+    ImportedName newName = importFullName(decl, nameVersion);
     ImportNameKey key(newName, newName.getEffectiveContext());
     bool seen = llvm::any_of(seenNames,
                              [&key](const ImportNameKey &existing) -> bool {
@@ -2669,9 +2657,9 @@ namespace {
         switch (enumKind) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
-          forEachDistinctName(Impl, constant,
-                              [&](ImportedName newName,
-                                  ImportNameVersion nameVersion) {
+          Impl.forEachDistinctName(constant,
+                                   [&](ImportedName newName,
+                                       ImportNameVersion nameVersion) {
             Decl *imported = Impl.importDecl(constant, nameVersion);
             if (!imported)
               return;
@@ -2682,9 +2670,9 @@ namespace {
           });
           break;
         case EnumKind::Options:
-          forEachDistinctName(Impl, constant,
-                              [&](ImportedName newName,
-                                  ImportNameVersion nameVersion) {
+          Impl.forEachDistinctName(constant,
+                                   [&](ImportedName newName,
+                                       ImportNameVersion nameVersion) {
             if (!contextIsEnum(newName))
               return;
             SwiftDeclConverter converter(Impl, nameVersion);
@@ -2741,9 +2729,9 @@ namespace {
             }
           }
 
-          forEachDistinctName(Impl, constant,
-                              [&](ImportedName newName,
-                                  ImportNameVersion nameVersion) {
+          Impl.forEachDistinctName(constant,
+                                   [&](ImportedName newName,
+                                       ImportNameVersion nameVersion) {
             if (nameVersion == getActiveSwiftVersion())
               return;
             if (!contextIsEnum(newName))
@@ -7737,8 +7725,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
       // Only continue members in the same submodule as this extension.
       if (decl->getImportedOwningModule() != submodule) continue;
 
-      forEachDistinctName(*this, decl, [&](ImportedName newName,
-                                           ImportNameVersion nameVersion) {
+      forEachDistinctName(decl, [&](ImportedName newName,
+                                    ImportNameVersion nameVersion) {
         // Quickly check the context and bail out if it obviously doesn't
         // belong here.
         if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
@@ -7806,7 +7794,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     if (!nd || nd != nd->getCanonicalDecl())
       continue;
 
-    forEachDistinctName(*this, nd,
+    forEachDistinctName(nd,
                         [&](ImportedName name, ImportNameVersion nameVersion) {
       auto member = importDecl(nd, nameVersion);
       if (!member)

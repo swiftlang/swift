@@ -1169,6 +1169,23 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
 
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context that
+  /// will eventually reference that declaration, the contexts will still be
+  /// considered distinct.
+  ///
+  /// The names are generated in the same order as
+  /// forEachImportNameVersionFromCurrent. The current name is always first.
+  void forEachDistinctName(
+      const clang::NamedDecl *decl,
+      llvm::function_ref<void(importer::ImportedName,
+                              importer::ImportNameVersion)> action);
+
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
 

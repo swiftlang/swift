@@ -14,6 +14,7 @@
 
 - (void)doImportantThings __attribute__((swift_name("finalDoImportantThings()")));
 @property (class, nullable) id importantClassProperty __attribute__((swift_name("finalClassProperty")));
+@property (nullable) id importantInstanceProperty __attribute__((swift_name("finalInstanceProperty")));
 @end
 
 #pragma clang assume_nonnull end
