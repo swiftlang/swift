@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : RangeReplaceableCollection, BidirectionalCollection {
+extension String : StringProtocol {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 

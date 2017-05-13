@@ -12,6 +12,46 @@
 
 import SwiftShims
 
+public protocol StringProtocol
+  : RangeReplaceableCollection, BidirectionalCollection,
+  CustomStringConvertible, CustomDebugStringConvertible,
+  CustomReflectable, CustomPlaygroundQuickLookable,
+  TextOutputStream, TextOutputStreamable,
+  LosslessStringConvertible, ExpressibleByStringLiteral,
+  Hashable
+  where Iterator.Element == Character {
+
+  // this should be just <T : StringProtocol>
+  init<
+    T : LosslessStringConvertible & Sequence
+  >(_ other: T) where T.Iterator.Element == Character
+
+  associatedtype UTF8Index
+  var utf8: String.UTF8View { get }
+  associatedtype UTF16Index
+  var utf16: String.UTF16View { get }
+  associatedtype UnicodeScalarIndex
+  var unicodeScalars: String.UnicodeScalarView { get }
+  /*associatedtype CharacterIndex*/
+  var characters: String.CharacterView { get }
+
+#if _runtime(_ObjC)
+  func hasPrefix(_ prefix: String) -> Bool
+  func hasSuffix(_ prefix: String) -> Bool
+#endif
+
+  func lowercased() -> String
+  func uppercased() -> String
+}
+
+extension StringProtocol {
+  public init<
+    T : LosslessStringConvertible & Sequence
+  >(_ other: T) where T.Iterator.Element == Character {
+    self.init(other.description.characters)
+  }
+}
+
 // FIXME: complexity documentation for most of methods on String is ought to be
 // qualified with "amortized" at least, as Characters are variable-length.
 
