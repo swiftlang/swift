@@ -33,10 +33,6 @@
 #include <dlfcn.h>
 #endif
 
-#ifndef SWIFT_RUNTIME_DLADDR_ALLOW
-#error "SWIFT_RUNTIME_DLADDR_ALLOW must be defined!"
-#endif
-
 using namespace swift;
 
 /// PE section name for the section that contains protocol conformance records.
@@ -223,7 +219,7 @@ void swift::initializeTypeMetadataRecordLookup() {
 
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-#if defined(__CYGWIN__) || SWIFT_RUNTIME_DLADDR_ALLOW
+#if defined(__CYGWIN__)
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
     return 0;
