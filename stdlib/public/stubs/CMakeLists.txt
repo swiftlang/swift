@@ -31,12 +31,6 @@ set(ICU_UC_LIBRARY "")
 
 set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  # Our shims need ICU headers. For now, use the ones inside corelibs-foundation
-  #
-  # TODO: Get them from the SDK instead
-  list(APPEND swift_stubs_c_compile_flags -I${CMAKE_CURRENT_LIST_DIR}/../../../../swift-corelibs-foundation/bootstrap/x86_64-apple-darwin/usr/local/include/)
-endif()
 
 add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_stubs_sources}
