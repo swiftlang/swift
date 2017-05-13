@@ -287,7 +287,8 @@ class GeneratePCHJobAction : public JobAction {
   virtual void anchor();
 public:
   GeneratePCHJobAction(Action *Input, StringRef persistentPCHDir)
-    : JobAction(Action::GeneratePCHJob, Input, types::TY_PCH),
+    : JobAction(Action::GeneratePCHJob, Input,
+                persistentPCHDir.empty() ? types::TY_PCH : types::TY_Nothing),
       PersistentPCHDir(persistentPCHDir) {}
 
   bool isPersistentPCH() const { return !PersistentPCHDir.empty(); }

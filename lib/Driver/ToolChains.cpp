@@ -808,7 +808,10 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
                                const JobContext &context) const {
   assert(context.Inputs.empty());
   assert(context.InputActions.size() == 1);
-  assert(context.Output.getPrimaryOutputType() == types::TY_PCH);
+  assert((!job.isPersistentPCH() &&
+            context.Output.getPrimaryOutputType() == types::TY_PCH) ||
+         (job.isPersistentPCH() &&
+            context.Output.getPrimaryOutputType() == types::TY_Nothing));
 
   ArgStringList Arguments;
 
