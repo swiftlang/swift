@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../SwiftShims/UnicodeShims.h"
+
 #if !defined(__APPLE__)
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
@@ -22,7 +24,6 @@
 #include <algorithm>
 #include <mutex>
 #include <assert.h>
-#endif
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -35,9 +36,6 @@
 
 #pragma clang diagnostic pop
 
-#include "../SwiftShims/UnicodeShims.h"
-
-#if !defined(__APPLE__)
 static const UCollator *MakeRootCollator() {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   UCollator *root = ucol_open("", &ErrorCode);
@@ -302,6 +300,24 @@ template <typename T, typename U> const T *ptr_cast(const U *p) {
   return static_cast<const T *>(static_cast<const void *>(p));
 }
 }
+
+#if defined(__APPLE__)
+#include <stdint.h>
+extern "C" {
+// Declare a few external functions to avoid a dependency on ICU headers.
+typedef struct UBreakIterator UBreakIterator;
+typedef enum UBreakIteratorType {} UBreakIteratorType;
+typedef enum UErrorCode {} UErrorCode;
+typedef uint16_t UChar;
+
+void ubrk_close(UBreakIterator *);
+UBreakIterator *ubrk_open(UBreakIteratorType, const char *, const UChar *,
+                          int32_t, UErrorCode *);
+int32_t ubrk_preceding(UBreakIterator *, int32_t);
+int32_t ubrk_following(UBreakIterator *, int32_t);
+void ubrk_setText(UBreakIterator *, const UChar *, int32_t, UErrorCode *);
+}
+#endif // defined(__APPLE__)
 
 void swift::__swift_stdlib_ubrk_close(
     swift::__swift_stdlib_UBreakIterator *bi) {
