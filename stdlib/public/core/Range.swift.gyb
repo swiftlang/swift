@@ -25,7 +25,9 @@ public protocol RangeExpression {
   ///           its bounds. Callers should apply the same preconditions
   ///           to the return value as they would to a range provided
   ///           directly by the user.
-  func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound
+  func relative<C: _Indexable>(
+    to collection: C
+  ) -> Range<Bound> where C.Index == Bound
   
   func contains(_ element: Bound) -> Bool
 }
@@ -37,8 +39,8 @@ extension RangeExpression {
   }  
 }
 
-// FIXME(ABI)#55 (Statically Unavailable/Dynamically Available): remove this type, it creates an ABI burden
-// on the library.
+// FIXME(ABI)#55 (Statically Unavailable/Dynamically Available): remove this
+// type, it creates an ABI burden on the library.
 //
 // A dummy type that we can use when we /don't/ want to create an
 // ambiguity indexing CountableRange<T> outside a generic context.
@@ -241,8 +243,8 @@ public struct CountableRange<Bound> : RandomAccessCollection
 // such as x = r[0], which will trap unless 0 happens to be contained in the
 // range r.
 //
-// FIXME(ABI)#56 (Statically Unavailable/Dynamically Available): remove this code, it creates an ABI burden
-// on the library.
+// FIXME(ABI)#56 (Statically Unavailable/Dynamically Available): remove this
+// code, it creates an ABI burden on the library.
 extension CountableRange {
   /// Accesses the element at specified position.
   ///
@@ -432,7 +434,8 @@ def get_init_warning(Self, OtherSelf):
 % for (Self, op) in all_range_types:
 %   for (OtherSelf, other_op) in all_range_types:
 extension ${Self}
-%   if ('Countable' in OtherSelf or 'Closed' in OtherSelf or 'Closed' in Self) and not 'Countable' in Self:
+%   if ('Countable' in OtherSelf or 'Closed' in OtherSelf or 'Closed' in Self) \
+%   and not 'Countable' in Self:
   where
   Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
@@ -541,14 +544,15 @@ extension ${Self} {
 }
 
 extension ${Self}: RangeExpression {
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  where C.Index == Bound {
     %   if 'Closed' in Self:
-      return Range(uncheckedBounds: 
-        (lower: lowerBound, upper: collection.index(after: self.upperBound))
+    return Range(
+      uncheckedBounds: (
+        lower: lowerBound, upper: collection.index(after: self.upperBound)))
     %   else:
-      return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound)
+    return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound))
     %   end
-    )
   }
 }
 
@@ -656,8 +660,8 @@ extension ${Self} : Equatable {
 %   'Range',
 %   'ClosedRange',
 % ]:
-// FIXME(ABI)#57 (Conditional Conformance): replace this extension with a conditional
-// conformance.
+// FIXME(ABI)#57 (Conditional Conformance): replace this extension with a
+// conditional conformance.
 // rdar://problem/17144340
 /// Ranges whose `Bound` is `Strideable` with `Integer` `Stride` have all
 /// the capabilities of `RandomAccessCollection`s, just like
@@ -739,11 +743,15 @@ public func ..< <Bound>(
 @_fixed_layout
 public struct PartialRangeUpTo<Bound: Comparable>: RangeExpression {
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
+  
   public let upperBound: Bound
+  
   @_transparent
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
+  
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element < upperBound
@@ -751,11 +759,14 @@ public struct PartialRangeUpTo<Bound: Comparable>: RangeExpression {
 }
 
 @_fixed_layout
-public struct PartialRangeThrough<Bound: Comparable>: RangeExpression {
+public struct PartialRangeThrough<Bound: Comparable>: RangeExpression {  
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
+  
   public let upperBound: Bound
+  
   @_transparent
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  where C.Index == Bound {
     return collection.startIndex..<collection.index(after: self.upperBound)
   }
   @_transparent
@@ -767,11 +778,15 @@ public struct PartialRangeThrough<Bound: Comparable>: RangeExpression {
 @_fixed_layout
 public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
   public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
+  
   public let lowerBound: Bound
+  
   @_transparent
-  public func relative<C: _Indexable>(to collection: C) -> Range<Bound> where C.Index == Bound {
+  public func relative<C: _Indexable>(to collection: C) -> Range<Bound>
+  where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
   }
+  
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element
@@ -908,20 +923,23 @@ extension Strideable where Stride: SignedInteger {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   @_transparent
-  public static postfix func ...(minimum: Self) -> CountablePartialRangeFrom<Self> {
-      return CountablePartialRangeFrom(minimum)
+  public static postfix func ...(minimum: Self)
+  -> CountablePartialRangeFrom<Self> {
+    return CountablePartialRangeFrom(minimum)
   }
 }
 
 extension _Indexable {
   @_inlineable
-  public subscript<R: RangeExpression>(r: R) -> SubSequence where R.Bound == Index {
+  public subscript<R: RangeExpression>(r: R)
+  -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
   }
 }
 extension _MutableIndexable {
   @_inlineable
-  public subscript<R: RangeExpression>(r: R) -> SubSequence where R.Bound == Index {
+  public subscript<R: RangeExpression>(r: R) -> SubSequence
+  where R.Bound == Index {
     get {
       return self[r.relative(to: self)]
     }
