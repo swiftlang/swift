@@ -79,6 +79,11 @@ public protocol StringProtocol
 }
 
 extension StringProtocol /* : LosslessStringConvertible */ {
+  // This overload is for the Swift 3 compatibility.
+  // In Swift 4, conformance is satisfied by the non-failable initializer, so
+  // that `String("") as String?` is still possible, but `String("")!` is not.
+  @available(swift, obsoleted: 4,
+    message: "Please use the non-failable initializer.")
   public init?(_ description: String) {
     self.init(description.characters)
   }
