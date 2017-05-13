@@ -365,6 +365,7 @@ StringTests.test("String.init(_:String)") {
   var s = String("")
   expectType(String.self, &s)
   var _ = String("") as String? // should also compile, but not be the default
+  var _ = String("")! // unwrapping optional should also work
 }
 
 
