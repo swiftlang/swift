@@ -649,7 +649,7 @@ func test17875634() {
   var row = 1
   var col = 2
   
-  match.append(row, col)  // expected-error {{extra argument in call}}
+  match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 }
 
 // <https://github.com/apple/swift/pull/1205> Improved diagnostics for enums with associated values
