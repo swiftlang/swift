@@ -336,9 +336,23 @@ func _heapSort<C>(
   }
 }
 
-/// Exchange the values of `a` and `b`.
+/// Exchanges the values of the two given variables.
 ///
-/// - Precondition: `a` and `b` do not alias each other.
+/// The two variables passed must not alias each other. That is, it is an error to
+/// pass the same variable as both `a` and `b`.
+///
+/// In the following example, the call to `swap(_:_:)` guarantees that the value
+/// in `a` is always less than the value in `b`:
+///
+///     var a: Int = getNumber()
+///     var b: Int = getNumber()
+///     if a >= b {
+///         swap(&a, &b)
+///     }
+///
+/// - Parameters:
+///   - i: The first value to swap.
+///   - j: The index of the second value to swap.
 @_inlineable
 public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).

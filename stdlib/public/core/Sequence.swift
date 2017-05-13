@@ -91,7 +91,7 @@
 /// `animals` array introduced earlier as an example:
 ///
 ///     let longestAnimal = animals.reduce1 { current, element in
-///         if current.characters.count > element.characters.count {
+///         if current.count > element.count {
 ///             return current
 ///         } else {
 ///             return element
@@ -365,7 +365,7 @@ public protocol Sequence {
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
   ///     let lowercaseNames = cast.map { $0.lowercased() }
   ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
-  ///     let letterCounts = cast.map { $0.characters.count }
+  ///     let letterCounts = cast.map { $0.count }
   ///     // 'letterCounts' == [6, 6, 3, 4]
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an
@@ -384,7 +384,7 @@ public protocol Sequence {
   /// five characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.characters.count < 5 }
+  ///     let shortNames = cast.filter { $0.count < 5 }
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
@@ -562,27 +562,25 @@ public protocol Sequence {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(whereSeparator: { $0 == " " })
-  ///                          .map(String.init))
+  ///     print(line.split(whereSeparator: { $0 == " " })
+  ///               .map(String.init))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
   ///     print(
-  ///         line.characters.split(maxSplits: 1, whereSeparator: { $0 == " " })
-  ///                        .map(String.init))
+  ///         line.split(maxSplits: 1, whereSeparator: { $0 == " " })
+  ///             .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(
-  ///         line.characters.split(
-  ///             omittingEmptySubsequences: false, 
-  ///             whereSeparator: { $0 == " " })
-  ///         ).map(String.init))
+  ///     print(line.split(omittingEmptySubsequences: false,
+  ///                      whereSeparator: { $0 == " " })
+  ///          ).map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:
@@ -830,7 +828,7 @@ extension Sequence {
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
   ///     let lowercaseNames = cast.map { $0.lowercased() }
   ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
-  ///     let letterCounts = cast.map { $0.characters.count }
+  ///     let letterCounts = cast.map { $0.count }
   ///     // 'letterCounts' == [6, 6, 3, 4]
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an
@@ -866,7 +864,7 @@ extension Sequence {
   /// five characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.characters.count < 5 }
+  ///     let shortNames = cast.filter { $0.count < 5 }
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
@@ -950,15 +948,15 @@ extension Sequence {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(whereSeparator: { $0 == " " })
-  ///                          .map(String.init))
+  ///     print(line.split(whereSeparator: { $0 == " " })
+  ///               .map(String.init))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
   ///     print(
-  ///        line.characters.split(maxSplits: 1, whereSeparator: { $0 == " " })
+  ///        line.split(maxSplits: 1, whereSeparator: { $0 == " " })
   ///                       .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
@@ -966,7 +964,7 @@ extension Sequence {
   /// the returned array contains empty strings where spaces were repeated.
   ///
   ///     print(
-  ///         line.characters.split(
+  ///         line.split(
   ///             omittingEmptySubsequences: false, 
   ///             whereSeparator: { $0 == " " }
   ///         ).map(String.init))
@@ -1152,23 +1150,23 @@ extension Sequence where Iterator.Element : Equatable {
   /// was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(separator: " ")
-  ///                          .map(String.init))
+  ///     print(line.split(separator: " ")
+  ///               .map(String.init))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(line.characters.split(separator: " ", maxSplits: 1)
-  ///                           .map(String.init))
+  ///     print(line.split(separator: " ", maxSplits: 1)
+  ///               .map(String.init))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(separator: " ", omittingEmptySubsequences: false)
-  ///                           .map(String.init))
+  ///     print(line.split(separator: " ", omittingEmptySubsequences: false)
+  ///               .map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:

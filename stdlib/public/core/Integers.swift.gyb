@@ -1016,7 +1016,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   ///     let y = Int8(exactly: 1_000)
   ///     // y == nil
   ///
-  /// - Parameter source: A floating-point value to convert to an integer.
+  /// - Parameter source: A value to convert to this type of integer.
   init?<T : BinaryInteger>(exactly source: T)
 
   // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just
@@ -1246,7 +1246,7 @@ extension Numeric {
 /// value is representable in the resulting type.
 ///
 ///     let e = Int8(exactly: 23.0)       // integral value, representable
-///     // e == Optional(127)
+///     // e == Optional(23)
 ///
 ///     let f = Int8(exactly: 23.75)      // fractional value, representable
 ///     // f == nil
@@ -1976,12 +1976,12 @@ public enum ArithmeticOverflow {
 ///     extension FixedWidthInteger {
 ///         var binaryString: String {
 ///             var result: [String] = []
-///             for i in Swift.stride(from: 0, to: Self.bitWidth, by: 8) {
-///                 let wordValue = UInt8(extendingOrTruncating: self >> i)
-///                 let word = String(wordValue, radix: 2)
+///             for i in 0..<(Self.bitWidth / 8) {
+///                 let byte = UInt8(extendingOrTruncating: self >> (i * 8))
+///                 let byteString = String(byte, radix: 2)
 ///                 let padding = String(repeating: "0",
-///                                      count: 8 - word.characters.count)
-///                 result.append(padding + word)
+///                                      count: 8 - byteString.count)
+///                 result.append(padding + byteString)
 ///             }
 ///             return "0b" + result.reversed().joined(separator: "_")
 ///         }
@@ -2009,9 +2009,9 @@ public enum ArithmeticOverflow {
 ///         return result
 ///     }
 ///
-///     let (x, y): (Int8, Int8) = (10, 100)
+///     let (x, y): (Int8, Int8) = (9, 123)
 ///     print(squared(x))
-///     // Prints "Optional(100)"
+///     // Prints "Optional(81)"
 ///     print(squared(y))
 ///     // Prints "nil"
 ///
@@ -2562,6 +2562,17 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
 %   z = 's' if signed else 'z'
+
+%   Article = 'An' if bits == 8 else 'A'
+%   if bits == word_bits:
+/// ${'A ' if signed else 'An un'}signed integer value type.
+///
+/// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and
+/// on 64-bit platforms, `${Self}` is the same size as `${Self}64`.
+%   else:
+/// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
+/// type.
+%   end
 @_fixed_layout
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
