@@ -14,6 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32)
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
+#else
+#  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,11 +40,7 @@
 #include <cxxabi.h>
 #endif
 
-#ifndef SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
-#error "SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING must be defined"
-#endif
-
-#if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
 // execinfo.h is not available on Android. Checks in this file ensure that
 // fatalError behaves as expected, but without stack traces.
 #include <execinfo.h>
@@ -55,8 +57,6 @@ enum: uint32_t {
 } // end namespace FatalErrorFlags
 
 using namespace swift;
-
-#if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
 
 static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -96,9 +96,9 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   return true;
 }
 
-/// This function dumps one line of a stack trace. It is assumed that \p address
-/// is the address of the stack frame at index \p index.
-static void dumpStackTraceEntry(unsigned index, void *framePC) {
+void swift::dumpStackTraceEntry(unsigned index, void *framePC,
+                                bool shortOutput) {
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol
@@ -118,6 +118,14 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   uintptr_t symbolAddr = uintptr_t(framePC);
   bool foundSymbol =
       getSymbolNameAddr(libraryName, syminfo, symbolName, symbolAddr);
+  ptrdiff_t offset = 0;
+  if (foundSymbol) {
+    offset = ptrdiff_t(uintptr_t(framePC) - symbolAddr);
+  } else {
+    offset = ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress));
+    symbolAddr = uintptr_t(framePC);
+    symbolName = "<unavailable>";
+  }
 
   // We do not use %p here for our pointers since the format is implementation
   // defined. This makes it logically impossible to check the output. Forcing
@@ -126,20 +134,38 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   // from the base address of where the image containing framePC is mapped.
   // This gives enough info to reconstruct identical debugging target after
   // this process terminates.
-  if (foundSymbol) {
-    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
-    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(), symbolAddr,
-            symbolName.c_str(), ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+  if (shortOutput) {
+    fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
+            offset);
   } else {
-    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx "
-                                              "<unavailable> + %td\n";
-    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
-            uintptr_t(framePC),
-            ptrdiff_t(uintptr_t(framePC) - uintptr_t(syminfo.baseAddress)));
+    constexpr const char *format = "%-4u %-34s 0x%0.16lx %s + %td\n";
+    fprintf(stderr, format, index, libraryName.data(), symbolAddr,
+            symbolName.c_str(), offset);
   }
+#else
+  if (shortOutput) {
+    fprintf(stderr, "<unavailable>");
+  } else {
+    constexpr const char *format = "%-4u 0x%0.16lx\n";
+    fprintf(stderr, format, index, framePC);
+  }
+#endif
 }
 
+LLVM_ATTRIBUTE_NOINLINE
+void swift::printCurrentBacktrace(unsigned framesToSkip) {
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+  constexpr unsigned maxSupportedStackDepth = 128;
+  void *addrs[maxSupportedStackDepth];
+
+  int symbolCount = backtrace(addrs, maxSupportedStackDepth);
+  for (int i = framesToSkip; i < symbolCount; ++i) {
+    dumpStackTraceEntry(i - framesToSkip, addrs[i]);
+  }
+#else
+  fprintf(stderr, "<backtrace unavailable>\n");
 #endif
+}
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <malloc/malloc.h>
@@ -205,16 +231,10 @@ reportNow(uint32_t flags, const char *message)
 #ifdef __APPLE__
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #endif
-#if SWIFT_RUNTIME_ENABLE_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
-    constexpr unsigned maxSupportedStackDepth = 128;
-    void *addrs[maxSupportedStackDepth];
-
-    int symbolCount = backtrace(addrs, maxSupportedStackDepth);
-    for (int i = 0; i < symbolCount; ++i) {
-      dumpStackTraceEntry(i, addrs[i]);
-    }
+    printCurrentBacktrace();
   }
 #endif
 }
@@ -223,6 +243,9 @@ reportNow(uint32_t flags, const char *message)
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
                               const char *message) {
+#if NDEBUG
+  flags &= ~FatalErrorFlags::ReportBacktrace;
+#endif
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }

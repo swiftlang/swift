@@ -19,6 +19,8 @@
 
 #include <cstdint>
 
+#include "swift/Runtime/Config.h"
+
 namespace swift {
 
 enum class ExclusivityFlags : uintptr_t;
