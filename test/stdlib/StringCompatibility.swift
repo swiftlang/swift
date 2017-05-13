@@ -37,5 +37,29 @@ Tests.test("ClosedRange/Subsript/ExpectedType") {
   expectType(ExpectedSubstring.self, &subsub)
 }
 
+Tests.test("String.init(_:String)/default type") {
+  var s = String("")
+  expectType(String.self, &s)
+}
+
+Tests.test("LosslessStringConvertible/generic") {
+  func f<T : LosslessStringConvertible>(_ x: T.Type) {
+    _ = T("")! // unwrapping optional should work in generic context
+  }
+  f(String.self)
+}
+
+Tests.test("LosslessStringConvertible/concrete") {
+  _ = String("") as String?
+}
+
+#if swift(>=4)
+#else
+Tests.test("LosslessStringConvertible/force unwrap") {
+  // Force unwrap should still work in Swift 3 mode
+  _ = String("")!
+}
+#endif
+
 
 runAllTests()
