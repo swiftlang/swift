@@ -502,26 +502,22 @@ public struct IndexingIterator<
 /// ================================
 ///
 /// You can access a slice of a collection through its ranged subscript or by
-/// calling methods like `prefix(_:)` or `suffix(from:)`. A slice of a
+/// calling methods like `prefix(while:)` or `suffix(_:)`. A slice of a
 /// collection can contain zero or more of the original collection's elements
 /// and shares the original collection's semantics.
 ///
 /// The following example creates a `firstWord` constant by using the
-/// `prefix(_:)` method to get a slice of the `text` string.
+/// `prefix(where:)` method to get a slice of the `text` string.
 ///
-///     let firstWord = text.prefix(7)
+///     let firstWord = text.prefix(while: { $0 != " " })
 ///     print(firstWord)
 ///     // Prints "Buffalo"
 ///
-/// You can retrieve the same slice using other methods, such as finding the
-/// terminating index, and the using the string's ranged subscript, or by
-/// using the `prefix(upTo:)` method, which takes an index as its parameter.
+/// You can retrieve the same slice using the string's ranged subscript, which
+/// takes a range expression.
 ///
 ///     if let firstSpace = text.index(of: " ") {
 ///         print(text[..<firstSpace]
-///         // Prints "Buffalo"
-///
-///         print(text.prefix(upTo: firstSpace))
 ///         // Prints "Buffalo"
 ///     }
 ///

@@ -21,8 +21,8 @@
 /// count the length of a string.
 ///
 ///     let greeting = "Hello! 🐥"
-///     print("Character count: \(greeting.count)")
-///     // Prints "Character count: 8"
+///     print("Length: \(greeting.count)")
+///     // Prints "Length: 8"
 ///
 /// Because each character in a string can be made up of one or more Unicode
 /// code points, the number of characters in a string may not match the length

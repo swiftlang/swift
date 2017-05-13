@@ -170,7 +170,7 @@ if True:
 """
   elif Self == 'Array':
     SelfDocComment = '''\
-/// An ordered, random-access collection of elements of a single type.
+/// An ordered, random-access collection.
 ///
 /// Arrays are one of the most commonly used data types in an app. You use
 /// arrays to organize your app's data. Specifically, you use the `Array` type
