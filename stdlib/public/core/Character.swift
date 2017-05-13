@@ -83,7 +83,7 @@ public struct Character :
   /// Creates a character containing the given Unicode scalar value.
   ///
   /// - Parameter scalar: The Unicode scalar value to convert into a character.
-  public init(_ scalar: UnicodeScalar) {
+  public init(_ scalar: Unicode.Scalar) {
     var asInt: UInt64 = 0
     var shift: UInt64 = 0
 

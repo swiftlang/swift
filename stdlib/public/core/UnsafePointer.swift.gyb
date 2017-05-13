@@ -1222,6 +1222,15 @@ extension UInt {
     }
   }
 }
+
+extension ${Self} {
+  @_versioned
+  static var _max : ${Self} {
+    return ${Self}(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
+  }
+}
 % end # for mutable
 
 // ${'Local Variables'}:

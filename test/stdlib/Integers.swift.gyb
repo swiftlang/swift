@@ -43,7 +43,7 @@ extension FixedWidthInteger {
 
   /// a hex representation of every bit in the number
   func hexBits(_ bitWidth: Int) -> String {
-    let hexDigits: [UnicodeScalar] = [
+    let hexDigits: [Unicode.Scalar] = [
       "0", "1", "2", "3", "4", "5", "6", "7",
       "8", "9", "A", "B", "C", "D", "E", "F"]
 

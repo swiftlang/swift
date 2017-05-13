@@ -25,6 +25,7 @@ set(SWIFTLIB_ESSENTIAL
   ArrayCast.swift
   Arrays.swift.gyb
   ArrayType.swift
+  ASCII.swift
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
@@ -82,6 +83,7 @@ set(SWIFTLIB_ESSENTIAL
   ManagedBuffer.swift
   Map.swift.gyb
   MemoryLayout.swift
+  UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
@@ -104,6 +106,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift
   Runtime.swift.gyb
   SipHash.swift.gyb
+  SentinelCollection.swift
   Sequence.swift
   SequenceAlgorithms.swift.gyb
   SequenceWrapper.swift
@@ -115,12 +118,12 @@ set(SWIFTLIB_ESSENTIAL
   StaticString.swift
   Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
+  StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
   StringBuffer.swift
   StringComparable.swift
   StringCore.swift
-  StringHashable.swift
   StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
@@ -130,9 +133,10 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF8.swift
   Substring.swift.gyb
   SwiftNativeNSArray.swift
+  UIntBuffer.swift
   UnavailableStringAPIs.swift.gyb
-  Unicode.swift
-  UnicodeScalar.swift
+  UnicodeEncoding.swift
+  UnicodeParser.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeBitMap.swift
@@ -140,6 +144,11 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
   UnsafeRawPointer.swift.gyb
+  UTFEncoding.swift
+  UTF8.swift
+  UTF16.swift
+  UTF32.swift
+  Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
   WriteBackMutableSlice.swift
   )
 

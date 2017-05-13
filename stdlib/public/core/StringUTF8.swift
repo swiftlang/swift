@@ -32,6 +32,7 @@ extension _StringCore {
   /// and the second element contains the encoded UTF-8 starting in its
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
+  @inline(__always)
   func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
@@ -215,7 +216,7 @@ extension String {
       }
 
       /// True iff the index is at the end of its view or if the next
-      /// byte begins a new UnicodeScalar.
+      /// byte begins a new Unicode.Scalar.
       internal func _isOnUnicodeScalarBoundary(in core: _StringCore) -> Bool {
         let buffer = UInt32(extendingOrTruncating: _buffer)
         let (codePoint, _) = UTF8._decodeOne(buffer)

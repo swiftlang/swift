@@ -12,7 +12,213 @@
 
 import SwiftShims
 
-// FIXME: complexity documentation for most of methods on String is ought to be
+public protocol StringProtocol
+  : RangeReplaceableCollection, BidirectionalCollection,
+  CustomDebugStringConvertible,
+  CustomReflectable, CustomPlaygroundQuickLookable,
+  TextOutputStream, TextOutputStreamable,
+  LosslessStringConvertible, ExpressibleByStringLiteral,
+  Hashable
+  where Iterator.Element == Character {
+
+  associatedtype UTF8Index
+  var utf8: String.UTF8View { get }
+  associatedtype UTF16Index
+  var utf16: String.UTF16View { get }
+  associatedtype UnicodeScalarIndex
+  var unicodeScalars: String.UnicodeScalarView { get }
+  /*associatedtype CharacterIndex*/
+  var characters: String.CharacterView { get }
+
+#if _runtime(_ObjC)
+  func hasPrefix(_ prefix: String) -> Bool
+  func hasSuffix(_ prefix: String) -> Bool
+#endif
+
+  func lowercased() -> String
+  func uppercased() -> String
+
+  /// Constructs a `String` having the same contents as `codeUnits`.
+  ///
+  /// - Parameter codeUnits: a collection of code units in
+  ///   the given `encoding`.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  init<C: Collection, Encoding: Unicode.Encoding>(
+    decoding codeUnits: C, as encoding: Encoding.Type
+  )
+    where C.Iterator.Element == Encoding.CodeUnit
+
+  /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
+  ///
+  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
+  ///   bytes ending just before the first zero byte (NUL character).
+  init(cString nulTerminatedUTF8: UnsafePointer<CChar>)
+  
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  init<Encoding: Unicode.Encoding>(
+    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as: Encoding.Type)
+    
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result
+
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of code units in the given encoding.
+  func withCString<Result, Encoding: Unicode.Encoding>(
+    encodedAs: Encoding.Type,
+    _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result
+}
+
+extension StringProtocol /* : LosslessStringConvertible */ {
+  public init?(_ description: String) {
+    self.init(description.characters)
+  }
+}
+
+/// Call body with a pointer to zero-terminated sequence of
+/// `TargetEncoding.CodeUnit` representing the same string as `source`, when
+/// `source` is interpreted as being encoded with `SourceEncoding`.
+internal func _withCString<
+  Source : Collection,
+  SourceEncoding : Unicode.Encoding, 
+  TargetEncoding : Unicode.Encoding, 
+  Result
+>(
+  encodedAs targetEncoding: TargetEncoding.Type,
+  from source: Source,
+  encodedAs sourceEncoding: SourceEncoding.Type,
+  execute body : (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+) rethrows -> Result
+where Source.Iterator.Element == SourceEncoding.CodeUnit {
+  return try _withCStringAndLength(
+    encodedAs: targetEncoding,
+    from: source,
+    encodedAs: sourceEncoding) { p, _ in try body(p) }
+}
+
+internal func _withCStringAndLength<
+  Source : Collection,
+  SourceEncoding : Unicode.Encoding, 
+  TargetEncoding : Unicode.Encoding, 
+  Result
+>(
+  encodedAs targetEncoding: TargetEncoding.Type,
+  from source: Source,
+  encodedAs sourceEncoding: SourceEncoding.Type,
+  execute body : (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
+) rethrows -> Result
+where Source.Iterator.Element == SourceEncoding.CodeUnit {
+  var targetLength = 0 // nul terminator
+  var i = source.makeIterator()
+  SourceEncoding.ForwardParser._parse(&i) {
+    targetLength += numericCast(
+      targetEncoding._transcode($0, from: SourceEncoding.self).count)
+  }
+  var a: [TargetEncoding.CodeUnit] = []
+  a.reserveCapacity(targetLength + 1)
+  i = source.makeIterator()
+  SourceEncoding.ForwardParser._parse(&i) {
+    a.append(
+      contentsOf: targetEncoding._transcode($0, from: SourceEncoding.self))
+  }
+  a.append(0)
+  return try body(a, targetLength)
+}
+
+extension _StringCore {
+  /// Invokes `body` on a null-terminated sequence of code units in the given
+  /// encoding corresponding to the substring in `bounds`.
+  internal func _withCSubstring<Result, TargetEncoding: Unicode.Encoding>(
+    in bounds: Range<Index>,
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result {
+    return try _withCSubstringAndLength(in: bounds, encoding: targetEncoding) {
+      p,_ in try body(p)
+    }
+  }
+
+  internal func _withCSubstringAndLength<
+    Result, TargetEncoding: Unicode.Encoding
+  >(
+    in bounds: Range<Index>,
+    encoding targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
+  ) rethrows -> Result {
+    if _fastPath(hasContiguousStorage) {
+      defer { _fixLifetime(self) }
+      if isASCII {
+        return try Swift._withCStringAndLength(
+          encodedAs: targetEncoding,
+          from: UnsafeBufferPointer(start: startASCII, count: count)[bounds],
+          encodedAs: Unicode.ASCII.self,
+          execute: body
+        )
+      }
+      else {
+        return try Swift._withCStringAndLength(
+          encodedAs: targetEncoding,
+          from: UnsafeBufferPointer(start: startUTF16, count: count)[bounds],
+          encodedAs: Unicode.UTF16.self,
+          execute: body
+        )
+      }
+    }
+    return try Swift._withCStringAndLength(
+      encodedAs: targetEncoding,
+      from: self[bounds],
+      encodedAs: Unicode.UTF16.self,
+      execute: body
+    )
+  }
+}
+
+extension String {
+  public init<C: Collection, Encoding: Unicode.Encoding>(
+    decoding codeUnits: C, as sourceEncoding: Encoding.Type
+  ) where C.Iterator.Element == Encoding.CodeUnit {
+    let (b,_) = _StringBuffer.fromCodeUnits(
+      codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)
+    self = String(_StringCore(b!))
+  }
+
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  public init<Encoding: Unicode.Encoding>(
+    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as sourceEncoding: Encoding.Type) {
+
+    let codeUnits = _SentinelCollection(
+      UnsafeBufferPointer(_unboundedStartingAt: nulTerminatedCodeUnits),
+      until: _IsZero()
+    )
+    self.init(decoding: codeUnits, as: sourceEncoding)
+  }
+
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of code units in the given encoding.
+  public func withCString<Result, TargetEncoding: Unicode.Encoding>(
+    encodedAs targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result {
+    return try _core._withCSubstring(
+      in: _core.startIndex..<_core.endIndex, encoding: targetEncoding, body)
+  }
+}
+// FIXME: complexity documentation for most of methods on String ought to be
 // qualified with "amortized" at least, as Characters are variable-length.
 
 /// A Unicode string value.
@@ -118,7 +324,7 @@ import SwiftShims
 ///
 /// A string's `unicodeScalars` property is a collection of Unicode scalar
 /// values, the 21-bit codes that are the basic unit of Unicode. Each scalar
-/// value is represented by a `UnicodeScalar` instance and is equivalent to a
+/// value is represented by a `Unicode.Scalar` instance and is equivalent to a
 /// UTF-32 code unit.
 ///
 ///     print(cafe.unicodeScalars.count)
@@ -304,23 +510,22 @@ public struct String {
 
 extension String {
   public // @testable
-  static func _fromWellFormedCodeUnitSequence<Encoding, Input>(
+  static func _fromWellFormedCodeUnitSequence<
+    Encoding : Unicode.Encoding, Input : Collection
+  >(
     _ encoding: Encoding.Type, input: Input
   ) -> String
-    where
-    Encoding: UnicodeCodec,
-    Input: Collection,
-    Input.Iterator.Element == Encoding.CodeUnit {
+    where  Input.Iterator.Element == Encoding.CodeUnit {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
   public // @testable
-  static func _fromCodeUnitSequence<Encoding, Input>(
+  static func _fromCodeUnitSequence<
+    Encoding : Unicode.Encoding, Input : Collection
+  >(
     _ encoding: Encoding.Type, input: Input
   ) -> String?
     where
-    Encoding: UnicodeCodec,
-    Input: Collection,
     Input.Iterator.Element == Encoding.CodeUnit {
     let (stringBufferOptional, _) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
@@ -329,12 +534,12 @@ extension String {
   }
 
   public // @testable
-  static func _fromCodeUnitSequenceWithRepair<Encoding, Input>(
+  static func _fromCodeUnitSequenceWithRepair<
+    Encoding : Unicode.Encoding, Input : Collection
+  >(
     _ encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool)
     where
-    Encoding: UnicodeCodec,
-    Input: Collection,
     Input.Iterator.Element == Encoding.CodeUnit {
 
     let (stringBuffer, hadError) =
@@ -445,23 +650,21 @@ extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
   func _encodedLength<
-    Encoding: UnicodeCodec
+    Encoding: Unicode.Encoding
   >(_ encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     self._encode(encoding, into: { _ in codeUnitCount += 1 })
     return codeUnitCount
   }
 
-  // FIXME: this function does not handle the case when a wrapped NSString
+  // FIXME: this function may not handle the case when a wrapped NSString
   // contains unpaired surrogates.  Fix this before exposing this function as a
   // public API.  But it is unclear if it is valid to have such an NSString in
   // the first place.  If it is not, we should not be crashing in an obscure
   // way -- add a test for that.
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
-  func _encode<
-    Encoding: UnicodeCodec
-  >(
+  func _encode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {
@@ -498,7 +701,7 @@ extension String {
   /// - Complexity: Appending a Unicode scalar to a string averages to O(1)
   ///   over many additions.
   @available(*, unavailable, message: "Replaced by append(_: String)")
-  public mutating func append(_ x: UnicodeScalar) {
+  public mutating func append(_ x: Unicode.Scalar) {
     Builtin.unreachable()
   }
 
@@ -823,12 +1026,6 @@ extension String {
 extension String : CustomStringConvertible {
   public var description: String {
     return self
-  }
-}
-
-extension String : LosslessStringConvertible {
-  public init?(_ description: String) {
-    self = description
   }
 }
 

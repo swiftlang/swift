@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : RangeReplaceableCollection, BidirectionalCollection {
+extension String : StringProtocol {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 
@@ -41,11 +41,8 @@ extension String : RangeReplaceableCollection, BidirectionalCollection {
   // - init<S>(_ characters: S) where S : Sequence, S.Iterator.Element == Character
   // Cannot simply do init(_: String) as that would itself be ambiguous with
   // init?(_ description: String)
-  public init<
-    T : LosslessStringConvertible & Sequence
-  >(_ other: T)
-  where T.Iterator.Element == Character {
-    self = other.description
+  public init(_ other: String) {
+    self.init(other._core)
   }
 
   /// The position of the first character in a nonempty string.

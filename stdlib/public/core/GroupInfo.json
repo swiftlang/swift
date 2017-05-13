@@ -4,6 +4,7 @@
     "AssertCommon.swift"
   ],
   "String": [
+    "ASCII.swift",
     "CString.swift",
     "Character.swift",
     "StaticString.swift",
@@ -23,9 +24,15 @@
     "StringUnicodeScalarView.swift",
     "Substring.swift",
     "Unicode.swift",
+    "UnicodeEncoding.swift",
+    "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeTrie.swift",
-    "UnavailableStringAPIs.swift"
+    "UnavailableStringAPIs.swift",
+    "UTFEncoding.swift",
+    "UTF8.swift",
+    "UTF16.swift",
+    "UTF32.swift"
   ],
   "Bool": [
     "Bool.swift"
@@ -41,6 +48,7 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
+    "SentinelCollection.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
@@ -52,6 +60,7 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "UIntBuffer.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
