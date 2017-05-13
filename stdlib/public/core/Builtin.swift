@@ -152,7 +152,12 @@ func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 /// `nil` or they both represent the same type.
 @_inlineable
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return unsafeBitCast(t0, to: Int.self) == unsafeBitCast(t1, to: Int.self)
+  switch (t0, t1) {
+  case (.none, .none): return true
+  case let (.some(ty0), .some(ty1)):
+    return Bool(Builtin.is_same_metatype(ty0, ty1))
+  default: return false
+  }
 }
 
 /// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both

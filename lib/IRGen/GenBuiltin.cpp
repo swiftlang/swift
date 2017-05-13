@@ -27,6 +27,7 @@
 
 #include "Explosion.h"
 #include "GenCall.h"
+#include "GenCast.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -876,6 +877,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsSameMetatype) {
+    auto metatypeLHS = args.claimNext();
+    auto metatypeRHS = args.claimNext();
+    (void)args.claimAll();
+    llvm::Value *metatypeLHSCasted =
+        IGF.Builder.CreateBitCast(metatypeLHS, IGF.IGM.Int8PtrTy);
+    llvm::Value *metatypeRHSCasted =
+        IGF.Builder.CreateBitCast(metatypeRHS, IGF.IGM.Int8PtrTy);
+
+    out.add(IGF.Builder.CreateICmpEQ(metatypeLHSCasted, metatypeRHSCasted));
+    return;
+  }
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
