@@ -78,6 +78,12 @@ public protocol StringProtocol
   ) rethrows -> Result
 }
 
+extension StringProtocol /* : LosslessStringConvertible */ {
+  public init?(_ description: String) {
+    self.init(description.characters)
+  }
+}
+
 /// Call body with a pointer to zero-terminated sequence of
 /// `TargetEncoding.CodeUnit` representing the same string as `source`, when
 /// `source` is interpreted as being encoded with `SourceEncoding`.
