@@ -5041,6 +5041,92 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
   return false;
 }
 
+static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
+                                           Type paramType, Type argType,
+                                           Expr *fnExpr, Expr *argExpr,
+                                           bool isTopLevel = true) {
+  // Try to diagnose function call tuple parameter splat only if
+  // there is no trailing or argument closure, because
+  // FailureDiagnosis::visitClosureExpr will produce better
+  // diagnostic and fix-it for trailing closure case.
+  if (isTopLevel) {
+    if (CCI.hasTrailingClosure)
+      return false;
+
+    if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
+      if (isa<ClosureExpr>(parenExpr->getSubExpr()))
+        return false;
+    }
+  }
+
+  if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
+    // Only if both of the parameter and argument types are functions
+    // let's recur into diagnosing their arguments.
+    if (auto *argFnType = argType->getAs<AnyFunctionType>())
+      return diagnoseTupleParameterMismatch(CCI, paramFnType->getInput(),
+                                            argFnType->getInput(), fnExpr,
+                                            argExpr, /* isTopLevel */ false);
+    return false;
+  }
+
+  unsigned parameterCount = 1, argumentCount = 1;
+
+  // Don't try to desugar ParenType which is going to result in incorrect
+  // inferred argument/parameter count.
+
+  if (auto *paramTypeTy = dyn_cast<TupleType>(paramType.getPointer()))
+    parameterCount = paramTypeTy->getNumElements();
+
+  if (auto *argTupleTy = dyn_cast<TupleType>(argType.getPointer()))
+    argumentCount = argTupleTy->getNumElements();
+
+  if (parameterCount == 1 && argumentCount > 1) {
+    // Let's see if inferred argument is actually a tuple inside of Paren.
+    auto *paramTupleTy = paramType->getAs<TupleType>();
+    if (!paramTupleTy)
+      return false;
+
+    // Looks like the number of tuple elements matches number
+    // of function arguments, which means we can we can emit an
+    // error about an attempt to make use of tuple splat or tuple
+    // destructuring, unfortunately we can't provide a fix-it for
+    // this case.
+    if (paramTupleTy->getNumElements() == argumentCount) {
+      auto &TC = CCI.CS->TC;
+      if (isTopLevel) {
+        if (auto *decl = CCI[0].getDecl()) {
+          Identifier name;
+          auto kind = decl->getDescriptiveKind();
+          // Constructors/descructors and subscripts don't really have names.
+          if (!(isa<ConstructorDecl>(decl) || isa<DestructorDecl>(decl) ||
+                isa<SubscriptDecl>(decl))) {
+            name = decl->getName();
+          }
+
+          TC.diagnose(argExpr->getLoc(), diag::single_tuple_parameter_mismatch,
+                      kind, name, paramType, !name.empty())
+              .highlight(argExpr->getSourceRange())
+              .fixItInsertAfter(argExpr->getStartLoc(), "(")
+              .fixItInsert(argExpr->getEndLoc(), ")");
+        } else {
+          TC.diagnose(argExpr->getLoc(),
+                      diag::unknown_single_tuple_parameter_mismatch, paramType)
+              .highlight(argExpr->getSourceRange())
+              .fixItInsertAfter(argExpr->getStartLoc(), "(")
+              .fixItInsert(argExpr->getEndLoc(), ")");
+        }
+      } else {
+        TC.diagnose(argExpr->getLoc(),
+                    diag::nested_tuple_parameter_destructuring, paramType,
+                    fnExpr->getType());
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Emit a class of diagnostics that we only know how to generate when there is
 /// exactly one candidate we know about.  Return true if an error is emitted.
 static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
@@ -5095,6 +5181,10 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       return true;
     }
   }
+
+  if (diagnoseTupleParameterMismatch(CCI, candidate.getArgumentType(),
+                                     argExpr->getType(), fnExpr, argExpr))
+    return true;
 
   // We only handle structural errors here.
   if (CCI.closeness != CC_ArgumentLabelMismatch &&
