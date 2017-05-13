@@ -2633,7 +2633,7 @@ clang::CodeGenOptions &ClangImporter::getClangCodeGenOpts() const {
 }
 
 std::string ClangImporter::getClangModuleHash() const {
-  return Impl.Invocation->getModuleHash();
+  return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
