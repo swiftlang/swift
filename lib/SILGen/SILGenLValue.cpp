@@ -2727,6 +2727,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        ManagedValue base,
                                        AccessKind accessKind,
                                        TSanKind tsanKind) {
+  bool isRValue = component.isRValue();
   ManagedValue addr;
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical()).offset(SGF, loc, base, accessKind);
@@ -2737,7 +2738,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 
   if (!SGF.getASTContext().LangOpts.DisableTsanInoutInstrumentation &&
       SGF.getModule().getOptions().Sanitize == SanitizerKind::Thread &&
-      tsanKind == TSanKind::InoutAccess && !component.isRValue()) {
+      tsanKind == TSanKind::InoutAccess && !isRValue) {
     emitTsanInoutAccess(SGF, loc, addr);
   }
 
@@ -2777,6 +2778,9 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   // Any writebacks should be scoped to after the load.
   FormalEvaluationScope scope(*this);
 
+  auto substFormalType = src.getSubstFormalType();
+  auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
+
   ManagedValue addr;
   PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(src), addr, AccessKind::Read);
@@ -2785,9 +2789,9 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical())
              .offset(*this, loc, addr, AccessKind::Read);
-    return RValue(*this, loc, src.getSubstFormalType(),
+    return RValue(*this, loc, substFormalType,
                   emitLoad(loc, addr.getValue(),
-                           getTypeLowering(src.getTypeOfRValue()), C, IsNotTake,
+                           rvalueTL, C, IsNotTake,
                            isGuaranteedValid));
   }
 
@@ -2886,6 +2890,8 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
     return;
   }
 
+  auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
   auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)
@@ -2895,9 +2901,7 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
     B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);
   } else {
     // If there's a semantic conversion necessary, do a load then assign.
-    auto loaded = emitLoad(loc, srcAddr, getTypeLowering(src.getTypeOfRValue()),
-                           SGFContext(),
-                           IsNotTake);
+    auto loaded = emitLoad(loc, srcAddr, rvalueTL, SGFContext(), IsNotTake);
     loaded.assignInto(*this, loc, destAddr);
   }
 }
