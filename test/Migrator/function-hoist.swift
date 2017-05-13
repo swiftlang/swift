@@ -18,4 +18,5 @@ func foo(_ c : Cities) {
   globalCityFunc2(getCities()[0])
   _ = globalCityFunc3(c, 1) + 2
   _ = globalCityFunc4(c, 1, 2) + 2
+  _ = globalCityFunc5() + 2 + 1
 }

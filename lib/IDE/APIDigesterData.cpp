@@ -132,7 +132,9 @@ swift::ide::api::TypeMemberDiffItem::getSubKind() const {
       return TypeMemberDiffItemSubKind::HoistSelfOnly;
     }
   } else if (ToProperty) {
-    llvm_unreachable("unknown situation");
+    assert(OldName.argSize() == 0);
+    assert(!removedIndex);
+    return TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty;
   } else {
     assert(NewName.argSize() == OldName.argSize());
     return TypeMemberDiffItemSubKind::SimpleReplacement;

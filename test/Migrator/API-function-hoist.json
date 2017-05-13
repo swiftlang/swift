@@ -47,5 +47,12 @@
     "NewTypeName": "Cities",
     "SelfIndex": 0,
     "RemovedIndex": 1
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15globalCityFunc5SiyF",
+    "OldPrintedName": "globalCityFunc5()",
+    "NewPrintedName": "property5",
+    "NewTypeName": "Cities.Nested"
   }
 ]

@@ -367,6 +367,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
     if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement)
       return false;
+
+    if (Item->Subkind == TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty) {
+      Editor.replace(Call->getSourceRange(), (llvm::Twine(Item->newTypeName) +
+        "." + Item->getNewName().base()).str());
+      return true;
+    }
     if (*Item->selfIndex)
       return false;
     std::vector<CallArgInfo> AllArgs =
@@ -402,6 +408,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
 
     switch (Item->Subkind) {
+    case TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty:
     case TypeMemberDiffItemSubKind::SimpleReplacement:
       llvm_unreachable("should be handled elsewhere");
     case TypeMemberDiffItemSubKind::HoistSelfOnly:
