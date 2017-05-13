@@ -17,7 +17,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///
   ///     var characters: [Character] = ["C", "a", "f", "é"]
   ///     characters.reverse()
-  ///     print(cafe.characters)
+  ///     print(characters)
   ///     // Prints "["é", "f", "a", "C"]
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
@@ -86,12 +86,12 @@ public struct ReversedIndex<Base : Collection> : Comparable {
   /// `"a"` character in a string's character view.
   ///
   ///     let name = "Horatio"
-  ///     let aIndex = name.characters.index(of: "a")!
-  ///     // name.characters[aIndex] == "a"
+  ///     let aIndex = name.index(of: "a")!
+  ///     // name[aIndex] == "a"
   ///
-  ///     let reversedCharacters = name.characters.reversed()
-  ///     let i = ReversedIndex<String.CharacterView>(aIndex)
-  ///     // reversedCharacters[i] == "r"
+  ///     let reversedName = name.reversed()
+  ///     let i = ReversedIndex<String>(aIndex)
+  ///     // reversedName[i] == "r"
   ///
   /// The element at the position created using `ReversedIndex<...>(aIndex)` is
   /// `"r"`, the character before `"a"` in the `name` string.
@@ -286,12 +286,12 @@ public struct ReversedRandomAccessIndex<
   /// index of the `"a"` character in a string's character view.
   ///
   ///     let name = "Horatio"
-  ///     let aIndex = name.characters.index(of: "a")!
-  ///     // name.characters[aIndex] == "a"
+  ///     let aIndex = name.index(of: "a")!
+  ///     // name[aIndex] == "a"
   ///
-  ///     let reversedCharacters = name.characters.reversed()
-  ///     let i = ReversedIndex<String.CharacterView>(aIndex)
-  ///     // reversedCharacters[i] == "r"
+  ///     let reversedName = name.reversed()
+  ///     let i = ReversedIndex<String>(aIndex)
+  ///     // reversedName[i] == "r"
   ///
   /// The element at the position created using `ReversedIndex<...>(aIndex)` is
   /// `"r"`, the character before `"a"` in the `name` string. Viewed from the
@@ -453,8 +453,8 @@ extension BidirectionalCollection {
   /// string in reverse order:
   ///
   ///     let word = "Backwards"
-  ///     for char in word.characters.reversed() {
-  ///         print(char, terminator="")
+  ///     for char in word.reversed() {
+  ///         print(char, terminator: "")
   ///     }
   ///     // Prints "sdrawkcaB"
   ///
@@ -463,7 +463,7 @@ extension BidirectionalCollection {
   /// example, to get the reversed version of a string, reverse its
   /// characters and initialize a new `String` instance from the result.
   ///
-  ///     let reversedWord = String(word.characters.reversed())
+  ///     let reversedWord = String(word.reversed())
   ///     print(reversedWord)
   ///     // Prints "sdrawkcaB"
   ///

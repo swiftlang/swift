@@ -202,9 +202,9 @@ extension Bool {
 }
 
 extension Bool {
-  /// Performs a logical AND operation on two Bool values.
+  /// Performs a logical AND operation on two Boolean values.
   ///
-  /// The logical AND operator (`&&`) combines two Bool values and returns
+  /// The logical AND operator (`&&`) combines two Boolean values and returns
   /// `true` if both of the values are `true`. If either of the values is
   /// `false`, the operator returns `false`.
   ///
@@ -241,9 +241,9 @@ extension Bool {
     return lhs ? try rhs() : false
   }
 
-  /// Performs a logical OR operation on two Bool values.
+  /// Performs a logical OR operation on two Boolean values.
   ///
-  /// The logical OR operator (`||`) combines two Bool values and returns
+  /// The logical OR operator (`||`) combines two Boolean values and returns
   /// `true` if at least one of the values is `true`. If both values are
   /// `false`, the operator returns `false`.
   ///
