@@ -412,5 +412,14 @@
     "RightUsr": "",
     "RightComment": "(Int) -> Int",
     "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@shouldnontexist",
+    "OldPrintedName": "exampleGlobalFunc(a:b:c:)",
+    "NewPrintedName": "MemberFunc(a:)",
+    "NewTypeName": "example",
+    "SelfIndex": 0,
+    "RemovedIndex": 1
   }
 ]
