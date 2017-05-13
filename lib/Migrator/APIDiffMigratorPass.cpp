@@ -373,6 +373,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
     if (!AllArgs.size())
       return false;
+    assert(*Item->selfIndex == 0 && "we cannot handle otherwise");
     DeclNameViewer NewName = Item->getNewName();
     llvm::SmallVector<unsigned, 2> IgnoredArgIndices;
     IgnoredArgIndices.push_back(*Item->selfIndex);

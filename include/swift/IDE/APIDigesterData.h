@@ -215,8 +215,8 @@ struct TypeMemberDiffItem: public APIDiffItem {
   StringRef oldPrintedName;
 
 private:
-  DeclNameViewer OldNameViwer;
-  DeclNameViewer NewNameViwer;
+  DeclNameViewer OldNameViewer;
+  DeclNameViewer NewNameViewer;
 
 public:
   TypeMemberDiffItemSubKind Subkind;
@@ -228,8 +228,8 @@ public:
                      StringRef oldPrintedName) : usr(usr),
     newTypeName(newTypeName), newPrintedName(newPrintedName),
     selfIndex(selfIndex), removedIndex(removedIndex),
-    oldPrintedName(oldPrintedName), OldNameViwer(oldPrintedName),
-    NewNameViwer(newPrintedName), Subkind(getSubKind()) {}
+    oldPrintedName(oldPrintedName), OldNameViewer(oldPrintedName),
+    NewNameViewer(newPrintedName), Subkind(getSubKind()) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
@@ -237,8 +237,8 @@ public:
   bool operator<(TypeMemberDiffItem Other) const;
   static bool classof(const APIDiffItem *D);
   StringRef getKey() const override { return usr; }
-  const DeclNameViewer &getOldName() const { return OldNameViwer; }
-  const DeclNameViewer &getNewName() const { return NewNameViwer; }
+  const DeclNameViewer &getOldName() const { return OldNameViewer; }
+  const DeclNameViewer &getNewName() const { return NewNameViewer; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_TypeMemberDiffItem;
   }
