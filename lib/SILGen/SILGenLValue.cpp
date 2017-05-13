@@ -167,10 +167,6 @@ SILGenFunction::getUnknownEnforcement(VarDecl *var) {
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
   : public Lowering::ExprVisitor<SILGenLValue, LValue, AccessKind>
 {
-  /// A mapping from opaque value expressions to the open-existential
-  /// expression that determines them.
-  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
-    openedExistentials;
 
 public:
   SILGenFunction &SGF;
@@ -1909,11 +1905,11 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind) {
 LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
                                           AccessKind accessKind) {
   // Handle an opaque lvalue that refers to an opened existential.
-  auto known = openedExistentials.find(e);
-  if (known != openedExistentials.end()) {
+  auto known = SGF.OpaqueValueExprs.find(e);
+  if (known != SGF.OpaqueValueExprs.end()) {
     // Dig the open-existential expression out of the list.
     OpenExistentialExpr *opened = known->second;
-    openedExistentials.erase(known);
+    SGF.OpaqueValueExprs.erase(known);
 
     // Do formal evaluation of the underlying existential lvalue.
     LValue lv = visitRec(opened->getExistentialValue(), accessKind);
@@ -2206,7 +2202,7 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
 
   // Record the fact that we're opening this existential. The actual
   // opening operation will occur when we see the OpaqueValueExpr.
-  bool inserted = openedExistentials.insert({e->getOpaqueValue(), e}).second;
+  bool inserted = SGF.OpaqueValueExprs.insert({e->getOpaqueValue(), e}).second;
   (void)inserted;
   assert(inserted && "already have this opened existential?");
 
@@ -2214,7 +2210,7 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
   LValue lv = visitRec(e->getSubExpr(), accessKind);
 
   // Sanity check that we did see the OpaqueValueExpr.
-  assert(openedExistentials.count(e->getOpaqueValue()) == 0 &&
+  assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
          "opened existential not removed?");
   return lv;
 }
