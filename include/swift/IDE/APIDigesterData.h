@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/IDE/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -198,18 +199,38 @@ public:
 //  myColor.components
 //
 //
+enum class TypeMemberDiffItemSubKind {
+  SimpleReplacement,
+  GlobalFuncToStaticProperty,
+  HoistSelfOnly,
+  HoistSelfAndRemoveParam,
+  HoistSelfAndUseProperty,
+};
+
 struct TypeMemberDiffItem: public APIDiffItem {
   StringRef usr;
   StringRef newTypeName;
   StringRef newPrintedName;
   Optional<uint8_t> selfIndex;
+  Optional<uint8_t> removedIndex;
   StringRef oldPrintedName;
 
+private:
+  DeclNameViewer OldNameViewer;
+  DeclNameViewer NewNameViewer;
+
+public:
+  TypeMemberDiffItemSubKind Subkind;
+
+public:
   TypeMemberDiffItem(StringRef usr, StringRef newTypeName,
                      StringRef newPrintedName, Optional<uint8_t> selfIndex,
+                     Optional<uint8_t> removedIndex,
                      StringRef oldPrintedName) : usr(usr),
     newTypeName(newTypeName), newPrintedName(newPrintedName),
-    selfIndex(selfIndex), oldPrintedName(oldPrintedName) {}
+    selfIndex(selfIndex), removedIndex(removedIndex),
+    oldPrintedName(oldPrintedName), OldNameViewer(oldPrintedName),
+    NewNameViewer(newPrintedName), Subkind(getSubKind()) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
@@ -217,9 +238,13 @@ struct TypeMemberDiffItem: public APIDiffItem {
   bool operator<(TypeMemberDiffItem Other) const;
   static bool classof(const APIDiffItem *D);
   StringRef getKey() const override { return usr; }
+  const DeclNameViewer &getOldName() const { return OldNameViewer; }
+  const DeclNameViewer &getNewName() const { return NewNameViewer; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_TypeMemberDiffItem;
   }
+private:
+  TypeMemberDiffItemSubKind getSubKind() const;
 };
 
 struct NoEscapeFuncParam: public APIDiffItem {

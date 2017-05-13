@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -103,6 +104,41 @@ void swift::ide::api::CommonDiffItem::streamDef(llvm::raw_ostream &S) const {
 
 StringRef swift::ide::api::TypeMemberDiffItem::head() {
   return "SDK_CHANGE_TYPE_MEMBER";
+}
+
+TypeMemberDiffItemSubKind
+swift::ide::api::TypeMemberDiffItem::getSubKind() const {
+  DeclNameViewer OldName = getOldName();
+  DeclNameViewer NewName = getNewName();
+  if(!OldName.isFunction()) {
+    assert(!NewName.isFunction());
+    return TypeMemberDiffItemSubKind::SimpleReplacement;
+  }
+  assert(OldName.isFunction());
+  bool ToProperty = !NewName.isFunction();
+  if (selfIndex) {
+    if (removedIndex) {
+      if (ToProperty)
+        llvm_unreachable("unknown situation");
+      else {
+        assert(NewName.argSize() + 2 == OldName.argSize());
+        return TypeMemberDiffItemSubKind::HoistSelfAndRemoveParam;
+      }
+    } else if (ToProperty) {
+      assert(OldName.argSize() == 1);
+      return TypeMemberDiffItemSubKind::HoistSelfAndUseProperty;
+    } else {
+      assert(NewName.argSize() + 1 == OldName.argSize());
+      return TypeMemberDiffItemSubKind::HoistSelfOnly;
+    }
+  } else if (ToProperty) {
+    assert(OldName.argSize() == 0);
+    assert(!removedIndex);
+    return TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty;
+  } else {
+    assert(NewName.argSize() == OldName.argSize());
+    return TypeMemberDiffItemSubKind::SimpleReplacement;
+  }
 }
 
 void swift::ide::api::TypeMemberDiffItem::describe(llvm::raw_ostream &os) {
@@ -274,11 +310,14 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
     Optional<uint8_t> SelfIndexShort;
+    Optional<uint8_t> RemovedIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.getValue();
+    if (RemovedIndex)
+      RemovedIndexShort = RemovedIndex.getValue();
     return new (Alloc.Allocate<TypeMemberDiffItem>())
       TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName, SelfIndexShort,
-                         OldPrintedName);
+                         RemovedIndexShort, OldPrintedName);
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     return new (Alloc.Allocate<NoEscapeFuncParam>())
@@ -395,6 +434,7 @@ public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   bool PrintUsr;
   std::vector<APIDiffItem*> AllItems;
+  llvm::StringSet<> PrintedUsrs;
   void addStorePath(StringRef FileName) {
     llvm::MemoryBuffer *pMemBuffer = nullptr;
     {
@@ -428,8 +468,10 @@ public:
 
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getDiffItems(StringRef Key) const {
-  if (Impl.PrintUsr)
+  if (Impl.PrintUsr && !Impl.PrintedUsrs.count(Key)) {
     llvm::outs() << Key << "\n";
+    Impl.PrintedUsrs.insert(Key);
+  }
   return Impl.Data[Key];
 }
 
