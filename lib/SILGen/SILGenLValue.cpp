@@ -223,6 +223,63 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &SGF,
                                                    SILLocation loc,
                                                    ManagedValue base,
                                                    AccessKind kind) && {
+  if (getTypeOfRValue().getSwiftRValueType()->hasOpenedExistential()) {
+    if (kind == AccessKind::Read) {
+      // Emit a 'get' into the temporary.
+      RValue value =
+        std::move(*this).get(SGF, loc, base, SGFContext());
+
+      // Create a temporary.
+      std::unique_ptr<TemporaryInitialization> temporaryInit =
+        SGF.emitFormalAccessTemporary(loc,
+                                      SGF.getTypeLowering(getTypeOfRValue()));
+
+      std::move(value).forwardInto(SGF, loc, temporaryInit.get());
+
+      return temporaryInit->getManagedAddress();
+    }
+
+    assert(SGF.InWritebackScope &&
+         "materializing l-value for modification without writeback scope");
+
+    // Clone anything else about the component that we might need in the
+    // writeback.
+    auto clonedComponent = clone(SGF, loc);
+
+    SILValue mv;
+    {
+      FormalEvaluationScope Scope(SGF);
+
+      // Otherwise, we need to emit a get and set.  Borrow the base for
+      // the getter.
+      ManagedValue getterBase =
+        base ? base.formalAccessBorrow(SGF, loc) : ManagedValue();
+
+      // Emit a 'get' into a temporary and then pop the borrow of base.
+      RValue value =
+        std::move(*this).get(SGF, loc, getterBase, SGFContext());
+
+      mv = std::move(value).forwardAsSingleValue(SGF, loc);
+    }
+
+    auto &TL = SGF.getTypeLowering(getTypeOfRValue());
+
+    // Create a temporary.
+    std::unique_ptr<TemporaryInitialization> temporaryInit =
+      SGF.emitFormalAccessTemporary(loc, TL);
+
+    SGF.emitSemanticStore(loc, mv, temporaryInit->getAddress(),
+                          TL, IsInitialization);
+    temporaryInit->finishInitialization(SGF);
+
+    auto temporary = temporaryInit->getManagedAddress();
+
+    // Push a writeback for the temporary.
+    pushWriteback(SGF, loc, std::move(clonedComponent), base,
+                  MaterializedLValue(temporary));
+    return temporary.unmanagedBorrow();
+  }
+
   // If this is just for a read, emit a load into a temporary memory
   // location.
   if (kind == AccessKind::Read) {
