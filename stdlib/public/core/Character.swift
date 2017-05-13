@@ -238,8 +238,8 @@ public struct Character :
     init(_ u8: UInt64) {
       let utf8Count = Character._smallSize(u8)
       _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
-      self.count = UInt16(utf8Count)
-      self.data = u8
+      self._count = UInt16(utf8Count)
+      self._data = u8
     }
 
     /// The position of the first element in a non-empty collection.
@@ -255,7 +255,7 @@ public struct Character :
     /// reachable from `startIndex` by zero or more applications of
     /// `index(after:)`.
     var endIndex: Int {
-      return Int(count)
+      return Int(_count)
     }
 
     /// Access the code unit at `position`.
@@ -263,12 +263,12 @@ public struct Character :
     /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF8.CodeUnit {
-      _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
+      _sanityCheck(position >= startIndex)
+      _sanityCheck(position < endIndex)
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
-        extendingOrTruncating: data &>> (UInt64(position) &* 8))
+        extendingOrTruncating: _data &>> (UInt64(position) &* 8))
     }
 
     internal struct Iterator : IteratorProtocol {
@@ -289,11 +289,11 @@ public struct Character :
     }
 
     internal func makeIterator() -> Iterator {
-      return Iterator(data)
+      return Iterator(_data)
     }
 
-    var count: UInt16
-    var data: UInt64
+    var _count: UInt16
+    var _data: UInt64
   }
 
   struct _SmallUTF16 : RandomAccessCollection {
@@ -305,7 +305,7 @@ public struct Character :
         decodedAs: UTF8.self,
         repairingIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
-      self.count = UInt16(count)
+      self._count = UInt16(count)
       var u16: UInt64 = 0
       let output: (UTF16.CodeUnit) -> Void = {
         u16 = u16 &<< 16
@@ -316,7 +316,7 @@ public struct Character :
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,
         into: output)
-      self.data = u16
+      self._data = u16
     }
 
     /// The position of the first element in a non-empty collection.
@@ -332,7 +332,7 @@ public struct Character :
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     var endIndex: Int {
-      return Int(count)
+      return Int(_count)
     }
 
     /// Access the code unit at `position`.
@@ -340,16 +340,16 @@ public struct Character :
     /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF16.CodeUnit {
-      _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
+      _sanityCheck(position >= startIndex)
+      _sanityCheck(position < endIndex)
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF16.CodeUnit(extendingOrTruncating:
-        data &>> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
+        _data &>> ((UInt64(_count) &- UInt64(position) &- 1) &* 16))
     }
 
-    var count: UInt16
-    var data: UInt64
+    var _count: UInt16
+    var _data: UInt64
   }
 
   /// The character's hash value.
