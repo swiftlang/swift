@@ -4590,7 +4590,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     
     auto deserializedReq = getDeclChecked(*rawIDIter++);
     if (deserializedReq) {
-      req = cast<ValueDecl>(*deserializedReq);
+      req = cast_or_null<ValueDecl>(*deserializedReq);
     } else if (getContext().LangOpts.EnableDeserializationRecovery) {
       consumeError(deserializedReq.takeError());
       req = nullptr;
@@ -4603,7 +4603,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     ValueDecl *witness;
     auto deserializedWitness = getDeclChecked(*rawIDIter++);
     if (deserializedWitness) {
-      witness = cast<ValueDecl>(*deserializedWitness);
+      witness = cast_or_null<ValueDecl>(*deserializedWitness);
     // Across language compatibility versions, the witnessing decl may have
     // changed its signature as seen by the current compatibility version.
     // In that case, we want the conformance to still be available, but
@@ -4705,7 +4705,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
     auto second = getType(*rawIDIter++);
     auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
-    if (isa<TypeAliasDecl>(third) &&
+    if (third &&
+        isa<TypeAliasDecl>(third) &&
         third->getModuleContext() != getAssociatedModule() &&
         !third->getDeclaredInterfaceType()->isEqual(second)) {
       // Conservatively drop references to typealiases in other modules
