@@ -587,6 +587,8 @@ namespace {
              "base for open existential component must be an existential");
       assert(base.getType().isAddress() &&
              "base value of open-existential component was not an address?");
+      assert(base.getType().getPreferredExistentialRepresentation(SGF.SGM.M)
+             == ExistentialRepresentation::Opaque);
 
       SILValue addr = SGF.B.createOpenExistentialAddr(
           loc, base.getValue(), getTypeOfRValue().getAddressType(),
