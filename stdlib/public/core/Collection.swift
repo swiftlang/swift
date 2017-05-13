@@ -453,15 +453,15 @@ public struct IndexingIterator<
 ///
 ///     let text = "Buffalo buffalo buffalo buffalo."
 ///     if let firstSpace = text.index(of: " ") {
-///         print(text.prefix(upTo: firstSpace))
+///         print(text[..<firstSpace])
 ///     }
 ///     // Prints "Buffalo"
 ///
-/// The `firstSpace` constant is an index into the `text` string---the position of the first space in the
-/// string. You can store indices in variables, and pass them to
-/// collection algorithms or use them later to access the corresponding
-/// element. In the example above, `firstSpace` is used to extract the prefix
-/// that contains elements up to that index.
+/// The `firstSpace` constant is an index into the `text` string---the position
+/// of the first space in the string. You can store indices in variables, and
+/// pass them to collection algorithms or use them later to access the
+/// corresponding element. In the example above, `firstSpace` is used to
+/// extract the prefix that contains elements up to that index.
 ///
 /// You can pass only valid indices to collection operations. You can find a
 /// complete set of a collection's valid indices by starting with the
@@ -514,20 +514,18 @@ public struct IndexingIterator<
 ///     // Prints "Buffalo"
 ///
 /// You can retrieve the same slice using other methods, such as finding the
-/// terminating index, and then using the `prefix(upTo:)` method, which takes
-/// an index as its parameter, or by using the view's ranged subscript.
+/// terminating index, and the using the string's ranged subscript, or by
+/// using the `prefix(upTo:)` method, which takes an index as its parameter.
 ///
 ///     if let firstSpace = text.index(of: " ") {
-///         print(text.prefix(upTo: firstSpace))
+///         print(text[..<firstSpace]
 ///         // Prints "Buffalo"
 ///
-///         let start = text.startIndex
-///         print(text[start..<firstSpace])
+///         print(text.prefix(upTo: firstSpace))
 ///         // Prints "Buffalo"
 ///     }
 ///
-/// The retrieved slice of `text` is equivalent in each of these
-/// cases.
+/// The retrieved slice of `text` is equivalent in each of these cases.
 ///
 /// Slices Share Indices
 /// --------------------
@@ -795,6 +793,15 @@ public protocol Collection : _Indexable, Sequence
   ///     print(numbers.prefix(upTo: numbers.startIndex))
   ///     // Prints "[]"
   ///
+  /// Using the `prefix(upTo:)` method is equivalent to using a partial
+  /// half-open range as the collection's subscript. The subscript notation is
+  /// preferred over `prefix(upTo:)`.
+  ///
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers[..<i])
+  ///     }
+  ///     // Prints "[10, 20, 30]"
+  ///
   /// - Parameter end: The "past the end" index of the resulting subsequence.
   ///   `end` must be a valid index of the collection.
   /// - Returns: A subsequence up to, but not including, the `end` position.
@@ -822,6 +829,15 @@ public protocol Collection : _Indexable, Sequence
   ///     print(numbers.suffix(from: numbers.endIndex))
   ///     // Prints "[]"
   ///
+  /// Using the `suffix(from:)` method is equivalent to using a partial range
+  /// from the index as the collection's subscript. The subscript notation is
+  /// preferred over `suffix(from:)`.
+  ///
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers[i...])
+  ///     }
+  ///     // Prints "[40, 50, 60]"
+  ///
   /// - Parameter start: The index at which to start the resulting subsequence.
   ///   `start` must be a valid index of the collection.
   /// - Returns: A subsequence starting at the `start` position.
@@ -840,6 +856,15 @@ public protocol Collection : _Indexable, Sequence
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
   ///         print(numbers.prefix(through: i))
+  ///     }
+  ///     // Prints "[10, 20, 30, 40]"
+  ///
+  /// Using the `prefix(through:)` method is equivalent to using a partial
+  /// closed range as the collection's subscript. The subscript notation is
+  /// preferred over `prefix(through:)`.
+  ///
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
   ///
@@ -1619,6 +1644,15 @@ extension Collection {
   ///     print(numbers.prefix(upTo: numbers.startIndex))
   ///     // Prints "[]"
   ///
+  /// Using the `prefix(upTo:)` method is equivalent to using a partial
+  /// half-open range as the collection's subscript. The subscript notation is
+  /// preferred over `prefix(upTo:)`.
+  ///
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers[..<i])
+  ///     }
+  ///     // Prints "[10, 20, 30]"
+  ///
   /// - Parameter end: The "past the end" index of the resulting subsequence.
   ///   `end` must be a valid index of the collection.
   /// - Returns: A subsequence up to, but not including, the `end` position.
@@ -1649,6 +1683,15 @@ extension Collection {
   ///     print(numbers.suffix(from: numbers.endIndex))
   ///     // Prints "[]"
   ///
+  /// Using the `suffix(from:)` method is equivalent to using a partial range
+  /// from the index as the collection's subscript. The subscript notation is
+  /// preferred over `suffix(from:)`.
+  ///
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers[i...])
+  ///     }
+  ///     // Prints "[40, 50, 60]"
+  ///
   /// - Parameter start: The index at which to start the resulting subsequence.
   ///   `start` must be a valid index of the collection.
   /// - Returns: A subsequence starting at the `start` position.
@@ -1670,6 +1713,15 @@ extension Collection {
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
   ///         print(numbers.prefix(through: i))
+  ///     }
+  ///     // Prints "[10, 20, 30, 40]"
+  ///
+  /// Using the `prefix(through:)` method is equivalent to using a partial
+  /// closed range as the collection's subscript. The subscript notation is
+  /// preferred over `prefix(through:)`.
+  ///
+  ///     if let i = numbers.index(of: 40) {
+  ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
   ///

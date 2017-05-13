@@ -95,8 +95,8 @@ if True:
 ///
 ///     let midpoint = absences.count / 2
 ///
-///     let firstHalf = absences.prefix(upTo: midpoint)
-///     let secondHalf = absences.suffix(from: midpoint)
+///     let firstHalf = absences[..<midpoint]
+///     let secondHalf = absences[midpoint...]
 ///
 /// Neither the `firstHalf` nor `secondHalf` slices allocate any new storage
 /// of their own. Instead, each presents a view onto the storage of the
@@ -151,7 +151,7 @@ if True:
 /// Here's an implementation of those steps:
 ///
 ///     if let i = absences.index(where: { $0 > 0 }) {                      // 1
-///         let absencesAfterFirst = absences.suffix(from: i + 1)           // 2
+///         let absencesAfterFirst = absences[(i + 1)...]                   // 2
 ///         if let j = absencesAfterFirst.index(where: { $0 > 0 }) {        // 3
 ///             print("The first day with absences had \(absences[i]).")    // 4
 ///             print("The second day with absences had \(absences[j]).")

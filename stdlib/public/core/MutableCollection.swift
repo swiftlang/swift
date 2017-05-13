@@ -267,13 +267,13 @@ public protocol MutableCollection : _MutableIndexable, Collection
   ///     // numbers == [30, 10, 20, 30, 30, 60, 40]
   ///
   /// The `numbers` array is now arranged in two partitions. The first
-  /// partition, `numbers.prefix(upTo: p)`, is made up of the elements that
-  /// are not greater than 30. The second partition, `numbers.suffix(from: p)`,
+  /// partition, `numbers[..<p]`, is made up of the elements that
+  /// are not greater than 30. The second partition, `numbers[p...]`,
   /// is made up of the elements that *are* greater than 30.
   ///
-  ///     let first = numbers.prefix(upTo: p)
+  ///     let first = numbers[..<p]
   ///     // first == [30, 10, 20, 30, 30]
-  ///     let second = numbers.suffix(from: p)
+  ///     let second = numbers[p...]
   ///     // second == [60, 40]
   ///
   /// - Parameter belongsInSecondPartition: A predicate used to partition
