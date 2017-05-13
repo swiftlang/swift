@@ -18,8 +18,7 @@
 
 import StdlibUnittest
 
-// FIXME: Various Sema and SILGen crashes if this is not ': class'
-protocol P : class {
+protocol P {
   init(protocolInit: ())
 
   func protocolMethodReturnsSelf() -> Self

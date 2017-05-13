@@ -183,8 +183,7 @@ func methodCalls(
   // CHECK-NEXT: }
 }
 
-// FIXME: Various Sema and SILGen crashes if this is not ': class'
-protocol PropertyP : class {
+protocol PropertyP {
   var p: PropertyP & PropertyC { get set }
 
   subscript(key: Int) -> Int { get set }
@@ -207,19 +206,20 @@ class PropertyC {
 
 // CHECK-LABEL: sil hidden @_T021subclass_existentials16propertyAccessesyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@owned PropertyC & PropertyP) -> () {
 func propertyAccesses(_ x: PropertyP & PropertyC) {
-  x.p.p = x
-  x.c.c = x
+  var xx = x
+  xx.p.p = x
+  xx.c.c = x
 
-  propertyAccesses(x.p)
-  propertyAccesses(x.c)
+  propertyAccesses(xx.p)
+  propertyAccesses(xx.c)
 
-  _ = x[1]
-  x[1] = 1
-  x[1] += 1
+  _ = xx[1]
+  xx[1] = 1
+  xx[1] += 1
 
-  _ = x[(1, 2)]
-  x[(1, 2)] = 1
-  x[(1, 2)] += 1
+  _ = xx[(1, 2)]
+  xx[(1, 2)] = 1
+  xx[(1, 2)] += 1
 }
 
 // CHECK-LABEL: sil hidden @_T021subclass_existentials19functionConversionsyAA1P_AA4BaseCySiGXcyc07returnsE4AndP_AaC_AFXcXpyc0feG5PTypeAA7DerivedCyc0fI0AJmyc0fI4TypeAA1R_AJXcyc0fiG1RAaM_AJXcXpyc0fiG5RTypetF : $@convention(thin) (@owned @callee_owned () -> @owned Base<Int> & P, @owned @callee_owned () -> @thick (Base<Int> & P).Type, @owned @callee_owned () -> @owned Derived, @owned @callee_owned () -> @thick Derived.Type, @owned @callee_owned () -> @owned Derived & R, @owned @callee_owned () -> @thick (Derived & R).Type) -> () {
