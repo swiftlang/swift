@@ -4047,29 +4047,33 @@ void SILGenFunction::emitOpenExistentialExprImpl(
        llvm::function_ref<void(Expr *)> emitSubExpr) {
   Optional<FormalEvaluationScope> writebackScope;
 
+  Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
+
   // Emit the existential value.
-  ManagedValue existentialValue;
+  SILGenFunction::OpaqueValueState state;
+
   AccessKind accessKind;
   if (E->getExistentialValue()->getType()->is<LValueType>()) {
     // Create a writeback scope for the access to the existential lvalue.
     writebackScope.emplace(*this);
 
     accessKind = E->getExistentialValue()->getLValueAccessKind();
-    existentialValue = emitAddressOfLValue(
-                         E->getExistentialValue(),
-                         emitLValue(E->getExistentialValue(), accessKind),
-                         accessKind);
+    auto lv = emitLValue(E->getExistentialValue(), accessKind);
+    lv = emitOpenExistentialLValue(E, std::move(lv),
+                                   CanArchetypeType(E->getOpenedArchetype()),
+                                   accessKind);
+    auto addr = emitAddressOfLValue(E, std::move(lv), accessKind);
+    state = {addr, false, false};
   } else {
     accessKind = AccessKind::Read;
-    existentialValue = emitRValueAsSingleValue(
-                         E->getExistentialValue(),
-                         SGFContext::AllowGuaranteedPlusZero);
-  }
+    auto existentialValue = emitRValueAsSingleValue(
+      E->getExistentialValue(),
+      SGFContext::AllowGuaranteedPlusZero);
   
-  Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
-  SILGenFunction::OpaqueValueState state = emitOpenExistential(
+    state = emitOpenExistential(
       E, existentialValue, E->getOpenedArchetype(),
       getLoweredType(opaqueValueType), accessKind);
+  }
 
   // Register the opaque value for the projected existential.
   SILGenFunction::OpaqueValueRAII opaqueValueRAII(
