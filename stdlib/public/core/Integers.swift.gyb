@@ -2578,13 +2578,6 @@ public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
 
-%   if Self != 'Int':
-  @_transparent
-  public init(_ other: ${Self}) {
-    self.init(other._value)
-  }
-%   end
-
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
     _value = Builtin.s_to_${u}_checked_trunc_${IntLiteral}_${BuiltinName}(x).0
