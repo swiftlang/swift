@@ -683,9 +683,9 @@ public:
     return OrphanKind::None;
   }
 
-  void analyze(ASTNode Node) {
+  bool analyze(ASTNode Node) {
     if (!shouldAnalyze(Node))
-      return;
+      return false;
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
@@ -702,7 +702,7 @@ public:
       // The node is contained in the given range.
       ContainedASTNodes.push_back(Node);
       Result = getSingleNodeKind(Node);
-      return;
+      return true;
     }
     case RangeMatchKind::StartMatch:
       DCInfo.StartMatches.emplace_back(Node);
@@ -712,13 +712,7 @@ public:
       break;
     }
 
-    // If no parent is considered as a contained node; this node should be
-    // a top-level contained node.
-    if (std::none_of(ContainedASTNodes.begin(), ContainedASTNodes.end(),
-      [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
-                                               Node.getSourceRange()); })) {
-      ContainedASTNodes.push_back(Node);
-    }
+    ContainedASTNodes.push_back(Node);
 
     if (DCInfo.isMultiStatement()) {
       postAnalysis(DCInfo.EndMatches.back());
@@ -732,8 +726,8 @@ public:
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
-      return;
     }
+    return true;
   }
 
   bool shouldEnter(ASTNode Node) {
@@ -834,7 +828,8 @@ RangeResolver::~RangeResolver() { if (Impl) delete Impl; }
 bool RangeResolver::walkToExprPre(Expr *E) {
   if (!Impl->shouldEnter(E))
     return false;
-  Impl->analyze(E);
+  if (Impl->analyze(E))
+    return false;
   Impl->enter(E);
   return true;
 }
@@ -842,7 +837,8 @@ bool RangeResolver::walkToExprPre(Expr *E) {
 bool RangeResolver::walkToStmtPre(Stmt *S) {
   if (!Impl->shouldEnter(S))
     return false;
-  Impl->analyze(S);
+  if (Impl->analyze(S))
+    return false;
   Impl->enter(S);
   return true;
 };
@@ -852,7 +848,8 @@ bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
     return false;
   if (!Impl->shouldEnter(D))
     return false;
-  Impl->analyze(D);
+  if (Impl->analyze(D))
+    return false;
   Impl->enter(D);
   return true;
 }
