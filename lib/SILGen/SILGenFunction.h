@@ -1284,6 +1284,10 @@ public:
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    AccessKind accessKind,
                                    TSanKind tsanKind = TSanKind::None);
+  LValue emitOpenExistentialLValue(SILLocation loc,
+                                   LValue &&existentialLV,
+                                   CanArchetypeType openedArchetype,
+                                   AccessKind accessKind);
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);

@@ -579,7 +579,7 @@ namespace {
   public:
     OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype)
       : PhysicalPathComponent(getOpenedArchetypeTypeData(openedArchetype),
-                              OpenedExistentialKind) {}
+                              OpenOpaqueExistentialKind) {}
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
@@ -601,6 +601,89 @@ namespace {
 
     void print(raw_ostream &OS) const override {
       OS << "OpenOpaqueExistentialComponent(" << getSubstFormalType() << ")\n";
+    }
+  };
+
+  /// A local path component for the payload of a class existential.
+  ///
+  /// TODO: Could be physical if we had a way to project out the
+  /// payload.
+  class OpenClassExistentialComponent : public LogicalPathComponent {
+    static LValueTypeData getOpenedArchetypeTypeData(CanArchetypeType type) {
+      return {
+        AbstractionPattern::getOpaque(), type,
+        SILType::getPrimitiveObjectType(type)
+      };
+    }
+  public:
+    OpenClassExistentialComponent(CanArchetypeType openedArchetype)
+      : LogicalPathComponent(getOpenedArchetypeTypeData(openedArchetype),
+                             OpenClassExistentialKind) {}
+
+    AccessKind getBaseAccessKind(SILGenFunction &SGF,
+                                 AccessKind kind) const override {
+      // Always use the same access kind for the base.
+      return kind;
+    }
+
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &SGF) override {
+      // no useful writeback diagnostics at this point
+    }
+
+    RValue get(SILGenFunction &SGF, SILLocation loc,
+               ManagedValue base, SGFContext c) && override {
+      auto refType = base.getType().getObjectType();
+      auto &TL = SGF.getTypeLowering(refType);
+
+      // Load the original value.
+      auto result = SGF.emitLoad(loc, base.getValue(), TL,
+                                 SGFContext(), IsNotTake);
+
+      assert(refType.isExistentialType() &&
+             "base for open existential component must be an existential");
+      assert(refType.getPreferredExistentialRepresentation(SGF.SGM.M)
+             == ExistentialRepresentation::Class);
+      auto ref = SGF.B.createOpenExistentialRef(
+        loc, result, getTypeOfRValue());
+
+      SGF.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
+                                  ref.getValue());
+
+      return RValue(SGF, loc, getSubstFormalType(), ref);
+    }
+
+    void set(SILGenFunction &SGF, SILLocation loc,
+             RValue &&value, ManagedValue base) && override {
+      auto payload = std::move(value).forwardAsSingleValue(SGF, loc);
+
+      SmallVector<ProtocolConformanceRef, 2> conformances;
+      for (auto proto : cast<ArchetypeType>(getSubstFormalType())->getConformsTo())
+        conformances.push_back(ProtocolConformanceRef(proto));
+
+      auto ref = SGF.B.createInitExistentialRef(
+        loc,
+        base.getType().getObjectType(),
+        getSubstFormalType(),
+        payload,
+        SGF.getASTContext().AllocateCopy(conformances));
+
+      auto &TL = SGF.getTypeLowering(base.getType());
+      SGF.emitSemanticStore(loc, ref,
+                            base.getValue(), TL, IsNotInitialization);
+    }
+
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &SGF, SILLocation loc) const override {
+      LogicalPathComponent *clone =
+        new OpenClassExistentialComponent(
+          cast<ArchetypeType>(getSubstFormalType()));
+      return std::unique_ptr<LogicalPathComponent>(clone);
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "OpenClassExistentialComponent(...)\n";
     }
   };
 
@@ -2815,6 +2898,31 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return ManagedValue::forLValue(addr.getValue());
+}
+
+LValue
+SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
+                                          LValue &&lv,
+                                          CanArchetypeType openedArchetype,
+                                          AccessKind accessKind) {
+  // Open up the existential.
+  auto rep = lv.getTypeOfRValue()
+    .getPreferredExistentialRepresentation(SGM.M);
+  switch (rep) {
+  case ExistentialRepresentation::Opaque: {
+    lv.add<OpenOpaqueExistentialComponent>(openedArchetype);
+    break;
+  }
+  case ExistentialRepresentation::Class: {
+    lv.add<OpenClassExistentialComponent>(openedArchetype);
+    break;
+  }
+  default:
+    llvm_unreachable("Cannot perform lvalue access of "
+                     "non-opaque, non-class existential");
+  }
+
+  return std::move(lv);
 }
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
