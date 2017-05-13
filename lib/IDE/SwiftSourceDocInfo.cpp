@@ -962,9 +962,14 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
   }
 }
 
-std::vector<CharSourceRange> swift::ide::
-getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
-  std::vector<CharSourceRange> Ranges;
+CharSourceRange CallArgInfo::getEntireCharRange(const SourceManager &SM) const {
+  return CharSourceRange(SM, LabelRange.getStart(),
+                         Lexer::getLocForEndOfToken(SM, ArgExp->getEndLoc()));
+}
+
+std::vector<CallArgInfo> swift::ide::
+getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
+  std::vector<CallArgInfo> InfoVec;
   if (auto *TE = dyn_cast<TupleExpr>(Arg)) {
     size_t ElemIndex = 0;
     for (Expr *Elem : TE->getElements()) {
@@ -978,13 +983,21 @@ getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
           LabelEnd = LabelStart.getAdvancedLoc(NameIdentifier.getLength());
       }
 
-      Ranges.push_back(CharSourceRange(SM, LabelStart, LabelEnd));
+      InfoVec.push_back({Elem, CharSourceRange(SM, LabelStart, LabelEnd)});
       ++ElemIndex;
     }
   } else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
-    if (PE->getSubExpr())
-      Ranges.push_back(CharSourceRange(PE->getSubExpr()->getStartLoc(), 0));
+    if (auto Sub = PE->getSubExpr())
+      InfoVec.push_back({Sub, CharSourceRange(Sub->getStartLoc(), 0)});
   }
+  return InfoVec;
+}
 
+std::vector<CharSourceRange> swift::ide::
+getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
+  std::vector<CharSourceRange> Ranges;
+  auto InfoVec = getCallArgInfo(SM, Arg, EndKind);
+  std::transform(InfoVec.begin(), InfoVec.end(), std::back_inserter(Ranges),
+                 [](CallArgInfo &Info) { return Info.LabelRange; });
   return Ranges;
 }

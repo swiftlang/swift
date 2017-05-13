@@ -20,3 +20,11 @@ public protocol ExtraCities {
 public protocol MoreCities {
   func setZooLocation(x: Int, y: Int, z: Int)
 }
+
+public func setCityProperty1(_ c : Cities, _ p : Int) {}
+public func globalCityFunc() {}
+public func setCityProperty2(_ c : Cities, _ p : Int, _ q: Int) {}
+public func globalCityFunc2(_ c : Cities) {}
+public func globalCityFunc3(_ c : Cities, _ p : Int) -> Int { return 0 }
+public func globalCityFunc4(_ c : Cities, _ p : Int, _ q: Int) -> Int { return 0 }
+public func globalCityFunc5() -> Int { return 0 }

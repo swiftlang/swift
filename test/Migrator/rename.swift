@@ -5,15 +5,15 @@
 import Bar
 
 func foo(_ b: BarForwardDeclaredClass) {
-  b.barInstanceFunc1(_: 0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
+  b.barInstanceFunc1(0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
   barGlobalFuncOldName(2)
-  b.barInstanceFunc1(_: 0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
+  b.barInstanceFunc1(0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
   barGlobalFuncOldName(2)
-  b.barInstanceFunc1(_: 0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
+  b.barInstanceFunc1(0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
   barGlobalFuncOldName(2)
-  b.barInstanceFunc1(_: 0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
+  b.barInstanceFunc1(0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
   barGlobalFuncOldName(2)
-  b.barInstanceFunc1(_: 0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
+  b.barInstanceFunc1(0, anotherValue: 1, anotherValue1: 2, anotherValue2: 3)
   barGlobalFuncOldName(2)
   _ = barGlobalVariableOldEnumElement
 }

@@ -307,6 +307,7 @@ public:
 class DeclNameViewer {
   StringRef BaseName;
   SmallVector<StringRef, 4> Labels;
+  bool HasParen;
 public:
   DeclNameViewer(StringRef Text);
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
@@ -316,6 +317,7 @@ public:
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
+  bool isFunction() const { return HasParen; }
 };
 
 /// This provide a utility for writing to an underlying string buffer multiple
@@ -414,6 +416,15 @@ enum class LabelRangeEndAt: int8_t {
   BeforeElemStart,
   LabelNameOnly,
 };
+
+struct CallArgInfo {
+  Expr *ArgExp;
+  CharSourceRange LabelRange;
+  CharSourceRange getEntireCharRange(const SourceManager &SM) const;
+};
+
+std::vector<CallArgInfo>
+getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 
 // Get the ranges of argument labels from an Arg, either tuple or paren.
 std::vector<CharSourceRange>
