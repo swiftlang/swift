@@ -149,12 +149,19 @@ default:
 
 // SR-3174
 
-class Hello {
+class D {
   func test() {
     let cancel = #selector(cancel) // expected-warning {{initialization of immutable value 'cancel' was never used; consider replacing with assignment to '_' or removing it}}
   }
 
-  func cancel() { }
+  @objc func cancel() { }
+}
+
+class E {
+  let d = D()
+  func test() {
+    let cancel = #selector(d.cancel) // expected-warning {{initialization of immutable value 'cancel' was never used; consider replacing with assignment to '_' or removing it}} 
+  }
 }
 
 func testVariableWithinItsOwnInitialValue() {
