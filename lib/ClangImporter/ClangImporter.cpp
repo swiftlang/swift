@@ -791,7 +791,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   PCHBasename.append(SwiftPCHHash);
   PCHBasename.append("-clang_");
   PCHBasename.append(getClangModuleHash());
-  llvm::sys::path::replace_extension(PCHBasename, ".pch");
+  PCHBasename.append(".pch");
   SmallString<256> PCHFilename { PCHOutputDir };
   llvm::sys::path::append(PCHFilename, PCHBasename);
   return PCHFilename.str().str();
@@ -807,13 +807,8 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
   if (!PCHFilename.hasValue()) {
     return None;
   }
-  if (!isExplicit && !canReadPCH(PCHFilename.getValue())) {
-    SmallString<256> Message;
-    llvm::raw_svector_ostream OS(Message);
-    auto Diags = new clang::TextDiagnosticPrinter {
-      llvm::errs(),
-      &Impl.Instance->getDiagnosticOpts()
-    };
+  if (!isExplicit && !ImporterOptions.PCHDisableValidation &&
+      !canReadPCH(PCHFilename.getValue())) {
     StringRef parentDir = llvm::sys::path::parent_path(PCHFilename.getValue());
     std::error_code EC = llvm::sys::fs::create_directories(parentDir);
     if (EC) {
@@ -822,8 +817,7 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
       return None;
     }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.getValue(),
-                                        Diags);
+                                        PCHFilename.getValue());
     if (FailedToEmit) {
       return None;
     }
@@ -1304,8 +1298,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
 bool
 ClangImporter::emitBridgingPCH(StringRef headerPath,
-                               StringRef outputPCHPath,
-                               clang::DiagnosticConsumer *Diags) {
+                               StringRef outputPCHPath) {
   auto invocation = std::make_shared<clang::CompilerInvocation>
     (clang::CompilerInvocation(*Impl.Invocation));
   invocation->getFrontendOpts().DisableFree = false;
@@ -1318,12 +1311,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations());
   emitInstance.setInvocation(std::move(invocation));
-
-  auto ReusingDiags = Diags == nullptr;
-  if (ReusingDiags) {
-    Diags = &Impl.Instance->getDiagnosticClient();
-  }
-  emitInstance.createDiagnostics(Diags, /*ShouldOwnClient=*/!ReusingDiags);
+  emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
+                                 /*ShouldOwnClient=*/false);
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   emitInstance.setFileManager(&fileManager);

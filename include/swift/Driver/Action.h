@@ -282,10 +282,17 @@ public:
 };
   
 class GeneratePCHJobAction : public JobAction {
+  std::string PersistentPCHDir;
+
   virtual void anchor();
 public:
-  explicit GeneratePCHJobAction(Action *Input)
-    : JobAction(Action::GeneratePCHJob, Input, types::TY_PCH) {}
+  GeneratePCHJobAction(Action *Input, StringRef persistentPCHDir)
+    : JobAction(Action::GeneratePCHJob, Input,
+                persistentPCHDir.empty() ? types::TY_PCH : types::TY_Nothing),
+      PersistentPCHDir(persistentPCHDir) {}
+
+  bool isPersistentPCH() const { return !PersistentPCHDir.empty(); }
+  StringRef getPersistentPCHDir() const { return PersistentPCHDir; }
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::GeneratePCHJob;
