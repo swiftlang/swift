@@ -247,6 +247,23 @@ private:
   TypeMemberDiffItemSubKind getSubKind() const;
 };
 
+/// This is an authored item to associate a USR with a specially handled case.
+/// It is up to the migrator to interpret the special case Id and apply proper
+/// transformation on an entity.
+struct SpecialCaseDiffItem: public APIDiffItem {
+  StringRef usr;
+  StringRef caseId;
+public:
+  SpecialCaseDiffItem(StringRef usr, StringRef caseId): usr(usr),
+    caseId(caseId) {}
+  StringRef getKey() const override { return usr; }
+  void streamDef(llvm::raw_ostream &S) const override {};
+  static bool classof(const APIDiffItem *D);
+  APIDiffItemKind getKind() const override {
+    return APIDiffItemKind::ADK_SpecialCaseDiffItem;
+  }
+};
+
 struct NoEscapeFuncParam: public APIDiffItem {
   StringRef Usr;
   unsigned Index;
