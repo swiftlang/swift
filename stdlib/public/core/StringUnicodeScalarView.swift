@@ -326,6 +326,10 @@ extension String {
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
+extension String.UnicodeScalarView : _SwiftStringView {
+  var _persistentContent : String { return String(_core) }
+}
+
 extension String {
   /// The string's value represented as a collection of Unicode scalar values.
   public var unicodeScalars: UnicodeScalarView {
