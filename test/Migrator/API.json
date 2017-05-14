@@ -421,10 +421,5 @@
     "NewTypeName": "example",
     "SelfIndex": 0,
     "RemovedIndex": 1
-  },
-  {
-    "DiffItemKind": "SpecialCaseDiffItem",
-    "Usr": "c:@shouldnotexistspecial",
-    "SpecialCaseId": "rdar://1234567"
   }
 ]
