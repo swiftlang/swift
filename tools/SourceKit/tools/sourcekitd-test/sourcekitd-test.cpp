@@ -139,6 +139,7 @@ static sourcekitd_uid_t KeyRangeContent;
 static sourcekitd_uid_t KeyBaseName;
 static sourcekitd_uid_t KeyArgNames;
 static sourcekitd_uid_t KeySelectorPieces;
+static sourcekitd_uid_t KeyIsZeroArgSelector;
 static sourcekitd_uid_t KeyNameKind;
 static sourcekitd_uid_t KeySwiftVersion;
 static sourcekitd_uid_t KeyCancelOnSubsequentRequest;
@@ -271,6 +272,7 @@ static int skt_main(int argc, const char **argv) {
   KeyBaseName = sourcekitd_uid_get_from_cstr("key.basename");
   KeyArgNames = sourcekitd_uid_get_from_cstr("key.argnames");
   KeySelectorPieces = sourcekitd_uid_get_from_cstr("key.selectorpieces");
+  KeyIsZeroArgSelector = sourcekitd_uid_get_from_cstr("key.is_zero_arg_selector");
   KeyNameKind = sourcekitd_uid_get_from_cstr("key.namekind");
 
   KeySwiftVersion = sourcekitd_uid_get_from_cstr("key.swift_version");
@@ -634,15 +636,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       if (ArgPieces.back().empty())
         ArgPieces.pop_back();
       ArgName = KeySelectorPieces;
-      std::transform(ArgPieces.begin(), ArgPieces.end(), ArgPieces.begin(),
-        [Name] (StringRef T) {
-        if (!T.empty() && T.data() + T.size() < Name.data() + Name.size() &&
-            *(T.data() + T.size()) == ':') {
-          // Include the colon belonging to the piece.
-          return StringRef(T.data(), T.size() + 1);
-        }
-        return T;
-      });
     } else {
       llvm::errs() << "must specify either -swift-name or -objc-name or -objc-selector\n";
       return 1;
@@ -1163,6 +1156,12 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
     Selectors.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyName));
   }
 
+  bool IsZeroArgSelector = false;
+  auto IsZeroArgObj = sourcekitd_variant_dictionary_get_value(Info, KeyIsZeroArgSelector);
+  if (sourcekitd_variant_get_type(IsZeroArgObj) != SOURCEKITD_VARIANT_TYPE_NULL) {
+    IsZeroArgSelector = sourcekitd_variant_int64_get_value(IsZeroArgObj);
+  }
+
   std::vector<const char *> Args;
   sourcekitd_variant_t ArgsObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyArgNames);
@@ -1188,6 +1187,9 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   }
   for (auto S : Selectors) {
     OS << S;
+    if (!IsZeroArgSelector) {
+      OS << ":";
+    }
   }
   OS << '\n';
 }

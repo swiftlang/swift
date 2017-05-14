@@ -1523,6 +1523,9 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
       NameEle.set(KeyName, N);
     }
   }
+  if (Info.IsZeroArgSelector) {
+    Elem.set(KeyIsZeroArgSelector, Info.IsZeroArgSelector);
+  }
   Rec(RespBuilder.createResponse());
 }
 
