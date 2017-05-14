@@ -244,6 +244,7 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem:
   case APIDiffItemKind::ADK_OverloadedFuncInfo:
+  case APIDiffItemKind::ADK_SpecialCaseDiffItem:
     return true;
   }
 }
@@ -326,6 +327,10 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   case APIDiffItemKind::ADK_OverloadedFuncInfo: {
     return new (Alloc.Allocate<OverloadedFuncInfo>()) OverloadedFuncInfo(Usr);
   }
+  case APIDiffItemKind::ADK_SpecialCaseDiffItem: {
+    return new (Alloc.Allocate<SpecialCaseDiffItem>())
+      SpecialCaseDiffItem(Usr, SpecialCaseId);
+  }
   }
 }
 } // end anonymous namespace
@@ -404,6 +409,8 @@ struct ObjectTraits<APIDiffItem*> {
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_Usr), Item->Usr);
       return;
     }
+    case APIDiffItemKind::ADK_SpecialCaseDiffItem:
+      llvm_unreachable("This entry should be authored only.");
     }
   }
 };
