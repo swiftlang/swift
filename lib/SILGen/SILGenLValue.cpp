@@ -589,22 +589,12 @@ namespace {
                         AccessKind accessKind) && override {
       assert(base.getType().isExistentialType() &&
              "base for open existential component must be an existential");
-      auto addr = SGF.B.createOpenExistentialAddr(
-          loc, base.getLValueAddress(), getTypeOfRValue().getAddressType(),
-          getOpenedExistentialAccessFor(accessKind));
+      assert(base.getType().isAddress() &&
+             "base value of open-existential component was not an address?");
 
-      if (base.hasCleanup()) {
-        assert(false && "I believe that we should never end up here. One, we "
-                        "assert above that base is an l-value address and we "
-                        "state l-values don't have associated cleanup. Two, we "
-                        "enter deinit of the buffer but don't have "
-                        "book-keeping for the value. Three, I believe that "
-                        "would mean to have a l-value passed at +1 which I "
-                        "don't believe we do.");
-        // Leave a cleanup to deinit the existential container.
-        SGF.enterDeinitExistentialCleanup(base.getValue(), CanType(),
-                                          ExistentialRepresentation::Opaque);
-      }
+      SILValue addr = SGF.B.createOpenExistentialAddr(
+          loc, base.getValue(), getTypeOfRValue().getAddressType(),
+          getOpenedExistentialAccessFor(accessKind));
 
       SGF.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
                                   addr);
@@ -1926,14 +1916,7 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
     openedExistentials.erase(known);
 
     // Do formal evaluation of the underlying existential lvalue.
-    LValue existentialLV = visitRec(opened->getExistentialValue(), accessKind);
-
-    ManagedValue existentialAddr
-      = SGF.emitAddressOfLValue(e, std::move(existentialLV), accessKind);
-
-    // Open up the existential.
-    LValue lv;
-    lv.add<ValueComponent>(existentialAddr, None, existentialLV.getTypeData());
+    LValue lv = visitRec(opened->getExistentialValue(), accessKind);
     lv.add<OpenOpaqueExistentialComponent>(
       cast<ArchetypeType>(opened->getOpenedArchetype()->getCanonicalType()));
     return lv;
