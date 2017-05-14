@@ -84,12 +84,12 @@ for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to proto
 }
 
 // Generic as part of function/tuple types
-func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) {
+func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) { // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{20-26=()}}
   return (c: 0, i: g())
 }
 
 func f7() -> (c: Int, v: A) {
-  let g: (Void) -> A = { return A() }
+  let g: (Void) -> A = { return A() } // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{10-16=()}}
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 

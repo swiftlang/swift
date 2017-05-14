@@ -90,6 +90,12 @@ struct FixitFilter {
       return false;
     }
 
+    // Trying to add '_ in' to a closure signature can be counterproductive when
+    // fixing function signatures like (Void) -> () to () -> ().
+    if (Info.ID == diag::closure_argument_list_missing.ID) {
+      return false;
+    }
+
     if (Kind == DiagnosticKind::Error)
       return true;
 
@@ -120,7 +126,8 @@ struct FixitFilter {
         Info.ID == diag::override_swift3_objc_inference.ID ||
         Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
         Info.ID == diag::missing_several_cases.ID ||
-        Info.ID == diag::missing_particular_case.ID)
+        Info.ID == diag::missing_particular_case.ID ||
+        Info.ID == diag::paren_void_probably_void.ID)
       return true;
 
     return false;
