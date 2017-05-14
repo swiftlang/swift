@@ -1409,7 +1409,7 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { (block: ((Bool, Bool)) -> ()) in
-  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void'}}
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '(((Bool, Bool) -> ())) -> Void}}
     block(p)
     block((c, c))
     block(c, c)
@@ -1461,7 +1461,7 @@ let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = Muta
 // SR-4745
 let sr4745 = [1, 2]
 let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
-// expected-error@-1 {{closure tuple parameter '(offset: Int, element: Int)' does not support destructuring}} {{35-51=(arg) -> <#Result#>}} {{55-55=let (count, element) = arg; return }}
+// expected-error@-1 {{closure tuple parameter '(offset: Int, element: (Int))' does not support destructuring}} {{35-51=(arg) -> <#Result#>}} {{55-55=let (count, element) = arg; return }}
 
 // SR-4738
 

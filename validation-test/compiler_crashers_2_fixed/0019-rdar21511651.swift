@@ -1,4 +1,5 @@
 // RUN: not %target-swift-frontend %s -typecheck
+// XFAIL: *
 
 internal protocol _SequenceWrapper {
   typealias Base : Sequence

@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// XFAIL: linux
+// XFAIL: *
 // RUN: rm -rf %t ; mkdir -p %t
 // RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out

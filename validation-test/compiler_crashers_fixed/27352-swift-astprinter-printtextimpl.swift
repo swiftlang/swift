@@ -6,4 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
+// XFAIL: *
 func b{struct Q<T where g:c{enum S{{}class a{class B{struct B{enum S<a{struct B{class a{struct Q{struct D:Collection

@@ -129,7 +129,7 @@ public protocol BidirectionalCollection : _BidirectionalIndexable, Collection
   ///     // Prints "50"
   ///     
   /// - Complexity: O(1)
-  var last: Iterator.Element? { get }
+  var last: Element? { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -233,7 +233,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1).
   /// - SeeAlso: `removeLast()`
-  public mutating func popLast() -> Iterator.Element? {
+  public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
@@ -250,7 +250,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Complexity: O(1)
   /// - SeeAlso: `popLast()`
   @discardableResult
-  public mutating func removeLast() -> Iterator.Element {
+  public mutating func removeLast() -> Element {
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
     return element

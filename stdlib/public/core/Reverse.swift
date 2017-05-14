@@ -255,10 +255,8 @@ public struct ReversedCollection<
     return _base.distance(from: end.base, to: start.base)
   }
 
-  public typealias _Element = Base.Iterator.Element
-
   @_inlineable
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     return _base[_base.index(before: position.base)]
   }
 
@@ -429,11 +427,8 @@ public struct ReversedRandomAccessCollection<
     return _base.distance(from: end.base, to: start.base)
   }
 
-  public typealias _Element = Base.Iterator.Element
-  // FIXME(compiler limitation): this typealias should be inferred.
-
   @_inlineable
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     return _base[_base.index(before: position.base)]
   }
 

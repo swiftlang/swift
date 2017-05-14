@@ -21,7 +21,7 @@ extension LazySequenceProtocol {
   ///
   /// - Complexity: O(1)
   public func flatMap<SegmentOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).joined()
@@ -38,7 +38,7 @@ extension LazySequenceProtocol {
   ///
   /// - Complexity: O(1)
   public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> ElementOfResult?
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
     LazyFilterSequence<
       LazyMapSequence<Elements, ElementOfResult?>>,
@@ -59,7 +59,7 @@ extension LazyCollectionProtocol {
   ///
   /// - Complexity: O(1)
   public func flatMap<SegmentOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenCollection<
       LazyMapCollection<Elements, SegmentOfResult>>
@@ -78,7 +78,7 @@ extension LazyCollectionProtocol {
   ///
   /// - Complexity: O(1)
   public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> ElementOfResult?
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
     LazyFilterCollection<
       LazyMapCollection<Elements, ElementOfResult?>>,
@@ -103,7 +103,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   public func flatMap<SegmentOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
+    _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
       LazyMapBidirectionalCollection<Elements, SegmentOfResult>>> {
@@ -121,7 +121,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Iterator.Element) -> ElementOfResult?
+    _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapBidirectionalCollection<
     LazyFilterBidirectionalCollection<
       LazyMapBidirectionalCollection<Elements, ElementOfResult?>>,

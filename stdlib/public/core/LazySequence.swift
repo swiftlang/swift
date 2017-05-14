@@ -47,7 +47,7 @@
 ///       /// - Complexity: O(n)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
+///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
@@ -83,7 +83,7 @@
 ///       private let initial: ResultElement
 ///       private let base: Base
 ///       private let nextPartialResult:
-///         (ResultElement, Base.Iterator.Element) -> ResultElement
+///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
@@ -101,7 +101,7 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
+///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
 ///           initial: initial, base: self, nextPartialResult)
@@ -116,7 +116,7 @@
 ///   as the accumulation of `result` below are never unexpectedly
 ///   dropped or deferred:
 ///
-///       extension Sequence where Iterator.Element == Int {
+///       extension Sequence where Element == Int {
 ///         func sum() -> Int {
 ///           var result = 0
 ///           _ = self.map { result += $0 }
@@ -203,7 +203,7 @@ public typealias LazySequenceType = LazySequenceProtocol
 
 extension LazySequenceProtocol {
   @available(*, unavailable, message: "Please use Array initializer instead.")
-  public var array: [Iterator.Element] {
+  public var array: [Element] {
     Builtin.unreachable()
   }
 }

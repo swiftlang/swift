@@ -19,8 +19,6 @@ let arrayCount = 1024
 // being really slow).
 @_versioned
 protocol MyArrayBufferProtocol : MutableCollection, RandomAccessCollection {
-  associatedtype Element
-
   mutating func myReplace<C>(
     _ subRange: Range<Int>,
     with newValues: C
