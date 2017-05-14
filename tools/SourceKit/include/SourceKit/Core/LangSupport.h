@@ -300,6 +300,7 @@ struct NameTranslatingInfo {
   UIdent NameKind;
   StringRef BaseName;
   std::vector<StringRef> ArgNames;
+  bool IsZeroArgSelector = false;
 };
 
 struct RelatedIdentsInfo {
