@@ -2324,13 +2324,43 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
       !repr->isWarnedAbout()) {
     auto args = repr->getArgsTypeRepr();
-    TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
-      .highlight(args->getSourceRange())
-      .fixItInsert(args->getStartLoc(), "(")
-      .fixItInsertAfter(args->getEndLoc(), ")");
+
+    bool isVoid = false;
+    if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(args)) {
+      if (Void->getIdentifier().str() == "Void") {
+        isVoid = true;
+      }
+    }
+    if (isVoid) {
+      TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
+        .fixItReplace(args->getStartLoc(), "()");
+    } else {
+      TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
+        .highlight(args->getSourceRange())
+        .fixItInsert(args->getStartLoc(), "(")
+        .fixItInsertAfter(args->getEndLoc(), ")");
+    }
     
     // Don't emit this warning three times when in generics.
     repr->setWarned();
+  } else if (isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
+             !repr->isWarnedAbout()) {
+    // If someone wrote (Void) -> () in Swift 3, they probably meant
+    // () -> (), but (Void) -> () is (()) -> () so emit a warning
+    // asking if they meant () -> ().
+    auto args = repr->getArgsTypeRepr();
+    if (const auto Tuple = dyn_cast<TupleTypeRepr>(args)) {
+      if (Tuple->getNumElements() == 1) {
+        if (const auto Void =
+            dyn_cast<SimpleIdentTypeRepr>(Tuple->getElement(0))) {
+          if (Void->getIdentifier().str() == "Void") {
+            TC.diagnose(args->getStartLoc(), diag::paren_void_probably_void)
+              .fixItReplace(args->getSourceRange(), "()");
+            repr->setWarned();
+          }
+        }
+      }
+    }
   }
 
   // SIL uses polymorphic function types to resolve overloaded member functions.

@@ -298,3 +298,5 @@ func complexSequence() {
   // expected-error @-3 {{expected member name or constructor call after type name}}
   // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }
+
+func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
