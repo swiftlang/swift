@@ -66,9 +66,7 @@ public protocol _BidirectionalIndexable : _Indexable {
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection : _BidirectionalIndexable, Collection 
-// FIXME(ABI) (Revert Where Clauses): Restore these 
-// where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection
-{
+where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the position immediately before the given index.
@@ -86,17 +84,11 @@ public protocol BidirectionalCollection : _BidirectionalIndexable, Collection
 
   /// A sequence that can represent a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence
-  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
-  : _BidirectionalIndexable, Collection
-    = BidirectionalSlice<Self>
+  associatedtype SubSequence = BidirectionalSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices 
-  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
-  : _BidirectionalIndexable, Collection
-    = DefaultBidirectionalIndices<Self>
+  associatedtype Indices = DefaultBidirectionalIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.

@@ -197,13 +197,8 @@ public protocol _MutableIndexable : _Indexable {
 ///     a[i] = x
 ///     let y = x
 public protocol MutableCollection : _MutableIndexable, Collection
-// FIXME(ABI) (Revert Where Clauses): restore this:
-// where SubSequence: MutableCollection
-{
-  associatedtype SubSequence
-  // FIXME(ABI) (Revert Where Clauses): remove this conformance:
-  : Collection
-   = MutableSlice<Self>
+where SubSequence: MutableCollection {
+  associatedtype SubSequence = MutableSlice<Self>
 
   /// Accesses the element at the specified position.
   ///
