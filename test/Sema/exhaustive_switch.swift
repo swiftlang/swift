@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
   case (.none, _): return 1
@@ -284,5 +285,27 @@ func switcheroo(a: XX, b: XX) -> Int {
   default:
     print("never hits this:", a, b)
     return 13
+  }
+}
+
+enum PatternCasts {
+  case one(Any)
+  case two
+}
+
+func checkPatternCasts() {
+  // Pattern casts with this structure shouldn't warn about duplicate cases.
+  let x: PatternCasts = .one("One")
+  switch x {
+  case .one(let s as String): print(s)
+  case .one: break
+  case .two: break
+  }
+
+  // But should warn here.
+  switch x {
+  case .one(_): print(s)
+  case .one: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  case .two: break
   }
 }

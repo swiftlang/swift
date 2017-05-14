@@ -251,8 +251,23 @@ namespace {
 
           // Special Case: A constructor pattern may include the head but not
           // the payload patterns.  In that case the space is covered.
+          // This also acts to short-circuit comparisons with payload-less
+          // constructors.
           if (other.getSpaces().empty()) {
             return true;
+          }
+
+          // If 'this' constructor pattern has no payload and the other space
+          // does, then 'this' covers more of the space only if the other
+          // constructor isn't the explicit form.
+          //
+          // .case <= .case(_, _, _, ...)
+          if (this->getSpaces().empty()) {
+            return std::accumulate(other.getSpaces().begin(),
+                                   other.getSpaces().end(),
+                                   true, [](bool acc, const Space sp){
+              return acc && sp.getKind() == SpaceKind::Type;
+            });
           }
 
           // H(a1, ..., an) <= H(b1, ..., bn) iff a1 <= b1 && ... && an <= bn
@@ -1071,8 +1086,25 @@ namespace {
         auto *BP = cast<BoolPattern>(item);
         return Space(BP->getValue());
       }
+      case PatternKind::Is: {
+        auto *IP = cast<IsPattern>(item);
+        switch (IP->getCastKind()) {
+        case CheckedCastKind::Coercion:
+        case CheckedCastKind::BridgingCoercion:
+          // These coercions are irrefutable.  Project with the original type
+          // instead of the cast's target type to maintain consistency with the
+          // scrutinee's type.
+          return Space(IP->getType());
+        case CheckedCastKind::Unresolved:
+        case CheckedCastKind::ValueCast:
+        case CheckedCastKind::ArrayDowncast:
+        case CheckedCastKind::DictionaryDowncast:
+        case CheckedCastKind::SetDowncast:
+        case CheckedCastKind::Swift3BridgingDowncast:
+            return Space();
+        }
+      }
       case PatternKind::Typed:
-      case PatternKind::Is:
       case PatternKind::Expr:
         return Space();
       case PatternKind::Var: {
