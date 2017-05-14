@@ -2791,7 +2791,7 @@ public:
 
     // Base name
     addLeadingDot(Builder);
-    Builder.addTextChunk(AFD->getFullName().getBaseName().str());
+    Builder.addTextChunk(AFD->getBaseName().getIdentifier().str());
 
     // Add the argument labels.
     auto ArgLabels = AFD->getFullName().getArgumentNames();

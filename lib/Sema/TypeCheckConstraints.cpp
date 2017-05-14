@@ -272,7 +272,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 
   unsigned splitLoc = splitCandidate.first;
   bool isBinOpFirst = splitCandidate.second;
-  StringRef nameStr = UDRE->getName().getBaseName().str();
+  StringRef nameStr = UDRE->getName().getBaseIdentifier().str();
   auto startStr = nameStr.substr(0, splitLoc);
   auto endStr = nameStr.drop_front(splitLoc);
 
@@ -300,7 +300,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
                                     DeclContext *DC,
                                     TypeChecker &TC) {
-  Identifier name = UDRE->getName().getBaseName();
+  Identifier name = UDRE->getName().getBaseIdentifier();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
     return false;
@@ -1300,7 +1300,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         }
     } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
       if (Decl->getName().isSimpleName() &&
-            Decl->getName().getBaseName().str() == "&")
+            Decl->getName().getBaseName() == "&")
         isComposition = true;
     }
 
@@ -2856,9 +2856,9 @@ void Solution::dump(raw_ostream &out) const {
       out << " as ";
       if (choice.getBaseType())
         out << choice.getBaseType()->getString() << ".";
-        
-      out << choice.getDecl()->getName().str() << ": "
-        << ovl.second.openedType->getString() << "\n";
+
+      out << choice.getDecl()->getBaseName() << ": "
+          << ovl.second.openedType->getString() << "\n";
       break;
 
     case OverloadChoiceKind::BaseType:
@@ -3024,9 +3024,9 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName() << ": "
-          << resolved->BoundType->getString() << " == "
-          << resolved->ImpliedType->getString() << "\n";
+        out << choice.getDecl()->getBaseName() << ": "
+            << resolved->BoundType->getString() << " == "
+            << resolved->ImpliedType->getString() << "\n";
         break;
 
       case OverloadChoiceKind::BaseType:
