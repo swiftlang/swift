@@ -36,6 +36,7 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
+  @inline(__always)
   public mutating func next() -> Base.Element.Iterator.Element? {
     while true {
       switch _state {
@@ -77,11 +78,16 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
     }
   }
 
+  @_versioned
   internal var _base: Base
+  @_versioned
   internal var _inner: Base.Element.Iterator?
+  @_versioned
   internal var _separatorData: ContiguousArray<Base.Element.Iterator.Element>
+  @_versioned
   internal var _separator:
     ContiguousArray<Base.Element.Iterator.Element>.Iterator?
+  @_versioned
   internal var _state: _JoinIteratorState = .start
 }
 

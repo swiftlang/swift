@@ -179,6 +179,7 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   /// Once `nil` has been returned, all subsequent calls return `nil`.
 
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
@@ -269,6 +270,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {

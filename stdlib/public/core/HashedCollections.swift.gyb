@@ -273,10 +273,13 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 ///
 /// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
 /// memory accesses. The memory remains bound to managed AnyObjects.
+@_versioned
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
+  @_versioned
   internal var value: UnsafeMutableRawPointer
 
+  @_versioned
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutableRawPointer(up)
   }
@@ -286,6 +289,7 @@ internal struct _UnmanagedAnyObjectArray {
     self.init(unwrapped)
   }
 
+  @_versioned
   internal subscript(i: Int) -> AnyObject {
     get {
       let unmanaged = value.load(
@@ -5506,21 +5510,26 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
 
   // This stored property should be stored at offset zero.  There's code below
   // relying on this.
+  @_versioned
   internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
     _makeSwiftNSFastEnumerationState()
 
   // This stored property should be stored right after `_fastEnumerationState`.
   // There's code below relying on this.
+  @_versioned
   internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
+  @_versioned
   internal let cocoa${Self}: _NS${Self}
 
+  @_versioned
   internal var _fastEnumerationStatePtr:
     UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: _SwiftNSFastEnumerationState.self)
   }
 
+  @_versioned
   internal var _fastEnumerationStackBufPtr:
     UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
     return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
@@ -5531,7 +5540,9 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   // Int8 just because our storage holds 16 elements: fast enumeration is
   // allowed to return inner pointers to the container, which can be much
   // larger.
+  @_versioned
   internal var itemIndex: Int = 0
+  @_versioned
   internal var itemCount: Int = 0
 
   @_versioned
@@ -5540,6 +5551,7 @@ final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   }
 
   @_versioned
+  @inline(__always)
   internal func next() -> Element? {
     if itemIndex < 0 {
       return nil

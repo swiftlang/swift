@@ -277,6 +277,7 @@ public struct Character :
         self._data = data
       }
 
+      @inline(__always)
       internal mutating func next() -> UInt8? {
         let result = UInt8(extendingOrTruncating: _data)
         if result == 0xFF {

@@ -116,6 +116,7 @@ public struct Unsafe${Mutable}RawBufferPointer
     /// - Returns: The next sequential byte in the raw buffer if another byte
     ///   exists; otherwise, `nil`.
     @_inlineable
+    @inline(__always)
     public mutating func next() -> UInt8? {
       if _position == _end { return nil }
 

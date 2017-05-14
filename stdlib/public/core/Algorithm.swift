@@ -114,6 +114,7 @@ public struct EnumeratedIterator<
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
     let result = (offset: _count, element: b)

@@ -28,6 +28,7 @@ from gyb_stdlib_support import (
 public struct LazyPrefixWhileIterator<Base : IteratorProtocol> :
   IteratorProtocol, Sequence {
 
+  @inline(__always)
   public mutating func next() -> Base.Element? {
     // Return elements from the base iterator until one fails the predicate.
     if !_predicateHasFailed, let nextElement = _base.next() {
@@ -45,8 +46,11 @@ public struct LazyPrefixWhileIterator<Base : IteratorProtocol> :
     self._predicate = predicate
   }
 
+  @_versioned
   internal var _predicateHasFailed = false
+  @_versioned
   internal var _base: Base
+  @_versioned
   internal let _predicate: (Base.Element) -> Bool
 }
 

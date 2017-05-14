@@ -315,6 +315,7 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 
 	/// Advance to the next element and return it, or `nil` if no next
 	/// element exists.
+  @inline(__always)
 	public mutating func next() -> DispatchData._Element? {
 		if _position == _count { return nil }
 		let element = _ptr.load(fromByteOffset: _position, as: UInt8.self)
@@ -323,8 +324,11 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 	}
 
 	internal let _data: __DispatchData
+  @_versioned
 	internal var _ptr: UnsafeRawPointer!
+  @_versioned
 	internal var _count: Int
+  @_versioned
 	internal var _position: DispatchData.Index
 }
 

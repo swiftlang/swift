@@ -32,6 +32,7 @@ where IsSentinel.Input == Base.Element {
     _isSentinel = condition
   }
   
+  @inline(__always)
   mutating func next() -> Base.Element? {
     guard _fastPath(!_expired) else { return nil }
     let x = _base.next()

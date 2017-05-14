@@ -26,12 +26,14 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
+  @inline(__always)
   public mutating func next() -> Element? {
     let result = _elements
     _elements = nil
     return result
   }
 
+  @_versioned
   internal var _elements: Element?
 }
 
