@@ -3822,10 +3822,10 @@ namespace {
       for (unsigned i : indices(ValueWitnesses)) {
         auto &valueWitness = ValueWitnesses[i];
         llvm::errs() << i << ":  " << (Decl*)valueWitness.first
-                     << ' ' << valueWitness.first->getName() << '\n';
+                     << ' ' << valueWitness.first->getBaseName() << '\n';
         valueWitness.first->getDeclContext()->dumpContext();
         llvm::errs() << "    for " << (Decl*)valueWitness.second
-                     << ' ' << valueWitness.second->getName() << '\n';
+                     << ' ' << valueWitness.second->getBaseName() << '\n';
         valueWitness.second->getDeclContext()->dumpContext();
       }
     }
@@ -5811,7 +5811,9 @@ canSuppressPotentialWitnessWarningWithNonObjC(ValueDecl *requirement,
 /// argument labels.
 static unsigned getNameLength(DeclName name) {
   unsigned length = 0;
-  if (!name.getBaseName().empty()) length += name.getBaseName().str().size();
+  // TODO: Handle special names
+  if (!name.getBaseName().empty())
+    length += name.getBaseIdentifier().str().size();
   for (auto arg : name.getArgumentNames()) {
     if (!arg.empty())
       length += arg.str().size();

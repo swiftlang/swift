@@ -390,7 +390,7 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
     diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
              DiagnosticID,
              VD->getDescriptiveKind(),
-             VD->getName(),
+             VD->getBaseName(),
              static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
         .highlight(rangeForMain);
   } else {

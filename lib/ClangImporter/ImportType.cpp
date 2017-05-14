@@ -1635,7 +1635,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
-                              .getBaseName();
+                              .getBaseIdentifier();
 
     // Retrieve the argument name.
     Identifier name;
@@ -2058,7 +2058,7 @@ Type ClangImporter::Implementation::importMethodType(
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
-                              .getBaseName();
+                              .getBaseIdentifier();
 
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;
@@ -2097,7 +2097,7 @@ Type ClangImporter::Implementation::importMethodType(
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam,
-          importedName.getDeclName().getBaseName(), numEffectiveParams,
+          importedName.getDeclName().getBaseIdentifier(), numEffectiveParams,
           name.empty() ? StringRef() : name.str(), paramIndex == 0,
           isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
@@ -2214,7 +2214,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
-    Identifier bodyName = fullBodyName.getDeclName().getBaseName();
+    Identifier bodyName = fullBodyName.getDeclName().getBaseIdentifier();
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo

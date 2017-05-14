@@ -696,15 +696,17 @@ private:
           if (AvAttr->PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
             // Availability for *
             if (!AvAttr->Rename.empty()) {
-                // NB: Don't bother getting obj-c names, we can't get one for the rename
-                os << " SWIFT_UNAVAILABLE_MSG(\"'" << VD->getName() << "' has been renamed to '";
-                printEncodedString(AvAttr->Rename, false);
-                os << '\'';
-                if (!AvAttr->Message.empty()) {
-                  os << ": ";
-                  printEncodedString(AvAttr->Message, false);
-                }
-                os << "\")";
+              // NB: Don't bother getting obj-c names, we can't get one for the
+              // rename
+              os << " SWIFT_UNAVAILABLE_MSG(\"'" << VD->getBaseName()
+                 << "' has been renamed to '";
+              printEncodedString(AvAttr->Rename, false);
+              os << '\'';
+              if (!AvAttr->Message.empty()) {
+                os << ": ";
+                printEncodedString(AvAttr->Message, false);
+              }
+              os << "\")";
             } else if (!AvAttr->Message.empty()) {
               os << " SWIFT_UNAVAILABLE_MSG(";
               printEncodedString(AvAttr->Message);
@@ -790,7 +792,8 @@ private:
           }
           if (!AvAttr->Rename.empty()) {
             // NB: Don't bother getting obj-c names, we can't get one for the rename
-            os << ",message=\"'" << VD->getName() << "' has been renamed to '";
+            os << ",message=\"'" << VD->getBaseName()
+               << "' has been renamed to '";
             printEncodedString(AvAttr->Rename, false);
             os << '\'';
             if (!AvAttr->Message.empty()) {
