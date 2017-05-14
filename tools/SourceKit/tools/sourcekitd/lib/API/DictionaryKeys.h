@@ -132,6 +132,7 @@ extern SourceKit::UIdent KeyArgNames;
 extern SourceKit::UIdent KeySelectorPieces;
 extern SourceKit::UIdent KeyNameKind;
 extern SourceKit::UIdent KeyLocalizationKey;
+extern SourceKit::UIdent KeyIsZeroArgSelector;
 
 extern SourceKit::UIdent KeySwiftVersion;
 
