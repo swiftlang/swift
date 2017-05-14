@@ -454,6 +454,11 @@ extension String {
   public typealias UTF8Index = UTF8View.Index
 }
 
+extension String.UTF8View : _SwiftStringView {
+  var _persistentContent : String { return String(self._core) }
+}
+
+
 extension String.UTF8View.Index : Comparable {
   // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
   //        assuming String.UTF8View.Index continues to exist
