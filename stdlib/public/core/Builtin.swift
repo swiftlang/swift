@@ -114,6 +114,12 @@ public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
+@_transparent
+public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
+  _precondition(type(of: x) == expectedType, "_identityCast to wrong type")
+  return Builtin.reinterpretCast(x)
+}
+
 /// `unsafeBitCast` something to `AnyObject`.
 @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
