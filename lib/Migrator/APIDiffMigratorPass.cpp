@@ -356,6 +356,56 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  bool handleSpecialCases(ValueDecl *FD, CallExpr* Call, Expr *Arg) {
+    SpecialCaseDiffItem *Item = nullptr;
+    for (auto *I: getRelatedDiffItems(FD)) {
+      Item = dyn_cast<SpecialCaseDiffItem>(I);
+      if (Item)
+        break;
+    }
+    if (!Item)
+      return false;
+    std::vector<CallArgInfo> AllArgs =
+      getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
+    switch(Item->caseId) {
+    case SpecialCaseId::NSOpenGLSetOption: {
+      // swift 3.2:
+      // NSOpenGLSetOption(NSOpenGLGOFormatCacheSize, 5)
+      // swift 4:
+      // NSOpenGLGOFormatCacheSize.globalValue = 5
+      CallArgInfo &FirstArg = AllArgs[0];
+      CallArgInfo &SecondArg = AllArgs[1];
+      Editor.remove(CharSourceRange(SM, Call->getStartLoc(),
+                                    FirstArg.ArgExp->getStartLoc()));
+      Editor.replace(CharSourceRange(SM, Lexer::getLocForEndOfToken(SM,
+        FirstArg.ArgExp->getEndLoc()), SecondArg.LabelRange.getStart()),
+                     ".globalValue = ");
+      Editor.remove(Call->getEndLoc());
+      return true;
+    }
+    case SpecialCaseId::NSOpenGLGetOption: {
+      // swift 3.2:
+      // NSOpenGLGetOption(NSOpenGLGOFormatCacheSize, &cacheSize)
+      // swift 4:
+      // cacheSize = NSOpenGLGOFormatCacheSize.globalValue
+      CallArgInfo &FirstArg = AllArgs[0];
+      CallArgInfo &SecondArg = AllArgs[1];
+
+      StringRef SecondArgContent = SecondArg.getEntireCharRange(SM).str();
+      if (SecondArgContent[0] == '&')
+        SecondArgContent = SecondArgContent.substr(1);
+
+      Editor.replace(CharSourceRange(SM, Call->getStartLoc(),
+                                     FirstArg.ArgExp->getStartLoc()),
+                     (llvm::Twine(SecondArgContent) + " = ").str());
+      Editor.replace(CharSourceRange(SM, FirstArg.getEntireCharRange(SM).getEnd(),
+                                     Lexer::getLocForEndOfToken(SM, Call->getEndLoc())),
+                     ".globalValue");
+      return true;
+    }
+    }
+  }
+
   bool handleTypeHoist(ValueDecl *FD, CallExpr* Call, Expr *Arg) {
     TypeMemberDiffItem *Item = nullptr;
     for (auto *I: getRelatedDiffItems(FD)) {
@@ -475,6 +525,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         if (auto FD = Fn->getReferencedDecl().getDecl()) {
           handleFuncRename(FD, Fn, Args);
           handleTypeHoist(FD, CE, Args);
+          handleSpecialCases(FD, CE, Args);
         }
         break;
       }

@@ -51,6 +51,13 @@ NodeAnnotation swift::ide::api::parseSDKNodeAnnotation(StringRef Content) {
   ;
 }
 
+SpecialCaseId swift::ide::api::parseSpecialCaseId(StringRef Content) {
+  return llvm::StringSwitch<SpecialCaseId>(Content)
+#define SPECIAL_CASE_ID(NAME) .Case(#NAME, SpecialCaseId::NAME)
+#include "swift/IDE/DigesterEnums.def"
+  ;
+}
+
 swift::ide::api::CommonDiffItem::
 CommonDiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind,
                StringRef ChildIndex, StringRef LeftUsr, StringRef RightUsr,
