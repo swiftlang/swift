@@ -595,7 +595,7 @@ public func transcode<
 internal func _transcodeSomeUTF16AsUTF8<Input : Collection>(
   _ input: Input, _ startIndex: Input.Index
 ) -> (Input.Index, _StringCore._UTF8Chunk)
-  where Input.Iterator.Element == UInt16 {
+  where Input.Element == UInt16 {
 
   typealias _UTF8Chunk = _StringCore._UTF8Chunk
 

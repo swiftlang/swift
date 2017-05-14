@@ -223,7 +223,7 @@ public protocol MutableCollection : _MutableIndexable, Collection
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  subscript(position: Index) -> Iterator.Element {get set}
+  subscript(position: Index) -> Element {get set}
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -286,7 +286,7 @@ public protocol MutableCollection : _MutableIndexable, Collection
   ///
   /// - Complexity: O(*n*)
   mutating func partition(
-    by belongsInSecondPartition: (Iterator.Element) throws -> Bool
+    by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index
 
   /// Exchanges the values at the specified indices of the collection.
@@ -311,7 +311,7 @@ public protocol MutableCollection : _MutableIndexable, Collection
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME(ABI)#53 (Type Checker): the signature should use
   // UnsafeMutableBufferPointer, but the compiler can't handle that.
@@ -325,7 +325,7 @@ public protocol MutableCollection : _MutableIndexable, Collection
 extension MutableCollection {
   @_inlineable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }

@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -disable-migrator-fixits -swift-version 3
 // RUN: diff -u %s.expected %t.result
 // RUN: %target-swift-frontend -typecheck %s.expected -swift-version 4
+// rdar://
+// XFAIL: *
 
 func test1(_: ()) {}
 test1(())
