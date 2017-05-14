@@ -785,7 +785,7 @@ public struct Set<Element : Hashable> :
   /// five characters.
   ///
   ///     let cast: Set = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.characters.count < 5 }
+  ///     let shortNames = cast.filter { $0.count < 5 }
   ///
   ///     shortNames.isSubset(of: cast)
   ///     // true

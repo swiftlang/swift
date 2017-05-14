@@ -30,12 +30,12 @@ extension String {
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
-  /// For example, use this initializer to create a string with ten `"00"`
+  /// For example, use this initializer to create a string with ten `"ab"`
   /// strings in a row.
   ///
   ///     let zeroes = String(repeating: "00", count: 10)
   ///     print(zeroes)
-  ///     // Prints "00000000000000000000"
+  ///     // Prints "abababababababababab"
   ///
   /// - Parameters:
   ///   - repeatedValue: The string to repeat.
@@ -228,7 +228,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -266,7 +266,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -305,7 +305,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -343,7 +343,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -381,7 +381,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters

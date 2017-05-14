@@ -817,12 +817,13 @@ public func type<T, Metatype>(of value: T) -> Metatype {
 ///   behavior for the escapable closure to be stored, referenced, or executed
 ///   after the function returns.
 ///
-/// - Parameter closure: A non-escaping closure value that will be made
-///   escapable for the duration of the execution of the `body` closure. If
-///   `body` has a return value, it is used as the return value for the
-///   `withoutActuallyEscaping(_:do:)` function.
-/// - Parameter body: A closure that will be immediately executed, receiving an
-///   escapable copy of `closure` as an argument.
+/// - Parameters:
+///   - closure: A non-escaping closure value that will be made escapable for
+///     the duration of the execution of the `body` closure. If `body` has a
+///     return value, it is used as the return value for the
+///     `withoutActuallyEscaping(_:do:)` function.
+///   - body: A closure that will be immediately executed, receiving an
+///     escapable copy of `closure` as an argument.
 /// - Returns: The return value of the `body` closure, if any.
 @_transparent
 @_semantics("typechecker.withoutActuallyEscaping(_:do:)")
