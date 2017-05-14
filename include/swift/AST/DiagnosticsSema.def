@@ -3183,6 +3183,8 @@ ERROR(objc_convention_invalid,none,
       " with '@convention(%1)'", (Type, StringRef))
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
+WARNING(paren_void_probably_void,none,
+      "when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?", ())
 NOTE(not_objc_empty_protocol_composition,none,
      "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,

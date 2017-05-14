@@ -5143,9 +5143,20 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
           tuple->hasTrailingClosure())
         TC.diagnose(loc, diag::extra_trailing_closure_in_call)
             .highlight(arg->getSourceRange());
-      else if (Parameters.empty())
-        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+      else if (Parameters.empty()) {
+        auto Paren = dyn_cast<ParenExpr>(ArgExpr);
+        Expr *SubExpr = nullptr;
+        if (Paren) {
+          SubExpr = Paren->getSubExpr();
+        }
+        if (SubExpr && SubExpr->getType() && SubExpr->getType()->isVoid()) {
+          TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+            .fixItRemove(SubExpr->getSourceRange());
+        } else {
+          TC.diagnose(loc, diag::extra_argument_to_nullary_call)
             .highlight(ArgExpr->getSourceRange());
+        }
+      }
       else if (name.empty())
         TC.diagnose(loc, diag::extra_argument_positional)
             .highlight(arg->getSourceRange());
