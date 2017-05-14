@@ -1359,12 +1359,15 @@ extension Collection {
   ///     // Prints "10"
   @_inlineable
   public var first: Element? {
-    // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
-    // so instead of testing `isEmpty` and then returning the first element,
-    // we'll just rely on the fact that the iterator always yields the
-    // first element first.
-    var i = makeIterator()
-    return i.next()
+    @inline(__always)
+    get {
+      // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
+      // so instead of testing `isEmpty` and then returning the first element,
+      // we'll just rely on the fact that the iterator always yields the
+      // first element first.
+      var i = makeIterator()
+      return i.next()
+    }
   }
   
   // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
