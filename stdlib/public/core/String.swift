@@ -118,6 +118,33 @@ extension StringProtocol /* : LosslessStringConvertible */ {
   }
 }
 
+/// A protocol that provides fast access to a known representation of String.
+///
+/// Can be used to specialize generic functions that would otherwise end up
+/// doing grapheme breaking to vend individual characters.
+internal protocol _SwiftStringView {
+  /// Returns a `String` that may be unsuitable for long-term storage with the
+  /// same contents as `self`.
+  func _ephemeralString() -> String
+  
+  /// Returns a `String` suitable for long-term storage that has the same
+  /// contents as `self`.
+  func _persistentString() -> String
+}
+
+extension _SwiftStringView {
+  func _substring() -> Substring {
+    return _ephemeralString()[...]
+  }
+  func _ephemeralString() -> String {
+    return _persistentString()
+  }
+}
+
+extension String : _SwiftStringView {
+  func _persistentString() -> String { return characters._persistentString() }
+}
+
 /// Call body with a pointer to zero-terminated sequence of
 /// `TargetEncoding.CodeUnit` representing the same string as `source`, when
 /// `source` is interpreted as being encoded with `SourceEncoding`.
