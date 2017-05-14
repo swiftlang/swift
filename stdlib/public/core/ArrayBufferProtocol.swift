@@ -21,9 +21,6 @@ internal protocol _ArrayBufferProtocol
   : RandomAccessCollection 
     = CountableRange<Int>
 
-  /// The type of elements stored in the buffer.
-  associatedtype Element
-
   /// Create an empty buffer.
   init()
 
@@ -79,7 +76,7 @@ internal protocol _ArrayBufferProtocol
     _ subrange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
-  ) where C : Collection, C.Iterator.Element == Element
+  ) where C : Collection, C.Element == Element
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
   subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
@@ -144,7 +141,7 @@ extension _ArrayBufferProtocol {
     _ subrange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
     let eraseCount = subrange.count

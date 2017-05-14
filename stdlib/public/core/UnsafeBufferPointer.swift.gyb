@@ -190,8 +190,8 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
   ///   initialized.
   public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
     guard !isEmpty else { return (makeIterator(),buffer.startIndex) }
 
     guard count <= buffer.count, let ptr = buffer.baseAddress else {
@@ -409,7 +409,7 @@ extension UnsafeMutableBufferPointer {
   ///   initialized.
   @_inlineable
   public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
-    where S.Iterator.Element == Iterator.Element {
+    where S.Element == Element {
     return source._copyContents(initializing: self)
   }
 }

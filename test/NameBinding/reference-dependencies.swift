@@ -111,7 +111,7 @@ extension ExpressibleByArrayLiteral {
 }
 
 // CHECK-DAG: OtherFileElementType
-extension ExpressibleByArrayLiteral where Element == OtherFileElementType {
+extension ExpressibleByArrayLiteral where ArrayLiteralElement == OtherFileElementType {
   func useless2() {}
 }
 

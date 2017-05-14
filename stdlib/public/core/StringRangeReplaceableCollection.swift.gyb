@@ -41,7 +41,7 @@ extension String : StringProtocol {
   // and disambiguates between the following intitializers, now that String
   // conforms to Collection:
   // - init<T>(_ value: T) where T : LosslessStringConvertible
-  // - init<S>(_ characters: S) where S : Sequence, S.Iterator.Element == Character
+  // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
   public init(_ other: String) {
     self.init(other._core)
   }
@@ -197,7 +197,7 @@ extension String {
   ///
   /// - Parameter characters: A sequence of characters.
   public init<S : Sequence>(_ characters: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     self._core = CharacterView(characters)._core
   }
 
@@ -239,7 +239,7 @@ extension String {
   ///
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.append(contentsOf: newElements)
     }
@@ -262,7 +262,7 @@ extension String {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C : Collection, C.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
@@ -302,7 +302,7 @@ extension String {
   ///   `newElements`.
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
-  ) where S.Iterator.Element == Character {
+  ) where S.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
@@ -395,7 +395,7 @@ extension String {
 extension Sequence {
   @available(swift, obsoleted: 4)
   public func flatMap(
-    _ transform: (Iterator.Element) throws -> String
+    _ transform: (Element) throws -> String
   ) rethrows -> [String] {
     return try map(transform)
   }
@@ -403,7 +403,7 @@ extension Sequence {
 
 extension Collection {
   public func flatMap(
-    _ transform: (Iterator.Element) throws -> String?
+    _ transform: (Element) throws -> String?
   ) rethrows -> [String] {
     return try _flatMap(transform)
   }

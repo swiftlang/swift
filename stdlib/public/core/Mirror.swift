@@ -214,7 +214,7 @@ public struct Mirror {
     children: C,
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
-  ) where C.Iterator.Element == Child 
+  ) where C.Element == Child 
   // FIXME(ABI) (Revert Where Clauses): Remove these 
   , C.SubSequence : Collection, C.SubSequence.Indices : Collection, C.Indices : Collection
   {
