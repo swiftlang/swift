@@ -256,7 +256,7 @@ public struct Substring : StringProtocol {
 }
 
 extension Substring : _SwiftStringView {
-  func _persistentString() -> String {
+  public func _persistentString() -> String {
     let wholeCore = _slice._base._core
     let native = wholeCore.nativeBuffer
     if _fastPath(native != nil), let n = native {
@@ -270,7 +270,7 @@ extension Substring : _SwiftStringView {
     return r
   }
   
-  func _ephemeralString() -> String {
+  public func _ephemeralString() -> String {
     let wholeCore = _slice._base._core
     let subCore : _StringCore = wholeCore[
       startIndex._base._position..<endIndex._base._position]

@@ -122,7 +122,7 @@ extension StringProtocol /* : LosslessStringConvertible */ {
 ///
 /// Can be used to specialize generic functions that would otherwise end up
 /// doing grapheme breaking to vend individual characters.
-internal protocol _SwiftStringView {
+public protocol _SwiftStringView {
   /// Returns a `String` that may be unsuitable for long-term storage with the
   /// same contents as `self`.
   func _ephemeralString() -> String
@@ -133,16 +133,18 @@ internal protocol _SwiftStringView {
 }
 
 extension _SwiftStringView {
-  func _substring() -> Substring {
+  public func _substring() -> Substring {
     return _ephemeralString()[...]
   }
-  func _ephemeralString() -> String {
+  public func _ephemeralString() -> String {
     return _persistentString()
   }
 }
 
 extension String : _SwiftStringView {
-  func _persistentString() -> String { return characters._persistentString() }
+  public func _persistentString() -> String { 
+    return characters._persistentString() 
+  }
 }
 
 /// Call body with a pointer to zero-terminated sequence of

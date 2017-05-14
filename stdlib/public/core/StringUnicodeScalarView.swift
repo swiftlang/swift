@@ -327,7 +327,7 @@ extension String {
 }
 
 extension String.UnicodeScalarView : _SwiftStringView {
-  func _persistentString() -> String { return String(_core) }
+  public func _persistentString() -> String { return String(_core) }
 }
 
 extension String {
