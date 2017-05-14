@@ -353,8 +353,8 @@ extension String {
 }
 
 extension String.UTF16View : _SwiftStringView {
-  func _ephemeralString() -> String { return _persistentString() }
-  func _persistentString() -> String { return String(self._core) }
+  public func _ephemeralString() -> String { return _persistentString() }
+  public func _persistentString() -> String { return String(self._core) }
 }
 
 extension String.UTF16View.Index : Comparable {

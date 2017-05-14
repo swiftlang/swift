@@ -152,7 +152,7 @@ extension String {
 }
 
 extension String.CharacterView : _SwiftStringView {
-  func _persistentString() -> String {
+  public func _persistentString() -> String {
     // FIXME: we might want to make sure our _StringCore isn't somehow a slice
     // of some larger storage before blindly wrapping/returning it as
     // persistent.  That said, if current benchmarks are measuring these cases,
