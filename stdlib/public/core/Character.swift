@@ -387,7 +387,7 @@ extension Character : CustomDebugStringConvertible {
   }
 }
 
-extension String {
+extension StringProtocol {
   /// Creates a string containing the given character.
   ///
   /// - Parameter c: The character to convert to a string.
@@ -396,11 +396,13 @@ extension String {
     case let .small(_63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
-      self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: smallUTF8)
+      self = Self(
+        String._fromWellFormedCodeUnitSequence(
+          UTF8.self, input: smallUTF8))
+      
     case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
+      self = Self(buf[buf.startIndex..<buf.index(after: buf.startIndex)])
     }
   }
 }

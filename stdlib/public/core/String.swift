@@ -248,21 +248,13 @@ extension _StringCore {
   }
 }
 
-extension String {
-  /// Creates a string from the given Unicode code units in the specified
-  /// encoding.
-  ///
-  /// - Parameters:
-  ///   - codeUnits: A collection of code units encoded in the ecoding
-  ///     specified in `sourceEncoding`.
-  ///   - sourceEncoding: The encoding in which `codeUnits` should be
-  ///     interpreted.
+extension StringProtocol {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
     let (b,_) = _StringBuffer.fromCodeUnits(
       codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)
-    self = String(_StringCore(b!))
+    self = Self(String(_StringCore(b!)))
   }
   
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -284,29 +276,18 @@ extension String {
     )
     self.init(decoding: codeUnits, as: sourceEncoding)
   }
-  
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withCString(encodedAs:_:)`. Do not store or return the
-  /// pointer for later use.
-  ///
-  /// - Parameters:
-  ///   - body: A closure with a pointer parameter that points to a
-  ///     null-terminated sequence of code units. If `body` has a return
-  ///     value, it is used as the return value for the
-  ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
-  ///     only for the duration of the method's execution.
-  ///   - targetEncoding: The encoding in which the code units should be
-  ///     interpreted.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+}
+
+extension StringProtocol where Self : _SwiftStringView {
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of code units in the given encoding.
   public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _core._withCSubstring(
-      in: _core.startIndex..<_core.endIndex, encoding: targetEncoding, body)
+    let s = self._ephemeralString()
+    return try s._core._withCSubstring(
+      in: s._core.startIndex..<s._core.endIndex, encoding: targetEncoding, body)
   }
 }
 // FIXME: complexity documentation for most of methods on String ought to be
@@ -667,16 +648,23 @@ extension String {
   }
 }
 
-extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
+extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {  }
+extension Substring : _ExpressibleByBuiltinUnicodeScalarLiteral {  }
+
+extension StringProtocol where Self : _ExpressibleByBuiltinUnicodeScalarLiteral {
   @effects(readonly)
   public // @testable
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self, input: CollectionOfOne(UInt32(value)))
+    self = Self(
+      String._fromWellFormedCodeUnitSequence(
+      UTF32.self, input: CollectionOfOne(UInt32(value))))
   }
 }
 
-extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {}
+extension Substring : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {}
+extension StringProtocol 
+where Self : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF8")
@@ -684,15 +672,18 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF8.self,
-      input: UnsafeBufferPointer(
-        start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-        count: Int(utf8CodeUnitCount)))
+    self = Self(
+      String._fromWellFormedCodeUnitSequence(
+        UTF8.self,
+        input: UnsafeBufferPointer(
+          start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+          count: Int(utf8CodeUnitCount))))
   }
 }
 
-extension String : _ExpressibleByBuiltinUTF16StringLiteral {
+extension String : _ExpressibleByBuiltinUTF16StringLiteral {}
+extension Substring : _ExpressibleByBuiltinUTF16StringLiteral {}
+extension StringProtocol where Self : _ExpressibleByBuiltinUTF16StringLiteral {
   @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF16")
@@ -700,17 +691,20 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
   ) {
-    self = String(
-      _StringCore(
-        baseAddress: UnsafeMutableRawPointer(start),
-        count: Int(utf16CodeUnitCount),
-        elementShift: 1,
-        hasCocoaBuffer: false,
-        owner: nil))
+    self = Self(
+      String(
+        _StringCore(
+          baseAddress: UnsafeMutableRawPointer(start),
+          count: Int(utf16CodeUnitCount),
+          elementShift: 1,
+          hasCocoaBuffer: false,
+          owner: nil)))
   }
 }
 
-extension String : _ExpressibleByBuiltinStringLiteral {
+extension String : _ExpressibleByBuiltinStringLiteral {}
+extension Substring : _ExpressibleByBuiltinStringLiteral {}
+extension StringProtocol where Self : _ExpressibleByBuiltinStringLiteral {
   @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF8")
@@ -719,25 +713,29 @@ extension String : _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     if Bool(isASCII) {
-      self = String(
-        _StringCore(
-          baseAddress: UnsafeMutableRawPointer(start),
-          count: Int(utf8CodeUnitCount),
-          elementShift: 0,
-          hasCocoaBuffer: false,
-          owner: nil))
+      self = Self(
+        String(
+          _StringCore(
+            baseAddress: UnsafeMutableRawPointer(start),
+            count: Int(utf8CodeUnitCount),
+            elementShift: 0,
+            hasCocoaBuffer: false,
+            owner: nil)))
     }
     else {
-      self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(
-          start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-          count: Int(utf8CodeUnitCount)))
+      self = Self(
+        String._fromWellFormedCodeUnitSequence(
+          UTF8.self,
+          input: UnsafeBufferPointer(
+            start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+            count: Int(utf8CodeUnitCount))))
     }
   }
 }
 
-extension String : ExpressibleByStringLiteral {
+extension String : ExpressibleByStringLiteral {}
+extension Substring : ExpressibleByStringLiteral {}
+extension StringProtocol /*: ExpressibleByStringLiteral*/ {
   /// Creates an instance initialized to the given string value.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -748,15 +746,17 @@ extension String : ExpressibleByStringLiteral {
   /// This assignment to the `nextStop` constant calls this string literal
   /// initializer behind the scenes.
   public init(stringLiteral value: String) {
-     self = value
+    self = Self(value)
   }
 }
 
-extension String : CustomDebugStringConvertible {
+extension String : CustomDebugStringConvertible {}
+extension Substring : CustomDebugStringConvertible {}
+extension _SwiftStringView where Self : CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
   public var debugDescription: String {
     var result = "\""
-    for us in self.unicodeScalars {
+    for us in self._ephemeralString().unicodeScalars {
       result += us.escaped(asASCII: false)
     }
     result += "\""
