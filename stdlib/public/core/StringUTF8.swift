@@ -455,7 +455,7 @@ extension String {
 }
 
 extension String.UTF8View : _SwiftStringView {
-  func _persistentString() -> String { return String(self._core) }
+  public func _persistentString() -> String { return String(self._core) }
 }
 
 
