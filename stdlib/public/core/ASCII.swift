@@ -49,12 +49,12 @@ extension Unicode.ASCII : Unicode.Encoding {
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
-      let c = unsafeBitCast(content, to: UTF16.EncodedScalar.self)
+      let c = _identityCast(content, to: UTF16.EncodedScalar.self)
       guard (c._storage & 0xFF80 == 0) else { return nil }
       return EncodedScalar(CodeUnit(c._storage & 0x7f))
     }
     else if _fastPath(FromEncoding.self == UTF8.self) {
-      let c = unsafeBitCast(content, to: UTF8.EncodedScalar.self)
+      let c = _identityCast(content, to: UTF8.EncodedScalar.self)
       guard (c._storage & 0x80 == 0) else { return nil }
       return EncodedScalar(CodeUnit(c._storage & 0x7f))
     }
