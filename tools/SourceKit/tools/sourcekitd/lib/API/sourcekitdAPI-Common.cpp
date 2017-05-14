@@ -145,6 +145,7 @@ UIdent sourcekitd::KeyArgNames("key.argnames");
 UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
 UIdent sourcekitd::KeyNameKind("key.namekind");
 UIdent sourcekitd::KeyLocalizationKey("key.localization_key");
+UIdent sourcekitd::KeyIsZeroArgSelector("key.is_zero_arg_selector");
 
 UIdent sourcekitd::KeySwiftVersion("key.swift_version");
 
@@ -247,6 +248,7 @@ static UIdent *OrderedKeys[] = {
   &KeySelectorPieces,
   &KeyNameKind,
   &KeyLocalizationKey,
+  &KeyIsZeroArgSelector,
 
   &KeySwiftVersion,
 };

@@ -900,17 +900,10 @@ getClangDeclarationName(const clang::NamedDecl *ND, NameTranslatingInfo &Info) {
   if (!Info.BaseName.empty()) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
-    StringRef last = Info.ArgNames.back();
-
     switch (OrigName.getNameKind()) {
     case clang::DeclarationName::ObjCZeroArgSelector:
-      if (last.endswith(":"))
-        return clang::DeclarationName();
-      break;
     case clang::DeclarationName::ObjCOneArgSelector:
     case clang::DeclarationName::ObjCMultiArgSelector:
-      if (!last.empty() && !last.endswith(":"))
-        return clang::DeclarationName();
       break;
     default:
       return clang::DeclarationName();
@@ -982,8 +975,8 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       if (Selector.getNumArgs()) {
         assert(Pieces.back().empty());
         Pieces.pop_back();
-        std::transform(Pieces.begin(), Pieces.end(), Pieces.begin(),
-          [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
+      } else {
+        Result.IsZeroArgSelector = true;
       }
       Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
       Receiver(Result);
