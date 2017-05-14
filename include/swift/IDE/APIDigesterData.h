@@ -40,6 +40,13 @@ enum class NodeAnnotation: uint8_t{
 
 NodeAnnotation parseSDKNodeAnnotation(StringRef Content);
 
+enum class SpecialCaseId: uint8_t{
+#define SPECIAL_CASE_ID(NAME) NAME,
+#include "DigesterEnums.def"
+};
+
+SpecialCaseId parseSpecialCaseId(StringRef Content);
+
 enum class APIDiffItemKind: uint8_t{
 #define DIFF_ITEM_KIND(NAME) ADK_##NAME,
 #include "DigesterEnums.def"
@@ -252,10 +259,10 @@ private:
 /// transformation on an entity.
 struct SpecialCaseDiffItem: public APIDiffItem {
   StringRef usr;
-  StringRef caseId;
+  SpecialCaseId caseId;
 public:
   SpecialCaseDiffItem(StringRef usr, StringRef caseId): usr(usr),
-    caseId(caseId) {}
+    caseId(parseSpecialCaseId(caseId)) {}
   StringRef getKey() const override { return usr; }
   void streamDef(llvm::raw_ostream &S) const override {};
   static bool classof(const APIDiffItem *D);
