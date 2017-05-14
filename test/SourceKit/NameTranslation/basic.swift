@@ -18,6 +18,12 @@ func foo2 (_ a : FooClassDerived) {
   _ = FooClassBase()
 }
 
+class MyDerived: FooClassDerived {
+  override func fooInstanceFunc0() {
+    self.fooInstanceFunc0()
+  }
+}
+
 // REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=translate -objc-name FooClassDerived2 -pos=5:30 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector FooClassDerived2 -pos=3:23 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK11 %s
@@ -44,6 +50,9 @@ func foo2 (_ a : FooClassDerived) {
 // RUN: %sourcekitd-test -req=translate -objc-selector init: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector iit: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector NAME -pos=18:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
+
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc01 -pos=22:17 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK5 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc01 -pos=23:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK5 %s
 
 // CHECK1: FooClassDerived2
 // CHECK-NONE: <empty name translation info>
