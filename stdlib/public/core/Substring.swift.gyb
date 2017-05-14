@@ -300,12 +300,6 @@ extension Substring : CustomStringConvertible {
   }
 }
 
-extension Substring : CustomDebugStringConvertible {
-  public var debugDescription: String {
-    return String(self).debugDescription
-  }
-}
-
 extension Substring : LosslessStringConvertible {
   public init(_ content: String) {
     self.init(_base: content, content.startIndex ..< content.endIndex)
@@ -409,18 +403,6 @@ extension Substring {
   }
 }
 
-extension Substring : TextOutputStream {
-  public mutating func write(_ other: String) {
-    append(contentsOf: other)
-  }
-}
-
-extension Substring : TextOutputStreamable {
-  public func write<Target : TextOutputStream>(to target: inout Target) {
-    target.write(String(self))
-  }
-}
-
 extension Substring : ExpressibleByUnicodeScalarLiteral {
   public init(unicodeScalarLiteral value: String) {
      self.init(_base: value, value.startIndex ..< value.endIndex)
@@ -428,12 +410,6 @@ extension Substring : ExpressibleByUnicodeScalarLiteral {
 }
 extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
   public init(extendedGraphemeClusterLiteral value: String) {
-     self.init(_base: value, value.startIndex ..< value.endIndex)
-  }
-}
-
-extension Substring : ExpressibleByStringLiteral {
-  public init(stringLiteral value: String) {
      self.init(_base: value, value.startIndex ..< value.endIndex)
   }
 }

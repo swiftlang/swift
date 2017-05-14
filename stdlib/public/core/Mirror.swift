@@ -375,6 +375,7 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 public protocol MirrorPath {}
 extension Int : MirrorPath {}
 extension String : MirrorPath {}
+extension Substring : MirrorPath {}
 
 extension Mirror {
   internal struct _Dummy : CustomReflectable {
@@ -816,7 +817,7 @@ extension DictionaryLiteral : RandomAccessCollection {
   }
 }
 
-extension String {
+extension StringProtocol {
   /// Creates a string representing the given value.
   ///
   /// Use this initializer to convert an instance of any type to its preferred
@@ -859,8 +860,9 @@ extension String {
   ///
   /// - SeeAlso: `String.init<Subject>(reflecting: Subject)`
   public init<Subject>(describing instance: Subject) {
-    self.init()
-    _print_unlocked(instance, &self)
+    var s = ""
+    _print_unlocked(instance, &s)
+    self = Self(s)
   }
 
   /// Creates a string with a detailed representation of the given value,
@@ -910,8 +912,9 @@ extension String {
   ///
   /// - SeeAlso: `String.init<Subject>(Subject)`
   public init<Subject>(reflecting subject: Subject) {
-    self.init()
-    _debugPrint_unlocked(subject, &self)
+    var s = ""
+    _debugPrint_unlocked(subject, &s)
+    self = Self(s)
   }
 }
 
