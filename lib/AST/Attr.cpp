@@ -493,10 +493,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_NSKeyedArchiveLegacy: {
-    Printer.printAttrName("@NSKeyedArchiveLegacy");
+  case DAK_NSKeyedArchiverClassName: {
+    Printer.printAttrName("@NSKeyedArchiverClassName");
     Printer << "(";
-    auto *attr = cast<NSKeyedArchiveLegacyAttr>(this);
+    auto *attr = cast<NSKeyedArchiverClassNameAttr>(this);
     Printer << "\"" << attr->Name << "\"";
     Printer << ")";
     break;
@@ -622,8 +622,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_specialize";
   case DAK_Implements:
     return "_implements";
-  case DAK_NSKeyedArchiveLegacy:
-    return "NSKeyedArchiveLegacy";
+  case DAK_NSKeyedArchiverClassName:
+    return "NSKeyedArchiverClassName";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

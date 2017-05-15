@@ -744,7 +744,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   case DAK_CDecl:
   case DAK_SILGenName:
-  case DAK_NSKeyedArchiveLegacy: {
+  case DAK_NSKeyedArchiverClassName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -787,8 +787,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
-      else if (DK == DAK_NSKeyedArchiveLegacy)
-        Attributes.add(new (Context) NSKeyedArchiveLegacyAttr(
+      else if (DK == DAK_NSKeyedArchiverClassName)
+        Attributes.add(new (Context) NSKeyedArchiverClassNameAttr(
                                                AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
       else

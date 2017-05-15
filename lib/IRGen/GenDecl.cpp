@@ -968,7 +968,7 @@ void IRGenerator::emitNSArchiveClassNameRegistration() {
     Type Ty = CD->getDeclaredType();
     llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(getAsCanType(Ty));
     if (auto *LegacyAttr = CD->getAttrs().
-          getAttribute<NSKeyedArchiveLegacyAttr>()) {
+          getAttribute<NSKeyedArchiverClassNameAttr>()) {
       // Register the name for the class in the NSKeyed(Un)Archiver.
       llvm::Value *NameStr = IGM->getAddrOfGlobalString(LegacyAttr->Name);
       RegisterIGF.Builder.CreateCall(IGM->getRegisterClassNameForArchivingFn(),

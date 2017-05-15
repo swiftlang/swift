@@ -755,7 +755,7 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
 void IRGenerator::addClassForArchiveNameRegistration(ClassDecl *ClassDecl) {
 
   // Those two attributes are interesting to us
-  if (!ClassDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>() &&
+  if (!ClassDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>() &&
       !ClassDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
