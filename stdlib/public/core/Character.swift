@@ -76,8 +76,6 @@ public struct Character :
   // should be represented as such.
   @_versioned
   internal enum Representation {
-    // A _StringBuffer whose first grapheme cluster is self.
-    // NOTE: may be more than 1 Character long.
     case large(_StringBuffer._Storage)
     case small(Builtin.Int63)
   }
@@ -137,15 +135,16 @@ public struct Character :
     }
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
-    self = Character(_largeRepresentationString: String(
-      _builtinExtendedGraphemeClusterLiteral: start,
-      utf8CodeUnitCount: utf8CodeUnitCount,
-      isASCII: isASCII))
+    self = Character(_largeRepresentationString:
+      String(
+        _builtinExtendedGraphemeClusterLiteral: start,
+        utf8CodeUnitCount: utf8CodeUnitCount,
+        isASCII: isASCII))
   }
 
   /// Creates a character with the specified value.
   ///
-  /// Do not call this initializer directly. It is used by the compiler when
+  /// Do not call this initalizer directly. It is used by the compiler when
   /// you use a string literal to initialize a `Character` instance. For
   /// example:
   ///
@@ -200,10 +199,14 @@ public struct Character :
 
   /// Creates a Character from a String that is already known to require the
   /// large representation.
+  ///
+  /// - Requires: s contains only a single grapheme
   @_versioned
   internal init(_largeRepresentationString s: String) {
+    _sanityCheck(s.index(after: s.startIndex) == s.endIndex)
     if let native = s._core.nativeBuffer,
-       native.start == s._core._baseAddress! {
+      native.start == s._core._baseAddress!,
+      native.usedCount == s._core.count {
       _representation = .large(native._storage)
       return
     }
@@ -399,8 +402,7 @@ extension String {
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
     case let .large(value):
-      let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
+      self = String(_StringCore(_StringBuffer(value)))
     }
   }
 }
