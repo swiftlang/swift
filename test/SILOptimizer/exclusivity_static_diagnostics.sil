@@ -462,15 +462,3 @@ bb23:
 bbUnreachable:
   br bb22
 }
-
-// Check that a pointer_to_address access passes diagnostics.
-//
-// CHECK-LABEL: sil hidden  @pointerToAddr
-sil hidden  @pointerToAddr : $@convention(thin) (Builtin.RawPointer) -> Int {
-bb0(%0: $Builtin.RawPointer):
-  %adr = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
-  %access = begin_access [read] [dynamic] %adr : $*Int
-  %val = load [trivial] %access : $*Int
-  end_access %access : $*Int
-  return %val : $Int
-}
