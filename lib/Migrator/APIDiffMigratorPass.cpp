@@ -338,7 +338,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           if (LR.getByteLength())
             Editor.replace(LR, Label);
           else
-            Editor.insert(LR.getStart(), (llvm::Twine(Label) + ":").str());
+            Editor.insert(LR.getStart(), (llvm::Twine(Label) + ": ").str());
         }
       }
     }
@@ -451,16 +451,22 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       IgnoredArgIndices.push_back(*RI);
     emitRenameLabelChanges(Arg, NewName, IgnoredArgIndices);
     auto *SelfExpr = AllArgs[0].ArgExp;
+    if (auto *IOE = dyn_cast<InOutExpr>(SelfExpr))
+      SelfExpr = IOE->getSubExpr();
+    const bool NeedParen = !SelfExpr->canAppendCallParentheses();
 
     // Remove the global function name: "Foo(a, b..." to "a, b..."
     Editor.remove(CharSourceRange(SM, Call->getStartLoc(),
                                   SelfExpr->getStartLoc()));
-
+    if (NeedParen)
+      Editor.insert(SelfExpr->getStartLoc(), "(");
     std::string MemberFuncBase;
     if (Item->Subkind == TypeMemberDiffItemSubKind::HoistSelfAndUseProperty)
-      MemberFuncBase = (llvm::Twine(".") + Item->getNewName().base()).str();
+      MemberFuncBase = (llvm::Twine(NeedParen ? ")." : ".") + Item->getNewName().
+        base()).str();
     else
-      MemberFuncBase = (llvm::Twine(".") + Item->getNewName().base() + "(").str();
+      MemberFuncBase = (llvm::Twine(NeedParen ? ")." : ".") + Item->getNewName().
+        base() + "(").str();
 
     if (AllArgs.size() > 1) {
       Editor.replace(CharSourceRange(SM, Lexer::getLocForEndOfToken(SM,
