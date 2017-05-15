@@ -104,9 +104,9 @@ public:
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
   IGNORED_ATTR(Implements)
-  IGNORED_ATTR(NSKeyedArchiveLegacy)
+  IGNORED_ATTR(NSKeyedArchiverClassName)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
-  IGNORED_ATTR(NSKeyedArchiveSubclassesOnly)
+  IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -783,7 +783,7 @@ public:
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
-    IGNORED_ATTR(NSKeyedArchiveSubclassesOnly)
+    IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -825,7 +825,7 @@ public:
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
-  void visitNSKeyedArchiveLegacyAttr(NSKeyedArchiveLegacyAttr *attr);
+  void visitNSKeyedArchiverClassNameAttr(NSKeyedArchiverClassNameAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1959,14 +1959,14 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 }
 
-void AttributeChecker::visitNSKeyedArchiveLegacyAttr(
-                                              NSKeyedArchiveLegacyAttr *attr) {
+void AttributeChecker::visitNSKeyedArchiverClassNameAttr(
+                                              NSKeyedArchiverClassNameAttr *attr) {
   auto classDecl = dyn_cast<ClassDecl>(D);
   if (!classDecl) return;
 
-  // Generic classes can't use @NSKeyedArchiveLegacy.
+  // Generic classes can't use @NSKeyedArchiverClassName.
   if (classDecl->getGenericSignatureOfContext()) {
-    diagnoseAndRemoveAttr(attr, diag::attr_nskeyedarchivelegacy_generic,
+    diagnoseAndRemoveAttr(attr, diag::attr_NSKeyedArchiverClassName_generic,
                           classDecl->getDeclaredInterfaceType());
   }
 }

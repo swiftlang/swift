@@ -386,7 +386,7 @@ Parser::ParserPosition Parser::getParserPositionAfterFirstCharacter(Token T) {
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
   // Consumes one-character token (like '?', '<', '>' or '!') and returns
-  // it's location.
+  // its location.
 
   // Current token can be either one-character token we want to consume...
   if (Tok.getLength() == 1) {
