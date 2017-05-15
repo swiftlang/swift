@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
 
+// XFAIL: *
+
 // This is an integration check for the inout-deshadow pass, verifying that it
 // deshadows the inout variables in certain cases.  These test should not be
 // very specific (as they are running the parser, silgen and other sil
