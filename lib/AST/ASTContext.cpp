@@ -1430,13 +1430,13 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    GenericSignatureBuilder *builder,
-                                                    ModuleDecl &module) {
+                                              GenericSignatureBuilder *builder,
+                                              GenericSignature *sig,
+                                              ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
-  auto sig = builder->getGenericSignature();
   auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
