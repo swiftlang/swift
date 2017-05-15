@@ -154,4 +154,33 @@ UIKitTests.test("UIFocusEnvironment") {
 }
 #endif
 
+#if os(iOS)
+
+UIKitTests.test("NSItemProviderReadingWriting support") {
+  if #available(iOS 11.0, *) {
+    func f<T : UIDragDropSession>(session: T) {
+      _ = session.canLoadObjects(ofClass: String.self)
+      _ = session.canLoadObjects(ofClass: URL.self)
+    }
+    func g<T : UIDropSession>(session: T) {
+      _ = session.loadObjects(ofClass: String.self) { _ in ()}
+      _ = session.loadObjects(ofClass: URL.self) { _ in () }
+    }
+
+    let pc0 = UIPasteConfiguration(forAccepting: String.self)
+    let pc1 = UIPasteConfiguration(forAccepting: URL.self)
+    pc0.addTypeIdentifiers(forAccepting: URL.self)
+    pc1.addTypeIdentifiers(forAccepting: String.self)
+
+    var pb = UIPasteboard.general
+    pb.setObjects(["Hello"])
+    pb.setObjects([URL(string: "https://www.apple.com")!])
+    pb.setObjects(["Hello"], localOnly: true, expirationDate: nil)
+    pb.setObjects([URL(string: "https://www.apple.com")!], localOnly: true, expirationDate: nil)
+  }
+}
+
+#endif
+
+
 runAllTests()
