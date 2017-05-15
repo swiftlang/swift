@@ -403,6 +403,20 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                      ".globalValue");
       return true;
     }
+    case SpecialCaseId::StaticAbsToSwiftAbs:
+      // swift 3:
+      // CGFloat.abs(1.0)
+      // Float.abs(1.0)
+      // Double.abs(1.0)
+      // Float80.abs(1.0)
+      //
+      // swift 4:
+      // Swift.abs(1.0)
+      // Swift.abs(1.0)
+      // Swift.abs(1.0)
+      // Swift.abs(1.0)
+      Editor.replace(Call->getFn()->getSourceRange(), "Swift.abs");
+      return true;
     }
   }
 
@@ -534,6 +548,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
           handleFuncRename(FD, DSC->getFn(), Args);
           handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
+          handleSpecialCases(FD, CE, Args);
         }
         break;
       }
