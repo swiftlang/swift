@@ -4,6 +4,9 @@ void acceptDoublePointer(double* _Nonnull ptr) __attribute__((swift_name("accept
 
 void oldAcceptDoublePointer(double* _Nonnull ptr) __attribute__((availability(swift, unavailable, replacement="acceptDoublePointer")));
 
+void normallyUnchanged(void);
+void normallyChangedOriginal(void) __attribute__((swift_name("normallyChanged()")));
+
 #ifdef __OBJC__
 
 __attribute__((objc_root_class))

@@ -98,11 +98,19 @@ SwiftVersions:
       - Name: acceptDoublePointer
         SwiftName: 'acceptPointer(_:)'
         Nullability: [ O ]
+      - Name: normallyUnchanged
+        SwiftName: normallyUnchangedButChangedInSwift3()
+      - Name: normallyChangedOriginal
+        SwiftName: normallyChangedButSpecialInSwift3()
     Tags:
       - Name: SomeCStruct
         SwiftName: ImportantCStruct
       - Name: InnerInSwift4
         SwiftName: InnerInSwift4
+      - Name: NormallyUnchangedWrapper
+        SwiftName: NormallyUnchangedButChangedInSwift3Wrapper
+      - Name: NormallyChangedOriginalWrapper
+        SwiftName: NormallyChangedButSpecialInSwift3Wrapper
     Typedefs:
       - Name: SomeCAlias
         SwiftName: ImportantCAlias
