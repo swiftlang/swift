@@ -17,6 +17,7 @@
 
 #import "FoundationShimSupport.h"
 #import "NSCalendarShims.h"
+#import "NSCharacterSetShims.h"
 #import "NSCoderShims.h"
 #import "NSDataShims.h"
 #import "NSDictionaryShims.h"
