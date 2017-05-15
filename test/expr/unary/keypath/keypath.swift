@@ -131,6 +131,28 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   let _: ReferenceWritableKeyPath<Prop, B> = \.nonMutatingProperty
 }
 
+struct TupleStruct {
+  var unlabeled: (Int, String)
+  var labeled: (foo: Int, bar: String)
+}
+
+func tupleComponent() {
+  // TODO: Customized diagnostic
+  let _ = \(Int, String).0 // expected-error{{}}
+  let _ = \(Int, String).1 // expected-error{{}}
+  let _ = \TupleStruct.unlabeled.0 // expected-error{{}}
+  let _ = \TupleStruct.unlabeled.1 // expected-error{{}}
+
+  let _ = \(foo: Int, bar: String).0 // expected-error{{}}
+  let _ = \(foo: Int, bar: String).1 // expected-error{{}}
+  let _ = \(foo: Int, bar: String).foo // expected-error{{}}
+  let _ = \(foo: Int, bar: String).bar // expected-error{{}}
+  let _ = \TupleStruct.labeled.0 // expected-error{{}}
+  let _ = \TupleStruct.labeled.1 // expected-error{{}}
+  let _ = \TupleStruct.labeled.foo // expected-error{{}}
+  let _ = \TupleStruct.labeled.bar // expected-error{{}}
+}
+
 struct Z { }
 
 func testKeyPathSubscript(readonly: Z, writable: inout Z,
