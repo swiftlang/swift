@@ -3222,9 +3222,8 @@ void ProtocolDecl::computeRequirementSignature() {
          GenericSignatureBuilder::RequirementSource
           ::forRequirementSignature(selfPA, this),
          nullptr);
-  builder.finalize(SourceLoc(), { selfType });
   
-  RequirementSignature = builder.getGenericSignature();
+  RequirementSignature = builder.computeGenericSignature(SourceLoc());
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is

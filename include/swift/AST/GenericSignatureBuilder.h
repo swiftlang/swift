@@ -526,6 +526,14 @@ public:
   void inferRequirements(ModuleDecl &module, ParameterList *params,
                          GenericParamList *genericParams);
 
+  /// \brief Finalize the set of requirements and compute the generic
+  /// signature.
+  ///
+  /// After this point, one cannot introduce new requirements.
+  GenericSignature *computeGenericSignature(
+                      SourceLoc loc,
+                      bool allowConcreteGenericParams = false);
+
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///

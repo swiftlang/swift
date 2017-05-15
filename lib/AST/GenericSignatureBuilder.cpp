@@ -5215,3 +5215,11 @@ GenericSignature *GenericSignatureBuilder::getGenericSignature() {
   auto sig = GenericSignature::get(Impl->GenericParams, requirements);
   return sig;
 }
+
+GenericSignature *GenericSignatureBuilder::computeGenericSignature(
+                                          SourceLoc loc,
+                                          bool allowConcreteGenericParams) {
+  finalize(loc, Impl->GenericParams, allowConcreteGenericParams);
+  return getGenericSignature();
+}
+
