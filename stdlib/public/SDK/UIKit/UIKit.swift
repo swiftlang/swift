@@ -194,7 +194,7 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
       if (bounds.size.width == 0) || (bounds.size.height == 0) {
         return .view(UIImage())
       }
-  
+
       UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
       // UIKit is about to update this to be optional, so make it work
       // with both older and newer SDKs. (In this context it should always
@@ -205,9 +205,9 @@ extension UIView : _DefaultCustomPlaygroundQuickLookable {
       layer.render(in: ctx)
 
       let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
-  
+
       UIGraphicsEndImageContext()
-  
+
       _UIViewQuickLookState.views.remove(self)
       return .view(image)
     }
@@ -251,22 +251,22 @@ extension UIContentSizeCategory {
     public var isAccessibilityCategory: Bool {
         return __UIContentSizeCategoryIsAccessibilityCategory(self)
     }
-    
+
     @available(iOS 11.0, tvOS 11.0, *)
     public static func < (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
         return __UIContentSizeCategoryCompareToCategory(left, right) == .orderedAscending
     }
-    
+
     @available(iOS 11.0, tvOS 11.0, *)
     public static func <= (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
         return __UIContentSizeCategoryCompareToCategory(left, right) != .orderedDescending
     }
-    
+
     @available(iOS 11.0, tvOS 11.0, *)
     public static func > (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
         return __UIContentSizeCategoryCompareToCategory(left, right) == .orderedDescending
     }
-    
+
     @available(iOS 11.0, tvOS 11.0, *)
     public static func >= (left: UIContentSizeCategory, right: UIContentSizeCategory) -> Bool {
         return __UIContentSizeCategoryCompareToCategory(left, right) != .orderedAscending
@@ -294,4 +294,92 @@ extension UIFocusItem {
     return self === UIScreen.main.focusedItem
   }
 }
+#endif
+
+//===----------------------------------------------------------------------===//
+// NSItemProviderReading/Writing support
+//===----------------------------------------------------------------------===//
+
+#if os(iOS)
+
+public protocol _SwiftDragDropItemProvider {
+  associatedtype _FoundationType : NSObject
+}
+
+extension String : _SwiftDragDropItemProvider {
+  public typealias _FoundationType = NSString
+}
+
+extension URL : _SwiftDragDropItemProvider {
+  public typealias _FoundationType = NSURL
+}
+
+@available(iOS 11.0, *)
+extension UIDragDropSession {
+  @available(iOS 11.0, *)
+  public func canLoadObjects<
+    T : _SwiftDragDropItemProvider
+  >(ofClass: T.Type) -> Bool where T._FoundationType : NSItemProviderReading {
+    return self.canLoadObjects(ofClass: T._FoundationType.self);
+  }
+}
+
+@available(iOS 11.0, *)
+extension UIDropSession {
+  @available(iOS 11.0, *)
+  public func loadObjects<
+    T : _SwiftDragDropItemProvider
+  >(
+    ofClass: T.Type,
+    completion: @escaping ([T]) -> Void
+  ) -> Progress where T._FoundationType : NSItemProviderReading {
+    return self.loadObjects(ofClass: T._FoundationType.self) { nss in
+      let natives = nss.map { $0 as! T }
+      completion(natives)
+    }
+  }
+}
+
+@available(iOS 11.0, *)
+extension UIPasteConfiguration {
+  @available(iOS 11.0, *)
+  public convenience init<
+    T : _SwiftDragDropItemProvider
+  >(forAccepting _: T.Type) where T._FoundationType : NSItemProviderReading {
+    self.init(forAccepting: T._FoundationType.self)
+  }
+
+  @available(iOS 11.0, *)
+  public func addTypeIdentifiers<
+    T : _SwiftDragDropItemProvider
+  >(forAccepting aClass: T.Type)
+  where T._FoundationType : NSItemProviderReading {
+    self.addTypeIdentifiers(forAccepting: T._FoundationType.self)
+  }
+}
+
+
+extension UIPasteboard {
+  @available(iOS 11.0, *)
+  public func setObjects<
+    T : _SwiftDragDropItemProvider
+  >(_ objects: [T]) where T._FoundationType : NSItemProviderWriting {
+    self.setObjects(objects.map { $0 as! T._FoundationType })
+  }
+
+  @available(iOS 11.0, *)
+  public func setObjects<
+    T : _SwiftDragDropItemProvider
+  >(
+    _ objects: [T],
+    localOnly: Bool,
+    expirationDate: Date?
+  ) where T._FoundationType : NSItemProviderWriting {
+    self.setObjects(
+      objects.map { $0 as! T._FoundationType },
+      localOnly: localOnly,
+      expirationDate: expirationDate)
+  }
+}
+
 #endif
