@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
+// XFAIL: *
+
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
 // CHECK:         string_literal utf16 "default_arguments"
