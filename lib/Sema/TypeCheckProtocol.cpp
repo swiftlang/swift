@@ -5918,14 +5918,14 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl,
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
-  // A class with the @NSKeyedArchiveLegacyAttr will end up getting registered
+  // A class with the @NSKeyedArchiverClassNameAttr will end up getting registered
   // with the Objective-C runtime anyway.
-  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>())
+  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>())
     return;
 
-  // A class with @NSKeyedArchiveSubclassesOnly promises not to be archived,
+  // A class with @NSKeyedArchiverEncodeNonGenericSubclassesOnly promises not to be archived,
   // so don't static-initialize its Objective-C metadata.
-  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiveSubclassesOnlyAttr>())
+  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiverEncodeNonGenericSubclassesOnlyAttr>())
     return;
 
   // If we know that the Objective-C metadata will be statically registered,
@@ -6021,9 +6021,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         }
 
         if (kind && !hasExplicitObjCName(classDecl) &&
-            !classDecl->getAttrs().hasAttribute<NSKeyedArchiveLegacyAttr>() &&
+            !classDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>() &&
             !classDecl->getAttrs()
-              .hasAttribute<NSKeyedArchiveSubclassesOnlyAttr>()) {
+              .hasAttribute<NSKeyedArchiverEncodeNonGenericSubclassesOnlyAttr>()) {
           SourceLoc loc;
           if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
             loc = normal->getLoc();
@@ -6046,15 +6046,15 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
               .fixItInsert(insertionLoc,
                            "@objc(<#Objective-C class name#>)");
             diagnose(classDecl,
-                     diag::unstable_mangled_name_add_nskeyedarchivelegacy)
+                     diag::unstable_mangled_name_add_NSKeyedArchiverClassName)
               .fixItInsert(insertionLoc,
-                           "@NSKeyedArchiveLegacy(\"" +
+                           "@NSKeyedArchiverClassName(\"" +
                            mangler.mangleObjCRuntimeName(classDecl) +
                            "\")");
           } else {
-            diagnose(classDecl, diag::add_nskeyedarchivesubclassesonly_attr,
+            diagnose(classDecl, diag::add_NSKeyedArchiverEncodeNonGenericSubclassesOnly_attr,
                      classDecl->getDeclaredInterfaceType())
-              .fixItInsert(insertionLoc, "@NSKeyedArchiveSubclassesOnly");
+              .fixItInsert(insertionLoc, "@NSKeyedArchiverEncodeNonGenericSubclassesOnly");
           }
         }
 

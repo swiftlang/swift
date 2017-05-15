@@ -1951,7 +1951,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_SynthesizedProtocol:
   case DAK_Count:
   case DAK_Implements:
-  case DAK_NSKeyedArchiveLegacy:
+  case DAK_NSKeyedArchiverClassName:
     llvm_unreachable("cannot serialize attribute");
     return;
 

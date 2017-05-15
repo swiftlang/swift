@@ -1223,16 +1223,16 @@ WARNING(nscoding_unstable_mangled_name_warn,none,
 NOTE(unstable_mangled_name_add_objc,none,
      "for new classes, add '@objc' to specify a unique, prefixed Objective-C "
      "runtime name", ())
-NOTE(unstable_mangled_name_add_nskeyedarchivelegacy,none,
-     "for compatibility with existing archives, use '@NSKeyedArchiveLegacy' "
+NOTE(unstable_mangled_name_add_NSKeyedArchiverClassName,none,
+     "for compatibility with existing archives, use '@NSKeyedArchiverClassName' "
      "to record the Swift 3 mangled name", ())
-NOTE(add_nskeyedarchivesubclassesonly_attr,none,
+NOTE(add_NSKeyedArchiverEncodeNonGenericSubclassesOnly_attr,none,
      "generic class %0 should not be archived directly; "
-     "add @NSKeyedArchiveSubclassesOnly "
+     "add @NSKeyedArchiverEncodeNonGenericSubclassesOnly "
      "and only archive specific subclasses of this class", (Type))
 
-ERROR(attr_nskeyedarchivelegacy_generic,none,
-      "'@NSKeyedArchiveLegacy' cannot be applied to generic class %0",
+ERROR(attr_NSKeyedArchiverClassName_generic,none,
+      "'@NSKeyedArchiverClassName' cannot be applied to generic class %0",
       (Type))
 
 // Generic types
