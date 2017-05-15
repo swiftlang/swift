@@ -2418,26 +2418,15 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
 static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
                                              SILLocation loc,
                                              VarDecl *property,
-                                             AccessStrategy strategy) {
-  // Build the signature of the thunk as expected by the keypath runtime.
-  // For concrete type properties, this is:
-  //   (@in Root, @thick Root.Type) -> @out Value
-  // with Root and Value maximally abstracted. For protocol properties, this is:
-  //   <Root: P> (@in Root) -> @out Value
-  // At the ABI level, this should lower to a signature looking like
-  //   void (sret void *outValue, void *inRoot, type *rootType, wtable *rootP)
-  // which can be abstractly invoked by the runtime.
-  auto typeContext = property->getDeclContext();
-  auto baseType = typeContext->getSelfInterfaceType()
-    ->getCanonicalType();
-  auto propertyType = baseType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                                property)
-    ->getCanonicalType();
-  auto genericEnv = typeContext->getGenericEnvironmentOfContext();
-  auto genericSig = typeContext->getGenericSignatureOfContext()
-    ? typeContext->getGenericSignatureOfContext()->getCanonicalSignature()
+                                             AccessStrategy strategy,
+                                             GenericEnvironment *genericEnv,
+                                             CanType baseType,
+                                             CanType propertyType) {
+  auto genericSig = genericEnv
+    ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
-  
+
+  // Build the signature of the thunk as expected by the keypath runtime.
   SILType loweredBaseTy, loweredPropTy;
   {
     GenericContextScope scope(SGF.SGM.Types, genericSig);
@@ -2447,16 +2436,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
                                        propertyType);
   }
   
-  SmallVector<SILParameterInfo, 2> params;
-  params.emplace_back(loweredBaseTy.getSwiftRValueType(),
-                      ParameterConvention::Indirect_In);
-  if (!typeContext->getAsProtocolOrProtocolExtensionContext()) {
-    // Add a thick metatype argument. This will act as a metadata source for the
-    // type's generic context, making the lowered calling convention uniform.
-    params.emplace_back(
-      CanMetatypeType::get(baseType, MetatypeRepresentation::Thick),
-      ParameterConvention::Direct_Unowned);
-  }
+  SILParameterInfo param(loweredBaseTy.getSwiftRValueType(),
+                         ParameterConvention::Indirect_In);
   SILResultInfo result(loweredPropTy.getSwiftRValueType(),
                        ResultConvention::Indirect);
   
@@ -2464,11 +2445,11 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false),
     ParameterConvention::Direct_Unowned,
-    params, result, None, SGF.getASTContext());
+    param, result, None, SGF.getASTContext());
   
   // Find the function and see if we already created it.
   auto name = Mangle::ASTMangler()
-    .mangleKeyPathGetterThunkHelper(property);
+    .mangleKeyPathGetterThunkHelper(property, genericSig, baseType);
   auto thunk = SGF.SGM.M.getOrCreateSharedFunction(loc, name,
                                                    signature,
                                                    IsBare,
@@ -2491,19 +2472,13 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   SILGenFunction subSGF(SGM, *thunk);
   auto entry = thunk->begin();
   auto resultArgTy = result.getSILStorageType();
-  auto paramArgTy = params[0].getSILStorageType();
+  auto paramArgTy = param.getSILStorageType();
   if (genericEnv) {
     resultArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, resultArgTy);
     paramArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, paramArgTy);
   }
   auto resultArg = entry->createFunctionArgument(resultArgTy);
   auto paramArg = entry->createFunctionArgument(paramArgTy);
-  if (!typeContext->getAsProtocolOrProtocolExtensionContext()) {
-    auto metatypeArgTy = params[1].getSILStorageType();
-    if (genericEnv)
-      metatypeArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, metatypeArgTy);
-    entry->createFunctionArgument(metatypeArgTy);
-  }
   
   Scope scope(subSGF, loc);
   
@@ -2537,24 +2512,12 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
 SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                       SILLocation loc,
                                       VarDecl *property,
-                                      AccessStrategy strategy) {
-  // Build the signature of the thunk as expected by the keypath runtime.
-  // For concrete type properties, this is:
-  //   (@in Value, @in Root, @thick Root.Type) -> ()
-  // with Root and Value maximally abstracted. For protocol properties, this is:
-  //   <Root: P> (@in Value, @in Root) -> ()
-  // At the ABI level, this should lower to a signature looking like
-  //   void (void *inValue, void *inRoot, type *rootType, wtable *rootP)
-  // which can be abstractly invoked by the runtime.
-  auto typeContext = property->getDeclContext();
-  auto baseType = typeContext->getSelfInterfaceType()
-    ->getCanonicalType();
-  auto propertyType = baseType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                                property)
-    ->getCanonicalType();
-  auto genericEnv = typeContext->getGenericEnvironmentOfContext();
-  auto genericSig = typeContext->getGenericSignatureOfContext()
-    ? typeContext->getGenericSignatureOfContext()->getCanonicalSignature()
+                                      AccessStrategy strategy,
+                                      GenericEnvironment *genericEnv,
+                                      CanType baseType,
+                                      CanType propertyType) {
+  auto genericSig = genericEnv
+    ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
 
   // Build the signature of the thunk as expected by the keypath runtime.
@@ -2567,35 +2530,27 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                        propertyType);
   }
   
-  SmallVector<SILParameterInfo, 3> params;
-  // The newValue param
-  params.emplace_back(loweredPropTy.getSwiftRValueType(),
-                      ParameterConvention::Indirect_In);
-  // The base param
-  params.emplace_back(loweredBaseTy.getSwiftRValueType(),
-                      property->isSetterNonMutating()
-                        ? ParameterConvention::Indirect_In
-                        : ParameterConvention::Indirect_Inout);
+  SILParameterInfo propParam(loweredPropTy.getSwiftRValueType(),
+                             ParameterConvention::Indirect_In);
   
-  if (!typeContext->getAsProtocolOrProtocolExtensionContext()) {
-    // Add a thick metatype argument. This will act as a metadata source for the
-    // type's generic context, making the lowered calling convention uniform.
-    params.emplace_back(
-      CanMetatypeType::get(baseType, MetatypeRepresentation::Thick),
-      ParameterConvention::Direct_Unowned);
-  }
+  SILParameterInfo baseParam(loweredBaseTy.getSwiftRValueType(),
+                             property->isSetterNonMutating()
+                             ? ParameterConvention::Indirect_In
+                             : ParameterConvention::Indirect_Inout);
   
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false),
     ParameterConvention::Direct_Unowned,
-    params, {}, None, SGF.getASTContext());
+    {propParam, baseParam}, {}, None, SGF.getASTContext());
   
   // Mangle the name of the thunk to see if we already created it.
   SmallString<64> nameBuf;
   
   // Find the function and see if we already created it.
-  auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property);
+  auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property,
+                                                                  genericSig,
+                                                                  baseType);
   auto thunk = SGF.SGM.M.getOrCreateSharedFunction(loc, name,
                                                    signature,
                                                    IsBare,
@@ -2617,20 +2572,14 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   
   SILGenFunction subSGF(SGM, *thunk);
   auto entry = thunk->begin();
-  auto valueArgTy = params[0].getSILStorageType();
-  auto baseArgTy = params[1].getSILStorageType();
+  auto valueArgTy = propParam.getSILStorageType();
+  auto baseArgTy = baseParam.getSILStorageType();
   if (genericEnv) {
     valueArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, valueArgTy);
     baseArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, baseArgTy);
   }
   auto valueArg = entry->createFunctionArgument(valueArgTy);
   auto baseArg = entry->createFunctionArgument(baseArgTy);
-  if (!typeContext->getAsProtocolOrProtocolExtensionContext()) {
-    auto metatypeArgTy = params[2].getSILStorageType();
-    if (genericEnv)
-      metatypeArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, metatypeArgTy);
-    entry->createFunctionArgument(metatypeArgTy);
-  }
   
   Scope scope(subSGF, loc);
   
@@ -2739,6 +2688,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Property: {
       auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
+      auto oldBaseTy = baseTy;
       baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
         ->getCanonicalType();
       
@@ -2769,11 +2719,15 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         auto id = getIdForKeyPathComponentComputedProperty(SGF, decl,
                                                            strategy);
         auto getter = getOrCreateKeyPathGetter(SGF, SILLocation(E),
-                 decl, strategy);
+                 decl, strategy,
+                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
+                 oldBaseTy, baseTy);
         
         if (decl->isSettable(decl->getDeclContext())) {
           auto setter = getOrCreateKeyPathSetter(SGF, SILLocation(E),
-                 decl, strategy);
+                 decl, strategy,
+                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
+                 oldBaseTy, baseTy);
           loweredComponents.push_back(
             KeyPathPatternComponent::forComputedSettableProperty(id,
                                                                  getter, setter,
