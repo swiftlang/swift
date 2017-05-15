@@ -1374,24 +1374,27 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+  auto builder =
+    new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
 
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
 
   builder->addGenericSignature(sig);
-  builder->finalize(SourceLoc(), sig->getGenericParams(),
-                    /*allowConcreteGenericParams=*/true);
 
+  auto builderSig =
+    builder->computeGenericSignature(SourceLoc(),
+                                     /*allowConcreteGenericParams=*/true);
+  (void)builderSig;
+  
 #ifndef NDEBUG
-  if (builder->getGenericSignature()->getCanonicalSignature() != sig) {
+  if (builderSig->getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig =
-    builder->getGenericSignature()->getCanonicalSignature();
+    auto reprocessedSig = builderSig->getCanonicalSignature();
 
     reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
