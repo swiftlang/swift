@@ -802,8 +802,8 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
-  public mutating func append(_ other: String) {
-    _core.append(other._core)
+  public mutating func append<Other: StringProtocol>(_ other: Other) {
+    append(contentsOf: other)
   }
 
   /// Appends the given Unicode scalar to the string.
