@@ -1,12 +1,12 @@
 // REQUIRES: OS=macosx
 // RUN: %target-swift-frontend -typecheck %s -swift-version 3
-// RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -swift-version 3
+// RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -swift-version 3 -disable-migrator-fixits
 // RUN: diff -u %s.expected %t.result
 
 import AppKit
 
 func a(_ outlineView: NSOutlineView) {
-  let cell: NSTableCellView = outlineView.makeView(withIdentifier: NSTableView.ReusableViewIdentifier(rawValue: "HeaderCell"), owner: outlineView) as! NSTableCellView
+  let cell: NSTableCellView = outlineView.makeView(withIdentifier: "HeaderCell", owner: outlineView) as! NSTableCellView
 }
 
 NSApplication.load()
