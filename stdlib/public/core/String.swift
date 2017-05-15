@@ -99,11 +99,11 @@ public protocol StringProtocol
   ///     value, it is used as the return value for the
   ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
   ///     only for the duration of the closure's execution.
-  ///   - encoding: The encoding in which the code units should be interpreted.
+  ///   - targetEncoding: The encoding of the code units expected by `body`.
   /// - Returns: The return value of the `body` closure parameter, if any.
-  func withCString<Result, Encoding: Unicode.Encoding>(
-    encodedAs encoding: Encoding.Type,
-    _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
+  func withCString<Result, TargetEncoding: Unicode.Encoding>(
+    encodedAs encoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
 }
 
@@ -273,8 +273,6 @@ extension StringProtocol {
 }
 
 extension StringProtocol where Self : _SwiftStringView {
-  /// Invokes the given closure on the contents of the string, represented as a
-  /// pointer to a null-terminated sequence of code units in the given encoding.
   public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
