@@ -587,12 +587,26 @@ namespace {
              "base for open existential component must be an existential");
       assert(base.getType().isAddress() &&
              "base value of open-existential component was not an address?");
-      assert(base.getType().getPreferredExistentialRepresentation(SGF.SGM.M)
-             == ExistentialRepresentation::Opaque);
+      SILValue addr;
 
-      SILValue addr = SGF.B.createOpenExistentialAddr(
+      auto rep = base.getType().getPreferredExistentialRepresentation(SGF.SGM.M);
+      switch (rep) {
+      case ExistentialRepresentation::Opaque:
+        addr = SGF.B.createOpenExistentialAddr(
           loc, base.getValue(), getTypeOfRValue().getAddressType(),
           getOpenedExistentialAccessFor(accessKind));
+        break;
+      case ExistentialRepresentation::Boxed: {
+        auto &TL = SGF.getTypeLowering(base.getType());
+        auto error = SGF.emitLoad(loc, base.getValue(), TL,
+                                  SGFContext(), IsNotTake);
+        addr = SGF.B.createOpenExistentialBox(
+          loc, error.getValue(), getTypeOfRValue().getAddressType());
+        break;
+      }
+      default:
+        llvm_unreachable("Bad existential representation for address-only type");
+      }
 
       SGF.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),
                                   addr);
@@ -1997,9 +2011,11 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
     SGF.OpaqueValueExprs.erase(known);
 
     // Do formal evaluation of the underlying existential lvalue.
-    LValue lv = visitRec(opened->getExistentialValue(), accessKind);
-    lv.add<OpenOpaqueExistentialComponent>(
-      cast<ArchetypeType>(opened->getOpenedArchetype()->getCanonicalType()));
+    auto lv = visitRec(opened->getExistentialValue(), accessKind);
+    lv = SGF.emitOpenExistentialLValue(
+        opened, std::move(lv),
+        CanArchetypeType(opened->getOpenedArchetype()),
+        accessKind);
     return lv;
   }
 
@@ -2909,7 +2925,8 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
   auto rep = lv.getTypeOfRValue()
     .getPreferredExistentialRepresentation(SGM.M);
   switch (rep) {
-  case ExistentialRepresentation::Opaque: {
+  case ExistentialRepresentation::Opaque:
+  case ExistentialRepresentation::Boxed: {
     lv.add<OpenOpaqueExistentialComponent>(openedArchetype);
     break;
   }
