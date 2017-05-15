@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -S -g -o - | %FileCheck %s
 
+// XFAIL: *
+
 // REQUIRES: CPU=x86_64
 
 func markUsed<T>(_ t: T) {}
