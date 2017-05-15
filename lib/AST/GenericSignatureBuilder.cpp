@@ -69,6 +69,10 @@ STATISTIC(NumSuperclassConstraints, "# of superclass constraints tracked");
 STATISTIC(NumLayoutConstraints, "# of layout constraints tracked");
 STATISTIC(NumSelfDerived, "# of self-derived constraints removed");
 STATISTIC(NumRecursive, "# of recursive types we bail out on");
+STATISTIC(NumArchetypeAnchorCacheHits,
+          "# of hits in the archetype anchor cache");
+STATISTIC(NumArchetypeAnchorCacheMisses,
+          "# of misses in the archetype anchor cache");
 
 struct GenericSignatureBuilder::Implementation {
   /// Function used to look up conformances.
@@ -1523,20 +1527,37 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
     anchor = rep;
   }
 
+  auto equivClass = rep->getEquivalenceClassIfPresent();
+  if (!equivClass) return anchor;
+
+  // Check whether
+  if (equivClass->archetypeAnchorCache.anchor &&
+      equivClass->archetypeAnchorCache.numMembers
+        == equivClass->members.size()) {
+    ++NumArchetypeAnchorCacheHits;
+
+    return equivClass->archetypeAnchorCache.anchor;
+  }
+
   // Find the best type within this equivalence class.
-  for (auto pa : rep->getEquivalenceClassMembers()) {
+  for (auto pa : equivClass->members) {
     if (compareDependentTypes(&pa, &anchor) < 0)
       anchor = pa;
   }
 
 #if SWIFT_GSB_EXPENSIVE_ASSERTIONS
   // Make sure that we did, in fact, get one that is better than all others.
-  for (auto pa : anchor->getEquivalenceClassMembers()) {
+  for (auto pa : equivClass->members) {
     assert((pa == anchor || compareDependentTypes(&anchor, &pa) < 0) &&
            compareDependentTypes(&pa, &anchor) >= 0 &&
            "archetype anchor isn't a total order");
   }
 #endif
+
+  // Record the cache miss and update the cache.
+  ++NumArchetypeAnchorCacheMisses;
+  equivClass->archetypeAnchorCache.anchor = anchor;
+  equivClass->archetypeAnchorCache.numMembers = equivClass->members.size();
 
   return anchor;
 }

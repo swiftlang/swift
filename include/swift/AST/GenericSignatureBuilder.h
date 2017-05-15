@@ -199,6 +199,18 @@ public:
 
     LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                               "only for use in the debugger");
+
+    /// Caches.
+
+    /// The cached archetype anchor.
+    struct {
+      /// The cached archetype anchor itself.
+      PotentialArchetype *anchor = nullptr;
+
+      /// The number of members of the equivalence class when the archetype
+      /// anchor was cached.
+      unsigned numMembers;
+    } archetypeAnchorCache;
   };
 
   friend class RequirementSource;
