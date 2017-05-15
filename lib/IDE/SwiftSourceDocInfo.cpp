@@ -967,6 +967,26 @@ CharSourceRange CallArgInfo::getEntireCharRange(const SourceManager &SM) const {
                          Lexer::getLocForEndOfToken(SM, ArgExp->getEndLoc()));
 }
 
+static Expr* getSingleNonImplicitChild(Expr *Parent) {
+  // If this expr is non-implicit, we are done.
+  if (!Parent->isImplicit())
+    return Parent;
+
+  // Collect all immediate children.
+  llvm::SmallVector<Expr*, 4> Children;
+  Parent->forEachImmediateChildExpr([&](Expr *E) {
+    Children.push_back(E);
+    return E;
+  });
+
+  // If more than one children are found, we are not sure the non-implicit node.
+  if (Children.size() != 1)
+    return Parent;
+
+  // Dig deeper if necessary.
+  return getSingleNonImplicitChild(Children[0]);
+}
+
 std::vector<CallArgInfo> swift::ide::
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   std::vector<CallArgInfo> InfoVec;
@@ -983,12 +1003,14 @@ getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
           LabelEnd = LabelStart.getAdvancedLoc(NameIdentifier.getLength());
       }
 
-      InfoVec.push_back({Elem, CharSourceRange(SM, LabelStart, LabelEnd)});
+      InfoVec.push_back({getSingleNonImplicitChild(Elem),
+        CharSourceRange(SM, LabelStart, LabelEnd)});
       ++ElemIndex;
     }
   } else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
     if (auto Sub = PE->getSubExpr())
-      InfoVec.push_back({Sub, CharSourceRange(Sub->getStartLoc(), 0)});
+      InfoVec.push_back({getSingleNonImplicitChild(Sub),
+        CharSourceRange(Sub->getStartLoc(), 0)});
   }
   return InfoVec;
 }
