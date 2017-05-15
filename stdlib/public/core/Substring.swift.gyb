@@ -205,54 +205,6 @@ public struct Substring : StringProtocol {
     self.init(
       String(decodingCString: nulTerminatedCodeUnits, as: encoding))
   }
-    
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of UTF-8 code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
-  ///
-  /// - Parameter body: A closure with a pointer parameter that points to a
-  ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, it is used as the return value for the `withCString(_:)`
-  ///   method. The pointer argument is valid only for the duration of the
-  ///   closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  public func withCString<Result>(
-    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _slice._base._core._withCSubstringAndLength(
-      in: startIndex._base._position..<endIndex._base._position,
-      encoding: UTF8.self) {
-      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
-        try body($0)
-      }
-    }
-  }
-
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
-  ///
-  /// - Parameters:
-  ///   - body: A closure with a pointer parameter that points to a
-  ///     null-terminated sequence of code units. If `body` has a return
-  ///     value, it is used as the return value for the
-  ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
-  ///     only for the duration of the closure's execution.
-  ///   - encoding: The encoding in which the code units should be interpreted.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
-    encodedAs encoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-  ) rethrows -> Result {
-    return try _slice._base._core._withCSubstring(
-      in: startIndex._base._position..<endIndex._base._position,
-      encoding: encoding, body)
-  }
 }
 
 extension Substring : _SwiftStringView {
