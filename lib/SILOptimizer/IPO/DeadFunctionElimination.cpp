@@ -210,8 +210,7 @@ protected:
             ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
                                    dyn_cast<FuncDecl>(decl),
                                    clas);
-          } else if (auto proto =
-                       dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+          } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
             ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
           } else {
             llvm_unreachable("key path keyed by a non-class, non-protocol method");

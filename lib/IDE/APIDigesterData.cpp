@@ -117,7 +117,7 @@ TypeMemberDiffItemSubKind
 swift::ide::api::TypeMemberDiffItem::getSubKind() const {
   DeclNameViewer OldName = getOldName();
   DeclNameViewer NewName = getNewName();
-  if(!OldName.isFunction()) {
+  if (!OldName.isFunction()) {
     assert(!NewName.isFunction());
     return TypeMemberDiffItemSubKind::SimpleReplacement;
   }
