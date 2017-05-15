@@ -614,18 +614,5 @@ tests.test("signum/concrete") {
 % end
 }
 
-tests.test("CopyConstructors") {
-% for suffix in ['8', '16', '32', '64', '']:
-%   for u in ['U', '']:
-%     Type = u + 'Int' + suffix
-  do {
-    let x = ${Type}(42)
-    let y = 42 as ${Type}
-    expectEqual(x, y)
-    expectEqualType(type(of: x), type(of: y))
-  }
-%   end
-% end
-}
 
 runAllTests()
