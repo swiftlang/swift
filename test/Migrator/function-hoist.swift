@@ -19,4 +19,11 @@ func foo(_ c : Cities) {
   _ = globalCityFunc3(c, 1) + 2
   _ = globalCityFunc4(c, 1, 2) + 2
   _ = globalCityFunc5() + 2 + 1
+  var vc = Cities(x : 1)
+  _ = globalCityPointerTaker(&vc, 2, 2)
+  _ = globalCityPointerTaker(getCities(), 2, 2)
+}
+
+func foo1(_ flag: Bool, _ c1: Cities, _ c2: Cities) {
+  _ = globalCityFunc4(flag ? c1 : c2, 1 + 1, 2 + 2)
 }

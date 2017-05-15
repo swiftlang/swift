@@ -54,5 +54,13 @@
     "OldPrintedName": "globalCityFunc5()",
     "NewPrintedName": "property5",
     "NewTypeName": "Cities.Nested"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities22globalCityPointerTakerSiSPyA2ACG_S2itF",
+    "OldPrintedName": "globalCityPointerTaker(_:_:_:)",
+    "NewPrintedName": "takePointer(Pointer1:Pointer2:)",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0,
   }
 ]
