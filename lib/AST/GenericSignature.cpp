@@ -730,6 +730,7 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment(
   // generic signature builders are stored on the ASTContext.
   return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
            module.getASTContext().getOrCreateGenericSignatureBuilder(*this, &module),
+           *this,
            module);
 }
 
