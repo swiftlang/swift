@@ -585,7 +585,13 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// 
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Element == Character {
+  where S.Element == Character {
+    let e0 = newElements as? _SwiftStringView
+    if _fastPath(e0 != nil), let e = e0 {
+      if isEmpty { _core = e._persistentString()._core }
+      else { _core.append(e._ephemeralString()._core) }
+      return
+    }
     reserveCapacity(_core.count + newElements.underestimatedCount)
     for c in newElements {
       self.append(c)
