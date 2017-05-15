@@ -164,8 +164,14 @@ class E {
   }
 }
 
-func testVariableWithinItsOwnInitialValue() {
-    let cancel = #selector(cancel) // expected-warning {{initialization of immutable value 'cancel' was never used; consider replacing with assignment to '_' or removing it}}
+class F: D {
+  override func test() {
+    let cancel = #selector(cancel) // expected-warning {{initialization of immutable value 'cancel' was never used; consider replacing with assignment to '_' or removing it}} 
+  }
 }
 
-func cancel() {}
+func testVariableWithinItsOwnInitialValue() {
+    let doSomething = #selector(doSomething) // expected-warning {{initialization of immutable value 'doSomething' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+func doSomething() {}
