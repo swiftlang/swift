@@ -1161,21 +1161,21 @@ public:
   }
 };
 
-/// Defines the @NSKeyedArchiveLegacyAttr attribute.
-class NSKeyedArchiveLegacyAttr : public DeclAttribute {
+/// Defines the @NSKeyedArchiverClassNameAttr attribute.
+class NSKeyedArchiverClassNameAttr : public DeclAttribute {
 public:
-  NSKeyedArchiveLegacyAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_NSKeyedArchiveLegacy, AtLoc, Range, Implicit),
+  NSKeyedArchiverClassNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_NSKeyedArchiverClassName, AtLoc, Range, Implicit),
       Name(Name) {}
 
-  NSKeyedArchiveLegacyAttr(StringRef Name, bool Implicit)
-    : NSKeyedArchiveLegacyAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  NSKeyedArchiverClassNameAttr(StringRef Name, bool Implicit)
+    : NSKeyedArchiverClassNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
 
   /// The legacy mangled name.
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_NSKeyedArchiveLegacy;
+    return DA->getKind() == DAK_NSKeyedArchiverClassName;
   }
 };
 

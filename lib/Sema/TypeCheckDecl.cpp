@@ -6139,9 +6139,9 @@ public:
 
     UNINTERESTING_ATTR(ObjCMembers)
     UNINTERESTING_ATTR(Implements)
-    UNINTERESTING_ATTR(NSKeyedArchiveLegacy)
+    UNINTERESTING_ATTR(NSKeyedArchiverClassName)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
-    UNINTERESTING_ATTR(NSKeyedArchiveSubclassesOnly)
+    UNINTERESTING_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

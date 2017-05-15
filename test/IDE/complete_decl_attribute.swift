@@ -67,8 +67,8 @@ class C {}
 // KEYWORD3-NEXT:             Keyword/None:                       objcMembers[#Class Attribute#]; name=objcMembers{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Class Attribute#]; name=objc_non_lazy_realization{{$}}
-// KEYWORD3-NEXT:             Keyword/None:                       NSKeyedArchiveLegacy[#Class Attribute#]; name=NSKeyedArchiveLegacy{{$}}
-// KEYWORD3-NEXT:             Keyword/None:                       NSKeyedArchiveSubclassesOnly[#Class Attribute#]; name=NSKeyedArchiveSubclassesOnly{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       NSKeyedArchiverClassName[#Class Attribute#]; name=NSKeyedArchiverClassName{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       NSKeyedArchiverEncodeNonGenericSubclassesOnly[#Class Attribute#]; name=NSKeyedArchiverEncodeNonGenericSubclassesOnly{{$}}
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD4^#
@@ -110,6 +110,6 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSKeyedArchiveLegacy[#Declaration Attribute#]; name=NSKeyedArchiveLegacy{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       NSKeyedArchiveSubclassesOnly[#Declaration Attribute#]; name=NSKeyedArchiveSubclassesOnly{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       NSKeyedArchiverClassName[#Declaration Attribute#]; name=NSKeyedArchiverClassName{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       NSKeyedArchiverEncodeNonGenericSubclassesOnly[#Declaration Attribute#]; name=NSKeyedArchiverEncodeNonGenericSubclassesOnly{{$}}
 // KEYWORD_LAST-NEXT:             End completions
