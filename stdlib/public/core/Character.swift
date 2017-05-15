@@ -207,9 +207,7 @@ public struct Character :
       _representation = .large(native._storage)
       return
     }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
+    _representation = .large(_StringCore(s.utf16).nativeBuffer!._storage)
   }
 
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
