@@ -27,6 +27,12 @@ protocol P {
   var y: String { get set }
 }
 
+extension P {
+  var z: String {
+    return y
+  }
+}
+
 // CHECK-LABEL: sil hidden @{{.*}}storedProperties
 func storedProperties<T>(_: T) {
   // CHECK: keypath $WritableKeyPath<S<T>, T>, <τ_0_0> (root $S<τ_0_0>; stored_property #S.x : $τ_0_0) <T>
@@ -133,4 +139,10 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME:   setter @_T08keypaths1PP1ySSvTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in String, @inout τ_0_0) -> ()
   // CHECK-SAME: ) <T>
   _ = \T.y
+
+  // CHECK: keypath $KeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
+  // CHECK-SAME: root $τ_0_0;
+  // CHECK-SAME: gettable_property $String,
+  // CHECK-SAME:   id @
+  _ = \T.z
 }

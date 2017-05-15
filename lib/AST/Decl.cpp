@@ -1138,7 +1138,7 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
     return false;
 
   case DeclKind::Protocol:
-    return true;
+    return !storage->getDeclContext()->isExtensionContext();
 
   case DeclKind::Class:
     // Final properties can always be direct, even in classes.
