@@ -94,5 +94,15 @@
     "OldPrintedName": "NSAvailableWindowDepths()",
     "NewPrintedName": "availableDepths",
     "NewTypeName": "NSWindow.Depth"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "c:@F@NSOpenGLSetOption",
+    "SpecialCaseId": "NSOpenGLSetOption"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "c:@F@NSOpenGLGetOption",
+    "SpecialCaseId": "NSOpenGLGetOption"
   }
 ]

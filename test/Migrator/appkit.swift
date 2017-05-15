@@ -16,32 +16,32 @@ NSRectFill(NSRect.zero)
 NSRectClip(NSRect.zero)
 NSFrameRect(NSRect.zero)
 
-// FIXME: NSRect.zero.fill(using: NSCompositingOperation.clear)
-// NSRectFillUsingOperation(NSRect.zero, NSCompositingOperation.clear)
+// NSRect.zero.fill(using: NSCompositingOperation.clear)
+NSRectFillUsingOperation(NSRect.zero, NSCompositingOperation.clear)
 
-// FIXME: NSRect.zero.frame(withWidth: 0.0)
-// NSFrameRectWithWidth(NSRect.zero, 0.0)
+// NSRect.zero.frame(withWidth: 0.0)
+NSFrameRectWithWidth(NSRect.zero, 0.0)
 
-// FIXME: NSRect.zero.frame(withWidth: 0.0, using:NSCompositingOperation.clear)
-// NSFrameRectWithWidthUsingOperation(NSRect.zero, 0.0, NSCompositingOperation.clear)
+// NSRect.zero.frame(withWidth: 0.0, using: NSCompositingOperation.clear)
+NSFrameRectWithWidthUsingOperation(NSRect.zero, 0.0, NSCompositingOperation.clear)
 
 let isTrue = true
 
-// FIXME: (isTrue ? NSRect.zero : NSRect.zero).frame(withWidth: 0.0)
-// NSFrameRectWithWidth(isTrue ? NSRect.zero : NSRect.zero, 0.0)
+// (isTrue ? NSRect.zero : NSRect.zero).frame(withWidth: 0.0)
+NSFrameRectWithWidth(isTrue ? NSRect.zero : NSRect.zero, 0.0)
 
 var rekts = [NSRect.zero]
 var kolors = [NSColor.red]
 var grays = [CGFloat(0)]
 
-// TODO: rekts.fill()
-// NSRectFillList(&rekts, 1)
+// rekts.fill()
+NSRectFillList(&rekts, 1)
 
-// FIXME: rekts.fill(using: NSCompositingOperation.clear)
-// NSRectFillListUsingOperation(rekts, 1, NSCompositingOperation.clear)
+// rekts.fill(using: NSCompositingOperation.clear)
+NSRectFillListUsingOperation(rekts, 1, NSCompositingOperation.clear)
 
-// TODO: rekts.clip()
-// NSRectClipList(&rekts, 1)
+// rekts.clip()
+NSRectClipList(&rekts, 1)
 
 // TODO: zip2(rekts, kolors).fill()
 // NSRectFillListWithColors(&rekts, &kolors, 1)
@@ -63,11 +63,11 @@ _ = NSAvailableWindowDepths()
 
 var cacheSize: GLint = 0
 
-// TODO: cacheSize = NSOpenGLGOFormatCacheSize.globalValue
-// NSOpenGLGetOption(NSOpenGLGOFormatCacheSize, &cacheSize)
+// cacheSize = NSOpenGLGOFormatCacheSize.globalValue
+NSOpenGLGetOption(NSOpenGLGOFormatCacheSize, &cacheSize)
 
-// TODO: NSOpenGLGOFormatCacheSize.globalValue = 5
-// NSOpenGLSetOption(NSOpenGLGOFormatCacheSize, 5)
+// NSOpenGLGOFormatCacheSize.globalValue = 5
+NSOpenGLSetOption(NSOpenGLGOFormatCacheSize, 5)
 
 var major = GLint(0)
 var minor = GLint(0)
