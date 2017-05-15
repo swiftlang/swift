@@ -10,6 +10,42 @@
 // CHECK-SWIFT-4: func accept(_ ptr: UnsafeMutablePointer<Double>)
 // CHECK-SWIFT-3: func acceptPointer(_ ptr: UnsafeMutablePointer<Double>?)
 
+// CHECK-SWIFT-4: func normallyUnchanged()
+// CHECK-SWIFT-4: @available(swift, obsoleted: 4, renamed: "normallyUnchanged()")
+// CHECK-SWIFT-4-NEXT: func normallyUnchangedButChangedInSwift3()
+// CHECK-SWIFT-3: @available(swift, obsoleted: 3, renamed: "normallyUnchangedButChangedInSwift3()")
+// CHECK-SWIFT-3-NEXT: func normallyUnchanged()
+// CHECK-SWIFT-3: func normallyUnchangedButChangedInSwift3()
+
+
+// CHECK-SWIFT-4: func normallyChanged()
+// CHECK-SWIFT-4-NEXT: @available(swift, obsoleted: 4, renamed: "normallyChanged()")
+// CHECK-SWIFT-4-NEXT: func normallyChangedButSpecialInSwift3()
+// CHECK-SWIFT-4-NEXT: @available(swift, obsoleted: 3, renamed: "normallyChanged()")
+// CHECK-SWIFT-4-NEXT: func normallyChangedOriginal()
+// CHECK-SWIFT-3: @available(swift, introduced: 4, renamed: "normallyChangedButSpecialInSwift3()")
+// CHECK-SWIFT-3-NEXT: func normallyChanged()
+// CHECK-SWIFT-3-NEXT: func normallyChangedButSpecialInSwift3()
+// CHECK-SWIFT-3-NEXT: @available(swift, obsoleted: 3, renamed: "normallyChangedButSpecialInSwift3()")
+// CHECK-SWIFT-3-NEXT: func normallyChangedOriginal()
+
+// CHECK-SWIFT-4: @available(swift, obsoleted: 4, renamed: "NormallyUnchangedWrapper")
+// CHECK-SWIFT-4-NEXT: typealias NormallyUnchangedButChangedInSwift3Wrapper = NormallyUnchangedWrapper
+// CHECK-SWIFT-4: struct NormallyUnchangedWrapper {
+// CHECK-SWIFT-3: typealias NormallyUnchangedButChangedInSwift3Wrapper = NormallyUnchangedWrapper
+// CHECK-SWIFT-3-NEXT: struct NormallyUnchangedWrapper {
+
+// CHECK-SWIFT-4: @available(swift, obsoleted: 4, renamed: "NormallyChangedWrapper")
+// CHECK-SWIFT-4-NEXT: typealias NormallyChangedButSpecialInSwift3Wrapper = NormallyChangedWrapper
+// CHECK-SWIFT-4: @available(swift, obsoleted: 3, renamed: "NormallyChangedWrapper")
+// CHECK-SWIFT-4-NEXT: typealias NormallyChangedOriginalWrapper = NormallyChangedWrapper
+// CHECK-SWIFT-4: struct NormallyChangedWrapper {
+// CHECK-SWIFT-3: typealias NormallyChangedButSpecialInSwift3Wrapper = NormallyChangedWrapper
+// CHECK-SWIFT-3-NEXT: @available(swift, obsoleted: 3, renamed: "NormallyChangedButSpecialInSwift3Wrapper")
+// CHECK-SWIFT-3-NEXT: typealias NormallyChangedOriginalWrapper = NormallyChangedButSpecialInSwift3Wrapper
+// CHECK-SWIFT-3-NEXT: struct NormallyChangedWrapper {
+
+
 // RUN: not %target-swift-frontend -typecheck -F %S/Inputs/custom-frameworks -swift-version 4 %s 2>&1 | %FileCheck -check-prefix=CHECK-DIAGS -check-prefix=CHECK-DIAGS-4 %s
 // RUN: not %target-swift-frontend -typecheck -F %S/Inputs/custom-frameworks -swift-version 3 %s 2>&1 | %FileCheck -check-prefix=CHECK-DIAGS -check-prefix=CHECK-DIAGS-3 %s
 

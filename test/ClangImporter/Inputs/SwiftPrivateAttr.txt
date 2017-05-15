@@ -107,11 +107,11 @@ struct NSOptions : OptionSet {
   static var __PrivA: NSOptions { get }
   static var B: NSOptions { get }
 }
-@available(swift, obsoleted: 3, renamed: "__PrivCFType")
-typealias __PrivCFTypeRef = __PrivCFType
 class __PrivCFType : _CFObject {
 }
+@available(swift, obsoleted: 3, renamed: "__PrivCFType")
+typealias __PrivCFTypeRef = __PrivCFType
+typealias __PrivCFSub = __PrivCFType
 @available(swift, obsoleted: 3, renamed: "__PrivCFSub")
 typealias __PrivCFSubRef = __PrivCFSub
-typealias __PrivCFSub = __PrivCFType
 typealias __PrivInt = Int32
