@@ -824,24 +824,13 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // Relational constraints: break out to look for types above/below.
       break;
 
-    case ConstraintKind::DynamicTypeOf: {
-      auto otherTy = constraint->getSecondType();
-      if (constraint->getSecondType()->isEqual(typeVar))
-        otherTy = constraint->getFirstType();
-
-      auto simplified = cs.simplifyType(otherTy);
-      if (simplified->hasTypeVariable())
-        result.InvolvesTypeVariables = true;
-      continue;
-    }
-
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
+    case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
-      // FIXME: check for other type variables?
       // Constraints from which we can't do anything.
       continue;
 
@@ -1038,17 +1027,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
         addOptionalSupertypeBindings = true;
         continue;
       }
-
-      // If the other side of an argument conversion is also a type
-      // variable, we shouldn't allow that to block us from attempting
-      // bindings if it is the only constraint involving other type
-      // variables. Doing this allows us to attempt a binding much
-      // earlier in solving which can result in backing out of
-      // solutions that cannot work due to conformance constraints.
-      if (constraint->getKind() ==
-              ConstraintKind::OperatorArgumentTupleConversion ||
-          constraint->getKind() == ConstraintKind::OperatorArgumentConversion)
-        continue;
 
       result.InvolvesTypeVariables = true;
       continue;
@@ -2391,81 +2369,6 @@ determineBestBindings(ConstraintSystem &CS) {
   return std::make_pair(bestBindings, bestTypeVar);
 }
 
-Constraint *getApplicableFunctionConstraint(ConstraintSystem &CS,
-                                             Constraint *disjunction) {
-  auto *nested = disjunction->getNestedConstraints().front();
-  auto *firstTy = nested->getFirstType()->castTo<TypeVariableType>();
-
-  // FIXME: Is there something else we should be doing when a member
-  //        of a disjunction is already bound because it's in an
-  //        equivalence class?
-  if (CS.getFixedType(firstTy))
-    return nullptr;
-
-  Constraint *found = nullptr;
-  for (auto *constraint : CS.getConstraintGraph()[firstTy].getConstraints()) {
-    if (constraint->getKind() != ConstraintKind::ApplicableFunction)
-      continue;
-
-    // Unapplied function reference, e.g. a.map(String.init)
-    if (!constraint->getSecondType()->isEqual(firstTy))
-      return nullptr;
-
-    found = constraint;
-    break;
-  }
-
-  if (!found)
-    return nullptr;
-
-#if !defined(NDEBUG)
-  for (auto *constraint : CS.getConstraintGraph()[firstTy].getConstraints()) {
-    if (constraint == found)
-      continue;
-
-    assert(constraint->getKind() != ConstraintKind::ApplicableFunction &&
-           "Type variable is involved in more than one applicable!");
-  }
-#endif
-
-  return found;
-}
-
-static unsigned countUnboundTypes(ConstraintSystem &CS,
-                                  Constraint *disjunction) {
-  auto *nested = disjunction->getNestedConstraints().front();
-  assert(nested->getKind() == ConstraintKind::BindOverload &&
-         "Expected bind overload constraint!");
-
-  auto firstTy = nested->getFirstType();
-
-  if (!firstTy->is<FunctionType>()) {
-    // If the disjunction is of the form "$T1 bound to..." we should have
-    // an associated applicable function constraint.
-    auto *applicableFn = getApplicableFunctionConstraint(CS, disjunction);
-
-    // If we have an unapplied function, we should be able to leave
-    // that disjunction for last without any downside.
-    if (!applicableFn)
-      return 100;
-
-    firstTy = applicableFn->getFirstType();
-  }
-
-  auto *fnTy = firstTy->getAs<FunctionType>();
-  assert(fnTy && "Expected function type!");
-  auto simplifiedTy = CS.simplifyType(fnTy->getInput());
-
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
-  findInferableTypeVars(simplifiedTy, typeVars);
-  unsigned count = 0;
-  for (auto *tv : typeVars)
-    if (!CS.getFixedType(tv))
-      ++count;
-
-  return count;
-}
-
 // Is this constraint a bind overload to a generic operator or one
 // that is unavailable?
 static bool isGenericOperatorOrUnavailable(Constraint *constraint) {
@@ -2559,77 +2462,28 @@ bool ConstraintSystem::solveSimplified(
     return false;
   }
 
-  // Select a disjunction based on a few factors, prioritizing
-  // coercions and initializer disjunctions, followed by bind overload
-  // disjunctions with fewest unbound argument types.
-  Optional<Constraint *> selection;
-  Optional<unsigned> lowestUnbound;
-  Optional<unsigned> lowestActive;
+  // Pick the smallest disjunction.
+  // FIXME: This heuristic isn't great, but it helped somewhat for
+  // overload sets.
+  auto disjunction = disjunctions[0];
+  auto bestSize = disjunction->countActiveNestedConstraints();
+  if (bestSize > 2) {
+    for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
+      unsigned newSize = contender->countActiveNestedConstraints();
+      if (newSize < bestSize) {
+        bestSize = newSize;
+        disjunction = contender;
 
-  for (auto candidate : disjunctions) {
-    unsigned countActive = candidate->countActiveNestedConstraints();
-    // Skip disjunctions with no active constraints.
-    if (!countActive)
-      continue;
-
-    // If this is the first disjunction with an active constraint,
-    // consider this our selection until we find a better one.
-    if (!selection)
-      selection = candidate;
-
-    if (auto loc = candidate->getLocator()) {
-      // If we have a coercion disjunction remaining, select that as
-      // they tend to constraint type variables maximally and give us
-      // information about potential bindings.
-      if (auto anchor = loc->getAnchor()) {
-        if (isa<CoerceExpr>(anchor)) {
-          selection = candidate;
+        if (bestSize == 2)
           break;
-        }
       }
-
-      // Initializers also provide a lot of information in the form of
-      // the result type and tend to split the system into independent
-      // pieces.
-      auto path = loc->getPath();
-      if (!path.empty() &&
-          path.back().getKind() ==
-          ConstraintLocator::PathElementKind::ConstructorMember) {
-        selection = candidate;
-        break;
-      }
-    }
-
-    // Attempt to find a bind overload disjunction before considering
-    // this one.
-    assert(!candidate->getNestedConstraints().empty() &&
-           "Expected non-empty disjunction!");
-    if (candidate->getNestedConstraints().front()->getKind() !=
-        ConstraintKind::BindOverload)
-      continue;
-
-    // Otherwise, attempt to count the number of unbound types used
-    // for bind overload disjunctions.
-    unsigned countUnbound = countUnboundTypes(*this, candidate);
-
-    // If the number of unbound arguments is smaller than previous
-    // candidate, or if we had no previous candidate, this is our
-    // newest best option.
-    if (!lowestUnbound || countUnbound < lowestUnbound.getValue() ||
-        (countUnbound == lowestUnbound.getValue() &&
-         countActive < lowestActive.getValue())) {
-      selection = candidate;
-      lowestUnbound = countUnbound;
-      lowestActive = countActive;
     }
   }
 
   // If there are no active constraints in the disjunction, there is
   // no solution.
-  if (!selection)
+  if (bestSize == 0)
     return true;
-
-  auto *disjunction = selection.getValue();
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
