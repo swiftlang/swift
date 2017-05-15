@@ -5,6 +5,8 @@
 // RUN: %llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
 // DISABLED <rdar://problem/28232630>: dwarfdump --verify %t.o
 
+// XFAIL: *
+
 // REQUIRES: OS=macosx
 
 import ObjectiveC
