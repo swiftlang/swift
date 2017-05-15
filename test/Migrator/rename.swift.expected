@@ -5,15 +5,15 @@
 import Bar
 
 func foo(_ b: BarForwardDeclaredClass) {
-  b.barNewInstanceFunc1(newlabel1:0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
-  barGlobalFuncNewName(newlabel:2)
-  b.barNewInstanceFunc1(newlabel1:0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
-  barGlobalFuncNewName(newlabel:2)
-  b.barNewInstanceFunc1(newlabel1:0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
-  barGlobalFuncNewName(newlabel:2)
-  b.barNewInstanceFunc1(newlabel1:0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
-  barGlobalFuncNewName(newlabel:2)
-  b.barNewInstanceFunc1(newlabel1:0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
-  barGlobalFuncNewName(newlabel:2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
   _ = NewEnum.enumElement
 }
