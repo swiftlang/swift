@@ -9,14 +9,21 @@ import Cities
 func getCities() -> [Cities] { return [] }
 
 func foo(_ c : Cities) {
-  c.setProperty(Prop:1)
-  getCities()[0].setProperty(Prop:1)
+  c.setProperty(Prop: 1)
+  getCities()[0].setProperty(Prop: 1)
   Cities.memberFunc()
-  c.setProperty2(with:1+1+1, using:2+2)
-  getCities()[0].setProperty2(with:1+1+1, using:2+2)
+  c.setProperty2(with: 1+1+1, using: 2+2)
+  getCities()[0].setProperty2(with: 1+1+1, using: 2+2)
   c.Property2
   getCities()[0].Property2
   _ = c.memberFunc3() + 2
-  _ = c.memberFunc4(remaining:2) + 2
+  _ = c.memberFunc4(remaining: 2) + 2
   _ = Cities.Nested.property5 + 2 + 1
+  var vc = Cities(x : 1)
+  _ = vc.takePointer(Pointer1: 2, Pointer2: 2)
+  _ = getCities().takePointer(Pointer1: 2, Pointer2: 2)
+}
+
+func foo1(_ flag: Bool, _ c1: Cities, _ c2: Cities) {
+  _ = (flag ? c1 : c2).memberFunc4(remaining: 2 + 2)
 }
