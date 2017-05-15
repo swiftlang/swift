@@ -267,7 +267,7 @@ extension String {
   /// strings. See the `getLineStart(_:end:contentsEnd:for:)` method for
   /// additional information.
   ///
-  /// Case transformations aren’t guaranteed to be symmetrical or to produce
+  /// Case transformations aren't guaranteed to be symmetrical or to produce
   /// strings of the same lengths as the originals. See lowercased for an
   /// example.
   public var capitalized: String {

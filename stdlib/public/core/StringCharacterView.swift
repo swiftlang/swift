@@ -284,7 +284,7 @@ extension String.CharacterView : BidirectionalCollection {
 
       // Unified CJK Han ideographs, common and some supplemental, amongst
       // others:
-      //   0x3400–0xA4CF
+      //   0x3400-0xA4CF
       if 0x3400 <= x && x <= 0xa4cf {
         return true
       }
