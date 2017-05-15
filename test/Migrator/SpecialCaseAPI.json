@@ -8,5 +8,10 @@
     "DiffItemKind": "SpecialCaseDiffItem",
     "Usr": "s:8MyAppKit17NSOpenGLGetOptionyAA0D8GLOptionC_SPySiGtF",
     "SpecialCaseId": "NSOpenGLGetOption"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:7MySwift0A6DoubleV3absS2dFZ",
+    "SpecialCaseId": "StaticAbsToSwiftAbs"
   }
 ]
