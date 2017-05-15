@@ -57,24 +57,24 @@ entry:
 }
 
 sil @id_a : $@convention(thin) () -> ()
-sil @get_s_int : $@convention(thin) (@in S, @thick S.Type) -> @out Int
-sil @set_s_int : $@convention(thin) (@in Int, @in S, @thick S.Type) -> ()
-sil @get_c_int : $@convention(thin) (@in C, @thick C.Type) -> @out Int
-sil @set_c_int : $@convention(thin) (@in Int, @in C, @thick C.Type) -> ()
-sil @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S, @thick ((S) -> S).Type) -> @out @callee_owned (@in C) -> @out C
-sil @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S, @thick ((S) -> S).Type) -> ()
+sil @get_s_int : $@convention(thin) (@in S) -> @out Int
+sil @set_s_int : $@convention(thin) (@in Int, @in S) -> ()
+sil @get_c_int : $@convention(thin) (@in C) -> @out Int
+sil @set_c_int : $@convention(thin) (@in Int, @in C) -> ()
+sil @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S) -> @out @callee_owned (@in C) -> @out C
+sil @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S) -> ()
 
 // CHECK-LABEL: sil shared @computed_properties
 sil shared @computed_properties : $@convention(thin) () -> () {
 entry:
-  // CHECK: keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S, @thick S.Type) -> @out Int)
-  %a = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S, @thick S.Type) -> @out Int)
-  // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S, @thick S.Type) -> @out Int, setter @set_s_int : $@convention(thin) (@in Int, @in S, @thick S.Type) -> ())
-  %b = keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S, @thick S.Type) -> @out Int, setter @set_s_int : $@convention(thin) (@in Int, @in S, @thick S.Type) -> ())
-  // CHECK: keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S, @thick ((S) -> S).Type) -> @out @callee_owned (@in C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S, @thick ((S) -> S).Type) -> ())
-  %c = keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S, @thick ((S) -> S).Type) -> @out @callee_owned (@in C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S, @thick ((S) -> S).Type) -> ())
-  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in C, @thick C.Type) -> @out Int, setter @set_c_int : $@convention(thin) (@in Int, @in C, @thick C.Type) -> ())
-  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in C, @thick C.Type) -> @out Int, setter @set_c_int : $@convention(thin) (@in Int, @in C, @thick C.Type) -> ())
+  // CHECK: keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int)
+  %a = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int)
+  // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int, setter @set_s_int : $@convention(thin) (@in Int, @in S) -> ())
+  %b = keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int, setter @set_s_int : $@convention(thin) (@in Int, @in S) -> ())
+  // CHECK: keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S) -> @out @callee_owned (@in C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S) -> ())
+  %c = keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S) -> @out @callee_owned (@in C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S) -> ())
+  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in C) -> @out Int, setter @set_c_int : $@convention(thin) (@in Int, @in C) -> ())
+  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in C) -> @out Int, setter @set_c_int : $@convention(thin) (@in Int, @in C) -> ())
 
   return undef : $()
 }
