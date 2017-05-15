@@ -14,7 +14,7 @@ func foo1(e : E) {
 
 func foo2(i : Int) {
   switch i { // expected-error{{switch must be exhaustive}}
-  // expected-note@-1{{do you want to add a default clause?}}{{3-3=default: <#code#>\n}}
+  // expected-note@-1{{do you want to add a default clause?}}{{3-3=default:\n<#code#>\n}}
   case 1: return
   }
 }

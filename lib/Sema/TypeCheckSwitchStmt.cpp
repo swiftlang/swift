@@ -920,7 +920,7 @@ namespace {
       bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
 
       if (JustNeedsDefault) {
-        OS << tok::kw_default << ": " << Placeholder << "\n";
+        OS << tok::kw_default << ":\n" << Placeholder << "\n";
         if (Empty) {
           TC.Context.Diags.diagnose(StartLoc, diag::empty_switch_stmt)
              .fixItInsert(EndLoc, Buffer.str());
@@ -956,7 +956,7 @@ namespace {
           for (auto &flat : flats) {
             OS << tok::kw_case << " ";
             flat.show(OS);
-            OS << ": " << Placeholder << "\n";
+            OS << ":\n" << Placeholder << "\n";
           }
         }
 
