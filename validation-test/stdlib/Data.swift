@@ -28,10 +28,7 @@ DataTestSuite.test("Data.Iterator semantics") {
       ptr[i] = UInt8(i % 23)
     }
   }
-  // SR-4724: Should not need to be split out but if it is not it
-  // is considered ambiguous.
-  let temp = (0..<65535).lazy.map({ UInt8($0 % 23) })
-  checkSequence(temp, data)
+  checkSequence((0..<65535).lazy.map({ UInt8($0 % 23) }), data)
 }
 
 DataTestSuite.test("associated types") {
