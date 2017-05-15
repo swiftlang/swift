@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %s -Xfrontend -enable-experimental-keypaths -o %t/a.out
+// RUN: %target-build-swift %s -Xfrontend -enable-experimental-keypath-components -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
