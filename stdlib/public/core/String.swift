@@ -802,8 +802,8 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
-  public mutating func append(_ other: String) {
-    _core.append(other._core)
+  public mutating func append<Other: StringProtocol>(_ other: Other) {
+    append(contentsOf: other)
   }
 
   /// Appends the given Unicode scalar to the string.
@@ -824,6 +824,7 @@ extension String {
 }
 
 extension String {
+  // FIXME: stringhoist - do we need something like this for Substring?
   @effects(readonly)
   @_semantics("string.concat")
   public static func + (lhs: String, rhs: String) -> String {
@@ -833,16 +834,6 @@ extension String {
     var lhs = lhs
     lhs._core.append(rhs._core)
     return lhs
-  }
-
-  // String append
-  public static func += (lhs: inout String, rhs: String) {
-    if lhs.isEmpty {
-      lhs = rhs
-    }
-    else {
-      lhs._core.append(rhs._core)
-    }
   }
 
   /// Constructs a `String` in `resultStorage` containing the given UTF-8.
