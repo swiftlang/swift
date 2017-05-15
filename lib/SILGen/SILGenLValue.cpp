@@ -167,10 +167,6 @@ SILGenFunction::getUnknownEnforcement(VarDecl *var) {
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
   : public Lowering::ExprVisitor<SILGenLValue, LValue, AccessKind>
 {
-  /// A mapping from opaque value expressions to the open-existential
-  /// expression that determines them.
-  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
-    openedExistentials;
 
 public:
   SILGenFunction &SGF;
@@ -591,6 +587,8 @@ namespace {
              "base for open existential component must be an existential");
       assert(base.getType().isAddress() &&
              "base value of open-existential component was not an address?");
+      assert(base.getType().getPreferredExistentialRepresentation(SGF.SGM.M)
+             == ExistentialRepresentation::Opaque);
 
       SILValue addr = SGF.B.createOpenExistentialAddr(
           loc, base.getValue(), getTypeOfRValue().getAddressType(),
@@ -1909,11 +1907,11 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, AccessKind accessKind) {
 LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
                                           AccessKind accessKind) {
   // Handle an opaque lvalue that refers to an opened existential.
-  auto known = openedExistentials.find(e);
-  if (known != openedExistentials.end()) {
+  auto known = SGF.OpaqueValueExprs.find(e);
+  if (known != SGF.OpaqueValueExprs.end()) {
     // Dig the open-existential expression out of the list.
     OpenExistentialExpr *opened = known->second;
-    openedExistentials.erase(known);
+    SGF.OpaqueValueExprs.erase(known);
 
     // Do formal evaluation of the underlying existential lvalue.
     LValue lv = visitRec(opened->getExistentialValue(), accessKind);
@@ -2206,7 +2204,7 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
 
   // Record the fact that we're opening this existential. The actual
   // opening operation will occur when we see the OpaqueValueExpr.
-  bool inserted = openedExistentials.insert({e->getOpaqueValue(), e}).second;
+  bool inserted = SGF.OpaqueValueExprs.insert({e->getOpaqueValue(), e}).second;
   (void)inserted;
   assert(inserted && "already have this opened existential?");
 
@@ -2214,7 +2212,7 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
   LValue lv = visitRec(e->getSubExpr(), accessKind);
 
   // Sanity check that we did see the OpaqueValueExpr.
-  assert(openedExistentials.count(e->getOpaqueValue()) == 0 &&
+  assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
          "opened existential not removed?");
   return lv;
 }
@@ -2731,6 +2729,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        ManagedValue base,
                                        AccessKind accessKind,
                                        TSanKind tsanKind) {
+  bool isRValue = component.isRValue();
   ManagedValue addr;
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical()).offset(SGF, loc, base, accessKind);
@@ -2741,7 +2740,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 
   if (!SGF.getASTContext().LangOpts.DisableTsanInoutInstrumentation &&
       SGF.getModule().getOptions().Sanitize == SanitizerKind::Thread &&
-      tsanKind == TSanKind::InoutAccess && !component.isRValue()) {
+      tsanKind == TSanKind::InoutAccess && !isRValue) {
     emitTsanInoutAccess(SGF, loc, addr);
   }
 
@@ -2781,6 +2780,9 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   // Any writebacks should be scoped to after the load.
   FormalEvaluationScope scope(*this);
 
+  auto substFormalType = src.getSubstFormalType();
+  auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
+
   ManagedValue addr;
   PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(src), addr, AccessKind::Read);
@@ -2789,9 +2791,9 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical())
              .offset(*this, loc, addr, AccessKind::Read);
-    return RValue(*this, loc, src.getSubstFormalType(),
+    return RValue(*this, loc, substFormalType,
                   emitLoad(loc, addr.getValue(),
-                           getTypeLowering(src.getTypeOfRValue()), C, IsNotTake,
+                           rvalueTL, C, IsNotTake,
                            isGuaranteedValid));
   }
 
@@ -2890,6 +2892,8 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
     return;
   }
 
+  auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
   auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)
@@ -2899,9 +2903,7 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
     B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsNotInitialization);
   } else {
     // If there's a semantic conversion necessary, do a load then assign.
-    auto loaded = emitLoad(loc, srcAddr, getTypeLowering(src.getTypeOfRValue()),
-                           SGFContext(),
-                           IsNotTake);
+    auto loaded = emitLoad(loc, srcAddr, rvalueTL, SGFContext(), IsNotTake);
     loaded.assignInto(*this, loc, destAddr);
   }
 }

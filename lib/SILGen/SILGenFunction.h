@@ -1416,7 +1416,13 @@ public:
 
   /// Mapping from active opaque value expressions to their values,
   /// along with a bit for each indicating whether it has been consumed yet.
-  llvm::DenseMap<OpaqueValueExpr *, OpaqueValueState> OpaqueValues;
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpaqueValueState>
+    OpaqueValues;
+
+  /// A mapping from opaque value expressions to the open-existential
+  /// expression that determines them, used while lowering lvalues.
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
+    OpaqueValueExprs;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///
