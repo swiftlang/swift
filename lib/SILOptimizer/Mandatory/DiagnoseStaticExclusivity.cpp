@@ -365,6 +365,10 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
                                          const BeginAccessInst *NewAccess,
                                          ASTContext &Ctx) {
 
+  DEBUG(llvm::dbgs() << "Conflict on " << *PriorAccess
+        << "\n  vs " << *NewAccess
+        << "\n  in function " << *PriorAccess->getFunction());
+
   // Can't have a conflict if both accesses are reads.
   assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
            NewAccess->getAccessKind() == SILAccessKind::Read));
