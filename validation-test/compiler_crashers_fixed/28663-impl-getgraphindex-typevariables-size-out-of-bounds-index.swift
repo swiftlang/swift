@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
 // REQUIRES: asserts
-&(_=nil?=nil
+// RUN: not %target-swift-frontend %s -emit-ir
+(_==_{return($0)u
