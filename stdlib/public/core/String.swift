@@ -788,7 +788,7 @@ extension String {
 }
 
 // Support for copy-on-write
-extension String {
+extension StringProtocol {
 
   /// Appends the given string to this string.
   ///
@@ -808,7 +808,9 @@ extension String {
   public mutating func append<Other: StringProtocol>(_ other: Other) {
     append(contentsOf: other)
   }
+}
 
+extension String {
   /// Appends the given Unicode scalar to the string.
   ///
   /// - Parameter x: A Unicode scalar value.
