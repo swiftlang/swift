@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-memory-threshold 10000 -propagate-constraints
-// XFAIL: *
-// rdar://problem/31794148
+// RUN: %target-typecheck-verify-swift -solver-memory-threshold 12000 -propagate-constraints
 
 var z = 10 + 10 // expected-error{{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
 
