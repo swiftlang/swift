@@ -51,6 +51,10 @@
 
 using namespace swift;
 
+/// Define this to 1 to enable expensive assertions of the
+/// GenericSignatureBuilder.
+#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
+
 LazyResolver::~LazyResolver() = default;
 DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
@@ -1362,24 +1366,25 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
+  auto builder =
+    new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
 
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
 
   builder->addGenericSignature(sig);
-  builder->finalize(SourceLoc(), sig->getGenericParams(),
-                    /*allowConcreteGenericParams=*/true);
 
-#ifndef NDEBUG
-  if (builder->getGenericSignature()->getCanonicalSignature() != sig) {
+#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
+  auto builderSig =
+    builder->computeGenericSignature(SourceLoc(),
+                                     /*allowConcreteGenericParams=*/true);
+  if (builderSig->getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig =
-    builder->getGenericSignature()->getCanonicalSignature();
+    auto reprocessedSig = builderSig->getCanonicalSignature();
 
     reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -1424,19 +1429,23 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
     llvm_unreachable("idempotency problem with a generic signature");
   }
+#else
+  // FIXME: This should be handled lazily in the future, and therefore not
+  // required.
+  builder->processDelayedRequirements();
 #endif
 
   return builder;
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    GenericSignatureBuilder *builder,
-                                                    ModuleDecl &module) {
+                                              GenericSignatureBuilder *builder,
+                                              GenericSignature *sig,
+                                              ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
-  auto sig = builder->getGenericSignature();
   auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;

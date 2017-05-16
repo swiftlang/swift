@@ -1111,13 +1111,10 @@ RequirementEnvironment::RequirementEnvironment(
                            &reqToSyntheticEnvMap);
   }
 
-  // Finalize the generic signature builder.
+  // Produce the generic signature and environment.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
-  builder.finalize(SourceLoc(), allGenericParams);
-
-  // Produce the generic signature and environment.
-  syntheticSignature = builder.getGenericSignature();
+  syntheticSignature = builder.computeGenericSignature(SourceLoc());
   syntheticEnvironment = syntheticSignature->createGenericEnvironment(
                                              *conformanceDC->getParentModule());
 }

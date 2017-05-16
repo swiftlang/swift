@@ -7411,10 +7411,8 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     assert(!result);
     (void) result;
   }
-  // TODO: any need to infer requirements?
-  builder.finalize(genericParams->getSourceRange().Start, allGenericParams);
 
-  return builder.getGenericSignature();
+  return builder.computeGenericSignature(SourceLoc());
 }
 
 // Calculate the generic environment from an imported generic param list.
