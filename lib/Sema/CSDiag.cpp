@@ -2170,6 +2170,7 @@ private:
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
   bool visitClosureExpr(ClosureExpr *CE);
+  bool visitKeyPathExpr(KeyPathExpr *KPE);
 };
 } // end anonymous namespace
 
@@ -6972,6 +6973,425 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 
   // Otherwise, we can't produce a specific diagnostic.
   return false;
+}
+
+// Ported version of TypeChecker::checkObjCKeyPathExpr which works
+// with new Smart KeyPath feature.
+static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
+                                      Type rootType) {
+  auto &TC = CS->TC;
+
+  // The key path string we're forming.
+  SmallString<32> keyPathScratch;
+  llvm::raw_svector_ostream keyPathOS(keyPathScratch);
+
+  // Captures the state of semantic resolution.
+  enum State {
+    Beginning,
+    ResolvingType,
+    ResolvingProperty,
+    ResolvingArray,
+    ResolvingSet,
+    ResolvingDictionary,
+  } state = Beginning;
+
+  /// Determine whether we are currently resolving a property.
+  auto isResolvingProperty = [&] {
+    switch (state) {
+    case Beginning:
+    case ResolvingType:
+      return false;
+
+    case ResolvingProperty:
+    case ResolvingArray:
+    case ResolvingSet:
+    case ResolvingDictionary:
+      return true;
+    }
+
+    llvm_unreachable("Unhandled State in switch.");
+  };
+
+  // The type of AnyObject, which is used whenever we don't have
+  // sufficient type information.
+  Type anyObjectType = TC.Context.getAnyObjectType();
+
+  // Local function to update the state after we've resolved a
+  // component.
+  Type currentType = rootType;
+  auto updateState = [&](bool isProperty, Type newType) {
+    // Strip off optionals.
+    newType = newType->lookThroughAllAnyOptionalTypes();
+
+    // If updating to a type, just set the new type; there's nothing
+    // more to do.
+    if (!isProperty) {
+      assert(state == Beginning || state == ResolvingType);
+      state = ResolvingType;
+      currentType = newType;
+      return;
+    }
+
+    // We're updating to a property. Determine whether we're looking
+    // into a bridged Swift collection of some sort.
+    if (auto boundGeneric = newType->getAs<BoundGenericType>()) {
+      auto nominal = boundGeneric->getDecl();
+
+      // Array<T>
+      if (nominal == TC.Context.getArrayDecl()) {
+        // Further lookups into the element type.
+        state = ResolvingArray;
+        currentType = boundGeneric->getGenericArgs()[0];
+        return;
+      }
+
+      // Set<T>
+      if (nominal == TC.Context.getSetDecl()) {
+        // Further lookups into the element type.
+        state = ResolvingSet;
+        currentType = boundGeneric->getGenericArgs()[0];
+        return;
+      }
+
+      // Dictionary<K, V>
+      if (nominal == TC.Context.getDictionaryDecl()) {
+        // Key paths look into the keys of a dictionary; further
+        // lookups into the value type.
+        state = ResolvingDictionary;
+        currentType = boundGeneric->getGenericArgs()[1];
+        return;
+      }
+    }
+
+    // Determine whether we're looking into a Foundation collection.
+    if (auto classDecl = newType->getClassOrBoundGenericClass()) {
+      if (classDecl->isObjC() && classDecl->hasClangNode()) {
+        SmallString<32> scratch;
+        StringRef objcClassName = classDecl->getObjCRuntimeName(scratch);
+
+        // NSArray
+        if (objcClassName == "NSArray") {
+          // The element type is unknown, so use AnyObject.
+          state = ResolvingArray;
+          currentType = anyObjectType;
+          return;
+        }
+
+        // NSSet
+        if (objcClassName == "NSSet") {
+          // The element type is unknown, so use AnyObject.
+          state = ResolvingSet;
+          currentType = anyObjectType;
+          return;
+        }
+
+        // NSDictionary
+        if (objcClassName == "NSDictionary") {
+          // Key paths look into the keys of a dictionary; there's no
+          // type to help us here.
+          state = ResolvingDictionary;
+          currentType = anyObjectType;
+          return;
+        }
+      }
+    }
+
+    // It's just a property.
+    state = ResolvingProperty;
+    currentType = newType;
+  };
+
+  // Local function to perform name lookup for the current index.
+  auto performLookup = [&](Identifier componentName, SourceLoc componentNameLoc,
+                           Type &lookupType) -> LookupResult {
+    assert(currentType && "Non-beginning state must have a type");
+
+    // Determine the type in which the lookup should occur. If we have
+    // a bridged value type, this will be the Objective-C class to
+    // which it is bridged.
+    if (auto bridgedClass = TC.Context.getBridgedToObjC(CS->DC, currentType))
+      lookupType = bridgedClass;
+    else
+      lookupType = currentType;
+
+    // Look for a member with the given name within this type.
+    return TC.lookupMember(CS->DC, lookupType, componentName);
+  };
+
+  // Local function to print a component to the string.
+  bool needDot = false;
+  auto printComponent = [&](Identifier component) {
+    if (needDot)
+      keyPathOS << ".";
+    else
+      needDot = true;
+
+    keyPathOS << component.str();
+  };
+
+  bool isInvalid = false;
+  SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
+
+  for (auto &component : KPE->getComponents()) {
+    auto componentNameLoc = component.getLoc();
+    Identifier componentName;
+
+    switch (auto kind = component.getKind()) {
+    case KeyPathExpr::Component::Kind::UnresolvedProperty: {
+      auto componentFullName = component.getUnresolvedDeclName();
+      componentName = componentFullName.getBaseName();
+      break;
+    }
+
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      componentName = TC.Context.Id_subscript;
+      break;
+
+    case KeyPathExpr::Component::Kind::OptionalChain:
+    case KeyPathExpr::Component::Kind::OptionalForce:
+      // FIXME: Diagnose optional chaining and forcing properly.
+      return false;
+
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
+      llvm_unreachable("already resolved!");
+    }
+
+    // If we are resolving into a dictionary, any component is
+    // well-formed because the keys are unknown dynamically.
+    if (state == ResolvingDictionary) {
+      // Just print the component unchanged; there's no checking we
+      // can do here.
+      printComponent(componentName);
+
+      // From here, we're resolving a property. Use the current type.
+      updateState(/*isProperty=*/true, currentType);
+
+      continue;
+    }
+
+    // Look for this component.
+    Type lookupType;
+    LookupResult lookup =
+        performLookup(componentName, componentNameLoc, lookupType);
+
+    // If we didn't find anything, try to apply typo-correction.
+    bool resultsAreFromTypoCorrection = false;
+    if (!lookup) {
+      TC.performTypoCorrection(CS->DC, DeclRefKind::Ordinary, lookupType,
+                               componentName, componentNameLoc,
+                               (lookupType ? defaultMemberTypeLookupOptions
+                                           : defaultUnqualifiedLookupOptions),
+                               lookup);
+
+      if (currentType)
+        TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
+                    currentType, componentName);
+      else
+        TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
+                    componentName, false);
+
+      // Note all the correction candidates.
+      for (auto &result : lookup) {
+        TC.noteTypoCorrection(componentName, DeclNameLoc(componentNameLoc),
+                              result);
+      }
+
+      isInvalid = true;
+      if (!lookup)
+        break;
+
+      // Remember that these are from typo correction.
+      resultsAreFromTypoCorrection = true;
+    }
+
+    // If we have more than one result, filter out unavailable or
+    // obviously unusable candidates.
+    if (lookup.size() > 1) {
+      lookup.filter([&](LookupResult::Result result) -> bool {
+        // Drop unavailable candidates.
+        if (result->getAttrs().isUnavailable(TC.Context))
+          return false;
+
+        // Drop non-property, non-type candidates.
+        if (!isa<VarDecl>(result.Decl) && !isa<TypeDecl>(result.Decl))
+          return false;
+
+        return true;
+      });
+    }
+
+    // If we *still* have more than one result, fail.
+    if (lookup.size() > 1) {
+      // Don't diagnose ambiguities if the results are from typo correction.
+      if (resultsAreFromTypoCorrection)
+        break;
+
+      if (lookupType)
+        TC.diagnose(componentNameLoc, diag::ambiguous_member_overload_set,
+                    componentName);
+      else
+        TC.diagnose(componentNameLoc, diag::ambiguous_decl_ref, componentName);
+
+      for (auto result : lookup) {
+        TC.diagnose(result, diag::decl_declared_here, result->getFullName());
+      }
+      isInvalid = true;
+      break;
+    }
+
+    auto found = lookup.front().Decl;
+
+    // Handle property references.
+    if (auto var = dyn_cast<VarDecl>(found)) {
+      TC.validateDecl(var);
+
+      // Resolve this component to the variable we found.
+      auto varRef = ConcreteDeclRef(var);
+      auto resolved =
+          KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
+      resolvedComponents.push_back(resolved);
+      updateState(/*isProperty=*/true,
+                  var->getInterfaceType()->getRValueObjectType());
+
+      continue;
+    }
+
+    // Handle type references.
+    if (auto type = dyn_cast<TypeDecl>(found)) {
+      // We cannot refer to a type via a property.
+      if (isResolvingProperty()) {
+        TC.diagnose(componentNameLoc, diag::expr_keypath_type_of_property,
+                    componentName, currentType);
+        isInvalid = true;
+        break;
+      }
+
+      // We cannot refer to a generic type.
+      if (type->getDeclaredInterfaceType()->hasTypeParameter()) {
+        TC.diagnose(componentNameLoc, diag::expr_keypath_generic_type,
+                    componentName);
+        isInvalid = true;
+        break;
+      }
+
+      Type newType;
+      if (lookupType && !lookupType->isAnyObject()) {
+        newType = lookupType->getTypeOfMember(CS->DC->getParentModule(), type,
+                                              type->getDeclaredInterfaceType());
+      } else {
+        newType = type->getDeclaredInterfaceType();
+      }
+      if (!newType) {
+        isInvalid = true;
+        break;
+      }
+
+      updateState(/*isProperty=*/false, newType);
+      continue;
+    }
+
+    continue;
+  }
+
+  return isInvalid;
+}
+
+bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
+  auto contextualType = CS->getContextualType();
+
+  auto components = KPE->getComponents();
+  assert(!components.empty() && "smart key path components cannot be empty.");
+
+  auto &firstComponent = components.front();
+  using ComponentKind = KeyPathExpr::Component::Kind;
+
+  ClassDecl *klass;
+  Type parentType, rootType, valueType;
+  switch (firstComponent.getKind()) {
+  case ComponentKind::UnresolvedProperty:
+  case ComponentKind::UnresolvedSubscript: {
+    // If there is no contextual type we can't really do anything,
+    // as in case of unresolved member expression, which relies on
+    // contextual information.
+    if (!contextualType)
+      return false;
+
+    if (auto *BGT = contextualType->getAs<BoundGenericClassType>()) {
+      auto genericArgs = BGT->getGenericArgs();
+      klass = BGT->getDecl();
+      parentType = BGT->getParent();
+
+      // Smart Key Path can either have 1 argument - root type or
+      // two arguments - root and value type.
+      assert(genericArgs.size() == 1 || genericArgs.size() == 2);
+
+      rootType = genericArgs.front();
+      if (genericArgs.size() == 2)
+        valueType = genericArgs.back();
+    }
+    break;
+  }
+
+  default:
+    return false;
+  }
+
+  // If there is no root type associated with expression we can't
+  // really diagnose anything here, it's most likely ambiguity.
+  if (!rootType)
+    return false;
+
+  // If we know value type, it might be contextual mismatch between
+  // the actual type of the path vs. given by the caller.
+  if (valueType && !valueType->hasUnresolvedType()) {
+    struct KeyPathListener : public ExprTypeCheckListener {
+      ClassDecl *Decl;
+      Type ParentType;
+      Type RootType;
+
+      KeyPathListener(ClassDecl *decl, Type parent, Type root)
+          : Decl(decl), ParentType(parent), RootType(root) {}
+
+      bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+        auto *locator = cs.getConstraintLocator(expr);
+        auto valueType = cs.createTypeVariable(locator, /* options */ 0);
+
+        auto keyPathType =
+            BoundGenericClassType::get(Decl, ParentType, {RootType, valueType});
+
+        cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                         keyPathType, locator, /*isFavored*/ true);
+        return false;
+      }
+    };
+
+    Expr *expr = KPE;
+    KeyPathListener listener(klass, parentType, rootType);
+    ConcreteDeclRef concreteDecl;
+
+    auto derivedType = CS->TC.getTypeOfExpressionWithoutApplying(
+        expr, CS->DC, concreteDecl, FreeTypeVariableBinding::Disallow,
+        &listener);
+
+    if (derivedType) {
+      if (auto *BGT = (*derivedType)->getAs<BoundGenericClassType>()) {
+        auto derivedValueType = BGT->getGenericArgs().back();
+        if (!CS->TC.isConvertibleTo(valueType, derivedValueType, CS->DC)) {
+          diagnose(KPE->getLoc(),
+                   diag::expr_smart_keypath_value_covert_to_contextual_type,
+                   derivedValueType, valueType);
+          return true;
+        }
+      }
+    }
+  }
+
+  // Looks like this is not a problem with contextual value type, let's see
+  // if there is something wrong with the path itself, maybe one of the
+  // components is incorrectly typed or doesn't exist...
+  return diagnoseKeyPathComponents(CS, KPE, rootType);
 }
 
 static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem *CS,
