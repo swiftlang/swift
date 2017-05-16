@@ -3041,37 +3041,30 @@ void ClangImporter::Implementation::lookupObjCMembers(
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
-    // Import the declaration.
-    auto decl =
-        cast_or_null<ValueDecl>(importDeclReal(clangDecl, CurrentVersion));
-    if (!decl)
-      continue;
+    forEachDistinctName(clangDecl,
+                        [&](ImportedName importedName,
+                            ImportNameVersion nameVersion) {
+      // Import the declaration.
+      auto decl =
+          cast_or_null<ValueDecl>(importDeclReal(clangDecl, nameVersion));
+      if (!decl)
+        return;
 
-    // If the name we found matches, report the declaration.
-    bool matchedAny = false;
-    if (decl->getFullName().matchesRef(name)) {
-      consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
-      matchedAny = true;
-    }
-
-    // Check for an alternate declaration; if it's name matches,
-    // report it.
-    for (auto alternate : getAlternateDecls(decl)) {
-      if (alternate->getFullName().matchesRef(name)) {
-        consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
-        matchedAny = true;
+      // If the name we found matches, report the declaration.
+      // FIXME: If we didn't need to check alternate decls here, we could avoid
+      // importing the member at all by checking importedName ahead of time.
+      if (decl->getFullName().matchesRef(name)) {
+        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
       }
-    }
 
-    // If we didn't find anything, try under the Swift 2 name.
-    if (!matchedAny) {
-      if (auto swift2Decl = cast_or_null<ValueDecl>(
-                              importDeclReal(clangDecl, Version::Swift2))) {
-        if (swift2Decl->getFullName().matchesRef(name)) {
-          consumer.foundDecl(swift2Decl, DeclVisibilityKind::DynamicLookup);
+      // Check for an alternate declaration; if its name matches,
+      // report it.
+      for (auto alternate : getAlternateDecls(decl)) {
+        if (alternate->getFullName().matchesRef(name)) {
+          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
         }
       }
-    }
+    });
   }
 }
 
