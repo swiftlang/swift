@@ -157,10 +157,3 @@ SwiftVersions:
         SwiftName: aliasRenamedSwift3
       - Name: OptionyEnumRenamed
         SwiftName: renamedSwift3
-  - Version: 4
-    Classes:
-      - Name: ClassWithManyRenames
-        Methods:
-          - Selector: "classWithManyRenamesForInt:"
-            MethodKind: Class
-            SwiftName: "init(swift4Factory:)"
