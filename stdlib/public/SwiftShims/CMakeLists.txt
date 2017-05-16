@@ -29,6 +29,7 @@ set(sources
   FoundationOverlayShims.h
   FoundationShimSupport.h
   NSCalendarShims.h
+  NSCharacterSetShims.h
   NSCoderShims.h
   NSDataShims.h
   NSDictionaryShims.h
