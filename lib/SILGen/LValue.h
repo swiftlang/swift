@@ -97,7 +97,7 @@ public:
     TupleElementKind,           // tuple_element_addr
     StructElementKind,          // struct_element_addr
     OptionalObjectKind,         // optional projection
-    OpenedExistentialKind,      // opened opaque existential
+    OpenOpaqueExistentialKind,  // opened opaque existential
     AddressorKind,              // var/subscript addressor
     ValueKind,                  // random base pointer as an lvalue
     KeyPathApplicationKind,     // applying a key path
@@ -107,6 +107,7 @@ public:
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
+    OpenClassExistentialKind,   // opened class existential
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
