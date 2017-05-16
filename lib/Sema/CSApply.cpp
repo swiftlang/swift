@@ -708,7 +708,8 @@ namespace {
       // better SILGen.
       if (isLValue &&
           (isNonMutatingMember(member) ||
-           isMetatype || baseTy->isClassExistentialType())) {
+           member->getDeclContext()->getDeclaredTypeOfContext()
+             ->hasReferenceSemantics())) {
         base = cs.coerceToRValue(base);
         isLValue = false;
       }
