@@ -345,6 +345,29 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   return true;
 }
 
+void ClangImporter::Implementation::forEachDistinctName(
+    const clang::NamedDecl *decl,
+    llvm::function_ref<void(ImportedName, ImportNameVersion)> action) {
+  using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
+  SmallVector<ImportNameKey, 8> seenNames;
+  forEachImportNameVersionFromCurrent(CurrentVersion,
+                                      [&](ImportNameVersion nameVersion) {
+    // Check to see if the name is different.
+    ImportedName newName = importFullName(decl, nameVersion);
+    ImportNameKey key(newName, newName.getEffectiveContext());
+    bool seen = llvm::any_of(seenNames,
+                             [&key](const ImportNameKey &existing) -> bool {
+      if (key.first != existing.first)
+        return false;
+      return key.second.equalsWithoutResolving(existing.second);
+    });
+    if (seen)
+      return;
+    seenNames.push_back(key);
+    action(newName, nameVersion);
+  });
+}
+
 // Build the init(rawValue:) initializer for an imported NS_ENUM.
 //   enum NSSomeEnum: RawType {
 //     init?(rawValue: RawType) {
@@ -2139,7 +2162,7 @@ namespace {
       if (Name.empty())
         return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(Decl, importedName,
@@ -2350,7 +2373,7 @@ namespace {
       if (!importedName)
         return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -2581,7 +2604,9 @@ namespace {
         break;
       }
       }
-      Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+
+      const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
+      Impl.ImportedDecls[{canonicalClangDecl, getVersion()}] = result;
 
       // Import each of the enumerators.
       
@@ -2610,23 +2635,56 @@ namespace {
         }
       }
 
+      auto contextIsEnum = [&](const ImportedName &name) -> bool {
+        EffectiveClangContext importContext = name.getEffectiveContext();
+        switch (importContext.getKind()) {
+        case EffectiveClangContext::DeclContext:
+          return importContext.getAsDeclContext() == canonicalClangDecl;
+        case EffectiveClangContext::TypedefContext: {
+          auto *typedefName = importContext.getTypedefName();
+          clang::QualType underlyingTy = typedefName->getUnderlyingType();
+          return underlyingTy->getAsTagDecl() == canonicalClangDecl;
+        }
+        case EffectiveClangContext::UnresolvedContext:
+          // Assume this is a context other than the enum.
+          return false;
+        }
+      };
+
       for (auto constant : decl->enumerators()) {
-        Decl *enumeratorDecl;
-        Decl *swift2EnumeratorDecl = nullptr;
+        Decl *enumeratorDecl = nullptr;
+        TinyPtrVector<Decl *> variantDecls;
         switch (enumKind) {
         case EnumKind::Constants:
         case EnumKind::Unknown:
-          enumeratorDecl = Impl.importDecl(constant, getActiveSwiftVersion());
-          swift2EnumeratorDecl =
-              Impl.importDecl(constant, ImportNameVersion::Swift2);
+          Impl.forEachDistinctName(constant,
+                                   [&](ImportedName newName,
+                                       ImportNameVersion nameVersion) {
+            Decl *imported = Impl.importDecl(constant, nameVersion);
+            if (!imported)
+              return;
+            if (nameVersion == getActiveSwiftVersion())
+              enumeratorDecl = imported;
+            else
+              variantDecls.push_back(imported);
+          });
           break;
         case EnumKind::Options:
-          enumeratorDecl =
-              SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importOptionConstant(constant, decl, result);
-          swift2EnumeratorDecl =
-              SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importOptionConstant(constant, decl, result);
+          Impl.forEachDistinctName(constant,
+                                   [&](ImportedName newName,
+                                       ImportNameVersion nameVersion) {
+            if (!contextIsEnum(newName))
+              return;
+            SwiftDeclConverter converter(Impl, nameVersion);
+            Decl *imported =
+                converter.importOptionConstant(constant, decl, result);
+            if (!imported)
+              return;
+            if (nameVersion == getActiveSwiftVersion())
+              enumeratorDecl = imported;
+            else
+              variantDecls.push_back(imported);
+          });
           break;
         case EnumKind::Enum: {
           auto canonicalCaseIter =
@@ -2671,10 +2729,21 @@ namespace {
             }
           }
 
-          swift2EnumeratorDecl =
-              SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importEnumCase(constant, decl, cast<EnumDecl>(result),
-                                  enumeratorDecl);
+          Impl.forEachDistinctName(constant,
+                                   [&](ImportedName newName,
+                                       ImportNameVersion nameVersion) {
+            if (nameVersion == getActiveSwiftVersion())
+              return;
+            if (!contextIsEnum(newName))
+              return;
+            SwiftDeclConverter converter(Impl, nameVersion);
+            Decl *imported =
+                converter.importEnumCase(constant, decl, cast<EnumDecl>(result),
+                                         enumeratorDecl);
+            if (!imported)
+              return;
+            variantDecls.push_back(imported);
+          });
           break;
         }
         }
@@ -2691,7 +2760,8 @@ namespace {
           };
 
           addDecl(result, enumeratorDecl);
-          addDecl(result, swift2EnumeratorDecl);
+          for (auto *variant : variantDecls)
+            addDecl(result, variant);
           
           // If there is an error wrapper, add an alias within the
           // wrapper to the corresponding value within the enumerator
@@ -2757,7 +2827,7 @@ namespace {
       if (!importedName)
         return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -3000,7 +3070,7 @@ namespace {
                                           /*static*/ false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-        // If this is a Swift 2 stub, mark it as such.
+        // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
           markAsVariant(result, *correctSwiftName);
 
@@ -3039,7 +3109,7 @@ namespace {
                                           /*static*/ false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-        // If this is a Swift 2 stub, mark it as such.
+        // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
           markAsVariant(result, *correctSwiftName);
 
@@ -3096,7 +3166,7 @@ namespace {
                        name, type, dc);
       result->setInterfaceType(type);
 
-      // If this is a Swift 2 stub, mark is as such.
+      // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3233,7 +3303,7 @@ namespace {
       result->setAccessibility(Accessibility::Public);
       finishFuncDecl(decl, result);
 
-      // If this is a Swift 2 stub, mark it as such.
+      // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3323,7 +3393,7 @@ namespace {
             new (Impl.SwiftContext) IBOutletAttr(/*IsImplicit=*/false));
       // FIXME: Handle IBOutletCollection.
 
-      // If this is a Swift 2 stub, handle it as such.
+      // If this is a compatibility stub, handle it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3401,7 +3471,7 @@ namespace {
       if (!decl->hasExternalStorage())
         Impl.registerExternalDecl(result);
 
-      // If this is a Swift 2 stub, mark it as such.
+      // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -3578,12 +3648,6 @@ namespace {
                             /*required=*/false, selector, importedName,
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), redundant);
-
-      if (auto rawDecl = Impl.importDecl(decl, ImportNameVersion::Raw)) {
-        // We expect the raw decl to always be a method.
-        assert(isa<FuncDecl>(rawDecl));
-        Impl.addAlternateDecl(result, cast<ValueDecl>(rawDecl));
-      }
 
       return result;
     }
@@ -3853,13 +3917,6 @@ namespace {
     importObjCGenericParams(const clang::ObjCInterfaceDecl *decl,
                             DeclContext *dc);
 
-    /// Import members of the given Objective-C container and add them to the
-    /// list of corresponding Swift members.
-    void importObjCMembers(const clang::ObjCContainerDecl *decl,
-                           DeclContext *swiftContext,
-                           llvm::SmallPtrSet<Decl *, 4> &knownMembers,
-                           SmallVectorImpl<Decl *> &members);
-
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
     /// the given list of members, so long as the method was not already
@@ -4031,7 +4088,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -4169,7 +4226,7 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
@@ -4498,7 +4555,7 @@ namespace {
             setter->setOverriddenDecl(parentSetter);
       }
 
-      // If this is a Swift 2 stub, mark it as such.
+      // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
@@ -4962,7 +5019,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
                                          const clang::EnumDecl *clangEnum,
                                          EnumDecl *theEnum,
-                                         Decl *swift3Decl) {
+                                         Decl *correctDecl) {
   auto &context = Impl.SwiftContext;
   Optional<ImportedName> correctSwiftName;
   auto name =
@@ -4971,25 +5028,22 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     return nullptr;
 
   if (correctSwiftName) {
-    // We're creating a Swift 2 stub. Treat it as an enum case alias.
-    if (!swift3Decl)
+    // We're creating a compatibility stub. Treat it as an enum case alias.
+    auto correctCase = dyn_cast_or_null<EnumElementDecl>(correctDecl);
+    if (!correctCase)
       return nullptr;
 
-    // If the Swift 3 declaration was unavailable, don't map to it.
+    // If the correct declaration was unavailable, don't map to it.
     // FIXME: This eliminates spurious errors, but affects QoI.
-    if (swift3Decl->getAttrs().isUnavailable(Impl.SwiftContext))
+    if (correctCase->getAttrs().isUnavailable(Impl.SwiftContext))
       return nullptr;
 
-    auto swift3Case = dyn_cast<EnumElementDecl>(swift3Decl);
-    if (!swift3Case)
-      return nullptr;
+    auto compatibilityCase =
+        importEnumCaseAlias(name, decl, correctCase, clangEnum, theEnum);
+    if (compatibilityCase)
+      markAsVariant(compatibilityCase, *correctSwiftName);
 
-    auto swift2Case =
-        importEnumCaseAlias(name, decl, swift3Case, clangEnum, theEnum);
-    if (swift2Case)
-      markAsVariant(swift2Case, *correctSwiftName);
-
-    return swift2Case;
+    return compatibilityCase;
   }
 
   // Use the constant's underlying value as its raw value in Swift.
@@ -5053,7 +5107,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
     CD->getAttrs().add(attr);
   }
 
-  // If this is a Swift 2 stub, mark it as such.
+  // If this is a compatibility stub, mark it as such.
   if (correctSwiftName)
     markAsVariant(CD, *correctSwiftName);
 
@@ -5496,7 +5550,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       importConstructor(objcMethod, dc, implicit, kind, required, selector,
                         importedName, params, variadic, redundant);
 
-  // If this is a Swift 2 stub, mark it as such.
+  // If this is a compatibility stub, mark it as such.
   if (result && correctSwiftName)
     markAsVariant(result, *correctSwiftName);
 
@@ -6342,37 +6396,6 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       genericParams, Impl.importSourceLoc(typeParamList->getRAngleLoc()));
 }
 
-void SwiftDeclConverter::importObjCMembers(
-    const clang::ObjCContainerDecl *decl, DeclContext *swiftContext,
-    llvm::SmallPtrSet<Decl *, 4> &knownMembers,
-    SmallVectorImpl<Decl *> &members) {
-  for (auto m = decl->decls_begin(), mEnd = decl->decls_end(); m != mEnd; ++m) {
-    auto nd = dyn_cast<clang::NamedDecl>(*m);
-    if (!nd || nd != nd->getCanonicalDecl())
-      continue;
-
-    auto member = Impl.importDecl(nd, getVersion());
-    if (!member)
-      continue;
-
-    if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-      // If there is are alternate declarations for this member, add it.
-      for (auto alternate : Impl.getAlternateDecls(member)) {
-        if (alternate->getDeclContext() == member->getDeclContext() &&
-            knownMembers.insert(alternate).second)
-          members.push_back(alternate);
-      }
-
-      // If this declaration shouldn't be visible, don't add it to
-      // the list.
-      if (shouldSuppressDeclImport(objcMethod))
-        continue;
-    }
-
-    members.push_back(member);
-  }
-}
-
 void SwiftDeclConverter::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
     ArrayRef<ProtocolDecl *> protocols, SmallVectorImpl<Decl *> &members,
@@ -6412,7 +6435,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
     const auto &languageVersion =
         Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
     for (auto member : proto->getMembers()) {
-      // Skip Swift 2 stubs; there's no reason to mirror them.
+      // Skip compatibility stubs; there's no reason to mirror them.
       if (member->getAttrs().isUnavailableInSwiftVersion(languageVersion))
         continue;
 
@@ -6512,7 +6535,7 @@ void SwiftDeclConverter::importInheritedConstructors(
       if (!ctor)
         continue;
 
-      // Don't inherit Swift 2 stubs.
+      // Don't inherit compatibility stubs.
       if (ctor->getAttrs().isUnavailableInSwiftVersion(languageVersion))
         continue;
 
@@ -6557,7 +6580,7 @@ void SwiftDeclConverter::importInheritedConstructors(
                                   /*required=*/false, ctor->getObjCSelector(),
                                   importedName, objcMethod->parameters(),
                                   objcMethod->isVariadic(), redundant)) {
-          // If this is a Swift 2 stub, mark it as such.
+          // If this is a compatibility stub, mark it as such.
           if (correctSwiftName)
             markAsVariant(newCtor, *correctSwiftName);
 
@@ -7700,14 +7723,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
       // Only continue members in the same submodule as this extension.
       if (decl->getImportedOwningModule() != submodule) continue;
 
-      SmallPtrSet<DeclName, 8> seenNames;
-      forEachImportNameVersionFromCurrent(CurrentVersion,
-                                          [&](ImportNameVersion nameVersion) {
-        // Check to see if the name is different.
-        ImportedName newName = importFullName(decl, nameVersion);
-        if (!seenNames.insert(newName).second)
-          return;
-
+      forEachDistinctName(decl, [&](ImportedName newName,
+                                    ImportNameVersion nameVersion) {
         // Quickly check the context and bail out if it obviously doesn't
         // belong here.
         if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
@@ -7734,10 +7751,6 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
                                     Instance->getSourceManager(),
                                     "loading members for");
-
-  // TODO: accommodate deprecated versions as well
-  SwiftDeclConverter converter(*this, CurrentVersion);
-  SwiftDeclConverter swift2Converter(*this, ImportNameVersion::Swift2);
 
   DeclContext *DC;
   IterableDeclContext *IDC;
@@ -7773,9 +7786,36 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   ImportingEntityRAII Importing(*this);
 
   SmallVector<Decl *, 16> members;
-  llvm::SmallPtrSet<Decl *, 4> knownMembers;
-  converter.importObjCMembers(objcContainer, DC, knownMembers, members);
-  swift2Converter.importObjCMembers(objcContainer, DC, knownMembers, members);
+  llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
+  for (const clang::Decl *m : objcContainer->decls()) {
+    auto nd = dyn_cast<clang::NamedDecl>(m);
+    if (!nd || nd != nd->getCanonicalDecl())
+      continue;
+
+    forEachDistinctName(nd,
+                        [&](ImportedName name, ImportNameVersion nameVersion) {
+      auto member = importDecl(nd, nameVersion);
+      if (!member)
+        return;
+
+      // If there are alternate declarations for this member, add them.
+      for (auto alternate : getAlternateDecls(member)) {
+        if (alternate->getDeclContext() == member->getDeclContext() &&
+            knownAlternateMembers.insert(alternate).second) {
+          members.push_back(alternate);
+        }
+      }
+
+      // If this declaration shouldn't be visible, don't add it to
+      // the list.
+      if (shouldSuppressDeclImport(nd))
+        return;
+
+      members.push_back(member);
+    });
+  }
+
+  SwiftDeclConverter converter(*this, CurrentVersion);
 
   protos = takeImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
@@ -7804,7 +7844,6 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   for (auto member : members) {
     IDC->addMember(member);
   }
-
 }
 
 void ClangImporter::Implementation::loadAllConformances(
