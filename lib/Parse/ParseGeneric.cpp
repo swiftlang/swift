@@ -205,11 +205,11 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
     WhereClauseText << ',';
 
   // For Swift 3, keep this warning. 
-  const Diagnostic message = Context.isSwiftVersion3() 
+  const auto Message = Context.isSwiftVersion3() 
                              ? diag::swift3_where_inside_brackets 
                              : diag::where_inside_brackets;
 
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start, message);
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
 
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
