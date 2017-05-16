@@ -1980,7 +1980,8 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
   if (Type concreteType = representative->getConcreteType()) {
     // Otherwise, substitute in the archetypes in the environment.
     // If this has a recursive type, return an error type.
-    if (representative->RecursiveConcreteType) {
+    auto equivClass = representative->getEquivalenceClassIfPresent();
+    if (equivClass->recursiveConcreteType) {
       return ErrorType::get(getDependentType(genericParams,
                                              /*allowUnresolved=*/true));
     }
@@ -2061,8 +2062,8 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
   // type parameters, substitute them.
   Type superclass = representative->getSuperclass();
   if (superclass && superclass->hasTypeParameter()) {
-    if (representative->RecursiveSuperclassType) {
-      superclass = ErrorType::get(superclass);
+    if (equivClass->recursiveSuperclassType) {
+      superclass = Type();
     } else {
       superclass = genericEnv->mapTypeIntoContext(
                                               superclass,
@@ -2271,7 +2272,9 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
 }
 
 #pragma mark Equivalence classes
-EquivalenceClass::EquivalenceClass(PotentialArchetype *representative) {
+EquivalenceClass::EquivalenceClass(PotentialArchetype *representative)
+  : recursiveConcreteType(false), recursiveSuperclassType(false)
+{
   members.push_back(representative);
 }
 
@@ -3925,7 +3928,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
                          constraint->value);
         }
 
-        archetype->RecursiveConcreteType = true;
+        equivClass->recursiveConcreteType = true;
       } else {
         checkConcreteTypeConstraints(genericParams, archetype);
       }
@@ -3943,7 +3946,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
                          equivClass->superclass);
         }
 
-        archetype->RecursiveSuperclassType = true;
+        equivClass->recursiveSuperclassType = true;
       } else {
         checkSuperclassConstraints(genericParams, archetype);
       }
@@ -5016,6 +5019,10 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
             ? knownAnchor->concreteTypeSource
             : RequirementSource::forAbstract(archetype);
 
+        // Drop recursive concrete-type constraints.
+        if (equivClass->recursiveConcreteType)
+          continue;
+
         f(RequirementKind::SameType, archetype, concreteType, source);
         continue;
       }
@@ -5043,7 +5050,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       continue;
 
     // If we have a superclass, produce a superclass requirement
-    if (equivClass->superclass) {
+    if (equivClass->superclass && !equivClass->recursiveSuperclassType) {
       f(RequirementKind::Superclass, archetype, equivClass->superclass,
         getBestConstraintSource<Type>(equivClass->superclassConstraints));
     }
