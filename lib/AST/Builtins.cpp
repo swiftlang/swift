@@ -750,6 +750,12 @@ static ValueDecl *getIsOptionalOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getIsSameMetatypeOperation(ASTContext &Context, Identifier Id) {
+  CanType anyMetatype = CanExistentialMetatypeType::get(Context.TheAnyType);
+  auto ResultTy = BuiltinIntegerType::get(1,Context);
+  return getBuiltinFunction(Id, {anyMetatype, anyMetatype}, ResultTy);
+}
+
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
   Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   Type ResultTy = Context.TheRawPointerType;
@@ -1663,6 +1669,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IsOptionalType:
     return getIsOptionalOperation(Context, Id);
+
+  case BuiltinValueKind::IsSameMetatype:
+    return getIsSameMetatypeOperation(Context, Id);
 
   case BuiltinValueKind::AllocRaw:
     return getAllocOperation(Context, Id);

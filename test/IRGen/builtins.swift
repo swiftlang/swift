@@ -745,6 +745,14 @@ func ispod_test() {
   var f = Builtin.ispod(Builtin.NativeObject)
 }
 
+// CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype
+func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
+  // CHECK: [[MT1_AS_PTR:%.*]] = bitcast %swift.type* %0 to i8*
+  // CHECK: [[MT2_AS_PTR:%.*]] = bitcast %swift.type* %1 to i8*
+  // CHECK: icmp eq i8* [[MT1_AS_PTR]], [[MT2_AS_PTR]]
+  var t = Builtin.is_same_metatype(t1, t2)
+}
+
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
 // CHECK:  call void @{{.*}}swift_{{.*}}etain({{.*}}* %0)
 // CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
