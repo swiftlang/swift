@@ -1424,12 +1424,12 @@ public enum FloatingPointRoundingRule {
   case awayFromZero
 }
 
-@_transparent
-public func == <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return lhs.isEqual(to: rhs)
-}
-
 extension FloatingPoint {
+  @_transparent
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.isEqual(to: rhs)
+  }
+
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)
