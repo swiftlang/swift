@@ -1364,18 +1364,19 @@ SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector) {
   // Figure out how much reporting we want by querying the environment
-  // variable SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT. We have four
+  // variable SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT. We have four meaningful
   // levels:
   //
   //   0: Don't report anything
   //   1: Complain about uses of implicit @objc entrypoints.
   //   2: Complain about uses of implicit @objc entrypoints, with backtraces
   //      if possible.
-  //   3: Complain about uses of implicit @objc entrypoints, with backtraces
-  //      if possible, then abort().
+  //   3: Complain about uses of implicit @objc entrypoints, then abort().
   //
   // The actual reportLevel is stored as the above values +1, so that
   // 0 indicates we have not yet checked. It's fine to race through here.
+  //
+  // The default, if SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT is not set, is 2.
   static int storedReportLevel = 0;
   if (storedReportLevel == 0) {
     auto reportLevelStr = getenv("SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT");
@@ -1384,7 +1385,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector) {
         reportLevelStr[1] == 0)
       storedReportLevel = (reportLevelStr[0] - '0') + 1;
     else
-      storedReportLevel = 1;
+      storedReportLevel = 3;
   }
 
   int reportLevel = storedReportLevel - 1;
