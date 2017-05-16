@@ -3079,7 +3079,7 @@ namespace {
         auto result = Impl.createConstant(name, dc, type,
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Coerce,
-                                          /*static*/ false, decl);
+                                          /*static*/dc->isTypeContext(), decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
         // If this is a Swift 2 stub, mark it as such.
@@ -7484,8 +7484,7 @@ ClangImporter::Implementation::importDeclContextOf(
 
   // If the declaration was not global to start with, we're done.
   bool isGlobal =
-    decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
-    !isa<clang::EnumConstantDecl>(decl);
+    decl->getDeclContext()->getRedeclContext()->isTranslationUnit();
   if (!isGlobal) return importedDC;
 
   // If the resulting declaration context is not a nominal type,
@@ -7653,6 +7652,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setStatic(isStatic);
   func->setInterfaceType(getterType);
   func->setAccessibility(getOverridableAccessibility(dc));
+  func->setImplicit();
 
   // If we're not done type checking, build the getter body.
   if (!hasFinishedTypeChecking()) {
