@@ -846,8 +846,9 @@ public:
   /// Retrieve or create the canonical generic environment of a canonical
   /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     GenericSignatureBuilder *builder,
-                                                     ModuleDecl &module);
+                                       GenericSignatureBuilder *builder,
+                                       GenericSignature *sig,
+                                       ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

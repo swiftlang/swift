@@ -482,16 +482,12 @@ namespace {
 
       GenericSignatureBuilder Builder(ctx,
                                LookUpConformanceInModule(ctx.TheBuiltinModule));
-      SmallVector<GenericTypeParamType *, 2> GenericTypeParamTypes;
       for (auto gp : GenericTypeParams) {
         Builder.addGenericParameter(gp);
-        GenericTypeParamTypes.push_back(
-          gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
 
-      Builder.finalize(SourceLoc(), GenericTypeParamTypes);
-      GenericEnv = Builder.getGenericSignature()->createGenericEnvironment(
-                                                        *ctx.TheBuiltinModule);
+      auto GenericSig = Builder.computeGenericSignature(SourceLoc());
+      GenericEnv = GenericSig->createGenericEnvironment(*ctx.TheBuiltinModule);
     }
 
     template <class G>
