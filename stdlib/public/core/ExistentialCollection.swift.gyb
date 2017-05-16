@@ -423,21 +423,14 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %     assert False, 'Unknown kind'
 %   end
 
-
-
 @_fixed_layout
 @_versioned
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
+%  if Kind == 'Sequence':
   where
   S.SubSequence : ${Kind},
-// FIXME(ABI) (Revert Where Clauses): apply all this only to Sequence:
-%  if Kind == 'Sequence':
   S.SubSequence.Element == S.Element,
   S.SubSequence.SubSequence == S.SubSequence
-// FIXME(ABI) (Revert Where Clauses): remove this else clause:
-%  else:
-  S.SubSequence.Indices : ${Kind},
-  S.Indices : ${Kind}
 %  end
 {
   internal typealias Element = S.Element
@@ -1042,13 +1035,9 @@ public struct ${Self}<Element>
   @_inlineable
   public init<C : ${SubProtocol}>(_ base: C)
     where
-    // FIXME(ABI) (Revert Where Clauses): remove next 3 lines
-    C.SubSequence : ${SubProtocol},
-    C.SubSequence.Indices : ${SubProtocol},
-    C.Indices : ${SubProtocol},
-    // FIXME(ABI)#101 (Associated Types with where clauses): these constraints
-    // should be applied to associated types of Collection.
-    C.SubSequence.Element == Element
+    // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
+    // associated types of Collection.
+    C.SubSequence.Iterator.Element == Element
      {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
