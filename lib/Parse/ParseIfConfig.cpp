@@ -265,7 +265,7 @@ public:
 
       auto Val = version::Version::parseCompilerVersionString(
           SLE->getValue(), SLE->getLoc(), &D);
-      if(!Val.hasValue())
+      if (!Val.hasValue())
         return nullptr;
       return E;
     }
@@ -284,7 +284,7 @@ public:
       auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getArg());
       auto Val = version::Version::parseVersionString(
           versionString, PUE->getArg()->getStartLoc(), &D);
-      if(!Val.hasValue())
+      if (!Val.hasValue())
         return nullptr;
       return E;
     }
