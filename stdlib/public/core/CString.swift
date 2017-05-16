@@ -14,7 +14,7 @@
 
 import SwiftShims
 
-extension String {
+extension StringProtocol {
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
@@ -49,7 +49,7 @@ extension String {
       _decodeCString(
         $0, as: UTF8.self, length: len, repairingInvalidCodeUnits: true)!
     }
-    self = result
+    self = Self(String(result))
   }
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
@@ -58,8 +58,9 @@ extension String {
   /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
   /// unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
-    self = String.decodeCString(
-      cString, as: UTF8.self, repairingInvalidCodeUnits: true)!.result
+    self = Self(
+      String.decodeCString(
+        cString, as: UTF8.self, repairingInvalidCodeUnits: true)!.result)
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -98,7 +99,7 @@ extension String {
     else {
       return nil
     }
-    self = result
+    self = Self(result)
   }
 
   /// Creates a new string by copying the null-terminated data referenced by

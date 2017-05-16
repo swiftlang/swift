@@ -2626,14 +2626,19 @@ extension Double : Codable {
     }
 }
 
-extension String : Codable {
-    public init(from decoder: Decoder) throws {
-        self = try decoder.singleValueContainer().decode(String.self)
-    }
+extension String : Codable {}
+extension Substring : Codable {}
 
+extension StringProtocol where Self : Codable {
+    public init(from decoder: Decoder) throws {
+        self = try Self(decoder.singleValueContainer().decode(String.self))
+    }
+}
+
+extension _SwiftStringView where Self : Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(self)
+        try container.encode(self._ephemeralString())
     }
 }
 

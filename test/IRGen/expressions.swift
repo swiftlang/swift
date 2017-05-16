@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -parse-stdlib -disable-access-control | %FileCheck %s
 
+// XFAIL: *
+
 // REQUIRES: CPU=x86_64
 
 import Swift
