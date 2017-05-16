@@ -867,27 +867,78 @@ static bool isBuiltinWordType(Type type) {
   return false;
 }
 
-FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
-  if (Impl.GetBoolDecl)
-    return Impl.GetBoolDecl;
+/// Looks up all implementations of an operator (globally and declared in types)
+/// and passes potential matches to the given callback. The search stops when
+/// the callback returns true (in which case the matching function declaration
+/// is returned); otherwise, nullptr is returned if there are no matches.
+/// \p C The AST context.
+/// \p oper The name of the operator.
+/// \p contextType If the operator is declared on a type, then only operators
+///     defined on this type should be considered.
+/// \p callback A callback that takes as its two arguments the input type and
+///     result type of a candidate function declaration and returns true if the
+///     function matches the desired criteria.
+/// \return The matching function declaration, or nullptr if there was no match.
+template <int ExpectedCandidateCount, typename MatchFuncCallback>
+static FuncDecl *lookupOperatorFunc(const ASTContext &ctx, StringRef oper,
+                                    Type contextType,
+                                    MatchFuncCallback &callback) {
+  SmallVector<ValueDecl *, ExpectedCandidateCount> candidates;
+  ctx.lookupInSwiftModule(oper, candidates);
 
-  // Look for the function.
-  Type input, output;
-  auto decl = findLibraryIntrinsic(*this, "_getBool", resolver);
+  for (auto candidate : candidates) {
+    // All operator declarations should be functions, but make sure.
+    auto *funcDecl = dyn_cast<FuncDecl>(candidate);
+    if (!funcDecl)
+      continue;
+
+    if (funcDecl->getDeclContext()->isTypeContext()) {
+      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
+      if (!contextTy->isEqual(contextType)) continue;
+    }
+
+    if (auto resolver = ctx.getLazyResolver())
+      resolver->resolveDeclSignature(funcDecl);
+
+    Type inputType, resultType;
+    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, inputType,
+                               resultType))
+      continue;
+
+    if (callback(inputType, resultType))
+      return funcDecl;
+  }
+
+  return nullptr;
+}
+
+/// Looks up the implementation (assumed to be singular) of a globally-defined
+/// standard library intrinsic function and passes the potential match to the
+/// given callback if it was found. If the callback returns true, then the
+/// match is returned; otherwise, nullptr is returned.
+/// \p ctx The AST context.
+/// \p name The name of the function.
+/// \p resolver The lazy resolver.
+/// \p callback A callback that takes as its two arguments the input type and
+///     result type of the candidate function declaration and returns true if
+///     the function matches the desired criteria.
+/// \return The matching function declaration, or nullptr if there was no match.
+template <typename MatchFuncCallback>
+static FuncDecl *lookupLibraryIntrinsicFunc(const ASTContext &ctx,
+                                            StringRef name,
+                                            LazyResolver *resolver,
+                                            MatchFuncCallback &callback) {
+  Type inputType, resultType;
+  auto decl = findLibraryIntrinsic(ctx, name, resolver);
   if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, inputType,
+                             resultType))
     return nullptr;
 
-  // Input must be Builtin.Int1
-  if (!isBuiltinInt1Type(input))
-    return nullptr;
+  if (callback(inputType, resultType))
+    return decl;
 
-  // Output must be a global type named Bool.
-  if (!output->isEqual(getBoolDecl()->getDeclaredType()))
-    return nullptr;
-
-  Impl.GetBoolDecl = decl;
-  return decl;
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getEqualIntDecl() const {
@@ -899,45 +950,19 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
 
   auto intType = getIntDecl()->getDeclaredType();
   auto boolType = getBoolDecl()->getDeclaredType();
-  SmallVector<ValueDecl *, 30> equalFuncs;
-  lookupInSwiftModule("==", equalFuncs);
-  
-  // Find the overload for Int.
-  for (ValueDecl *vd : equalFuncs) {
-    // All "==" decls should be functions, but who knows...
-    auto *funcDecl = dyn_cast<FuncDecl>(vd);
-    if (!funcDecl)
-      continue;
-
-    if (funcDecl->getDeclContext()->isTypeContext()) {
-      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
-      if (!contextTy->isEqual(intType)) continue;
-    }
-
-    if (auto resolver = getLazyResolver())
-      resolver->resolveDeclSignature(funcDecl);
-
-    Type input, resultType;
-    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
-                               resultType))
-      continue;
-    
+  auto callback = [&](Type inputType, Type resultType) {
     // Check for the signature: (Int, Int) -> Bool
-    auto tupleType = dyn_cast<TupleType>(input.getPointer());
+    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
     assert(tupleType);
-    if (tupleType->getNumElements() != 2)
-      continue;
+    return tupleType->getNumElements() == 2 &&
+        tupleType->getElementType(0)->isEqual(intType) &&
+        tupleType->getElementType(1)->isEqual(intType) &&
+        resultType->isEqual(boolType);
+  };
 
-    auto argType1 = tupleType->getElementType(0);
-    auto argType2 = tupleType->getElementType(1);
-    if (argType1->isEqual(intType) &&
-        argType2->isEqual(intType) &&
-        resultType->isEqual(boolType)) {
-      Impl.EqualIntDecl = funcDecl;
-      return funcDecl;
-    }
-  }
-  return nullptr;
+  auto decl = lookupOperatorFunc<32>(*this, "==", intType, callback);
+  Impl.EqualIntDecl = decl;
+  return decl;
 }
 
 FuncDecl *ASTContext::getMutatingXorIntDecl() const {
@@ -946,45 +971,34 @@ FuncDecl *ASTContext::getMutatingXorIntDecl() const {
 
   auto intType = getIntDecl()->getDeclaredType();
   auto inoutIntType = InOutType::get(intType);
-  SmallVector<ValueDecl *, 16> xorFuncs;
-  lookupInSwiftModule("^=", xorFuncs);
-
-  // Find the overload for Int.
-  for (ValueDecl *vd : xorFuncs) {
-    // All "^=" decls should be functions, but who knows...
-    auto *funcDecl = dyn_cast<FuncDecl>(vd);
-    if (!funcDecl)
-      continue;
-
-    if (funcDecl->getDeclContext()->isTypeContext()) {
-      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
-      if (!contextTy->isEqual(intType)) continue;
-    }
-
-    if (auto resolver = getLazyResolver())
-      resolver->resolveDeclSignature(funcDecl);
-
-    Type input, resultType;
-    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
-                               resultType))
-      continue;
-
-    // Check for the signature: (inout Int, Int) -> Int
-    auto tupleType = dyn_cast<TupleType>(input.getPointer());
+  auto callback = [&](Type inputType, Type resultType) {
+    // Check for the signature: (inout Int, Int) -> Void
+    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
     assert(tupleType);
-    if (tupleType->getNumElements() != 2)
-      continue;
+    return (tupleType->getNumElements() == 2 &&
+            tupleType->getElementType(0)->isEqual(inoutIntType) &&
+            tupleType->getElementType(1)->isEqual(intType) &&
+            resultType->isVoid());
+  };
 
-    auto argType1 = tupleType->getElementType(0);
-    auto argType2 = tupleType->getElementType(1);
-    if (argType1->isEqual(inoutIntType) &&
-        argType2->isEqual(intType) &&
-        resultType->isVoid()) {
-      Impl.MutatingXorIntDecl = funcDecl;
-      return funcDecl;
-    }
-  }
-  return nullptr;
+  auto decl = lookupOperatorFunc<16>(*this, "^=", intType, callback);
+  Impl.MutatingXorIntDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
+  if (Impl.GetBoolDecl)
+    return Impl.GetBoolDecl;
+
+  auto callback = [&](Type inputType, Type resultType) {
+    // Look for the signature (Builtin.Int1) -> Bool
+    return isBuiltinInt1Type(inputType) &&
+        resultType->isEqual(getBoolDecl()->getDeclaredType());
+  };
+
+  auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool", resolver, callback);
+  Impl.GetBoolDecl = decl;
+  return decl;
 }
 
 FuncDecl *ASTContext::getMixIntDecl() const {
@@ -994,17 +1008,12 @@ FuncDecl *ASTContext::getMixIntDecl() const {
   auto resolver = getLazyResolver();
   auto intType = getIntDecl()->getDeclaredType();
 
-  // Look for the function.
-  Type input, output;
-  auto decl = findLibraryIntrinsic(*this, "_mixInt", resolver);
-  if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
-    return nullptr;
+  auto callback = [&](Type inputType, Type resultType) {
+    // Look for the signature (Int) -> Int
+    return inputType->isEqual(intType) && resultType->isEqual(intType);
+  };
 
-  // Input and output must both be Int.
-  if (!input->isEqual(intType) || !output->isEqual(intType))
-    return nullptr;
-
+  auto decl = lookupLibraryIntrinsicFunc(*this, "_mixInt", resolver, callback);
   Impl.MixIntDecl = decl;
   return decl;
 }
