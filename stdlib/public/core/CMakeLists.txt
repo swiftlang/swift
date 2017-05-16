@@ -67,6 +67,7 @@ set(SWIFTLIB_ESSENTIAL
   HashedCollectionsAnyHashableExtensions.swift
   Hashing.swift
   HeapBuffer.swift
+  ICU.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
   Indices.swift.gyb
@@ -175,6 +176,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
+  list(APPEND swift_core_private_link_libraries -licucore)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker
   # --whole-archive before the archive and --no-whole-archive after (without
@@ -188,7 +190,13 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-    list(APPEND swift_core_private_link_libraries
+    if("${ICU_UC}" STREQUAL "")
+      message(FATAL_ERROR "ICU_UC undefined")
+    endif()
+    if("${ICU_I18N}" STREQUAL "")
+      message(FATAL_ERROR "ICU_I18N undefined")
+    endif()
+    list(APPEND swift_core_private_link_libraries 
       ICU_UC ICU_I18N)
   else()
     list(APPEND swift_core_private_link_libraries -licui18n -licuuc -licudata)
