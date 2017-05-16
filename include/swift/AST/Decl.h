@@ -1467,6 +1467,10 @@ public:
                                  GenericSignature *genericSig,
                                  uint64_t genericEnvData);
 
+  /// Whether this generic context has a lazily-created generic environment
+  /// that has not yet been constructed.
+  bool hasLazyGenericEnvironment() const;
+
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
 };

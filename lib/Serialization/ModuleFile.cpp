@@ -1297,11 +1297,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
-ModuleFile::~ModuleFile() {
-  assert(DelayedGenericEnvironments.empty() &&
-         "either finishPendingActions() was never called, or someone forgot "
-         "to use getModuleFileForDelayedActions()");
-}
+ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,
                              SmallVectorImpl<ValueDecl*> &results) {
