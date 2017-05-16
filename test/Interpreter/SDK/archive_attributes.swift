@@ -14,7 +14,7 @@ import Foundation
 
 struct ABC {
   // CHECK-ARCHIVE-DAG: nested_class_coding
-  @NSKeyedArchiveLegacy("nested_class_coding")
+  @NSKeyedArchiverClassName("nested_class_coding")
   class NestedClass : NSObject, NSCoding {
     var i : Int
 
@@ -33,7 +33,7 @@ struct ABC {
 }
 
 // CHECK-ARCHIVE-DAG: private_class_coding
-@NSKeyedArchiveLegacy("private_class_coding")
+@NSKeyedArchiverClassName("private_class_coding")
 private class PrivateClass : NSObject, NSCoding {
   var pi : Int
 
@@ -50,7 +50,7 @@ private class PrivateClass : NSObject, NSCoding {
   }
 }
 
-@NSKeyedArchiveSubclassesOnly
+@NSKeyedArchiverEncodeNonGenericSubclassesOnly
 class GenericClass<T> : NSObject, NSCoding {
   var gi : T? = nil
 
@@ -83,7 +83,7 @@ class IntClass : GenericClass<Int> {
 }
 
 // CHECK-ARCHIVE-DAG: double_class_coding
-@NSKeyedArchiveLegacy("double_class_coding")
+@NSKeyedArchiverClassName("double_class_coding")
 class DoubleClass : GenericClass<Double> {
 
   init(dd: Double) {
@@ -102,7 +102,7 @@ class DoubleClass : GenericClass<Double> {
 }
 
 // CHECK-ARCHIVE-DAG: top_level_coding
-@NSKeyedArchiveLegacy("top_level_coding")
+@NSKeyedArchiverClassName("top_level_coding")
 class TopLevel : NSObject, NSCoding {
   var tli : Int
 
