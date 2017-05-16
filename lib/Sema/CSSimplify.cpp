@@ -3840,6 +3840,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         return SolutionKind::Unsolved;
       }
       
+      // Discarded unsupported non-decl member lookups.
+      if (!choices[i].isDecl()) {
+        return SolutionKind::Error;
+      }
+      
       auto storage = cast<AbstractStorageDecl>(choices[i].getDecl());
       if (!storage->isSettable(DC)) {
         // A non-settable component makes the key path read-only, unless
