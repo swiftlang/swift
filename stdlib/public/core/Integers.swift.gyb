@@ -3490,7 +3490,7 @@ public typealias Integer = BinaryInteger
 public typealias IntegerArithmetic = BinaryInteger
 
 @available(swift, obsoleted: 4)
-public typealias SignedNumber = SignedNumeric
+public typealias SignedNumber = SignedNumeric & Comparable
 
 @available(swift, obsoleted: 4)
 public typealias AbsoluteValuable = SignedNumeric & Comparable
