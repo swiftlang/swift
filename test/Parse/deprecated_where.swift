@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s -swift-version 4
 
 protocol Mashable { }
 protocol Womparable { }

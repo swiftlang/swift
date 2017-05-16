@@ -161,5 +161,5 @@ struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-nam
 
 // SR-3124 - Protocol Composition Often Migrated Incorrectly
 struct S3124<T: protocol<P1, P3>> {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{17-34=P1 & P3>}}
-func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-warning {{'where' clause}}
+func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-error {{'where' clause}}
 func f3124_2<U : protocol<P1>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{18-31=P1>}}
