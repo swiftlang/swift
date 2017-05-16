@@ -2365,18 +2365,15 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
 
   for (auto &Clause : ICD->getClauses()) {
     if (&Clause == &*ICD->getClauses().begin())
-      Printer << tok::pound_if << " "; // FIXME: print condition
+      Printer << tok::pound_if << " /* condition */"; // FIXME: print condition
     else if (Clause.Cond)
-      Printer << tok::pound_elseif << ""; // FIXME: print condition
+      Printer << tok::pound_elseif << " /* condition */"; // FIXME: print condition
     else
       Printer << tok::pound_else;
+    printASTNodes(Clause.Elements);
     Printer.printNewline();
-    if (printASTNodes(Clause.Elements)) {
-      Printer.printNewline();
-      indent();
-    }
+    indent();
   }
-  Printer.printNewline();
   Printer << tok::pound_endif;
 }
 
