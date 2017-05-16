@@ -1433,8 +1433,8 @@ internal var keyPathObjectHeaderSize: Int {
 
 // Runtime entry point to instantiate a key path object.
 @_cdecl("swift_getKeyPath")
-public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
-                             arguments: UnsafeRawPointer)
+public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
+                              arguments: UnsafeRawPointer)
     -> UnsafeRawPointer {
   // The key path pattern is laid out like a key path object, with a few
   // modifications:
