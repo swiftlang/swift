@@ -51,6 +51,10 @@
 
 using namespace swift;
 
+/// Define this to 1 to enable expensive assertions of the
+/// GenericSignatureBuilder.
+#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
+
 LazyResolver::~LazyResolver() = default;
 DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
@@ -1371,12 +1375,10 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
   builder->addGenericSignature(sig);
 
+#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
   auto builderSig =
     builder->computeGenericSignature(SourceLoc(),
                                      /*allowConcreteGenericParams=*/true);
-  (void)builderSig;
-  
-#ifndef NDEBUG
   if (builderSig->getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
@@ -1427,6 +1429,10 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
     llvm_unreachable("idempotency problem with a generic signature");
   }
+#else
+  // FIXME: This should be handled lazily in the future, and therefore not
+  // required.
+  builder->processDelayedRequirements();
 #endif
 
   return builder;

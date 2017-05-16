@@ -549,10 +549,10 @@ public:
   bool diagnoseRemainingRenames(SourceLoc loc,
                                 ArrayRef<GenericTypeParamType *> genericParams);
 
-private:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
+private:
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
