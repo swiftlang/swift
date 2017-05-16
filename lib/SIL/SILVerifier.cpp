@@ -3778,8 +3778,69 @@ public:
         case KeyPathPatternComponent::Kind::SettableProperty: {
           require(component.getComputedPropertyIndices().empty(),
                   "subscripts not implemented");
+        
+          // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
+          {
+            auto getter = component.getComputedPropertyGetter();
+            auto substGetterType = getter->getLoweredFunctionType()
+              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
+            require(substGetterType->getRepresentation() ==
+                      SILFunctionTypeRepresentation::Thin,
+                    "getter should be a thin function");
+            
+              // TODO: indexes
+            require(substGetterType->getNumParameters() == 1,
+                    "getter should have one parameter");
+            auto baseParam = substGetterType->getSelfParameter();
+            require(baseParam.getConvention() == ParameterConvention::Indirect_In,
+                    "getter base parameter should be @in");
+            require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
+                    "getter base parameter should match base of component");
+            require(substGetterType->getNumResults() == 1,
+                    "getter should have one result");
+            auto result = substGetterType->getResults()[0];
+            require(result.getConvention() == ResultConvention::Indirect,
+                    "getter result should be @out");
+            require(result.getType() == loweredComponentTy.getSwiftRValueType(),
+                    "getter result should match the maximal abstraction of the "
+                    "formal component type");
+          }
+          
+          if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+            // Setter should be
+            // <Sig...> @convention(thin) (@in Result, @in Base) -> ()
+            
+            auto setter = component.getComputedPropertySetter();
+            auto substSetterType = setter->getLoweredFunctionType()
+              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
+            
+            require(substSetterType->getRepresentation() ==
+                      SILFunctionTypeRepresentation::Thin,
+                    "getter should be a thin function");
+            
+            // TODO: indexes
+            require(substSetterType->getNumParameters() == 2,
+                    "setter should have two parameters");
+            auto baseParam = substSetterType->getSelfParameter();
+            require(baseParam.getConvention() ==
+                      ParameterConvention::Indirect_In
+                    || baseParam.getConvention() ==
+                        ParameterConvention::Indirect_Inout,
+                    "setter base parameter should be @in or @inout");
+            auto newValueParam = substSetterType->getParameters()[0];
+            require(newValueParam.getConvention() ==
+                      ParameterConvention::Indirect_In,
+                    "setter value parameter should be @in");
+            
+            require(newValueParam.getType() ==
+                      loweredComponentTy.getSwiftRValueType(),
+                    "setter value should match the maximal abstraction of the "
+                    "formal component type");
+            
+            require(substSetterType->getNumResults() == 0,
+                    "setter should have no results");
+          }
 
-          // TODO: Verify the signatures of the getter and setter
           break;
         }
         }

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-build-swift %s -Xfrontend -enable-experimental-keypaths -o %t/a.out
+// RUN: %target-build-swift %s -Xfrontend -enable-experimental-keypath-components -o %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -192,7 +192,9 @@ keyPath.test("key path generic instantiation") {
   expectEqual(s_c_x_lt, s_c_x_lt2)
 }
 
-struct TestComputed {
+protocol P {}
+
+struct TestComputed: P {
   static var numNonmutatingSets = 0
   static var numMutatingSets = 0
 
@@ -222,6 +224,14 @@ struct TestComputed {
   }
 }
 
+extension P {
+  var readonlyProtoExt: Self { return self }
+  var mutatingProtoExt: Self {
+    get { return self }
+    set { self = newValue }
+  }
+}
+
 keyPath.test("computed properties") {
   var test = TestComputed()
 
@@ -244,13 +254,26 @@ keyPath.test("computed properties") {
 
   do {
     let tc_mutating = \TestComputed.mutating
-    TestComputed.resetCounts()
     expectTrue(test[keyPath: tc_mutating] !== test[keyPath: tc_mutating])
     expectEqual(test[keyPath: tc_mutating].value,
                 test[keyPath: tc_mutating].value)
     let newObject = LifetimeTracked(5)
     test[keyPath: tc_mutating] = newObject
     expectTrue(test.canary === newObject)
+  }
+
+  do {
+    let tc_readonlyProtoExt = \TestComputed.readonlyProtoExt
+    expectTrue(test.canary === test[keyPath: tc_readonlyProtoExt].canary)
+  }
+
+  do {
+    let tc_mutatingProtoExt = \TestComputed.mutatingProtoExt
+    expectTrue(test.canary === test[keyPath: tc_mutatingProtoExt].canary)
+    let oldTest = test
+    test[keyPath: tc_mutatingProtoExt] = TestComputed()
+    expectTrue(oldTest.canary !== test.canary)
+    expectTrue(test.canary === test[keyPath: tc_mutatingProtoExt].canary)
   }
 }
 

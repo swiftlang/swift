@@ -2797,6 +2797,13 @@ namespace {
         
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
+          
+          // TODO: This currently crashes the compiler in some cases, so short-
+          // circuit out.
+          if (!CS.TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
+            return ErrorType::get(CS.TC.Context);
+          }
+          
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
           auto rvalueTy = CS.createTypeVariable(locator, 0);
