@@ -109,5 +109,25 @@
     "DiffItemKind": "SpecialCaseDiffItem",
     "Usr": "c:@F@NSOpenGLGetVersion",
     "SpecialCaseId": "NSOpenGLGetVersion"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:12CoreGraphics7CGFloatV3absA2CFZ",
+    "SpecialCaseId": "StaticAbsToSwiftAbs"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:Sf3absS2fFZ",
+    "SpecialCaseId": "StaticAbsToSwiftAbs"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:s7Float80V3absA2BFZ",
+    "SpecialCaseId": "StaticAbsToSwiftAbs"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:Sd3absS2dFZ",
+    "SpecialCaseId": "StaticAbsToSwiftAbs"
   }
 ]
