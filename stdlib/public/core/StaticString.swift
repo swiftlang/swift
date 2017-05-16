@@ -121,14 +121,14 @@ public struct StaticString
   /// This method works regardless of whether the static string stores a
   /// pointer or a single Unicode scalar value.
   ///
-  /// The pointer argument to `body` is valid only for the lifetime of the
-  /// closure. Do not escape it from the closure for later use.
+  /// The pointer argument to `body` is valid only during the execution of
+  /// `withUTF8Buffer(_:)`. Do not store or return the pointer for later use.
   ///
   /// - Parameter body: A closure that takes a buffer pointer to the static
   ///   string's UTF-8 code unit sequence as its sole argument. If the closure
   ///   has a return value, it is used as the return value of the
   ///   `withUTF8Buffer(invoke:)` method. The pointer argument is valid only
-  ///   for the duration of the closure's execution.
+  ///   for the duration of the method's execution.
   /// - Returns: The return value of the `body` closure, if any.
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {

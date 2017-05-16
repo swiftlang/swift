@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A single extended grapheme cluster, which approximates a user-perceived
+/// A single extended grapheme cluster that approximates a user-perceived
 /// character.
 ///
 /// The `Character` type represents a character made up of one or more Unicode
