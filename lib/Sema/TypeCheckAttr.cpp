@@ -1820,8 +1820,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
-  Builder.finalize(attr->getLocation(), genericSig->getGenericParams(),
-                   /*allowConcreteGenericParams=*/true);
+  (void)Builder.computeGenericSignature(attr->getLocation(),
+                                        /*allowConcreteGenericParams=*/true);
 }
 
 static Accessibility getAccessForDiagnostics(const ValueDecl *D) {

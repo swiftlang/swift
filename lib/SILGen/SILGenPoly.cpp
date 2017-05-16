@@ -2673,9 +2673,9 @@ buildThunkSignature(SILGenFunction &gen,
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(newRequirement, source, nullptr);
 
-  builder.finalize(SourceLoc(), {newGenericParam},
-                   /*allowConcreteGenericParams=*/true);
-  GenericSignature *genericSig = builder.getGenericSignature();
+  GenericSignature *genericSig =
+    builder.computeGenericSignature(SourceLoc(),
+                                    /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->createGenericEnvironment(*mod);
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)

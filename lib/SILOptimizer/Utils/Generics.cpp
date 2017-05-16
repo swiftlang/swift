@@ -576,18 +576,6 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                          M.getASTContext());
 }
 
-/// Create a new generic signature and generic environment using
-/// a provided builder.
-static std::pair<GenericEnvironment *, GenericSignature *>
-getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
-                                  SILModule &M) {
-  auto *GenericSig =
-      Builder.getGenericSignature()->getCanonicalSignature().getPointer();
-  auto *GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
-  assert(!GenericSig || GenericEnv);
-  return std::make_pair(GenericEnv, GenericSig);
-}
-
 /// Create a new generic signature from an existing one by adding
 /// additional requirements.
 static std::pair<GenericEnvironment *, GenericSignature *>
@@ -609,9 +597,11 @@ getGenericEnvironmentAndSignatureWithRequirements(
     Builder.addRequirement(Req, Source, M.getSwiftModule());
   }
 
-  Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams(),
-                   /*allowConcreteGenericParams=*/true);
-  return getGenericEnvironmentAndSignature(Builder, M);
+  auto NewGenSig =
+    Builder.computeGenericSignature(SourceLoc(),
+                                   /*allowConcreteGenericParams=*/true);
+  auto NewGenEnv = NewGenSig->createGenericEnvironment(*M.getSwiftModule());
+  return { NewGenEnv, NewGenSig };
 }
 
 /// Perform some sanity checks on the newly formed substitution lists.
@@ -1287,14 +1277,15 @@ void FunctionSignaturePartialSpecializer::addCalleeRequirements() {
 std::pair<GenericEnvironment *, GenericSignature *>
 FunctionSignaturePartialSpecializer::
     getSpecializedGenericEnvironmentAndSignature() {
+  if (AllGenericParams.empty())
+    return { nullptr, nullptr };
+
   // Finalize the archetype builder.
-  Builder.finalize(SourceLoc(), AllGenericParams,
-                   /*allowConcreteGenericParams=*/true);
-  // Get the specialized generic signature and generic environment.
-  if (!AllGenericParams.empty()) {
-    return getGenericEnvironmentAndSignature(Builder, M);
-  }
-  return std::make_pair(nullptr, nullptr);
+  auto GenSig =
+      Builder.computeGenericSignature(SourceLoc(),
+                                      /*allowConcreteGenericParams=*/true);
+  auto GenEnv = GenSig->createGenericEnvironment(*M.getSwiftModule());
+  return { GenEnv, GenSig };
 }
 
 void FunctionSignaturePartialSpecializer::computeClonerParamSubs(

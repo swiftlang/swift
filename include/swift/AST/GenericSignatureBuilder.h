@@ -172,6 +172,14 @@ public:
     /// only the derived same-type constraints in the graph.
     std::vector<DerivedSameTypeComponent> derivedSameTypeComponents;
 
+    /// Whether we have detected recursion during the substitution of
+    /// the concrete type.
+    unsigned recursiveConcreteType : 1;
+
+    /// Whether we have detected recursion during the substitution of
+    /// the superclass type.
+    unsigned recursiveSuperclassType : 1;
+
     /// Construct a new equivalence class containing only the given
     /// potential archetype (which represents itself).
     EquivalenceClass(PotentialArchetype *representative);
@@ -199,6 +207,18 @@ public:
 
     LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                               "only for use in the debugger");
+
+    /// Caches.
+
+    /// The cached archetype anchor.
+    struct {
+      /// The cached archetype anchor itself.
+      PotentialArchetype *anchor = nullptr;
+
+      /// The number of members of the equivalence class when the archetype
+      /// anchor was cached.
+      unsigned numMembers;
+    } archetypeAnchorCache;
   };
 
   friend class RequirementSource;
@@ -514,6 +534,14 @@ public:
   void inferRequirements(ModuleDecl &module, ParameterList *params,
                          GenericParamList *genericParams);
 
+  /// \brief Finalize the set of requirements and compute the generic
+  /// signature.
+  ///
+  /// After this point, one cannot introduce new requirements.
+  GenericSignature *computeGenericSignature(
+                      SourceLoc loc,
+                      bool allowConcreteGenericParams = false);
+
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
@@ -529,10 +557,10 @@ public:
   bool diagnoseRemainingRenames(SourceLoc loc,
                                 ArrayRef<GenericTypeParamType *> genericParams);
 
-private:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
+private:
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
@@ -1288,14 +1316,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// be resolved.
   unsigned Invalid : 1;
 
-  /// Whether we have detected recursion during the substitution of
-  /// the concrete type.
-  unsigned RecursiveConcreteType : 1;
-
-  /// Whether we have detected recursion during the substitution of
-  /// the superclass type.
-  unsigned RecursiveSuperclassType : 1;
-
   /// Whether we have diagnosed a rename.
   unsigned DiagnosedRename : 1;
 
@@ -1308,7 +1328,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *parent, Identifier name)
     : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
       IsRecursive(false), Invalid(false),
-      RecursiveConcreteType(false), RecursiveSuperclassType(false),
       DiagnosedRename(false)
   { 
     assert(parent != nullptr && "Not an associated type?");
@@ -1318,8 +1337,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
     : parentOrBuilder(parent), identifier(assocType),
       isUnresolvedNestedType(false), IsRecursive(false), Invalid(false),
-      RecursiveConcreteType(false),
-      RecursiveSuperclassType(false), DiagnosedRename(false)
+      DiagnosedRename(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1329,8 +1347,7 @@ class GenericSignatureBuilder::PotentialArchetype {
     : parentOrBuilder(parent), identifier(typeAlias),
       isUnresolvedNestedType(false),
       IsRecursive(false), Invalid(false),
-      RecursiveConcreteType(false),
-      RecursiveSuperclassType(false), DiagnosedRename(false)
+      DiagnosedRename(false)
   {
     assert(parent != nullptr && "Not an associated type?");
   }
@@ -1340,7 +1357,6 @@ class GenericSignatureBuilder::PotentialArchetype {
     : parentOrBuilder(builder), identifier(genericParam),
       isUnresolvedNestedType(false),
       IsRecursive(false), Invalid(false),
-      RecursiveConcreteType(false), RecursiveSuperclassType(false),
       DiagnosedRename(false)
   {
   }
