@@ -27,12 +27,15 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
+/// A type-erased key path, from any root type to any resulting value type.
 public class AnyKeyPath: Hashable, _AppendKeyPath {
+  /// The root type for this key path.
   @_inlineable
   public static var rootType: Any.Type {
     return _rootAndValueType.root
   }
 
+  /// The value type for this key path.
   @_inlineable
   public static var valueType: Any.Type {
     return _rootAndValueType.value
@@ -138,11 +141,14 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 }
 
+/// A partially type-erased key path, from a concrete root type to any
+/// resulting value type.
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
 internal enum KeyPathKind { case readOnly, value, reference }
 
+/// A key path from a specific root type to a specific resulting value type.
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   public typealias _Root = Root
   public typealias _Value = Value
@@ -219,6 +225,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
 }
 
+/// A key path that supports reading from and writing to the resulting value.
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // MARK: Implementation detail
   
@@ -268,6 +275,8 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 
 }
 
+/// A key path that supports reading from and writing to the resulting value
+/// with reference semantics.
 public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value> {
   // MARK: Implementation detail
 

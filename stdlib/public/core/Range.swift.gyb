@@ -916,7 +916,7 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
 /// In the following example, the `asciiTable` sequence is made by zipping
 /// together the characters in the `alphabet` string with a partial range
 /// starting at 65, the ASCII value of the capital letter A. Iterating over
-/// two zipped sequence continues only as long as the shorter of the two
+/// two zipped sequences continues only as long as the shorter of the two
 /// sequences, so the iteration stops at the end of `alphabet`.
 ///
 ///     let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -933,7 +933,7 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
 ///
 /// The behavior of incrementing indefinitely is determined by the type of
 /// `Bound`. For example, iterating over an instance of
-/// `CountablePartialRangeFrom<Int>` will trap when the sequence's next value
+/// `CountablePartialRangeFrom<Int>` traps when the sequence's next value
 /// would be above `Int.max`.
 @_fixed_layout
 public struct CountablePartialRangeFrom<
@@ -1125,7 +1125,7 @@ extension Strideable where Stride: SignedInteger {
   ///
   /// The behavior of incrementing indefinitely is determined by the type of
   /// `Bound`. For example, iterating over an instance of
-  /// `CountablePartialRangeFrom<Int>` will trap when the sequence's next
+  /// `CountablePartialRangeFrom<Int>` traps when the sequence's next
   /// value would be above `Int.max`.
   ///
   /// - Parameter minimum: The lower bound for the range.

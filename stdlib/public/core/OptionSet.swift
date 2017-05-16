@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that presents a mathematical set interface to a bitset.
+/// A type that presents a mathematical set interface to a bit set.
 ///
 /// You use the `OptionSet` protocol to represent bitset types, where
 /// individual bits represent members of a set. Adopting this protocol in

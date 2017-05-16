@@ -1677,15 +1677,15 @@ extension ${Self} {
   ///     }
   ///     // 'sum' == 9
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeBufferPointer(_:)`. Do not store or return the
+  /// pointer for later use.
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
   ///   points to the contiguous storage for the array. ${contiguousCaveat} If
   ///   `body` has a return value, it is used as the return value for the
   ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid
-  ///   only for the duration of the closure's execution.
+  ///   only for the duration of the method's execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///
   /// - SeeAlso: `withUnsafeMutableBufferPointer`, `UnsafeBufferPointer`
@@ -1716,9 +1716,9 @@ extension ${Self} {
   ///     print(numbers)
   ///     // Prints "[2, 1, 4, 3, 5]"
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeMutableBufferPointer(_:)`. Do not store or
+  /// return the pointer for later use.
   ///
   /// - Warning: Do not rely on anything about the array that is the target of
   ///   this method during execution of the `body` closure; it might not
@@ -1729,7 +1729,7 @@ extension ${Self} {
   ///   parameter that points to the contiguous storage for the array.
   ///   ${contiguousCaveat} If `body` has a return value, it is used as the
   ///   return value for the `withUnsafeMutableBufferPointer(_:)` method. The
-  ///   pointer argument is valid only for the duration of the closure's
+  ///   pointer argument is valid only for the duration of the method's
   ///   execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///

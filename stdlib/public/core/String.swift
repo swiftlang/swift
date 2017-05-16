@@ -44,44 +44,46 @@ public protocol StringProtocol
   ///
   /// - Parameters:
   ///   - codeUnits: A collection of code units encoded in the ecoding
-  ///     specified in `encoding`.
-  ///   - encoding: The encoding in which `codeUnits` should be interpreted.
+  ///     specified in `sourceEncoding`.
+  ///   - sourceEncoding: The encoding in which `codeUnits` should be
+  ///     interpreted.
   init<C: Collection, Encoding: Unicode.Encoding>(
-    decoding codeUnits: C, as encoding: Encoding.Type
+    decoding codeUnits: C, as sourceEncoding: Encoding.Type
   )
     where C.Iterator.Element == Encoding.CodeUnit
 
   /// Creates a string from the null-terminated, UTF-8 encoded sequence of
   /// bytes at the given pointer.
   ///
-  /// - Parameter nulTerminatedUTF8: A pointer to a sequence of contiguous,
+  /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
-  init(cString nulTerminatedUTF8: UnsafePointer<CChar>)
+  init(cString nullTerminatedUTF8: UnsafePointer<CChar>)
   
   /// Creates a string from the null-terminated sequence of bytes at the given
   /// pointer.
   ///
   /// - Parameters:
-  ///   - nulTerminatedCodeUnits: A pointer to a sequence of contiguous code
-  ///     units in the encoding specified in `encoding`, ending just before
-  ///     the first zero code unit.
-  ///   - encoding: The encoding in which the code units should be interpreted.
+  ///   - nullTerminatedCodeUnits: A pointer to a sequence of contiguous code
+  ///     units in the encoding specified in `sourceEncoding`, ending just
+  ///     before the first zero code unit.
+  ///   - sourceEncoding: The encoding in which the code units should be
+  ///     interpreted.
   init<Encoding: Unicode.Encoding>(
-    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    as encoding: Encoding.Type)
-    
+    decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as sourceEncoding: Encoding.Type)
+  
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withCString(_:)`. Do not store or return the pointer for
+  /// later use.
   ///
   /// - Parameter body: A closure with a pointer parameter that points to a
   ///   null-terminated sequence of UTF-8 code units. If `body` has a return
   ///   value, it is used as the return value for the `withCString(_:)`
   ///   method. The pointer argument is valid only for the duration of the
-  ///   closure's execution.
+  ///   method's execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result
@@ -89,20 +91,21 @@ public protocol StringProtocol
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withCString(encodedAs:_:)`. Do not store or return the
+  /// pointer for later use.
   ///
   /// - Parameters:
   ///   - body: A closure with a pointer parameter that points to a
   ///     null-terminated sequence of code units. If `body` has a return
   ///     value, it is used as the return value for the
   ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
-  ///     only for the duration of the closure's execution.
-  ///   - encoding: The encoding in which the code units should be interpreted.
+  ///     only for the duration of the method's execution.
+  ///   - targetEncoding: The encoding in which the code units should be
+  ///     interpreted.
   /// - Returns: The return value of the `body` closure parameter, if any.
   func withCString<Result, Encoding: Unicode.Encoding>(
-    encodedAs encoding: Encoding.Type,
+    encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
 }
@@ -217,6 +220,14 @@ extension _StringCore {
 }
 
 extension String {
+  /// Creates a string from the given Unicode code units in the specified
+  /// encoding.
+  ///
+  /// - Parameters:
+  ///   - codeUnits: A collection of code units encoded in the ecoding
+  ///     specified in `sourceEncoding`.
+  ///   - sourceEncoding: The encoding in which `codeUnits` should be
+  ///     interpreted.
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
@@ -224,26 +235,43 @@ extension String {
       codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)
     self = String(_StringCore(b!))
   }
-
-  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  
+  /// Creates a string from the null-terminated sequence of bytes at the given
+  /// pointer.
   ///
-  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
-  ///   the given `encoding`, ending just before the first zero code unit.
-  /// - Parameter encoding: describes the encoding in which the code units
-  ///   should be interpreted.
+  /// - Parameters:
+  ///   - nullTerminatedCodeUnits: A pointer to a sequence of contiguous code
+  ///     units in the encoding specified in `sourceEncoding`, ending just
+  ///     before the first zero code unit.
+  ///   - sourceEncoding: The encoding in which the code units should be
+  ///     interpreted.
   public init<Encoding: Unicode.Encoding>(
-    decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type) {
 
     let codeUnits = _SentinelCollection(
-      UnsafeBufferPointer(_unboundedStartingAt: nulTerminatedCodeUnits),
+      UnsafeBufferPointer(_unboundedStartingAt: nullTerminatedCodeUnits),
       until: _IsZero()
     )
     self.init(decoding: codeUnits, as: sourceEncoding)
   }
-
-  /// Invokes the given closure on the contents of the string, represented as a
-  /// pointer to a null-terminated sequence of code units in the given encoding.
+  
+  /// Calls the given closure with a pointer to the contents of the string,
+  /// represented as a null-terminated sequence of code units.
+  ///
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withCString(encodedAs:_:)`. Do not store or return the
+  /// pointer for later use.
+  ///
+  /// - Parameters:
+  ///   - body: A closure with a pointer parameter that points to a
+  ///     null-terminated sequence of code units. If `body` has a return
+  ///     value, it is used as the return value for the
+  ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
+  ///     only for the duration of the method's execution.
+  ///   - targetEncoding: The encoding in which the code units should be
+  ///     interpreted.
+  /// - Returns: The return value of the `body` closure parameter, if any.
   public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
@@ -286,9 +314,9 @@ extension String {
 ///     print(longerGreeting)
 ///     // Prints "Welcome! We're glad you're here!"
 ///
-/// Multiline string literals are enclosed in triple quotes (`"""`), with each
-/// delimiter on its own line. Indentation is stripped from each line of a
-/// multiline string literal to match the indentation of the closing
+/// Multiline string literals are enclosed in three double quotes (`"""`), with
+/// each delimiter on its own line. Indentation is stripped from each line of
+/// a multiline string literal to match the indentation of the closing
 /// delimiter.
 ///
 ///     let banner = """
@@ -448,8 +476,8 @@ extension String {
 ///     print(cLength)
 ///     // Prints "14"
 ///
-/// Counting the Length of a String
-/// ===============================
+/// Measuring the Length of a String
+/// ================================
 ///
 /// When you need to know the length of a string, you must first consider what
 /// you'll use the length for. Are you measuring the number of characters that
@@ -463,7 +491,7 @@ extension String {
 /// UTF-16 and UTF-8.
 ///
 ///     let capitalA = "A"
-///     print(capitalA.characters.count)
+///     print(capitalA.count)
 ///     // Prints "1"
 ///     print(capitalA.unicodeScalars.count)
 ///     // Prints "1"
@@ -479,7 +507,7 @@ extension String {
 /// different length.
 ///
 ///     let flag = "🇵🇷"
-///     print(flag.characters.count)
+///     print(flag.count)
 ///     // Prints "1"
 ///     print(flag.unicodeScalars.count)
 ///     // Prints "2"
