@@ -2649,18 +2649,6 @@ public struct ${Self}
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
   }
 
-// FIXME(integers): pending compiler improvements.
-// Basically, most simple arithmetic expressions become too complex when `+`
-// gets defined on the protocol rather than on concrete type.
-%       for x in chain(*binaryArithmetic.values()):
-  @_transparent
-  public static func ${x.operator}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
-%       end
-
 // FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
@@ -2770,6 +2758,7 @@ public struct ${Self}
 % end
 
 % for x in maskingShifts:
+
 ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
@@ -2778,16 +2767,6 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
   }
 
-${operatorComment(x.operator, True)}
-  // FIXME(integers): this overload is not necessary, as there is one in the
-  // protocol extension. But omitting it makes a lot of expressions too complex
-  // to typecheck.
-  @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
 % end
 
   @_transparent
@@ -3139,6 +3118,48 @@ extension ${Self} {
 }
 %   end
 % end
+
+
+// FIXME(integers): this section here is to help the typechecker,
+// as it seems to have problems with a pattern where the nonmutating operation
+// is defined on a protocol in terms of a mutating one that is itself defined
+// on concrete types.
+extension ${Self} {
+
+%   for x in binaryBitwise + maskingShifts + list(chain(*binaryArithmetic.values())):
+
+  @_transparent
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+%   end
+
+%   for op in maskingShifts:
+
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> ${Self} {
+    var lhs = lhs
+    ${op.helper}Generic(&lhs, rhs)
+    return lhs
+  }
+
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}=(
+    lhs: inout ${Self}, rhs: ${Self}
+  ) {
+    ${op.helper}Generic(&lhs, rhs)
+  }
+
+%   end
+}
+
 
 % if signed:
 // TODO: Consider removing the underscore.
