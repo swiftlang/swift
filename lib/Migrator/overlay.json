@@ -104,5 +104,10 @@
     "DiffItemKind": "SpecialCaseDiffItem",
     "Usr": "c:@F@NSOpenGLGetOption",
     "SpecialCaseId": "NSOpenGLGetOption"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "c:@F@NSOpenGLGetVersion",
+    "SpecialCaseId": "NSOpenGLGetVersion"
   }
 ]
