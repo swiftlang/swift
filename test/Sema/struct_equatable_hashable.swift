@@ -60,7 +60,6 @@ let _: Int = FromOtherFile(v: "c").hashValue
 func getFromOtherFile() -> AlsoFromOtherFile { return AlsoFromOtherFile(v: 4) }
 if AlsoFromOtherFile(v: 3) == getFromOtherFile() {}
 
-// FIXME: This should work.
 func overloadFromOtherFile() -> YetAnotherFromOtherFile { return YetAnotherFromOtherFile(v: 1.2) }
 func overloadFromOtherFile() -> Bool { return false }
 if YetAnotherFromOtherFile(v: 1.9) == overloadFromOtherFile() {}

@@ -74,7 +74,6 @@ let _: Int = FromOtherFile.A.hashValue
 func getFromOtherFile() -> AlsoFromOtherFile { return .A }
 if .A == getFromOtherFile() {}
 
-// FIXME: This should work.
 func overloadFromOtherFile() -> YetAnotherFromOtherFile { return .A }
 func overloadFromOtherFile() -> Bool { return false }
 if .A == overloadFromOtherFile() {}
@@ -112,7 +111,6 @@ _ = EnumWithHashablePayload.B("x", 1).hashValue
 _ = EnumWithHashablePayload.C.hashValue
 
 // ...and they should also inherit equatability from Hashable.
-
 if EnumWithHashablePayload.A(1) == .B("x", 1) { }
 if EnumWithHashablePayload.A(1) == .C { }
 if EnumWithHashablePayload.B("x", 1) == .C { }

@@ -946,35 +946,35 @@ FuncDecl *ASTContext::getMutatingXorIntDecl() const {
 
   auto intType = getIntDecl()->getDeclaredType();
   auto inoutIntType = InOutType::get(intType);
-  SmallVector<ValueDecl *, 30> xorFuncs;
+  SmallVector<ValueDecl *, 16> xorFuncs;
   lookupInSwiftModule("^=", xorFuncs);
-  
+
   // Find the overload for Int.
   for (ValueDecl *vd : xorFuncs) {
     // All "^=" decls should be functions, but who knows...
     auto *funcDecl = dyn_cast<FuncDecl>(vd);
     if (!funcDecl)
       continue;
-    
+
     if (funcDecl->getDeclContext()->isTypeContext()) {
       auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
       if (!contextTy->isEqual(intType)) continue;
     }
-    
+
     if (auto resolver = getLazyResolver())
       resolver->resolveDeclSignature(funcDecl);
-    
+
     Type input, resultType;
     if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, input,
                                resultType))
       continue;
-    
+
     // Check for the signature: (inout Int, Int) -> Int
     auto tupleType = dyn_cast<TupleType>(input.getPointer());
     assert(tupleType);
     if (tupleType->getNumElements() != 2)
       continue;
-    
+
     auto argType1 = tupleType->getElementType(0);
     auto argType2 = tupleType->getElementType(1);
     if (argType1->isEqual(inoutIntType) &&
@@ -990,7 +990,7 @@ FuncDecl *ASTContext::getMutatingXorIntDecl() const {
 FuncDecl *ASTContext::getMixIntDecl() const {
   if (Impl.MixIntDecl)
     return Impl.MixIntDecl;
-  
+
   auto resolver = getLazyResolver();
   auto intType = getIntDecl()->getDeclaredType();
 
@@ -1000,11 +1000,11 @@ FuncDecl *ASTContext::getMixIntDecl() const {
   if (!decl ||
       !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
     return nullptr;
-  
+
   // Input and output must both be Int.
   if (!input->isEqual(intType) || !output->isEqual(intType))
     return nullptr;
-  
+
   Impl.MixIntDecl = decl;
   return decl;
 }
