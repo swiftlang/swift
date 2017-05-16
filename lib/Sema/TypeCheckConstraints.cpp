@@ -1344,6 +1344,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   if (KPE->isObjC())
     return;
+  
+  if (!KPE->getComponents().empty())
+    return;
 
   TypeRepr *rootType = nullptr;
   SmallVector<KeyPathExpr::Component, 4> components;
@@ -1374,6 +1377,12 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
         expr = UDE->getBase();
       } else if (auto SE = dyn_cast<SubscriptExpr>(expr)) {
+        if (!TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
+          TC.diagnose(SE->getLoc(),
+                      diag::expr_swift_keypath_unimplemented_component,
+                      "subscript");
+        }
+      
         // .[0] or just plain [0]
         components.push_back(
             KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
@@ -1381,12 +1390,23 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
         expr = SE->getBase();
       } else if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
+        if (!TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
+          TC.diagnose(BOE->getLoc(),
+                      diag::expr_swift_keypath_unimplemented_component,
+                      "optional chaining");
+        }
+
         // .? or ?
         components.push_back(KeyPathExpr::Component::forUnresolvedOptionalChain(
             BOE->getQuestionLoc()));
 
         expr = BOE->getSubExpr();
       } else if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
+        if (!TC.Context.LangOpts.EnableExperimentalKeyPathComponents) {
+          TC.diagnose(FVE->getLoc(),
+                      diag::expr_swift_keypath_unimplemented_component,
+                      "optional force-unwrapping");
+        }
         // .! or !
         components.push_back(KeyPathExpr::Component::forUnresolvedOptionalForce(
             FVE->getExclaimLoc()));

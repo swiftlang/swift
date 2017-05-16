@@ -3982,6 +3982,9 @@ namespace {
       }
 
       simplifyExprType(E);
+      
+      if (E->getType()->hasError())
+        return E;
 
       SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
 

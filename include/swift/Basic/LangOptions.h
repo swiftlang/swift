@@ -228,8 +228,8 @@ namespace swift {
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
     
-    /// Enable keypaths.
-    bool EnableExperimentalKeyPaths = true;
+    /// Enable keypath components that aren't fully implemented.
+    bool EnableExperimentalKeyPathComponents = false;
 
     /// When a conversion from String to Substring fails, emit a fix-it to append
     /// the void subscript '[]'.
