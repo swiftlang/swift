@@ -226,7 +226,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   }
   OS << "</Kind>\n";
 
-  OS << "<Content>" << Content << "</Content>\n";
+  OS << "<Content>" << Content.str() << "</Content>\n";
 
   if (auto Ty = ExitInfo.getPointer()) {
     OS << "<Type>";
@@ -372,7 +372,7 @@ private:
   Token &EndTok;
   SourceLoc Start;
   SourceLoc End;
-  StringRef Content;
+  CharSourceRange Content;
   Optional<ResolvedRangeInfo> Result;
   std::vector<ContextInfo> ContextStack;
   ContextInfo &getCurrentDC() {
@@ -498,7 +498,7 @@ private:
     File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
     AllTokens(AllTokens), StartTok(AllTokens[StartIdx]), EndTok(AllTokens[EndIdx]),
     Start(StartTok.getLoc()), End(EndTok.getLoc()),
-    Content(getContent()) {
+    Content(getContentRange()) {
       assert(Start.isValid() && End.isValid());
   }
 
@@ -815,11 +815,11 @@ private:
       return RangeMatchKind::NoneMatch;
   }
 
-  StringRef getContent() {
+  CharSourceRange getContentRange() {
     SourceManager &SM = File.getASTContext().SourceMgr;
     return CharSourceRange(SM, StartTok.hasComment() ?
                             StartTok.getCommentStart() : StartTok.getLoc(),
-                           Lexer::getLocForEndOfToken(SM, End)).str();
+                           Lexer::getLocForEndOfToken(SM, End));
   }
 };
 
@@ -882,7 +882,7 @@ visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
 
 ResolvedRangeInfo RangeResolver::resolve() {
   if (!Impl)
-    return ResolvedRangeInfo(StringRef());
+    return ResolvedRangeInfo(CharSourceRange());
   Impl->enter(ASTNode());
   walk(Impl->File);
   return Impl->getResult();
