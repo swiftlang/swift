@@ -11,68 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// Codable Extensions
-//===----------------------------------------------------------------------===//
-
-extension Date : Codable {
-    public init(from decoder: Decoder) throws {
-        let timestamp = try decoder.singleValueContainer().decode(Double.self)
-        self.init(timeIntervalSinceReferenceDate: timestamp)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(self.timeIntervalSinceReferenceDate)
-    }
-}
-
-extension Data : Codable {
-    private enum CodingKeys : Int, CodingKey {
-        case length
-        case bytes
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let length = try container.decode(Int.self, forKey: .length)
-        guard length >= 0 else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
-                                                                    debugDescription: "Cannot decode a Data of negative length \(length)."))
-        }
-
-        var bytesContainer = try container.nestedUnkeyedContainer(forKey: .bytes)
-
-        self.init(capacity: length)
-        for i in 0 ..< length {
-            let byte = try bytesContainer.decode(UInt8.self)
-            self[i] = byte
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(self.count, forKey: .length)
-
-        var bytesContainer = container.nestedUnkeyedContainer(forKey: .bytes)
-
-        // Since enumerateBytes does not rethrow, we need to catch the error, stow it away, and rethrow if we stopped.
-        var caughtError: Error? = nil
-        self.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, byteIndex: Data.Index, stop: inout Bool) in
-            do {
-                try bytesContainer.encode(contentsOf: buffer)
-            } catch {
-                caughtError = error
-                stop = true
-            }
-        }
-
-        if let error = caughtError {
-            throw error
-        }
-    }
-}
-
-//===----------------------------------------------------------------------===//
 // Errors
 //===----------------------------------------------------------------------===//
 
