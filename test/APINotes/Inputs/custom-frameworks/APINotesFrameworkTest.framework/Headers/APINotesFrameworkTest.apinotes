@@ -88,12 +88,42 @@ SwiftVersions:
         SwiftImportAsNonGeneric: true
       - Name: RenamedGeneric
         SwiftName: OldRenamedGeneric
+      - Name: ClassWithManyRenames
+        Methods:
+          - Selector: "classWithManyRenamesForInt:"
+            MethodKind: Class
+            SwiftName: "init(swift3Factory:)"
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift3Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift3DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift3ClassProperty"
+          - Name: "importantInstanceProperty"
+            PropertyKind: Instance
+            SwiftName: "swift3InstanceProperty"
     Protocols:
       - Name: ProtoWithVersionedUnavailableMember
         Methods:
           - Selector: requirement
             MethodKind: Instance
             ResultType: 'ForwardClass * _Nullable'
+      - Name: ProtoWithManyRenames
+        Methods:
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift3Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift3DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift3ClassProperty"
     Functions:
       - Name: acceptDoublePointer
         SwiftName: 'acceptPointer(_:)'
@@ -127,4 +157,10 @@ SwiftVersions:
         SwiftName: aliasRenamedSwift3
       - Name: OptionyEnumRenamed
         SwiftName: renamedSwift3
-    
+  - Version: 4
+    Classes:
+      - Name: ClassWithManyRenames
+        Methods:
+          - Selector: "classWithManyRenamesForInt:"
+            MethodKind: Class
+            SwiftName: "init(swift4Factory:)"
