@@ -219,6 +219,22 @@ func isSmallRepresentation(_ s: String) -> Bool {
   }
 }
 
+func checkUnicodeScalars(_ s: String) {
+  let c = s.first!
+  expectEqualSequence(s.unicodeScalars, c.unicodeScalars)
+  
+  expectEqualSequence(
+    s.unicodeScalars, c.unicodeScalars.indices.map { c.unicodeScalars[$0] })
+  
+  expectEqualSequence(
+    s.unicodeScalars.reversed(), c.unicodeScalars.reversed())
+  
+  expectEqualSequence(
+    s.unicodeScalars.reversed(), c.unicodeScalars.indices.reversed().map {
+      c.unicodeScalars[$0]
+    })
+}
+
 func checkRepresentation(_ s: String) {
   let expectSmall = s.utf8.count <= 8
   let isSmall = isSmallRepresentation(s)
@@ -231,13 +247,15 @@ func checkRepresentation(_ s: String) {
 
 CharacterTests.test("RoundTripping") {
   // Single Unicode Scalar Value tests
-  for s in baseScalars {
-    checkRepresentation(String(s))
-    checkRoundTripThroughCharacter(String(s))
+  for s in baseScalars.lazy.map(String.init) {
+    checkUnicodeScalars(s)
+    checkRepresentation(s)
+    checkRoundTripThroughCharacter(s)
   }
 
   // Edge case tests
   for s in testCharacters {
+    checkUnicodeScalars(s)
     checkRepresentation(s)
     checkRoundTripThroughCharacter(s)
   }
@@ -249,6 +267,7 @@ CharacterTests.test("RoundTripping/Random") {
     // Character's small representation variant has 63 bits. Making
     // the maximum length 9 scalars tests both sides of the limit.
     var s = randomGraphemeCluster(1, 9)
+    checkUnicodeScalars(s)
     checkRepresentation(s)
     checkRoundTripThroughCharacter(s)
   }
