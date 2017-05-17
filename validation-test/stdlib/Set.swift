@@ -129,8 +129,10 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   switch s._variantBuffer {
   case .native:
     return true
+#if _runtime(_ObjC)
   case .cocoa:
     return false
+#endif
   }
 }
 
