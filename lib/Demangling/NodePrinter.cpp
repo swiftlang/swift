@@ -347,6 +347,7 @@ private:
     case Node::Kind::LocalDeclName:
     case Node::Kind::PrivateDeclName:
     case Node::Kind::MaterializeForSet:
+    case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
@@ -1238,6 +1239,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(Node->getNumChildren() - 1));
     return nullptr;
   }
+  case Node::Kind::MergedFunction:
+    if (!Options.ShortenThunk) {
+      Printer << "merged ";
+    }
+    return nullptr;
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";
     print(Node->getChild(0));

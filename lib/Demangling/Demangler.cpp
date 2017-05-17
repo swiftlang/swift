@@ -100,6 +100,7 @@ static bool isFunctionAttr(Node::Kind kind) {
     case Node::Kind::VTableAttribute:
     case Node::Kind::PartialApplyForwarder:
     case Node::Kind::PartialApplyObjCForwarder:
+    case Node::Kind::MergedFunction:
       return true;
     default:
       return false;
@@ -1219,6 +1220,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
+    case 'm': return createNode(Node::Kind::MergedFunction);
     case 'V': {
       NodePointer Base = popNode(isEntity);
       NodePointer Derived = popNode(isEntity);

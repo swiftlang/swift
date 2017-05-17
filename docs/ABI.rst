@@ -826,7 +826,8 @@ types where the metadata itself has unknown layout.)
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
-  global ::= global 'T_' specialization  // reset substitutions before demangling specialization
+  global ::= global specialization       // function specialization
+  global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
 
