@@ -1469,7 +1469,8 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
   return std::move(solutions[0]);
 }
 
-bool ConstraintSystem::Candidate::solve() {
+bool ConstraintSystem::Candidate::solve(
+    llvm::SmallDenseSet<Expr *> &shrunkExprs) {
   // Don't attempt to solve candidate if there is closure
   // expression involved, because it's handled specially
   // by parent constraint system (e.g. parameter lists).
@@ -1511,6 +1512,11 @@ bool ConstraintSystem::Candidate::solve() {
     cleanupImplicitExprs(E);
     return true;
   }
+
+  // If this candidate is too complex given the number
+  // of the domains we have reduced so far, let's bail out early.
+  if (isTooComplexGiven(&cs, shrunkExprs))
+    return false;
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
@@ -1565,7 +1571,7 @@ bool ConstraintSystem::Candidate::solve() {
   }
 
   // Record found solutions as suggestions.
-  this->applySolutions(solutions);
+  this->applySolutions(solutions, shrunkExprs);
 
   // Let's double-check if we have any implicit expressions
   // with type variables and nullify their types.
@@ -1577,7 +1583,8 @@ bool ConstraintSystem::Candidate::solve() {
 }
 
 void ConstraintSystem::Candidate::applySolutions(
-                            llvm::SmallVectorImpl<Solution> &solutions) const {
+    llvm::SmallVectorImpl<Solution> &solutions,
+    llvm::SmallDenseSet<Expr *> &shrunkExprs) const {
   // A collection of OSRs with their newly reduced domains,
   // it's domains are sets because multiple solutions can have the same
   // choice for one of the type variables, and we want no duplication.
@@ -1624,6 +1631,9 @@ void ConstraintSystem::Candidate::applySolutions(
       = TC.Context.AllocateUninitialized<ValueDecl *>(choices.size());
     std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
     OSR->setDecls(decls);
+
+    // Record successfully shrunk expression.
+    shrunkExprs.insert(OSR);
   }
 }
 
@@ -1692,7 +1702,8 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto func = applyExpr->getFn();
         // Let's record this function application for post-processing
         // as well as if it contains overload set, see walkToExprPost.
-        ApplyExprs.push_back({applyExpr, isa<OverloadSetRefExpr>(func)});
+        ApplyExprs.push_back(
+            {applyExpr, isa<OverloadSetRefExpr>(func) || isa<TypeExpr>(func)});
       }
 
       return { true, expr };
@@ -1926,11 +1937,12 @@ void ConstraintSystem::shrink(Expr *expr) {
   // so we can start solving them separately.
   expr->walk(collector);
 
+  llvm::SmallDenseSet<Expr *> shrunkExprs;
   for (auto &candidate : collector.Candidates) {
     // If there are no results, let's forget everything we know about the
     // system so far. This actually is ok, because some of the expressions
     // might require manual salvaging.
-    if (candidate.solve()) {
+    if (candidate.solve(shrunkExprs)) {
       // Let's restore all of the original OSR domains for this sub-expression,
       // this means that we can still make forward progress with solving of the
       // top sub-expressions.
@@ -1941,6 +1953,7 @@ void ConstraintSystem::shrink(Expr *expr) {
             return childExpr;
 
           OSR->setDecls(domain->getSecond());
+          shrunkExprs.erase(OSR);
         }
 
         return childExpr;
