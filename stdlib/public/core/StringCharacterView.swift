@@ -265,9 +265,48 @@ extension String.CharacterView : BidirectionalCollection {
       return lhs != UInt16(_CR) && rhs != UInt16(_LF)
     }
 
-    // TODO: Other large ranges, such as CJK? Note that any such addition must
-    // be highly probable to never change in future Unicode versions.
-    return false
+    return _internalExtraCheckGraphemeBreakBetween(lhs, rhs)
+  }
+
+  // A quick check helper to quickly perform extra grapheme-break-between
+  // checks that tightly integrate Unicode version-specific assumptions. Should
+  // never be inlined into user code, as it is version- specific.
+  //
+  // TODO: this is actually fine to inline into non-inlinable code
+  //
+  @inline(never) // @inline(resilient_only)
+  internal static func _internalExtraCheckGraphemeBreakBetween(
+    _ lhs: UInt16, _ rhs: UInt16
+  ) -> Bool {
+    // Whether the given scalar, when it appears paired with another scalar
+    // satisfying this property, has a grapheme break between it and the other
+    // scalar.
+    func hasBreakWhenPaired(_ x: UInt16) -> Bool {
+      // TODO: This doesn't generate optimal code, tune/re-write at a lower level.
+
+      // Unified CJK Han ideographs, common and some supplemental, amongst
+      // others:
+      //   0x3400–0xA4CF
+      if 0x3400 <= x && x <= 0xa4cf {
+        return true
+      }
+
+      //
+      // Non-combining kana:
+      //   0x3041-0x3096
+      //   0x30A1-0x30FA
+      //
+      // TODO: may be faster to verify whether only 3099 and 309A don't have
+      // this property, and compare not-equal rather than using two ranges.
+      if 0x3041 <= x && x <= 0x3096 || 0x30a1 <= x && x <= 0x30fa {
+        return true
+      }
+
+      // TODO: sub-300 check would also be valuable, e.g. when breaking at the
+      // boundary between English embedded in Chinese.
+      return false
+    }
+    return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
   }
 
   // NOTE: don't make this function inlineable.  Grapheme cluster
