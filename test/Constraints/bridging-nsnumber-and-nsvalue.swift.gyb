@@ -29,7 +29,6 @@ coercionTypes = {
     'CGRect',
     'CGPoint',
     'CGSize',
-    'NSRange',
   ],
 }
 }%
@@ -41,7 +40,6 @@ extension Equatable {
   }
 }
 extension Hashable { public var hashValue: Int { fatalError("trill hiphy") } }
-extension NSRange: Hashable {}
 extension CGSize: Hashable {}
 extension CGPoint: Hashable {}
 extension CGRect: Hashable {}
