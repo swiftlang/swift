@@ -2,8 +2,6 @@
 // RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -disable-migrator-fixits -swift-version 3
 // RUN: diff -u %s.expected %t.result
 // RUN: %target-swift-frontend -typecheck %s.expected -swift-version 4
-// rdar://
-// XFAIL: *
 
 func test1(_: ()) {}
 test1(())
@@ -37,4 +35,15 @@ func toString(indexes: Int?...) -> String {
     if index != nil {}
     return ""
   })
+  let _ = indexes.reduce(0) { print($0); return $0.0 + ($0.1 ?? 0)}
+  let _ = indexes.reduce(0) { (true ? $0 : (1, 2)).0 + ($0.1 ?? 0) }
+  let _ = [(1, 2)].contains { $0 != $1 }
+  _ = ["Hello", "Foo"].sorted { print($0); return $0.0.characters.count > ($0).1.characters.count }
+  _ = ["Hello" : 2].map { ($0, ($1)) }
+}
+
+extension Dictionary {
+  public mutating func merge(with dictionary: Dictionary) {
+    dictionary.forEach { updateValue($1, forKey: $0) }
+  }
 }
