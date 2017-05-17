@@ -96,6 +96,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
   std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
+  /// The set of imported modules.
+  llvm::DenseSet<ModuleDecl::ImportedModule> ImportedModules;
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
@@ -1550,6 +1552,15 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 void IRGenDebugInfoImpl::finalize() {
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
 
+  // Get the list of imported modules (which may actually be different
+  // from all ImportDecls).
+  SmallVector<ModuleDecl::ImportedModule, 8> ModuleWideImports;
+  IGM.getSwiftModule()->getImportedModules(ModuleWideImports,
+                                           ModuleDecl::ImportFilter::All);
+  for (auto M : ModuleWideImports)
+    if (!ImportedModules.count(M))
+       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), 0);
+
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {
     llvm::TempMDNode FwdDecl(cast<llvm::MDNode>(Ty.second));
@@ -1716,9 +1727,11 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
     assert(M && "Could not find module for import decl.");
     return;
   }
-  auto DIMod = getOrCreateModule({D->getModulePath(), M});
+  ModuleDecl::ImportedModule Imported = {D->getModulePath(), M};
+  auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
+  ImportedModules.insert(Imported);
 }
 
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
