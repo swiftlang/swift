@@ -1338,55 +1338,55 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     case XREF_TYPE_PATH_PIECE: {
       if (values.size() == 1) {
         ModuleDecl *module = values.front()->getModuleContext();
-        if (module == this->getAssociatedModule()) {
-          // Fast path for nested types in the same module.
-          IdentifierID IID;
-          bool onlyInNominal = false;
-          XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
-          Identifier memberName = getIdentifier(IID);
-          pathTrace.addValue(memberName);
 
-          llvm::PrettyStackTraceString message{
-              "If you're seeing a crash here, try passing "
-              "-Xfrontend -disable-serialization-nested-type-lookup-table"};
+        // Fast path for nested types that avoids deserializing all
+        // members of the parent type.
+        IdentifierID IID;
+        bool onlyInNominal = false;
+        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+        Identifier memberName = getIdentifier(IID);
+        pathTrace.addValue(memberName);
 
-          TypeDecl *nestedType = nullptr;
-          if (onlyInNominal) {
-            // Only look in the file containing the type itself.
-            const DeclContext *dc = values.front()->getDeclContext();
-            auto *serializedFile =
-                dyn_cast<SerializedASTFile>(dc->getModuleScopeContext());
-            if (serializedFile) {
-              nestedType =
-                  serializedFile->File.lookupNestedType(memberName,
-                                                        values.front());
-            }
-          } else {
-            // Fault in extensions, then ask every serialized AST in the module.
-            (void)cast<NominalTypeDecl>(values.front())->getExtensions();
-            for (FileUnit *file : module->getFiles()) {
-              if (file == getFile())
-                continue;
-              auto *serializedFile = dyn_cast<SerializedASTFile>(file);
-              if (!serializedFile)
-                continue;
-              nestedType =
-                  serializedFile->File.lookupNestedType(memberName,
-                                                        values.front());
-              if (nestedType)
-                break;
-            }
+        llvm::PrettyStackTraceString message{
+          "If you're seeing a crash here, try passing "
+            "-Xfrontend -disable-serialization-nested-type-lookup-table"};
+
+        TypeDecl *nestedType = nullptr;
+        if (onlyInNominal) {
+          // Only look in the file containing the type itself.
+          const DeclContext *dc = values.front()->getDeclContext();
+          auto *serializedFile =
+            dyn_cast<SerializedASTFile>(dc->getModuleScopeContext());
+          if (serializedFile) {
+            nestedType =
+              serializedFile->File.lookupNestedType(memberName,
+                                                    values.front());
           }
-
-          if (nestedType) {
-            values.clear();
-            values.push_back(nestedType);
-            ++NumNestedTypeShortcuts;
-            break;
+        } else {
+          // Fault in extensions, then ask every serialized AST in the module.
+          (void)cast<NominalTypeDecl>(values.front())->getExtensions();
+          for (FileUnit *file : module->getFiles()) {
+            if (file == getFile())
+              continue;
+            auto *serializedFile = dyn_cast<SerializedASTFile>(file);
+            if (!serializedFile)
+              continue;
+            nestedType =
+              serializedFile->File.lookupNestedType(memberName,
+                                                    values.front());
+            if (nestedType)
+              break;
           }
-
-          pathTrace.removeLast();
         }
+
+        if (nestedType) {
+          values.clear();
+          values.push_back(nestedType);
+          ++NumNestedTypeShortcuts;
+          break;
+        }
+
+        pathTrace.removeLast();
       }
       LLVM_FALLTHROUGH;
     }
