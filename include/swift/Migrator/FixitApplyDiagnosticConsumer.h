@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/DenseSet.h"
 
 namespace swift {
 
@@ -44,6 +45,9 @@ class FixitApplyDiagnosticConsumer final
   /// The number of fix-its pushed into the rewrite buffer. Use this to
   /// determine whether to call `printResult`.
   unsigned NumFixitsApplied;
+
+  /// Tracks whether a SourceLoc already got an `@objc` insertion.
+  llvm::SmallPtrSet<const void *, 32> AddedObjC;
 
 public:
   FixitApplyDiagnosticConsumer(const StringRef Text,
