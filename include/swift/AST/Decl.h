@@ -2893,14 +2893,6 @@ public:
   /// conformances.
   void registerProtocolConformance(ProtocolConformance *conformance);
 
-  /// \brief True if the type can implicitly derive a conformance for the given
-  /// protocol.
-  ///
-  /// If true, explicit conformance checking will synthesize implicit
-  /// declarations for requirements of the protocol that are not satisfied by
-  /// the type's explicit members.
-  bool derivesProtocolConformance(ProtocolDecl *protocol) const;
-
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   /// classifyAsOptionalType - Decide whether this declaration is one

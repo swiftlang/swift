@@ -35,7 +35,7 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note{{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 3 {{non-matching type}}
   return true
 }
 
@@ -50,7 +50,7 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note{{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 3 {{non-matching type}}
   return ""
 }
 if InvalidCustomHashable.A == .B { }
@@ -132,7 +132,7 @@ var genericHashableHash: Int = GenericHashable<String>.A("a").hashValue
 
 // But it should be an error if the generic argument doesn't have the necessary
 // constrants to satisfy the conditions for derivation.
-enum GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform}}
+enum GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
   case A(T)
   case B
 }
@@ -172,7 +172,7 @@ public enum Medicine {
 
 extension Medicine : Equatable {}
 
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-matching type}}
+public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 2 {{non-matching type}}
   return true
 }
 
@@ -180,10 +180,10 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-mat
 extension Complex : Hashable {}
 
 // No explicit conformance and it cannot be derived.
-enum NotExplicitlyHashableAndCannotDerive {  // expected-error 2 {{does not conform}}
+enum NotExplicitlyHashableAndCannotDerive {
   case A(NotHashable)
 }
-extension NotExplicitlyHashableAndCannotDerive : Hashable {}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {} // expected-error 2 {{does not conform}}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'

@@ -38,7 +38,7 @@ struct CustomHashable: Hashable {
 
   var hashValue: Int { return 0 }
 
-  static func ==(x: CustomHashable, y: CustomHashable) -> Bool { return true }
+  static func ==(x: CustomHashable, y: CustomHashable) -> Bool { return true } // expected-note 2 {{non-matching type}}
 }
 
 if CustomHashable(x: 1, y: 2) == CustomHashable(x: 2, y: 3) { }
@@ -103,7 +103,7 @@ var genericHashableHash: Int = GenericHashable<String>(value: "a").hashValue
 
 // But it should be an error if the generic argument doesn't have the necessary
 // constrants to satisfy the conditions for derivation.
-struct GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform}}
+struct GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
   let value: T
 }
 if GenericNotHashable<String>(value: "a") == GenericNotHashable<String>(value: "b") { }
@@ -121,16 +121,16 @@ public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
 extension StructConformsAndImplementsInExtension : Equatable {
-  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {
+  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note {{non-matching type}}
     return true
   }  
 }
 
 // No explicit conformance and it cannot be derived.
-struct NotExplicitlyHashableAndCannotDerive {  // expected-error 2 {{does not conform}}
+struct NotExplicitlyHashableAndCannotDerive {
   let v: NotHashable
 }
-extension NotExplicitlyHashableAndCannotDerive : Hashable {}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}}
 
 // A struct with no stored properties trivially derives conformance.
 struct NoStoredProperties: Hashable {}

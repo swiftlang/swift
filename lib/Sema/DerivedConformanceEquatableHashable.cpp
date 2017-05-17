@@ -89,8 +89,12 @@ bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
   auto storedProperties =
     theStruct->getStoredProperties(/*skipInaccessible=*/true);
   for (auto propertyDecl : storedProperties) {
-    auto propertyType = propertyDecl->getType();
-    if (!typeConformsToProtocol(tc, declContext, propertyType, protocol)) {
+    if (!propertyDecl->hasType())
+      tc.validateDecl(propertyDecl);
+
+    if (!propertyDecl->hasType() ||
+        !typeConformsToProtocol(tc, declContext, propertyDecl->getType(),
+                                protocol)) {
       return false;
     }
   }
@@ -697,29 +701,17 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   return eqDecl;
 }
 
+bool DerivedConformance::canDeriveEquatable(TypeChecker &tc,
+                                            NominalTypeDecl *type,
+                                            ValueDecl *requirement) {
+  auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
+  return canDeriveConformance(tc, type, equatableProto);
+}
+
 ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
                                                Decl *parentDecl,
                                                NominalTypeDecl *type,
                                                ValueDecl *requirement) {
-  // Check that we can actually derive Equatable for this type.
-  auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
-  if (!canDeriveConformance(tc, type, equatableProto)) {
-    // FIXME: We have to output at least one error diagnostic here because we
-    // returned true from NominalTypeDecl::derivesProtocolConformance; if we
-    // don't, we expect to return a witness here later and crash on an
-    // assertion. Producing an error stops compilation before then.
-    auto equatableType = equatableProto->getDeclaredType();
-    tc.diagnose(type, diag::type_does_not_conform, type->getDeclaredType(),
-                equatableType);
-    // FIXME: Should this (and the corresponding code in derive{En,De}codable)
-    // be using something like getRequirementTypeForDisplay from
-    // TypeCheckProtocol.cpp instead to improve the diagnostic?
-    tc.diagnose(requirement, diag::no_witnesses,
-                diag::RequirementKind::Func, requirement->getFullName(),
-                equatableType, /*AddFixIt=*/false);
-    return nullptr;
-  }
-
   // Build the necessary decl.
   if (requirement->getBaseName() == "==") {
     if (auto theEnum = dyn_cast<EnumDecl>(type)) {
@@ -1134,29 +1126,17 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   return hashValueDecl;
 }
 
+bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
+                                           NominalTypeDecl *type,
+                                           ValueDecl *requirement) {
+  auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
+  return canDeriveConformance(tc, type, hashableProto);
+}
+
 ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
                                               Decl *parentDecl,
                                               NominalTypeDecl *type,
                                               ValueDecl *requirement) {
-  // Check that we can actually derive Hashable for this type.
-  auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
-  if (!canDeriveConformance(tc, type, hashableProto)) {
-    // FIXME: We have to output at least one error diagnostic here because we
-    // returned true from NominalTypeDecl::derivesProtocolConformance; if we
-    // don't, we expect to return a witness here later and crash on an
-    // assertion. Producing an error stops compilation before then.
-    auto hashableType = hashableProto->getDeclaredType();
-    tc.diagnose(type, diag::type_does_not_conform, type->getDeclaredType(),
-                hashableType);
-    // FIXME: Should this (and the corresponding code in derive{En,De}codable)
-    // be using something like getRequirementTypeForDisplay from
-    // TypeCheckProtocol.cpp instead to improve the diagnostic?
-    tc.diagnose(requirement, diag::no_witnesses,
-                diag::RequirementKind::Var, requirement->getFullName(),
-                hashableType, /*AddFixIt=*/false);
-    return nullptr;
-  }
-
   // Build the necessary decl.
   if (requirement->getBaseName() == "hashValue") {
     if (auto theEnum = dyn_cast<EnumDecl>(type))
