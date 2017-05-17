@@ -461,11 +461,11 @@ extension String {
 extension Substring {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(self[bounds])
+    return String(characters[bounds])
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(self[bounds] as Substring)
+    return String(characters[bounds])
   }
 }
