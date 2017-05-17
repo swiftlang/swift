@@ -133,7 +133,7 @@ extension NSRange {
 extension Range where Bound: BinaryInteger {
   public init?(_ range: NSRange) {
     guard range.location != NSNotFound else { return nil }
-    self = numericCast(range.lowerBound)..<numericCast(range.upperBound)
+    self.init(uncheckedBounds: (numericCast(range.lowerBound), numericCast(range.upperBound)))
   }
 }
 
@@ -142,7 +142,7 @@ extension Range where Bound: BinaryInteger {
 extension Range where Bound == Int {
   public init?(_ range: NSRange) {
     guard range.location != NSNotFound else { return nil }
-    self = range.lowerBound..<range.upperBound
+    self.init(uncheckedBounds: (range.lowerBound, range.upperBound))
   }
 }
 
