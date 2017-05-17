@@ -365,6 +365,10 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
                                          const BeginAccessInst *NewAccess,
                                          ASTContext &Ctx) {
 
+  DEBUG(llvm::dbgs() << "Conflict on " << *PriorAccess
+        << "\n  vs " << *NewAccess
+        << "\n  in function " << *PriorAccess->getFunction());
+
   // Can't have a conflict if both accesses are reads.
   assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
            NewAccess->getAccessKind() == SILAccessKind::Read));
@@ -431,30 +435,15 @@ static SILValue findUnderlyingObject(SILValue Value) {
 static AccessedStorage findAccessedStorage(SILValue Source) {
   SILValue Iter = Source;
   while (true) {
-    // Inductive cases: look through operand to find ultimate source.
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(Iter)) {
-      Iter = PBI->getOperand();
-      continue;
-    }
-
-    if (auto *CVI = dyn_cast<CopyValueInst>(Iter)) {
-      Iter = CVI->getOperand();
-      continue;
-    }
-
-    if (auto *MII = dyn_cast<MarkUninitializedInst>(Iter)) {
-      Iter = MII->getOperand();
-      continue;
-    }
-
-    // Base cases: make sure ultimate source is recognized.
+    // Base case for globals: make sure ultimate source is recognized.
     if (auto *GAI = dyn_cast<GlobalAddrInst>(Iter)) {
       return AccessedStorage(GAI->getReferencedGlobal());
     }
 
+    // Base case for class objects.
     if (auto *REA = dyn_cast<RefElementAddrInst>(Iter)) {
       // Do a best-effort to find the identity of the object being projected
-      // from. It is OK to unsound here (i.e., miss when two ref_element_addrs
+      // from. It is OK to be unsound here (i.e. miss when two ref_element_addrs
       // actually refer the same address) because these will be dynamically
       // checked.
       SILValue Object = findUnderlyingObject(REA->getOperand());
@@ -463,18 +452,50 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
       return AccessedStorage(AccessedStorageKind::ClassProperty, OP);
     }
 
-    if (isa<AllocBoxInst>(Iter) || isa<BeginAccessInst>(Iter) ||
-        isa<SILFunctionArgument>(Iter)) {
-      // Treat the instruction itself as the identity of the storage being
-      // being accessed.
-      return AccessedStorage(Iter);
-    }
+    switch (Iter->getKind()) {
+    // Inductive cases: look through operand to find ultimate source.
+    case ValueKind::ProjectBoxInst:
+    case ValueKind::CopyValueInst:
+    case ValueKind::MarkUninitializedInst:
+    case ValueKind::UncheckedAddrCastInst:
+    // Inlined access to subobjects.
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+    case ValueKind::RefTailAddrInst:
+    case ValueKind::TailAddrInst:
+    case ValueKind::IndexAddrInst:
+      Iter = cast<SILInstruction>(Iter)->getOperand(0);
+      continue;
 
-    // For now we're still allowing arbitrary addresses here. Once
-    // we start doing a best-effort static check for dynamically-enforced
-    // accesses we should lock this down to only recognized sources.
-    assert(Iter->getType().isAddress() || Iter->getType().is<SILBoxType>());
-    return AccessedStorage(Iter);
+    // Base address producers.
+    case ValueKind::AllocBoxInst:
+      // An AllocBox is a fully identified memory location.
+    case ValueKind::AllocStackInst:
+      // An AllocStack is a fully identified memory location, which may occur
+      // after inlining code already subjected to stack promotion.
+    case ValueKind::BeginAccessInst:
+      // The current access is nested within another access.
+      // View the outer access as a separate location because nested accesses do
+      // not conflict with each other.
+    case ValueKind::SILFunctionArgument:
+      // A function argument is effectively a nested access, enforced
+      // independently in the caller and callee.
+    case ValueKind::PointerToAddressInst:
+      // An addressor provides access to a global or class property via a
+      // RawPointer. Calling the addressor casts that raw pointer to an address.
+      return AccessedStorage(Iter);
+
+    // Unsupported address producers.
+    // Initialization is always local.
+    case ValueKind::InitEnumDataAddrInst:
+    case ValueKind::InitExistentialAddrInst:
+    // Accessing an existential value requires a cast.
+    case ValueKind::OpenExistentialAddrInst:
+    default:
+      DEBUG(llvm::dbgs() << "Bad memory access source: " << Iter);
+      llvm_unreachable("Unexpected access source.");
+    }
   }
 }
 

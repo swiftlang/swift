@@ -130,3 +130,18 @@ extension NSRange : CustomPlaygroundQuickLookable {
         return .range(Int64(location), Int64(length))
     }
 }
+
+extension NSRange : Codable {
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        let location = try container.decode(Int.self)
+        let length = try container.decode(Int.self)
+        self.init(location: location, length: length)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        try container.encode(self.location)
+        try container.encode(self.length)
+    }
+}

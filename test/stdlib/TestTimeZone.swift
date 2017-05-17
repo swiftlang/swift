@@ -9,15 +9,20 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
+// RUN: pushd %t
+// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
+// RUN: popd %t
+//
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestTimeZone
-
-// RUN: %target-run %t/TestTimeZone > %t.txt
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -I%t -L%t -Xlinker %t/FoundationBridgeObjC.o -o %t/TestTimeZone
+// RUN: %target-run %t/TestTimeZone
+//
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
 import FoundationBridgeObjC
+import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
     import XCTest
@@ -90,6 +95,30 @@ class TestTimeZone : TestTimeZoneSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_EncodingRoundTrip_JSON() {
+        let values: [TimeZone] = [
+            TimeZone(identifier: "America/Los_Angeles")!,
+            TimeZone(identifier: "UTC")!,
+            TimeZone.current
+        ]
+
+        for timeZone in values {
+            expectRoundTripEqualityThroughJSON(for: timeZone)
+        }
+    }
+
+    func test_EncodingRoundTrip_Plist() {
+        let values: [TimeZone] = [
+            TimeZone(identifier: "America/Los_Angeles")!,
+            TimeZone(identifier: "UTC")!,
+            TimeZone.current
+        ]
+
+        for timeZone in values {
+            expectRoundTripEqualityThroughPlist(for: timeZone)
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -99,5 +128,7 @@ TimeZoneTests.test("test_bridgingAutoupdating") { TestTimeZone().test_bridgingAu
 TimeZoneTests.test("test_equality") { TestTimeZone().test_equality() }
 TimeZoneTests.test("test_AnyHashableContainingTimeZone") { TestTimeZone().test_AnyHashableContainingTimeZone() }
 TimeZoneTests.test("test_AnyHashableCreatedFromNSTimeZone") { TestTimeZone().test_AnyHashableCreatedFromNSTimeZone() }
+TimeZoneTests.test("test_EncodingRoundTrip_JSON") { TestTimeZone().test_EncodingRoundTrip_JSON() }
+TimeZoneTests.test("test_EncodingRoundTrip_Plist") { TestTimeZone().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
