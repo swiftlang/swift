@@ -28,12 +28,6 @@ using swift::Demangle::FunctionSigSpecializationParamKind;
 // Private utility functions    //
 //////////////////////////////////
 
-[[noreturn]]
-static void demangler_unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
-
 namespace {
 
 static bool isDeclName(Node::Kind kind) {
@@ -1283,6 +1277,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
 NodePointer Demangler::demangleGenericSpecialization(Node::Kind SpecKind) {
   NodePointer Spec = demangleSpecAttributes(SpecKind);
+  if (!Spec)
+    return nullptr;
   NodePointer TyList = popTypeList();
   if (!TyList)
     return nullptr;
@@ -1907,21 +1903,21 @@ NodePointer Demangler::demangleGenericRequirement() {
         return nullptr;
       name = "m";
     } else {
-      demangler_unreachable("Unknown layout constraint");
+      // Unknown layout constraint.
+      return nullptr;
     }
 
     auto NameNode = createNode(Node::Kind::Identifier, name);
     auto LayoutRequirement = createWithChildren(
         Node::Kind::DependentGenericLayoutRequirement, ConstrTy, NameNode);
     if (size)
-      LayoutRequirement->addChild(size, *this);
+      addChild(LayoutRequirement, size);
     if (alignment)
-      LayoutRequirement->addChild(alignment, *this);
+      addChild(LayoutRequirement, alignment);
     return LayoutRequirement;
   }
   }
-
-  demangler_unreachable("Unhandled TypeKind in switch.");
+  return nullptr;
 }
 
 NodePointer Demangler::demangleGenericType() {
