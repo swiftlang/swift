@@ -301,29 +301,47 @@ extension String.CharacterView : BidirectionalCollection {
     // satisfying this property, has a grapheme break between it and the other
     // scalar.
     func hasBreakWhenPaired(_ x: UInt16) -> Bool {
-      // TODO: This doesn't generate optimal code, tune/re-write at a lower level.
-
+      // TODO: This doesn't generate optimal code, tune/re-write at a lower
+      // level.
+      //
+      // NOTE: Order of case ranges affects codegen, and thus performance. All
+      // things being equal, keep existing order below.
+      switch x {
       // Unified CJK Han ideographs, common and some supplemental, amongst
       // others:
       //   0x3400-0xA4CF
-      if 0x3400 <= x && x <= 0xa4cf {
-        return true
-      }
+      case 0x3400...0xa4cf: return true
+      // TODO: CJK punctuation
 
-      //
+      // Repeat sub-300 check, this is beneficial for common cases of Latin
+      // characters embedded within non-Latin script (e.g. newlines, spaces,
+      // proper nouns and/or jargon, punctuation).
+      case 0x0000...0x02ff:
+        // Conservatively exclude CR, though this might not be necessary from
+        // previous checks.
+        return x != _CR
+      // TODO: general punctuation
+
       // Non-combining kana:
       //   0x3041-0x3096
       //   0x30A1-0x30FA
-      //
-      // TODO: may be faster to verify whether only 3099 and 309A don't have
-      // this property, and compare not-equal rather than using two ranges.
-      if 0x3041 <= x && x <= 0x3096 || 0x30a1 <= x && x <= 0x30fa {
-        return true
-      }
+      case 0x3041...0x3096: return true
+      case 0x30a1...0x30fa: return true
 
-      // TODO: sub-300 check would also be valuable, e.g. when breaking at the
-      // boundary between English embedded in Chinese.
-      return false
+      // Non-combining modern (and some archaic) Cyrillic:
+      //   0x0400-0x0482 (first half of Cyrillic block)
+      case 0x0400...0x0482: return true
+
+      // Modern Arabic, excluding extenders and prependers:
+      //   0x061D-0x064A
+      case 0x061d...0x064a: return true
+
+      // Precomposed Hangul syllables:
+      //   0xAC00–0xD7AF
+      case 0xac00...0xd7af: return true
+
+      default: return false
+      }
     }
     return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
   }
