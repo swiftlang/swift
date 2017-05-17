@@ -2153,12 +2153,19 @@ private:
                                            CalleeCandidateInfo &candidates,
                                            ArrayRef<Identifier> argLabels);
 
+  bool diagnoseMemberFailures(
+      Expr *E, Expr *baseEpxr, ConstraintKind lookupKind, DeclName memberName,
+      FunctionRefKind funcRefKind, ConstraintLocator *locator,
+      Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback = None,
+      bool includeInaccessibleMembers = true);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
   bool visitTupleExpr(TupleExpr *E);
   
   bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
+  bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
@@ -2323,9 +2330,6 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
 
 bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   assert(isMemberConstraint(constraint));
-  
-  auto memberName = constraint->getMember();
-  auto isInitializer = memberName.isSimpleName(CS->TC.Context.Id_init);
 
   // Get the referenced base expression from the failed constraint, along with
   // the SourceRange for the member ref.  In "x.y", this returns the expr for x
@@ -2338,7 +2342,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     if (locator->getAnchor())
       anchor = locator->getAnchor();
   }
-  
+
   // Check to see if this is a locator referring to something we cannot or do
   // here: in this case, we ignore paths that end on archetypes witnesses, or
   // associated types of the expression.
@@ -2347,190 +2351,10 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     // archetypes
     return false;
   }
-  
-  // Retypecheck the anchor type, which is the base of the member expression.
-  anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
-  if (!anchor) return true;
-  
-  auto baseTy = anchor->getType()->getLValueOrInOutObjectType();
-  auto baseObjTy = baseTy;
 
-  // If the base type is an IUO, look through it.  Odds are, the code is not
-  // trying to find a member of it.
-  if (auto objTy = CS->lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
-    baseTy = baseObjTy = objTy;
-
-  
-  if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
-    diagnose(anchor->getLoc(), diag::no_member_of_module,
-             moduleTy->getModule()->getName(), memberName)
-      .highlight(anchor->getSourceRange()).highlight(memberRange);
-    return true;
-  }
-  
-  // If the base of this property access is a function that takes an empty
-  // argument list, then the most likely problem is that the user wanted to
-  // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
-  // Produce a specific diagnostic + fixit for this situation.
-  if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
-    if (baseFTy->getInput()->isVoid() &&
-        (constraint->getKind() == ConstraintKind::ValueMember ||
-         constraint->getKind() == ConstraintKind::UnresolvedValueMember)) {
-      SourceLoc insertLoc = anchor->getEndLoc();
-    
-      if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
-        diagnose(anchor->getLoc(), diag::did_not_call_function,
-                 DRE->getDecl()->getName())
-          .fixItInsertAfter(insertLoc, "()");
-        return true;
-      }
-      
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(anchor))
-        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
-          diagnose(anchor->getLoc(), diag::did_not_call_method,
-                   DRE->getDecl()->getName())
-            .fixItInsertAfter(insertLoc, "()");
-          return true;
-        }
-      
-      diagnose(anchor->getLoc(), diag::did_not_call_function_value)
-      .fixItInsertAfter(insertLoc, "()");
-      return true;
-    }
-  }
-
-  // If this is a tuple, then the index needs to be valid.
-  if (auto tuple = baseObjTy->getAs<TupleType>()) {
-    StringRef nameStr = memberName.getBaseName().str();
-    int fieldIdx = -1;
-    // Resolve a number reference into the tuple type.
-    unsigned Value = 0;
-    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
-      fieldIdx = Value;
-    } else {
-      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
-    }
-
-    if (fieldIdx != -1)
-      return false;    // Lookup is valid.
-
-    diagnose(anchor->getLoc(), diag::could_not_find_tuple_member,
-             baseObjTy, memberName)
-      .highlight(anchor->getSourceRange()).highlight(memberRange);
-    return true;
-  }
-
-  // If this is initializer/constructor lookup we are dealing this.
-  if (isInitializer) {
-    // Let's check what is the base type we are trying to look it up on
-    // because only MetatypeType is viable to find constructor on, as per
-    // rules in ConstraintSystem::performMemberLookup.
-    if (!baseTy->is<AnyMetatypeType>()) {
-      baseTy = MetatypeType::get(baseTy, CS->getASTContext());
-    }
-  }
-
-  // If base type has unresolved generic parameters, such might mean
-  // that it's initializer with erroneous argument, otherwise this would
-  // be a simple ambiguous archetype case, neither can be diagnosed here.
-  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
-    return false;
-
-  MemberLookupResult result = CS->performMemberLookup(
-      constraint->getKind(), memberName, baseTy,
-      constraint->getFunctionRefKind(), constraint->getLocator(),
-      /*includeInaccessibleMembers*/ true);
-
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:      
-    // If we couldn't resolve a specific type for the base expression, then we
-    // cannot produce a specific diagnostic.
-    return false;
-
-  case MemberLookupResult::ErrorAlreadyDiagnosed:
-    // If an error was already emitted, then we're done, don't emit anything
-    // redundant.
-    return true;
-      
-  case MemberLookupResult::HasResults:
-    break;
-  }
-
-  // Since the lookup was allowing inaccessible members, let's check
-  // if it found anything of that sort, which is easy to diagnose.
-  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
-  bool allInaccessible = true;
-  for (auto &member : result.ViableCandidates) {
-    if (!member.isDecl()) {
-      // if there is no declaration, this choice is implicitly available.
-      allUnavailable = false;
-      continue;
-    }
-
-    auto decl = member.getDecl();
-    // Check availability of the found choice.
-    if (!decl->getAttrs().isUnavailable(CS->getASTContext()))
-      allUnavailable = false;
-
-    if (decl->isAccessibleFrom(CS->DC))
-      allInaccessible = false;
-  }
-  
-  // If no candidates were accessible, say so.
-  if (allInaccessible && !result.ViableCandidates.empty()) {
-    CS->TC.diagnose(anchor->getLoc(), diag::all_candidates_inaccessible,
-                    memberName);
-
-    for (auto &candidate : result.ViableCandidates) {
-      if (auto decl = candidate.getDecl()) {
-        CS->TC.diagnose(decl, diag::note_candidate_inaccessible,
-                        decl->getFullName(), decl->getFormalAccess());
-      }
-    }
-
-    return true;
-  }
-
-  if (result.UnviableCandidates.empty() && isInitializer &&
-      !baseObjTy->is<MetatypeType>()) {
-    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(expr)) {
-      // Diagnose 'super.init', which can only appear inside another
-      // initializer, specially.
-      if (isa<SuperRefExpr>(ctorRef->getBase())) {
-        diagnose(anchor->getLoc(), diag::super_initializer_not_in_initializer);
-        return true;
-      }
-
-      // Suggest inserting a call to 'type(of:)' to construct another object
-      // of the same dynamic type.
-      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-
-      // Surround the caller in `type(of:)`.
-      diagnose(anchor->getLoc(), diag::init_not_instance_member)
-          .fixItInsert(fixItRng.Start, "type(of: ")
-          .fixItInsertAfter(fixItRng.End, ")");
-      return true;
-    }
-  }
-
-  if (result.ViableCandidates.empty()) {
-    // FIXME: Dig out the property DeclNameLoc.
-    diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
-                                  DeclNameLoc(memberRange.Start),
-                                  anchor->getLoc());
-    return true;
-  }
-  
-  if (allUnavailable) {
-    auto firstDecl = result.ViableCandidates[0].getDecl();
-    // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
-    if (CS->TC.diagnoseExplicitUnavailability(firstDecl, anchor->getLoc(),
-                                              CS->DC, /*call*/nullptr))
-      return true;
-  }
-  
-  // Otherwise, we don't know why this failed.
-  return false;
+  return diagnoseMemberFailures(expr, anchor, constraint->getKind(),
+                                constraint->getMember(),
+                                constraint->getFunctionRefKind(), locator);
 }
 
 void FailureDiagnosis::
@@ -2703,7 +2527,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     };
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (memberName.isSimpleName("subscript")) {
+    if (memberName.isSimpleName(CS->getASTContext().Id_subscript)) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
     } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
@@ -2720,6 +2544,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       }
       diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
+    } else if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
+      diagnose(baseExpr->getLoc(), diag::no_member_of_module,
+               moduleTy->getModule()->getName(), memberName)
+          .highlight(baseRange)
+          .highlight(nameLoc.getSourceRange());
+      return;
     } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
@@ -5566,151 +5396,126 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
   if (!baseExpr) return true;
   auto baseType = baseExpr->getType();
-  
+
   if (isa<NilLiteralExpr>(baseExpr)) {
     diagnose(baseExpr->getLoc(), diag::cannot_subscript_nil_literal)
       .highlight(baseExpr->getSourceRange());
     return true;
   }
 
+  std::function<bool(ArrayRef<OverloadChoice>)> callback =
+      [&](ArrayRef<OverloadChoice> candidates) -> bool {
+    CalleeCandidateInfo calleeInfo(Type(), candidates, SE->hasTrailingClosure(),
+                                   CS,
+                                   /*selfAlreadyApplied*/ false);
+
+    // We're about to typecheck the index list, which needs to be processed with
+    // self already applied.
+    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+      ++calleeInfo.candidates[i].level;
+
+    auto indexExpr =
+        typeCheckArgumentChildIndependently(SE->getIndex(), Type(), calleeInfo);
+    if (!indexExpr)
+      return true;
+
+    // Back to analyzing the candidate list with self applied.
+    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+      --calleeInfo.candidates[i].level;
+
+    ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
+    if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
+      return true;
+
+    auto indexType = indexExpr->getType();
+
+    auto decomposedBaseType = decomposeArgType(baseType, {Identifier()});
+    auto decomposedIndexType = decomposeArgType(indexType, argLabels);
+    calleeInfo.filterList(
+        [&](UncurriedCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
+          // Classify how close this match is.  Non-subscript decls don't match.
+          if (!dyn_cast_or_null<SubscriptDecl>(cand.getDecl()))
+            return {CC_GeneralMismatch, {}};
+
+          // Check whether the self type matches.
+          auto selfConstraint = CC_ExactMatch;
+          if (calleeInfo.evaluateCloseness(cand, decomposedBaseType).first !=
+              CC_ExactMatch)
+            selfConstraint = CC_SelfMismatch;
+
+          // Increase the uncurry level to look past the self argument to the
+          // indices.
+          cand.level++;
+
+          // Explode out multi-index subscripts to find the best match.
+          auto indexResult =
+              calleeInfo.evaluateCloseness(cand, decomposedIndexType);
+          if (selfConstraint > indexResult.first)
+            return {selfConstraint, {}};
+          return indexResult;
+        });
+
+    // If the closest matches all mismatch on self, we either have something
+    // that
+    // cannot be subscripted, or an ambiguity.
+    if (calleeInfo.closeness == CC_SelfMismatch) {
+      diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
+          .highlight(SE->getBase()->getSourceRange());
+      // FIXME: Should suggest overload set, but we're not ready for that until
+      // it points to candidates and identifies the self type in the diagnostic.
+      // calleeInfo.suggestPotentialOverloads(SE->getLoc());
+      return true;
+    }
+
+    // Any other failures relate to the index list.
+    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
+      ++calleeInfo.candidates[i].level;
+
+    // TODO: Is there any reason to check for CC_NonLValueInOut here?
+
+    if (calleeInfo.closeness == CC_ExactMatch) {
+      // Otherwise, whatever the result type of the call happened to be must not
+      // have been what we were looking for.  Lets diagnose it as a conversion
+      // or ambiguity failure.
+      if (calleeInfo.size() == 1)
+        return false;
+
+      diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
+          .highlight(indexExpr->getSourceRange())
+          .highlight(baseExpr->getSourceRange());
+
+      // FIXME: suggestPotentialOverloads should do this.
+      // calleeInfo.suggestPotentialOverloads(SE->getLoc());
+      for (auto candidate : calleeInfo.candidates)
+        if (auto decl = candidate.getDecl())
+          diagnose(decl, diag::found_candidate);
+        else
+          diagnose(candidate.getExpr()->getLoc(), diag::found_candidate);
+
+      return true;
+    }
+
+    if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
+      return true;
+
+    // Diagnose some simple and common errors.
+    if (calleeInfo.diagnoseSimpleErrors(SE))
+      return true;
+
+    diagnose(SE->getLoc(), diag::cannot_subscript_with_index, baseType,
+             indexType);
+
+    calleeInfo.suggestPotentialOverloads(SE->getLoc());
+    return true;
+  };
+
   auto locator =
-    CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+      CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
-  auto subscriptName = CS->getASTContext().Id_subscript;
-  
-  MemberLookupResult result =
-    CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
-                            baseType, FunctionRefKind::DoubleApply, locator,
-                            /*includeInaccessibleMembers*/true);
-
-  
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:
-    return false;
-  case MemberLookupResult::ErrorAlreadyDiagnosed:
-    // If an error was already emitted, then we're done, don't emit anything
-    // redundant.
-    return true;
-  case MemberLookupResult::HasResults:
-    break;    // Interesting case. :-)
-  }
-  
-  // Don't noise up diagnostics with key path application candidates, since they
-  // appear on every type.
-  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
-  for (auto candidate : result.ViableCandidates)
-    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
-      viableCandidatesToReport.push_back(candidate);
-  
-  // If we have unviable candidates (e.g. because of access control or some
-  // other problem) we should diagnose the problem.
-  if (viableCandidatesToReport.empty()) {
-    diagnoseUnviableLookupResults(result, baseType, baseExpr, subscriptName,
-                                  DeclNameLoc(SE->getLoc()), SE->getLoc());
-    return true;
-  }
-
-  CalleeCandidateInfo calleeInfo(Type(), viableCandidatesToReport,
-                                 SE->hasTrailingClosure(), CS,
-                                 /*selfAlreadyApplied*/false);
-
-  // We're about to typecheck the index list, which needs to be processed with
-  // self already applied.
-  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-    ++calleeInfo.candidates[i].level;
-  
-  auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
-                                                       Type(), calleeInfo);
-  if (!indexExpr) return true;
-
-  // Back to analyzing the candidate list with self applied.
-  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-    --calleeInfo.candidates[i].level;
-
-  ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
-    return true;
-
-  auto indexType = indexExpr->getType();
-
-  auto decomposedBaseType = decomposeArgType(baseType, { Identifier() });
-  auto decomposedIndexType = decomposeArgType(indexType, argLabels);
-  calleeInfo.filterList([&](UncurriedCandidate cand) ->
-                                 CalleeCandidateInfo::ClosenessResultTy
-  {
-    // Classify how close this match is.  Non-subscript decls don't match.
-    if (!dyn_cast_or_null<SubscriptDecl>(cand.getDecl()))
-      return { CC_GeneralMismatch, {}};
-    
-    // Check whether the self type matches.
-    auto selfConstraint = CC_ExactMatch;
-    if (calleeInfo.evaluateCloseness(cand, decomposedBaseType)
-          .first != CC_ExactMatch)
-      selfConstraint = CC_SelfMismatch;
-    
-    // Increase the uncurry level to look past the self argument to the indices.
-    cand.level++;
-    
-    // Explode out multi-index subscripts to find the best match.
-    auto indexResult =
-      calleeInfo.evaluateCloseness(cand, decomposedIndexType);
-    if (selfConstraint > indexResult.first)
-      return {selfConstraint, {}};
-    return indexResult;
-  });
-
-  // If the closest matches all mismatch on self, we either have something that
-  // cannot be subscripted, or an ambiguity.
-  if (calleeInfo.closeness == CC_SelfMismatch) {
-    diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
-    .highlight(SE->getBase()->getSourceRange());
-    // FIXME: Should suggest overload set, but we're not ready for that until
-    // it points to candidates and identifies the self type in the diagnostic.
-    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
-    return true;
-  }
-
-  // Any other failures relate to the index list.
-  for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-    ++calleeInfo.candidates[i].level;
-  
-  // TODO: Is there any reason to check for CC_NonLValueInOut here?
-  
-  if (calleeInfo.closeness == CC_ExactMatch) {
-    // Otherwise, whatever the result type of the call happened to be must not
-    // have been what we were looking for.  Lets diagnose it as a conversion
-    // or ambiguity failure.
-    if (calleeInfo.size() == 1)
-      return false;
-
-    diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
-      .highlight(indexExpr->getSourceRange())
-      .highlight(baseExpr->getSourceRange());
-    
-    // FIXME: suggestPotentialOverloads should do this.
-    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
-    for (auto candidate : calleeInfo.candidates)
-      if (auto decl = candidate.getDecl())
-        diagnose(decl, diag::found_candidate);
-      else
-        diagnose(candidate.getExpr()->getLoc(), diag::found_candidate);
-
-    return true;
-  }
-
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
-    return true;
-
-  // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(SE))
-    return true;
-
-
-  diagnose(SE->getLoc(), diag::cannot_subscript_with_index,
-           baseType, indexType);
-
-  calleeInfo.suggestPotentialOverloads(SE->getLoc());
-  return true;
+  return diagnoseMemberFailures(SE, baseExpr, ConstraintKind::ValueMember,
+                                CS->getASTContext().Id_subscript,
+                                FunctionRefKind::DoubleApply, locator,
+                                callback);
 }
 
 
@@ -7665,168 +7470,402 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   // If we can't find the member constraint in question, then we failed.
   if (!memberConstraint)
     return false;
-  
-  // If we succeeded, get ready to do the member lookup.
-  auto baseObjTy = CS->getContextualType()->getRValueType();
 
-  // If the base object is already a metatype type, then something weird is
-  // going on.  For now, just generate a generic error.
-  if (baseObjTy->is<MetatypeType>())
+  std::function<bool(ArrayRef<OverloadChoice>)> callback = [&](
+      ArrayRef<OverloadChoice> candidates) {
+    bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
+
+    // Dump all of our viable candidates into a CalleeCandidateInfo & sort it
+    // out.
+    CalleeCandidateInfo candidateInfo(Type(), candidates, hasTrailingClosure,
+                                      CS);
+
+    // Filter the candidate list based on the argument we may or may not have.
+    candidateInfo.filterContextualMemberList(E->getArgument());
+
+    // If we have multiple candidates, then we have an ambiguity.
+    if (candidateInfo.size() != 1) {
+      SourceRange argRange;
+      if (auto arg = E->getArgument())
+        argRange = arg->getSourceRange();
+      diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
+               E->getName())
+          .highlight(argRange);
+      candidateInfo.suggestPotentialOverloads(E->getNameLoc().getBaseNameLoc());
+      return true;
+    }
+
+    auto *argExpr = E->getArgument();
+    auto candidateArgTy = candidateInfo[0].getArgumentType();
+
+    // Depending on how we matched, produce tailored diagnostics.
+    switch (candidateInfo.closeness) {
+    case CC_NonLValueInOut: // First argument is inout but no lvalue present.
+    case CC_OneArgumentMismatch: // All arguments except one match.
+    case CC_OneArgumentNearMismatch:
+    case CC_OneGenericArgumentMismatch:
+    case CC_OneGenericArgumentNearMismatch:
+    case CC_GenericNonsubstitutableMismatch:
+    case CC_SelfMismatch:         // Self argument mismatches.
+    case CC_ArgumentNearMismatch: // Argument list mismatch.
+    case CC_ArgumentMismatch:     // Argument list mismatch.
+      assert(0 && "These aren't produced by filterContextualMemberList");
+      return false;
+
+    case CC_ExactMatch: { // This is a perfect match for the arguments.
+
+      // If we have an exact match, then we must have an argument list, check
+      // it.
+      if (candidateArgTy) {
+        assert(argExpr && "Exact match without argument?");
+        if (!typeCheckArgumentChildIndependently(argExpr, candidateArgTy,
+                                                 candidateInfo))
+          return true;
+      }
+
+      // If the argument is a match, then check the result type.  We might have
+      // looked up a contextual member whose result type disagrees with the
+      // expected result type.
+      auto resultTy = candidateInfo[0].getResultType();
+      if (!resultTy)
+        resultTy = candidateInfo[0].getUncurriedType();
+
+      if (resultTy && !CS->getContextualType()->is<UnboundGenericType>() &&
+          !CS->TC.isConvertibleTo(resultTy, CS->getContextualType(), CS->DC)) {
+        diagnose(E->getNameLoc(), diag::expected_result_in_contextual_member,
+                 E->getName(), resultTy, CS->getContextualType());
+        return true;
+      }
+
+      // Otherwise, this is an exact match, return false to diagnose this as an
+      // ambiguity.  It must be some other problem, such as failing to infer a
+      // generic argument on the enum type.
+      return false;
+    }
+
+    case CC_Unavailable:
+    case CC_Inaccessible:
+      // Diagnose some simple and common errors.
+      return candidateInfo.diagnoseSimpleErrors(E);
+
+    case CC_ArgumentLabelMismatch:
+    case CC_ArgumentCountMismatch: {
+      // If we have no argument, the candidates must have expected one.
+      if (!argExpr) {
+        if (!candidateArgTy)
+          return false; // Candidate must be incorrect for some other reason.
+
+        // Pick one of the arguments that are expected as an exemplar.
+        if (candidateArgTy->isVoid()) {
+          // If this member is () -> T, suggest adding parentheses.
+          diagnose(E->getNameLoc(), diag::expected_parens_in_contextual_member,
+                   E->getName())
+              .fixItInsertAfter(E->getEndLoc(), "()");
+        } else {
+          diagnose(E->getNameLoc(),
+                   diag::expected_argument_in_contextual_member, E->getName(),
+                   candidateArgTy);
+        }
+        return true;
+      }
+
+      assert(argExpr && candidateArgTy && "Exact match without an argument?");
+      return diagnoseSingleCandidateFailures(candidateInfo, E, argExpr,
+                                             E->getArgumentLabels());
+    }
+
+    case CC_GeneralMismatch: { // Something else is wrong.
+      // If an argument value was specified, but this member expects no
+      // arguments,
+      // then we fail with a nice error message.
+      if (!candidateArgTy) {
+        if (argExpr->getType()->isVoid()) {
+          diagnose(E->getNameLoc(),
+                   diag::unexpected_parens_in_contextual_member, E->getName())
+              .fixItRemove(E->getArgument()->getSourceRange());
+        } else {
+          diagnose(E->getNameLoc(),
+                   diag::unexpected_argument_in_contextual_member, E->getName())
+              .highlight(E->getArgument()->getSourceRange());
+        }
+        return true;
+      }
+
+      return false;
+    }
+    }
+
+    llvm_unreachable("all cases should be handled");
+  };
+
+  return diagnoseMemberFailures(E, nullptr, memberConstraint->getKind(),
+                                memberConstraint->getMember(),
+                                memberConstraint->getFunctionRefKind(),
+                                memberConstraint->getLocator(), callback);
+}
+
+bool FailureDiagnosis::diagnoseMemberFailures(
+    Expr *E, Expr *baseExpr, ConstraintKind lookupKind, DeclName memberName,
+    FunctionRefKind funcRefKind, ConstraintLocator *locator,
+    Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback,
+    bool includeInaccessibleMembers) {
+  auto isInitializer = memberName.isSimpleName(CS->TC.Context.Id_init);
+
+  // Get the referenced base expression from the failed constraint, along with
+  // the SourceRange for the member ref.  In "x.y", this returns the expr for x
+  // and the source range for y.
+  SourceRange memberRange;
+  SourceLoc BaseLoc;
+
+  Type baseTy, baseObjTy;
+  // UnresolvedMemberExpr doesn't have "base" expression,
+  // it's represented as ".foo", which means that we need
+  // to get base from the context.
+  if (isa<UnresolvedMemberExpr>(E)) {
+    memberRange = E->getSourceRange();
+    BaseLoc = E->getLoc();
+    baseTy = CS->getContextualType();
+    if (!baseTy)
+      return false;
+
+    // If we succeeded, get ready to do the member lookup.
+    baseObjTy = baseTy->getRValueType();
+
+    // If the base object is already a metatype type, then something weird is
+    // going on.  For now, just generate a generic error.
+    if (baseObjTy->is<MetatypeType>())
+      return false;
+
+    baseTy = baseObjTy = MetatypeType::get(baseObjTy);
+  } else {
+    memberRange = baseExpr->getSourceRange();
+    if (locator)
+      locator = simplifyLocator(*CS, locator, memberRange);
+
+    BaseLoc = baseExpr->getLoc();
+    // Retypecheck the anchor type, which is the base of the member expression.
+    baseExpr =
+        typeCheckArbitrarySubExprIndependently(baseExpr, TCC_AllowLValue);
+    if (!baseExpr)
+      return true;
+
+    baseTy = baseExpr->getType()->getLValueOrInOutObjectType();
+    baseObjTy = baseTy;
+  }
+
+  // If the base type is an IUO, look through it.  Odds are, the code is not
+  // trying to find a member of it.
+  if (auto objTy = CS->lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
+    baseTy = baseObjTy = objTy;
+
+  // If the base of this property access is a function that takes an empty
+  // argument list, then the most likely problem is that the user wanted to
+  // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
+  // Produce a specific diagnostic + fixit for this situation.
+  if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
+    if (baseExpr && baseFTy->getInput()->isVoid()) {
+      SourceLoc insertLoc = baseExpr->getEndLoc();
+
+      if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
+        diagnose(baseExpr->getLoc(), diag::did_not_call_function,
+                 DRE->getDecl()->getName())
+            .fixItInsertAfter(insertLoc, "()");
+        return true;
+      }
+
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr))
+        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+          diagnose(baseExpr->getLoc(), diag::did_not_call_method,
+                   DRE->getDecl()->getName())
+              .fixItInsertAfter(insertLoc, "()");
+          return true;
+        }
+
+      diagnose(baseExpr->getLoc(), diag::did_not_call_function_value)
+          .fixItInsertAfter(insertLoc, "()");
+      return true;
+    }
+  }
+
+  // If this is a tuple, then the index needs to be valid.
+  if (auto tuple = baseObjTy->getAs<TupleType>()) {
+    StringRef nameStr = memberName.getBaseName().str();
+    int fieldIdx = -1;
+    // Resolve a number reference into the tuple type.
+    unsigned Value = 0;
+    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
+      fieldIdx = Value;
+    } else {
+      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+    }
+
+    if (fieldIdx != -1)
+      return false; // Lookup is valid.
+
+    diagnose(BaseLoc, diag::could_not_find_tuple_member, baseObjTy, memberName)
+        .highlight(memberRange);
+    return true;
+  }
+
+  // If this is initializer/constructor lookup we are dealing this.
+  if (isInitializer) {
+    // Let's check what is the base type we are trying to look it up on
+    // because only MetatypeType is viable to find constructor on, as per
+    // rules in ConstraintSystem::performMemberLookup.
+    if (!baseTy->is<AnyMetatypeType>()) {
+      baseTy = MetatypeType::get(baseTy, CS->getASTContext());
+    }
+  }
+
+  // If base type has unresolved generic parameters, such might mean
+  // that it's initializer with erroneous argument, otherwise this would
+  // be a simple ambiguous archetype case, neither can be diagnosed here.
+  if (baseTy->hasTypeParameter() && baseTy->hasUnresolvedType())
     return false;
 
-  // Otherwise, we'll perform a lookup against the metatype of our contextual
-  // type.
-  baseObjTy = MetatypeType::get(baseObjTy);
   MemberLookupResult result =
-    CS->performMemberLookup(memberConstraint->getKind(),
-                            memberConstraint->getMember(),
-                            baseObjTy,
-                            memberConstraint->getFunctionRefKind(),
-                            memberConstraint->getLocator(),
-                            /*includeInaccessibleMembers*/true);
+      CS->performMemberLookup(lookupKind, memberName, baseTy, funcRefKind,
+                              locator, includeInaccessibleMembers);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
-    llvm_unreachable("base expr type should be resolved at this point");
+    // If we couldn't resolve a specific type for the base expression, then we
+    // cannot produce a specific diagnostic.
+    return false;
+
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     // If an error was already emitted, then we're done, don't emit anything
     // redundant.
     return true;
+
   case MemberLookupResult::HasResults:
-    break;    // Interesting case. :-)
+    break;
   }
 
-  // If we have unviable candidates (e.g. because of access control or some
-  // other problem) we should diagnose the problem.  Note that we diagnose this
-  // here instead of letting diagnoseGeneralMemberFailure handle it, because it
-  // doesn't know how to handle lookup into a contextual type for an URME.
-  if (result.ViableCandidates.empty()) {
-    diagnoseUnviableLookupResults(result, baseObjTy, /*no base expr*/nullptr,
-                                  E->getName(), E->getNameLoc(),
-                                  E->getLoc());
+  SmallVector<OverloadChoice, 4> viableCandidatesToReport;
+  for (auto candidate : result.ViableCandidates)
+    if (candidate.getKind() != OverloadChoiceKind::KeyPathApplication)
+      viableCandidatesToReport.push_back(candidate);
+
+  // Since the lookup was allowing inaccessible members, let's check
+  // if it found anything of that sort, which is easy to diagnose.
+  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
+  bool allInaccessible = true;
+  for (auto &member : viableCandidatesToReport) {
+    if (!member.isDecl()) {
+      // if there is no declaration, this choice is implicitly available.
+      allUnavailable = false;
+      continue;
+    }
+
+    auto decl = member.getDecl();
+    // Check availability of the found choice.
+    if (!decl->getAttrs().isUnavailable(CS->getASTContext()))
+      allUnavailable = false;
+
+    if (decl->isAccessibleFrom(CS->DC))
+      allInaccessible = false;
+  }
+
+  // If no candidates were accessible, say so.
+  if (allInaccessible && !viableCandidatesToReport.empty()) {
+    diagnose(BaseLoc, diag::all_candidates_inaccessible, memberName);
+    for (auto &candidate : result.ViableCandidates) {
+      if (!candidate.isDecl())
+        continue;
+
+      if (auto decl = candidate.getDecl()) {
+        diagnose(decl, diag::note_candidate_inaccessible, decl->getFullName(),
+                 decl->getFormalAccess());
+      }
+    }
+
     return true;
   }
-  
-  bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
 
-  // Dump all of our viable candidates into a CalleeCandidateInfo & sort it out.
-  CalleeCandidateInfo candidateInfo(Type(), result.ViableCandidates,
-                                    hasTrailingClosure, CS);
-
-  // Filter the candidate list based on the argument we may or may not have.
-  candidateInfo.filterContextualMemberList(E->getArgument());
-
-  // If we have multiple candidates, then we have an ambiguity.
-  if (candidateInfo.size() != 1) {
-    SourceRange argRange;
-    if (auto arg = E->getArgument()) argRange = arg->getSourceRange();
-    diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
-             E->getName())
-      .highlight(argRange);
-    candidateInfo.suggestPotentialOverloads(E->getNameLoc().getBaseNameLoc());
-    return true;
-  }
-
-  auto *argExpr = E->getArgument();
-  auto candidateArgTy = candidateInfo[0].getArgumentType();
-
-  // Depending on how we matched, produce tailored diagnostics.
-  switch (candidateInfo.closeness) {
-  case CC_NonLValueInOut:      // First argument is inout but no lvalue present.
-  case CC_OneArgumentMismatch: // All arguments except one match.
-  case CC_OneArgumentNearMismatch:
-  case CC_OneGenericArgumentMismatch:
-  case CC_OneGenericArgumentNearMismatch:
-  case CC_GenericNonsubstitutableMismatch:
-  case CC_SelfMismatch:        // Self argument mismatches.
-  case CC_ArgumentNearMismatch:// Argument list mismatch.
-  case CC_ArgumentMismatch:    // Argument list mismatch.
-    assert(0 && "These aren't produced by filterContextualMemberList");
-    return false;
-
-  case CC_ExactMatch: {        // This is a perfect match for the arguments.
-
-    // If we have an exact match, then we must have an argument list, check it.
-    if (candidateArgTy) {
-      assert(argExpr && "Exact match without argument?");
-      if (!typeCheckArgumentChildIndependently(argExpr, candidateArgTy,
-                                               candidateInfo))
+  if (result.UnviableCandidates.empty() && isInitializer &&
+      !baseObjTy->is<MetatypeType>()) {
+    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(E)) {
+      // Diagnose 'super.init', which can only appear inside another
+      // initializer, specially.
+      if (isa<SuperRefExpr>(ctorRef->getBase())) {
+        diagnose(BaseLoc, diag::super_initializer_not_in_initializer);
         return true;
-    }
-    
-    // If the argument is a match, then check the result type.  We might have
-    // looked up a contextual member whose result type disagrees with the
-    // expected result type.
-    auto resultTy = candidateInfo[0].getResultType();
-    if (!resultTy)
-      resultTy = candidateInfo[0].getUncurriedType();
-    
-    if (resultTy && !CS->getContextualType()->is<UnboundGenericType>() &&
-        !CS->TC.isConvertibleTo(resultTy, CS->getContextualType(), CS->DC)) {
-      diagnose(E->getNameLoc(), diag::expected_result_in_contextual_member,
-               E->getName(), resultTy, CS->getContextualType());
-      return true;
-    }
-    
-    // Otherwise, this is an exact match, return false to diagnose this as an
-    // ambiguity.  It must be some other problem, such as failing to infer a
-    // generic argument on the enum type.
-    return false;
-  }
-
-  case CC_Unavailable:
-  case CC_Inaccessible:
-    // Diagnose some simple and common errors.
-    return candidateInfo.diagnoseSimpleErrors(E);
-
-  case CC_ArgumentLabelMismatch:
-  case CC_ArgumentCountMismatch: {
-    // If we have no argument, the candidates must have expected one.
-    if (!argExpr) {
-      if (!candidateArgTy)
-        return false; // Candidate must be incorrect for some other reason.
-
-      // Pick one of the arguments that are expected as an exemplar.
-      if (candidateArgTy->isVoid()) {
-        // If this member is () -> T, suggest adding parentheses.
-        diagnose(E->getNameLoc(), diag::expected_parens_in_contextual_member,
-                 E->getName())
-            .fixItInsertAfter(E->getEndLoc(), "()");
-      } else {
-        diagnose(E->getNameLoc(), diag::expected_argument_in_contextual_member,
-                 E->getName(), candidateArgTy);
       }
+
+      // Suggest inserting a call to 'type(of:)' to construct another object
+      // of the same dynamic type.
+      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+
+      // Surround the caller in `type(of:)`.
+      diagnose(BaseLoc, diag::init_not_instance_member)
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
       return true;
     }
-
-    assert(argExpr && candidateArgTy && "Exact match without an argument?");
-    return diagnoseSingleCandidateFailures(candidateInfo, E, argExpr,
-                                           E->getArgumentLabels());
   }
 
-  case CC_GeneralMismatch: { // Something else is wrong.
-    // If an argument value was specified, but this member expects no arguments,
-    // then we fail with a nice error message.
-    if (!candidateArgTy) {
-      if (argExpr->getType()->isVoid()) {
-        diagnose(E->getNameLoc(), diag::unexpected_parens_in_contextual_member,
-                 E->getName())
-            .fixItRemove(E->getArgument()->getSourceRange());
-      } else {
-        diagnose(E->getNameLoc(),
-                 diag::unexpected_argument_in_contextual_member, E->getName())
-            .highlight(E->getArgument()->getSourceRange());
+  if (viableCandidatesToReport.empty()) {
+    // If this was an optional type let's check if the base type
+    // has requested member, if so - generate nice error saying that
+    // optional was not unwrapped, otherwise say that type value has
+    // no such member.
+    if (auto *OT = dyn_cast<OptionalType>(baseObjTy.getPointer())) {
+      auto optionalResult = CS->performMemberLookup(
+          lookupKind, memberName, OT->getBaseType(), funcRefKind, locator,
+          /*includeInaccessibleMembers*/ false);
+
+      switch (optionalResult.OverallResult) {
+      case MemberLookupResult::ErrorAlreadyDiagnosed:
+        // If an error was already emitted, then we're done, don't emit anything
+        // redundant.
+        return true;
+
+      case MemberLookupResult::Unsolved:
+      case MemberLookupResult::HasResults:
+        break;
       }
-      return true;
+
+      if (!optionalResult.ViableCandidates.empty()) {
+        // By default we assume that the LHS type is not optional.
+        StringRef fixIt = "!";
+        auto contextualType = CS->getContextualType();
+        if (contextualType && isa<OptionalType>(contextualType.getPointer()))
+          fixIt = "?";
+
+        diagnose(BaseLoc, diag::missing_unwrap_optional, baseObjTy)
+            .fixItInsertAfter(baseExpr->getEndLoc(), fixIt);
+        return true;
+      }
     }
 
-    return false;
-  }
+    // FIXME: Dig out the property DeclNameLoc.
+    diagnoseUnviableLookupResults(result, baseObjTy, baseExpr, memberName,
+                                  DeclNameLoc(memberRange.Start), BaseLoc);
+    return true;
   }
 
-  llvm_unreachable("all cases should be handled");
+  if (allUnavailable) {
+    auto firstDecl = viableCandidatesToReport[0].getDecl();
+    // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
+    if (CS->TC.diagnoseExplicitUnavailability(firstDecl, BaseLoc, CS->DC,
+                                              /*call*/ nullptr))
+      return true;
+  }
+
+  return callback.hasValue() ? (*callback)(viableCandidatesToReport) : false;
 }
 
+bool FailureDiagnosis::visitUnresolvedDotExpr(UnresolvedDotExpr *UDE) {
+  auto *baseExpr = UDE->getBase();
+  auto *locator = CS->getConstraintLocator(UDE, ConstraintLocator::Member);
+  if (!locator)
+    return false;
+
+  return diagnoseMemberFailures(UDE, baseExpr, ConstraintKind::ValueMember,
+                                UDE->getName(), UDE->getFunctionRefKind(),
+                                locator);
+}
 
 /// A TupleExpr propagate contextual type information down to its children and
 /// can be erroneous when there is a label mismatch etc.

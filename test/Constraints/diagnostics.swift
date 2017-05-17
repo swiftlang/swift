@@ -222,8 +222,7 @@ struct StructWithOptionalArray {
 }
 
 func testStructWithOptionalArray(_ foo: StructWithOptionalArray) -> Int {
-  // TODO: Restore regressed diagnostics rdar://problem/31724211
-  return foo.array[0]  // expected-error {{}}
+  return foo.array[0]  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{19-19=!}}
 }
 
 
