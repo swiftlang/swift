@@ -222,6 +222,7 @@ enum class RangeKind : int8_t{
   SingleDecl,
 
   MultiStatement,
+  PartOfExpression,
 };
 
 struct DeclaredDecl {
@@ -260,9 +261,12 @@ struct ResolvedRangeInfo {
   ArrayRef<DeclaredDecl> DeclaredDecls;
   ArrayRef<ReferencedDecl> ReferencedDecls;
   DeclContext* RangeContext;
+  Expr* CommonExprParent;
+
   ResolvedRangeInfo(RangeKind Kind, ReturnTyAndWhetherExit ExitInfo,
                     CharSourceRange Content, DeclContext* RangeContext,
-                    bool HasSingleEntry, bool ThrowingUnhandledError,
+                    Expr *CommonExprParent, bool HasSingleEntry,
+                    bool ThrowingUnhandledError,
                     OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
@@ -272,9 +276,11 @@ struct ResolvedRangeInfo {
                       Orphan(Orphan), ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
-                      RangeContext(RangeContext) {}
+                      RangeContext(RangeContext),
+                      CommonExprParent(CommonExprParent) {}
   ResolvedRangeInfo(CharSourceRange Content) :
-  ResolvedRangeInfo(RangeKind::Invalid, {nullptr, false}, Content, nullptr,
+  ResolvedRangeInfo(RangeKind::Invalid, {nullptr, false}, Content,
+                    nullptr, /*Commom Expr Parent*/nullptr,
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
