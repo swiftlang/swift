@@ -506,12 +506,14 @@ def create_argument_parser():
     option('--llvm-max-parallel-lto-link-jobs', store_int,
            default=defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
+           type=int,
            help='the maximum number of parallel link jobs to use when '
                 'compiling llvm')
 
     option('--swift-tools-max-parallel-lto-link-jobs', store_int,
            default=defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
            metavar='COUNT',
+           type=int,
            help='the maximum number of parallel link jobs to use when '
                 'compiling swift tools.')
 
