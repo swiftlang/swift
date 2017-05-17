@@ -240,7 +240,7 @@ def compare_frontend_stats(args):
             if old == 0 or new == 0:
                 continue
             delta = (new - old)
-            delta_pct = round((float(delta) / float(new)) * 100.0, 2)
+            delta_pct = round((float(delta) / float(old)) * 100.0, 2)
             if (stat_name.startswith("time.") and
                abs(delta) < args.delta_usec_thresh):
                 continue
