@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend %s -typecheck
-// XFAIL: *
 
 protocol Resettable : AnyObject {
   func reset()

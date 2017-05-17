@@ -4584,7 +4584,13 @@ void ConformanceChecker::resolveTypeWitnesses() {
     auto &typeWitnesses = solutions.front().TypeWitnesses;
     for (auto assocType : unresolvedAssocTypes) {
       assert(typeWitnesses.count(assocType) == 1 && "missing witness");
-      recordTypeWitness(assocType, typeWitnesses[assocType].first, nullptr, true);
+      auto replacement = typeWitnesses[assocType].first;
+      if (replacement.findIf([](Type t) -> bool {
+            return isa<DependentMemberType>(t.getPointer());
+          })) {
+        replacement = ErrorType::get(TC.Context);
+      }
+      recordTypeWitness(assocType, replacement, nullptr, true);
     }
 
     return;
