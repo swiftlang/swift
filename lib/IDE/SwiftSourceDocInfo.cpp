@@ -221,6 +221,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   case RangeKind::SingleExpression: OS << "SingleExpression"; break;
   case RangeKind::SingleDecl: OS << "SingleDecl"; break;
   case RangeKind::MultiStatement: OS << "MultiStatement"; break;
+  case RangeKind::PartOfExpression: OS << "PartOfExpression"; break;
   case RangeKind::SingleStatement: OS << "SingleStatement"; break;
   case RangeKind::Invalid: OS << "Invalid"; break;
   }
@@ -242,6 +243,12 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "<Context>";
     printContext(OS, RangeContext);
     OS << "</Context>\n";
+  }
+
+  if (CommonExprParent) {
+    OS << "<Parent>";
+    OS << Expr::getKindName(CommonExprParent->getKind());
+    OS << "</Parent>\n";
   }
 
   if (!HasSingleEntry) {
@@ -394,6 +401,7 @@ private:
     switch(Kind) {
     case RangeKind::Invalid:
     case RangeKind::SingleDecl:
+    case RangeKind::PartOfExpression:
       llvm_unreachable("cannot get type.");
 
     // For a single expression, its type is apparent.
@@ -453,7 +461,9 @@ private:
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node, RangeKind::SingleExpression),
                                Content,
-                               getImmediateContext(), SingleEntry,
+                               getImmediateContext(),
+                               /*Common Parent Expr*/nullptr,
+                               SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
@@ -461,7 +471,9 @@ private:
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement,
                                resolveNodeType(Node, RangeKind::SingleStatement),
-                               Content, getImmediateContext(), SingleEntry,
+                               Content, getImmediateContext(),
+                               /*Common Parent Expr*/nullptr,
+                               SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
@@ -469,7 +481,9 @@ private:
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, {nullptr, false}, Content,
-                               getImmediateContext(), SingleEntry,
+                               getImmediateContext(),
+                               /*Common Parent Expr*/nullptr,
+                               SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
@@ -523,6 +537,22 @@ public:
   }
 
   void leave(ASTNode Node) {
+    if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
+      if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
+        Result = {
+          RangeKind::PartOfExpression, {nullptr, false}, Content,
+          getImmediateContext(),
+          Parent,
+          hasSingleEntryPoint(ContainedASTNodes),
+          hasUnhandledError(ContainedASTNodes),
+          getOrphanKind(ContainedASTNodes),
+          llvm::makeArrayRef(ContainedASTNodes),
+          llvm::makeArrayRef(DeclaredDecls),
+          llvm::makeArrayRef(ReferencedDecls)
+        };
+      }
+    }
+
     assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
     ContextStack.pop_back();
   }
@@ -690,12 +720,13 @@ public:
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
     switch (getRangeMatchKind(Node.getSourceRange())) {
-    case RangeMatchKind::NoneMatch:
+    case RangeMatchKind::NoneMatch: {
       // PatternBindingDecl is not visited; we need to explicitly analyze here.
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
         if (auto PBD = VA->getParentPatternBinding())
           analyze(PBD);
       break;
+    }
     case RangeMatchKind::RangeMatch: {
       postAnalysis(Node);
 
@@ -726,13 +757,13 @@ public:
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back(),
                                 RangeKind::MultiStatement), Content,
-                getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
+                getImmediateContext(), nullptr,
+                hasSingleEntryPoint(ContainedASTNodes),
                 hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
-      return;
     }
   }
 
@@ -743,6 +774,17 @@ public:
       return false;
     if (SM.isBeforeInBuffer(Node.getSourceRange().End, Start))
       return false;
+    return true;
+  }
+
+  bool nodeContainSelection(ASTNode Node) {
+    // If the selection starts before the node, return false.
+    if (SM.isBeforeInBuffer(Start, Node.getStartLoc()))
+      return false;
+    // If the node ends before the selection, return false.
+    if (SM.isBeforeInBuffer(Lexer::getLocForEndOfToken(SM, Node.getEndLoc()), End))
+      return false;
+    // Contained.
     return true;
   }
 
