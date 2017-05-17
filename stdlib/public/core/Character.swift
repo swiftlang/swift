@@ -76,8 +76,6 @@ public struct Character :
   // should be represented as such.
   @_versioned
   internal enum Representation {
-    // A _StringBuffer whose first grapheme cluster is self.
-    // NOTE: may be more than 1 Character long.
     case large(_StringBuffer._Storage)
     case small(Builtin.Int63)
   }
@@ -137,15 +135,16 @@ public struct Character :
     }
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
-    self = Character(_largeRepresentationString: String(
-      _builtinExtendedGraphemeClusterLiteral: start,
-      utf8CodeUnitCount: utf8CodeUnitCount,
-      isASCII: isASCII))
+    self = Character(_largeRepresentationString:
+      String(
+        _builtinExtendedGraphemeClusterLiteral: start,
+        utf8CodeUnitCount: utf8CodeUnitCount,
+        isASCII: isASCII))
   }
 
   /// Creates a character with the specified value.
   ///
-  /// Do not call this initializer directly. It is used by the compiler when
+  /// Do not call this initalizer directly. It is used by the compiler when
   /// you use a string literal to initialize a `Character` instance. For
   /// example:
   ///
@@ -203,13 +202,12 @@ public struct Character :
   @_versioned
   internal init(_largeRepresentationString s: String) {
     if let native = s._core.nativeBuffer,
-       native.start == s._core._baseAddress! {
+      native.start == s._core._baseAddress!,
+      native.usedCount == s._core.count {
       _representation = .large(native._storage)
       return
     }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
+    _representation = .large(_StringCore(s.utf16).nativeBuffer!._storage)
   }
 
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
@@ -387,7 +385,7 @@ extension Character : CustomDebugStringConvertible {
   }
 }
 
-extension String {
+extension StringProtocol {
   /// Creates a string containing the given character.
   ///
   /// - Parameter c: The character to convert to a string.
@@ -396,11 +394,12 @@ extension String {
     case let .small(_63bits):
       let value = Character._smallValue(_63bits)
       let smallUTF8 = Character._SmallUTF8(value)
-      self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: smallUTF8)
+      self = Self(
+        String._fromWellFormedCodeUnitSequence(
+          UTF8.self, input: smallUTF8))
+      
     case let .large(value):
-      let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
+      self = Self(String(_StringCore(_StringBuffer(value))))
     }
   }
 }

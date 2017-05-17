@@ -207,56 +207,32 @@ public struct Substring : StringProtocol {
     self.init(
       String(decodingCString: nullTerminatedCodeUnits, as: sourceEncoding))
   }
-
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of UTF-8 code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withCString(_:)`. Do not store or return the pointer for
-  /// later use.
-  ///
-  /// - Parameter body: A closure with a pointer parameter that points to a
-  ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, it is used as the return value for the `withCString(_:)`
-  ///   method. The pointer argument is valid only for the duration of the
-  ///   method's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  public func withCString<Result>(
-    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _slice._base._core._withCSubstringAndLength(
-      in: startIndex._base._position..<endIndex._base._position,
-      encoding: UTF8.self) {
-      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
-        try body($0)
-      }
-    }
-  }
-
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withCString(encodedAs:_:)`. Do not store or return the
-  /// pointer for later use.
-  ///
-  /// - Parameters:
-  ///   - body: A closure with a pointer parameter that points to a
-  ///     null-terminated sequence of code units. If `body` has a return
-  ///     value, it is used as the return value for the
-  ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
-  ///     only for the duration of the method's execution.
-  ///   - targetEncoding: The encoding in which the code units should be interpreted.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
-    encodedAs targetEncoding: TargetEncoding.Type,
-    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
-  ) rethrows -> Result {
-    return try _slice._base._core._withCSubstring(
-      in: startIndex._base._position..<endIndex._base._position,
-      encoding: targetEncoding, body)
-  }
 }
 
+extension Substring : _SwiftStringView {
+  public func _persistentString() -> String {
+    let wholeCore = _slice._base._core
+    let native = wholeCore.nativeBuffer
+    if _fastPath(native != nil), let n = native {
+      if _fastPath(
+        n.start == wholeCore._baseAddress && n.usedCount == wholeCore.count) {
+        return String(wholeCore)
+      }
+    }
+    var r = String()
+    r._core.append(_ephemeralString()._core)
+    return r
+  }
+  
+  public func _ephemeralString() -> String {
+    let wholeCore = _slice._base._core
+    let subCore : _StringCore = wholeCore[
+      startIndex._base._position..<endIndex._base._position]
+    // check that we haven't allocated a new buffer for the result
+    _sanityCheck(subCore._owner === wholeCore._owner)
+    return String(subCore)
+  }
+}
 
 extension Substring : CustomReflectable {
   public var customMirror: Mirror {
@@ -273,12 +249,6 @@ extension Substring : CustomPlaygroundQuickLookable {
 extension Substring : CustomStringConvertible {
   public var description: String {
     return String(self)
-  }
-}
-
-extension Substring : CustomDebugStringConvertible {
-  public var debugDescription: String {
-    return String(self).debugDescription
   }
 }
 
@@ -361,6 +331,20 @@ extension Substring {
 
 #endif
 
+extension Substring : RangeReplaceableCollection {
+  public init<S : Sequence>(_ elements: S)
+  where S.Element == Character {
+    let e0 = elements as? _SwiftStringView
+    if _fastPath(e0 != nil), let e = e0 {
+      self = e._substring()
+    }
+    else {
+      self = String(elements)[...]
+    }
+  }
+  // TODO: specialize append(contentsOf:) similarly
+}
+
 extension Substring {
   public func lowercased() -> String {
     return String(self).lowercased()
@@ -371,18 +355,6 @@ extension Substring {
   }
 }
 
-extension Substring : TextOutputStream {
-  public mutating func write(_ other: String) {
-    append(contentsOf: other)
-  }
-}
-
-extension Substring : TextOutputStreamable {
-  public func write<Target : TextOutputStream>(to target: inout Target) {
-    target.write(String(self))
-  }
-}
-
 extension Substring : ExpressibleByUnicodeScalarLiteral {
   public init(unicodeScalarLiteral value: String) {
      self.init(_base: value, value.startIndex ..< value.endIndex)
@@ -390,12 +362,6 @@ extension Substring : ExpressibleByUnicodeScalarLiteral {
 }
 extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
   public init(extendedGraphemeClusterLiteral value: String) {
-     self.init(_base: value, value.startIndex ..< value.endIndex)
-  }
-}
-
-extension Substring : ExpressibleByStringLiteral {
-  public init(stringLiteral value: String) {
      self.init(_base: value, value.startIndex ..< value.endIndex)
   }
 }

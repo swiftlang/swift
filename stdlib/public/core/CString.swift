@@ -14,7 +14,7 @@
 
 import SwiftShims
 
-extension String {
+extension StringProtocol {
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
@@ -49,7 +49,7 @@ extension String {
       _decodeCString(
         $0, as: UTF8.self, length: len, repairingInvalidCodeUnits: true)!
     }
-    self = result
+    self = Self(String(result))
   }
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
@@ -58,8 +58,9 @@ extension String {
   /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
   /// unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
-    self = String.decodeCString(
-      cString, as: UTF8.self, repairingInvalidCodeUnits: true)!.result
+    self = Self(
+      String.decodeCString(
+        cString, as: UTF8.self, repairingInvalidCodeUnits: true)!.result)
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -98,7 +99,7 @@ extension String {
     else {
       return nil
     }
-    self = result
+    self = Self(result)
   }
 
   /// Creates a new string by copying the null-terminated data referenced by
@@ -196,6 +197,31 @@ func _decodeCString<Encoding : _UnicodeEncoding>(
     buffer, encoding: encoding, repairIllFormedSequences: isRepairing)
   return stringBuffer.map {
     (result: String(_storage: $0), repairsMade: hadError)
+  }
+}
+
+extension StringProtocol where Self : _SwiftStringView {
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  ///
+  /// The `withCString(_:)` method ensures that the sequence's lifetime extends
+  /// through the execution of `body`. The pointer argument to `body` is only
+  /// valid for the lifetime of the closure. Do not escape it from the closure
+  /// for later use.
+  ///
+  /// - Parameter body: A closure that takes a pointer to the string's UTF-8
+  ///   code unit sequence as its sole argument. If the closure has a return
+  ///   value, it is used as the return value of the `withCString(_:)` method.
+  ///   The pointer argument is valid only for the duration of the closure's
+  ///   execution.
+  /// - Returns: The return value of the `body` closure, if any.
+  @_inlineable
+  public func withCString<Result>(
+    _ body: (UnsafePointer<Int8>) throws -> Result
+  ) rethrows -> Result {
+    return try self._ephemeralString().utf8CString.withUnsafeBufferPointer {
+      try body($0.baseAddress!)
+    }
   }
 }
 
