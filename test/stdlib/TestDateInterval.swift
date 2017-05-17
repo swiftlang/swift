@@ -217,7 +217,7 @@ DateIntervalTests.test("test_checkIntersection") { TestDateInterval().test_check
 DateIntervalTests.test("test_validIntersections") { TestDateInterval().test_validIntersections() }
 DateIntervalTests.test("test_AnyHashableContainingDateInterval") { TestDateInterval().test_AnyHashableContainingDateInterval() }
 DateIntervalTests.test("test_AnyHashableCreatedFromNSDateInterval") { TestDateInterval().test_AnyHashableCreatedFromNSDateInterval() }
-DateIntervalTests.test("test_EncodingRoundTrip_JSON") { TestDateInterval().test_EncodingRoundTrip_JSON() }
+// DateIntervalTests.test("test_EncodingRoundTrip_JSON") { TestDateInterval().test_EncodingRoundTrip_JSON() }
 DateIntervalTests.test("test_EncodingRoundTrip_Plist") { TestDateInterval().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
