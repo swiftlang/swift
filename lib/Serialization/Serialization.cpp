@@ -2315,6 +2315,15 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
                                            resultTypeID);
 }
 
+static SmallVector<Type, 4> collectDependenciesFromType(CanType ty) {
+  llvm::SmallSetVector<Type, 4> result;
+  ty.visit([&](CanType next) {
+    if (auto *nominal = next->getAnyNominal())
+      result.insert(nominal->getDeclaredInterfaceType());
+  });
+  return result.takeVector();
+}
+
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -2770,7 +2779,11 @@ void Serializer::writeDecl(const Decl *D) {
     if (var->isSettable(nullptr))
       rawSetterAccessLevel =
         getRawStableAccessibility(var->getSetterAccessibility());
+
     Type ty = var->getInterfaceType();
+    SmallVector<TypeID, 2> dependencies;
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      dependencies.push_back(addTypeRef(dependency));
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2783,7 +2796,6 @@ void Serializer::writeDecl(const Decl *D) {
                           var->hasNonPatternBindingInit(),
                           (unsigned) accessors.Kind,
                           addTypeRef(ty),
-                          addTypeRef(ty->getCanonicalType()),
                           addDeclRef(accessors.Get),
                           addDeclRef(accessors.Set),
                           addDeclRef(accessors.MaterializeForSet),
@@ -2792,7 +2804,8 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(accessors.WillSet),
                           addDeclRef(accessors.DidSet),
                           addDeclRef(var->getOverriddenDecl()),
-                          rawAccessLevel, rawSetterAccessLevel);
+                          rawAccessLevel, rawSetterAccessLevel,
+                          dependencies);
     break;
   }
 
@@ -2826,16 +2839,20 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(fn->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
-    SmallVector<IdentifierID, 4> nameComponents;
-    nameComponents.push_back(addIdentifierRef(fn->getFullName().getBaseName()));
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(
+        addIdentifierRef(fn->getFullName().getBaseName()));
     for (auto argName : fn->getFullName().getArgumentNames())
-      nameComponents.push_back(addIdentifierRef(argName));
+      nameComponentsAndDependencies.push_back(addIdentifierRef(argName));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(fn->getFormalAccess());
     uint8_t rawAddressorKind =
       getRawStableAddressorKind(fn->getAddressorKind());
     Type ty = fn->getInterfaceType();
+
+    for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            contextID,
@@ -2851,15 +2868,15 @@ void Serializer::writeDecl(const Decl *D) {
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                            addTypeRef(ty),
-                           addTypeRef(ty->getCanonicalType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
-                           !fn->getFullName().isSimpleName(),
+                           fn->getFullName().getArgumentNames().size() +
+                             fn->getFullName().isCompoundName(),
                            rawAddressorKind,
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
-                           nameComponents);
+                           nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
 
@@ -2909,9 +2926,13 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(subscript->getDeclContext());
 
-    SmallVector<IdentifierID, 4> nameComponents;
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     for (auto argName : subscript->getFullName().getArgumentNames())
-      nameComponents.push_back(addIdentifierRef(argName));
+      nameComponentsAndDependencies.push_back(addIdentifierRef(argName));
+
+    Type ty = subscript->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
     Accessors accessors = getAccessors(subscript);
     uint8_t rawAccessLevel =
@@ -2920,7 +2941,6 @@ void Serializer::writeDecl(const Decl *D) {
     if (subscript->isSettable())
       rawSetterAccessLevel =
         getRawStableAccessibility(subscript->getSetterAccessibility());
-    Type ty = subscript->getInterfaceType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2931,7 +2951,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
                                 addTypeRef(ty),
-                                addTypeRef(ty->getCanonicalType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
                                 addDeclRef(accessors.MaterializeForSet),
@@ -2942,7 +2961,9 @@ void Serializer::writeDecl(const Decl *D) {
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
-                                nameComponents);
+                                subscript->
+                                  getFullName().getArgumentNames().size(),
+                                nameComponentsAndDependencies);
 
     writeGenericParams(subscript->getGenericParams());
     writeParameterList(subscript->getIndices());
@@ -2956,13 +2977,16 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(ctor->getDeclContext());
 
-    SmallVector<IdentifierID, 4> nameComponents;
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     for (auto argName : ctor->getFullName().getArgumentNames())
-      nameComponents.push_back(addIdentifierRef(argName));
+      nameComponentsAndDependencies.push_back(addIdentifierRef(argName));
+
+    Type ty = ctor->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(ctor->getFormalAccess());
-    Type ty = ctor->getInterfaceType();
 
     bool firstTimeRequired = ctor->isRequired();
     if (auto *overridden = ctor->getOverriddenDecl())
@@ -2983,12 +3007,12 @@ void Serializer::writeDecl(const Decl *D) {
                                   addGenericEnvironmentRef(
                                                  ctor->getGenericEnvironment()),
                                   addTypeRef(ty),
-                                  addTypeRef(ty->getCanonicalType()),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
                                   firstTimeRequired,
-                                  nameComponents);
+                                  ctor->getFullName().getArgumentNames().size(),
+                                  nameComponentsAndDependencies);
 
     writeGenericParams(ctor->getGenericParams());
     assert(ctor->getParameterLists().size() == 2);
