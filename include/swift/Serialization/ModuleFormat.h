@@ -855,12 +855,13 @@ namespace decls_block {
     CtorInitializerKindField,  // initializer kind
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
-    TypeIDField, // canonical interface type
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
-    BCArray<IdentifierIDField> // argument names
+    BCVBR<5>,     // number of parameter name components
+    BCArray<IdentifierIDField> // name components,
+                               // followed by TypeID dependencies
     // Trailed by its generic parameters, if any, followed by the parameter
     // patterns.
   >;
@@ -876,7 +877,6 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     StorageKindField,   // StorageKind
     TypeIDField,  // interface type
-    TypeIDField,  // canonical interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
     DeclIDField,  // materializeForSet
@@ -886,7 +886,8 @@ namespace decls_block {
     DeclIDField,  // didset
     DeclIDField,  // overridden decl
     AccessibilityKindField, // accessibility
-    AccessibilityKindField // setter accessibility, if applicable
+    AccessibilityKindField, // setter accessibility, if applicable
+    BCArray<TypeIDField> // dependencies
   >;
 
   using ParamLayout = BCRecordLayout<
@@ -911,15 +912,16 @@ namespace decls_block {
     BCVBR<5>,     // number of parameter patterns
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // interface type
-    TypeIDField,  // canonical interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
-    BCFixed<1>,   // name is compound?
+    BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
+                  // components plus one
     AddressorKindField, // addressor kind
     AccessibilityKindField, // accessibility
     BCFixed<1>,   // requires a new vtable slot
-    BCArray<IdentifierIDField> // name components
+    BCArray<IdentifierIDField> // name components,
+                               // followed by TypeID dependencies
     // The record is trailed by:
     // - its _silgen_name, if any
     // - its generic parameters, if any
@@ -984,7 +986,6 @@ namespace decls_block {
     StorageKindField,   // StorageKind
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
-    TypeIDField,  // canonical interface type
     DeclIDField, // getter
     DeclIDField, // setter
     DeclIDField, // materializeForSet
@@ -995,7 +996,9 @@ namespace decls_block {
     DeclIDField, // overridden decl
     AccessibilityKindField, // accessibility
     AccessibilityKindField, // setter accessibility, if applicable
-    BCArray<IdentifierIDField> // name components
+    BCVBR<5>,    // number of parameter name components
+    BCArray<IdentifierIDField> // name components,
+                               // followed by TypeID dependencies
     // Trailed by:
     // - generic parameters, if any
     // - the indices pattern
