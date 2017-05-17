@@ -385,6 +385,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   initClangTypeConverter();
 
+  if (ClangASTContext) {
+    auto atomicBoolTy = ClangASTContext->getAtomicType(ClangASTContext->BoolTy);
+    AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
+    AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
+  }
+
   IsSwiftErrorInRegister =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
