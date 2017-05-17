@@ -526,6 +526,11 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
     return result;
   }
 
+  if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
+    result.push_back(parenTy->getUnderlyingType());
+    return result;
+  }
+
   result.push_back(type);
   return result;
 }
