@@ -9,15 +9,20 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
+// RUN: pushd %t
+// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
+// RUN: popd %t
+//
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestDecimal
-
-// RUN: %target-run %t/TestDecimal > %t.txt
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -I%t -L%t -Xlinker %t/FoundationBridgeObjC.o -o %t/TestDecimal
+// RUN: %target-run %t/TestDecimal
+//
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
 import FoundationBridgeObjC
+import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
     import XCTest
@@ -583,6 +588,36 @@ class TestDecimal : TestDecimalSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(Decimal(), Decimal._unconditionallyBridgeFromObjectiveC(nil))
     }
+
+    func test_EncodingRoundTrip_JSON() {
+        let decimals: [Decimal] = [
+            Decimal.leastFiniteMagnitude,
+            Decimal.greatestFiniteMagnitude,
+            Decimal.leastNormalMagnitude,
+            Decimal.leastNonzeroMagnitude,
+            Decimal.pi,
+            Decimal()
+        ]
+
+        for decimal in decimals {
+            expectRoundTripEqualityThroughJSON(for: decimal)
+        }
+    }
+
+    func test_EncodingRoundTrip_Plist() {
+        let decimals: [Decimal] = [
+            Decimal.leastFiniteMagnitude,
+            Decimal.greatestFiniteMagnitude,
+            Decimal.leastNormalMagnitude,
+            Decimal.leastNonzeroMagnitude,
+            Decimal.pi,
+            Decimal()
+        ]
+
+        for decimal in decimals {
+            expectRoundTripEqualityThroughPlist(for: decimal)
+        }
+    }
 }
 
 
@@ -605,5 +640,7 @@ DecimalTests.test("test_Round") { TestDecimal().test_Round() }
 DecimalTests.test("test_ScanDecimal") { TestDecimal().test_ScanDecimal() }
 DecimalTests.test("test_SimpleMultiplication") { TestDecimal().test_SimpleMultiplication() }
 DecimalTests.test("test_unconditionallyBridgeFromObjectiveC") { TestDecimal().test_unconditionallyBridgeFromObjectiveC() }
+DecimalTests.test("test_EncodingRoundTrip_JSON") { TestDecimal().test_EncodingRoundTrip_JSON() }
+DecimalTests.test("test_EncodingRoundTrip_Plist") { TestDecimal().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif

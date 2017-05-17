@@ -6,11 +6,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+//
+// RUN: pushd %t
+// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
+// RUN: popd %t
+//
+// RUN: %target-build-swift %s -I%t -L%t -o %t/TestIndexSet
+// RUN: %target-run %t/TestIndexSet
+//
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
+import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -823,6 +833,30 @@ class TestIndexSet : TestIndexSetSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(IndexSet(), IndexSet._unconditionallyBridgeFromObjectiveC(nil))
     }
+
+    func test_EncodingRoundTrip_JSON() {
+        let values: [IndexSet] = [
+            IndexSet(),
+            IndexSet(integer: 42),
+            IndexSet(integersIn: 0 ..< Int.max)
+        ]
+
+        for indexSet in values {
+            expectRoundTripEqualityThroughJSON(for: indexSet)
+        }
+    }
+
+    func test_EncodingRoundTrip_Plist() {
+        let values: [IndexSet] = [
+            IndexSet(),
+            IndexSet(integer: 42),
+            IndexSet(integersIn: 0 ..< Int.max)
+        ]
+
+        for indexSet in values {
+            expectRoundTripEqualityThroughPlist(for: indexSet)
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -849,6 +883,8 @@ IndexSetTests.test("test_findIndex") { TestIndexSet().test_findIndex() }
 IndexSetTests.test("test_AnyHashableContainingIndexSet") { TestIndexSet().test_AnyHashableContainingIndexSet() }
 IndexSetTests.test("test_AnyHashableCreatedFromNSIndexSet") { TestIndexSet().test_AnyHashableCreatedFromNSIndexSet() }
 IndexSetTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexSet().test_unconditionallyBridgeFromObjectiveC() }
+IndexSetTests.test("test_EncodingRoundTrip_JSON") { TestIndexSet().test_EncodingRoundTrip_JSON() }
+IndexSetTests.test("test_EncodingRoundTrip_Plist") { TestIndexSet().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
 

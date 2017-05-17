@@ -6,11 +6,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+//
+// RUN: pushd %t
+// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
+// RUN: popd %t
+//
+// RUN: %target-build-swift %s -I%t -L%t -o %t/TestUUID
+// RUN: %target-run %t/TestUUID
+//
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
+import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -117,6 +127,47 @@ class TestUUID : TestUUIDSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_EncodingRoundTrip_JSON() {
+        let values: [UUID] = [
+            UUID(),
+            UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!,
+            UUID(uuidString: "e621e1f8-c36c-495a-93fc-0c247a3e6e5f")!,
+            UUID(uuid: uuid_t(0xe6,0x21,0xe1,0xf8,0xc3,0x6c,0x49,0x5a,0x93,0xfc,0x0c,0x24,0x7a,0x3e,0x6e,0x5f))
+        ]
+
+        for uuid in values {
+            // We have to wrap the UUID since we cannot have a top-level string.
+            expectRoundTripEqualityThroughJSON(for: UUIDCodingWrapper(uuid))
+        }
+    }
+
+    func test_EncodingRoundTrip_Plist() {
+        let values: [UUID] = [
+            UUID(),
+            UUID(uuidString: "E621E1F8-C36C-495A-93FC-0C247A3E6E5F")!,
+            UUID(uuidString: "e621e1f8-c36c-495a-93fc-0c247a3e6e5f")!,
+            UUID(uuid: uuid_t(0xe6,0x21,0xe1,0xf8,0xc3,0x6c,0x49,0x5a,0x93,0xfc,0x0c,0x24,0x7a,0x3e,0x6e,0x5f))
+        ]
+
+        for uuid in values {
+            // We have to wrap the UUID since we cannot have a top-level string.
+            expectRoundTripEqualityThroughPlist(for: UUIDCodingWrapper(uuid))
+        }
+    }
+}
+
+// A wrapper around a UUID that will allow it to be encoded at the top level of an encoder.
+fileprivate struct UUIDCodingWrapper : Codable, Equatable {
+    let value: UUID
+
+    init(_ value: UUID) {
+        self.value = value
+    }
+
+    static func ==(_ lhs: UUIDCodingWrapper, _ rhs: UUIDCodingWrapper) -> Bool {
+        return lhs.value == rhs.value
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -132,6 +183,8 @@ UUIDTests.test("test_roundTrips") { TestUUID().test_roundTrips() }
 UUIDTests.test("test_hash") { TestUUID().test_hash() }
 UUIDTests.test("test_AnyHashableContainingUUID") { TestUUID().test_AnyHashableContainingUUID() }
 UUIDTests.test("test_AnyHashableCreatedFromNSUUID") { TestUUID().test_AnyHashableCreatedFromNSUUID() }
+UUIDTests.test("test_EncodingRoundTrip_JSON") { TestUUID().test_EncodingRoundTrip_JSON() }
+UUIDTests.test("test_EncodingRoundTrip_Plist") { TestUUID().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
 
