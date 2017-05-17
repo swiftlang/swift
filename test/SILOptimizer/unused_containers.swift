@@ -3,6 +3,8 @@
 // REQUIRES: swift_stdlib_no_asserts
 // XFAIL: resilient_stdlib
 
+// XFAIL: *
+
 //CHECK-LABEL: @_T017unused_containers16empty_array_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple

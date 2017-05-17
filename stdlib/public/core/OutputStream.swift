@@ -530,7 +530,7 @@ internal struct _Stdout : TextOutputStream {
   }
 }
 
-extension String : TextOutputStream {
+extension StringProtocol /* : TextOutputStream */ {
   /// Appends the given string to this string.
   /// 
   /// - Parameter other: A string to append.
@@ -543,12 +543,12 @@ extension String : TextOutputStream {
 // Streamables
 //===----------------------------------------------------------------------===//
 
-extension String : TextOutputStreamable {
+extension _SwiftStringView where Self : TextOutputStreamable {
   /// Writes the string into the given output stream.
   /// 
   /// - Parameter target: An output stream.
   public func write<Target : TextOutputStream>(to target: inout Target) {
-    target.write(self)
+    target.write(self._ephemeralString())
   }
 }
 
