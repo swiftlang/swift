@@ -1510,6 +1510,22 @@ bool ConstraintSystem::Candidate::solve() {
     return true;
   }
 
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+    log << "--- Solving candidate for shrinking at ";
+    auto R = E->getSourceRange();
+    if (R.isValid()) {
+      R.print(log, TC.Context.SourceMgr, /*PrintText=*/ false);
+    } else {
+      log << "<invalid range>";
+    }
+    log << " ---\n";
+
+    E->print(log);
+    log << '\n';
+    cs.print(log);
+  }
+
   // If there is contextual type present, add an explicit "conversion"
   // constraint to the system.
   if (!CT.isNull()) {
@@ -1530,6 +1546,20 @@ bool ConstraintSystem::Candidate::solve() {
     // would try to deduce the best solution, which we don't
     // really want. Instead, we want the reduced set of domain choices.
     cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
+  }
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+    if (solutions.empty()) {
+      log << "--- No Solutions ---\n";
+    } else {
+      log << "--- Solutions ---\n";
+      for (unsigned i = 0, n = solutions.size(); i != n; ++i) {
+        auto &solution = solutions[i];
+        log << "--- Solution #" << i << " ---\n";
+        solution.dump(log);
+      }
+    }
   }
 
   // Record found solutions as suggestions.
