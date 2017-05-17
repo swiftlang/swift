@@ -14,34 +14,39 @@
 // Codable
 //===----------------------------------------------------------------------===//
 
-/// Conformance to `Encodable` indicates that a type can encode itself to an external representation.
+/// A type that can encode itself to an external representation.
 public protocol Encodable {
-    /// Encodes `self` into the given encoder.
+    /// Encodes this value into the given encoder.
     ///
-    /// If `self` fails to encode anything, `encoder` will encode an empty keyed container in its place.
+    /// If the value fails to encode anything, `encoder` will encode an empty
+    /// keyed container in its place.
     ///
-    /// - parameter encoder: The encoder to write data to.
-    /// - throws: An error if any values are invalid for `encoder`'s format.
+    /// This function throws an error if any values are invalid for the given
+    /// encoder's format.
+    ///
+    /// - Parameter encoder: The encoder to write data to.
     func encode(to encoder: Encoder) throws
 }
 
-/// Conformance to `Decodable` indicates that a type can decode itself from an external representation.
+/// A type that can decode itself from an external representation.
 public protocol Decodable {
-    /// Initializes `self` by decoding from `decoder`.
+    /// Creates a new instance by decoding from the given decoder.
     ///
-    /// - parameter decoder: The decoder to read data from.
-    /// - throws: An error if reading from the decoder fails, or if read data is corrupted or otherwise invalid.
+    /// This initializer throws an error if reading from the decoder fails, or
+    /// if the data read is corrupted or otherwise invalid.
+    ///
+    /// - Parameter decoder: The decoder to read data from.
     init(from decoder: Decoder) throws
 }
 
-/// Conformance to `Codable` indicates that a type can convert itself into and out of an external representation.
+/// A type that can convert itself into and out of an external representation.
 public typealias Codable = Encodable & Decodable
 
 //===----------------------------------------------------------------------===//
 // CodingKey
 //===----------------------------------------------------------------------===//
 
-/// Conformance to `CodingKey` indicates that a type can be used as a key for encoding and decoding.
+/// A type that can be used as a key for encoding and decoding.
 public protocol CodingKey {
     /// The string to use in a named collection (e.g. a string-keyed dictionary).
     var stringValue: String { get }
@@ -66,7 +71,7 @@ public protocol CodingKey {
 // Encoder & Decoder
 //===----------------------------------------------------------------------===//
 
-/// An `Encoder` is a type which can encode values into a native format for external representation.
+/// A type that can encode values into a native format for external representation.
 public protocol Encoder {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
@@ -99,7 +104,7 @@ public protocol Encoder {
     func singleValueContainer() -> SingleValueEncodingContainer
 }
 
-/// A `Decoder` is a type which can decode values from a native format into in-memory representations.
+/// A type that can decode values from a native format into in-memory representations.
 public protocol Decoder {
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
@@ -132,9 +137,11 @@ public protocol Decoder {
 // Keyed Encoding Containers
 //===----------------------------------------------------------------------===//
 
-/// Conformance to `KeyedEncodingContainerProtocol` indicates that a type provides a view into an `Encoder`'s storage and is used to hold the encoded properties of an `Encodable` type in a keyed manner.
+/// A type that provides a view into an encoder's storage and is used to hold
+/// the encoded properties of an encodable type in a keyed manner.
 ///
-/// Encoders should provide types conforming to `KeyedEncodingContainerProtocol` for their format.
+/// Encoders should provide types conforming to
+/// `KeyedEncodingContainerProtocol` for their format.
 public protocol KeyedEncodingContainerProtocol {
     associatedtype Key : CodingKey
 
@@ -286,7 +293,9 @@ public protocol KeyedEncodingContainerProtocol {
 }
 
 // An implementation of _KeyedEncodingContainerBase and _KeyedEncodingContainerBox are given at the bottom of this file.
-/// `KeyedEncodingContainer` is a type-erased box for `KeyedEncodingContainerProtocol` types, similar to `AnyCollection` and `AnyHashable`. This is the type which consumers of the API interact with directly.
+
+/// A concrete container that provides a view into an encoder's storage, making
+/// the encoded properties of an encodable type accessible by keys.
 public struct KeyedEncodingContainer<K : CodingKey> {
     public typealias Key = K
 
@@ -488,9 +497,11 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     }
 }
 
-/// Conformance to `KeyedDecodingContainerProtocol` indicates that a type provides a view into a `Decoder`'s storage and is used to hold the encoded properties of a `Decodable` type in a keyed manner.
+/// A type that provides a view into a decoder's storage and is used to hold
+/// the encoded properties of a decodable type in a keyed manner.
 ///
-/// Decoders should provide types conforming to `UnkeyedDecodingContainer` for their format.
+/// Decoders should provide types conforming to `UnkeyedDecodingContainer` for
+/// their format.
 public protocol KeyedDecodingContainerProtocol {
     associatedtype Key : CodingKey
 
@@ -845,7 +856,9 @@ public protocol KeyedDecodingContainerProtocol {
 }
 
 // An implementation of _KeyedDecodingContainerBase and _KeyedDecodingContainerBox are given at the bottom of this file.
-/// `KeyedDecodingContainer` is a type-erased box for `KeyedDecodingContainerProtocol` types, similar to `AnyCollection` and `AnyHashable`. This is the type which consumers of the API interact with directly.
+
+/// A concrete container that provides a view into an decoder's storage, making
+/// the encoded properties of an decodable type accessible by keys.
 public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProtocol {
     public typealias Key = K
 
@@ -1107,9 +1120,11 @@ public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProt
 // Unkeyed Encoding Containers
 //===----------------------------------------------------------------------===//
 
-/// Conformance to `UnkeyedEncodingContainer` indicates that a type provides a view into an `Encoder`'s storage and is used to hold the encoded properties of an `Encodable` type sequentially, without keys.
+/// A type that provides a view into an encoder's storage and is used to hold
+/// the encoded properties of an encodable type sequentially, without keys.
 ///
-/// Encoders should provide types conforming to `UnkeyedEncodingContainer` for their format.
+/// Encoders should provide types conforming to `UnkeyedEncodingContainer` for
+/// their format.
 public protocol UnkeyedEncodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
     /// A `nil` value indicates an unkeyed container.
@@ -1322,9 +1337,11 @@ public protocol UnkeyedEncodingContainer {
     mutating func superEncoder() -> Encoder
 }
 
-/// Conformance to `UnkeyedDecodingContainer` indicates that a type provides a view into a `Decoder`'s storage and is used to hold the encoded properties of a `Decodable` type sequentially, without keys.
+/// A type that provides a view into a decoder's storage and is used to hold
+/// the encoded properties of a decodable type sequentially, without keys.
 ///
-/// Decoders should provide types conforming to `UnkeyedDecodingContainer` for their format.
+/// Decoders should provide types conforming to `UnkeyedDecodingContainer` for
+/// their format.
 public protocol UnkeyedDecodingContainer {
     /// The path of coding keys taken to get to this point in decoding.
     /// A `nil` value indicates an unkeyed container.
@@ -1615,7 +1632,8 @@ public protocol UnkeyedDecodingContainer {
 // Single Value Encoding Containers
 //===----------------------------------------------------------------------===//
 
-/// A `SingleValueEncodingContainer` is a container which can support the storage and direct encoding of a single non-keyed value.
+/// A container that can support the storage and direct encoding of a single
+/// non-keyed value.
 public protocol SingleValueEncodingContainer {
     /// Encodes a single value of the given type.
     ///
@@ -1821,7 +1839,7 @@ public protocol SingleValueDecodingContainer {
 // User Info
 //===----------------------------------------------------------------------===//
 
-/// Represents a user-defined key for providing context for encoding and decoding.
+/// A user-defined key for providing context during encoding and decoding.
 public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
     public typealias RawValue = String
 
@@ -1853,7 +1871,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
 // Errors
 //===----------------------------------------------------------------------===//
 
-/// An `EncodingError` indicates that something has gone wrong during encoding of a value.
+/// An error that occurs during the encoding of a value.
 public enum EncodingError : Error {
     /// The context in which the error occurred.
     public struct Context {
@@ -1879,7 +1897,7 @@ public enum EncodingError : Error {
     case invalidValue(Any, Context)
 }
 
-/// A `DecodingError` indicates that something has gone wrong during decoding of a value.
+/// An error that occurs during the decoding of a value.
 public enum DecodingError : Error {
     /// The context in which the error occurred.
     public struct Context {
