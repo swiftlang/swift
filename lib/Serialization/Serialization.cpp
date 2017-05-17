@@ -4445,7 +4445,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);
 
-    if (DC.is<SourceFile *>() && enableNestedTypeLookupTable &&
+    if (enableNestedTypeLookupTable &&
         !nestedTypeDecls.empty()) {
       index_block::NestedTypeDeclsLayout NestedTypeDeclsTable(Out);
       writeNestedTypeDeclsTable(NestedTypeDeclsTable, nestedTypeDecls);
