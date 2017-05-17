@@ -207,12 +207,6 @@ ModuleFile &ModuleFile::getModuleFileForDelayedActions() {
 void ModuleFile::finishPendingActions() {
   assert(&getModuleFileForDelayedActions() == this &&
          "wrong module used for delayed actions");
-  while (!DelayedGenericEnvironments.empty()) {
-    // Force completion of the last generic environment.
-    auto genericEnvDC = DelayedGenericEnvironments.back();
-    DelayedGenericEnvironments.pop_back();
-    (void)genericEnvDC->getGenericEnvironmentOfContext();
-  }
 }
 
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
@@ -922,8 +916,6 @@ void ModuleFile::configureGenericEnvironment(
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
     genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
-    ModuleFile &delayedActionFile = getModuleFileForDelayedActions();
-    delayedActionFile.DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 

@@ -250,7 +250,7 @@ typedef llvm::PointerIntPair<TypeBase*, 1, bool> ReturnTyAndWhetherExit;
 struct ResolvedRangeInfo {
   RangeKind Kind;
   ReturnTyAndWhetherExit ExitInfo;
-  StringRef Content;
+  CharSourceRange Content;
   bool HasSingleEntry;
   bool ThrowingUnhandledError;
   OrphanKind Orphan;
@@ -260,8 +260,8 @@ struct ResolvedRangeInfo {
   ArrayRef<DeclaredDecl> DeclaredDecls;
   ArrayRef<ReferencedDecl> ReferencedDecls;
   DeclContext* RangeContext;
-  ResolvedRangeInfo(RangeKind Kind, ReturnTyAndWhetherExit ExitInfo, StringRef Content,
-                    DeclContext* RangeContext,
+  ResolvedRangeInfo(RangeKind Kind, ReturnTyAndWhetherExit ExitInfo,
+                    CharSourceRange Content, DeclContext* RangeContext,
                     bool HasSingleEntry, bool ThrowingUnhandledError,
                     OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
@@ -273,7 +273,7 @@ struct ResolvedRangeInfo {
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
                       RangeContext(RangeContext) {}
-  ResolvedRangeInfo(StringRef Content) :
+  ResolvedRangeInfo(CharSourceRange Content) :
   ResolvedRangeInfo(RangeKind::Invalid, {nullptr, false}, Content, nullptr,
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}

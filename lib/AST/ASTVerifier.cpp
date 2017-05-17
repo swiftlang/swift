@@ -141,6 +141,46 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
   return {false, node};
 }
 
+/// Describes a generic environment that might be lazily deserialized.
+///
+/// This class abstracts over a declaration context that may have a generic
+/// environment, ensuring that we don't deserialize the environment.
+struct LazyGenericEnvironment {
+  llvm::PointerUnion<DeclContext *, GenericEnvironment *> storage;
+
+  explicit operator bool() const {
+    if (storage.dyn_cast<GenericEnvironment *>())
+      return true;
+
+    if (auto dc = storage.dyn_cast<DeclContext *>())
+      return dc->getGenericSignatureOfContext();
+
+    return false;
+  }
+
+  bool isLazy() const {
+    if (auto dc = storage.dyn_cast<DeclContext *>())
+      return dc->contextHasLazyGenericEnvironment();
+
+    return false;
+  }
+
+  bool containsPrimaryArchetype(ArchetypeType *archetype) const {
+    // Assume true so we don't deserialize.
+    if (isLazy()) return true;
+
+    if (auto genericEnv = storage.dyn_cast<GenericEnvironment *>())
+      return genericEnv->containsPrimaryArchetype(archetype);
+
+    if (auto dc = storage.dyn_cast<DeclContext *>()) {
+      if (auto genericEnv = dc->getGenericEnvironmentOfContext())
+        return genericEnv->containsPrimaryArchetype(archetype);
+    }
+
+    return false;
+  }
+};
+
 class Verifier : public ASTWalker {
   PointerUnion<ModuleDecl *, SourceFile *> M;
   ASTContext &Ctx;
@@ -155,8 +195,8 @@ class Verifier : public ASTWalker {
   using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
   SmallVector<ScopeLike, 4> Scopes;
 
-  /// The set of primary archetypes that are currently available.
-  SmallVector<GenericEnvironment *, 2> GenericEnv;
+  /// The stack of generic environments.
+  SmallVector<LazyGenericEnvironment, 2> GenericEnv;
 
   /// \brief The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
@@ -197,7 +237,7 @@ class Verifier : public ASTWalker {
                                  : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()), HadError(Ctx.hadError()) {
     Scopes.push_back(DC);
-    GenericEnv.push_back(DC->getGenericEnvironmentOfContext());
+    GenericEnv.push_back({DC});
   }
 
 public:
@@ -447,7 +487,7 @@ public:
     }
     void verifyCheckedAlways(Stmt *S) {}
     void verifyCheckedAlways(Pattern *P) {
-      if (P->hasType())
+      if (P->hasType() && !P->getDelayedInterfaceType())
         verifyChecked(P->getType());
     }
     void verifyCheckedAlways(Decl *D) {
@@ -536,7 +576,7 @@ public:
           // Get the primary archetype.
           auto *parent = archetype->getPrimary();
 
-          if (!GenericEnv.back()->containsPrimaryArchetype(parent)) {
+          if (!GenericEnv.back().containsPrimaryArchetype(parent)) {
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
@@ -587,14 +627,14 @@ public:
 
     void pushScope(DeclContext *scope) {
       Scopes.push_back(scope);
-      GenericEnv.push_back(scope->getGenericEnvironmentOfContext());
+      GenericEnv.push_back({scope});
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-      assert(GenericEnv.back() == scope->getGenericEnvironmentOfContext());
+      assert(GenericEnv.back().storage.get<DeclContext *>() == scope);
       Scopes.pop_back();
       GenericEnv.pop_back();
     }
@@ -2008,23 +2048,25 @@ public:
 
       Type typeForAccessors =
           var->getInterfaceType()->getReferenceStorageReferent();
-      typeForAccessors =
-          var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
-      if (const FuncDecl *getter = var->getGetter()) {
-        if (getter->getParameterLists().back()->size() != 0) {
-          Out << "property getter has parameters\n";
-          abort();
-        }
-        Type getterResultType = getter->getResultInterfaceType();
-        getterResultType =
-            var->getDeclContext()->mapTypeIntoContext(getterResultType);
-        if (!getterResultType->isEqual(typeForAccessors)) {
-          Out << "property and getter have mismatched types: '";
-          typeForAccessors.print(Out);
-          Out << "' vs. '";
-          getterResultType.print(Out);
-          Out << "'\n";
-          abort();
+      if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
+        typeForAccessors =
+            var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
+        if (const FuncDecl *getter = var->getGetter()) {
+          if (getter->getParameterLists().back()->size() != 0) {
+            Out << "property getter has parameters\n";
+            abort();
+          }
+          Type getterResultType = getter->getResultInterfaceType();
+          getterResultType =
+              var->getDeclContext()->mapTypeIntoContext(getterResultType);
+          if (!getterResultType->isEqual(typeForAccessors)) {
+            Out << "property and getter have mismatched types: '";
+            typeForAccessors.print(Out);
+            Out << "' vs. '";
+            getterResultType.print(Out);
+            Out << "'\n";
+            abort();
+          }
         }
       }
 
@@ -2043,14 +2085,16 @@ public:
         }
         const ParamDecl *param = setter->getParameterLists().back()->get(0);
         Type paramType = param->getInterfaceType();
-        paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
-        if (!paramType->isEqual(typeForAccessors)) {
-          Out << "property and setter param have mismatched types: '";
-          typeForAccessors.print(Out);
-          Out << "' vs. '";
-          paramType.print(Out);
-          Out << "'\n";
-          abort();
+        if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
+          paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
+          if (!paramType->isEqual(typeForAccessors)) {
+            Out << "property and setter param have mismatched types: '";
+            typeForAccessors.print(Out);
+            Out << "' vs. '";
+            paramType.print(Out);
+            Out << "'\n";
+            abort();
+          }
         }
       }
 
@@ -2226,11 +2270,12 @@ public:
           const auto &witness = normal->getWitness(req, nullptr);
 
           if (witness.requiresSubstitution()) {
-            GenericEnv.push_back(witness.getSyntheticEnvironment());
+            GenericEnv.push_back({witness.getSyntheticEnvironment()});
             for (const auto &sub : witness.getSubstitutions()) {
               verifyChecked(sub.getReplacement());
             }
-            assert(GenericEnv.back() == witness.getSyntheticEnvironment());
+            assert(GenericEnv.back().storage.dyn_cast<GenericEnvironment *>()
+                     == witness.getSyntheticEnvironment());
             GenericEnv.pop_back();
           }
 
@@ -2293,9 +2338,12 @@ public:
     }
 
     void verifyChecked(GenericTypeDecl *generic) {
-      verifyGenericEnvironment(generic,
-                               generic->getGenericSignature(),
-                               generic->getGenericEnvironment());
+      if (!generic->hasLazyGenericEnvironment()) {
+        verifyGenericEnvironment(generic,
+                                 generic->getGenericSignature(),
+                                 generic->getGenericEnvironment());
+      }
+
       verifyCheckedBase(generic);
     }
 
@@ -2472,15 +2520,17 @@ public:
       // If the function has a generic interface type, it should also have a
       // generic signature.
       if (AFD->isGenericContext() !=
-          (AFD->getGenericEnvironment() != nullptr)) {
+          (AFD->getGenericSignature() != nullptr)) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
       }
 
-      verifyGenericEnvironment(AFD,
-                               AFD->getGenericSignature(),
-                               AFD->getGenericEnvironment());
+      if (!AFD->hasLazyGenericEnvironment()) {
+        verifyGenericEnvironment(AFD,
+                                 AFD->getGenericSignature(),
+                                 AFD->getGenericEnvironment());
+      }
 
       // If there is an interface type, it shouldn't have any unresolved
       // dependent member types.
