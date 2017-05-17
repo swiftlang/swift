@@ -653,6 +653,10 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
   return nullptr;
 }
 
+bool GenericContext::hasLazyGenericEnvironment() const {
+  return GenericSigOrEnv.dyn_cast<GenericSignature *>() != nullptr;
+}
+
 void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
   assert((GenericSigOrEnv.isNull() ||
           getGenericSignature()->getCanonicalSignature() ==

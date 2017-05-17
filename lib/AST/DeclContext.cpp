@@ -286,6 +286,37 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   }
 }
 
+bool DeclContext::contextHasLazyGenericEnvironment() const {
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return false;
+
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::AbstractClosureExpr:
+      // Closures and initializers can't themselves be generic, but they
+      // can occur in generic contexts.
+      continue;
+
+    case DeclContextKind::SubscriptDecl:
+      return cast<SubscriptDecl>(dc)->hasLazyGenericEnvironment();
+
+    case DeclContextKind::AbstractFunctionDecl:
+      return cast<AbstractFunctionDecl>(dc)->hasLazyGenericEnvironment();
+
+    case DeclContextKind::GenericTypeDecl:
+      return cast<GenericTypeDecl>(dc)->hasLazyGenericEnvironment();
+
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(dc)->hasLazyGenericEnvironment();
+    }
+    llvm_unreachable("bad DeclContextKind");
+  }
+}
+
 Type DeclContext::mapTypeIntoContext(Type type) const {
   return GenericEnvironment::mapTypeIntoContext(
       getGenericEnvironmentOfContext(), type);
