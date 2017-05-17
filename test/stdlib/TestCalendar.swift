@@ -9,20 +9,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -I%t -L%t -Xlinker %t/FoundationBridgeObjC.o -o %t/TestCalendar
-// RUN: %target-run %t/TestCalendar
-//
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestCalendar
+
+// RUN: %target-run %t/TestCalendar > %t.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
 import FoundationBridgeObjC
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
     import XCTest
@@ -290,52 +285,6 @@ class TestCalendar : TestCalendarSuper {
             expectEqual(anyHashables[1], anyHashables[2])
         }
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        let values: [Calendar] = [
-            Calendar(identifier: .gregorian),
-            Calendar(identifier: .buddhist),
-            Calendar(identifier: .chinese),
-            Calendar(identifier: .coptic),
-            Calendar(identifier: .ethiopicAmeteMihret),
-            Calendar(identifier: .ethiopicAmeteAlem),
-            Calendar(identifier: .hebrew),
-            Calendar(identifier: .iso8601),
-            Calendar(identifier: .indian),
-            Calendar(identifier: .islamic),
-            Calendar(identifier: .islamicCivil),
-            Calendar(identifier: .japanese),
-            Calendar(identifier: .persian),
-            Calendar(identifier: .republicOfChina),
-        ]
-
-        for calendar in values {
-            expectRoundTripEqualityThroughJSON(for: calendar)
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        let values: [Calendar] = [
-            Calendar(identifier: .gregorian),
-            Calendar(identifier: .buddhist),
-            Calendar(identifier: .chinese),
-            Calendar(identifier: .coptic),
-            Calendar(identifier: .ethiopicAmeteMihret),
-            Calendar(identifier: .ethiopicAmeteAlem),
-            Calendar(identifier: .hebrew),
-            Calendar(identifier: .iso8601),
-            Calendar(identifier: .indian),
-            Calendar(identifier: .islamic),
-            Calendar(identifier: .islamicCivil),
-            Calendar(identifier: .japanese),
-            Calendar(identifier: .persian),
-            Calendar(identifier: .republicOfChina),
-        ]
-
-        for calendar in values {
-            expectRoundTripEqualityThroughPlist(for: calendar)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -346,7 +295,5 @@ CalendarTests.test("test_equality") { TestCalendar().test_equality() }
 CalendarTests.test("test_properties") { TestCalendar().test_properties() }
 CalendarTests.test("test_AnyHashableContainingCalendar") { TestCalendar().test_AnyHashableContainingCalendar() }
 CalendarTests.test("test_AnyHashableCreatedFromNSCalendar") { TestCalendar().test_AnyHashableCreatedFromNSCalendar() }
-CalendarTests.test("test_EncodingRoundTrip_JSON") { TestCalendar().test_EncodingRoundTrip_JSON() }
-CalendarTests.test("test_EncodingRoundTrip_Plist") { TestCalendar().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif

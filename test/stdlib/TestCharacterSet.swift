@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestCharacterSet
-// RUN: %target-run %t/TestCharacterSet
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -315,54 +305,6 @@ class TestCharacterSet : TestCharacterSetSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(CharacterSet(), CharacterSet._unconditionallyBridgeFromObjectiveC(nil))
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        let values: [CharacterSet] = [
-            CharacterSet.controlCharacters,
-            CharacterSet.whitespaces,
-            CharacterSet.whitespacesAndNewlines,
-            CharacterSet.decimalDigits,
-            CharacterSet.letters,
-            CharacterSet.lowercaseLetters,
-            CharacterSet.uppercaseLetters,
-            CharacterSet.nonBaseCharacters,
-            CharacterSet.alphanumerics,
-            CharacterSet.decomposables,
-            CharacterSet.illegalCharacters,
-            CharacterSet.punctuationCharacters,
-            CharacterSet.capitalizedLetters,
-            CharacterSet.symbols,
-            CharacterSet.newlines
-        ]
-
-        for characterSet in values {
-            expectRoundTripEqualityThroughJSON(for: characterSet)
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        let values: [CharacterSet] = [
-            CharacterSet.controlCharacters,
-            CharacterSet.whitespaces,
-            CharacterSet.whitespacesAndNewlines,
-            CharacterSet.decimalDigits,
-            CharacterSet.letters,
-            CharacterSet.lowercaseLetters,
-            CharacterSet.uppercaseLetters,
-            CharacterSet.nonBaseCharacters,
-            CharacterSet.alphanumerics,
-            CharacterSet.decomposables,
-            CharacterSet.illegalCharacters,
-            CharacterSet.punctuationCharacters,
-            CharacterSet.capitalizedLetters,
-            CharacterSet.symbols,
-            CharacterSet.newlines
-        ]
-
-        for characterSet in values {
-            expectRoundTripEqualityThroughPlist(for: characterSet)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -388,8 +330,6 @@ CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 CharacterSetTests.test("test_setOperationsOfEmptySet") { TestCharacterSet().test_setOperationsOfEmptySet() }
 CharacterSetTests.test("test_moreSetOperations") { TestCharacterSet().test_moreSetOperations() }
 CharacterSetTests.test("test_unconditionallyBridgeFromObjectiveC") { TestCharacterSet().test_unconditionallyBridgeFromObjectiveC() }
-CharacterSetTests.test("test_EncodingRoundTrip_JSON") { TestCharacterSet().test_EncodingRoundTrip_JSON() }
-CharacterSetTests.test("test_EncodingRoundTrip_Plist") { TestCharacterSet().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
 

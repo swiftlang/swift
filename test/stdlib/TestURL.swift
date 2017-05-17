@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestURL
-// RUN: %target-run %t/TestURL
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -386,40 +376,6 @@ class TestURL : TestURLSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        var values: [URL] = [
-            URL(fileURLWithPath: NSTemporaryDirectory()),
-            URL(fileURLWithPath: "/"),
-            URL(string: "http://apple.com")!,
-            URL(string: "swift", relativeTo: URL(string: "http://apple.com")!)!
-        ]
-
-        if #available(OSX 10.11, iOS 9.0, *) {
-            values.append(URL(fileURLWithPath: "bin/sh", relativeTo: URL(fileURLWithPath: "/")))
-        }
-
-        for url in values {
-            expectRoundTripEqualityThroughJSON(for: url)
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        var values: [URL] = [
-            URL(fileURLWithPath: NSTemporaryDirectory()),
-            URL(fileURLWithPath: "/"),
-            URL(string: "http://apple.com")!,
-            URL(string: "swift", relativeTo: URL(string: "http://apple.com")!)!
-        ]
-
-        if #available(OSX 10.11, iOS 9.0, *) {
-            values.append(URL(fileURLWithPath: "bin/sh", relativeTo: URL(fileURLWithPath: "/")))
-        }
-
-        for url in values {
-            expectRoundTripEqualityThroughPlist(for: url)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -441,7 +397,5 @@ URLTests.test("test_AnyHashableContainingURLQueryItem") { TestURL().test_AnyHash
 URLTests.test("test_AnyHashableCreatedFromNSURLQueryItem") { TestURL().test_AnyHashableCreatedFromNSURLQueryItem() }
 URLTests.test("test_AnyHashableContainingURLRequest") { TestURL().test_AnyHashableContainingURLRequest() }
 URLTests.test("test_AnyHashableCreatedFromNSURLRequest") { TestURL().test_AnyHashableCreatedFromNSURLRequest() }
-URLTests.test("test_EncodingRoundTrip_JSON") { TestURL().test_EncodingRoundTrip_JSON() }
-URLTests.test("test_EncodingRoundTrip_Plist") { TestURL().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
