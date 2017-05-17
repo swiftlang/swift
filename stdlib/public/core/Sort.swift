@@ -338,11 +338,11 @@ func _heapSort<C>(
 
 /// Exchanges the values of the two given variables.
 ///
-/// The two variables passed must not alias each other. That is, it is an error to
-/// pass the same variable as both `a` and `b`.
+/// The two variables passed must not alias each other. For example, it is an
+/// error to pass the same variable as both `a` and `b`.
 ///
-/// In the following example, the call to `swap(_:_:)` guarantees that the value
-/// in `a` is always less than the value in `b`:
+/// In the following example, the call to `swap(_:_:)` guarantees that the
+/// value in `a` is always less than the value in `b`:
 ///
 ///     var a: Int = getNumber()
 ///     var b: Int = getNumber()
