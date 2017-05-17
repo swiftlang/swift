@@ -22,9 +22,15 @@ using namespace swift;
 using namespace swift::migrator;
 
 namespace {
-  
+
+/// Builds a mapping from each ParamDecl of a ClosureExpr to its references in
+/// in the closure body. This is used below to rewrite shorthand param
+/// references from $0.1 to $1 and vice versa.
 class ShorthandFinder: public ASTWalker {
 private:
+  /// A mapping from each ParamDecl of the supplied ClosureExpr to a list of
+  /// each referencing DeclRefExpr (e.g. $0) or its immediately containing
+  /// TupleElementExpr (e.g $0.1) if one exists
   llvm::DenseMap<ParamDecl*, std::vector<Expr*>> References;
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -117,9 +123,8 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
           std::string TupleText;
           {
             llvm::raw_string_ostream OS(TupleText);
-            for (size_t i = 1; i != NativeArity; ++i) {
-                OS << ", ";
-              OS << "$" << i;
+            for (size_t i = 1; i < NativeArity; ++i) {
+              OS << ", $" << i;
             }
             OS << ")";
           }
