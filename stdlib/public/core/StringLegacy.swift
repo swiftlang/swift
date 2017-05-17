@@ -26,7 +26,9 @@ extension String {
   public init(repeating repeatedValue: Unicode.Scalar, count: Int) {
     Builtin.unreachable()
   }
+}
 
+extension StringProtocol {
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
@@ -48,35 +50,23 @@ extension String {
     }
     precondition(count > 0, "Negative count not allowed")
     let s = repeatedValue
-    self = String(_storage: _StringBuffer(
+    self_ = String(_storage: _StringBuffer(
         capacity: s._core.count * count,
         initialSize: 0,
         elementWidth: s._core.elementWidth))
     for _ in 0..<count {
-      self += s
+      self_ += s
     }
-  }
-
-  public var _lines : [String] {
-    return _split(separator: "\n")
-  }
-  
-  public func _split(separator: Unicode.Scalar) -> [String] {
-    let scalarSlices = unicodeScalars.split { $0 == separator }
-    return scalarSlices.map { String($0) }
-  }
-
-  /// A Boolean value indicating whether a string has no characters.
-  public var isEmpty: Bool {
-    return _core.count == 0
+    self = Self(self_)
   }
 }
 
-extension String {
+extension StringProtocol {
   public init(_ _c: Unicode.Scalar) {
-    self = String._fromWellFormedCodeUnitSequence(
+    self = Self(
+      String._fromWellFormedCodeUnitSequence(
       UTF32.self,
-      input: repeatElement(_c.value, count: 1))
+      input: CollectionOfOne(_c.value)))
   }
 }
 
@@ -96,7 +86,14 @@ func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
 func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
-extension String {
+extension StringProtocol {
+  
+  var _ephemeralString : String {
+    let s0 = self as? _SwiftStringView
+    if _fastPath(s0 != nil), let s1 = s0 { return $0.ephemeralString() }
+    return String(self)
+  }
+  
   /// Returns a Boolean value indicating whether the string begins with the
   /// specified prefix.
   ///
@@ -126,9 +123,11 @@ extension String {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
-  public func hasPrefix(_ prefix: String) -> Bool {
-    let selfCore = self._core
-    let prefixCore = prefix._core
+  public func hasPrefix<Prefix : StringProtocol>(
+    _ prefix: StringProtocol
+  ) -> Bool {
+    let selfCore = self._ephemeralString._core
+    let prefixCore = prefix._ephemeralString._core
     let prefixCount = prefixCore.count
     if prefixCount == 0 {
       return true
@@ -152,7 +151,8 @@ extension String {
       }
     }
     return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
+      String(selfCore)._bridgeToObjectiveCImpl(),
+      String(prefixCore)._bridgeToObjectiveCImpl())
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -184,9 +184,9 @@ extension String {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
-  public func hasSuffix(_ suffix: String) -> Bool {
-    let selfCore = self._core
-    let suffixCore = suffix._core
+  public func hasSuffix<Suffix : StringProtocol>(_ suffix: Suffix) -> Bool {
+    let selfCore = self._ephemeralString._core
+    let suffixCore = suffix._ephemeralString._core
     let suffixCount = suffixCore.count
     if suffixCount == 0 {
       return true
@@ -211,7 +211,8 @@ extension String {
       }
     }
     return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
+      String(selfCore)._bridgeToObjectiveCImpl(),
+      String(suffixCore)._bridgeToObjectiveCImpl())
   }
 }
 #else

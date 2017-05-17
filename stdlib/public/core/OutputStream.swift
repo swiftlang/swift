@@ -530,7 +530,7 @@ internal struct _Stdout : TextOutputStream {
   }
 }
 
-extension StringProtocol /* : TextOutputStream */ {
+extension StringProtocol /* : TextOutputStream implied */ {
   /// Appends the given string to this string.
   /// 
   /// - Parameter other: A string to append.

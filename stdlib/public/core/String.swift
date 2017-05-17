@@ -109,7 +109,7 @@ public protocol StringProtocol
   ) rethrows -> Result
 }
 
-extension StringProtocol /* : LosslessStringConvertible */ {
+extension StringProtocol /* : LosslessStringConvertible implied */ {
   // This overload is for the Swift 3 compatibility.
   // In Swift 4, conformance is satisfied by the non-failable initializer, so
   // that `String("") as String?` is still possible, but `String("")!` is not.
@@ -732,7 +732,7 @@ extension StringProtocol where Self : _ExpressibleByBuiltinStringLiteral {
 
 extension String : ExpressibleByStringLiteral {}
 extension Substring : ExpressibleByStringLiteral {}
-extension StringProtocol /*: ExpressibleByStringLiteral*/ {
+extension StringProtocol /* : ExpressibleByStringLiteral implied */ {
   /// Creates an instance initialized to the given string value.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -749,7 +749,8 @@ extension StringProtocol /*: ExpressibleByStringLiteral*/ {
 
 extension String : CustomDebugStringConvertible {}
 extension Substring : CustomDebugStringConvertible {}
-extension _SwiftStringView where Self : CustomDebugStringConvertible {
+extension StringProtocol where
+  Self : CustomDebugStringConvertible  & _SwiftStringView {
   /// A representation of the string that is suitable for debugging.
   public var debugDescription: String {
     var result = "\""

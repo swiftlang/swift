@@ -375,7 +375,6 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 public protocol MirrorPath {}
 extension Int : MirrorPath {}
 extension String : MirrorPath {}
-extension Substring : MirrorPath {}
 
 extension Mirror {
   internal struct _Dummy : CustomReflectable {
