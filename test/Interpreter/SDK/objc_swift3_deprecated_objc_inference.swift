@@ -45,8 +45,12 @@ DeprecatedObjCInferenceTestSuite.test("messagingObjCInference") {
 	// CHECK_WARNINGS: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	// CHECK_CRASH: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
+	// CHECK_WARNINGS-NOT: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	x.perform(Selector(fooSel))
 
 	// CHECK_WARNINGS: .swift:27:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	type(of: x).perform(Selector(barSel))
+	// CHECK_WARNINGS-NOT: .swift:27:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
 
 	// CHECK_NOTHING-NEXT: ---End 

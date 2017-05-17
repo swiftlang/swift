@@ -860,7 +860,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
-    llvm::Value *entrypointArgs[6];
+    llvm::Value *entrypointArgs[7];
     auto argIter = IGF.CurFn->arg_begin();
 
     // self
@@ -881,6 +881,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     entrypointArgs[4] = args.claimNext();
     // Column
     entrypointArgs[5] = args.claimNext();
+    
+    // Create a flag variable so that this invocation logs only once.
+    auto flagStorageTy = llvm::ArrayType::get(IGF.IGM.Int8Ty,
+                                        IGF.IGM.getAtomicBoolSize().getValue());
+    auto flag = new llvm::GlobalVariable(IGF.IGM.Module, flagStorageTy,
+                               /*constant*/ false,
+                               llvm::GlobalValue::PrivateLinkage,
+                               llvm::ConstantAggregateZero::get(flagStorageTy));
+    flag->setAlignment(IGF.IGM.getAtomicBoolAlignment().getValue());
+    entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
 
     IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),
                            entrypointArgs);
