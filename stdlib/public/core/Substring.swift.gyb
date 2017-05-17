@@ -255,6 +255,30 @@ public struct Substring : StringProtocol {
   }
 }
 
+extension Substring : _SwiftStringView {
+  func _persistentString() -> String {
+    let wholeCore = _slice._base._core
+    let native = wholeCore.nativeBuffer
+    if _fastPath(native != nil), let n = native {
+      if _fastPath(
+        n.start == wholeCore._baseAddress && n.usedCount == wholeCore.count) {
+        return String(wholeCore)
+      }
+    }
+    var r = String()
+    r._core.append(_ephemeralString()._core)
+    return r
+  }
+  
+  func _ephemeralString() -> String {
+    let wholeCore = _slice._base._core
+    let subCore : _StringCore = wholeCore[
+      startIndex._base._position..<endIndex._base._position]
+    // check that we haven't allocated a new buffer for the result
+    _sanityCheck(subCore._owner === wholeCore._owner)
+    return String(subCore)
+  }
+}
 
 extension Substring : CustomReflectable {
   public var customMirror: Mirror {
@@ -358,6 +382,20 @@ extension Substring {
 }
 
 #endif
+
+extension Substring : RangeReplaceableCollection {
+  public init<S : Sequence>(_ elements: S)
+  where S.Element == Character {
+    let e0 = elements as? _SwiftStringView
+    if _fastPath(e0 != nil), let e = e0 {
+      self = e._substring()
+    }
+    else {
+      self = String(elements)[...]
+    }
+  }
+  // TODO: specialize append(contentsOf:) similarly
+}
 
 extension Substring {
   public func lowercased() -> String {
