@@ -39,7 +39,7 @@ Tests.test("ClosedRange/Subsript/ExpectedType") {
 
 Tests.test("String.init(_:String)/default type") {
   var s = String("")
-  expectType(String.self, &s)
+  expectType(String?.self, &s)
 }
 
 Tests.test("LosslessStringConvertible/generic") {
