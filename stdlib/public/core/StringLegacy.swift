@@ -33,7 +33,7 @@ extension String {
   /// For example, use this initializer to create a string with ten `"ab"`
   /// strings in a row.
   ///
-  ///     let zeroes = String(repeating: "00", count: 10)
+  ///     let zeroes = String(repeating: "ab", count: 10)
   ///     print(zeroes)
   ///     // Prints "abababababababababab"
   ///
@@ -125,7 +125,7 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
-  /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
+  /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
@@ -183,7 +183,7 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
-  /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
+  /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core

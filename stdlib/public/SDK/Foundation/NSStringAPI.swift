@@ -267,9 +267,8 @@ extension String {
   /// strings. See the `getLineStart(_:end:contentsEnd:for:)` method for
   /// additional information.
   ///
-  /// Case transformations aren't guaranteed to be symmetrical or to produce
-  /// strings of the same lengths as the originals. See lowercased for an
-  /// example.
+  /// Case transformations aren’t guaranteed to be symmetrical or to produce
+  /// strings of the same lengths as the originals.
   public var capitalized: String {
     return _ns.capitalized as String
   }
@@ -626,7 +625,7 @@ extension String {
 
   // @property NSStringEncoding fastestEncoding;
 
-  /// The fastest encoding to which the string may be converted without loss
+  /// The fastest encoding to which the string can be converted without loss
   /// of information.
   public var fastestEncoding: Encoding {
     return Encoding(rawValue: _ns.fastestEncoding)
@@ -825,10 +824,11 @@ extension String {
   //     encoding:(NSStringEncoding)encoding
   //     freeWhenDone:(BOOL)flag
 
-  /// Creates a new string that contains the specified number of bytes
-  /// from the given buffer interpreted
-  /// in the specified encoding, and optionally frees the buffer.  WARNING:
-  /// this initializer is not memory-safe!
+  /// Creates a new string that contains the specified number of bytes from the
+  /// given buffer, interpreted in the specified encoding, and optionally
+  /// frees the buffer.
+  ///
+  /// - Warning: This initializer is not memory-safe!
   public init?(
     bytesNoCopy bytes: UnsafeMutableRawPointer, length: Int,
     encoding: Encoding, freeWhenDone flag: Bool
@@ -862,8 +862,8 @@ extension String {
   //     length:(NSUInteger)length
   //     freeWhenDone:(BOOL)flag
 
-  /// Creates a new string that contains the specified
-  /// number of characters from a given array of UTF-16 Code Units
+  /// Creates a new string that contains the specified number of characters
+  /// from the given C array of UTF-16 code units.
   public init(
     utf16CodeUnitsNoCopy: UnsafePointer<unichar>,
     count: Int,
@@ -1715,7 +1715,7 @@ extension String {
   /// Locale-independent case-insensitive operation, and other needs, can be
   /// achieved by calling `range(of:options:range:locale:)`.
   ///
-  /// Equivalent to
+  /// Equivalent to:
   ///
   ///     range(of: other, options: .caseInsensitiveSearch,
   ///           locale: Locale.current) != nil
