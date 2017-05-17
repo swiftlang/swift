@@ -9,20 +9,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -I%t -L%t -Xlinker %t/FoundationBridgeObjC.o -o %t/TestLocale
-// RUN: %target-run %t/TestLocale
-//
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestLocale
+
+// RUN: %target-run %t/TestLocale > %t.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
 import FoundationBridgeObjC
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
     import XCTest
@@ -141,40 +136,6 @@ class TestLocale : TestLocaleSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        let values: [Locale] = [
-            Locale(identifier: ""),
-            Locale(identifier: "en"),
-            Locale(identifier: "en_US"),
-            Locale(identifier: "en_US_POSIX"),
-            Locale(identifier: "uk"),
-            Locale(identifier: "fr_FR"),
-            Locale(identifier: "fr_BE"),
-            Locale(identifier: "zh-Hant-HK")
-        ]
-
-        for locale in values {
-            expectRoundTripEqualityThroughJSON(for: locale)
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        let values: [Locale] = [
-            Locale(identifier: ""),
-            Locale(identifier: "en"),
-            Locale(identifier: "en_US"),
-            Locale(identifier: "en_US_POSIX"),
-            Locale(identifier: "uk"),
-            Locale(identifier: "fr_FR"),
-            Locale(identifier: "fr_BE"),
-            Locale(identifier: "zh-Hant-HK")
-        ]
-
-        for locale in values {
-            expectRoundTripEqualityThroughPlist(for: locale)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -185,7 +146,5 @@ LocaleTests.test("test_localizedStringFunctions") { TestLocale().test_localizedS
 LocaleTests.test("test_properties") { TestLocale().test_properties() }
 LocaleTests.test("test_AnyHashableContainingLocale") { TestLocale().test_AnyHashableContainingLocale() }
 LocaleTests.test("test_AnyHashableCreatedFromNSLocale") { TestLocale().test_AnyHashableCreatedFromNSLocale() }
-LocaleTests.test("test_EncodingRoundTrip_JSON") { TestLocale().test_EncodingRoundTrip_JSON() }
-LocaleTests.test("test_EncodingRoundTrip_Plist") { TestLocale().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif

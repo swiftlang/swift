@@ -119,23 +119,16 @@ fileprivate class _PlistEncoder : Encoder {
         return ret
     }
 
-    /// Returns whether a new element can be encoded at this coding path.
-    ///
-    /// `true` if an element has not yet been encoded at this coding path; `false` otherwise.
-    var canEncodeNewElement: Bool {
-        // Every time a new value gets encoded, the key it's encoded for is pushed onto the coding path (even if it's a nil key from an unkeyed container).
-        // At the same time, every time a container is requested, a new value gets pushed onto the storage stack.
-        // If there are more values on the storage stack than on the coding path, it means the value is requesting more than one container, which violates the precondition.
-        //
-        // This means that anytime something that can request a new container goes onto the stack, we MUST push a key onto the coding path.
-        // Things which will not request containers do not need to have the coding path extended for them (but it doesn't matter if it is, because they will not reach here).
-        return self.storage.count == self.codingPath.count
-    }
-
     /// Asserts that a new container can be requested at this coding path.
     /// `preconditionFailure()`s if one cannot be requested.
     func assertCanRequestNewContainer() {
-        guard self.canEncodeNewElement else {
+        // Every time a new value gets encoded, the key it's encoded for is pushed onto the coding path (even if it's a nil key from an unkeyed container).
+        // At the same time, every time a container is requested, a new value gets pushed onto the storage stack.
+        // If there are more values on the storage stack than on the coding path, it means the value is requesting more than one container, which violates the precondition.
+
+        // This means that anytime something that can request a new container goes onto the stack, we MUST push a key onto the coding path.
+        // Things which will not request containers do not need to have the coding path extended for them (but it doesn't matter if it is, because they will not reach here).
+        guard self.storage.count == self.codingPath.count else {
             let previousContainerType: String
             if self.storage.containers.last is NSDictionary {
                 previousContainerType = "keyed"
@@ -283,7 +276,7 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let array = NSMutableArray()
+        let array = self.encoder.storage.pushUnkeyedContainer()
         self.container[key.stringValue] = array
 
         return self.with(pushedKey: key) {
@@ -382,14 +375,14 @@ fileprivate struct _PlistUnkeyedEncodingContainer : UnkeyedEncodingContainer {
 }
 
 extension _PlistEncoder : SingleValueEncodingContainer {
-    // MARK: - Utility Methods
+    // MARK: Utility
 
     /// Asserts that a single value can be encoded at the current coding path (i.e. that one has not already been encoded through this container).
     /// `preconditionFailure()`s if one cannot be encoded.
     ///
     /// This is similar to assertCanRequestNewContainer above.
     func assertCanEncodeSingleValue() {
-        guard self.canEncodeNewElement else {
+        guard self.storage.count == self.codingPath.count else {
             let previousContainerType: String
             if self.storage.containers.last is NSDictionary {
                 previousContainerType = "keyed"
@@ -568,13 +561,24 @@ fileprivate class _PlistReferencingEncoder : _PlistEncoder {
         self.codingPath.append(key)
     }
 
-    // MARK: - Coding Path Operations
+    // MARK: - Overridden Implementations
 
-    override var canEncodeNewElement: Bool {
-        // With a regular encoder, the storage and coding path grow together.
-        // A referencing encoder, however, inherits its parents coding path, as well as the key it was created for.
-        // We have to take this into account.
-        return self.storage.count == self.codingPath.count - self.encoder.codingPath.count - 1
+    /// Asserts that we can add a new container at this coding path. See _PlistEncoder.assertCanRequestNewContainer for the logic behind this.
+    override func assertCanRequestNewContainer() {
+        // We can push a new container given that we won't have two containers for the same coding path.
+        // We make sure of this by comparing the number of containers we already have to the length of our coding path (we can push 1 more container than the length of the path, since it starts off empty). Since we copied our reference's coding path (and pushed on the key we were created at), we need to account for that.
+        guard self.storage.count == self.codingPath.count - self.encoder.codingPath.count - 1 else {
+            let previousContainerType: String
+            if self.storage.containers.last is NSDictionary {
+                previousContainerType = "keyed"
+            } else if self.storage.containers.last is NSArray {
+                previousContainerType = "unkeyed"
+            } else {
+                previousContainerType = "single value"
+            }
+
+            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
+        }
     }
 
     // MARK: - Deinitialization

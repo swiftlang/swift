@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestMeasurement
-// RUN: %target-run %t/TestMeasurement
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
     import XCTest
@@ -188,30 +178,6 @@ class TestMeasurement : TestMeasurementSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        let measurements = [
-            Measurement(value: 1, unit: MyDimensionalUnit.unitA),
-            Measurement(value: 1, unit: MyDimensionalUnit.unitKiloA),
-            Measurement(value: 1, unit: MyDimensionalUnit.unitMegaA)
-        ]
-
-        for measurement in measurements {
-            expectRoundTripEqualityThroughJSON(for: measurement)
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        let measurements = [
-            Measurement(value: 1, unit: MyDimensionalUnit.unitA),
-            Measurement(value: 1, unit: MyDimensionalUnit.unitKiloA),
-            Measurement(value: 1, unit: MyDimensionalUnit.unitMegaA)
-        ]
-
-        for measurement in measurements {
-            expectRoundTripEqualityThroughPlist(for: measurement)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -225,9 +191,7 @@ if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
     MeasurementTests.test("testEquality") { TestMeasurement().testEquality() }
     MeasurementTests.test("testComparison") { TestMeasurement().testComparison() }
     MeasurementTests.test("test_AnyHashableContainingMeasurement") { TestMeasurement().test_AnyHashableContainingMeasurement() }
-    MeasurementTests.test("test_AnyHashableCreatedFromNSMeasurement") { TestMeasurement().test_AnyHashableCreatedFromNSMeasurement() }
-    MeasurementTests.test("test_EncodingRoundTrip_JSON") { TestMeasurement().test_EncodingRoundTrip_JSON() }
-    MeasurementTests.test("test_EncodingRoundTrip_Plist") { TestMeasurement().test_EncodingRoundTrip_Plist() }
+  MeasurementTests.test("test_AnyHashableCreatedFromNSMeasurement") { TestMeasurement().test_AnyHashableCreatedFromNSMeasurement() }
     runAllTests()
 }
 #endif

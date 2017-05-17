@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestAffineTransform
-// RUN: %target-run %t/TestAffineTransform
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 
 #if os(OSX)
 
@@ -382,46 +372,6 @@ class TestAffineTransform : TestAffineTransformSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(AffineTransform(), AffineTransform._unconditionallyBridgeFromObjectiveC(nil))
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        let values: [AffineTransform] = [
-            AffineTransform.identity,
-            AffineTransform(),
-            AffineTransform(translationByX: 2.0, byY: 2.0),
-            AffineTransform(scale: 2.0),
-            AffineTransform(rotationByDegrees: .pi / 2),
-
-            AffineTransform(m11: 1.0, m12: 2.5, m21: 66.2, m22: 40.2, tX: -5.5, tY: 3.7),
-            AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
-            AffineTransform(m11: 4.5, m12: 1.1, m21: 0.025, m22: 0.077, tX: -0.55, tY: 33.2),
-            AffineTransform(m11: 7.0, m12: -2.3, m21: 6.7, m22: 0.25, tX: 0.556, tY: 0.99),
-            AffineTransform(m11: 0.498, m12: -0.284, m21: -0.742, m22: 0.3248, tX: 12, tY: 44)
-        ]
-
-        for transform in values {
-            expectRoundTripEqualityThroughJSON(for: transform)
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        let values: [AffineTransform] = [
-            AffineTransform.identity,
-            AffineTransform(),
-            AffineTransform(translationByX: 2.0, byY: 2.0),
-            AffineTransform(scale: 2.0),
-            AffineTransform(rotationByDegrees: .pi / 2),
-
-            AffineTransform(m11: 1.0, m12: 2.5, m21: 66.2, m22: 40.2, tX: -5.5, tY: 3.7),
-            AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
-            AffineTransform(m11: 4.5, m12: 1.1, m21: 0.025, m22: 0.077, tX: -0.55, tY: 33.2),
-            AffineTransform(m11: 7.0, m12: -2.3, m21: 6.7, m22: 0.25, tX: 0.556, tY: 0.99),
-            AffineTransform(m11: 0.498, m12: -0.284, m21: -0.742, m22: 0.3248, tX: 12, tY: 44)
-        ]
-
-        for transform in values {
-            expectRoundTripEqualityThroughPlist(for: transform)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -445,8 +395,6 @@ AffineTransformTests.test("test_hashing_values") { TestAffineTransform().test_ha
 AffineTransformTests.test("test_AnyHashableContainingAffineTransform") { TestAffineTransform().test_AnyHashableContainingAffineTransform() }
 AffineTransformTests.test("test_AnyHashableCreatedFromNSAffineTransform") { TestAffineTransform().test_AnyHashableCreatedFromNSAffineTransform() }
 AffineTransformTests.test("test_unconditionallyBridgeFromObjectiveC") { TestAffineTransform().test_unconditionallyBridgeFromObjectiveC() }
-AffineTransformTests.test("test_EncodingRoundTrip_JSON") { TestAffineTransform().test_EncodingRoundTrip_JSON() }
-AffineTransformTests.test("test_EncodingRoundTrip_Plist") { TestAffineTransform().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
     

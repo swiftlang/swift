@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestIndexPath
-// RUN: %target-run %t/TestIndexPath
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -721,32 +711,6 @@ class TestIndexPath: TestIndexPathSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(IndexPath(), IndexPath._unconditionallyBridgeFromObjectiveC(nil))
     }
-
-    func test_RoundTripEncoding_JSON() {
-        let values: [IndexPath] = [
-            IndexPath(), // empty
-            IndexPath(index: 0), // single
-            IndexPath(indexes: [1, 2]), // pair
-            IndexPath(indexes: [3, 4, 5, 6, 7, 8]), // array
-        ]
-
-        for indexPath in values {
-            expectRoundTripEqualityThroughJSON(for: indexPath)
-        }
-    }
-
-    func test_RoundTripEncoding_Plist() {
-        let values: [IndexPath] = [
-            IndexPath(), // empty
-            IndexPath(index: 0), // single
-            IndexPath(indexes: [1, 2]), // pair
-            IndexPath(indexes: [3, 4, 5, 6, 7, 8]), // array
-        ]
-
-        for indexPath in values {
-            expectRoundTripEqualityThroughPlist(for: indexPath)
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -798,7 +762,5 @@ IndexPathTests.test("testObjcBridgeType") { TestIndexPath().testObjcBridgeType()
 IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().test_AnyHashableContainingIndexPath() }
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
 IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
-IndexPathTests.test("test_RoundTripEncoding_JSON") { TestIndexPath().test_RoundTripEncoding_JSON() }
-IndexPathTests.test("test_RoundTripEncoding_Plist") { TestIndexPath().test_RoundTripEncoding_Plist() }
 runAllTests()
 #endif
