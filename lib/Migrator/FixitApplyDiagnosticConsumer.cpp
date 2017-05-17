@@ -37,6 +37,9 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                  StringRef FormatString,
                  ArrayRef<DiagnosticArgument> FormatArgs,
                  const DiagnosticInfo &Info) {
+  if (Loc.isInvalid()) {
+    return;
+  }
   auto ThisBufferID = SM.findBufferContainingLoc(Loc);
   auto ThisBufferName = SM.getIdentifierForBuffer(ThisBufferID);
   if (ThisBufferName != BufferName) {
