@@ -1879,35 +1879,51 @@ public:
         Out << "MakeTemporarilyEscapableExpr type does not match subexpression";
         abort();
       }
-      
+
+      auto call = dyn_cast<CallExpr>(E->getSubExpr());
+      if (!call) {
+        Out << "MakeTemporarilyEscapableExpr subexpression is not a call\n";
+        abort();
+      }
+
+      auto callFnTy = call->getFn()->getType()->getAs<FunctionType>();
+      if (!callFnTy) {
+        Out << "MakeTemporarilyEscapableExpr call does not call function\n";
+        abort();
+      }
+      if (!callFnTy->getExtInfo().isNoEscape()) {
+        Out << "MakeTemporarilyEscapableExpr called function is not noescape\n";
+        abort();
+      }
+
+      auto callArgTy = call->getArg()->getType()->getAs<FunctionType>();
+      if (!callArgTy) {
+        Out << "MakeTemporarilyEscapableExpr call argument is not a function\n";
+        abort();
+      }
+
       // Closure and opaque value should both be functions, with the closure
       // noescape and the opaque value escapable but otherwise matching.
-      auto closureFnTy = E->getNonescapingClosureValue()->getType()
-        ->getAs<FunctionType>();
+      auto closureFnTy =
+          E->getNonescapingClosureValue()->getType()->getAs<FunctionType>();
       if (!closureFnTy) {
-        Out << "MakeTemporarilyEscapableExpr closure type is not a closure";
+        Out << "MakeTemporarilyEscapableExpr closure type is not a closure\n";
         abort();
       }
-      auto opaqueValueFnTy = E->getOpaqueValue()->getType()
-        ->getAs<FunctionType>();
+      auto opaqueValueFnTy =
+          E->getOpaqueValue()->getType()->getAs<FunctionType>();
       if (!opaqueValueFnTy) {
-        Out<<"MakeTemporarilyEscapableExpr opaque value type is not a closure";
+        Out << "MakeTemporarilyEscapableExpr opaque value type is not a "
+               "closure\n";
         abort();
       }
-      if (!closureFnTy->isNoEscape()) {
-        Out << "MakeTemporarilyEscapableExpr closure type should be noescape";
-        abort();
-      }
-      if (opaqueValueFnTy->isNoEscape()) {
-        Out << "MakeTemporarilyEscapableExpr opaque value type should be "
-               "escaping";
-        abort();
-      }
-      if (!closureFnTy->isEqual(
-            opaqueValueFnTy->withExtInfo(opaqueValueFnTy->getExtInfo()
-                                                        .withNoEscape()))) {
+      auto closureFnNoEscape =
+          closureFnTy->withExtInfo(closureFnTy->getExtInfo().withNoEscape());
+      auto opaqueValueNoEscape = opaqueValueFnTy->withExtInfo(
+          opaqueValueFnTy->getExtInfo().withNoEscape());
+      if (!closureFnNoEscape->isEqual(opaqueValueNoEscape)) {
         Out << "MakeTemporarilyEscapableExpr closure and opaque value type "
-               "don't match";
+               "don't match\n";
         abort();
       }
     }

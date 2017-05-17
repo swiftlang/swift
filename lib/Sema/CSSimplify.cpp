@@ -3682,9 +3682,6 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
 
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   if (auto fn2 = type2->getAs<FunctionType>()) {
-    // We should have the noescape end of the relation.
-    if (!fn2->getExtInfo().isNoEscape())
-      return SolutionKind::Error;
     // Solve forward by binding the other type variable to the escapable
     // variation of this type.
     auto fn1 = fn2->withExtInfo(fn2->getExtInfo().withNoEscape(false));
