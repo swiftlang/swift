@@ -88,3 +88,21 @@ func violationWithGenericType<T>(_ p: T) {
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&local, &local)
 }
+
+// Helper.
+struct StructWithTwoStoredProp {
+  var f1: Int
+  var f2: Int
+}
+
+// Take an unsafe pointer to a stored property while accessing another stored property.
+func violationWithUnsafePointer(_ s: inout StructWithTwoStoredProp) {
+  // FIXME: This needs to be statically enforced.
+  withUnsafePointer(to: &s.f1) { (ptr) in
+    _ = s.f1
+  }
+  // FIXME: We may want to allow this case for known-layout stored properties.
+  withUnsafePointer(to: &s.f1) { (ptr) in
+    _ = s.f2
+  }
+}
