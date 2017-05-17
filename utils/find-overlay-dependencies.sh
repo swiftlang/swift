@@ -92,14 +92,6 @@ for sdk in $SDKS_ORDERED; do
   if [[ $sdk != macosx* ]]; then
     DEPENDS_ON=("${(@)DEPENDS_ON:#XPC}")
   fi
-
-  # Foundation depends on CoreGraphics in the .swift code.
-  # Hardcode the dependency.
-  if [[ "$1" == "Foundation" ]]; then
-    DEPENDS_ON+="CoreGraphics"
-  fi
-
-
   echo "$DEPENDS_ON"
   if [[ $UPDATE_CMAKE == 1 ]]; then
     sed -i "" -E -e "s/^([ \t]*$CMAKE_DEPENDS_NAME[$sdk]).*$/\1 $DEPENDS_ON # auto-updated/" "$CMAKE_PATH"
