@@ -492,7 +492,7 @@ public:
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
-
+  
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
@@ -574,9 +574,14 @@ public:
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
+  
+  Size getAtomicBoolSize() const { return AtomicBoolSize; }
+  Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
 
 private:
   Size PtrSize;
+  Size AtomicBoolSize;
+  Alignment AtomicBoolAlign;
   llvm::Type *FixedBufferTy;          /// [N x i8], where N == 3 * sizeof(void*)
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
