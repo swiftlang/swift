@@ -6,8 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -emit-ir
-
-// REQUIRES: deterministic-compiler
-// see https://bugs.swift.org/browse/SR-4894
-
 struct A:RangeReplaceableCollection{let c{{a f{}}var f=max
