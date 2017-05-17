@@ -63,14 +63,16 @@ func nestedNoEscape(f: inout Frob) {
 // Allow aliased noescape reads.
 func readRead() {
   var x = 3
-  // Around the call: [read] [dynamic]
+  // Around the call: [read] [static]
   // Inside each closure: [read] [static]
   doTwo({ _ = x }, { _ = x })
   x = 42
 }
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape8readReadyyF : $@convention(thin) () -> () {
 // CHECK: [[ALLOC:%.*]] = alloc_stack $Int, var, name "x"
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ALLOC]] : $*Int
+// CHECK-NOT: begin_access [read] [dynamic]
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[ALLOC]] : $*Int
+// CHECK-NOT: begin_access [read] [dynamic]
 // CHECK: apply
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape8readReadyyF'
@@ -121,18 +123,15 @@ func inoutReadRead(x: inout Int) {
 func readBoxRead() {
   var x = 3
   let c = { _ = x }
-  // Around the call: [read] [dynamic]
   // Inside may-escape closure `c`: [read] [dynamic]
-  // Inside never-escape closure: [read] [static]
+  // Inside never-escape closure: [read] [dynamic]
   doTwo(c, { _ = x })
   x = 42
 }
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape11readBoxReadyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: [[PA2:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] %0 : $*Int
 // CHECK: apply %{{.*}}([[PA1]], [[PA2]])
-// FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape11readBoxReadyyF'
 
 // closure #1 in readBoxRead()
@@ -144,8 +143,9 @@ func readBoxRead() {
 
 // closure #2 in readBoxRead()
 // CHECK-LABEL: sil private @_T027access_enforcement_noescape11readBoxReadyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK-NOT: [[ACCESS:%.*]] = begin_access [read] [dynamic]
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
+// FIXME-CHECK-LABEL: sil private @_T027access_enforcement_noescape11readBoxReadyyFyycfU0_ : $@convention(thin) (@owned { var Int }) -> () {
+// FIXME-CHECK: [[ADDR:%.*]] = project_box %0 : ${ var Int }, 0
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Int
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape11readBoxReadyyFyycfU0_'
 
@@ -159,7 +159,7 @@ func readBoxRead() {
 // Allow aliased noescape read + write.
 func readWrite() {
   var x = 3
-  // Around the call: [modify] [dynamic]
+  // Around the call: [modify] [static]
   // Inside closure 1: [read] [static]
   // Inside closure 2: [modify] [static]
   doTwo({ _ = x }, { x = 42 })
@@ -167,7 +167,7 @@ func readWrite() {
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape9readWriteyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: [[PA2:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // CHECK: apply %{{.*}}([[PA1]], [[PA2]])
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape9readWriteyyF'
@@ -227,17 +227,15 @@ func inoutReadWrite(x: inout Int) {
 func readBoxWrite() {
   var x = 3
   let c = { _ = x }
-  // Around the call: [modify] [dynamic]
   // Inside may-escape closure `c`: [read] [dynamic]
-  // Inside never-escape closure: [modify] [static]
+  // Inside never-escape closure: [modify] [dynamic]
   doTwo(c, { x = 42 })
 }
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape12readBoxWriteyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: [[PA2:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
+// CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[PA1]], [[PA2]])
-// FIXME-CHECK: end_access [[ACCESS]]
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape12readBoxWriteyyF'
 
 // closure #1 in readBoxWrite()
@@ -249,8 +247,9 @@ func readBoxWrite() {
 
 // closure #2 in readBoxWrite()
 // CHECK-LABEL: sil private @_T027access_enforcement_noescape12readBoxWriteyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK-NOT: [[ACCESS:%.*]] = begin_access [modify] [dynamic]
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
+// FIXME-CHECK-LABEL: sil private @_T027access_enforcement_noescape12readBoxWriteyyFyycfU0_ : $@convention(thin) (@owned { var Int }) -> () {
+// FIXME-CHECK: [[ADDR:%.*]] = project_box %0 : ${ var Int }, 0
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Int
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape12readBoxWriteyyFyycfU0_'
 
@@ -266,18 +265,16 @@ func readBoxWrite() {
 func readWriteBox() {
   var x = 3
   let c = { x = 42 }
-  // Around the call: [read] [dynamic]
   // Inside may-escape closure `c`: [modify] [dynamic]
-  // Inside never-escape closure: [read] [static]
+  // Inside never-escape closure: [read] [dynamic]
   doTwo({ _ = x }, c)
 }
 
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape12readWriteBoxyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: [[PA2:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] %0 : $*Int
+// CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}([[PA2]], [[PA1]])
-// FIXME-CHECK: end_access [[ACCESS]]
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape12readWriteBoxyyF'
 
 // closure #1 in readWriteBox()
@@ -289,8 +286,9 @@ func readWriteBox() {
 
 // closure #2 in readWriteBox()
 // CHECK-LABEL: sil private @_T027access_enforcement_noescape12readWriteBoxyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK-NOT: [[ACCESS:%.*]] = begin_access [read] [dynamic]
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
+// FIXME-CHECK-LABEL: sil private @_T027access_enforcement_noescape12readWriteBoxyyFyycfU0_ : $@convention(thin) ((@owned { var Int }) -> () {
+// FIXME-CHECK: [[ADDR:%.*]] = project_box %0 : ${ var Int }, 0
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Int
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape12readWriteBoxyyFyycfU0_'
 
@@ -303,7 +301,7 @@ func readWriteBox() {
 // Error: noescape read + write inout.
 func readWriteInout() {
   var x = 3
-  // Around the call: [read] [dynamic]
+  // Around the call: [read] [static]
   // Around the call: [modify] [static] // Error
   // Inside closure: [modify] [static]
   doOneInout({ _ = x }, &x)
@@ -311,7 +309,7 @@ func readWriteInout() {
 
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape14readWriteInoutyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] %0 : $*Int
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
 // FIXME-CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
 // FIXME-CHECK: apply %{{.*}}([[PA1]], [[ACCESS2]])
 // FIXME-CHECK: end_access [[ACCESS2]]
@@ -350,6 +348,7 @@ func inoutReadWriteInout(x: inout Int) {
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape19inoutReadWriteInoutySiz1x_tFyycfU_'
 
 // Trap on boxed read + write inout.
+// FIXME: Passing a captured var as inout needs dynamic enforcement.
 func readBoxWriteInout() {
   var x = 3
   let c = { _ = x }
@@ -381,7 +380,7 @@ func readBoxWriteInout() {
 // Allow aliased noescape write + write.
 func writeWrite() {
   var x = 3
-  // Around the call: [modify] [dynamic]
+  // Around the call: [modify] [static]
   // Inside closure 1: [modify] [static]
   // Inside closure 2: [modify] [static]
   doTwo({ x = 42 }, { x = 87 })
@@ -391,7 +390,7 @@ func writeWrite() {
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape10writeWriteyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: [[PA2:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
 // FIXME-CHECK: apply %{{.*}}([[PA1]], [[PA2]])
 // FIXME-CHECK: end_access [[ACCESS]]
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape10writeWriteyyF'
@@ -447,9 +446,8 @@ func inoutWriteWrite(x: inout Int) {
 func writeWriteBox() {
   var x = 3
   let c = { x = 87 }
-  // Around the call: [modify] [dynamic]
   // Inside may-escape closure `c`: [modify] [dynamic]
-  // Inside never-escape closure: [modify] [static]
+  // Inside never-escape closure: [modify] [dynamic]
   doTwo({ x = 42 }, c)
   _ = x
 }
@@ -457,9 +455,8 @@ func writeWriteBox() {
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape13writeWriteBoxyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
 // CHECK: [[PA2:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
+// FIXME-CHECK-NOT: begin_access
 // FIXME-CHECK: apply %{{.*}}([[PA1]], [[PA2]])
-// FIXME-CHECK: end_access [[ACCESS]]
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape13writeWriteBoxyyF'
 
 // closure #1 in writeWriteBox()
@@ -471,8 +468,8 @@ func writeWriteBox() {
 
 // closure #2 in writeWriteBox()
 // CHECK-LABEL: sil private @_T027access_enforcement_noescape13writeWriteBoxyyFyycfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK-NOT: [[ACCESS:%.*]] = begin_access [modify] [dynamic]
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
+// FIXME-CHECK: [[ADDR:%.*]] = project_box %0 : ${ var Int }, 0
+// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Int
 // FIXME-CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape13writeWriteBoxyyFyycfU0_'
 
@@ -482,10 +479,10 @@ func writeWriteBox() {
 //   doTwo({ x = 42 }, c)
 // }
 
-/// Error: on noescape write + write inout.
+// Error: on noescape write + write inout.
 func writeWriteInout() {
   var x = 3
-  // Around the call: [modify] [dynamic]
+  // Around the call: [modify] [static]
   // Around the call: [modify] [static] // Error
   // Inside closure: [modify] [static]
   doOneInout({ x = 42 }, &x)
@@ -493,10 +490,11 @@ func writeWriteInout() {
 
 // CHECK-LABEL: sil hidden @_T027access_enforcement_noescape15writeWriteInoutyyF : $@convention(thin) () -> () {
 // CHECK: [[PA1:%.*]] = partial_apply
-// FIXME-CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %0 : $*Int
+// FIXME-CHECK: [[ACCESS1:%.*]] = begin_access [modify] [static] %0 : $*Int
 // FIXME-CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
 // FIXME-CHECK: apply %{{.*}}([[PA1]], [[ACCESS2]])
-// FIXME-CHECK: end_access [[ACCESS]]
+// FIXME-CHECK: end_access [[ACCESS2]]
+// FIXME-CHECK: end_access [[ACCESS1]]
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape15writeWriteInoutyyF'
 
 // closure #1 in writeWriteInout()
@@ -531,6 +529,7 @@ func inoutWriteWriteInout(x: inout Int) {
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape010inoutWriteE5InoutySiz1x_tFyycfU_'
 
 // Trap on boxed write + write inout.
+// FIXME: Passing a captured var as inout needs dynamic enforcement.
 func writeBoxWriteInout() {
   var x = 3
   let c = { x = 42 }
