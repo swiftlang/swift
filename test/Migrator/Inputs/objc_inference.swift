@@ -23,3 +23,16 @@ func test(object: AnyObject, mine: MyClass) {
   _ = #keyPath(MyClass.propertyUsedInKeyPath)
   _ = object.usedViaAnyObject?()
 }
+
+class SelfReferences : NSObject {
+  var prop: Int = 2
+  func foo() {
+    _ = #selector(self.foo)
+    _ = #keyPath(prop)
+  }
+
+  func bar() {
+    _ = #selector(self.foo)
+    _ = #selector(self.bar)
+  }
+}
