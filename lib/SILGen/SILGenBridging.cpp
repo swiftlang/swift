@@ -1050,8 +1050,23 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       if (attr->isSwift3Inferred() &&
           !decl->getAttrs().hasAttribute<DynamicAttr>() &&
           !getASTContext().LangOpts.isSwiftVersion3()) {
-        B.createBuiltin(loc, getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
-            getModule().Types.getEmptyTupleType(), { }, { });
+        
+        // Get the starting source location of the declaration so we can say
+        // exactly where to stick '@objc'.
+        SourceLoc objcInsertionLoc =
+          decl->getAttributeInsertionLoc(/*modifier*/ false);
+
+        auto objcInsertionLocArgs
+          = emitSourceLocationArgs(objcInsertionLoc, loc);
+        
+        B.createBuiltin(loc,
+          getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
+          getModule().Types.getEmptyTupleType(), { }, {
+            objcInsertionLocArgs.filenameStartPointer.forward(*this),
+            objcInsertionLocArgs.filenameLength.forward(*this),
+            objcInsertionLocArgs.line.forward(*this),
+            objcInsertionLocArgs.column.forward(*this)
+          });
       }
     }
   }
