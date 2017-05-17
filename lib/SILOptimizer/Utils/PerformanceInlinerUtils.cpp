@@ -727,7 +727,6 @@ bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
     return false;
   // Check if all parameters are constant.
   auto Args = AI.getArgumentsWithoutIndirectResults();
-  bool allArgsConstant = true;
   for (auto Arg : Args) {
     if (!isConstantValue(Arg)) {
       return false;
