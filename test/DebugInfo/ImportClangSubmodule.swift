@@ -10,7 +10,12 @@
 // CHECK-SAME:                         configMacros:
 // CHECK-SAME:                         {{..}}-DFOO=foo{{..}}
 // CHECK-SAME:                         {{..}}-UBAR{{..}}
+
 // CHECK: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]], line: [[@LINE+1]])
 import ClangModule.SubModule
+
+// The Swift compiler uses an ugly hack that auto-imports a
+// submodule's top-level-module, even if we didn't ask for it.
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]])
 
 let bar = Bar()
