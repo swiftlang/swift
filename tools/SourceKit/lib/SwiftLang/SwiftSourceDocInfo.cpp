@@ -1357,6 +1357,7 @@ static void resolveRange(SwiftLangSupport &Lang,
         Receiver(Result);
         return;
       }
+      case RangeKind::PartOfExpression:
       case RangeKind::Invalid:
         if (!getPreviousASTSnaps().empty()) {
           // Attempt again using the up-to-date AST.
