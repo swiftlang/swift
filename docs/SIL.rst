@@ -2456,7 +2456,7 @@ index_raw_pointer
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of a builtin integer type
-  // %2 will be of type $*T
+  // %2 will be of type $Builtin.RawPointer
 
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
