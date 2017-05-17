@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestPersonNameComponents
-// RUN: %target-run %t/TestPersonNameComponents
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 import CoreFoundation
 
 #if FOUNDATION_XCTEST
@@ -33,14 +23,10 @@ class TestPersonNameComponentsSuper { }
 
 class TestPersonNameComponents : TestPersonNameComponentsSuper {
     @available(OSX 10.11, iOS 9.0, *)
-    func makePersonNameComponents(namePrefix: String? = nil, givenName: String, middleName: String? = nil, familyName: String, nameSuffix: String? = nil, nickname: String? = nil) -> PersonNameComponents {
+    func makePersonNameComponents(givenName: String, familyName: String) -> PersonNameComponents {
         var result = PersonNameComponents()
-        result.namePrefix = namePrefix
         result.givenName = givenName
-        result.middleName = middleName
         result.familyName = familyName
-        result.nameSuffix = nameSuffix
-        result.nickname = nickname
         return result
     }
     func test_AnyHashableContainingPersonNameComponents() {
@@ -82,41 +68,11 @@ class TestPersonNameComponents : TestPersonNameComponentsSuper {
             expectEqual(anyHashables[1], anyHashables[2])
         }
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        if #available(OSX 10.11, iOS 9.0, *) {
-            let values: [PersonNameComponents] = [
-                makePersonNameComponents(givenName: "John", familyName: "Appleseed"),
-                makePersonNameComponents(givenName: "John", familyName: "Appleseed", nickname: "Johnny"),
-                makePersonNameComponents(namePrefix: "Dr.", givenName: "Jane", middleName: "A.", familyName: "Appleseed", nameSuffix: "Esq.", nickname: "Janie")
-            ]
-
-            for components in values {
-                expectRoundTripEqualityThroughJSON(for: components)
-            }
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        if #available(OSX 10.11, iOS 9.0, *) {
-            let values: [PersonNameComponents] = [
-                makePersonNameComponents(givenName: "John", familyName: "Appleseed"),
-                makePersonNameComponents(givenName: "John", familyName: "Appleseed", nickname: "Johnny"),
-                makePersonNameComponents(namePrefix: "Dr.", givenName: "Jane", middleName: "A.", familyName: "Appleseed", nameSuffix: "Esq.", nickname: "Janie")
-            ]
-
-            for components in values {
-                expectRoundTripEqualityThroughPlist(for: components)
-            }
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
 var PersonNameComponentsTests = TestSuite("TestPersonNameComponents")
 PersonNameComponentsTests.test("test_AnyHashableContainingPersonNameComponents") { TestPersonNameComponents().test_AnyHashableContainingPersonNameComponents() }
 PersonNameComponentsTests.test("test_AnyHashableCreatedFromNSPersonNameComponents") { TestPersonNameComponents().test_AnyHashableCreatedFromNSPersonNameComponents() }
-PersonNameComponentsTests.test("test_EncodingRoundTrip_JSON") { TestPersonNameComponents().test_EncodingRoundTrip_JSON() }
-PersonNameComponentsTests.test("test_EncodingRoundTrip_Plist") { TestPersonNameComponents().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif
