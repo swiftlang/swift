@@ -860,20 +860,30 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
-    llvm::Value *args[2];
+    llvm::Value *entrypointArgs[6];
     auto argIter = IGF.CurFn->arg_begin();
 
     // self
-    args[0] = &*argIter++;
-    if (args[0]->getType() != IGF.IGM.ObjCPtrTy)
-      args[0] = IGF.Builder.CreateBitCast(args[0], IGF.IGM.ObjCPtrTy);
+    entrypointArgs[0] = &*argIter++;
+    if (entrypointArgs[0]->getType() != IGF.IGM.ObjCPtrTy)
+      entrypointArgs[0] = IGF.Builder.CreateBitCast(entrypointArgs[0], IGF.IGM.ObjCPtrTy);
 
     // _cmd
-    args[1] = &*argIter;
-    if (args[1]->getType() != IGF.IGM.ObjCSELTy)
-      args[1] = IGF.Builder.CreateBitCast(args[1], IGF.IGM.ObjCSELTy);
+    entrypointArgs[1] = &*argIter;
+    if (entrypointArgs[1]->getType() != IGF.IGM.ObjCSELTy)
+      entrypointArgs[1] = IGF.Builder.CreateBitCast(entrypointArgs[1], IGF.IGM.ObjCSELTy);
+    
+    // Filename pointer
+    entrypointArgs[2] = args.claimNext();
+    // Filename length
+    entrypointArgs[3] = args.claimNext();
+    // Line
+    entrypointArgs[4] = args.claimNext();
+    // Column
+    entrypointArgs[5] = args.claimNext();
 
-    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(), args);
+    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),
+                           entrypointArgs);
     return;
   }
 
