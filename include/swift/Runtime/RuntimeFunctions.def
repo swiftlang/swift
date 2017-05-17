@@ -1242,7 +1242,7 @@ FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreserv
 FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(ObjCPtrTy, ObjCSELTy, Int8PtrTy, SizeTy, SizeTy, SizeTy),
+         ARGS(ObjCPtrTy, ObjCSELTy, Int8PtrTy, SizeTy, SizeTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 #endif

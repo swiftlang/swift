@@ -1365,7 +1365,13 @@ SWIFT_RUNTIME_EXPORT
 void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
                                              const char *filename,
                                              size_t filenameLength,
-                                             size_t line, size_t column) {
+                                             size_t line, size_t column,
+                                             std::atomic<bool> *didLog) {
+  // Only log once. We should have been given a unique zero-initialized
+  // atomic flag for each entry point.
+  if (didLog->exchange(true))
+    return;
+  
   // Figure out how much reporting we want by querying the environment
   // variable SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT. We have four meaningful
   // levels:
