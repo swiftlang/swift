@@ -6,21 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-//
-// RUN: pushd %t
-// RUN: %target-build-swift -emit-module -emit-library %S/Inputs/FoundationTestsShared.swift -module-name FoundationTestsShared -module-link-name FoundationTestsShared
-// RUN: popd %t
-//
-// RUN: %target-build-swift %s -I%t -L%t -o %t/TestDateInterval
-// RUN: %target-run %t/TestDateInterval
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
-import FoundationTestsShared
 
 #if FOUNDATION_XCTEST
 import XCTest
@@ -175,38 +165,6 @@ class TestDateInterval : TestDateIntervalSuper {
             expectEqual(anyHashables[1], anyHashables[2])
         }
     }
-
-    func test_EncodingRoundTrip_JSON() {
-        if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
-            let now = Date()
-            let values: [DateInterval] = [
-                DateInterval(),
-                DateInterval(start: Date.distantPast, end: now),
-                DateInterval(start: now, end: Date.distantFuture),
-                DateInterval(start: Date.distantPast, end: Date.distantFuture)
-            ]
-
-            for interval in values {
-                expectRoundTripEqualityThroughJSON(for: interval)
-            }
-        }
-    }
-
-    func test_EncodingRoundTrip_Plist() {
-        if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
-            let now = Date()
-            let values: [DateInterval] = [
-                DateInterval(),
-                DateInterval(start: Date.distantPast, end: now),
-                DateInterval(start: now, end: Date.distantFuture),
-                DateInterval(start: Date.distantPast, end: Date.distantFuture)
-            ]
-
-            for interval in values {
-                expectRoundTripEqualityThroughPlist(for: interval)
-            }
-        }
-    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -217,7 +175,5 @@ DateIntervalTests.test("test_checkIntersection") { TestDateInterval().test_check
 DateIntervalTests.test("test_validIntersections") { TestDateInterval().test_validIntersections() }
 DateIntervalTests.test("test_AnyHashableContainingDateInterval") { TestDateInterval().test_AnyHashableContainingDateInterval() }
 DateIntervalTests.test("test_AnyHashableCreatedFromNSDateInterval") { TestDateInterval().test_AnyHashableCreatedFromNSDateInterval() }
-// DateIntervalTests.test("test_EncodingRoundTrip_JSON") { TestDateInterval().test_EncodingRoundTrip_JSON() }
-DateIntervalTests.test("test_EncodingRoundTrip_Plist") { TestDateInterval().test_EncodingRoundTrip_Plist() }
 runAllTests()
 #endif

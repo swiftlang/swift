@@ -1435,9 +1435,6 @@ ERROR(unsupported_platform_runtime_condition_argument,none,
 ERROR(unsupported_platform_condition_argument,none,
       "unexpected platform condition argument: expected %0",
       (StringRef))
-ERROR(unexpected_version_comparison_operator,none,
-      "expected '>=' prefix operator on a version requirement",
-      ())
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
 WARNING(swift3_unsupported_conditional_compilation_expression_type,none,

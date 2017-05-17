@@ -869,6 +869,23 @@ public:
   ManagedValue getOptionalSomeValue(SILLocation loc, ManagedValue value,
                                     const TypeLowering &optTL);
 
+  struct SourceLocArgs {
+    ManagedValue filenameStartPointer,
+                 filenameLength,
+                 filenameIsAscii,
+                 line,
+                 column;
+  };
+
+  /// Emit raw lowered arguments for a runtime diagnostic to report the given
+  /// source location:
+  /// - The first three arguments are the components necessary to construct
+  ///   a StaticString for the filename: start pointer, length, and
+  ///   "is ascii" bit.
+  /// - The fourth argument is the line number.
+  SourceLocArgs
+  emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
+
   /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
   /// The result is a Builtin.Int1.

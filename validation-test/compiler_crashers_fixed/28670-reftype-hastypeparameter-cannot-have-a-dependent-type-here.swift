@@ -9,4 +9,5 @@
 
 // REQUIRES: deterministic-compiler
 // see https://bugs.swift.org/browse/SR-4894
+
 struct A:RangeReplaceableCollection{let c{{a f{}}var f=max

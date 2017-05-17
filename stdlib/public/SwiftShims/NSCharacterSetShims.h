@@ -1,4 +1,4 @@
-//===--- NSCharacterSetShims.h - Foundation declarations for CharacterSet overlay -----===//
+//===--- NSCharacterSetShims.h - Foundation decl. for CharacterSet overlay ===//
 //
 // This source file is part of the Swift.org open source project
 //
