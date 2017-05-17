@@ -119,10 +119,10 @@ func protocolExtArray<T : Equatable>(_ a: [T]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_4^#
 }
 // PRIVATE_NOMINAL_MEMBERS_4: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         map({#(transform): ((Equatable)) throws -> T##((Equatable)) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceVar]/Super:            last[#(Equatable)?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#of: (Equatable)#})[#Int?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#where: ((Equatable)) throws -> Bool##((Equatable)) throws -> Bool#})[' rethrows'][#Int?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (Equatable) throws -> T##(Equatable) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceVar]/Super:            last[#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#of: Equatable#})[#Int?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#where: (Equatable) throws -> Bool##(Equatable) throws -> Bool#})[' rethrows'][#Int?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4: End completions
 
 func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {
@@ -130,11 +130,11 @@ func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_5: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): (Equatable)#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): (Equatable)#}, {#at: Int#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#(Equatable)?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            isEmpty[#Bool#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            first[#(Equatable)?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceVar]/Super:            first[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         dropLast({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_5-DAG: Decl[InstanceMethod]/Super:         prefix({#(maxLength): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
@@ -146,33 +146,33 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_6: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): (Equatable)#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): (Equatable)#}, {#at: Int#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#(Equatable)?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Equatable#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   insert({#(newElement): Equatable#}, {#at: Int#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst()[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropLast()[#ArraySlice<Equatable>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         enumerated()[#EnumeratedSequence<[Equatable]>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         min({#by: ((Equatable), (Equatable)) throws -> Bool##((Equatable), (Equatable)) throws -> Bool#})[' rethrows'][#(Equatable)?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         max({#by: ((Equatable), (Equatable)) throws -> Bool##((Equatable), (Equatable)) throws -> Bool#})[' rethrows'][#(Equatable)?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         min({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         max({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
 // FIXME: The following should include 'partialResult' as local parameter name: "(nextPartialResult): (_ partialResult: Result, Equatable)"
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, (Equatable)) throws -> Result##(Result, (Equatable)) throws -> Result#})[' rethrows'][#Result#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, Equatable) throws -> Result##(Result, Equatable) throws -> Result#})[' rethrows'][#Result#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
-// FIXME: restore Decl[InstanceMethod]/Super:         flatMap({#(transform): ((Equatable)) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[IteratorProtocol.Element]#]{{; name=.+}}
+// FIXME: restore Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[IteratorProtocol.Element]#]{{; name=.+}}
 
 func testArchetypeReplacement3 (_ a : [Int]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_7^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_7: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): (Int)#})[#Void#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         removeLast()[#(Int)#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#(Int)?#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceVar]/Super:            first[#(Int)?#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         map({#(transform): ((Int)) throws -> T##((Int)) throws -> T#})[' rethrows'][#[T]#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(newElement): Int#})[#Void#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         removeLast()[#Int#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/CurrNominal:   popLast()[#Int?#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceVar]/Super:            first[#Int?#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (Int) throws -> T##(Int) throws -> T#})[' rethrows'][#[T]#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         dropLast({#(n): Int#})[#ArraySlice<Int>#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#AnySequence<(Int)>#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         prefix({#(maxLength): Int#})[#AnySequence<(Int)>#]
-// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         elementsEqual({#(other): Sequence#}, {#by: ((Int), (Int)) throws -> Bool##((Int), (Int)) throws -> Bool#})[' rethrows'][#Bool#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         dropFirst({#(n): Int#})[#AnySequence<Int>#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         prefix({#(maxLength): Int#})[#AnySequence<Int>#]
+// PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         elementsEqual({#(other): Sequence#}, {#by: (Int, Int) throws -> Bool##(Int, Int) throws -> Bool#})[' rethrows'][#Bool#]
 
 
 protocol P2 {
