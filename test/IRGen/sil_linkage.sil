@@ -8,7 +8,7 @@ sil_stage canonical
 // CHECK: define{{( protected)?}} swiftcc void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_fragile_function_test() {{.*}} {
 // CHECK: define{{( protected)?}} swiftcc void @private_fragile_function_test() {{.*}} {
-// CHECK: define linkonce_odr hidden swiftcc void @public_external_fragile_function_def_test() {{.*}} {
+// CHECK: define available_externally swiftcc void @public_external_fragile_function_def_test() {{.*}} {
 // CHECK: define{{( protected)?}} available_externally swiftcc void @hidden_external_fragile_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_fragile_function_def_test() {{.*}} {
 // CHECK: define{{( protected)?}} available_externally swiftcc void @private_external_fragile_function_def_test() {{.*}} {
@@ -16,7 +16,7 @@ sil_stage canonical
 // CHECK: define hidden swiftcc void @hidden_resilient_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_resilient_function_test() {{.*}} {
 // CHECK: define internal swiftcc void @private_resilient_function_test() {{.*}}{
-// CHECK: define linkonce_odr hidden swiftcc void @public_external_resilient_function_def_test() {{.*}} {
+// CHECK: define available_externally swiftcc void @public_external_resilient_function_def_test() {{.*}} {
 // CHECK: define{{( protected)?}} available_externally hidden swiftcc void @hidden_external_resilient_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_resilient_function_def_test() {{.*}} {
 
