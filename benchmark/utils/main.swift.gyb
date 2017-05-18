@@ -34,8 +34,9 @@ imports = sorted(tests + [msb.name for msb in multisource_benches])
 
 other_re = [
     "Ackermann",
+    "ExistentialTest.+",
     "Fibonacci",
-    "ExistentialTest.+"
+    "HashQuadratic"
 ]
 
 string_re = [
