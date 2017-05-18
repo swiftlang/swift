@@ -177,16 +177,23 @@ fileprivate class _JSONEncoder : Encoder {
         return ret
     }
 
-    /// Asserts that a new container can be requested at this coding path.
-    /// `preconditionFailure()`s if one cannot be requested.
-    func assertCanRequestNewContainer() {
+    /// Returns whether a new element can be encoded at this coding path.
+    ///
+    /// `true` if an element has not yet been encoded at this coding path; `false` otherwise.
+    var canEncodeNewElement: Bool {
         // Every time a new value gets encoded, the key it's encoded for is pushed onto the coding path (even if it's a nil key from an unkeyed container).
         // At the same time, every time a container is requested, a new value gets pushed onto the storage stack.
         // If there are more values on the storage stack than on the coding path, it means the value is requesting more than one container, which violates the precondition.
-
+        //
         // This means that anytime something that can request a new container goes onto the stack, we MUST push a key onto the coding path.
         // Things which will not request containers do not need to have the coding path extended for them (but it doesn't matter if it is, because they will not reach here).
-        guard self.storage.count == self.codingPath.count else {
+        return self.storage.count == self.codingPath.count
+    }
+
+    /// Asserts that a new container can be requested at this coding path.
+    /// `preconditionFailure()`s if one cannot be requested.
+    func assertCanRequestNewContainer() {
+        guard self.canEncodeNewElement else {
             let previousContainerType: String
             if self.storage.containers.last is NSDictionary {
                 previousContainerType = "keyed"
@@ -457,14 +464,14 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
 }
 
 extension _JSONEncoder : SingleValueEncodingContainer {
-    // MARK: Utility
+    // MARK: - Utility Methods
 
     /// Asserts that a single value can be encoded at the current coding path (i.e. that one has not already been encoded through this container).
     /// `preconditionFailure()`s if one cannot be encoded.
     ///
     /// This is similar to assertCanRequestNewContainer above.
     func assertCanEncodeSingleValue() {
-        guard self.storage.count == self.codingPath.count else {
+        guard self.canEncodeNewElement else {
             let previousContainerType: String
             if self.storage.containers.last is NSDictionary {
                 previousContainerType = "keyed"
@@ -691,6 +698,9 @@ extension _JSONEncoder {
         } else if T.self == Data.self {
             // Respect Data encoding strategy
             return try self.box((value as! Data))
+        } else if T.self == URL.self {
+            // Encode URLs as single strings.
+            return self.box((value as! URL).absoluteString)
         }
 
         // The value should request a container from the _JSONEncoder.
@@ -751,24 +761,13 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
         self.codingPath.append(key)
     }
 
-    // MARK: - Overridden Implementations
+    // MARK: - Coding Path Operations
 
-    /// Asserts that we can add a new container at this coding path. See _JSONEncoder.assertCanRequestNewContainer for the logic behind this.
-    override func assertCanRequestNewContainer() {
-        // We can push a new container given that we won't have two containers for the same coding path.
-        // We make sure of this by comparing the number of containers we already have to the length of our coding path (we can push 1 more container than the length of the path, since it starts off empty). Since we copied our reference's coding path (and pushed on the key we were created at), we need to account for that.
-        guard self.storage.count == self.codingPath.count - self.encoder.codingPath.count - 1 else {
-            let previousContainerType: String
-            if self.storage.containers.last is NSDictionary {
-                previousContainerType = "keyed"
-            } else if self.storage.containers.last is NSArray {
-                previousContainerType = "unkeyed"
-            } else {
-                previousContainerType = "single value"
-            }
-
-            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
-        }
+    override var canEncodeNewElement: Bool {
+        // With a regular encoder, the storage and coding path grow together.
+        // A referencing encoder, however, inherits its parents coding path, as well as the key it was created for.
+        // We have to take this into account.
+        return self.storage.count == self.codingPath.count - self.encoder.codingPath.count - 1
     }
 
     // MARK: - Deinitialization
@@ -1851,6 +1850,17 @@ extension _JSONDecoder {
             decoded = (try self.unbox(value, as: Date.self) as! T)
         } else if T.self == Data.self {
             decoded = (try self.unbox(value, as: Data.self) as! T)
+        } else if T.self == URL.self {
+            guard let urlString = try self.unbox(value, as: String.self) else {
+                return nil
+            }
+
+            guard let url = URL(string: urlString) else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                        debugDescription: "Invalid URL string."))
+            }
+
+            decoded = (url as! T)
         } else {
             self.storage.push(container: value)
             decoded = try T(from: self)
