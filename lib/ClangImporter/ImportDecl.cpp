@@ -1865,6 +1865,9 @@ applyPropertyOwnership(VarDecl *prop,
   }
 }
 
+using MirroredMethodEntry =
+  std::pair<const clang::ObjCMethodDecl*, ProtocolDecl*>;
+
 namespace {
   /// Customized llvm::DenseMapInfo for storing borrowed APSInts.
   struct APSIntRefDenseMapInfo {
@@ -3933,6 +3936,10 @@ namespace {
                                        ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members,
                                        ASTContext &Ctx);
+
+    void importNonOverriddenMirroredMethods(DeclContext *dc,
+                                  MutableArrayRef<MirroredMethodEntry> entries,
+                                  SmallVectorImpl<Decl *> &newMembers);
 
     /// \brief Import constructors from our superclasses (and their
     /// categories/extensions), effectively "inheriting" constructors.
@@ -6405,6 +6412,15 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
   const ClangModuleUnit *declModule;
   const ClangModuleUnit *interfaceModule;
 
+  // 'protocols' is, for some reason, the full recursive expansion of
+  // the protocol hierarchy, so there's no need to recursively descend
+  // into inherited protocols.
+
+  // Try to import only the most specific methods with a particular name.
+  // We use a MapVector to get deterministic iteration order later.
+  llvm::MapVector<clang::Selector, std::vector<MirroredMethodEntry>>
+    methodsByName;
+
   for (auto proto : protocols) {
     auto clangProto =
         cast_or_null<clang::ObjCProtocolDecl>(proto->getClangDecl());
@@ -6493,27 +6509,143 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (!objcMethod)
         continue;
 
-      // When mirroring an initializer, make it designated and required.
-      if (isInitMethod(objcMethod)) {
-        // Import the constructor.
-        if (auto imported = importConstructor(objcMethod, dc, /*implicit=*/true,
-                                              CtorInitializerKind::Designated,
-                                              /*required=*/true)) {
-          members.push_back(imported);
-        }
+      // For now, just remember that we saw this method.
+      methodsByName[objcMethod->getSelector()]
+        .push_back(MirroredMethodEntry{objcMethod, proto});
+    }
+  }
 
-        continue;
-      }
+  // Process all the methods, now that we've arranged them by selector.
+  for (auto &mapEntry : methodsByName) {
+    importNonOverriddenMirroredMethods(dc, mapEntry.second, members);
+  }
+}
 
-      // Import the method.
-      if (auto imported =
-              Impl.importMirroredDecl(objcMethod, dc, getVersion(), proto)) {
+enum MirrorImportComparison {
+  // There's no suppression relationship between the methods.
+  NoSuppression,
+
+  // The first method suppresses the second.
+  Suppresses,
+
+  // The second method suppresses the first.
+  IsSuppressed,
+};
+
+/// Should the mirror import of the first method be suppressed in favor
+/// of the second method?  The methods are known to have the same selector
+/// and (because this is mirror-import) to be declared on protocols.
+///
+/// The algorithm that uses this assumes that it is transitive.
+static bool isMirrorImportSuppressedBy(ClangImporter::Implementation &importer,
+                                       const clang::ObjCMethodDecl *first,
+                                       const clang::ObjCMethodDecl *second) {
+  auto firstProto = cast<clang::ObjCProtocolDecl>(first->getDeclContext());
+  auto secondProto = cast<clang::ObjCProtocolDecl>(second->getDeclContext());
+
+  // If the first method's protocol is a super-protocol of the second's,
+  // then the second method overrides the first and we should suppress.
+  // Clang provides a function to check that, phrased in terms of whether
+  // a value of one protocol (the RHS) can be assigned to an l-value of
+  // the other (the LHS).
+  auto &ctx = importer.getClangASTContext();
+  return ctx.ProtocolCompatibleWithProtocol(
+                          const_cast<clang::ObjCProtocolDecl*>(firstProto),
+                          const_cast<clang::ObjCProtocolDecl*>(secondProto));
+}
+
+/// Compare two methods for mirror-import purposes.
+static MirrorImportComparison
+compareMethodsForMirrorImport(ClangImporter::Implementation &importer,
+                              const clang::ObjCMethodDecl *first,
+                              const clang::ObjCMethodDecl *second) {
+  if (isMirrorImportSuppressedBy(importer, first, second))
+    return IsSuppressed;
+  if (isMirrorImportSuppressedBy(importer, second, first))
+    return Suppresses;
+  return NoSuppression;
+}
+
+/// Mark any methods in the given array that are overridden by this method
+/// as suppressed by nulling their entries out.
+/// Return true if this method is overridden by any methods in the array.
+static bool suppressOverriddenMethods(ClangImporter::Implementation &importer,
+                                      const clang::ObjCMethodDecl *method,
+                               MutableArrayRef<MirroredMethodEntry> entries) {
+  assert(method && "method was already suppressed");
+
+  for (auto &entry: entries) {
+    auto otherMethod = entry.first;
+    if (!otherMethod) continue;
+
+    assert(method != otherMethod && "found same method twice?");
+    switch (compareMethodsForMirrorImport(importer, method, otherMethod)) {
+    // If the second method is suppressed, null it out.
+    case Suppresses:
+      entry.first = nullptr;
+      continue;
+
+    // If the first method is suppressed, return immediately.  We should
+    // be able to suppress any following methods.
+    case IsSuppressed:
+      return true;
+
+    case NoSuppression:
+      continue;
+    }
+    llvm_unreachable("bad comparison result");
+  }
+
+  return false;
+}
+
+/// Given a set of methods with the same selector, each taken from a
+/// different protocol in the protocol hierarchy of a class into which
+/// we want to introduce mirror imports, import only the methods which
+/// are not overridden by another method in the set.
+///
+/// It's possible that we'll end up selecting multiple methods to import
+/// here, in the cases where there's no hierarchical relationship between
+/// two methods.  The importer already has code to handle this case.
+void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
+                               MutableArrayRef<MirroredMethodEntry> entries,
+                                           SmallVectorImpl<Decl *> &members) {
+  for (size_t i = 0, e = entries.size(); i != e; ++i) {
+    auto objcMethod = entries[i].first;
+
+    // If the method was suppressed by a previous method, ignore it.
+    if (!objcMethod)
+      continue;
+
+    // Compare this method to all the following methods, suppressing any
+    // that it overrides.  If it is overridden by any of them, suppress it
+    // instead; but there's no need to mark that in the array, just continue
+    // on to the next method.
+    if (suppressOverriddenMethods(Impl, objcMethod, entries.slice(i + 1)))
+      continue;
+
+    // Okay, the method wasn't suppressed, import it.
+
+    // When mirroring an initializer, make it designated and required.
+    if (isInitMethod(objcMethod)) {
+      // Import the constructor.
+      if (auto imported = importConstructor(objcMethod, dc, /*implicit=*/true,
+                                            CtorInitializerKind::Designated,
+                                            /*required=*/true)) {
         members.push_back(imported);
-
-        for (auto alternate : Impl.getAlternateDecls(imported))
-          if (imported->getDeclContext() == alternate->getDeclContext())
-            members.push_back(alternate);
       }
+      continue;
+    }
+
+    // Import the method.
+    auto proto = entries[i].second;
+    if (auto imported =
+            Impl.importMirroredDecl(objcMethod, dc, getVersion(), proto)) {
+      members.push_back(imported);
+
+      for (auto alternate : Impl.getAlternateDecls(imported))
+        if (imported->getDeclContext() == alternate->getDeclContext())
+          members.push_back(alternate);
     }
   }
 }
