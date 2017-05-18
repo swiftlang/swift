@@ -1410,7 +1410,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
     "*** %*s:%zu:%zu: implicit Objective-C entrypoint %c[%s %s] "
     "is deprecated and will be removed in Swift 4; "
     "add explicit '@objc' to the declaration to emit the Objective-C "
-    "entrypoint in Swift 4 and suppress this message",
+    "entrypoint in Swift 4 and suppress this message\n",
     (int)filenameLength, filename, line, column,
     isInstanceMethod ? '-' : '+',
     class_getName([self class]),
