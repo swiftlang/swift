@@ -110,6 +110,42 @@ public protocol StringProtocol
   ) rethrows -> Result
 }
 
+/// A protocol that provides fast access to a known representation of String.
+///
+/// Can be used to specialize generic functions that would otherwise end up
+/// doing grapheme breaking to vend individual characters.
+internal protocol _SwiftStringView {
+  /// A `String`, having the same contents as `self`, that may be unsuitable for
+  /// long-term storage.
+  var _ephemeralContent : String { get }
+  
+  /// A `String`, having the same contents as `self`, that is suitable for
+  /// long-term storage.
+  var _persistentContent : String { get }
+}
+
+extension _SwiftStringView {
+  var _ephemeralContent : String { return _persistentContent }
+}
+
+extension StringProtocol {
+  internal var _ephemeralString : String {
+    let s0 = self as? _SwiftStringView
+    if _fastPath(s0 != nil), let s1 = s0 { return s1._ephemeralContent }
+    return String(String.CharacterView(self))
+  }
+
+  internal var _persistentString : String {
+    let s0 = self as? _SwiftStringView
+    if _fastPath(s0 != nil), let s1 = s0 { return s1._persistentContent }
+    return String(String.CharacterView(self))
+  }
+}
+
+extension String : _SwiftStringView {
+  var _persistentContent : String { return characters._persistentContent }
+}
+
 /// Call body with a pointer to zero-terminated sequence of
 /// `TargetEncoding.CodeUnit` representing the same string as `source`, when
 /// `source` is interpreted as being encoded with `SourceEncoding`.
