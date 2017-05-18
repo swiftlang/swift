@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 344; // Last change: ctor newly required flag
+const uint16_t VERSION_MINOR = 346; // Last change: dependency types for enums
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -802,7 +802,8 @@ namespace decls_block {
     TypeIDField,            // raw type
     AccessibilityKindField, // accessibility
     BCVBR<4>,               // number of conformances
-    BCArray<TypeIDField>    // inherited types
+    BCVBR<4>,               // number of inherited types
+    BCArray<TypeIDField>    // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
