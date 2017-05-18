@@ -87,10 +87,10 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   /// @{
   llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
-  llvm::DenseMap<llvm::StringRef, llvm::TrackingMDNodeRef> DIFileCache;
   llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
+  llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   TrackingDIRefMap DIRefMap;
   /// @}
 
