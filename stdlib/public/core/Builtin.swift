@@ -114,6 +114,18 @@ public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
+/// Returns `x` as its concrete type `U`.
+///
+/// This cast can be useful for dispatching to specializations of generic
+/// functions.
+///
+/// - Requires: `x` has type `U`.
+@_transparent
+public func _identityCast<T, U>(_ x: T, to expectedType: U.Type) -> U {
+  _precondition(T.self == expectedType, "_identityCast to wrong type")
+  return Builtin.reinterpretCast(x)
+}
+
 /// `unsafeBitCast` something to `AnyObject`.
 @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
