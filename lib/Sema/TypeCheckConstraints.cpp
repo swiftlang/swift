@@ -1472,7 +1472,7 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       // If the type of this expression has a type variable or is invalid,
       // overwrite it with ErrorType.
       Type type = expr->getType();
-      if (!type || type->hasTypeVariable())
+      if (type && type->hasTypeVariable())
         expr->setType(ErrorType::get(context));
 
       return { true, expr };
@@ -2119,6 +2119,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                      contextualPurpose,
                                      flags,
                                      &listener);
+  
+  if (hadError && !initializer->getType()) {
+    initializer->setType(ErrorType::get(Context));
+  }
 
   if (hadError && !pattern->hasType()) {
     pattern->setType(ErrorType::get(Context));
@@ -2709,8 +2713,9 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
+  // If expr has no type, just assume it's the right expr.
   // If the type is already materializable, then we're already done.
-  if (expr->getType()->isMaterializable())
+  if (!expr->getType() || expr->getType()->isMaterializable())
     return expr;
   
   // Load lvalues.
