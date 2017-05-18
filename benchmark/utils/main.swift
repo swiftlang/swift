@@ -232,7 +232,6 @@ addTo(&precommitTests, "DropWhileSequenceLazy", run_DropWhileSequenceLazy)
 addTo(&precommitTests, "ErrorHandling", run_ErrorHandling)
 addTo(&precommitTests, "GlobalClass", run_GlobalClass)
 addTo(&precommitTests, "Hanoi", run_Hanoi)
-addTo(&precommitTests, "HashQuadratic", run_HashQuadratic)
 addTo(&precommitTests, "HashTest", run_HashTest)
 addTo(&precommitTests, "Histogram", run_Histogram)
 addTo(&precommitTests, "Integrate", run_Integrate)
@@ -506,6 +505,7 @@ addTo(&otherTests, "ExistentialTestTwoMethodCalls_IntValueBuffer2", run_Existent
 addTo(&otherTests, "ExistentialTestTwoMethodCalls_IntValueBuffer3", run_ExistentialTestTwoMethodCalls_IntValueBuffer3)
 addTo(&otherTests, "ExistentialTestTwoMethodCalls_IntValueBuffer4", run_ExistentialTestTwoMethodCalls_IntValueBuffer4)
 addTo(&otherTests, "Fibonacci", run_Fibonacci)
+addTo(&otherTests, "HashQuadratic", run_HashQuadratic)
 
 // String tests, an extended benchmark suite exercising finer-granularity
 // behavior of our Strings.
