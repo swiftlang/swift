@@ -413,10 +413,10 @@ decideInWarmBlock(FullApplySite AI,
 
   SILFunction *Callee = AI.getReferencedFunction();
 
-  if (Callee->getInlineStrategy() == AlwaysInline) {
+  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
     DEBUG(
       dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " <<Callee->getName() << '\n';
+      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
     );
     return true;
   }
@@ -436,8 +436,13 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
     return false;
   }
 
-  if (Callee->getInlineStrategy() == AlwaysInline)
+  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
+      );
     return true;
+  }
 
   int CalleeCost = 0;
 
