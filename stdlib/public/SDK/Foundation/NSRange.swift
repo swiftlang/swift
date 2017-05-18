@@ -105,18 +105,59 @@ extension NSRange {
 //===----------------------------------------------------------------------===//
 
 extension NSRange {
-    public init(_ x: Range<Int>) {
-        location = x.lowerBound
-        length = x.count
-    }
+  public init<R: RangeExpression>(_ rangeExpression: R)
+  where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+    let range = rangeExpression.relative(to: 0..<R.Bound.max)
+    let start: Int = numericCast(range.lowerBound)
+    let end: Int = numericCast(range.upperBound)
+    self = NSRange(location: start, length: end - start)
+  }
+  
+  public init<R: RangeExpression, S: StringProtocol>(_ rangeExpression: R, in string: S)
+  where R.Bound == String.Index, S.Index == String.Index {
+    let range = rangeExpression.relative(to: string)
+    let start = range.lowerBound.samePosition(in: string.utf16)
+    let end = range.upperBound.samePosition(in: string.utf16)
+    let location = string.utf16.distance(from: string.utf16.startIndex, to: start)
+    let length = string.utf16.distance(from: start, to: end)
+    self = NSRange(location: location, length: length)
+  }
 
-    // FIXME(ABI)#75 (Conditional Conformance): this API should be an extension on Range.
-    // Can't express it now because the compiler does not support conditional
-    // extensions with type equality constraints.
-    public func toRange() -> Range<Int>? {
-        if location == NSNotFound { return nil }
-        return location..<(location+length)
-    }
+  @available(swift, deprecated: 4, renamed: "Range.init(_:)")
+  public func toRange() -> Range<Int>? {
+      if location == NSNotFound { return nil }
+      return location..<(location+length)
+  }
+}
+
+extension Range where Bound: BinaryInteger {
+  public init?(_ range: NSRange) {
+    guard range.location != NSNotFound else { return nil }
+    self.init(uncheckedBounds: (numericCast(range.lowerBound), numericCast(range.upperBound)))
+  }
+}
+
+// This additional overload will mean Range.init(_:) defaults to Range<Int> when
+// no additional type context is provided:
+extension Range where Bound == Int {
+  public init?(_ range: NSRange) {
+    guard range.location != NSNotFound else { return nil }
+    self.init(uncheckedBounds: (range.lowerBound, range.upperBound))
+  }
+}
+
+extension Range where Bound == String.Index {
+  public init?(_ range: NSRange, in string: String) {
+    let u = string.utf16
+    guard range.location != NSNotFound,
+      let start = u.index(u.startIndex, offsetBy: range.location, limitedBy: u.endIndex),
+      let end = u.index(u.startIndex, offsetBy: range.location + range.length, limitedBy: u.endIndex),
+      let lowerBound = String.Index(start, within: string),
+      let upperBound = String.Index(end, within: string)
+    else { return nil }
+    
+    self = lowerBound..<upperBound
+  }
 }
 
 extension NSRange : CustomReflectable {
@@ -130,3 +171,4 @@ extension NSRange : CustomPlaygroundQuickLookable {
         return .range(Int64(location), Int64(length))
     }
 }
+
