@@ -38,7 +38,9 @@ bool migrator::updateCodeAndEmitRemap(CompilerInstance *Instance,
       Invocation.getLangOptions().EffectiveLanguageVersion);
 
     // If we still couldn't fix all of the errors, give up.
-    if (PreFixItInstance->getASTContext().hadError()) {
+    if (PreFixItInstance == nullptr ||
+        !PreFixItInstance->hasASTContext() ||
+        PreFixItInstance->getASTContext().hadError()) {
       return true;
     }
     M.StartInstance = PreFixItInstance.get();
