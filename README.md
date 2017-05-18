@@ -41,6 +41,9 @@ Another source of documentation is the standard library itself, located in
 (including `Int`), and the standard library gives some examples of what can be
 expressed today.
 
+You can see the rendered documentation on 
+[Read the Docs](http://apple-swift.readthedocs.org/en/latest/contents.html)
+
 
 ## Getting Started
 
