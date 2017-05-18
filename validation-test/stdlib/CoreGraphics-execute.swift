@@ -48,6 +48,17 @@ CoreGraphicsTests.test("CGColor.components") {
   expectEqual(components[3], 1)
 }
 
+CoreGraphicsTests.test("CGColor/ExpressibleByColorLiteral") {
+  let colorLit: CGColor = #colorLiteral(red: 0.25, green: 0.5, blue: 0.75,
+                                        alpha: 1.0)
+  let components = colorLit.components!
+  expectEqual(components.count, 4)
+  expectEqual(components[0], 0.25)
+  expectEqual(components[1], 0.50)
+  expectEqual(components[2], 0.75)
+  expectEqual(components[3], 1.0)
+}
+
 //===----------------------------------------------------------------------===//
 // CGPoint
 //===----------------------------------------------------------------------===//

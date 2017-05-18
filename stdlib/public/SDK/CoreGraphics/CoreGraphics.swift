@@ -48,6 +48,19 @@ extension CGColor {
 #endif
 }
 
+public protocol _CGColorInitTrampoline {
+  init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)
+}
+
+extension _CGColorInitTrampoline {
+  public init(colorLiteralRed red: Float, green: Float, blue: Float,
+              alpha: Float) {
+    self.init(red: CGFloat(red), green: CGFloat(green), blue: CGFloat(blue),
+              alpha: CGFloat(alpha))
+  }
+}
+
+extension CGColor : _CGColorInitTrampoline, _ExpressibleByColorLiteral { }
 
 //===----------------------------------------------------------------------===//
 // CGColorSpace
