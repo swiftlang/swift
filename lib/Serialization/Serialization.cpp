@@ -2315,12 +2315,46 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
                                            resultTypeID);
 }
 
-static SmallVector<Type, 4> collectDependenciesFromType(CanType ty) {
-  llvm::SmallSetVector<Type, 4> result;
-  ty.visit([&](CanType next) {
-    if (auto *nominal = next->getAnyNominal())
-      result.insert(nominal->getDeclaredInterfaceType());
+/// Returns true if the declaration of \p decl depends on \p problemContext
+/// based on lexical nesting.
+///
+/// - \p decl is \p problemContext
+/// - \p decl is declared within \p problemContext
+/// - \p decl is declared in an extension of a type that depends on
+///   \p problemContext
+static bool contextDependsOn(const NominalTypeDecl *decl,
+                             const DeclContext *problemContext) {
+  const DeclContext *dc = decl;
+  do {
+    if (dc == problemContext)
+      return true;
+    if (auto *extension = dyn_cast<ExtensionDecl>(dc))
+      dc = extension->getAsNominalTypeOrNominalTypeExtensionContext();
+    else
+      dc = dc->getParent();
+  } while (!dc->isModuleScopeContext());
+  return false;
+}
+
+static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
+                                        Type ty,
+                                        const DeclContext *excluding) {
+  ty.visit([&](Type next) {
+    auto *nominal = next->getAnyNominal();
+    if (!nominal)
+      return;
+    // FIXME: The child context case is still important for enums. It's
+    // possible an enum element has a payload that references a type declaration
+    // nested within the enum that can't be imported (for whatever reason).
+    if (contextDependsOn(nominal, excluding))
+      return;
+    seen.insert(nominal->getDeclaredInterfaceType());
   });
+}
+
+static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
+  llvm::SmallSetVector<Type, 4> result;
+  collectDependenciesFromType(result, ty, /*excluding*/nullptr);
   return result.takeVector();
 }
 
@@ -2668,9 +2702,20 @@ void Serializer::writeDecl(const Decl *D) {
                           ConformanceLookupKind::All,
                           nullptr, /*sorted=*/true);
 
-    SmallVector<TypeID, 4> inheritedTypes;
+    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited())
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
+
+    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
+      if (!nextElt->hasAssociatedValues())
+        continue;
+      collectDependenciesFromType(dependencyTypes,
+                                  nextElt->getArgumentInterfaceType(),
+                                  /*excluding*/theEnum);
+    }
+    for (Type ty : dependencyTypes)
+      inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(theEnum->getFormalAccess());
@@ -2685,7 +2730,8 @@ void Serializer::writeDecl(const Decl *D) {
                             addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
                             conformances.size(),
-                            inheritedTypes);
+                            theEnum->getInherited().size(),
+                            inheritedAndDependencyTypes);
 
     writeGenericParams(theEnum->getGenericParams());
     writeMembers(theEnum->getMembers(), false);

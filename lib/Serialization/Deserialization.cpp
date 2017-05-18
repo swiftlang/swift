@@ -3265,24 +3265,35 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     GenericEnvironmentID genericEnvID;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
-    unsigned numConformances;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numConformances, numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
                                         isImplicit, genericEnvID, rawTypeID,
                                         rawAccessLevel,
-                                        numConformances, rawInheritedIDs);
+                                        numConformances, numInheritedTypes,
+                                        rawInheritedAndDependencyIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    Identifier name = getIdentifier(nameID);
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
+
     auto genericParams = maybeReadGenericParams(DC);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theEnum = createDecl<EnumDecl>(SourceLoc(), getIdentifier(nameID),
-                                        SourceLoc(), None, genericParams, DC);
+    auto theEnum = createDecl<EnumDecl>(SourceLoc(), name, SourceLoc(), None,
+                                        genericParams, DC);
 
     declOrOffset = theEnum;
 
@@ -3301,7 +3312,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     theEnum->computeType();
 
-    handleInherited(theEnum, rawInheritedIDs);
+    handleInherited(theEnum,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     theEnum->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
