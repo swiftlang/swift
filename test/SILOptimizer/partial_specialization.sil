@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer -sil-partial-specialization-with-generic-substitutions  %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer -sil-partial-specialization -sil-partial-specialization-with-generic-substitutions  %s | %FileCheck %s
 
 // Test different cases of partial specialization.
 // In particular, test the correctness of partial specializaitons where substitutions may be generic.
