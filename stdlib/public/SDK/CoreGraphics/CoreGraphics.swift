@@ -17,9 +17,11 @@ import Darwin
 // CGAffineTransform
 //===----------------------------------------------------------------------===//
 
-extension CGAffineTransform: Equatable {}
-public func ==(lhs: CGAffineTransform, rhs: CGAffineTransform) -> Bool {
-  return lhs.__equalTo(rhs)
+extension CGAffineTransform: Equatable {
+  public static func ==(lhs: CGAffineTransform,
+                        rhs: CGAffineTransform) -> Bool {
+    return lhs.__equalTo(rhs)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -46,6 +48,19 @@ extension CGColor {
 #endif
 }
 
+public protocol _CGColorInitTrampoline {
+  init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)
+}
+
+extension _CGColorInitTrampoline {
+  public init(colorLiteralRed red: Float, green: Float, blue: Float,
+              alpha: Float) {
+    self.init(red: CGFloat(red), green: CGFloat(green), blue: CGFloat(blue),
+              alpha: CGFloat(alpha))
+  }
+}
+
+extension CGColor : _CGColorInitTrampoline, _ExpressibleByColorLiteral { }
 
 //===----------------------------------------------------------------------===//
 // CGColorSpace
@@ -228,10 +243,11 @@ extension CGPoint : CustomDebugStringConvertible {
   }
 }
 
-extension CGPoint : Equatable {}
-@_transparent // @fragile
-public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
-  return lhs.x == rhs.x  &&  lhs.y == rhs.y
+extension CGPoint : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
+    return lhs.x == rhs.x  &&  lhs.y == rhs.y
+  }
 }
 
 public extension CGSize {
@@ -279,10 +295,11 @@ extension CGSize : CustomDebugStringConvertible {
   }
 }
 
-extension CGSize : Equatable {}
-@_transparent // @fragile
-public func == (lhs: CGSize, rhs: CGSize) -> Bool {
-  return lhs.width == rhs.width  &&  lhs.height == rhs.height
+extension CGSize : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: CGSize, rhs: CGSize) -> Bool {
+    return lhs.width == rhs.width  &&  lhs.height == rhs.height
+  }
 }
 
 public extension CGVector {
@@ -302,10 +319,11 @@ public extension CGVector {
   }
 }
 
-extension CGVector : Equatable {}
-@_transparent // @fragile
-public func == (lhs: CGVector, rhs: CGVector) -> Bool {
-  return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
+extension CGVector : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: CGVector, rhs: CGVector) -> Bool {
+    return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
+  }
 }
 
 extension CGVector : CustomDebugStringConvertible {
@@ -380,10 +398,11 @@ extension CGRect : CustomDebugStringConvertible {
   }
 }
 
-extension CGRect : Equatable {}
-@_transparent // @fragile
-public func == (lhs: CGRect, rhs: CGRect) -> Bool {
-  return lhs.equalTo(rhs)
+extension CGRect : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: CGRect, rhs: CGRect) -> Bool {
+    return lhs.equalTo(rhs)
+  }
 }
 
 extension CGAffineTransform {
