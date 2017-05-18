@@ -1237,10 +1237,10 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
     Arguments.push_back("-lc++");
+    Arguments.push_back("-licucore");
     Arguments.push_back("-framework");
     Arguments.push_back("Foundation");
     Arguments.push_back("-force_load_swift_libs");
-    Arguments.push_back("-licucore");
   } else {
     Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
   }
