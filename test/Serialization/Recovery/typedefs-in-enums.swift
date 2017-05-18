@@ -19,6 +19,9 @@ func use(_: BadEnum) {} // expected-error {{use of undeclared type 'BadEnum'}}
 func test() {
   _ = producesOkayEnum()
   _ = producesBadEnum() // expected-error {{use of unresolved identifier 'producesBadEnum'}}
+
+  // Force a lookup of the ==
+  _ = Optional(OkayEnum.noPayload).map { $0 == .noPayload }
 }
 
 #else // TEST
@@ -30,6 +33,10 @@ public enum BadEnum {
   case perfectlyOkayPayload(Int)
   case problematic(Any, WrappedInt)
   case alsoOkay(Any, Any, Any)
+
+  static public func ==(a: BadEnum, b: BadEnum) -> Bool {
+    return false
+  }
 }
 // CHECK-LABEL: enum BadEnum {
 // CHECK-RECOVERY-NOT: enum BadEnum
@@ -38,16 +45,22 @@ public enum OkayEnum {
   case noPayload
   case plainOldAlias(Any, UnwrappedInt)
   case other(Int)
+
+  static public func ==(a: OkayEnum, b: OkayEnum) -> Bool {
+    return false
+  }
 }
 // CHECK-LABEL: enum OkayEnum {
 // CHECK-NEXT:   case noPayload
 // CHECK-NEXT:   case plainOldAlias(Any, UnwrappedInt)
 // CHECK-NEXT:   case other(Int)
+// CHECK-NEXT:   static func ==(a: OkayEnum, b: OkayEnum) -> Bool
 // CHECK-NEXT: }
 // CHECK-RECOVERY-LABEL: enum OkayEnum {
 // CHECK-RECOVERY-NEXT:   case noPayload
 // CHECK-RECOVERY-NEXT:   case plainOldAlias(Any, Int32)
 // CHECK-RECOVERY-NEXT:   case other(Int)
+// CHECK-RECOVERY-NEXT:   static func ==(a: OkayEnum, b: OkayEnum) -> Bool
 // CHECK-RECOVERY-NEXT: }
 
 public enum OkayEnumWithSelfRefs {
