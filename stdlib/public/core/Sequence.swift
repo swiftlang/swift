@@ -877,6 +877,13 @@ extension Sequence {
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
+    return try _filter(isIncluded)
+  }
+
+  @_transparent
+  public func _filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
 
     var result = ContiguousArray<Element>()
 

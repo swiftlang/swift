@@ -1212,6 +1212,31 @@ public func += <
   lhs.append(contentsOf: rhs)
 }
 
+extension RangeReplaceableCollection {
+  /// Returns a new collection of the same type containing, in order, the
+  /// elements of the original collection that satisfy the given predicate.
+  ///
+  /// In this example, `filter(_:)` is used to include only names shorter than
+  /// five characters.
+  ///
+  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let shortNames = cast.filter { $0.count < 5 }
+  ///     print(shortNames)
+  ///     // Prints "["Kim", "Karl"]"
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An array of the elements that `isIncluded` allowed.
+  @_inlineable
+  @available(swift, introduced: 4.0)
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> Self {
+    return try Self(self.lazy.filter(isIncluded))
+  }
+}
+
 @available(*, unavailable, renamed: "RangeReplaceableCollection")
 public typealias RangeReplaceableCollectionType = RangeReplaceableCollection
 
