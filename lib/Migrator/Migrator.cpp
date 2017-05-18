@@ -283,7 +283,7 @@ void printRemap(const StringRef OriginalFilename,
   assert(!OriginalFilename.empty());
 
   diff_match_patch<std::string> DMP;
-  const auto Diffs = DMP.diff_main(InputText, OutputText);
+  const auto Diffs = DMP.diff_main(InputText, OutputText, /*checkLines=*/false);
 
   OS << "[";
 
