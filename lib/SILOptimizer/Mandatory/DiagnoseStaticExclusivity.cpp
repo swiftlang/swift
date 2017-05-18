@@ -30,6 +30,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -305,33 +306,48 @@ static ExclusiveOrShared_t getRequiredAccess(const BeginAccessInst *BAI) {
   return ExclusiveOrShared_t::ExclusiveAccess;
 }
 
-/// Perform a syntactic suppression that returns true when the accesses are for
-/// inout arguments to a call that corresponds to one of the passed-in
-/// 'apply' instructions.
-static bool
-isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
-                                       const BeginAccessInst *Access2,
-                                       ArrayRef<ApplyInst *> CallsToSuppress) {
-  if (CallsToSuppress.empty())
-    return false;
+/// Extract the text for the given expression.
+static StringRef extractExprText(const Expr *E, SourceManager &SM) {
+  const auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,
+      E->getSourceRange());
+  return SM.extractText(CSR);
+}
+
+/// Do a sytactic pattern match to try to safely suggest a Fix-It to rewrite
+/// calls like swap(&collection[index1], &collection[index2]) to
+///
+/// This method takes an array of all the ApplyInsts for calls to swap()
+/// in the function to avoid need to construct a parent map over the AST
+/// to find the CallExpr for the inout accesses.
+static void
+tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
+                                  const BeginAccessInst *Access2,
+                                  ArrayRef<ApplyInst *> CallsToSwap,
+                                  ASTContext &Ctx,
+                                  InFlightDiagnostic &Diag) {
+  if (CallsToSwap.empty())
+    return;
 
   // Inout arguments must be modifications.
   if (Access1->getAccessKind() != SILAccessKind::Modify ||
       Access2->getAccessKind() != SILAccessKind::Modify) {
-    return false;
+    return;
   }
 
   SILLocation Loc1 = Access1->getLoc();
   SILLocation Loc2 = Access2->getLoc();
   if (Loc1.isNull() || Loc2.isNull())
-    return false;
+    return;
 
   auto *InOut1 = Loc1.getAsASTNode<InOutExpr>();
   auto *InOut2 = Loc2.getAsASTNode<InOutExpr>();
   if (!InOut1 || !InOut2)
-    return false;
+    return;
 
-  for (ApplyInst *AI : CallsToSuppress) {
+  CallExpr *FoundCall = nullptr;
+  // Look through all the calls to swap() recorded in the function to find
+  // which one we're diagnosing.
+  for (ApplyInst *AI : CallsToSwap) {
     SILLocation CallLoc = AI->getLoc();
     if (CallLoc.isNull())
       continue;
@@ -340,21 +356,89 @@ isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
     if (!CE)
       continue;
 
-    bool FoundTarget = false;
-    CE->forEachChildExpr([=,&FoundTarget](Expr *Child) {
-      if (Child == InOut1) {
-        FoundTarget = true;
-        // Stops the traversal.
-        return (Expr *)nullptr;
+    assert(CE->getCalledValue() == Ctx.getSwap(nullptr));
+    // swap() takes two arguments.
+    auto *ArgTuple = cast<TupleExpr>(CE->getArg());
+    const Expr *Arg1 = ArgTuple->getElement(0);
+    const Expr *Arg2 = ArgTuple->getElement(1);
+    if ((Arg1 == InOut1 && Arg2 == InOut2)) {
+        FoundCall = CE;
+      break;
+    }
+  }
+  if (!FoundCall)
+    return;
+
+  // We found a call to swap(&e1, &e2). Now check to see whether it
+  // matches the form swap(&someCollection[index1], &someCollection[index2]).
+  auto *SE1 = dyn_cast<SubscriptExpr>(InOut1->getSubExpr());
+  if (!SE1)
+    return;
+  auto *SE2 = dyn_cast<SubscriptExpr>(InOut2->getSubExpr());
+  if (!SE2)
+    return;
+
+  // Do the two subscripts refer to the same subscript declaration?
+  auto *Decl1 = cast<SubscriptDecl>(SE1->getDecl().getDecl());
+  auto *Decl2 = cast<SubscriptDecl>(SE2->getDecl().getDecl());
+  if (Decl1 != Decl2)
+    return;
+
+  ProtocolDecl *MutableCollectionDecl = Ctx.getMutableCollectionDecl();
+
+  // Is the subcript either (1) on MutableCollection itself or (2) a
+  // a witness for a subscript on MutableCollection?
+  bool IsSubscriptOnMutableCollection = false;
+  ProtocolDecl *ProtocolForDecl =
+      Decl1->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+  if (ProtocolForDecl) {
+    IsSubscriptOnMutableCollection = (ProtocolForDecl == MutableCollectionDecl);
+  } else {
+    for (ValueDecl *Req : Decl1->getSatisfiedProtocolRequirements()) {
+      DeclContext *ReqDC = Req->getDeclContext();
+      ProtocolDecl *ReqProto = ReqDC->getAsProtocolOrProtocolExtensionContext();
+      assert(ReqProto && "Protocol requirement not in a protocol?");
+
+      if (ReqProto == MutableCollectionDecl) {
+        IsSubscriptOnMutableCollection = true;
+        break;
       }
-      return Child;
-     }
-    );
-    if (FoundTarget)
-      return true;
+    }
   }
 
-  return false;
+  if (!IsSubscriptOnMutableCollection)
+    return;
+
+  // We're swapping two subscripts on mutable collections -- but are they
+  // the same collection? Approximate this by checking for textual
+  // equality on the base expressions. This is just an approximation,
+  // but is fine for a best-effort Fix-It.
+  SourceManager &SM = Ctx.SourceMgr;
+  StringRef Base1Text = extractExprText(SE1->getBase(), SM);
+  StringRef Base2Text = extractExprText(SE2->getBase(), SM);
+
+  if (Base1Text != Base2Text)
+    return;
+
+  auto *Index1 = dyn_cast<ParenExpr>(SE1->getIndex());
+  if (!Index1)
+    return;
+
+  auto *Index2 = dyn_cast<ParenExpr>(SE2->getIndex());
+  if (!Index2)
+    return;
+
+  StringRef Index1Text = extractExprText(Index1->getSubExpr(), SM);
+  StringRef Index2Text = extractExprText(Index2->getSubExpr(), SM);
+
+  // Suggest replacing with call with a call to swapAt().
+  SmallString<64> FixItText;
+  {
+    llvm::raw_svector_ostream Out(FixItText);
+    Out << Base1Text << ".swapAt(" << Index1Text << ", " << Index2Text << ")";
+  }
+
+  Diag.fixItReplace(FoundCall->getSourceRange(), FixItText);
 }
 
 /// Emits a diagnostic if beginning an access with the given in-progress
@@ -363,6 +447,7 @@ isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
 static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
                                          const BeginAccessInst *PriorAccess,
                                          const BeginAccessInst *NewAccess,
+                                         ArrayRef<ApplyInst *> CallsToSwap,
                                          ASTContext &Ctx) {
 
   DEBUG(llvm::dbgs() << "Conflict on " << *PriorAccess
@@ -385,25 +470,29 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
 
   SourceRange rangeForMain =
     AccessForMainDiagnostic->getLoc().getSourceRange();
+  unsigned AccessKindForMain =
+      static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind());
 
   if (const ValueDecl *VD = Storage.getStorageDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_swift3 :
                          diag::exclusivity_access_required);
-    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-             DiagnosticID,
-             VD->getDescriptiveKind(),
-             VD->getName(),
-             static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
-        .highlight(rangeForMain);
+    auto D = diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
+                       DiagnosticID,
+                       VD->getDescriptiveKind(),
+                       VD->getName(),
+                       AccessKindForMain);
+    D.highlight(rangeForMain);
+    tryFixItWithCallToCollectionSwapAt(PriorAccess, NewAccess,
+                                       CallsToSwap, Ctx, D);
   } else {
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_unknown_decl_swift3 :
                          diag::exclusivity_access_required_unknown_decl);
     diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
              DiagnosticID,
-             static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind()))
+             AccessKindForMain)
         .highlight(rangeForMain);
   }
   diagnose(Ctx, AccessForNote->getLoc().getSourceLoc(),
@@ -500,7 +589,8 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
 }
 
 /// Returns true when the apply calls the Standard Library swap().
-/// Used for diagnostic suppression.
+/// Used for fix-its to suggest replacing with Collection.swapAt()
+/// on exclusivity violations.
 bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   SILFunction *SF = AI->getReferencedFunction();
   if (!SF)
@@ -535,9 +625,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   if (Fn.empty())
     return;
 
-  // Collects calls to functions for which diagnostics about conflicting inout
-  // arguments should be suppressed.
-  llvm::SmallVector<ApplyInst *, 8> CallsToSuppress;
+  // Collects calls the Standard Library swap() for Fix-Its.
+  llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
 
   // Stores the accesses that have been found to conflict. Used to defer
   // emitting diagnostics until we can determine whether they should
@@ -606,11 +695,9 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
       }
 
       if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-        // Suppress for the arguments to the Standard Library's swap()
-        // function until we can recommend a safe alternative.
-        if (Fn.getModule().getOptions().SuppressStaticExclusivitySwap &&
-            isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
-          CallsToSuppress.push_back(AI);
+        // Record calls to swap() for potential Fix-Its.
+        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
+          CallsToSwap.push_back(AI);
       }
 
       // Sanity check to make sure entries are properly removed.
@@ -624,12 +711,9 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   for (auto &Violation : ConflictingAccesses) {
     const BeginAccessInst *PriorAccess = Violation.FirstAccess;
     const BeginAccessInst *NewAccess = Violation.SecondAccess;
-    if (isConflictOnInoutArgumentsToSuppressed(PriorAccess, NewAccess,
-                                               CallsToSuppress))
-      continue;
 
     diagnoseExclusivityViolation(Violation.Storage, PriorAccess, NewAccess,
-                                 Fn.getASTContext());
+                                 CallsToSwap, Fn.getASTContext());
   }
 }
 
