@@ -222,6 +222,9 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
 endif()
 
+list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
+list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
+
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
