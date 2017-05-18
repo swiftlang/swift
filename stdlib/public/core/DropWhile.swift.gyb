@@ -103,20 +103,18 @@ extension LazySequenceProtocol {
 public struct LazyDropWhileIndex<Base : Collection> : Comparable {
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
-}
 
-public func == <Base>(
-  lhs: LazyDropWhileIndex<Base>,
-  rhs: LazyDropWhileIndex<Base>
-) -> Bool {
-  return lhs.base == rhs.base
-}
+  public static func == (
+    lhs: LazyDropWhileIndex, rhs: LazyDropWhileIndex
+  ) -> Bool {
+    return lhs.base == rhs.base
+  }
 
-public func < <Base>(
-  lhs: LazyDropWhileIndex<Base>,
-  rhs: LazyDropWhileIndex<Base>
-) -> Bool {
-  return lhs.base < rhs.base
+  public static func < (
+    lhs: LazyDropWhileIndex, rhs: LazyDropWhileIndex
+  ) -> Bool {
+    return lhs.base < rhs.base
+  }
 }
 
 % for Traversal in ['Forward', 'Bidirectional']:

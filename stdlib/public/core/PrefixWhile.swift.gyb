@@ -111,33 +111,31 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   internal init(endOf: Base) {
     self._value = .pastEnd
   }
-}
 
-public func == <Base>(
-  lhs: LazyPrefixWhileIndex<Base>,
-  rhs: LazyPrefixWhileIndex<Base>
-) -> Bool {
-  switch (lhs._value, rhs._value) {
-  case let (.index(l), .index(r)):
-    return l == r
-  case (.pastEnd, .pastEnd):
-    return true
-  default:
-    return false
+  public static func == (
+    lhs: LazyPrefixWhileIndex, rhs: LazyPrefixWhileIndex
+  ) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case let (.index(l), .index(r)):
+      return l == r
+    case (.pastEnd, .pastEnd):
+      return true
+    default:
+      return false
+    }
   }
-}
 
-public func < <Base>(
-  lhs: LazyPrefixWhileIndex<Base>,
-  rhs: LazyPrefixWhileIndex<Base>
-) -> Bool {
-  switch (lhs._value, rhs._value) {
-  case let (.index(l), .index(r)):
-    return l < r
-  case (.index, .pastEnd):
-    return true
-  default:
-    return false
+  public static func < (
+    lhs: LazyPrefixWhileIndex, rhs: LazyPrefixWhileIndex
+  ) -> Bool {
+    switch (lhs._value, rhs._value) {
+    case let (.index(l), .index(r)):
+      return l < r
+    case (.index, .pastEnd):
+      return true
+    default:
+      return false
+    }
   }
 }
 
