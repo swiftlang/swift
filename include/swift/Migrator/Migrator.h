@@ -54,6 +54,15 @@ struct Replacement {
       return Offset + Remove;
     }
   }
+
+  bool operator<(const Replacement &Other) const {
+    return Offset < Other.Offset && Remove < Other.Remove && Text < Other.Text;
+  }
+
+  bool operator==(const Replacement &Other) const {
+    return Offset == Other.Offset && Remove == Other.Remove &&
+      Text == Other.Text;
+  }
 };
 
 struct Migrator {

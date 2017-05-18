@@ -56,12 +56,11 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                           ThisBufferID);
     auto Length = Fixit.getRange().getByteLength();
 
-    if (Fixit.getText().ltrim().rtrim() == "@objc") {
-      if (AddedObjC.count(Loc.getOpaquePointerValue())) {
-        return;
-      } else {
-        AddedObjC.insert(Loc.getOpaquePointerValue());
-      }
+    Replacement R { Offset, Length, Fixit.getText() };
+    if (Replacements.count(R)) {
+      return;
+    } else {
+      Replacements.insert(R);
     }
 
     RewriteBuf.ReplaceText(Offset, Length, Fixit.getText());
