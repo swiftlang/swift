@@ -106,9 +106,9 @@ Migrator::repeatFixitMigrations(const unsigned Iterations,
 std::unique_ptr<swift::CompilerInstance>
 Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   auto InputState = States.back();
+  auto InputText = InputState->getOutputText();
   auto InputBuffer =
-    llvm::MemoryBuffer::getMemBufferCopy(InputState->getOutputText(),
-                                         getInputFilename());
+    llvm::MemoryBuffer::getMemBufferCopy(InputText, getInputFilename());
 
   CompilerInvocation Invocation { StartInvocation };
   Invocation.clearInputs();
@@ -156,14 +156,14 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   }
 
   FixitApplyDiagnosticConsumer FixitApplyConsumer {
-    InputState->getOutputText(),
+    InputText,
     getInputFilename(),
   };
   Instance->addDiagnosticConsumer(&FixitApplyConsumer);
 
   Instance->performSema();
 
-  StringRef ResultText = InputState->getOutputText();
+  StringRef ResultText = InputText;
   unsigned ResultBufferID = InputState->getOutputBufferID();
 
   if (FixitApplyConsumer.getNumFixitsApplied() > 0) {
