@@ -1369,8 +1369,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
-  Opts.SuppressStaticExclusivitySwap |=
-      Args.hasArg(OPT_suppress_static_exclusivity_swap);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
