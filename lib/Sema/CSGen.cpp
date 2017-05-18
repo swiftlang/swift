@@ -1302,8 +1302,10 @@ namespace {
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
       CS.getTypeChecker().validateDecl(E->getDecl());
-      if (E->getDecl()->isInvalid())
+      if (E->getDecl()->isInvalid()) {
+        CS.setType(E, E->getDecl()->getInterfaceType());
         return nullptr;
+      }
 
       auto locator = CS.getConstraintLocator(E);
       

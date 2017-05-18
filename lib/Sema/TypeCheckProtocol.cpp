@@ -4119,7 +4119,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
           if (known != typeWitnesses.end())
             substitutions[archetype] = known->first;
           else
-            substitutions[archetype] = ErrorType::get(TC.Context);
+            substitutions[archetype] = ErrorType::get(archetype);
         }
       }
     }
