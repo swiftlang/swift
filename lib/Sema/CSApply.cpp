@@ -6745,7 +6745,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         assert(arg->getNumElements() == 2 && "should have two arguments");
         auto nonescaping = arg->getElements()[0];
         auto body = arg->getElements()[1];
-        auto bodyFnTy = cs.getType(body)->castTo<FunctionType>();
+        auto bodyTy = cs.getType(body)->getLValueOrInOutObjectType();
+        auto bodyFnTy = bodyTy->castTo<FunctionType>();
         auto escapableType = bodyFnTy->getInput();
         auto resultType = bodyFnTy->getResult();
         
