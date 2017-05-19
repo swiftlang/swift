@@ -868,7 +868,7 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto *genericEnv = outerDC->getGenericEnvironmentOfContext();
+  auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
 
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
