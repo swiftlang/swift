@@ -365,6 +365,15 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   assert(!AI.getSubstitutions().empty() &&
          "Expected a generic apply");
 
+  if (!EnableSILInliningOfGenerics)
+    return false;
+
+  // If all substitutions are concrete, then there is no need to perform the
+  // generic inlining. Let the generic specializer create a specialized
+  // function and then decide if it is beneficial to inline it.
+  if (!hasArchetypes(AI.getSubstitutions()))
+    return false;
+
   SILFunction *Callee = AI.getReferencedFunction();
 
   // Do not inline @_semantics functions when compiling the stdlib,
@@ -384,17 +393,6 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
     return true;
 
-  // All other generic functions should not be inlined if this kind of inlining
-  // is disabled.
-  if (!EnableSILInliningOfGenerics)
-    return false;
-
-  // If all substitutions are concrete, then there is no need to perform the
-  // generic inlining. Let the generic specializer create a specialized
-  // function and then decide if it is beneficial to inline it.
-  if (!hasArchetypes(AI.getSubstitutions()))
-    return false;
-
   // It is not clear yet if this function should be decided or not.
   return None;
 }
@@ -413,10 +411,10 @@ decideInWarmBlock(FullApplySite AI,
 
   SILFunction *Callee = AI.getReferencedFunction();
 
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
+  if (Callee->getInlineStrategy() == AlwaysInline) {
     DEBUG(
       dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
+      llvm::dbgs() << "    always-inline decision " <<Callee->getName() << '\n';
     );
     return true;
   }
@@ -436,13 +434,8 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
     return false;
   }
 
-  if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
-    DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
-      );
+  if (Callee->getInlineStrategy() == AlwaysInline)
     return true;
-  }
 
   int CalleeCost = 0;
 
