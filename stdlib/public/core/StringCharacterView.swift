@@ -323,12 +323,11 @@ extension String.CharacterView : BidirectionalCollection {
     return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
   }
 
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
-  //
+  // NOTE: Because this function is inlineable, it should contain only the fast
+  // paths of grapheme breaking that we have high confidence won't change.
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never) // Don't remove, see above.
+  @_inlineable
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
@@ -381,7 +380,16 @@ extension String.CharacterView : BidirectionalCollection {
       // TODO: Check for (potentially non-contiguous) UTF16 NSStrings,
       // especially small tagged pointers
     }
-
+    return _measureExtendedGraphemeClusterForward1(from: start)
+  }
+  
+  // NOTE: don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  //
+  @inline(never)
+  func _measureExtendedGraphemeClusterForward1(
+    from start: UnicodeScalarView.Index
+  ) -> Int {
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
@@ -403,8 +411,7 @@ extension String.CharacterView : BidirectionalCollection {
     // CFString API available, or worst case we can map over it via UTextFuncs.
 
     return legacyGraphemeForward(
-      start: start, end: end, startIndexUTF16: startIndexUTF16
-    )
+      start: start, end: end, startIndexUTF16: startIndexUTF16)
   }
 
   @inline(never)
@@ -441,12 +448,12 @@ extension String.CharacterView : BidirectionalCollection {
     return start._position - startIndexUTF16
   }
 
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
+  // NOTE: Because this function is inlineable, it should contain only the fast
+  // paths of grapheme breaking that we have high confidence won't change.
   //
   /// Returns the length of the previous extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never) // Don't remove, see above.
+  @_inlineable
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {
@@ -498,6 +505,16 @@ extension String.CharacterView : BidirectionalCollection {
       }
     }
 
+    return _measureExtendedGraphemeClusterBackward1(from: start)
+  }
+  
+  // NOTE: don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  //
+  @inline(never)
+  func _measureExtendedGraphemeClusterBackward1(
+    from start: UnicodeScalarView.Index
+  ) -> Int {
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
