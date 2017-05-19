@@ -52,7 +52,8 @@ def get_run_funcs(filepath):
 
 
 def find_run_funcs():
-    swift_files = all_files(perf_dir, '.swift')
+    swift_files = all_files(single_source_dir, '.swift')
+    swift_files += all_files(multi_source_dir, '.swift')
     return sorted([func for f in swift_files for func in get_run_funcs(f)])
 
 
