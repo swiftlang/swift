@@ -20,10 +20,20 @@ tests.test("Array.filter return type") {
   expectType([Int].self, &filtered)
 }
 
+tests.test("ContiguousArray.filter return type") {
+  var filtered = ContiguousArray(0..<10).filter { $0 % 2 == 0 }
+  expectType([Int].self, &filtered)
+}
+
+tests.test("ArraySlice.filter return type") {
+  var filtered = Array(0..<10)[0..<10].filter { $0 % 2 == 0 }
+  expectType([Int].self, &filtered)
+}
+
 tests.test("String.filter can return [Character]") {
   let filtered = "Hello, World".filter { "A" <= $0 && $0 <= "Z"} as [Character]
   expectEqualSequence("HW", filtered)
 }
 
-
 runAllTests()
+
