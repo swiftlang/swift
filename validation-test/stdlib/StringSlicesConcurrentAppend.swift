@@ -13,17 +13,21 @@ import Glibc
 var StringTestSuite = TestSuite("String")
 
 extension String {
-  var bufferID: UInt {
-    return unsafeBitCast(_core._owner, to: UInt.self)
-  }
   var capacityInBytes: Int {
     return _core.nativeBuffer!.capacity
   }
 }
 
-// Swift.String has an optimization that allows us to append to a shared string
-// buffer.  Make sure that it works correctly when two threads try to append to
-// different non-shared strings that point to the same shared buffer.
+// Swift.String used to hsve an optimization that allowed us to append to a
+// shared string buffer.  However, as lock-free programming invariably does, it
+// introduced a race condition [rdar://25398370 Data Race in StringBuffer.append
+// (found by TSan)].
+//
+// These tests verify that it works correctly when two threads try to append to
+// different non-shared strings that point to the same shared buffer.  They used
+// to verify that the first append could succeed without reallocation even if
+// the string was held by another thread, but that has been removed.  This could
+// still be an effective thread-safety test, though.
 
 enum ThreadID {
   case Primary
@@ -79,11 +83,6 @@ func sliceConcurrentAppendThread(_ tid: ThreadID) {
       secondaryString = privateString
     }
     barrier()
-    if tid == .Primary {
-      expectTrue(
-        (privateString.bufferID == sharedString.bufferID) !=
-          (secondaryString.bufferID == sharedString.bufferID))
-    }
   }
 }
 
