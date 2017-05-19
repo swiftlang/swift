@@ -42,3 +42,37 @@ func constructArray(_ n: Int) {
 
 typealias FixIt0 = Int[] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
 
+// Make sure preCheckExpression() properly folds member types.
+
+class Outer {
+  class Middle {
+    class Inner {}
+    typealias Alias = Inner
+  }
+
+  typealias Alias = Middle
+}
+
+func takesInner(_: [Outer.Middle.Inner]) {}
+
+takesInner([Outer.Middle.Inner]())
+takesInner([Outer.Alias.Inner]())
+takesInner([Outer.Middle.Alias]())
+takesInner([Outer.Alias.Alias]())
+
+takesInner([array.Outer.Middle.Inner]())
+takesInner([array.Outer.Alias.Inner]())
+takesInner([array.Outer.Middle.Alias]())
+takesInner([array.Outer.Alias.Alias]())
+
+// FIXME: We should support this with nested types of generic parameters also
+protocol HasAssocType {
+  associatedtype A
+}
+
+func takesAssocType<T : HasAssocType>(_: T, _: [T.A]) {}
+
+func passAssocType<T : HasAssocType>(_ t: T) {
+  takesAssocType(t, [T.A]())
+  // expected-error@-1 {{cannot call value of non-function type '[T.A.Type]'}}
+}
