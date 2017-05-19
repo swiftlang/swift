@@ -816,6 +816,11 @@ private:
   }
 
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
+    const LangOptions &langOpts = M.getASTContext().LangOpts;
+    if (!langOpts.EnableSwift3ObjCInference ||
+        langOpts.WarnSwift3ObjCInference == Swift3ObjCInferenceWarnings::None) {
+      return;
+    }
     auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
     if (!attr || !attr->isSwift3Inferred())
       return;
