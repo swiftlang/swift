@@ -581,8 +581,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
     if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
-      if (isa<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(Entry);
+      if (auto *TD = dyn_cast<TypeDecl>(Entry))
+        ComponentsR[0]->setValue(TD);
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }

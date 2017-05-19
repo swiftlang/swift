@@ -1137,9 +1137,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
   // If the component has already been bound to a declaration, handle
   // that now.
-  if (ValueDecl *VD = comp->getBoundDecl()) {
-    auto *typeDecl = cast<TypeDecl>(VD);
-
+  if (auto *typeDecl = comp->getBoundDecl()) {
     // Resolve the type declaration within this context.
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                            dyn_cast<GenericIdentTypeRepr>(comp), options,
@@ -1328,9 +1326,7 @@ static Type resolveNestedIdentTypeComponent(
   }
 
   // Phase 2: If a declaration has already been bound, use it.
-  if (ValueDecl *decl = comp->getBoundDecl()) {
-    auto *typeDecl = cast<TypeDecl>(decl);
-
+  if (auto *typeDecl = comp->getBoundDecl()) {
     // Otherwise, simply substitute the parent type into the member.
     auto memberType = TC.substMemberTypeWithBase(DC->getParentModule(),
                                                  typeDecl, parentTy);
@@ -1428,7 +1424,7 @@ static Type resolveNestedIdentTypeComponent(
     }
 
     memberType = ty;
-    member = cast_or_null<TypeDecl>(comp->getBoundDecl());
+    member = comp->getBoundDecl();
   } else {
     memberType = memberTypes.back().second;
     member = memberTypes.back().first;
@@ -1530,7 +1526,7 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
                                  bool AllowPotentiallyUnavailableProtocol) {
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
-    if (auto typeDecl = dyn_cast_or_null<TypeDecl>(comp->getBoundDecl())) {
+    if (auto *typeDecl = comp->getBoundDecl()) {
       // In Swift 3, components other than the last one were not properly
       // checked for availability.
       // FIXME: We should try to downgrade these errors to warnings, not just
@@ -4053,13 +4049,13 @@ public:
       return;
     
     auto comp = T->getComponentRange().back();
-    if (auto proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
+    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported(&TC)) {
         TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
                     proto->getName());
         T->setInvalid();
       }
-    } else if (auto alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
+    } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       if (!alias->hasInterfaceType())
         return;
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
