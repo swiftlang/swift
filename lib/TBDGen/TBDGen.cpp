@@ -281,9 +281,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     auto hasFieldOffset =
         !isGeneric && var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
-      // Field are only direct if the class's internals are completely known.
-      auto isIndirect = !CD->hasFixedLayout();
-      addSymbol(LinkEntity::forFieldOffset(var, isIndirect));
+      // FIXME: a field only has one sort of offset, but it is moderately
+      // non-trivial to compute which one. Including both is less painful than
+      // missing the correct one (for now), so we do that.
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/true));
     }
 
     // The non-allocating forms of the constructors and destructors.
