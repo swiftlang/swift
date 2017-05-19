@@ -6206,15 +6206,17 @@ public:
         if (func->isAccessor()) return;
       }
 
-      // If @objc was explicit or handles elsewhere, nothing to do.
+      // If @objc was explicit or handled elsewhere, nothing to do.
       if (!attr->isSwift3Inferred()) return;
 
-      // When warning about all deprecated @objc inference rules,
-      // we only need to do this check if we have implicit 'dynamic'.
-      if (TC.Context.LangOpts.WarnSwift3ObjCInference !=
-            Swift3ObjCInferenceWarnings::None) {
-        if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>())
-          if (!dynamicAttr->isImplicit()) return;
+      // If we aren't warning about Swift 3 @objc inference, we're done.
+      if (TC.Context.LangOpts.WarnSwift3ObjCInference ==
+            Swift3ObjCInferenceWarnings::None)
+        return;
+
+      // If 'dynamic' was implicit, we'll already have warned about this.
+      if (auto dynamicAttr = Base->getAttrs().getAttribute<DynamicAttr>()) {
+        if (!dynamicAttr->isImplicit()) return;
       }
 
       // The overridden declaration needs to be in an extension.
