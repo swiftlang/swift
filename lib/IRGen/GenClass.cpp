@@ -714,12 +714,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
                                /*allow uninitialized*/ true);
     StackAllocSize = -1;
-    auto &ti = IGF.getTypeInfo(selfType);
-    assert(ti.getSchema().size() == 1);
-    assert(!ti.getSchema().containsAggregate());
-    auto destType = ti.getSchema()[0].getScalarType();
-    auto *val = emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
-    return IGF.Builder.CreateBitCast(val, destType);
+    return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   llvm::Value *metadata =
@@ -755,8 +750,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                TailArraysRef TailArrays) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
-    return emitObjCAllocObjectCall(IGF, metadata, 
-                                   selfType.getSwiftRValueType());
+    return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   // Otherwise, allocate using Swift's routines.
