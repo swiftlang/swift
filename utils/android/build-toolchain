@@ -17,6 +17,7 @@ ANDROID_NDK_DIR="${ANDROID_NDK_DIR:?Please set the Android NDK directory in the 
 ANDROID_ICU_DIR="${ANDROID_ICU_DIR:?Please set the libiconv-libicu-android directory in the ANDROID_ICU_DIR environment variable}"
 
 SWIFT_INSTALL_DIR="${SRC_DIR}/../swift-android-toolchain"
+SWIFT_LINUX_DIR="${SRC_DIR}/../build/Ninja-ReleaseAssert/swift-linux-x86_64"
 
 ./utils/build-script \
     -R \
@@ -28,12 +29,8 @@ SWIFT_INSTALL_DIR="${SRC_DIR}/../swift-android-toolchain"
     --android-icu-i18n "${ANDROID_NDK_DIR}/armeabi-v7a" \
     --android-icu-i18n-include "${ANDROID_NDK_DIR}/armeabi-v7a/icu/source/i18n" || exit
 
-cd ${SRC_DIR}/..
-test -e build/Ninja-ReleaseAssert/swift-linux-x86_64 || exit
+test -e ${SWIFT_LINUX_DIR} || exit
 rm -rf ${SWIFT_INSTALL_DIR}
 mkdir -p ${SWIFT_INSTALL_DIR}/usr
 
-cp -r build/Ninja-ReleaseAssert/swift-linux-x86_64/bin ${SWIFT_INSTALL_DIR}/usr
-cp -r build/Ninja-ReleaseAssert/swift-linux-x86_64/lib ${SWIFT_INSTALL_DIR}/usr
-cp -r build/Ninja-ReleaseAssert/swift-linux-x86_64/include ${SWIFT_INSTALL_DIR}/usr
-
+cp -r ${SWIFT_LINUX_DIR}/{bin,lib,include} ${SWIFT_INSTALL_DIR}/usr
