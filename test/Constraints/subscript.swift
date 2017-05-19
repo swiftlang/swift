@@ -106,3 +106,15 @@ class C_r25601561 {
     return s
   }
 }
+
+class B_27017206 {
+  subscript(_ keyword: String) -> [B_27017206] {
+    return []
+  }
+}
+class D_27017206 : B_27017206 {
+  func foo() {
+    self.subscript("bar")
+    // expected-error@-1 {{brace notation is required when refering to subscript}}
+  }
+}

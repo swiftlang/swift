@@ -2610,7 +2610,23 @@ namespace {
       }
 
       auto selected = *selectedElt;
-      switch (selected.choice.getKind()) {
+      auto selectedChoice = selected.choice;
+
+      if (selectedChoice.isDecl()) {
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+          if (isa<SubscriptDecl>(selectedChoice.getDecl())) {
+            auto nameRange = UDE->getNameLoc().getSourceRange();
+            cs.TC
+                .diagnose(UDE->getLoc(), diag::use_brace_notation_for_subscript)
+                .highlight(nameLoc.getSourceRange())
+                .fixItReplaceChars(UDE->getDotLoc(), nameRange.End, "[")
+                .fixItReplace(UDE->getEndLoc(), "]");
+            return nullptr;
+          }
+        }
+      }
+
+      switch (selectedChoice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         // Look through an implicitly unwrapped optional.
         auto baseTy = cs.getType(base)->getRValueType();
