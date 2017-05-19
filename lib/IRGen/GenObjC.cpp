@@ -608,8 +608,17 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     ClassDecl *searchClassDecl =
       searchClass.castTo<MetatypeType>().getInstanceType()
         .getClassOrBoundGenericClass();
-    searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
-                                                   NotForDefinition);
+    if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, searchClassDecl)) {
+      searchValue = emitClassHeapMetadataRef(IGF,
+                                             searchClass.castTo<MetatypeType>().getInstanceType(),
+                                             MetadataValueType::ObjCClass,
+                                             /*allow uninitialized*/ true);
+      searchValue = emitLoadOfObjCHeapMetadataRef(IGF, searchValue);
+      searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
+    } else {
+      searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
+                                                     NotForDefinition);
+    }
   }
   
   // Store the receiver and class to the struct.
