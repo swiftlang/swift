@@ -52,7 +52,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   URLRequest.swift
   UUID.swift
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics Dispatch IOKit ObjectiveC # auto-updated

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sorted-sil -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sorted-sil -emit-sil -O %s | %FileCheck %s
 
 // We used to crash on this when trying to devirtualize t.boo(a, 1),
 // because it is an "apply" with replacement types that contain
