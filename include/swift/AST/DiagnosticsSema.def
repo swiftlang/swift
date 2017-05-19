@@ -2008,6 +2008,9 @@ NOTE(enum_raw_value_incrementing_from_zero,none,
 
 // Derived conformances
 
+ERROR(cannot_synthesize_in_extension,none,
+      "implementation of %0 cannot be automatically synthesized in an extension yet", (Type))
+
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
@@ -2028,6 +2031,17 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+
+NOTE(codable_extraneous_codingkey_case_here,none,
+     "CodingKey case %0 does match any stored properties", (Identifier))
+NOTE(codable_non_conforming_property_here,none,
+     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Identifier))
+NOTE(codable_non_decoded_property_here,none,
+     "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
+NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
+     "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
+NOTE(codable_codingkeys_type_does_not_conform_here,none,
+     "cannot automatically synthesize %0 because 'CodingKeys' does not conform to CodingKey", (Type))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
