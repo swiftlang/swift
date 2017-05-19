@@ -371,12 +371,7 @@ namespace {
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(
           cast<GenericTypeParamType>(genericParam->getCanonicalType()));
-        
-        if (known == replacements.end())
-          return cs.createTypeVariable(nullptr,
-                                       TVO_PrefersSubtypeBinding |
-                                       TVO_MustBeMaterializable);
-        
+        assert(known != replacements.end());
         return known->second;
       }
 
@@ -417,11 +412,23 @@ namespace {
         // Open up the generic type.
         cs.openGeneric(unboundDecl->getInnermostDeclContext(),
                        unboundDecl->getDeclContext(),
-                       unboundDecl->getInnermostGenericParamTypes(),
-                       unboundDecl->getGenericRequirements(),
+                       unboundDecl->getGenericSignature(),
                        /*skipProtocolSelfConstraint=*/false,
                        locator,
                        unboundReplacements);
+
+        if (parentTy) {
+          auto subs = parentTy->getContextSubstitutions(
+            parentTy->getAnyNominal());
+          for (auto pair : subs) {
+            auto found = unboundReplacements.find(
+              cast<GenericTypeParamType>(pair.first));
+            assert(found != unboundReplacements.end() &&
+                  "Missing generic parameter?");
+            cs.addConstraint(ConstraintKind::Equal, found->second, pair.second,
+                             locator);
+          }
+        }
         
         // Map the generic parameters to their corresponding type variables.
         llvm::SmallVector<TypeLoc, 4> arguments;
@@ -815,22 +822,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
-void ConstraintSystem::openGeneric(
-       DeclContext *innerDC,
-       DeclContext *outerDC,
-       GenericSignature *signature,
-       bool skipProtocolSelfConstraint,
-       ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements) {
-  openGeneric(innerDC,
-              outerDC,
-              signature->getGenericParams(),
-              signature->getRequirements(),
-              skipProtocolSelfConstraint,
-              locator,
-              replacements);
-}
-
 /// Bind type variables for archetypes that are determined from
 /// context.
 ///
@@ -906,16 +897,18 @@ static void bindArchetypesFromContext(
 void ConstraintSystem::openGeneric(
        DeclContext *innerDC,
        DeclContext *outerDC,
-       ArrayRef<GenericTypeParamType *> params,
-       ArrayRef<Requirement> requirements,
+       GenericSignature *sig,
        bool skipProtocolSelfConstraint,
        ConstraintLocatorBuilder locator,
        OpenedTypeMap &replacements) {
+  if (sig == nullptr)
+    return;
+
   auto locatorPtr = getConstraintLocator(locator);
   auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
-  for (auto gp : params) {
+  for (auto gp : sig->getGenericParams()) {
     auto contextTy = genericEnv->mapTypeIntoContext(gp);
     if (auto *archetype = contextTy->getAs<ArchetypeType>())
       locatorPtr = getConstraintLocator(
@@ -941,7 +934,7 @@ void ConstraintSystem::openGeneric(
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
 
   // Add the requirements as constraints.
-  for (auto req : requirements) {
+  for (auto req : sig->getRequirements()) {
   switch (req.getKind()) {
     case RequirementKind::Conformance: {
       auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
@@ -1110,12 +1103,10 @@ ConstraintSystem::getTypeOfMemberReference(
     if (isTypeReference)
       openedType = openedType->castTo<AnyMetatypeType>()->getInstanceType();
 
-    if (auto sig = innerDC->getGenericSignatureOfContext()) {
-      // Open up the generic parameter list for the container.
-      openGeneric(innerDC, outerDC, sig,
-                  /*skipProtocolSelfConstraint=*/true,
-                  locator, replacements);
-    }
+    // Open up the generic parameter list for the container.
+    openGeneric(innerDC, outerDC, innerDC->getGenericSignatureOfContext(),
+                /*skipProtocolSelfConstraint=*/true,
+                locator, replacements);
 
     // Open up the type of the member.
     openedType = openType(openedType, locator, replacements);

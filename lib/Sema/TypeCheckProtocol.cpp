@@ -6649,9 +6649,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   OpenedTypeMap replacements;
   auto genericSig = protocolExtension->getGenericSignature();
   
-  cs.openGeneric(protocolExtension, protocolExtension,
-                 genericSig->getGenericParams(),
-                 genericSig->getRequirements(), false,
+  cs.openGeneric(protocolExtension, protocolExtension, genericSig, false,
                  ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type variable to the provided type.
