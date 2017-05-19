@@ -15,23 +15,23 @@ import _SwiftFoundationOverlayShims
 
 extension IndexSet.Index {
     public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value == rhs.value && rhs.rangeIndex == rhs.rangeIndex
+        return lhs.value == rhs.value
     }
 
     public static func <(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value < rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value < rhs.value
     }
 
     public static func <=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value <= rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value <= rhs.value
     }
 
     public static func >(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value > rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value > rhs.value
     }
 
     public static func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value >= rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value >= rhs.value
     }
 }
 
