@@ -678,8 +678,10 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   }
 
   if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
-    // Inlining of generics is not allowed.
-    return nullptr;
+    // Inlining of generics is not allowed unless it is an @inline(__always)
+    // or transparent function.
+    if (Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
+      return nullptr;
   }
 
   // IRGen cannot handle partial_applies containing opened_existentials
