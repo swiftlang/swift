@@ -124,6 +124,28 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2:0:0",
     "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
     "LeftComment": "String",
@@ -233,6 +255,72 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)UIView(im)systemLayoutSizeFittingSize:withHorizontalFittingPriority:verticalFittingPriority:",
+    "LeftComment": "UILayoutPriority",
+    "RightUsr": "",
+    "RightComment": "UILayoutPriority",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)UIView(im)systemLayoutSizeFittingSize:withHorizontalFittingPriority:verticalFittingPriority:",
+    "LeftComment": "UILayoutPriority",
+    "RightUsr": "",
+    "RightComment": "UILayoutPriority",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)UIView(im)contentHuggingPriorityForAxis:",
+    "LeftComment": "UILayoutPriority",
+    "RightUsr": "",
+    "RightComment": "UILayoutPriority",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)UIView(im)setContentHuggingPriority:forAxis:",
+    "LeftComment": "UILayoutPriority",
+    "RightUsr": "",
+    "RightComment": "UILayoutPriority",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)UIView(im)contentCompressionResistancePriorityForAxis:",
+    "LeftComment": "UILayoutPriority",
+    "RightUsr": "",
+    "RightComment": "UILayoutPriority",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)UIView(im)setContentCompressionResistancePriority:forAxis:",
+    "LeftComment": "UILayoutPriority",
+    "RightUsr": "",
+    "RightComment": "UILayoutPriority",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)MPSBinaryImageKernel(im)encodeToCommandBuffer:primaryTexture:inPlaceSecondaryTexture:fallbackCopyAllocator:",
@@ -265,17 +353,6 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(cs)MPSMatrixDescriptor(cm)rowBytesFromColumns:dataType:",
-    "LeftComment": "rowBytes(fromColumns:dataType:)",
-    "RightUsr": "",
-    "RightComment": "rowBytes(forColumns:dataType:)",
-    "ModuleName": "MetalPerformanceShaders"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "WrapOptional",
     "ChildIndex": "0",
@@ -304,7 +381,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -315,7 +403,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -326,7 +425,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -337,7 +447,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:bundle:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithNames:scaleFactor:bundle:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -348,7 +469,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -359,7 +491,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -370,7 +513,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:completionHandler:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -381,7 +535,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithContentsOfURL:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -392,7 +557,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTexturesWithContentsOfURLs:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -403,7 +579,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithData:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -414,7 +601,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithCGImage:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -425,7 +623,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithMDLTexture:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -436,7 +645,18 @@
     "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:",
     "LeftComment": "String",
     "RightUsr": "",
-    "RightComment": "MTKTextureLoaderOption",
+    "RightComment": "MTKTextureLoader.Option",
+    "ModuleName": "MetalKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:0:1",
+    "LeftUsr": "c:objc(cs)MTKTextureLoader(im)newTextureWithName:scaleFactor:bundle:options:error:",
+    "LeftComment": "NSObject",
+    "RightUsr": "",
+    "RightComment": "Any",
     "ModuleName": "MetalKit"
   },
   {
@@ -636,6 +856,116 @@
     "RightUsr": "",
     "RightComment": "matrix_float4x4",
     "ModuleName": "ModelIO"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)blackColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)whiteColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)grayColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)redColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)greenColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)blueColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)cyanColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)magentaColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)yellowColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CIColor(cm)clearColor",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreImage"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -1119,6 +1449,127 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AVMediaType",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioChannelLayout(im)initWithLayoutTag:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioConverter(im)initFromFormat:toFormat:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithStreamDescription:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithStreamDescription:channelLayout:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initStandardFormatWithSampleRate:channels:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithCommonFormat:sampleRate:channels:interleaved:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithSettings:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioNode(im)nameForInputBus:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioNode(im)nameForOutputBus:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioPCMBuffer(im)initWithPCMFormat:frameCapacity:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioTime(im)extrapolateTimeFromAnchor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
@@ -1664,6 +2115,61 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)attributesAtIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)dataFromRange:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)fileWrapperFromRange:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:",
     "LeftComment": "String",
@@ -1928,12 +2434,56 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2:0:0",
     "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSAttributedStringKey",
     "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)readFromURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -2224,6 +2774,149 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs5RangeSc__S0_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs11ClosedRangeSc__S0_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFT12charactersInGVs5RangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFT12charactersInGVs11ClosedRangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFT12charactersInGVs5RangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFT12charactersInGVs11ClosedRangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFScT8insertedSb17memberAfterInsertSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFScT8insertedSb17memberAfterInsertSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6updateFT4withSc_GSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6updateFT4withSc_GSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFScGSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFScGSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet8containsFScSb",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "0",
     "LeftUsr": "s:FOV10Foundation8URLError4CodecFT8rawValueSi_GSqS1__",
@@ -2267,6 +2960,270 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCTNSNotificationExpectation(im)initWithName:object:notificationCenter:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSNotification.Name",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCTNSNotificationExpectation(im)initWithName:object:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSNotification.Name",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCTNSNotificationExpectation(im)initWithName:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSNotification.Name",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTWaiter(im)waitForExpectations:timeout:",
+    "LeftComment": "XCTWaiterResult",
+    "RightUsr": "",
+    "RightComment": "XCTWaiter.Result",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTWaiter(im)waitForExpectations:timeout:enforceOrder:",
+    "LeftComment": "XCTWaiterResult",
+    "RightUsr": "",
+    "RightComment": "XCTWaiter.Result",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTWaiter(cm)waitForExpectations:timeout:",
+    "LeftComment": "XCTWaiterResult",
+    "RightUsr": "",
+    "RightComment": "XCTWaiter.Result",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTWaiter(cm)waitForExpectations:timeout:enforceOrder:",
+    "LeftComment": "XCTWaiterResult",
+    "RightUsr": "",
+    "RightComment": "XCTWaiter.Result",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)XCTestCase(im)recordFailureWithDescription:inFile:atLine:expected:",
+    "LeftComment": "UInt",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTestCase(cm)testInvocations",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTestCase(cm)defaultPerformanceMetrics",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)XCTestCase(im)measureMetrics:automaticallyStartMeasuring:forBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "XCTPerformanceMetric",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTestCase(cm)defaultTestSuite",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCTestCase(im)expectationForNotification:object:handler:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSNotification.Name",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4",
+    "LeftUsr": "c:objc(cs)XCTestCaseRun(im)recordFailureInTest:withDescription:inFile:atLine:expected:",
+    "LeftComment": "UInt",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4",
+    "LeftUsr": "c:objc(pl)XCTestObservation(im)testSuite:didFailWithDescription:inFile:atLine:",
+    "LeftComment": "UInt",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4",
+    "LeftUsr": "c:objc(pl)XCTestObservation(im)testCase:didFailWithDescription:inFile:atLine:",
+    "LeftComment": "UInt",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTestObservationCenter(cm)sharedTestObservationCenter",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4",
+    "LeftUsr": "c:objc(cs)XCTestObserver(im)testCaseDidFail:withDescription:inFile:atLine:",
+    "LeftComment": "UInt",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)XCTestRun(im)recordFailureWithDescription:inFile:atLine:expected:",
+    "LeftComment": "UInt",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCTestSuite(cm)defaultTestSuite",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)XCUIDevice(cm)sharedDevice",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIDevice(im)pressButton:",
+    "LeftComment": "XCUIDeviceButton",
+    "RightUsr": "",
+    "RightComment": "XCUIDevice.Button",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElement(im)descendantsMatchingType:",
+    "LeftComment": "XCUIElementType",
+    "RightUsr": "",
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElement(im)childrenMatchingType:",
+    "LeftComment": "XCUIElementType",
+    "RightUsr": "",
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
@@ -2278,146 +3235,113 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSUndefinedAttributeType",
-    "LeftComment": "undefinedAttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)elementAtIndex:",
+    "LeftComment": "UInt",
     "RightUsr": "",
-    "RightComment": "NSUndefinedAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSInteger16AttributeType",
-    "LeftComment": "integer16AttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)elementBoundByIndex:",
+    "LeftComment": "UInt",
     "RightUsr": "",
-    "RightComment": "NSInteger16AttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "Int",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSInteger32AttributeType",
-    "LeftComment": "integer32AttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)elementMatchingType:identifier:",
+    "LeftComment": "XCUIElementType",
     "RightUsr": "",
-    "RightComment": "NSInteger32AttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSInteger64AttributeType",
-    "LeftComment": "integer64AttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)descendantsMatchingType:",
+    "LeftComment": "XCUIElementType",
     "RightUsr": "",
-    "RightComment": "NSInteger64AttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSDecimalAttributeType",
-    "LeftComment": "decimalAttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)childrenMatchingType:",
+    "LeftComment": "XCUIElementType",
     "RightUsr": "",
-    "RightComment": "NSDecimalAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSDoubleAttributeType",
-    "LeftComment": "doubleAttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)matchingType:identifier:",
+    "LeftComment": "XCUIElementType",
     "RightUsr": "",
-    "RightComment": "NSDoubleAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSFloatAttributeType",
-    "LeftComment": "floatAttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIElementQuery(im)containingType:identifier:",
+    "LeftComment": "XCUIElementType",
     "RightUsr": "",
-    "RightComment": "NSFloatAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIElement.Type",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSStringAttributeType",
-    "LeftComment": "stringAttributeType",
+    "LeftUsr": "c:objc(cs)XCUIRemote(cm)sharedRemote",
+    "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "NSStringAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSBooleanAttributeType",
-    "LeftComment": "booleanAttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIRemote(im)pressButton:",
+    "LeftComment": "XCUIRemoteButton",
     "RightUsr": "",
-    "RightComment": "NSBooleanAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIRemote.Button",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSDateAttributeType",
-    "LeftComment": "dateAttributeType",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)XCUIRemote(im)pressButton:forDuration:",
+    "LeftComment": "XCUIRemoteButton",
     "RightUsr": "",
-    "RightComment": "NSDateAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSBinaryDataAttributeType",
-    "LeftComment": "binaryDataAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSBinaryDataAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSTransformableAttributeType",
-    "LeftComment": "transformableAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSTransformableAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSObjectIDAttributeType",
-    "LeftComment": "objectIDAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSObjectIDAttributeType",
-    "ModuleName": "CoreData"
+    "RightComment": "XCUIRemote.Button",
+    "ModuleName": "XCTest"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -3001,6 +3925,34 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@UILayoutPriorityRequired",
+    "OldPrintedName": "UILayoutPriorityRequired",
+    "NewPrintedName": "required",
+    "NewTypeName": "UILayoutPriority"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@UILayoutPriorityDefaultHigh",
+    "OldPrintedName": "UILayoutPriorityDefaultHigh",
+    "NewPrintedName": "defaultHigh",
+    "NewTypeName": "UILayoutPriority"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@UILayoutPriorityDefaultLow",
+    "OldPrintedName": "UILayoutPriorityDefaultLow",
+    "NewPrintedName": "defaultLow",
+    "NewTypeName": "UILayoutPriority"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@UILayoutPriorityFittingSizeLevel",
+    "OldPrintedName": "UILayoutPriorityFittingSizeLevel",
+    "NewPrintedName": "fittingSizeLevel",
+    "NewTypeName": "UILayoutPriority"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKModelErrorDomain",
     "OldPrintedName": "MTKModelErrorDomain",
     "NewPrintedName": "domain",
@@ -3015,101 +3967,115 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@MTKTextureLoaderCubeLayoutVertical",
-    "OldPrintedName": "MTKTextureLoaderCubeLayoutVertical",
-    "NewPrintedName": "vertical",
-    "NewTypeName": "MTKTextureLoaderCubeLayout"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderErrorDomain",
     "OldPrintedName": "MTKTextureLoaderErrorDomain",
     "NewPrintedName": "domain",
-    "NewTypeName": "MTKTextureLoaderError"
+    "NewTypeName": "MTKTextureLoader.Error"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderErrorKey",
     "OldPrintedName": "MTKTextureLoaderErrorKey",
     "NewPrintedName": "key",
-    "NewTypeName": "MTKTextureLoaderError"
+    "NewTypeName": "MTKTextureLoader.Error"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionAllocateMipmaps",
     "OldPrintedName": "MTKTextureLoaderOptionAllocateMipmaps",
     "NewPrintedName": "allocateMipmaps",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionGenerateMipmaps",
     "OldPrintedName": "MTKTextureLoaderOptionGenerateMipmaps",
     "NewPrintedName": "generateMipmaps",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionSRGB",
     "OldPrintedName": "MTKTextureLoaderOptionSRGB",
     "NewPrintedName": "SRGB",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionTextureUsage",
     "OldPrintedName": "MTKTextureLoaderOptionTextureUsage",
     "NewPrintedName": "textureUsage",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionTextureCPUCacheMode",
     "OldPrintedName": "MTKTextureLoaderOptionTextureCPUCacheMode",
     "NewPrintedName": "textureCPUCacheMode",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionTextureStorageMode",
     "OldPrintedName": "MTKTextureLoaderOptionTextureStorageMode",
     "NewPrintedName": "textureStorageMode",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionCubeLayout",
     "OldPrintedName": "MTKTextureLoaderOptionCubeLayout",
     "NewPrintedName": "cubeLayout",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOptionOrigin",
     "OldPrintedName": "MTKTextureLoaderOptionOrigin",
     "NewPrintedName": "origin",
-    "NewTypeName": "MTKTextureLoaderOption"
+    "NewTypeName": "MTKTextureLoader.Option"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@MTKTextureLoaderCubeLayoutVertical",
+    "OldPrintedName": "MTKTextureLoaderCubeLayoutVertical",
+    "NewPrintedName": "vertical",
+    "NewTypeName": "MTKTextureLoader.CubeLayout"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOriginTopLeft",
     "OldPrintedName": "MTKTextureLoaderOriginTopLeft",
     "NewPrintedName": "topLeft",
-    "NewTypeName": "MTKTextureLoaderOrigin"
+    "NewTypeName": "MTKTextureLoader.Origin"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOriginBottomLeft",
     "OldPrintedName": "MTKTextureLoaderOriginBottomLeft",
     "NewPrintedName": "bottomLeft",
-    "NewTypeName": "MTKTextureLoaderOrigin"
+    "NewTypeName": "MTKTextureLoader.Origin"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@MTKTextureLoaderOriginFlippedVertically",
     "OldPrintedName": "MTKTextureLoaderOriginFlippedVertically",
     "NewPrintedName": "flippedVertically",
-    "NewTypeName": "MTKTextureLoaderOrigin"
+    "NewTypeName": "MTKTextureLoader.Origin"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@T@MTKTextureLoaderCallback",
+    "OldPrintedName": "MTKTextureLoaderCallback",
+    "NewPrintedName": "Callback",
+    "NewTypeName": "MTKTextureLoader"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@T@MTKTextureLoaderArrayCallback",
+    "OldPrintedName": "MTKTextureLoaderArrayCallback",
+    "NewPrintedName": "ArrayCallback",
+    "NewTypeName": "MTKTextureLoader"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -3305,20 +4271,6 @@
     "Usr": "c:@AVFileTypeEnhancedAC3",
     "OldPrintedName": "AVFileTypeEnhancedAC3",
     "NewPrintedName": "eac3",
-    "NewTypeName": "AVFileType"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@AVStreamingKeyDeliveryContentKeyType",
-    "OldPrintedName": "AVStreamingKeyDeliveryContentKeyType",
-    "NewPrintedName": "streamingKeyDeliveryContentKeyType",
-    "NewTypeName": "AVFileType"
-  },
-  {
-    "DiffItemKind": "TypeMemberDiffItem",
-    "Usr": "c:@AVStreamingKeyDeliveryPersistentContentKeyType",
-    "OldPrintedName": "AVStreamingKeyDeliveryPersistentContentKeyType",
-    "NewPrintedName": "streamingKeyDeliveryPersistentContentKeyType",
     "NewTypeName": "AVFileType"
   },
   {
@@ -7418,6 +8370,146 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextEffectLetterpressStyle",
+    "OldPrintedName": "NSTextEffectLetterpressStyle",
+    "NewPrintedName": "letterpressStyle",
+    "NewTypeName": "NSAttributedString.TextEffectStyle"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPlainTextDocumentType",
+    "OldPrintedName": "NSPlainTextDocumentType",
+    "NewPrintedName": "plain",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRTFTextDocumentType",
+    "OldPrintedName": "NSRTFTextDocumentType",
+    "NewPrintedName": "rtf",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRTFDTextDocumentType",
+    "OldPrintedName": "NSRTFDTextDocumentType",
+    "NewPrintedName": "rtfd",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSHTMLTextDocumentType",
+    "OldPrintedName": "NSHTMLTextDocumentType",
+    "NewPrintedName": "html",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionOrientation",
+    "OldPrintedName": "NSTextLayoutSectionOrientation",
+    "NewPrintedName": "orientation",
+    "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionRange",
+    "OldPrintedName": "NSTextLayoutSectionRange",
+    "NewPrintedName": "range",
+    "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDocumentTypeDocumentAttribute",
+    "OldPrintedName": "NSDocumentTypeDocumentAttribute",
+    "NewPrintedName": "documentType",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCharacterEncodingDocumentAttribute",
+    "OldPrintedName": "NSCharacterEncodingDocumentAttribute",
+    "NewPrintedName": "characterEncoding",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultAttributesDocumentAttribute",
+    "OldPrintedName": "NSDefaultAttributesDocumentAttribute",
+    "NewPrintedName": "defaultAttributes",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPaperSizeDocumentAttribute",
+    "OldPrintedName": "NSPaperSizeDocumentAttribute",
+    "NewPrintedName": "paperSize",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPaperMarginDocumentAttribute",
+    "OldPrintedName": "NSPaperMarginDocumentAttribute",
+    "NewPrintedName": "paperMargin",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewSizeDocumentAttribute",
+    "OldPrintedName": "NSViewSizeDocumentAttribute",
+    "NewPrintedName": "viewSize",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewZoomDocumentAttribute",
+    "OldPrintedName": "NSViewZoomDocumentAttribute",
+    "NewPrintedName": "viewZoom",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewModeDocumentAttribute",
+    "OldPrintedName": "NSViewModeDocumentAttribute",
+    "NewPrintedName": "viewMode",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSReadOnlyDocumentAttribute",
+    "OldPrintedName": "NSReadOnlyDocumentAttribute",
+    "NewPrintedName": "readOnly",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBackgroundColorDocumentAttribute",
+    "OldPrintedName": "NSBackgroundColorDocumentAttribute",
+    "NewPrintedName": "backgroundColor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSHyphenationFactorDocumentAttribute",
+    "OldPrintedName": "NSHyphenationFactorDocumentAttribute",
+    "NewPrintedName": "hyphenationFactor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultTabIntervalDocumentAttribute",
+    "OldPrintedName": "NSDefaultTabIntervalDocumentAttribute",
+    "NewPrintedName": "defaultTabInterval",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionsAttribute",
+    "OldPrintedName": "NSTextLayoutSectionsAttribute",
+    "NewPrintedName": "textLayoutSections",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontAttributeName",
     "OldPrintedName": "NSFontAttributeName",
     "NewPrintedName": "font",
@@ -7844,6 +8936,391 @@
     "NewTypeName": "NSNotification.Name"
   },
   {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCTPerformanceMetric_WallClockTime",
+    "OldPrintedName": "XCTPerformanceMetric_WallClockTime",
+    "NewPrintedName": "wallClockTime",
+    "NewTypeName": "XCTPerformanceMetric"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCTWaiterResult",
+    "OldPrintedName": "XCTWaiterResult",
+    "NewPrintedName": "Result",
+    "NewTypeName": "XCTWaiter"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCTestErrorCode",
+    "OldPrintedName": "XCTestErrorCode",
+    "NewPrintedName": "Code",
+    "NewTypeName": "XCTestError"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCTestErrorCode",
+    "OldPrintedName": "XCTestErrorCode",
+    "NewPrintedName": "_ErrorType",
+    "NewTypeName": "XCTestError.Code"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCUIDeviceButton",
+    "OldPrintedName": "XCUIDeviceButton",
+    "NewPrintedName": "Button",
+    "NewTypeName": "XCUIDevice"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCUIElementType",
+    "OldPrintedName": "XCUIElementType",
+    "NewPrintedName": "Type",
+    "NewTypeName": "XCUIElement"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCUIUserInterfaceSizeClass",
+    "OldPrintedName": "XCUIUserInterfaceSizeClass",
+    "NewPrintedName": "SizeClass",
+    "NewTypeName": "XCUIElement"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCUIKeyModifierFlags",
+    "OldPrintedName": "XCUIKeyModifierFlags",
+    "NewPrintedName": "KeyModifierFlags",
+    "NewTypeName": "XCUIElement"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyDelete",
+    "OldPrintedName": "XCUIKeyboardKeyDelete",
+    "NewPrintedName": "delete",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyReturn",
+    "OldPrintedName": "XCUIKeyboardKeyReturn",
+    "NewPrintedName": "return",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyEnter",
+    "OldPrintedName": "XCUIKeyboardKeyEnter",
+    "NewPrintedName": "enter",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyTab",
+    "OldPrintedName": "XCUIKeyboardKeyTab",
+    "NewPrintedName": "tab",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeySpace",
+    "OldPrintedName": "XCUIKeyboardKeySpace",
+    "NewPrintedName": "space",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyEscape",
+    "OldPrintedName": "XCUIKeyboardKeyEscape",
+    "NewPrintedName": "escape",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyUpArrow",
+    "OldPrintedName": "XCUIKeyboardKeyUpArrow",
+    "NewPrintedName": "upArrow",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyDownArrow",
+    "OldPrintedName": "XCUIKeyboardKeyDownArrow",
+    "NewPrintedName": "downArrow",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyLeftArrow",
+    "OldPrintedName": "XCUIKeyboardKeyLeftArrow",
+    "NewPrintedName": "leftArrow",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyRightArrow",
+    "OldPrintedName": "XCUIKeyboardKeyRightArrow",
+    "NewPrintedName": "rightArrow",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF1",
+    "OldPrintedName": "XCUIKeyboardKeyF1",
+    "NewPrintedName": "F1",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF2",
+    "OldPrintedName": "XCUIKeyboardKeyF2",
+    "NewPrintedName": "F2",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF3",
+    "OldPrintedName": "XCUIKeyboardKeyF3",
+    "NewPrintedName": "F3",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF4",
+    "OldPrintedName": "XCUIKeyboardKeyF4",
+    "NewPrintedName": "F4",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF5",
+    "OldPrintedName": "XCUIKeyboardKeyF5",
+    "NewPrintedName": "F5",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF6",
+    "OldPrintedName": "XCUIKeyboardKeyF6",
+    "NewPrintedName": "F6",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF7",
+    "OldPrintedName": "XCUIKeyboardKeyF7",
+    "NewPrintedName": "F7",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF8",
+    "OldPrintedName": "XCUIKeyboardKeyF8",
+    "NewPrintedName": "F8",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF9",
+    "OldPrintedName": "XCUIKeyboardKeyF9",
+    "NewPrintedName": "F9",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF10",
+    "OldPrintedName": "XCUIKeyboardKeyF10",
+    "NewPrintedName": "F10",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF11",
+    "OldPrintedName": "XCUIKeyboardKeyF11",
+    "NewPrintedName": "F11",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF12",
+    "OldPrintedName": "XCUIKeyboardKeyF12",
+    "NewPrintedName": "F12",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF13",
+    "OldPrintedName": "XCUIKeyboardKeyF13",
+    "NewPrintedName": "F13",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF14",
+    "OldPrintedName": "XCUIKeyboardKeyF14",
+    "NewPrintedName": "F14",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF15",
+    "OldPrintedName": "XCUIKeyboardKeyF15",
+    "NewPrintedName": "F15",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF16",
+    "OldPrintedName": "XCUIKeyboardKeyF16",
+    "NewPrintedName": "F16",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF17",
+    "OldPrintedName": "XCUIKeyboardKeyF17",
+    "NewPrintedName": "F17",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF18",
+    "OldPrintedName": "XCUIKeyboardKeyF18",
+    "NewPrintedName": "F18",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyF19",
+    "OldPrintedName": "XCUIKeyboardKeyF19",
+    "NewPrintedName": "F19",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyForwardDelete",
+    "OldPrintedName": "XCUIKeyboardKeyForwardDelete",
+    "NewPrintedName": "forwardDelete",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyHome",
+    "OldPrintedName": "XCUIKeyboardKeyHome",
+    "NewPrintedName": "home",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyEnd",
+    "OldPrintedName": "XCUIKeyboardKeyEnd",
+    "NewPrintedName": "end",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyPageUp",
+    "OldPrintedName": "XCUIKeyboardKeyPageUp",
+    "NewPrintedName": "pageUp",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyPageDown",
+    "OldPrintedName": "XCUIKeyboardKeyPageDown",
+    "NewPrintedName": "pageDown",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyClear",
+    "OldPrintedName": "XCUIKeyboardKeyClear",
+    "NewPrintedName": "clear",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyHelp",
+    "OldPrintedName": "XCUIKeyboardKeyHelp",
+    "NewPrintedName": "help",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyCapsLock",
+    "OldPrintedName": "XCUIKeyboardKeyCapsLock",
+    "NewPrintedName": "capsLock",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyShift",
+    "OldPrintedName": "XCUIKeyboardKeyShift",
+    "NewPrintedName": "shift",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyControl",
+    "OldPrintedName": "XCUIKeyboardKeyControl",
+    "NewPrintedName": "control",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyOption",
+    "OldPrintedName": "XCUIKeyboardKeyOption",
+    "NewPrintedName": "option",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyCommand",
+    "OldPrintedName": "XCUIKeyboardKeyCommand",
+    "NewPrintedName": "command",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyRightShift",
+    "OldPrintedName": "XCUIKeyboardKeyRightShift",
+    "NewPrintedName": "rightShift",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyRightControl",
+    "OldPrintedName": "XCUIKeyboardKeyRightControl",
+    "NewPrintedName": "rightControl",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyRightOption",
+    "OldPrintedName": "XCUIKeyboardKeyRightOption",
+    "NewPrintedName": "rightOption",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeyRightCommand",
+    "OldPrintedName": "XCUIKeyboardKeyRightCommand",
+    "NewPrintedName": "rightCommand",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@XCUIKeyboardKeySecondaryFn",
+    "OldPrintedName": "XCUIKeyboardKeySecondaryFn",
+    "NewPrintedName": "secondaryFn",
+    "NewTypeName": "XCUIKeyboardKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@XCUIRemoteButton",
+    "OldPrintedName": "XCUIRemoteButton",
+    "NewPrintedName": "Button",
+    "NewTypeName": "XCUIRemote"
+  },
+  {
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:@F@CGPathApplyWithBlock",
     "Index": 1
@@ -7905,8 +9382,13 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)NSProgress(im)performAsCurrentWithPendingUnitCount:usingBlock:",
-    "Index": 2
+    "Usr": "c:objc(cs)XCTestCase(im)measureBlock:",
+    "Index": 1
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)XCTestCase(im)measureMetrics:automaticallyStartMeasuring:forBlock:",
+    "Index": 3
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
@@ -8047,30 +9529,6 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)NFCNDEFReaderSessionDelegate(im)readerSession:didInvalidateWithError:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)NFCNDEFReaderSessionDelegate(im)readerSession:didDetectNDEFs:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)NFCReaderSessionDelegate(im)readerSession:didDetectTags:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)NFCReaderSessionDelegate(im)readerSession:didInvalidateWithError:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MLMultiDimDoubleArray(im)fill:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)MLMultiDimDoubleArray(im)fillWithValueArray:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MDLAnimatedScalarArray(im)copyFloatArrayInto:maxCount:atTime:"
   },
   {
@@ -8136,6 +9594,14 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)AVAsset(im)tracksWithMediaCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioNode(im)nameForInputBus:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioNode(im)nameForOutputBus:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8235,11 +9701,23 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSAttributedString(im)attributesAtIndex:effectiveRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSLinguisticTagger(cm)availableTagSchemesForLanguage:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromURL:options:documentAttributes:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8267,11 +9745,31 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)NSProgress(im)performAsCurrentWithPendingUnitCount:usingBlock:"
+    "Usr": "c:objc(pl)NSURLSessionTaskDelegate(im)URLSession:taskIsWaitingForConnectivity:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "s:So8ProgressC10FoundationE16performAsCurrentxs5Int64V20withPendingUnitCount_xyKc5usingtKlF"
+    "Usr": "s:10Foundation12CharacterSetV6insertys5RangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6insertys11ClosedRangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6removeys5RangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6removeys11ClosedRangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6insertSb8inserted_s7UnicodeO6ScalarV17memberAfterInserttAIF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6removes7UnicodeO6ScalarVSgAHF"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -8280,6 +9778,62 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "s:10Foundation19PropertyListDecoderC6decodexxm_AA4DataV4fromSo0bC13SerializationC0bC6FormatOz6formattKs9DecodableRzlF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCTWaiter(im)waitForExpectations:timeout:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCTWaiter(im)waitForExpectations:timeout:enforceOrder:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCTWaiter(cm)waitForExpectations:timeout:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCTWaiter(cm)waitForExpectations:timeout:enforceOrder:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCUIElementQuery(im)elementAtIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCUIElementQuery(im)elementBoundByIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCUIRemote(im)pressButton:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)XCUIRemote(im)pressButton:forDuration:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)fetchHistoryAfterDate:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)fetchHistoryAfterToken:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)fetchHistoryAfterTransaction:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)deleteHistoryBeforeDate:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)deleteHistoryBeforeToken:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)deleteHistoryBeforeTransaction:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
