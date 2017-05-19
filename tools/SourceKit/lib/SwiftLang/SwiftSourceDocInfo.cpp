@@ -1346,7 +1346,7 @@ static void resolveRange(SwiftLangSupport &Lang,
       case RangeKind::SingleExpression: {
         SmallString<64> SS;
         llvm::raw_svector_ostream OS(SS);
-        Info.ExitInfo.getPointer()->print(OS);
+        Info.ExitInfo.ReturnType->print(OS);
         Result.ExprType = OS.str();
         Receiver(Result);
         return;
