@@ -1439,6 +1439,12 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   if (!Linker.empty()) {
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
   }
+  
+  // Add the linker search path
+  if (const Arg *A = context.Args.getLastArg(options::OPT_ld_path)) {
+    Arguments.push_back("-B");
+    Arguments.push_back(context.Args.MakeArgString(A->getValue()));
+  }
 
   // Configure the toolchain.
   // By default, use the system clang++ to link.
