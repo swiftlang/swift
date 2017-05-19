@@ -249,3 +249,33 @@ let c = PandorasBox(30)
 // CHECK: 30
 // Uses ConstantDirect access pattern
 print(c.value)
+
+// Super method calls from a generic subclass of an @objc class
+class HasDynamicMethod : NSObject {
+  @objc dynamic class func funkyTown() {
+    print("Here we are with \(self)")
+  }
+}
+
+class GenericOverrideOfDynamicMethod<T> : HasDynamicMethod {
+  override class func funkyTown() {
+    print("Hello from \(self) with T = \(T.self)")
+    super.funkyTown()
+    print("Goodbye from \(self) with T = \(T.self)")
+  }
+}
+
+class ConcreteOverrideOfDynamicMethod : GenericOverrideOfDynamicMethod<Int> {
+  override class func funkyTown() {
+    print("Hello from \(self)")
+    super.funkyTown()
+    print("Goodbye from \(self)")
+  }
+}
+
+// CHECK: Hello from ConcreteOverrideOfDynamicMethod
+// CHECK: Hello from ConcreteOverrideOfDynamicMethod with T = Int
+// CHECK: Here we are with ConcreteOverrideOfDynamicMethod
+// CHECK: Goodbye from ConcreteOverrideOfDynamicMethod with T = Int
+// CHECK: Goodbye from ConcreteOverrideOfDynamicMethod
+ConcreteOverrideOfDynamicMethod.funkyTown()
