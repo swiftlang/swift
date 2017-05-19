@@ -1155,7 +1155,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         ImportHint hint,
                                         bool allowNSUIntegerAsInt,
                                         bool canFullyBridgeTypes,
-                                        OptionalTypeKind optKind) {
+                                        OptionalTypeKind optKind,
+                                        bool resugarNSErrorPointer) {
   if (importKind == ImportTypeKind::Abstract) {
     return importedType;
   }
@@ -1223,10 +1224,16 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
           != elementClass->getModuleContext()->getName())
       return Type();
 
-    return impl.getNamedSwiftType(
-            foundationModule,
-            impl.SwiftContext.getSwiftName(
-              KnownFoundationEntity::NSErrorPointer));
+
+    if (resugarNSErrorPointer)
+      return impl.getNamedSwiftType(
+        foundationModule,
+          impl.SwiftContext.getSwiftName(
+            KnownFoundationEntity::NSErrorPointer));
+
+    // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?
+    // so we have to manually make them match.
+    return OptionalType::get(importedType);
   };
   if (Type result = maybeImportNSErrorPointer())
     return result;
@@ -1390,7 +1397,8 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                                                ImportTypeKind importKind,
                                                bool allowNSUIntegerAsInt,
                                                bool canFullyBridgeTypes,
-                                               OptionalTypeKind optionality) {
+                                               OptionalTypeKind optionality,
+                                               bool resugarNSErrorPointer) {
   if (type.isNull())
     return Type();
 
@@ -1437,7 +1445,8 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                                      importKind, importResult.Hint,
                                      allowNSUIntegerAsInt,
                                      canFullyBridgeTypes,
-                                     optionality);
+                                     optionality,
+                                     resugarNSErrorPointer);
 }
 
 bool ClangImporter::Implementation::shouldImportGlobalAsLet(
@@ -1981,8 +1990,9 @@ Type ClangImporter::Implementation::importMethodType(
   for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
     auto param = params[paramIndex];
     auto paramTy = param->getType();
+    auto paramIsError = errorInfo && paramIndex == errorInfo->ErrorParameterIndex;
     if (paramTy->isVoidType()) {
-      assert(!errorInfo || paramIndex != errorInfo->ErrorParameterIndex);
+      assert(!paramIsError);
       ++nameIndex;
       continue;
     }
@@ -2023,18 +2033,27 @@ Type ClangImporter::Implementation::importMethodType(
         importKind = ImportTypeKind::CFRetainedOutParameter;
       else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
         importKind = ImportTypeKind::CFUnretainedOutParameter;
-      
+
+      // If this is the throws error parameter, we don't need to convert any
+      // NSError** arguments to the sugared NSErrorPointer typealias form,
+      // because all that is done with it is retrieving the canonical
+      // type. Avoiding the sugar breaks a loop in Foundation caused by method
+      // on NSString that has an error parameter. FIXME: This is a work-around
+      // for the specific case when the throws conversion works, but is not
+      // sufficient if it fails. (The correct, overarching fix is ClangImporter
+      // being lazier.)
       swiftParamTy = importType(paramTy, importKind,
                                 allowNSUIntegerAsIntInParam,
                                 /*isFullyBridgeable*/true,
-                                optionalityOfParam);
+                                optionalityOfParam,
+                                /*resugarNSErrorPointer=*/!paramIsError);
     }
     if (!swiftParamTy)
       return Type();
 
     // If this is the error parameter, remember it, but don't build it
     // into the parameter type.
-    if (errorInfo && paramIndex == errorInfo->ErrorParameterIndex) {
+    if (paramIsError) {
       errorParamType = swiftParamTy->getCanonicalType();
 
       // ...unless we're supposed to replace it with ().

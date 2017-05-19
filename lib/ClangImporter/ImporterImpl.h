@@ -911,7 +911,8 @@ public:
                   ImportTypeKind kind,
                   bool allowNSUIntegerAsInt,
                   bool canFullyBridgeTypes,
-                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
+                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
+                  bool resugarNSErrorPointer = true);
 
   /// \brief Import the given function type.
   ///
