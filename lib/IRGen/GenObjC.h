@@ -224,7 +224,7 @@ namespace irgen {
   /// Allocate an Objective-C object.
   llvm::Value *emitObjCAllocObjectCall(IRGenFunction &IGF,
                                        llvm::Value *classPtr,
-                                       CanType resultType);
+                                       SILType resultType);
 
 } // end namespace irgen
 } // end namespace swift
