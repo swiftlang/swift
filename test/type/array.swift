@@ -47,11 +47,27 @@ typealias FixIt0 = Int[] // expected-error{{array types are now written with the
 class Outer {
   class Middle {
     class Inner {}
+    class GenericInner<V> {}
+
     typealias Alias = Inner
+  }
+
+  class GenericMiddle<U> {
+    class Inner {}
   }
 
   typealias Alias = Middle
 }
+
+class GenericOuter<T> {
+  class Middle {
+    class Inner {}
+  }
+}
+
+func takesMiddle(_: [Outer.Middle]) {}
+
+takesMiddle([Outer.Middle]())
 
 func takesInner(_: [Outer.Middle.Inner]) {}
 
@@ -64,6 +80,29 @@ takesInner([array.Outer.Middle.Inner]())
 takesInner([array.Outer.Alias.Inner]())
 takesInner([array.Outer.Middle.Alias]())
 takesInner([array.Outer.Alias.Alias]())
+
+func takesMiddle(_: [GenericOuter<Int>.Middle]) {}
+
+takesMiddle([GenericOuter<Int>.Middle]())
+
+func takesInner(_: [GenericOuter<Int>.Middle.Inner]) {}
+
+takesInner([GenericOuter<Int>.Middle.Inner]())
+takesInner([array.GenericOuter<Int>.Middle.Inner]())
+
+func takesMiddle(_: [Outer.GenericMiddle<Int>]) {}
+
+takesMiddle([Outer.GenericMiddle<Int>]())
+
+func takesInner(_: [Outer.GenericMiddle<Int>.Inner]) {}
+
+takesInner([Outer.GenericMiddle<Int>.Inner]())
+takesInner([array.Outer.GenericMiddle<Int>.Inner]())
+
+func takesInner(_: [Outer.Middle.GenericInner<Int>]) {}
+
+takesInner([Outer.Middle.GenericInner<Int>]())
+takesInner([array.Outer.Middle.GenericInner<Int>]())
 
 // FIXME: We should support this with nested types of generic parameters also
 protocol HasAssocType {

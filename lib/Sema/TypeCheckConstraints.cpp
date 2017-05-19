@@ -770,6 +770,8 @@ namespace {
     /// Simplify unresolved dot expressions which are nested type productions.
     TypeExpr *simplifyNestedTypeExpr(UnresolvedDotExpr *UDE);
 
+    TypeExpr *simplifyUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *USE);
+
     /// Simplify a key path expression into a canonical form.
     void resolveKeyPathExpr(KeyPathExpr *KPE);
 
@@ -841,37 +843,19 @@ namespace {
       ExprStack.pop_back();
 
       // Mark the direct callee as being a callee.
-      if (auto call = dyn_cast<CallExpr>(expr))
+      if (auto *call = dyn_cast<CallExpr>(expr))
         markDirectCallee(call->getFn());
 
       // Fold sequence expressions.
-      if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TC.foldSequence(seqExpr, DC);
         return result->walk(*this);
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
-      if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
-        for (TypeLoc &type : us->getUnresolvedParams()) {
-          if (TC.validateType(type, DC))
-            return nullptr;
-        }
-        
-        // If this is a reference type a specialized type, form a TypeExpr.
-        if (auto *dre = dyn_cast<DeclRefExpr>(us->getSubExpr())) {
-          if (auto *TD = dyn_cast<TypeDecl>(dre->getDecl())) {
-            SmallVector<TypeRepr*, 4> TypeReprs;
-            for (auto elt : us->getUnresolvedParams())
-              TypeReprs.push_back(elt.getTypeRepr());
-            auto angles = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
-            return TypeExpr::createForSpecializedDecl(dre->getLoc(),
-                                                      TD,
-                                            TC.Context.AllocateCopy(TypeReprs),
-                                                      angles);
-          }
-        }
-
-        return expr;
+      if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+        if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
+          return typeExpr;
       }
       
       // If we're about to step out of a ClosureExpr, restore the DeclContext.
@@ -1175,6 +1159,80 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
           auto *NewTypeRepr = IdentTypeRepr::create(TC.Context, Components);
           return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
         }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
+    UnresolvedSpecializeExpr *us) {
+  SmallVector<TypeRepr *, 4> genericArgs;
+  for (auto &type : us->getUnresolvedParams()) {
+    genericArgs.push_back(type.getTypeRepr());
+  }
+
+  auto angleRange = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
+
+  // If this is a reference type a specialized type, form a TypeExpr.
+
+  // The base is either a DeclRefExpr pointing at a type...
+  if (auto *dre = dyn_cast<DeclRefExpr>(us->getSubExpr())) {
+    if (auto *TD = dyn_cast<TypeDecl>(dre->getDecl())) {
+      return TypeExpr::createForSpecializedDecl(
+        dre->getLoc(), TD,
+        TC.Context.AllocateCopy(genericArgs),
+        angleRange);
+    }
+  }
+
+  // Or a TypeExpr that we already resolved.
+  if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
+    if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
+      // Create a new list of components.
+      SmallVector<ComponentIdentTypeRepr *, 2> components;
+      for (auto *component : ITR->getComponentRange()) {
+        components.push_back(component);
+      }
+
+      auto *last = components.back();
+      components.pop_back();
+
+      if (isa<SimpleIdentTypeRepr>(last) &&
+          last->getBoundDecl()) {
+        if (isa<TypeAliasDecl>(last->getBoundDecl())) {
+          // If any of our parent types are unbound, bail out and let
+          // the constraint solver can infer generic parameters for them.
+          //
+          // This is because a type like GenericClass.GenericAlias<Int>
+          // cannot be represented directly.
+          //
+          // This also means that [GenericClass.GenericAlias<Int>]()
+          // won't parse correctly, whereas if we fully specialize
+          // GenericClass, it does.
+          //
+          // FIXME: Once we can model generic typealiases properly, rip
+          // this out.
+          for (auto *component : components) {
+            auto *componentDecl = dyn_cast_or_null<GenericTypeDecl>(
+              component->getBoundDecl());
+
+            if (isa<SimpleIdentTypeRepr>(component) &&
+                componentDecl &&
+                componentDecl->isGeneric())
+              return nullptr;
+          }
+        }
+
+        auto *genericComp = new (TC.Context) GenericIdentTypeRepr(
+          last->getIdLoc(), last->getIdentifier(),
+          TC.Context.AllocateCopy(genericArgs), angleRange);
+        genericComp->setValue(last->getBoundDecl());
+        components.push_back(genericComp);
+
+        auto *genericRepr = IdentTypeRepr::create(TC.Context, components);
+        return new (TC.Context) TypeExpr(TypeLoc(genericRepr, Type()));
       }
     }
   }

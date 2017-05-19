@@ -1557,6 +1557,11 @@ namespace {
           // open type.
           auto locator = CS.getConstraintLocator(expr);
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
+            if (tc.validateType(specializations[i], CS.DC,
+                                (TR_InExpression |
+                                 TR_AllowUnboundGenerics)))
+              return Type();
+
             CS.addConstraint(ConstraintKind::Equal,
                              typeVars[i], specializations[i].getType(),
                              locator);
