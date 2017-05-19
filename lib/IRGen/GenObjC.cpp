@@ -752,7 +752,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
 /// Call [self allocWithZone: nil].
 llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             llvm::Value *self,
-                                            CanType classType) {
+                                            SILType selfType) {
   // Get an appropriately-cast function pointer.
   auto fn = IGF.IGM.getObjCAllocWithZoneFn();
 
@@ -763,7 +763,11 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   }
   
   auto call = IGF.Builder.CreateCall(fn, self);
-  return call;
+
+  // Cast the returned pointer to the right type.
+  auto &classTI = IGF.getTypeInfo(selfType);
+  llvm::Type *destType = classTI.getStorageType();
+  return IGF.Builder.CreateBitCast(call, destType);
 }
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
