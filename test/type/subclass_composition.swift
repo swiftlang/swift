@@ -531,3 +531,10 @@ func staticMembers(
   _ = m2.instanceProtocolMember // expected-error {{instance member 'instanceProtocolMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
   _ = m2.instanceClassMember // expected-error {{instance member 'instanceClassMember' cannot be used on type 'ClassWithStaticMember & ProtocolWithStaticMember'}}
 }
+
+// Make sure we correctly form subclass existentials in expression context.
+func takesBaseIntAndPArray(_: [Base<Int> & P2]) {}
+
+func passesBaseIntAndPArray() {
+  takesBaseIntAndPArray([Base<Int> & P2]())
+}

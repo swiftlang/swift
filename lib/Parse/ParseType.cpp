@@ -581,8 +581,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
     if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
-      if (isa<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(Entry);
+      if (auto *TD = dyn_cast<TypeDecl>(Entry))
+        ComponentsR[0]->setValue(TD);
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
@@ -1136,9 +1136,13 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::exclaim_postfix:
   case tok::question_postfix:
     return true;
-  
-  case tok::oper_binary_unspaced:
+
   case tok::oper_binary_spaced:
+    if (tok.getText() == "&")
+      return true;
+
+    LLVM_FALLTHROUGH;
+  case tok::oper_binary_unspaced:
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
     return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
