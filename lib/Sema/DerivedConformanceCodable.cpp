@@ -64,6 +64,47 @@ static bool superclassIsDecodable(ClassDecl *target) {
                                  C.getProtocol(KnownProtocolKind::Decodable));
 }
 
+/// Returns whether the given type conforms to the given {En,De}codable
+/// protocol.
+///
+/// \param tc The typechecker to use in validating {En,De}codable conformance.
+///
+/// \param context The \c DeclContext the var declarations belong to.
+///
+/// \param target The \c Type to validate.
+///
+/// \param proto The \c ProtocolDecl to check conformance to.
+static bool typeConformsToProtocol(TypeChecker &tc, DeclContext *context,
+                                   Type target, ProtocolDecl *proto) {
+  // FIXME: Remove when conditional conformance lands.
+  // Some generic types in the stdlib currently conform to Codable even when
+  // the type they are generic on does not [Optional, Array, Set, Dictionary].
+  // For synthesizing conformance, we don't want to consider these types as
+  // Codable if the nested type is not Codable. Look through the generic type
+  // parameters of these types recursively to avoid synthesizing code that will
+  // crash at runtime.
+  if (!tc.conformsToProtocol(target, proto, context, ConformanceCheckFlags::Used))
+    return false;
+
+  // We only want to look through generic params for these types; other types
+  // may validly conform to Codable even if their generic param types do not.
+  auto canType = target->getCanonicalType();
+  if (auto genericType = dyn_cast<BoundGenericType>(canType)) {
+    auto *nominalTypeDecl = genericType->getAnyNominal();
+    if (nominalTypeDecl == tc.Context.getOptionalDecl() ||
+        nominalTypeDecl == tc.Context.getArrayDecl() ||
+        nominalTypeDecl == tc.Context.getSetDecl() ||
+        nominalTypeDecl == tc.Context.getDictionaryDecl()) {
+      for (auto paramType : genericType->getGenericArgs()) {
+        if (!typeConformsToProtocol(tc, context, paramType, proto))
+          return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 /// Returns whether the given variable conforms to the given protocol.
 ///
 /// \param tc The typechecker to use in validating {En,De}codable conformance.
@@ -94,10 +135,10 @@ static bool varConformsToProtocol(TypeChecker &tc, DeclContext *context,
 
   // If the var decl didn't validate, it may still not have a type; confirm it
   // has a type before ensuring the type conforms to Codable.
-  // TODO: Peer through Optional and collection types to get at inner type.
-  return varDecl->hasType() &&
-         tc.conformsToProtocol(varDecl->getType(), proto, context,
-                               ConformanceCheckFlags::Used);
+  if (!varDecl->hasType())
+    return false;
+
+  return typeConformsToProtocol(tc, context, varDecl->getType(), proto);
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
@@ -147,9 +188,16 @@ validateCodingKeysEnum(TypeChecker &tc, EnumDecl *codingKeysDecl,
     bool conforms = varConformsToProtocol(tc, target->getDeclContext(),
                                           it->second, proto);
     if (!conforms) {
-      tc.diagnose(it->second->getLoc(),
-                  diag::codable_non_conforming_property_here,
-                  proto->getDeclaredType(), it->second->getName());
+      // This may have failed either because varDecl failed to validate (and
+      // does not have a type), or because the type truly did not conform. We'll
+      // only diagnose in the case where we have a type though, since this will
+      // fail elsewhere.
+      if (it->second->hasType()) {
+        tc.diagnose(it->second->getLoc(),
+                    diag::codable_non_conforming_property_here,
+                    proto->getDeclaredType(), it->second->getType());
+      }
+
       propertiesAreValid = false;
       continue;
     }
@@ -302,9 +350,16 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
   bool allConform = true;
   for (auto *varDecl : target->getStoredProperties(/*skipInaccessible=*/true)) {
     if (!varConformsToProtocol(tc, target->getDeclContext(), varDecl, proto)) {
-      tc.diagnose(varDecl->getLoc(),
-                  diag::codable_non_conforming_property_here,
-                  proto->getDeclaredType(), varDecl->getName());
+      // This may have failed either because varDecl failed to validate (and
+      // does not have a type), or because the type truly did not conform. We'll
+      // only diagnose in the case where we have a type though, since this will
+      // fail elsewhere.
+      if (varDecl->hasType()) {
+        tc.diagnose(varDecl->getLoc(),
+                    diag::codable_non_conforming_property_here,
+                    proto->getDeclaredType(), varDecl->getType());
+      }
+
       allConform = false;
       continue;
     }
