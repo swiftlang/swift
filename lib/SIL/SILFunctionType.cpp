@@ -2135,12 +2135,14 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
                                   const SubstitutionMap &subs) {
+  if (!isPolymorphic()) {
+    return CanSILFunctionType(this);
+  }
+  
   if (subs.empty()) {
-    assert(!isPolymorphic() && "no args for polymorphic substitution");
     return CanSILFunctionType(this);
   }
 
-  assert(isPolymorphic());
   return substGenericArgs(silModule,
                           QuerySubstitutionMap{subs},
                           LookUpConformanceInSubstitutionMap(subs));
