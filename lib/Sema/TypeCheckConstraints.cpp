@@ -1324,7 +1324,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
             return nullptr;
         else
           return nullptr;
-      }
+      } else
+        return nullptr;
 
       // Add the rhs which is just a TypeExpr
       auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
