@@ -19,8 +19,8 @@
 // allow performance optimizations of linear traversals.
 
 /// CR and LF are common special cases in grapheme breaking logic
-internal let _CR: UInt8 = 0x0d
-internal let _LF: UInt8 = 0x0a
+@_versioned internal var _CR: UInt8 { return 0x0d }
+@_versioned internal var _LF: UInt8 { return 0x0a }
 
 import SwiftShims
 
@@ -58,12 +58,14 @@ extension String {
   ///     }
   ///     // Prints "Marie"
   public struct CharacterView {
+    @_versioned
     internal var _core: _StringCore
 
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_StringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
     /// before that value is used as a `_core` index.
+    @_versioned
     internal var _coreOffset: Int
 
     /// Creates a view of the given string.
@@ -170,6 +172,7 @@ extension String.CharacterView : _SwiftStringView {
 /// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
+  @_versioned
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
@@ -269,7 +272,8 @@ extension String.CharacterView : BidirectionalCollection {
   }
 
   /// Fast check for a (stable) grapheme break between two UInt16 code units
-  @inline(__always)
+  @_inlineable
+  @_versioned
   internal static func _quickCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
@@ -289,6 +293,7 @@ extension String.CharacterView : BidirectionalCollection {
   // TODO: this is actually fine to inline into non-inlinable code
   //
   @inline(never) // @inline(resilient_only)
+  @_versioned
   internal static func _internalExtraCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
@@ -323,12 +328,12 @@ extension String.CharacterView : BidirectionalCollection {
     return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
   }
 
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
-  //
+  // NOTE: Because this function is inlineable, it should contain only the fast
+  // paths of grapheme breaking that we have high confidence won't change.
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never) // Don't remove, see above.
+  @_inlineable
+  @_versioned
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
@@ -381,7 +386,22 @@ extension String.CharacterView : BidirectionalCollection {
       // TODO: Check for (potentially non-contiguous) UTF16 NSStrings,
       // especially small tagged pointers
     }
-
+    return _measureExtendedGraphemeClusterForwardSlow(
+      relativeOffset: relativeOffset,
+      start: start,
+      end: end,
+      startIndexUTF16: startIndexUTF16
+    )
+  }
+  
+  @inline(never)
+  @_versioned
+  func _measureExtendedGraphemeClusterForwardSlow(
+    relativeOffset: Int,
+    start: String.UnicodeScalarView.Index,
+    end: String.UnicodeScalarView.Index,
+    startIndexUTF16: Int
+  ) -> Int {
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
@@ -405,7 +425,7 @@ extension String.CharacterView : BidirectionalCollection {
     return legacyGraphemeForward(
       start: start, end: end, startIndexUTF16: startIndexUTF16
     )
-  }
+	}
 
   @inline(never)
   func legacyGraphemeForward(
@@ -441,12 +461,13 @@ extension String.CharacterView : BidirectionalCollection {
     return start._position - startIndexUTF16
   }
 
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
+  // NOTE: Because this function is inlineable, it should contain only the fast
+  // paths of grapheme breaking that we have high confidence won't change.
   //
   /// Returns the length of the previous extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never) // Don't remove, see above.
+  @_inlineable
+  @_versioned
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {
@@ -497,7 +518,19 @@ extension String.CharacterView : BidirectionalCollection {
         return 1
       }
     }
-
+    return _measureExtendedGraphemeClusterBackwardSlow(
+      endOffset: endOffset, start: start, end: end, endIndexUTF16: endIndexUTF16
+    )
+  }
+  
+  @inline(never)
+  @_versioned
+  func _measureExtendedGraphemeClusterBackwardSlow(
+    endOffset: Int,
+    start: String.UnicodeScalarView.Index,
+    end: String.UnicodeScalarView.Index,
+    endIndexUTF16: Int
+  ) -> Int {
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
