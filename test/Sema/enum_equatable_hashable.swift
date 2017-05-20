@@ -176,8 +176,9 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 2 {{non-
   return true
 }
 
-// No explicit conformance, but it can be derived.
-extension Complex : Hashable {}
+// No explicit conformance; it could be derived, but we don't support extensions
+// yet.
+extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension yet}}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {

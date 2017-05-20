@@ -102,27 +102,25 @@ bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
 }
 
 /// Common preconditions for Equatable and Hashable.
-static bool canDeriveConformance(TypeChecker &tc, NominalTypeDecl *type,
+static bool canDeriveConformance(TypeChecker &tc, NominalTypeDecl *target,
                                  ProtocolDecl *protocol) {
   // The type must be an enum or a struct.
-  if (auto enumDecl = dyn_cast<EnumDecl>(type)) {
+  if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The enum must have cases.
     if (!enumDecl->hasCases())
       return false;
 
-    // The enum must not have associated values.
-    if (!allAssociatedValuesConformToProtocol(tc, enumDecl, protocol))
-      return false;
-
-    return true;
+    // The cases must not have associated values, or all associated values must
+    // conform to the protocol.
+    return allAssociatedValuesConformToProtocol(tc, enumDecl, protocol);
   }
 
-  if (auto structDecl = dyn_cast<StructDecl>(type)) {
+  if (auto structDecl = dyn_cast<StructDecl>(target)) {
     // All stored properties of the struct must conform to the protocol.
     return allStoredPropertiesConformToProtocol(tc, structDecl, protocol);
   }
 
-  return true;
+  return false;
 }
 
 /// Creates a named variable based on a prefix character and a numeric index.
@@ -712,9 +710,21 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
                                                Decl *parentDecl,
                                                NominalTypeDecl *type,
                                                ValueDecl *requirement) {
+  // Conformance can't be synthesized in an extension; we allow it as a special
+  // case for enums with no associated values to preserve source compatibility.
+  auto theEnum = dyn_cast<EnumDecl>(type);
+  if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
+      type != parentDecl) {
+    auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
+    auto equatableType = equatableProto->getDeclaredType();
+    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+                equatableType);
+    return nullptr;
+  }
+
   // Build the necessary decl.
   if (requirement->getBaseName() == "==") {
-    if (auto theEnum = dyn_cast<EnumDecl>(type)) {
+    if (theEnum) {
       auto bodySynthesizer =
           theEnum->hasOnlyCasesWithoutAssociatedValues()
               ? &deriveBodyEquatable_enum_noAssociatedValues_eq
@@ -1137,9 +1147,21 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
                                               Decl *parentDecl,
                                               NominalTypeDecl *type,
                                               ValueDecl *requirement) {
+  // Conformance can't be synthesized in an extension; we allow it as a special
+  // case for enums with no associated values to preserve source compatibility.
+  auto theEnum = dyn_cast<EnumDecl>(type);
+  if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
+      type != parentDecl) {
+    auto hashableProto = tc.Context.getProtocol(KnownProtocolKind::Hashable);
+    auto hashableType = hashableProto->getDeclaredType();
+    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+                hashableType);
+    return nullptr;
+  }
+
   // Build the necessary decl.
   if (requirement->getBaseName() == "hashValue") {
-    if (auto theEnum = dyn_cast<EnumDecl>(type))
+    if (theEnum)
       return deriveHashable_hashValue(tc, parentDecl, theEnum,
                                       &deriveBodyHashable_enum_hashValue);
     else if (auto theStruct = dyn_cast<StructDecl>(type))

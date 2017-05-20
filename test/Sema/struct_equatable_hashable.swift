@@ -110,13 +110,13 @@ if GenericNotHashable<String>(value: "a") == GenericNotHashable<String>(value: "
 var genericNotHashableHash: Int = GenericNotHashable<String>(value: "a").hashValue // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hashValue'}}
 
 
-// Conformance can be synthesized in an extension.
+// Conformance cannot be synthesized in an extension.
 struct StructConformsInExtension {
   let v: Int
 }
-extension StructConformsInExtension : Equatable {}
+extension StructConformsInExtension : Equatable {} // expected-error {{cannot be automatically synthesized in an extension yet}}
 
-// Explicit conformance in an extension should work too.
+// But explicit conformance in an extension should work.
 public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
