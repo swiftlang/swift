@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : StringProtocol, RangeReplaceableCollection {
-  /// The index type for subscripting a string.
-  public typealias Index = CharacterView.Index
-
+extension String : StringProtocol, RangeReplaceableCollection {  
   /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
   ///
@@ -172,16 +169,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
   public subscript(i: Index) -> Character { return characters[i] }
-}
-
-extension String.Index {
-  public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._base == rhs._base
-  }
-
-  public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._base < rhs._base
-  }
 }
 
 extension String {
