@@ -574,29 +574,7 @@ extension String.UTF8View.Index {
         return nil
       }
     }
-    self.init(utf8._core, _utf16Offset: utf16Index._offset)
-  }
-
-  /// Creates an index in the given UTF-8 view that corresponds exactly to the
-  /// specified string position.
-  ///
-  /// The following example converts the position of the teacup emoji (`"🍵"`)
-  /// into its corresponding position in the string's `utf8` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///     let stringIndex = cafe.index(of: "🍵")!
-  ///     let utf8Index = String.UTF8View.Index(stringIndex, within: cafe.utf8)
-  ///
-  ///     print(Array(cafe.utf8[utf8Index...]))
-  ///     // Prints "[240, 159, 141, 181]"
-  ///
-  /// - Parameters:
-  ///   - index: A position in a string instance.
-  ///     `index` must be an element of
-  ///     `String(utf8).indices`.
-  ///   - utf8: The `UTF8View` in which to find the new position.
-  public init(_ index: String.Index, within utf8: String.UTF8View) {
-    self.init(utf8._core, _utf16Offset: index.encodedOffset)
+    self.init(utf8._core, _utf16Offset: utf16Index.encodedOffset)
   }
 
   /// Returns the position in the given UTF-16 view that corresponds exactly to
@@ -698,5 +676,21 @@ extension String {
   @available(*, unavailable, message: "Please use String.utf8CString instead.")
   public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     Builtin.unreachable()
+  }
+}
+
+// backward compatibility for index interchange.  
+extension String.UTF8View {
+  @available(swift, obsoleted: 4.0)
+  public func index(after i: Index?) -> Index {
+    return index(after: i!)
+  }
+  @available(swift, obsoleted: 4.0)
+  public func index(_ i: Index?, offsetBy n: String.UTF8View.IndexDistance) -> Index {
+    return index(i!, offsetBy: n)
+  }
+  @available(swift, obsoleted: 4.0)
+  public subscript(i: Index?) -> Unicode.UTF8.CodeUnit {
+    return self[i!]
   }
 }

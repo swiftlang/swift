@@ -26,7 +26,7 @@ func test_UTF16ViewSubscriptByInt(x: String.UTF16View, i: Int, r: Range<Int>) {
 
 func test_UTF8View(s: String.UTF8View, i: String.UTF8View.Index, d: Int) {
   _ = s.index(after: i) // OK
-  _ = s.index(before: i) // expected-error {{before:}}
+  _ = s.index(before: i) // expected-error {{before:}} expected-note {{overloads}}
   _ = s.index(i, offsetBy: d) // OK
   _ = s.index(i, offsetBy: d, limitedBy: i) // OK
   _ = s.distance(from: i, to: i) // OK
