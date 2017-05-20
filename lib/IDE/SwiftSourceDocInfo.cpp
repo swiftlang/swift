@@ -229,12 +229,14 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
 
   OS << "<Content>" << Content.str() << "</Content>\n";
 
-  if (auto Ty = ExitInfo.getPointer()) {
+  if (auto Ty = getType()) {
     OS << "<Type>";
     Ty->print(OS);
     OS << "</Type>";
-    if (ExitInfo.getInt()) {
-      OS << "<Exit>true</Exit>";
+    switch(exit()) {
+    case ExitState::Positive: OS << "<Exit>true</Exit>"; break;
+    case ExitState::Unsure: OS << "<Exit>unsure</Exit>"; break;
+    case ExitState::Negative: OS << "<Exit>false</Exit>"; break;
     }
     OS << "\n";
   }
@@ -335,6 +337,23 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
   });
 }
 
+ReturnInfo::
+ReturnInfo(ASTContext &Ctx, ArrayRef<ReturnInfo> Branches):
+    ReturnType(Ctx.TheErrorType.getPointer()), Exit(ExitState::Unsure) {
+  std::set<TypeBase*> AllTypes;
+  std::set<ExitState> AllExitStates;
+  for (auto I : Branches) {
+    AllTypes.insert(I.ReturnType);
+    AllExitStates.insert(I.Exit);
+  }
+  if (AllTypes.size() == 1) {
+    ReturnType = *AllTypes.begin();
+  }
+  if (AllExitStates.size() == 1) {
+    Exit = *AllExitStates.begin();
+  }
+}
+
 struct RangeResolver::Implementation {
   SourceFile &File;
   ASTContext &Ctx;
@@ -394,10 +413,10 @@ private:
   std::vector<ASTNode> ContainedASTNodes;
 
   /// Collect the type that an ASTNode should be evaluated to.
-  ReturnTyAndWhetherExit resolveNodeType(ASTNode N, RangeKind Kind) {
+  ReturnInfo resolveNodeType(ASTNode N, RangeKind Kind) {
     auto *VoidTy = Ctx.getVoidDecl()->getDeclaredInterfaceType().getPointer();
     if (N.isNull())
-      return {VoidTy, false};
+      return {VoidTy, ExitState::Negative};
     switch(Kind) {
     case RangeKind::Invalid:
     case RangeKind::SingleDecl:
@@ -406,7 +425,7 @@ private:
 
     // For a single expression, its type is apparent.
     case RangeKind::SingleExpression:
-      return {N.get<Expr*>()->getType().getPointer(), false};
+      return {N.get<Expr*>()->getType().getPointer(), ExitState::Negative};
 
     // For statements, we either resolve to the returning type or Void.
     case RangeKind::SingleStatement:
@@ -415,9 +434,7 @@ private:
         if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
           return {
             resolveNodeType(RS->hasResult() ? RS->getResult() : nullptr,
-              RangeKind::SingleExpression).getPointer(),
-            true
-          };
+              RangeKind::SingleExpression).ReturnType, ExitState::Positive };
         }
 
         // Unbox the brace statement to find its type.
@@ -430,22 +447,26 @@ private:
 
         // Unbox the if statement to find its type.
         if (auto *IS = dyn_cast<IfStmt>(N.get<Stmt*>())) {
-          auto ThenTy = resolveNodeType(IS->getThenStmt(),
-                                        RangeKind::SingleStatement);
-          auto ElseTy = resolveNodeType(IS->getElseStmt(),
-                                        RangeKind::SingleStatement);
+          llvm::SmallVector<ReturnInfo, 2> Branches;
+          Branches.push_back(resolveNodeType(IS->getThenStmt(),
+                             RangeKind::SingleStatement));
+          Branches.push_back(resolveNodeType(IS->getElseStmt(),
+                             RangeKind::SingleStatement));
+          return {Ctx, Branches};
+        }
 
-          // If two branches agree on the return type, return that type.
-          if (ThenTy.getPointer()->isEqual(ElseTy.getPointer()) &&
-              ThenTy.getInt() == ElseTy.getInt())
-            return ThenTy;
-
-          // Otherwise, return the error type.
-          return {Ctx.TheErrorType.getPointer(), false};
+        // Unbox switch statement to find return information.
+        if (auto *SWS = dyn_cast<SwitchStmt>(N.get<Stmt*>())) {
+          llvm::SmallVector<ReturnInfo, 4> Branches;
+          for (auto *CS : SWS->getCases()) {
+            Branches.push_back(resolveNodeType(CS->getBody(),
+              RangeKind::SingleStatement));
+          }
+          return {Ctx, Branches};
         }
       }
       // For other statements, the type should be void.
-      return {VoidTy, false};
+      return {VoidTy, ExitState::Negative};
     }
     }
   }
@@ -480,7 +501,8 @@ private:
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
-      return ResolvedRangeInfo(RangeKind::SingleDecl, {nullptr, false}, Content,
+      return ResolvedRangeInfo(RangeKind::SingleDecl,
+                               ReturnInfo(), Content,
                                getImmediateContext(),
                                /*Common Parent Expr*/nullptr,
                                SingleEntry,
@@ -540,7 +562,7 @@ public:
     if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
       if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
         Result = {
-          RangeKind::PartOfExpression, {nullptr, false}, Content,
+          RangeKind::PartOfExpression, ReturnInfo(), Content,
           getImmediateContext(),
           Parent,
           hasSingleEntryPoint(ContainedASTNodes),
