@@ -1,9 +1,13 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -enable-nskeyedarchiver-diagnostics -verify
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s 2>&1 | %FileCheck -check-prefix CHECK-NO-DIAGS %s
 
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -dump-ast 2> %t.ast
 // RUN: %FileCheck %s < %t.ast
 
 // REQUIRES: objc_interop
+
+// CHECK-NO-DIAGS-NOT: NSCoding
+// CHECK-NO-DIAGS-NOT: unstable
 
 import Foundation
 
