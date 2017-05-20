@@ -578,31 +578,6 @@ extension String.UTF8View.Index {
   }
 
   /// Creates an index in the given UTF-8 view that corresponds exactly to the
-  /// specified `UnicodeScalarView` position.
-  ///
-  /// The following example converts the position of the Unicode scalar `"e"`
-  /// into its corresponding position in the string's `utf8` view.
-  ///
-  ///     let cafe = "Cafe\u{0301}"
-  ///     let scalarsIndex = cafe.unicodeScalars.index(of: "e")!
-  ///     let utf8Index = String.UTF8View.Index(scalarsIndex, within: cafe.utf8)
-  ///
-  ///     print(Array(cafe.utf8[...utf8Index]))
-  ///     // Prints "[67, 97, 102, 101]"
-  ///
-  /// - Parameters:
-  ///   - unicodeScalarIndex: A position in a `UnicodeScalarView` instance.
-  ///     `unicodeScalarIndex` must be an element of
-  ///     `String(utf8).unicodeScalars.indices`.
-  ///   - utf8: The `UTF8View` in which to find the new position.
-  public init(
-    _ unicodeScalarIndex: String.UnicodeScalarIndex,
-    within utf8: String.UTF8View
-  ) {
-    self.init(utf8._core, _utf16Offset: unicodeScalarIndex._position)
-  }
-
-  /// Creates an index in the given UTF-8 view that corresponds exactly to the
   /// specified string position.
   ///
   /// The following example converts the position of the teacup emoji (`"🍵"`)
@@ -621,7 +596,7 @@ extension String.UTF8View.Index {
   ///     `String(utf8).indices`.
   ///   - utf8: The `UTF8View` in which to find the new position.
   public init(_ index: String.Index, within utf8: String.UTF8View) {
-    self.init(utf8._core, _utf16Offset: index._base._position)
+    self.init(utf8._core, _utf16Offset: index.encodedOffset)
   }
 
   /// Returns the position in the given UTF-16 view that corresponds exactly to

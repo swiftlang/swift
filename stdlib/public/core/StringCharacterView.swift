@@ -63,7 +63,7 @@ extension String {
 
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_StringCore` is always zero-indexed.
-    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
+    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
     /// before that value is used as a `_core` index.
     @_versioned
     internal var _coreOffset: Int
@@ -177,61 +177,14 @@ extension String.CharacterView : BidirectionalCollection {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
   
-  /// A position in a string's `CharacterView` instance.
-  ///
-  /// You can convert between indices of the different string views by using
-  /// conversion initializers and the `samePosition(in:)` method overloads.
-  /// The following example finds the index of the first space in the string's
-  /// character view and then converts that to the same position in the UTF-8
-  /// view:
-  ///
-  ///     let hearts = "Hearts <3 ♥︎ 💘"
-  ///     if let i = hearts.characters.index(of: " ") {
-  ///         let j = i.samePosition(in: hearts.utf8)
-  ///         print(Array(hearts.utf8[..<j]))
-  ///     }
-  ///     // Prints "[72, 101, 97, 114, 116, 115]"
-  public struct Index : Comparable, CustomPlaygroundQuickLookable {
-    public // SPI(Foundation)    
-    init(_base: String.UnicodeScalarView.Index, in c: String.CharacterView) {
-      self._base = _base
-      self._countUTF16 = c._measureExtendedGraphemeClusterForward(from: _base)
-    }
-
-    internal init(_base: UnicodeScalarView.Index, _countUTF16: Int) {
-      self._base = _base
-      self._countUTF16 = _countUTF16
-    }
-
-    internal let _base: UnicodeScalarView.Index
-
-    /// The count of this extended grapheme cluster in UTF-16 code units.
-    internal let _countUTF16: Int
-
-    /// The integer offset of this index in UTF-16 code units.
-    public // SPI(Foundation)
-    var _utf16Index: Int {
-      return _base._position
-    }
-
-    /// The one past end index for this extended grapheme cluster in Unicode
-    /// scalars.
-    internal var _endBase: UnicodeScalarView.Index {
-      return UnicodeScalarView.Index(_position: _utf16Index + _countUTF16)
-    }
-
-    public var customPlaygroundQuickLook: PlaygroundQuickLook {
-      return .int(Int64(_utf16Index))
-    }
-  }
-
+  public typealias Index = String.Index
   public typealias IndexDistance = Int
 
   /// The position of the first character in a nonempty character view.
   /// 
   /// In an empty character view, `startIndex` is equal to `endIndex`.
   public var startIndex: Index {
-    return Index(_base: unicodeScalars.startIndex, in: self)
+    return unicodeScalars.startIndex
   }
 
   /// A character view's "past the end" position---that is, the position one
@@ -239,35 +192,51 @@ extension String.CharacterView : BidirectionalCollection {
   ///
   /// In an empty character view, `endIndex` is equal to `startIndex`.
   public var endIndex: Index {
-    return Index(_base: unicodeScalars.endIndex, in: self)
+    return unicodeScalars.endIndex
   }
 
+  internal func _index(atEncodedOffset n: Int) -> Index {
+    let stride = _measureExtendedGraphemeClusterForward(
+      from: Index(encodedOffset: n))
+    return Index(encodedOffset: n, .character(stride: UInt16(stride)))
+  }
+  
   /// Returns the next consecutive position after `i`.
   ///
   /// - Precondition: The next position is valid.
   public func index(after i: Index) -> Index {
-    _precondition(i._base < unicodeScalars.endIndex,
+    _precondition(
+      i < unicodeScalars.endIndex,
       "cannot increment beyond endIndex")
-    _precondition(i._base >= unicodeScalars.startIndex,
+    
+    _precondition(
+      i >= unicodeScalars.startIndex,
       "cannot increment invalid index")
-    return Index(_base: i._endBase, in: self)
+
+    var j = i
+    while true {
+      if case .character(let oldStride) = j._cache {
+        return _index(atEncodedOffset: j.encodedOffset + Int(oldStride))
+      }
+      j = _index(atEncodedOffset: j.encodedOffset)
+    }
   }
 
   /// Returns the previous consecutive position before `i`.
   ///
   /// - Precondition: The previous position is valid.
   public func index(before i: Index) -> Index {
-    _precondition(i._base > unicodeScalars.startIndex,
+    _precondition(i > unicodeScalars.startIndex,
       "cannot decrement before startIndex")
-    _precondition(i._base <= unicodeScalars.endIndex,
+    _precondition(i <= unicodeScalars.endIndex,
       "cannot decrement invalid index")
-    let predecessorLengthUTF16 =
-      _measureExtendedGraphemeClusterBackward(from: i._base)
+    
+    let stride = _measureExtendedGraphemeClusterBackward(
+      from: Index(encodedOffset: i.encodedOffset))
+    
     return Index(
-      _base: UnicodeScalarView.Index(
-        _position: i._utf16Index - predecessorLengthUTF16
-      ),
-      in: self
+      encodedOffset: i.encodedOffset &- stride,
+      .character(stride: numericCast(stride))
     )
   }
 
@@ -365,8 +334,8 @@ extension String.CharacterView : BidirectionalCollection {
     }
 
     // Our relative position (offset). If our _core is not a substring, this is
-    // the same as start._position.
-    let relativeOffset = start._position - _coreOffset
+    // the same as start.encodedOffset.
+    let relativeOffset = start.encodedOffset - _coreOffset
 
     // Grapheme breaking is much simpler if known ASCII
     if _core.isASCII {
@@ -389,10 +358,10 @@ extension String.CharacterView : BidirectionalCollection {
       // especially small tagged pointers.
     }
     
-    let startIndexUTF16 = start._position
+    let startIndexUTF16 = start.encodedOffset
 
     // Last scalar is its own grapheme
-    if (startIndexUTF16+1 == end._position) {
+    if (startIndexUTF16+1 == end.encodedOffset) {
       return 1
     }
 
@@ -433,7 +402,7 @@ extension String.CharacterView : BidirectionalCollection {
       // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
       // string.
       let nextPosition =
-        ubrkFollowing == -1 ? end._position : Int(ubrkFollowing)
+        ubrkFollowing == -1 ? end.encodedOffset : Int(ubrkFollowing)
       return nextPosition - relativeOffset
     } else {
       // TODO: See if we can get fast character contents.
@@ -480,7 +449,7 @@ extension String.CharacterView : BidirectionalCollection {
       unicodeScalars.formIndex(after: &start)
     }
     
-    return start._position - startIndexUTF16
+    return start.encodedOffset - startIndexUTF16
   }
 
   // NOTE: Because this function is inlineable, it should contain only the fast
@@ -499,7 +468,7 @@ extension String.CharacterView : BidirectionalCollection {
     }
 
     // The relative position (offset) to the last code unit.
-    let lastOffset = end._position - _coreOffset - 1
+    let lastOffset = end.encodedOffset - _coreOffset - 1
     // The relative position (offset) that is one-past-the-last
     let endOffset = lastOffset + 1
 
@@ -524,10 +493,10 @@ extension String.CharacterView : BidirectionalCollection {
       return 1
     }
     
-    let endIndexUTF16 = end._position
+    let endIndexUTF16 = end.encodedOffset
 
     // First scalar is its own grapheme
-    if (endIndexUTF16-1 == start._position) {
+    if (endIndexUTF16-1 == start.encodedOffset) {
       return 1
     }
 
@@ -562,7 +531,7 @@ extension String.CharacterView : BidirectionalCollection {
       // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
       // string.
       let priorPosition =
-        ubrkPreceding == -1 ? start._position : Int(ubrkPreceding)
+        ubrkPreceding == -1 ? start.encodedOffset : Int(ubrkPreceding)
       return endOffset - priorPosition
     } else {
       // TODO: See if we can get fast character contents.
@@ -594,7 +563,7 @@ extension String.CharacterView : BidirectionalCollection {
     var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
       unicodeScalars[graphemeClusterStart].value)
     
-    var graphemeClusterStartUTF16 = graphemeClusterStart._position
+    var graphemeClusterStartUTF16 = graphemeClusterStart.encodedOffset
     
     while graphemeClusterStart != start {
       unicodeScalars.formIndex(before: &graphemeClusterStart)
@@ -604,7 +573,7 @@ extension String.CharacterView : BidirectionalCollection {
         break
       }
       gcb0 = gcb1
-      graphemeClusterStartUTF16 = graphemeClusterStart._position
+      graphemeClusterStartUTF16 = graphemeClusterStart.encodedOffset
     }
     
     return endIndexUTF16 - graphemeClusterStartUTF16
@@ -623,31 +592,38 @@ extension String.CharacterView : BidirectionalCollection {
   ///
   /// - Parameter position: A valid index of the character view. `position`
   ///   must be less than the view's end index.
-  public subscript(i: Index) -> Character {
-    if i._countUTF16 == 1 {
-      // For single-code-unit graphemes, we can construct a Character directly
-      // from a single unicode scalar (if sub-surrogate).
-      let relativeOffset = i._base._position - _coreOffset
-      if _core.isASCII {
-        let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
-        // Bounds checks in an UnsafeBufferPointer (asciiBuffer) are only
-        // performed in Debug mode, so they need to be duplicated here.
-        // Falling back to the non-optimal behavior in the case they don't
-        // pass.
-        if relativeOffset >= asciiBuffer.startIndex &&
-          relativeOffset < asciiBuffer.endIndex {
-          return Character(Unicode.Scalar(asciiBuffer[relativeOffset]))
+  public subscript(i_: Index) -> Character {
+    var i = i_
+    while true {
+      if case .character(let stride) = i._cache {
+        if _fastPath(stride == 1) {
+          // For single-code-unit graphemes, we can construct a Character directly
+          // from a single unicode scalar (if sub-surrogate).
+          let relativeOffset = i.encodedOffset - _coreOffset
+          if _core.isASCII {
+            let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+            // Bounds checks in an UnsafeBufferPointer (asciiBuffer) are only
+            // performed in Debug mode, so they need to be duplicated here.
+            // Falling back to the non-optimal behavior in the case they don't
+            // pass.
+            if relativeOffset >= asciiBuffer.startIndex &&
+            relativeOffset < asciiBuffer.endIndex {
+              return Character(Unicode.Scalar(asciiBuffer[relativeOffset]))
+            }
+          } else if _core._baseAddress != nil {
+            let cu = _core._nthContiguous(relativeOffset)
+            // Only constructible if sub-surrogate
+            if (cu < 0xd800) {
+              return Character(Unicode.Scalar(cu)._unsafelyUnwrappedUnchecked)
+            }
+          }
         }
-      } else if _core._baseAddress != nil {
-        let cu = _core._nthContiguous(relativeOffset)
-        // Only constructible if sub-surrogate
-        if (cu < 0xd800) {
-          return Character(Unicode.Scalar(cu)._unsafelyUnwrappedUnchecked)
-        }
+        
+        let s = self[i..<Index(encodedOffset: i.encodedOffset + Int(stride))]
+        return Character(s._ephemeralContent)
       }
+      i = _index(atEncodedOffset: i.encodedOffset)
     }
-
-    return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 }
 
@@ -676,8 +652,8 @@ extension String.CharacterView : RangeReplaceableCollection {
     with newElements: C
   ) where C : Collection, C.Element == Character {
     let rawSubRange: Range<Int> =
-      bounds.lowerBound._base._position - _coreOffset
-      ..< bounds.upperBound._base._position - _coreOffset
+      bounds.lowerBound.encodedOffset - _coreOffset
+      ..< bounds.upperBound.encodedOffset - _coreOffset
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
@@ -744,9 +720,9 @@ extension String.CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: Range<Index>) -> String.CharacterView {
-    let unicodeScalarRange = bounds.lowerBound._base..<bounds.upperBound._base
-    return String.CharacterView(unicodeScalars[unicodeScalarRange]._core,
-      coreOffset: unicodeScalarRange.lowerBound._position)
+    return String.CharacterView(
+      unicodeScalars[bounds]._core,
+      coreOffset: bounds.lowerBound.encodedOffset)
   }
 }
 
