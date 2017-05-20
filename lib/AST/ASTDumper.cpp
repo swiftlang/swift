@@ -2743,6 +2743,35 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
 
     printCommon("normal");
     // Maybe print information about the conforming context?
+    if (normal->isLazilyResolved()) {
+      out << " lazy";
+    } else {
+      forEachTypeWitness(nullptr, [&](const AssociatedTypeDecl *req,
+                                      Type ty, const TypeDecl *) -> bool {
+        out << '\n';
+        out.indent(indent + 2);
+        PrintWithColorRAII(out, ParenthesisColor) << '(';
+        out << "assoc_type req=" << req->getName() << " type=";
+        PrintWithColorRAII(out, TypeColor) << ty;
+        PrintWithColorRAII(out, ParenthesisColor) << ')';
+        return false;
+      });
+      normal->forEachValueWitness(nullptr, [&](const ValueDecl *req,
+                                               Witness witness) {
+        out << '\n';
+        out.indent(indent + 2);
+        PrintWithColorRAII(out, ParenthesisColor) << '(';
+        out << "value req=" << req->getFullName() << " witness=";
+        if (!witness) {
+          out << "(none)";
+        } else if (witness.getDecl() == req) {
+          out << "(dynamic)";
+        } else {
+          witness.getDecl()->dumpRef(out);
+        }
+        PrintWithColorRAII(out, ParenthesisColor) << ')';
+      });
+    }
 
     for (auto conformance : normal->getSignatureConformances()) {
       out << '\n';
