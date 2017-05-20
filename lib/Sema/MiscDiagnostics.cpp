@@ -485,6 +485,38 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                     DRE->getDecl()->getName());
     }
 
+    // Swift 3 mode produces a warning + Fix-It for the missing ".self"
+    // in certain cases.
+    bool shouldWarnOnMissingSelf(Expr *E) {
+      if (!TC.Context.isSwiftVersion3())
+        return false;
+
+      if (auto *TE = dyn_cast<TypeExpr>(E)) {
+        if (auto *TR = TE->getTypeRepr()) {
+          if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
+            auto range = ITR->getComponentRange();
+            assert(!range.empty());
+
+            // Swift 3 did not consistently diagnose identifier type reprs
+            // with multiple components.
+            if (range.front() != range.back())
+              return true;
+          }
+        }
+      }
+
+      auto *ParentExpr = Parent.getAsExpr();
+
+      // Swift 3 did not diagnose missing '.self' in argument lists.
+      if (ParentExpr &&
+          (isa<ParenExpr>(ParentExpr) ||
+           isa<TupleExpr>(ParentExpr)) &&
+          CallArgs.count(ParentExpr) > 0)
+        return true;
+
+      return false;
+    }
+
     // Diagnose metatype values that don't appear as part of a property,
     // method, or constructor reference.
     void checkUseOfMetaTypeName(Expr *E) {
@@ -509,22 +541,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
         }
+      }
 
-        // Note: as a specific hack, produce a warning + Fix-It for
-        // the missing ".self" as the subexpression of a parenthesized
-        // expression, which is a historical bug.
-        if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
-          auto diag = TC.diagnose(E->getEndLoc(),
-              diag::warn_value_of_metatype_missing_self,
-              E->getType()->getRValueInstanceType());
-          if (E->canAppendCallParentheses()) {
-            diag.fixItInsertAfter(E->getEndLoc(), ".self");
-          } else {
-            diag.fixItInsert(E->getStartLoc(), "(");
-            diag.fixItInsertAfter(E->getEndLoc(), ").self");
-          }
-          return;
+      if (shouldWarnOnMissingSelf(E)) {
+        auto diag = TC.diagnose(E->getEndLoc(),
+                                diag::warn_value_of_metatype_missing_self,
+                                E->getType()->getRValueInstanceType());
+        if (E->canAppendCallParentheses()) {
+          diag.fixItInsertAfter(E->getEndLoc(), ".self");
+        } else {
+          diag.fixItInsert(E->getStartLoc(), "(");
+          diag.fixItInsertAfter(E->getEndLoc(), ").self");
         }
+        return;
       }
 
       // Is this a protocol metatype?
