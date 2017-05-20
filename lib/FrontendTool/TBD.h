@@ -25,9 +25,9 @@ class FrontendOptions;
 bool writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
               llvm::StringRef OutputFilename);
 bool validateTBD(ModuleDecl *M, llvm::Module &IRModule,
-                 bool hasMultipleIRGenThreads);
+                 bool hasMultipleIRGenThreads, bool diagnoseExtraSymbolsInTBD);
 bool validateTBD(FileUnit *M, llvm::Module &IRModule,
-                 bool hasMultipleIRGenThreads);
+                 bool hasMultipleIRGenThreads, bool diagnoseExtraSymbolsInTBD);
 }
 
 #endif

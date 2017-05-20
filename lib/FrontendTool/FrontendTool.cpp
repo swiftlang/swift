@@ -917,17 +917,27 @@ static bool performCompile(CompilerInstance &Instance,
     countStatsPostIRGen(*Stats, *IRModule);
   }
 
-  if (opts.ValidateTBDAgainstIR) {
+  bool allSymbols = false;
+  switch (opts.ValidateTBDAgainstIR) {
+  case FrontendOptions::TBDValidationMode::None:
+    break;
+  case FrontendOptions::TBDValidationMode::All:
+    allSymbols = true;
+    LLVM_FALLTHROUGH;
+  case FrontendOptions::TBDValidationMode::MissingFromTBD: {
     auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
     bool error;
     if (PrimarySourceFile)
-      error =
-          validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads);
+      error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads,
+                          allSymbols);
     else
       error = validateTBD(Instance.getMainModule(), *IRModule,
-                          hasMultipleIRGenThreads);
+                          hasMultipleIRGenThreads, allSymbols);
     if (error)
       return true;
+
+    break;
+  }
   }
 
   std::unique_ptr<llvm::TargetMachine> TargetMachine =
