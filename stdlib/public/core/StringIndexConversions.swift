@@ -55,57 +55,6 @@ extension String.Index {
   }
 
   /// Creates an index in the given string that corresponds exactly to the
-  /// specified `UTF16View` position.
-  ///
-  /// The following example finds the position of a space in a string's `utf16`
-  /// view and then converts that position to an index in the string. The
-  /// value `32` is the UTF-16 encoded value of a space character.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///
-  ///     let utf16Index = cafe.utf16.index(of: 32)!
-  ///     let stringIndex = String.Index(utf16Index, within: cafe)!
-  ///
-  ///     print(cafe[..<stringIndex])
-  ///     // Prints "Café"
-  ///
-  /// If the position passed in `utf16Index` doesn't have an exact
-  /// corresponding position in `other`, the result of the initializer is
-  /// `nil`. For example, an attempt to convert the position of the trailing
-  /// surrogate of a UTF-16 surrogate pair fails.
-  ///
-  /// The next example attempts to convert the indices of the two UTF-16 code
-  /// points that represent the teacup emoji (`"🍵"`). The index of the lead
-  /// surrogate is successfully converted to a position in `other`, but the
-  /// index of the trailing surrogate is not.
-  ///
-  ///     let emojiHigh = cafe.utf16.index(after: utf16Index)
-  ///     print(String.Index(emojiHigh, within: cafe))
-  ///     // Prints "Optional(String.Index(...))"
-  ///
-  ///     let emojiLow = cafe.utf16.index(after: emojiHigh)
-  ///     print(String.Index(emojiLow, within: cafe))
-  ///     // Prints "nil"
-  ///
-  /// - Parameters:
-  ///   - utf16Index: A position in the `utf16` view of the `other` parameter.
-  ///   - other: The string referenced by both `utf16Index` and the resulting
-  ///     index.
-  public init?(
-    _ utf16Index: String.UTF16Index,
-    within other: String
-  ) {
-    if let me = utf16Index.samePosition(
-      in: other.unicodeScalars
-    )?.samePosition(in: other) {
-      self = me
-    }
-    else {
-      return nil
-    }
-  }
-
-  /// Creates an index in the given string that corresponds exactly to the
   /// specified `UTF8View` position.
   ///
   /// If the position passed in `utf8Index` doesn't have an exact corresponding
@@ -150,7 +99,7 @@ extension String.Index {
   /// - Returns: The position in `utf8` that corresponds exactly to this index.
   public func samePosition(
     in utf8: String.UTF8View
-  ) -> String.UTF8View.Index {
+  ) -> String.UTF8View.Index? {
     return String.UTF8View.Index(self, within: utf8)
   }
 
@@ -199,7 +148,7 @@ extension String.Index {
   public func samePosition(
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {
-    return String.UnicodeScalarView.Index(self, within: unicodeScalars)
+    return String.UnicodeScalarView.Index(self, within: unicodeScalars)!
   }
 }
 

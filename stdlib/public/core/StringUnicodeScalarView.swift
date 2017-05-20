@@ -433,7 +433,7 @@ extension String.UnicodeScalarIndex {
         return nil
       }
     }
-    self.init(encodedOffset: utf16Index._offset)
+    self = utf16Index
   }
 
   /// Creates an index in the given Unicode scalars view that corresponds
@@ -466,31 +466,6 @@ extension String.UnicodeScalarIndex {
     self.init(encodedOffset: utf8Index._coreIndex)
   }
 
-  /// Creates an index in the given Unicode scalars view that corresponds
-  /// exactly to the specified string position.
-  ///
-  /// The following example converts the position of the teacup emoji (`"🍵"`)
-  /// into its corresponding position in the string's `unicodeScalars` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///     let stringIndex = cafe.index(of: "🍵")!
-  ///     let scalarIndex = String.UnicodeScalarView.Index(stringIndex, within: cafe.unicodeScalars)
-  ///
-  ///     print(cafe.unicodeScalars[scalarIndex...])
-  ///     // Prints "🍵"
-  ///
-  /// - Parameters:
-  ///   - index: A position in a string. `index` must be an element of
-  ///     `String(unicodeScalars).indices`.
-  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
-  ///     position.
-  public init(
-    _ index: String.Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    self.init(encodedOffset: index.encodedOffset)
-  }
-
   /// Returns the position in the given string that corresponds exactly to this
   /// index.
   ///
@@ -518,9 +493,20 @@ extension String.UnicodeScalarIndex {
 }
 
 extension String.UnicodeScalarView {
+  internal func _isOnUnicodeScalarBoundary(_ i: Index) -> Bool {
+    if _fastPath(_core.isASCII) { return true }
+    if i == startIndex || i == endIndex {
+      return true
+    }
+    let i2 = _toCoreIndex(i)
+    if _fastPath(_core[i2] & 0xFC00 != 0xDC00) { return true }
+    return _core[i2 &- 1] & 0xFC00 != 0xD800
+  }
+  
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
+    if !_isOnUnicodeScalarBoundary(i) { return false }
     if i == startIndex || i == endIndex {
       return true
     }
