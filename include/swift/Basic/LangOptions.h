@@ -227,6 +227,9 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
+
+    /// Diagnose uses of NSCoding with classes that have unstable mangled names.
+    bool EnableNSKeyedArchiverDiagnostics = false;
     
     /// Enable keypath components that aren't fully implemented.
     bool EnableExperimentalKeyPathComponents = false;
