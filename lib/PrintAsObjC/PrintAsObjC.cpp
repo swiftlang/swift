@@ -1361,11 +1361,23 @@ private:
       return;
 
     if (alias->hasClangNode()) {
-      auto *clangTypeDecl = cast<clang::TypeDecl>(alias->getClangDecl());
-      os << clangTypeDecl->getName();
+      if (auto *clangTypeDecl =
+            dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+        os << clangTypeDecl->getName();
 
-      if (isClangPointerType(clangTypeDecl))
+        if (isClangPointerType(clangTypeDecl))
+          printNullability(optionalKind);
+      } else if (auto *clangObjCClass
+                   = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+        os << clangObjCClass->getName() << " *";
         printNullability(optionalKind);
+      } else {
+        auto *clangCompatAlias =
+          cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
+        os << clangCompatAlias->getName() << " *";
+        printNullability(optionalKind);
+      }
+
       return;
     }
 
