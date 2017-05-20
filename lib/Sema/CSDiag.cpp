@@ -6464,6 +6464,16 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   auto contextualType = CS->getContextualType();
+  // Look through IUO because it doesn't influence
+  // neither parameter nor return type diagnostics itself,
+  // but if we have function type inside, that might
+  // signficantly improve diagnostic quality.
+  if (contextualType) {
+    if (auto IUO =
+            CS->lookThroughImplicitlyUnwrappedOptionalType(contextualType))
+      contextualType = IUO;
+  }
+
   Type expectedResultType;
 
   // If we have a contextual type available for this closure, apply it to the
@@ -6487,9 +6497,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // inferred argument count.
     if (auto *argTupleTy = dyn_cast<TupleType>(inferredArgType.getPointer()))
       inferredArgCount = argTupleTy->getNumElements();
-    
-    // If the actual argument count is 1, it can match a tuple as a whole.
-    if (actualArgCount != 1 && actualArgCount != inferredArgCount) {
+
+    if (actualArgCount != inferredArgCount) {
       // If the closure didn't specify any arguments and it is in a context that
       // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
       if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
@@ -6659,8 +6668,31 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
       fnType = FunctionType::get(fnType->getInput(), fnType->getResult());
-      diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
-               fnType, inferredArgCount, actualArgCount, (actualArgCount == 1));
+      auto diag = diagnose(
+          params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+          inferredArgCount, actualArgCount, (actualArgCount == 1));
+
+      // If the number of parameters is less than number of inferred
+      // and all of the parameters are anonymous, let's suggest a fix-it
+      // with the rest of the missing parameters.
+      if (actualArgCount < inferredArgCount) {
+        bool onlyAnonymousParams =
+        std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
+          return !param->hasName();
+        });
+
+        SmallString<32> fixIt;
+        llvm::raw_svector_ostream OS(fixIt);
+
+        OS << ",";
+        auto numMissing = inferredArgCount - actualArgCount;
+        for (unsigned i = 0; i != numMissing; ++i) {
+          OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
+          OS << ((i == numMissing - 1) ? " " : ",");
+        }
+
+        diag.fixItInsertAfter(params->getEndLoc(), OS.str());
+      }
       return true;
     }
 
