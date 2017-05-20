@@ -171,7 +171,7 @@ StringTests.test("ForeignIndexes/Valid") {
   do {
     let donor = "abcdef"
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
-    expectEqual("\u{fffd}", acceptor[donor.startIndex])
+    expectEqual("\u{1f601}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
       acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
@@ -188,8 +188,12 @@ StringTests.test("ForeignIndexes/UnexpectedCrash")
 
   let donor = "\u{1f601}\u{1f602}\u{1f603}"
   let acceptor = "abcdef"
+
+  // Adjust donor.startIndex to ensure it caches a stride
+  let start = donor.index(before: donor.index(after: donor.startIndex))
+  
   // FIXME: this traps right now when trying to construct Character("ab").
-  expectEqual("a", acceptor[donor.startIndex])
+  expectEqual("a", acceptor[start])
 }
 
 StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {

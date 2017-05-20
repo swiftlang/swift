@@ -419,32 +419,6 @@ extension String.UTF16View.Index {
   }
 
   /// Creates an index in the given UTF-16 view that corresponds exactly to the
-  /// specified `UnicodeScalarView` position.
-  ///
-  /// The following example finds the position of a space in a string's `utf8`
-  /// view and then converts that position to an index in the string's
-  /// `utf16` view.
-  ///
-  ///     let cafe = "Café 🍵"
-  ///
-  ///     let scalarIndex = cafe.unicodeScalars.index(of: "é")!
-  ///     let utf16Index = String.UTF16View.Index(scalarIndex, within: cafe.utf16)
-  ///
-  ///     print(cafe.utf16[...utf16Index])
-  ///     // Prints "Café"
-  ///
-  /// - Parameters:
-  ///   - unicodeScalarIndex: A position in a `UnicodeScalarView` instance.
-  ///     `unicodeScalarIndex` must be an element in
-  ///     `String(utf16).unicodeScalarIndex.indices`.
-  ///   - utf16: The `UTF16View` in which to find the new position.
-  public init(
-    _ unicodeScalarIndex: String.UnicodeScalarIndex,
-    within utf16: String.UTF16View) {
-    _offset = unicodeScalarIndex._position
-  }
-
-  /// Creates an index in the given UTF-16 view that corresponds exactly to the
   /// specified string position.
   ///
   /// The following example finds the position of a space in a string and then
@@ -463,7 +437,7 @@ extension String.UTF16View.Index {
   ///     `String(utf16).indices`.
   ///   - utf16: The `UTF16View` in which to find the new position.
   public init(_ index: String.Index, within utf16: String.UTF16View) {
-    _offset = index._utf16Index
+    _offset = index.encodedOffset
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to

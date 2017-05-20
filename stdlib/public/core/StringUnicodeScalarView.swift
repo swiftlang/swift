@@ -85,41 +85,18 @@ extension String {
       }
     }
 
-    /// A position in a string's `UnicodeScalars` view.
-    ///
-    /// You can convert between indices of the different string views by using
-    /// conversion initializers and the `samePosition(in:)` method overloads.
-    /// The following example finds the index of the solid heart pictograph in
-    /// the string's character view and then converts that to the same
-    /// position in the Unicode scalars view:
-    ///
-    ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     let i = hearts.index(of: "♥︎")!
-    ///
-    ///     let j = i.samePosition(in: hearts.unicodeScalars)
-    ///     print(hearts.unicodeScalars[j...])
-    ///     // Prints "♥︎ 💘"
-    ///     print(hearts.unicodeScalars[j].value)
-    ///     // Prints "9829"
-    public struct Index {
-      public // SPI(Foundation)
-      init(_position: Int) {
-        self._position = _position
-      }
-
-      @_versioned internal var _position: Int
-    }
-
+    public typealias Index = String.Index
+    
     /// Translates a `_core` index into a `UnicodeScalarIndex` using this view's
     /// `_coreOffset`.
     internal func _fromCoreIndex(_ i: Int) -> Index {
-      return Index(_position: i + _coreOffset)
+      return Index(encodedOffset: i + _coreOffset)
     }
     
     /// Translates a `UnicodeScalarIndex` into a `_core` index using this view's
     /// `_coreOffset`.
     internal func _toCoreIndex(_ i: Index) -> Int {
-      return i._position - _coreOffset
+      return i.encodedOffset - _coreOffset
     }
     
     /// The position of the first Unicode scalar value if the string is
@@ -208,7 +185,7 @@ extension String {
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       let rawSubRange = _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
       return UnicodeScalarView(_core[rawSubRange],
-        coreOffset: r.lowerBound._position)
+        coreOffset: r.lowerBound.encodedOffset)
     }
 
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
@@ -296,7 +273,7 @@ extension String {
     
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_StringCore` is always zero-indexed.
-    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
+    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
     /// before that value is used as a `_core` index.
     internal var _coreOffset: Int
   }
@@ -339,22 +316,6 @@ extension String {
     set {
       _core = newValue._core
     }
-  }
-}
-
-extension String.UnicodeScalarView.Index : Comparable {
-  public static func == (
-    lhs: String.UnicodeScalarView.Index,
-    rhs: String.UnicodeScalarView.Index
-  ) -> Bool {
-    return lhs._position == rhs._position
-  }
-
-  public static func < (
-    lhs: String.UnicodeScalarView.Index,
-    rhs: String.UnicodeScalarView.Index
-  ) -> Bool {
-    return lhs._position < rhs._position
   }
 }
 
@@ -472,7 +433,7 @@ extension String.UnicodeScalarIndex {
         return nil
       }
     }
-    self.init(_position: utf16Index._offset)
+    self.init(encodedOffset: utf16Index._offset)
   }
 
   /// Creates an index in the given Unicode scalars view that corresponds
@@ -502,7 +463,7 @@ extension String.UnicodeScalarIndex {
     if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
       return nil
     }
-    self.init(_position: utf8Index._coreIndex)
+    self.init(encodedOffset: utf8Index._coreIndex)
   }
 
   /// Creates an index in the given Unicode scalars view that corresponds
@@ -527,51 +488,7 @@ extension String.UnicodeScalarIndex {
     _ index: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    self.init(_position: index._base._position)
-  }
-
-  /// Returns the position in the given UTF-8 view that corresponds exactly to
-  /// this index.
-  ///
-  /// The index must be a valid index of `String(utf8).unicodeScalars`.
-  ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `utf8` view.
-  ///
-  ///     let cafe = "Café"
-  ///     if let i = cafe.unicodeScalars.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.utf8)
-  ///         print(Array(cafe.utf8[j...]))
-  ///     }
-  ///     // Prints "[195, 169]"
-  ///
-  /// - Parameter utf8: The view to use for the index conversion.
-  /// - Returns: The position in `utf8` that corresponds exactly to this index.
-  public func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index {
-    return String.UTF8View.Index(self, within: utf8)
-  }
-
-  /// Returns the position in the given UTF-16 view that corresponds exactly to
-  /// this index.
-  ///
-  /// The index must be a valid index of `String(utf16).unicodeScalars`.
-  ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `utf16` view.
-  ///
-  ///     let cafe = "Café"
-  ///     if let i = cafe.unicodeScalars.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.utf16)
-  ///         print(cafe.utf16[j])
-  ///     }
-  ///     // Prints "233"
-  ///
-  /// - Parameter utf16: The view to use for the index conversion.
-  /// - Returns: The position in `utf16` that corresponds exactly to this index.
-  public func samePosition(
-    in utf16: String.UTF16View
-  ) -> String.UTF16View.Index {
-    return String.UTF16View.Index(self, within: utf16)
+    self.init(encodedOffset: index.encodedOffset)
   }
 
   /// Returns the position in the given string that corresponds exactly to this

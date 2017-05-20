@@ -51,7 +51,7 @@ extension String.Index {
     if !other.unicodeScalars._isOnGraphemeClusterBoundary(unicodeScalarIndex) {
       return nil
     }
-    self.init(_base: unicodeScalarIndex, in: other.characters)
+    self = unicodeScalarIndex
   }
 
   /// Creates an index in the given string that corresponds exactly to the
