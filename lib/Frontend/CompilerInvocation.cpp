@@ -1038,6 +1038,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.EnableNSKeyedArchiverDiagnostics =
+      Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
+                   OPT_disable_nskeyedarchiver_diagnostics,
+                   Opts.EnableNSKeyedArchiverDiagnostics);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {

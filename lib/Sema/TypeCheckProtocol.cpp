@@ -6022,7 +6022,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           }
         }
 
-        if (kind && !hasExplicitObjCName(classDecl) &&
+        if (kind && getLangOpts().EnableNSKeyedArchiverDiagnostics &&
+            !hasExplicitObjCName(classDecl) &&
             !classDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>() &&
             !classDecl->getAttrs()
               .hasAttribute<NSKeyedArchiverEncodeNonGenericSubclassesOnlyAttr>()) {
