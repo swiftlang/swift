@@ -367,10 +367,21 @@ extension String.CharacterView : BidirectionalCollection {
       // especially small tagged pointers.
     }
     
+    return _measureExtendedGraphemeClusterForward1(
+      from: start, relativeOffset: relativeOffset)
+  }
+  
+  // NOTE: don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  @_versioned
+  @inline(never)
+  func _measureExtendedGraphemeClusterForward1(
+    from start: UnicodeScalarView.Index, relativeOffset: Int
+  ) -> Int {
     let startIndexUTF16 = start._position
 
     // Last scalar is its own grapheme
-    if (startIndexUTF16+1 == end._position) {
+    if (startIndexUTF16+1 == unicodeScalars.endIndex._position) {
       return 1
     }
 
@@ -386,17 +397,7 @@ extension String.CharacterView : BidirectionalCollection {
       // TODO: Check for (potentially non-contiguous) UTF16 NSStrings,
       // especially small tagged pointers
     }
-    return _measureExtendedGraphemeClusterForward1(
-      from: start, relativeOffset: relativeOffset)
-  }
-  
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
-  @_versioned
-  @inline(never)
-  func _measureExtendedGraphemeClusterForward1(
-    from start: UnicodeScalarView.Index, relativeOffset: Int
-  ) -> Int {
+    
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
@@ -496,11 +497,23 @@ extension String.CharacterView : BidirectionalCollection {
 
       return 1
     }
+    return _measureExtendedGraphemeClusterBackward1(
+      from: start, endOffset: endOffset, lastOffset: lastOffset)
+  }
+  
+  // NOTE: don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  //
+  @inline(never)
+  @_versioned
+  func _measureExtendedGraphemeClusterBackward1(
+    from end: UnicodeScalarView.Index, endOffset: Int, lastOffset: Int
+  ) -> Int {
     
     let endIndexUTF16 = end._position
 
     // First scalar is its own grapheme
-    if (endIndexUTF16-1 == start._position) {
+    if (endIndexUTF16-1 == unicodeScalars.startIndex._position) {
       return 1
     }
 
@@ -514,18 +527,6 @@ extension String.CharacterView : BidirectionalCollection {
       }
     }
 
-    return _measureExtendedGraphemeClusterBackward1(
-      from: start, endOffset: endOffset)
-  }
-  
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
-  //
-  @inline(never)
-  @_versioned
-  func _measureExtendedGraphemeClusterBackward1(
-    from end: UnicodeScalarView.Index, endOffset: Int
-  ) -> Int {
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
