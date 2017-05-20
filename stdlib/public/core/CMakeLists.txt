@@ -74,8 +74,7 @@ set(SWIFTLIB_ESSENTIAL
   Index.swift
   Indices.swift.gyb
   InputStream.swift
-  #IntegerArithmetic.swift.gyb
-  IntegerParsing.swift.gyb
+  IntegerParsing.swift
   Integers.swift.gyb
   Join.swift
   KeyPath.swift
