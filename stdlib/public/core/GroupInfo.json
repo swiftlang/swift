@@ -17,6 +17,7 @@
     "StringComparable.swift",
     "StringCore.swift",
     "StringHashable.swift",
+    "StringIndex.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
