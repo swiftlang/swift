@@ -1174,8 +1174,8 @@ StringTests.test("indexConversion")
     result, flags, stop
   in
     let r = result!.rangeAt(1)
-    let start = String.UTF16Index(_offset: r.location)
-    let end = String.UTF16Index(_offset: r.location + r.length)
+    let start = String.UTF16Index(encodedOffset: r.location)
+    let end = String.UTF16Index(encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)
   }
 
@@ -1271,8 +1271,7 @@ StringTests.test("String.append(_: Character)") {
 internal func decodeCString<
   C : UnicodeCodec
 >(_ s: String, as codec: C.Type)
--> (result: String, repairsMade: Bool)?
-where C.CodeUnit : FixedWidthInteger {
+-> (result: String, repairsMade: Bool)? {
   let units = s.unicodeScalars.map({ $0.value }) + [0]
   return units.map({ C.CodeUnit($0) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
