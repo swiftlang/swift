@@ -112,6 +112,7 @@ import StringInterpolation
 import StringMatch
 import StringTests
 import StringWalk
+import Substring
 import Suffix
 import SuperChars
 import TwoSum
@@ -380,6 +381,8 @@ addPrecommitTest("StringBuilder", run_StringBuilder)
 addPrecommitTest("StringBuilderLong", run_StringBuilderLong)
 addPrecommitTest("StringEdits", run_StringEdits)
 addPrecommitTest("StringEqualPointerComparison", run_StringEqualPointerComparison)
+addPrecommitTest("StringFromLongWholeSubstring", run_StringFromLongWholeSubstring)
+addPrecommitTest("StringFromLongWholeSubstringGeneric", run_StringFromLongWholeSubstringGeneric)
 addPrecommitTest("StringHasPrefix", run_StringHasPrefix)
 addPrecommitTest("StringHasPrefixUnicode", run_StringHasPrefixUnicode)
 addPrecommitTest("StringHasSuffix", run_StringHasSuffix)
@@ -389,6 +392,8 @@ addPrecommitTest("StringMatch", run_StringMatch)
 addPrecommitTest("StringUTF16Builder", run_StringUTF16Builder)
 addPrecommitTest("StringWalk", run_StringWalk)
 addPrecommitTest("StringWithCString", run_StringWithCString)
+addPrecommitTest("SubstringFromLongString", run_SubstringFromLongString)
+addPrecommitTest("SubstringFromLongStringGeneric", run_SubstringFromLongStringGeneric)
 addPrecommitTest("SuffixAnyCollection", run_SuffixAnyCollection)
 addPrecommitTest("SuffixAnyCollectionLazy", run_SuffixAnyCollectionLazy)
 addPrecommitTest("SuffixAnySeqCRangeIter", run_SuffixAnySeqCRangeIter)

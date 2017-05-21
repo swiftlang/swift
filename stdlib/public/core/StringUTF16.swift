@@ -352,6 +352,11 @@ extension String {
   public typealias UTF16Index = UTF16View.Index
 }
 
+extension String.UTF16View : _SwiftStringView {
+  var _ephemeralContent : String { return _persistentContent }
+  var _persistentContent : String { return String(self._core) }
+}
+
 extension String.UTF16View.Index : Comparable {
   // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
   //        assuming String.UTF8View.Index continues to exist
