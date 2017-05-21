@@ -260,7 +260,8 @@ self.test("\(testNamePrefix).subscript(_: Range)/Set/semantics") {
 
       let newElements = makeWrappedCollection(
         test.expected.map { OpaqueValue($0.value + 90000) })
-      c[test.bounds(in: c)] = newElements[...]
+      c[test.bounds(in: c)] =
+        newElements[newElements.startIndex..<newElements.endIndex]
 
       // FIXME: improve checkForwardCollection to check the SubSequence type.
       /*
@@ -302,7 +303,8 @@ if isFixedLengthCollection {
     let newElements = makeWrappedCollection([ 91010, 92020, 93030, 94040 ].map(OpaqueValue.init))
 
     expectCrashLater()
-    c[...] = newElements[...]
+    c[c.startIndex..<c.endIndex] =
+      newElements[newElements.startIndex..<newElements.endIndex]
   }
 
   self.test("\(testNamePrefix).subscript(_: Range)/Set/SmallerRange") {
@@ -310,7 +312,8 @@ if isFixedLengthCollection {
     let newElements = makeWrappedCollection([ 91010, 92020 ].map(OpaqueValue.init))
 
     expectCrashLater()
-    c[...] = newElements[...]
+    c[c.startIndex..<c.endIndex] =
+      newElements[newElements.startIndex..<newElements.endIndex]
   }
 } else {
   self.test("\(testNamePrefix).subscript(_: Range)/Set/DifferentlySizedRange") {
@@ -319,7 +322,8 @@ if isFixedLengthCollection {
       let newElements = makeWrappedCollection(test.newElements)
       let rangeToReplace = test.rangeSelection.range(in: c)
 
-      c[rangeToReplace] = newElements[...]
+      c[rangeToReplace] =
+        newElements[newElements.startIndex..<newElements.endIndex]
 
       expectEqualSequence(
         test.expected,
@@ -363,7 +367,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
             let newValues = makeWrappedCollection(
               elements[i..<j].map { OpaqueValue($0.value + 90000) }
             )
-            slice[subSliceStartIndex..<subSliceEndIndex] = newValues[...]
+            slice[subSliceStartIndex..<subSliceEndIndex]
+              = newValues[newValues.startIndex..<newValues.endIndex]
             let subSlice = slice[subSliceStartIndex..<subSliceEndIndex]
             for (k, index) in subSlice.indices.enumerated() {
               expectEqual(
@@ -377,7 +382,8 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
                 extractValue(subSlice[index]).value)
             }
             let oldValues = makeWrappedCollection(Array(elements[i..<j]))
-            slice[subSliceStartIndex..<subSliceEndIndex] = oldValues[...]
+            slice[subSliceStartIndex..<subSliceEndIndex]
+              = oldValues[oldValues.startIndex..<oldValues.endIndex]
           }
         }
       }
@@ -431,7 +437,7 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
     let count: Int = numericCast(
       base.distance(from: bounds.lowerBound, to: bounds.upperBound))
     let newValues = makeWrappedCollection(Array(elements[0..<count]))
-    let newSlice = newValues[...]
+    let newSlice = newValues[newValues.startIndex..<newValues.endIndex]
 
     expectCrashLater()
     slice[bounds] = newSlice

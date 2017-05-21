@@ -1122,24 +1122,10 @@ extension Strideable where Stride: SignedInteger {
   }
 }
 
-// FIXME: replace this with a computed var named `...` when the language makes
-// that possible.
-public enum UnboundedRange_ {
-  public static postfix func ... (_: UnboundedRange_) -> () {
-    fatalError("uncallable")
-  }
-}
-public typealias UnboundedRange = (UnboundedRange_)->()
-
 extension _Indexable {
   @_inlineable
   public subscript<R: RangeExpression>(r: R) -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
-  }
-  
-  @_inlineable
-  public subscript(x: UnboundedRange) -> SubSequence {
-    return self[startIndex...]
   }
 }
 extension _MutableIndexable {
@@ -1150,15 +1136,6 @@ extension _MutableIndexable {
     }
     set {
       self[r.relative(to: self)] = newValue
-    }
-  }
-
-  public subscript(x: UnboundedRange) -> SubSequence {
-    get {
-      return self[startIndex...]
-    }
-    set {
-      self[startIndex...] = newValue
     }
   }
 }
