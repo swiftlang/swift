@@ -150,7 +150,7 @@ public struct Character :
   ///
   ///     let oBreve: Character = "o\u{306}"
   ///     print(oBreve)
-  ///     // Prints "ŏ"
+  ///     // Prints "ŏ"
   ///
   /// The assignment to the `oBreve` constant calls this initializer behind the
   /// scenes.
@@ -200,10 +200,11 @@ public struct Character :
   /// Creates a Character from a String that is already known to require the
   /// large representation.
   ///
-  /// - Requires: s contains only a single grapheme
+  /// - Note: `s` should contain only a single grapheme, but we can't require
+  ///   that formally because of grapheme cluster literals and the shifting
+  ///   sands of Unicode.  https://bugs.swift.org/browse/SR-4955
   @_versioned
   internal init(_largeRepresentationString s: String) {
-    _sanityCheck(s.index(after: s.startIndex) == s.endIndex)
     if let native = s._core.nativeBuffer,
       native.start == s._core._baseAddress!,
       native.usedCount == s._core.count {
