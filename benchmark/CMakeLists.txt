@@ -107,6 +107,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringMatch
     single-source/StringTests
     single-source/StringWalk
+    single-source/Substring
     single-source/Suffix
     single-source/SuperChars
     single-source/TwoSum
