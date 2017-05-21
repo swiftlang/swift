@@ -1118,22 +1118,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         // If there is no nested type with this name, we have a lookup of
         // a non-type member, so leave the expression as-is.
         if (Result.size() == 1) {
-          auto *NewDecl = Result.front().first;
-          // Filter out dicey cases that we diagnose or handle later:
-          //
-          // 1) Dependent typealias or associated type reference with
-          //    protocol base.
-          if (NewDecl->getDeclaredInterfaceType()->hasTypeParameter() &&
-              BaseTy->isExistentialType())
-            return nullptr;
-
-          // 2) Generic typealias reference with unbound generic base.
-          if (isa<TypeAliasDecl>(NewDecl) &&
-              NewDecl->getDeclaredInterfaceType()->hasTypeParameter() &&
-              BaseTy->hasUnboundGenericType())
-            return nullptr;
-
-          return TypeExpr::createForMemberDecl(ITR, NameLoc, NewDecl);
+          return TypeExpr::createForMemberDecl(ITR, NameLoc,
+                                               Result.front().first);
         }
       }
     }

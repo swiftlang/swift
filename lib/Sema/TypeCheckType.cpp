@@ -1279,22 +1279,20 @@ static Type resolveNestedIdentTypeComponent(
   // associated type but the type itself was erroneous. We'll produce a
   // diagnostic here if the diagnostic for the bad type witness would show up in
   // a different context.
-  auto maybeDiagnoseBadConformanceRef = [&](AssociatedTypeDecl *assocType,
-                                            ProtocolConformance *conformance) {
+  auto maybeDiagnoseBadConformanceRef = [&](AssociatedTypeDecl *assocType) {
     // If we aren't emitting any diagnostics, we're done.
     if (!diagnoseErrors)
       return;
 
     // If we weren't given a conformance, go look it up.
-    if (!conformance) {
-      if (auto conformanceRef =
-            TC.conformsToProtocol(
-              parentTy, assocType->getProtocol(), DC,
-              (ConformanceCheckFlags::InExpression|
-               ConformanceCheckFlags::SuppressDependencyTracking))) {
-        if (conformanceRef->isConcrete())
-          conformance = conformanceRef->getConcrete();
-      }
+    ProtocolConformance *conformance = nullptr;
+    if (auto conformanceRef =
+        TC.conformsToProtocol(
+          parentTy, assocType->getProtocol(), DC,
+            (ConformanceCheckFlags::InExpression|
+             ConformanceCheckFlags::SuppressDependencyTracking))) {
+      if (conformanceRef->isConcrete())
+        conformance = conformanceRef->getConcrete();
     }
 
     // If there is a conformance and it comes from the same source file as type
@@ -1313,6 +1311,69 @@ static Type resolveNestedIdentTypeComponent(
                 assocType->getFullName(), parentTy);
   };
 
+  auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType) {
+    // Diagnose invalid cases.
+    if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
+      if (diagnoseErrors) {
+        if (parentTy->is<UnboundGenericType>())
+          diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
+        else if (parentTy->isExistentialType() &&
+                 isa<AssociatedTypeDecl>(member)) {
+          TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
+                      comp->getIdentifier());
+        } else if (parentTy->isExistentialType() &&
+                   isa<TypeAliasDecl>(member)) {
+          TC.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
+                      comp->getIdentifier());
+        }
+      }
+
+      return ErrorType::get(TC.Context);
+    }
+
+    // Only the last component of the underlying type of a type alias may
+    // be an unbound generic.
+    if (options & TR_TypeAliasUnderlyingType) {
+      if (parentTy->is<UnboundGenericType>()) {
+        if (diagnoseErrors)
+          diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
+
+        return ErrorType::get(TC.Context);
+      }
+    }
+
+    // If we found a reference to an associated type or other member type that
+    // was marked invalid, just return ErrorType to silence downstream errors.
+    if (member->isInvalid())
+      return ErrorType::get(TC.Context);
+
+    // Diagnose a bad conformance reference if we need to.
+    if (isa<AssociatedTypeDecl>(member) &&
+        memberType &&
+        memberType->hasError())
+      maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(member));
+
+    // At this point, we need to have resolved the type of the member.
+    if (!memberType || memberType->hasError()) return memberType;
+
+    // If there are generic arguments, apply them now.
+    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+      return TC.applyGenericArguments(
+        memberType, member, comp->getIdLoc(), DC, genComp,
+          options, resolver, unsatisfiedDependency);
+    }
+
+    if (memberType->is<UnboundGenericType>() &&
+        !options.contains(TR_AllowUnboundGenerics) &&
+        !options.contains(TR_TypeAliasUnderlyingType) &&
+        !options.contains(TR_ResolveStructure)) {
+      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
+      return ErrorType::get(TC.Context);
+    }
+
+    return memberType;
+  };
+
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
@@ -1327,34 +1388,9 @@ static Type resolveNestedIdentTypeComponent(
 
   // Phase 2: If a declaration has already been bound, use it.
   if (auto *typeDecl = comp->getBoundDecl()) {
-    // Otherwise, simply substitute the parent type into the member.
     auto memberType = TC.substMemberTypeWithBase(DC->getParentModule(),
                                                  typeDecl, parentTy);
-
-    // Diagnose the bad reference if we need to.
-    if (typeDecl && isa<AssociatedTypeDecl>(typeDecl) && memberType->hasError())
-      maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(typeDecl), nullptr);
-
-    // Propagate failure.
-    if (!memberType || memberType->hasError()) return memberType;
-
-    // If there are generic arguments, apply them now.
-    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-      return TC.applyGenericArguments(
-          memberType, typeDecl, comp->getIdLoc(), DC, genComp,
-          options, resolver, unsatisfiedDependency);
-    }
- 
-    if (memberType->is<UnboundGenericType>() &&
-        !options.contains(TR_AllowUnboundGenerics) &&
-        !options.contains(TR_TypeAliasUnderlyingType) &&
-        !options.contains(TR_ResolveStructure)) {
-      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
-      return ErrorType::get(TC.Context);
-    }
-
-    // We're done.
-    return memberType;
+    return maybeDiagnoseBadMemberType(typeDecl, memberType);
   }
 
   // Phase 1: Find and bind the component decl.
@@ -1412,77 +1448,22 @@ static Type resolveNestedIdentTypeComponent(
   if (!memberTypes) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors) {
+    if (!diagnoseErrors)
       return ErrorType::get(TC.Context);
-    }
 
-    Type ty = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp, options,
-                                  lookupOptions, resolver,
-                                  unsatisfiedDependency);
-    if (!ty || ty->hasError()) {
-      return ErrorType::get(TC.Context);
-    }
-
-    memberType = ty;
+    memberType = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp,
+                                     options, lookupOptions, resolver,
+                                     unsatisfiedDependency);
     member = comp->getBoundDecl();
+    if (!member)
+      return ErrorType::get(TC.Context);
   } else {
     memberType = memberTypes.back().second;
     member = memberTypes.back().first;
-  }
-
-  // Diagnose invalid cases.
-  if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
-    if (diagnoseErrors) {
-      if (parentTy->is<UnboundGenericType>())
-        diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
-      else if (parentTy->isExistentialType() &&
-               isa<AssociatedTypeDecl>(member)) {
-        TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
-                    comp->getIdentifier());
-      } else if (parentTy->isExistentialType() &&
-                 isa<TypeAliasDecl>(member)) {
-        TC.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
-                    comp->getIdentifier());
-      }
-    }
-
-    return ErrorType::get(TC.Context);
-  }
-
-  if (options & TR_TypeAliasUnderlyingType) {
-    if (parentTy->is<UnboundGenericType>()) {
-      if (diagnoseErrors)
-        diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
-
-      return ErrorType::get(TC.Context);
-    }
-  }
-
-  // If there are generic arguments, apply them now.
-  if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-    memberType = TC.applyGenericArguments(
-        memberType, member, comp->getIdLoc(), DC, genComp,
-        options, resolver, unsatisfiedDependency);
-  } else if (memberType->is<UnboundGenericType>() &&
-             !options.contains(TR_AllowUnboundGenerics) &&
-             !options.contains(TR_TypeAliasUnderlyingType) &&
-             !options.contains(TR_ResolveStructure)) {
-    diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
-    memberType = ErrorType::get(TC.Context);
-  }
-
-  // If we found a reference to an associated type or other member type that
-  // was marked invalid, just return ErrorType to silence downstream errors.
-  if (member && member->isInvalid())
-    memberType = ErrorType::get(TC.Context);
-
-  // Diagnose the bad reference if we need to.
-  if (member && isa<AssociatedTypeDecl>(member) && memberType->hasError())
-    maybeDiagnoseBadConformanceRef(cast<AssociatedTypeDecl>(member), nullptr);
-
-  if (member)
     comp->setValue(member);
-  return memberType;
+  }
+
+  return maybeDiagnoseBadMemberType(member, memberType);
 }
 
 static Type resolveIdentTypeComponent(
