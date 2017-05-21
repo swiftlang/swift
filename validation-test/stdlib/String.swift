@@ -53,7 +53,7 @@ StringTests.test("AssociatedTypes-UTF8View") {
   expectCollectionAssociatedTypes(
     collectionType: View.self,
     iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
+    subSequenceType: Slice<View>.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
     indicesType: DefaultIndices<View>.self)
@@ -1086,14 +1086,25 @@ StringTests.test("unicodeViews") {
   let winter = "\u{1F3C2}\u{2603}"
 
   // slices
-  // It is 4 bytes long, so it should return a replacement character.
+  // First scalar is 4 bytes long, so this should be invalid
+  expectNil(
+    String(winter.utf8[
+        winter.utf8.startIndex
+        ..<
+        winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
+      ]))
+
+  /*
+  // FIXME: note changed String(describing:) results
   expectEqual(
-    "\u{FFFD}", String(describing: 
+    "\u{FFFD}",
+    String(describing: 
       winter.utf8[
         winter.utf8.startIndex
         ..<
         winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
       ]))
+  */
   
   expectEqual(
     "\u{1F3C2}", String(
