@@ -15,23 +15,23 @@ import _SwiftFoundationOverlayShims
 
 extension IndexSet.Index {
     public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value == rhs.value && rhs.rangeIndex == rhs.rangeIndex
+        return lhs.value == rhs.value
     }
 
     public static func <(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value < rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value < rhs.value
     }
 
     public static func <=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value <= rhs.value && rhs.rangeIndex <= rhs.rangeIndex
+        return lhs.value <= rhs.value
     }
 
     public static func >(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value > rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value > rhs.value
     }
 
     public static func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
-        return lhs.value >= rhs.value && rhs.rangeIndex >= rhs.rangeIndex
+        return lhs.value >= rhs.value
     }
 }
 
@@ -237,9 +237,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
     
     public var startIndex: Index {
-        // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
-        let extent = _range(at: 0)
-        return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
+        let rangeCount = _rangeCount
+        if rangeCount > 0 {
+            // If this winds up being NSNotFound, that's ok because then endIndex is also NSNotFound, and empty collections have startIndex == endIndex
+            let extent = _range(at: 0)
+            return Index(value: extent.lowerBound, extent: extent, rangeIndex: 0, rangeCount: _rangeCount)
+        } else {
+            return Index(value: 0, extent: 0..<0, rangeIndex: -1, rangeCount: rangeCount)
+        }
     }
 
     public var endIndex: Index {
