@@ -78,6 +78,31 @@ extension String.Index {
   }
 }
 
+// SPI for Foundation
+extension String.Index {
+  public // SPI(Foundation)    
+  init(_position: Int) {
+    self.init(encodedOffset: _position)
+  }
+  
+  public // SPI(Foundation)    
+  init(_offset: Int) {
+    self.init(encodedOffset: _offset)
+  }
+  
+  public // SPI(Foundation)    
+  init(_base: String.Index, in c: String.CharacterView) {
+    self = _base
+  }
+  
+  /// The integer offset of this index in UTF-16 code units.
+  public // SPI(Foundation)
+  var _utf16Index: Int {
+    return self.encodedOffset
+  }
+}
+
+
 // backward compatibility for index interchange.  
 extension Optional where Wrapped == String.Index {
   @available(
