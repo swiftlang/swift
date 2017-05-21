@@ -12,6 +12,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// UNSUPPORTED: OS=linux-gnu
+
 import StdlibUnittest
 
 
