@@ -153,20 +153,6 @@ extension String {
   }
 }
 
-extension String.CharacterView : _SwiftStringView {
-  var _persistentContent : String {
-    // FIXME: we might want to make sure our _StringCore isn't somehow a slice
-    // of some larger storage before blindly wrapping/returning it as
-    // persistent.  That said, if current benchmarks are measuring these cases,
-    // we might end up regressing something by copying the storage.  For now,
-    // assume we are not a slice; we can come back and measure the effects of
-    // this fix later.  If we make the fix we should use the line below as an
-    // implementation of _ephemeralContent
-    return String(self._core)
-  }
-}
-
-
 /// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
@@ -672,15 +658,9 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// - Parameter characters: A sequence of characters.
   public init<S : Sequence>(_ characters: S)
-  where S.Element == Character {
-    let v0 = characters as? _SwiftStringView
-    if _fastPath(v0 != nil), let v = v0 {
-      self = v._persistentContent.characters
-    }
-    else {
-      self = String.CharacterView()
-      self.append(contentsOf: characters)
-    }
+    where S.Element == Character {
+    self = String.CharacterView()
+    self.append(contentsOf: characters)
   }
 }
 
