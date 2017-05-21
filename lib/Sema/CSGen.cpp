@@ -1537,7 +1537,7 @@ namespace {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          ArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
+          MutableArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.
           if (specializations.size() > typeVars.size()) {

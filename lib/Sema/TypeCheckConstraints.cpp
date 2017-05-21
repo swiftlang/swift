@@ -1060,22 +1060,9 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
-        // Create a new list of components.
-        SmallVector<ComponentIdentTypeRepr *, 2> Components;
-
-        // The first component is the parent type.
-        auto *ParentComp = new (TC.Context) SimpleIdentTypeRepr(
-          DRE->getNameLoc().getBaseNameLoc(), TD->getName());
-        ParentComp->setValue(TD);
-        Components.push_back(ParentComp);
-
-        // The second component is the member we just found.
-        auto *NewComp = new (TC.Context) SimpleIdentTypeRepr(NameLoc, Name);
-        NewComp->setValue(Result.front().first);
-        Components.push_back(NewComp);
-
-        auto *NewTypeRepr = IdentTypeRepr::create(TC.Context, Components);
-        return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+        return TypeExpr::createForMemberDecl(
+          DRE->getNameLoc().getBaseNameLoc(), TD,
+          NameLoc, Result.front().first);
       }
     }
 
@@ -1146,18 +1133,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
               BaseTy->hasUnboundGenericType())
             return nullptr;
 
-          // Create a new list of components.
-          SmallVector<ComponentIdentTypeRepr *, 2> Components;
-          for (auto *Component : ITR->getComponentRange())
-            Components.push_back(Component);
-
-          // Add a new component for the member we just found.
-          auto *NewComp = new (TC.Context) SimpleIdentTypeRepr(NameLoc, Name);
-          NewComp->setValue(NewDecl);
-          Components.push_back(NewComp);
-
-          auto *NewTypeRepr = IdentTypeRepr::create(TC.Context, Components);
-          return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+          return TypeExpr::createForMemberDecl(ITR, NameLoc, NewDecl);
         }
       }
     }
@@ -1190,50 +1166,11 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
   // Or a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
-      // Create a new list of components.
-      SmallVector<ComponentIdentTypeRepr *, 2> components;
-      for (auto *component : ITR->getComponentRange()) {
-        components.push_back(component);
-      }
-
-      auto *last = components.back();
-      components.pop_back();
-
-      if (isa<SimpleIdentTypeRepr>(last) &&
-          last->getBoundDecl()) {
-        if (isa<TypeAliasDecl>(last->getBoundDecl())) {
-          // If any of our parent types are unbound, bail out and let
-          // the constraint solver can infer generic parameters for them.
-          //
-          // This is because a type like GenericClass.GenericAlias<Int>
-          // cannot be represented directly.
-          //
-          // This also means that [GenericClass.GenericAlias<Int>]()
-          // won't parse correctly, whereas if we fully specialize
-          // GenericClass, it does.
-          //
-          // FIXME: Once we can model generic typealiases properly, rip
-          // this out.
-          for (auto *component : components) {
-            auto *componentDecl = dyn_cast_or_null<GenericTypeDecl>(
-              component->getBoundDecl());
-
-            if (isa<SimpleIdentTypeRepr>(component) &&
-                componentDecl &&
-                componentDecl->isGeneric())
-              return nullptr;
-          }
-        }
-
-        auto *genericComp = new (TC.Context) GenericIdentTypeRepr(
-          last->getIdLoc(), last->getIdentifier(),
-          TC.Context.AllocateCopy(genericArgs), angleRange);
-        genericComp->setValue(last->getBoundDecl());
-        components.push_back(genericComp);
-
-        auto *genericRepr = IdentTypeRepr::create(TC.Context, components);
-        return new (TC.Context) TypeExpr(TypeLoc(genericRepr, Type()));
-      }
+      return TypeExpr::createForSpecializedDecl(
+        ITR,
+        TC.Context.AllocateCopy(genericArgs),
+        angleRange,
+        TC.Context);
     }
   }
 
