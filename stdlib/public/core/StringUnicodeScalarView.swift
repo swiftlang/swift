@@ -86,6 +86,7 @@ extension String {
     }
 
     public typealias Index = String.Index
+    public typealias IndexDistance = Int
     
     /// Translates a `_core` index into a `UnicodeScalarIndex` using this view's
     /// `_coreOffset`.
@@ -415,55 +416,8 @@ extension String.UnicodeScalarIndex {
     _ utf16Index: String.UTF16Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    let utf16 = String.UTF16View(unicodeScalars._core)
-
-    if utf16Index != utf16.startIndex
-    && utf16Index != utf16.endIndex {
-      _precondition(
-        utf16Index >= utf16.startIndex
-        && utf16Index <= utf16.endIndex,
-        "Invalid String.UTF16Index for this Unicode.Scalar view")
-
-      // Detect positions that have no corresponding index.  Note that
-      // we have to check before and after, because an unpaired
-      // surrogate will be decoded as a single replacement character,
-      // thus making the corresponding position valid.
-      if UTF16.isTrailSurrogate(utf16[utf16Index])
-        && UTF16.isLeadSurrogate(utf16[utf16.index(before: utf16Index)]) {
-        return nil
-      }
-    }
+    if !unicodeScalars._isOnUnicodeScalarBoundary(utf16Index) { return nil }
     self = utf16Index
-  }
-
-  /// Creates an index in the given Unicode scalars view that corresponds
-  /// exactly to the specified `UTF8View` position.
-  ///
-  /// If the position passed as `utf8Index` doesn't have an exact corresponding
-  /// position in `unicodeScalars`, the result of the initializer is `nil`.
-  /// For example, an attempt to convert the position of a UTF-8 continuation
-  /// byte returns `nil`.
-  ///
-  /// - Parameters:
-  ///   - utf8Index: A position in the `utf8` view of a string. `utf8Index`
-  ///     must be an element of `String(unicodeScalars).utf8.indices`.
-  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
-  ///     position.
-  public init?(
-    _ utf8Index: String.UTF8Index,
-    within unicodeScalars: String.UnicodeScalarView
-  ) {
-    let core = unicodeScalars._core
-
-    _precondition(
-      utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
-      "Invalid String.UTF8Index for this Unicode.Scalar view")
-
-    // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
-      return nil
-    }
-    self.init(encodedOffset: utf8Index._coreIndex)
   }
 
   /// Returns the position in the given string that corresponds exactly to this
@@ -498,6 +452,7 @@ extension String.UnicodeScalarView {
     if i == startIndex || i == endIndex {
       return true
     }
+    if i._transcodedOffset != 0 { return false }
     let i2 = _toCoreIndex(i)
     if _fastPath(_core[i2] & 0xFC00 != 0xDC00) { return true }
     return _core[i2 &- 1] & 0xFC00 != 0xD800
@@ -540,5 +495,33 @@ extension String.UnicodeScalarView : CustomReflectable {
 extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
+  }
+}
+
+// backward compatibility for index interchange.  
+extension String.UnicodeScalarView {
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public func index(after i: Index?) -> Index {
+    return index(after: i)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public func index(_ i: Index?,  offsetBy n: IndexDistance) -> Index {
+    return index(i!, offsetBy: n)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
+  public func distance(from i: Index?, to j: Index?) -> IndexDistance {
+    return distance(from: i!, to: j!)
+  }
+  @available(
+    swift, obsoleted: 4.0,
+    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
+  public subscript(i: Index?) -> Unicode.Scalar {
+    return self[i!]
   }
 }

@@ -40,44 +40,18 @@ extension String.Index {
   ///     // Prints "nil"
   ///
   /// - Parameters:
-  ///   - unicodeScalarIndex: A position in the `unicodeScalars` view of the
-  ///     `other` parameter.
-  ///   - other: The string referenced by both `unicodeScalarIndex` and the
+  ///   - sourcePosition: A position in (a view of) the `other` parameter.
+  ///   - target: The string referenced by both `unicodeScalarIndex` and the
   ///     resulting index.
   public init?(
-    _ unicodeScalarIndex: String.UnicodeScalarIndex,
-    within other: String
+    _ sourcePosition: String.Index,
+    within target: String
   ) {
-    if !other.unicodeScalars._isOnGraphemeClusterBoundary(unicodeScalarIndex) {
-      return nil
-    }
-    self = unicodeScalarIndex
-  }
+    guard target.unicodeScalars._isOnGraphemeClusterBoundary(sourcePosition)
+    else { return nil }
 
-  /// Creates an index in the given string that corresponds exactly to the
-  /// specified `UTF8View` position.
-  ///
-  /// If the position passed in `utf8Index` doesn't have an exact corresponding
-  /// position in `other`, the result of the initializer is `nil`. For
-  /// example, an attempt to convert the position of a UTF-8 continuation byte
-  /// returns `nil`.
-  ///
-  /// - Parameters:
-  ///   - utf8Index: A position in the `utf8` view of the `other` parameter.
-  ///   - other: The string referenced by both `utf8Index` and the resulting
-  ///     index.
-  public init?(
-    _ utf8Index: String.UTF8Index,
-    within other: String
-  ) {
-    if let me = utf8Index.samePosition(
-      in: other.unicodeScalars
-    )?.samePosition(in: other) {
-      self = me
-    }
-    else {
-      return nil
-    }
+    self = target.characters._index(
+      atEncodedOffset: sourcePosition.encodedOffset)
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -122,33 +96,8 @@ extension String.Index {
   /// - Returns: The position in `utf16` that corresponds exactly to this index.
   public func samePosition(
     in utf16: String.UTF16View
-  ) -> String.UTF16View.Index {
+  ) -> String.UTF16View.Index? {
     return String.UTF16View.Index(self, within: utf16)
-  }
-
-  /// Returns the position in the given view of Unicode scalars that
-  /// corresponds exactly to this index.
-  ///
-  /// The index must be a valid index of `String(unicodeScalars)`.
-  ///
-  /// This example first finds the position of the character `"é"` and then uses
-  /// this method find the same position in the string's `unicodeScalars`
-  /// view.
-  ///
-  ///     let cafe = "Café"
-  ///     if let i = cafe.index(of: "é") {
-  ///         let j = i.samePosition(in: cafe.unicodeScalars)
-  ///         print(cafe.unicodeScalars[j])
-  ///     }
-  ///     // Prints "é"
-  ///
-  /// - Parameter unicodeScalars: The view to use for the index conversion.
-  /// - Returns: The position in `unicodeScalars` that corresponds exactly to
-  ///   this index.
-  public func samePosition(
-    in unicodeScalars: String.UnicodeScalarView
-  ) -> String.UnicodeScalarView.Index {
-    return String.UnicodeScalarView.Index(self, within: unicodeScalars)!
   }
 }
 
