@@ -326,7 +326,7 @@ class TestIndexSet : TestIndexSetSuper {
     }
     
     func testEmptyIteration() {
-        let empty = IndexSet()
+        var empty = IndexSet()
         let start = empty.startIndex
         let end = empty.endIndex
         
@@ -344,6 +344,21 @@ class TestIndexSet : TestIndexSetSuper {
             count += 1
         }
         
+        expectEqual(count, 0)
+
+        empty.insert(5)
+        empty.remove(5)
+        
+        count = 0
+        for _ in empty {
+            count += 1
+        }
+        expectEqual(count, 0)
+
+        count = 0
+        for _ in empty.rangeView {
+            count += 1
+        }
         expectEqual(count, 0)
     }
     
