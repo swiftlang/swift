@@ -380,7 +380,7 @@ extension MutableCollection
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: startIndex..<endIndex, by: <)
+      _introSort(&self, subRange: startIndex..<endIndex)
     }
   }
 }
