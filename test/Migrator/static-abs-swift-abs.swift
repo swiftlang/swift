@@ -8,5 +8,4 @@ import CoreGraphics
 
 _ = CGFloat.abs(0)
 _ = Float.abs(0)
-_ = Float80.abs(0)
 _ = Double.abs(0)
