@@ -3823,6 +3823,9 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     auto &component = keyPath->getComponents()[i];
     
     switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::Invalid:
+      return SolutionKind::Error;
+      
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
       // If no choice was made, leave the constraint unsolved.

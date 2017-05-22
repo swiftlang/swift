@@ -2429,6 +2429,10 @@ public:
       OS.indent(Indent + 2);
       OS << "(component=";
       switch (component.getKind()) {
+      case KeyPathExpr::Component::Kind::Invalid:
+        OS << "invalid ";
+        break;
+
       case KeyPathExpr::Component::Kind::OptionalChain:
         OS << "optional_chain ";
         break;

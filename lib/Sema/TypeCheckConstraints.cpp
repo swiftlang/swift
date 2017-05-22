@@ -1511,9 +1511,18 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
       } else {
-        if (emitErrors)
-          TC.diagnose(expr->getLoc(),
-                      diag::expr_swift_keypath_invalid_component);
+        if (emitErrors) {
+          // \(<expr>) may be an attempt to write a string interpolation outside
+          // of a string literal; diagnose this case specially.
+          if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
+            TC.diagnose(expr->getLoc(),
+                        diag::expr_string_interpolation_outside_string);
+          } else {
+            TC.diagnose(expr->getLoc(),
+                        diag::expr_swift_keypath_invalid_component);
+          }
+        }
+        components.push_back(KeyPathExpr::Component());
         return;
       }
     }
