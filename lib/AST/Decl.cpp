@@ -3043,6 +3043,25 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   return SelfReferenceKind::None();
 }
 
+/// Find Self references in a generic signature's same-type requirements.
+static SelfReferenceKind
+findProtocolSelfReferences(const ProtocolDecl *protocol,
+                           GenericSignature *genericSig){
+  if (!genericSig) return SelfReferenceKind::None();
+
+  auto selfTy = protocol->getSelfInterfaceType();
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::SameType)
+      continue;
+
+    if (req.getFirstType()->isEqual(selfTy) ||
+        req.getSecondType()->isEqual(selfTy))
+      return SelfReferenceKind::Requirement();
+  }
+
+  return SelfReferenceKind::None();
+}
+
 /// Find Self references within the given requirement.
 SelfReferenceKind
 ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
@@ -3062,7 +3081,7 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
   if (type->hasError())
     return SelfReferenceKind::None();
 
-  if (isa<AbstractFunctionDecl>(value)) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     // Skip the 'self' parameter.
     type = type->castTo<AnyFunctionType>()->getResult();
 
@@ -3076,9 +3095,24 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
         return SelfReferenceKind::Other();
     }
 
+    // Check the requirements of a generic function.
+    if (func->isGeneric()) {
+      if (auto result =
+            ::findProtocolSelfReferences(this, func->getGenericSignature()))
+        return result;
+    }
+
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
-  } else if (isa<SubscriptDecl>(value)) {
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
+    // Check the requirements of a generic subscript.
+    if (subscript->isGeneric()) {
+      if (auto result =
+            ::findProtocolSelfReferences(this,
+                                         subscript->getGenericSignature()))
+        return result;
+    }
+
     return ::findProtocolSelfReferences(this, type,
                                         skipAssocTypes);
   } else {
