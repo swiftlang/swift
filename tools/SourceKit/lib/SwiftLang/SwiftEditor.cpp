@@ -293,6 +293,20 @@ public:
     return false;
   }
 
+  bool matchesAnyTokenOnLine(unsigned Line, const SwiftSyntaxToken &Token) const {
+    assert(Line > 0);
+    if (Lines.size() < Line)
+      return false;
+
+    unsigned LineOffset = Line - 1;
+    for (auto &Tok: Lines[LineOffset]) {
+      if (Tok.Column == Token.Column && Tok.Length == Token.Length
+        && Tok.Kind == Token.Kind)
+      return true;
+    }
+    return false;
+  }
+
   void addTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
     assert(Line > 0);
     if (Lines.size() < Line) {
@@ -332,12 +346,17 @@ public:
     }
   }
 
-  void clearLineRange(unsigned StartLine, unsigned Length) {
-    assert(StartLine > 0);
-    unsigned LineOffset = StartLine - 1;
-    for (unsigned Line = LineOffset; Line < LineOffset + Length
-                                    && Line < Lines.size(); ++Line) {
-      Lines[Line].clear();
+  void clearLineRange(unsigned StartLine, unsigned EndLine, unsigned StartColumn = 0) {
+    assert (StartLine > 0 && EndLine >= StartLine);
+    auto LineIndex = StartLine - 1;
+    if (StartColumn > 0) {
+      auto &LineToks = Lines[LineIndex++];
+      while (!LineToks.empty() && LineToks.back().Column >= StartColumn)
+        LineToks.pop_back();
+    }
+
+    for (; LineIndex < Lines.size() && LineIndex < EndLine; ++LineIndex) {
+      Lines[LineIndex].clear();
     }
   }
 
@@ -1232,15 +1251,79 @@ public:
 };
 
 class SwiftEditorSyntaxWalker: public ide::SyntaxModelWalker {
+  struct RangeToken : SwiftSyntaxToken {
+    unsigned Line;
+    unsigned EndLine;
+    unsigned Offset;
+
+    RangeToken(SyntaxNodeKind Kind, unsigned Offset, unsigned Length,
+               unsigned Line, unsigned Column, unsigned EndLine) :
+      SwiftSyntaxToken(Column, Length, Kind), Line(Line), EndLine(EndLine),
+      Offset(Offset) {}
+  };
+
   SwiftSyntaxMap &SyntaxMap;
   LineRange EditedLineRange;
   SwiftEditorCharRange &AffectedRange;
+  unsigned OrigAffectedRangeEnd;
+
   SourceManager &SrcManager;
   EditorConsumer &Consumer;
   unsigned BufferID;
   SwiftDocumentStructureWalker DocStructureWalker;
   std::vector<EditorConsumerSyntaxMapEntry> ConsumerSyntaxMap;
+  std::vector<RangeToken> QueuedTokens;
   unsigned NestingLevel = 0;
+
+  RangeToken getToken(SyntaxNode Node) {
+    SourceLoc StartLoc = Node.Range.getStart();
+    auto StartLineAndColumn = SrcManager.getLineAndColumn(StartLoc);
+    auto EndLineAndColumn = SrcManager.getLineAndColumn(Node.Range.getEnd());
+    auto EndLine = EndLineAndColumn.first;
+    if (EndLineAndColumn.second == 1) {
+      --EndLine;
+    }
+
+    return {
+      Node.Kind,
+      /*Offset=*/ SrcManager.getLocOffsetInBuffer(StartLoc, BufferID),
+      /*Length=*/ Node.Range.getByteLength(),
+      /*Line=*/ StartLineAndColumn.first,
+      /*Column=*/ StartLineAndColumn.second,
+      EndLine
+    };
+  }
+
+  void addSyntaxMapEntry(const RangeToken Token) {
+    if (NestingLevel > 1) {
+      SyntaxMap.mergeTokenForLine(Token.Line, Token);
+    } else {
+      SyntaxMap.addTokenForLine(Token.Line, Token);
+    }
+
+    UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Token.Kind);
+    if (NestingLevel > 1) {
+      assert(!ConsumerSyntaxMap.empty());
+      auto &Last = ConsumerSyntaxMap.back();
+      mergeSplitRanges(Last.Offset, Last.Length, Token.Offset, Token.Length,
+                       [&](unsigned BeforeOff, unsigned BeforeLen,
+                           unsigned AfterOff, unsigned AfterLen) {
+                         auto LastKind = Last.Kind;
+                         ConsumerSyntaxMap.pop_back();
+                         if (BeforeLen)
+                           ConsumerSyntaxMap.emplace_back(BeforeOff, BeforeLen,
+                                                          LastKind);
+                         ConsumerSyntaxMap.emplace_back(Token.Offset,
+                                                        Token.Length, Kind);
+                         if (AfterLen)
+                           ConsumerSyntaxMap.emplace_back(AfterOff, AfterLen,
+                                                          LastKind);
+                       });
+    } else {
+      ConsumerSyntaxMap.emplace_back(Token.Offset, Token.Length, Kind);
+    }
+  }
+
 public:
   SwiftEditorSyntaxWalker(SwiftSyntaxMap &SyntaxMap,
                           LineRange EditedLineRange,
@@ -1248,8 +1331,9 @@ public:
                           SourceManager &SrcManager, EditorConsumer &Consumer,
                           unsigned BufferID)
     : SyntaxMap(SyntaxMap), EditedLineRange(EditedLineRange),
-      AffectedRange(AffectedRange), SrcManager(SrcManager), Consumer(Consumer),
-      BufferID(BufferID),
+      AffectedRange(AffectedRange),
+      OrigAffectedRangeEnd(AffectedRange.first + AffectedRange.second),
+      SrcManager(SrcManager), Consumer(Consumer), BufferID(BufferID),
       DocStructureWalker(SrcManager, BufferID, Consumer) { }
 
   bool walkToNodePre(SyntaxNode Node) override {
@@ -1257,96 +1341,83 @@ public:
       return DocStructureWalker.walkToNodePre(Node);
 
     ++NestingLevel;
-    SourceLoc StartLoc = Node.Range.getStart();
-    auto StartLineAndColumn = SrcManager.getLineAndColumn(StartLoc);
-    auto EndLineAndColumn = SrcManager.getLineAndColumn(Node.Range.getEnd());
-    unsigned StartLine = StartLineAndColumn.first;
-    unsigned EndLine = EndLineAndColumn.second > 1 ? EndLineAndColumn.first
-                                                   : EndLineAndColumn.first - 1;
-    unsigned Offset = SrcManager.getByteDistance(
-                           SrcManager.getLocForBufferStart(BufferID), StartLoc);
-    // Note that the length can span multiple lines.
-    unsigned Length = Node.Range.getByteLength();
+    RangeToken Token  = getToken(Node);
 
-    SwiftSyntaxToken Token(StartLineAndColumn.second, Length,
-                           Node.Kind);
     if (EditedLineRange.isValid()) {
-      if (StartLine < EditedLineRange.startLine()) {
-        if (EndLine < EditedLineRange.startLine()) {
-          // We're entirely before the edited range, no update needed.
+      if (Token.Line < EditedLineRange.startLine()) {
+        if (Token.EndLine < EditedLineRange.startLine()
+            && SyntaxMap.matchesAnyTokenOnLine(Token.Line, Token)) {
+          // 1: We start before the edited range and we have this token already
+          //    so don't process or report it.
           return true;
         }
 
-        // This token starts before the edited range, but doesn't end before it,
-        // we need to adjust edited line range and clear the affected syntax map
-        // line range.
-        unsigned AdjLineCount = EditedLineRange.startLine() - StartLine;
-        EditedLineRange.setRange(StartLine, AdjLineCount
-                                            + EditedLineRange.lineCount());
-        SyntaxMap.clearLineRange(StartLine, AdjLineCount);
+        // 2: The edit was inside this token, or made it appear (e.g. tokens
+        //    inside a multiline string interpolation when the string is
+        //    closed). Extend the edited range to include it, clear out the old
+        //    syntax map entries, and update the the affected range to start
+        //    here.
+        EditedLineRange.extendToIncludeLine(Token.Line);
+        EditedLineRange.extendToIncludeLine(Token.EndLine);
+        SyntaxMap.clearLineRange(Token.Line, EditedLineRange.endLine(), Token.Column);
 
-        // Also adjust the affected char range accordingly.
-        unsigned AdjCharCount = AffectedRange.first - Offset;
+        // Bring the start of the affected range back to this offset
+        unsigned AdjCharCount = AffectedRange.first - Token.Offset;
         AffectedRange.first -= AdjCharCount;
         AffectedRange.second += AdjCharCount;
       }
-      else if (Offset > AffectedRange.first + AffectedRange.second) {
-        // We're passed the affected range and already synced up, just return.
-        return true;
-      }
-      else if (StartLine > EditedLineRange.endLine()) {
-        // We're after the edited line range, let's test if we're synced up.
-        if (SyntaxMap.matchesFirstTokenOnLine(StartLine, Token)) {
-          // We're synced up, mark the affected range and return.
-          AffectedRange.second =
-                 Offset - (StartLineAndColumn.second - 1) - AffectedRange.first;
+      else if (Token.Offset > AffectedRange.first + AffectedRange.second) {
+        // 4: We're after the Edited range and affected range. Check we're still
+        //    in sync.
+        if (SyntaxMap.matchesAnyTokenOnLine(Token.Line, Token)) {
+          // 4a: We're in sync. No need to process the token now, but we may
+          //     still need to later if we see differences. That can happen if
+          //     the edit restored the opening quotes of a multiline string
+          //     literal and this token is in an interpolation – this token is
+          //     in sync, but there will be a new string token later.
+          QueuedTokens.push_back(Token);
           return true;
         }
 
-        // We're not synced up, continue replacing syntax map data on this line.
-        SyntaxMap.clearLineRange(StartLine, 1);
-        EditedLineRange.extendToIncludeLine(StartLine);
+        // 4b: We're out of sync again. Process any tokens we queued up,
+        //     clearing out the existing syntax map tokens before hand and
+        //     restore the end of the affected range back to its original state
+        //     (the end of the buffer).
+        auto &FromToken = QueuedTokens.empty() ? Token : QueuedTokens.front();
+
+        EditedLineRange.extendToIncludeLine(Token.EndLine);
+        SyntaxMap.clearLineRange(FromToken.Line, Token.EndLine);
+
+        for (auto &QueuedToken: QueuedTokens)
+          addSyntaxMapEntry(QueuedToken);
+        AffectedRange.second = OrigAffectedRangeEnd - AffectedRange.first;
       }
-
-      if (EndLine > StartLine) {
-        // The token spans multiple lines, make sure to replace syntax map data
-        // for affected lines.
-        EditedLineRange.extendToIncludeLine(EndLine);
-
-        unsigned LineCount = EndLine - StartLine + 1;
-        SyntaxMap.clearLineRange(StartLine, LineCount);
+      else if (Token.Line > EditedLineRange.endLine()) {
+        // 3: We're after the edited line range but not the affected range,
+        //    check if we're in sync.
+        if (SyntaxMap.matchesFirstTokenOnLine(Token.Line, Token)) {
+          // 3a: We're synced up so don't process or report this token.
+          //     Tentatively update the end of the affected range and queue the
+          //     token in case we fall out of sync again later.
+          AffectedRange.second =
+            Token.Offset - (Token.Column - 1) - AffectedRange.first;
+          QueuedTokens.push_back(Token);
+          return true;
+        }
+        // 3b: We're not synced up, continue replacing syntax map data on
+        //     this line.
+        EditedLineRange.extendToIncludeLine(Token.EndLine);
+        SyntaxMap.clearLineRange(Token.Line, Token.EndLine);
       }
-
+      else if (Token.EndLine > Token.Line) {
+        // We're in the edited range and this token spans multiple lines. Make
+        // sure to replace syntax map data for the affected lines.
+        EditedLineRange.extendToIncludeLine(Token.EndLine);
+        SyntaxMap.clearLineRange(Token.Line, Token.EndLine, Token.Column);
+      }
     }
 
-    // Add the syntax map token.
-    if (NestingLevel > 1)
-      SyntaxMap.mergeTokenForLine(StartLine, Token);
-    else
-      SyntaxMap.addTokenForLine(StartLine, Token);
-
-    // Add consumer entry.
-    unsigned ByteOffset = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(),
-                                                          BufferID);
-    UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
-    if (NestingLevel > 1) {
-      assert(!ConsumerSyntaxMap.empty());
-      auto &Last = ConsumerSyntaxMap.back();
-      mergeSplitRanges(Last.Offset, Last.Length, ByteOffset, Length,
-                       [&](unsigned BeforeOff, unsigned BeforeLen,
-                           unsigned AfterOff, unsigned AfterLen) {
-        auto LastKind = Last.Kind;
-        ConsumerSyntaxMap.pop_back();
-        if (BeforeLen)
-          ConsumerSyntaxMap.emplace_back(BeforeOff, BeforeLen, LastKind);
-        ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
-        if (AfterLen)
-          ConsumerSyntaxMap.emplace_back(AfterOff, AfterLen, LastKind);
-      });
-    }
-    else
-      ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
-
+    addSyntaxMapEntry(std::move(Token));
     return true;
   }
 
