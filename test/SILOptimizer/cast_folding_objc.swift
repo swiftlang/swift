@@ -265,3 +265,37 @@ public func testBridgedCastFromSwiftToObjC(_ s: String) -> NSString {
   return s as NSString
 }
 
+public class MyString: NSString {}
+
+// Check that the cast-optimizer bails out on a conditional downcast to a subclass of a
+// bridged ObjC class.
+// CHECK-LABEL: sil [noinline] @{{.*}}testConditionalBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
+// CHECK-NOT: apply
+// CHECK-NOT: unconditional
+// CHECK-NOT: checked_cast_br
+// CHECK: checked_cast_addr_br
+// CHECK-NOT: apply
+// CHECK-NOT: unconditional
+// CHECK-NOT: checked_cast_br
+// CHECK: return
+@inline(never)
+public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString? {
+  return s as? MyString
+}
+
+// Check that the cast-optimizer does not bail out on an unconditional downcast to a subclass of a
+// bridged ObjC class.
+// CHECK-LABEL: sil [noinline] @{{.*}}testForcedBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
+// CHECK: function_ref @_T0SS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: apply
+// CHECK-NOT: apply
+// CHECK-NOT: checked_cast_br
+// CHECK: unconditional_checked_cast
+// CHECK-NOT: apply
+// CHECK-NOT: unconditional
+// CHECK-NOT: checked_cast
+// CHECK: return
+@inline(never)
+public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString {
+    return s as! MyString
+}
