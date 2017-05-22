@@ -1382,12 +1382,37 @@ public:
   static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
   
-  /// Return a TypeExpr for a TypeDecl and the specified location.
+  /// Create a TypeExpr for a TypeDecl at the specified location.
   static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
                                  bool isImplicit);
+
+  /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
+  static TypeExpr *createForMemberDecl(SourceLoc ParentNameLoc,
+                                       TypeDecl *Parent,
+                                       SourceLoc NameLoc,
+                                       TypeDecl *Decl);
+
+  /// Create a TypeExpr for a member TypeDecl of the given parent IdentTypeRepr.
+  static TypeExpr *createForMemberDecl(IdentTypeRepr *ParentTR,
+                                       SourceLoc NameLoc,
+                                       TypeDecl *Decl);
+
+  /// Create a TypeExpr for a generic TypeDecl with the given arguments applied
+  /// at the specified location.
   static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
                                             ArrayRef<TypeRepr*> args,
                                             SourceRange angleLocs);
+
+  /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
+  /// at the specified location.
+  ///
+  /// Returns nullptr if the reference cannot be formed, which is a hack due
+  /// to limitations in how we model generic typealiases.
+  static TypeExpr *createForSpecializedDecl(IdentTypeRepr *ParentTR,
+                                            ArrayRef<TypeRepr*> Args,
+                                            SourceRange AngleLocs,
+                                            ASTContext &C);
+
   TypeLoc &getTypeLoc() { return Info; }
   TypeLoc getTypeLoc() const { return Info; }
   TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }

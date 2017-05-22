@@ -168,8 +168,8 @@ func f3124_2<U : protocol<P1>>(x: U)  {} // expected-warning {{'protocol<...>' c
 func takesP1AndP2(_: [AnyObject & P1 & P2]) {}
 
 takesP1AndP2([AnyObject & P1 & P2]())
-// takesP1AndP2([Swift.AnyObject & P1 & P2]()) // FIXME
-// takesP1AndP2([AnyObject & protocol_composition.P1 & P2]()) // FIXME
-// takesP1AndP2([AnyObject & P1 & protocol_composition.P2]()) // FIXME
+takesP1AndP2([Swift.AnyObject & P1 & P2]())
+takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
+takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
 takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
 takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}

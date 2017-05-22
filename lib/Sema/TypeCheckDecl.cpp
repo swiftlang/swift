@@ -7229,6 +7229,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateGenericTypeSignature(proto);
     proto->setIsBeingValidated(false);
 
+    // See the comment in validateDeclForNameLookup(); we may have validated
+    // the alias before we built the protocol's generic environment.
+    //
+    // FIXME: Hopefully this can all go away with the ITC.
+    for (auto member : proto->getMembers()) {
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+        if (!aliasDecl->isGeneric())
+          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+      }
+    }
+
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
 
@@ -7504,6 +7515,13 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         typealias->setUnderlyingType(
                                 typealias->getUnderlyingTypeLoc().getType());
 
+        // Note that this doesn't set the generic environment of the alias yet,
+        // because we haven't built one for the protocol.
+        //
+        // See how validateDecl() sets the generic environment on alias members
+        // explicitly.
+        //
+        // FIXME: Hopefully this can all go away with the ITC.
         return;
       }
     }
