@@ -7254,11 +7254,12 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
         }
       }
     }
-    
+
+    auto numElements = E->getNumElements();
     if (!Conformance) {
       // If the contextual type conforms to ExpressibleByDictionaryLiteral and
       // this is an empty array, then they meant "[:]".
-      if (E->getNumElements() == 0 &&
+      if (numElements == 0 &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
         diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
           .fixItInsert(E->getEndLoc(), ":");
@@ -7271,13 +7272,19 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
       // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
       // they wrote "x = [1,2]" but probably meant "x = [1:2]".
-      if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
+      if ((numElements & 1) == 0 && numElements > 0 &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
         auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
 
-        // Change every other comma into a colon.
-        for (unsigned i = 0, e = E->getElements().size()/2; i != e; ++i)
-          diag.fixItReplace(E->getCommaLocs()[i*2], ":");
+        // Change every other comma into a colon, only if the number
+        // of commas present matches the number of elements, because
+        // otherwise it might a structural problem with the expression
+        // e.g. ["a""b": 1].
+        const auto commaLocs = E->getCommaLocs();
+        if (commaLocs.size() == numElements - 1) {
+          for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+            diag.fixItReplace(commaLocs[i*2], ":");
+        }
       }
 
       return true;
