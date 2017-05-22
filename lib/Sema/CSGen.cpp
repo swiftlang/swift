@@ -2755,7 +2755,13 @@ namespace {
         CS.TC.diagnose(E->getLoc(), diag::expr_keypath_no_keypath_type);
         return ErrorType::get(CS.getASTContext());
       }
-
+      
+      // If the key path contained any syntactically invalid components, bail
+      // out.
+      for (auto &c : E->getComponents())
+        if (!c.isValid())
+          return ErrorType::get(CS.getASTContext());
+      
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.
       auto locator = CS.getConstraintLocator(E);
@@ -2778,6 +2784,9 @@ namespace {
       for (unsigned i : indices(E->getComponents())) {
         auto &component = E->getComponents()[i];
         switch (auto kind = component.getKind()) {
+        case KeyPathExpr::Component::Kind::Invalid:
+          llvm_unreachable("should have bailed out");
+        
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
           auto memberTy = CS.createTypeVariable(locator, TVO_CanBindToLValue);
           auto refKind = component.getUnresolvedDeclName().isSimpleName()

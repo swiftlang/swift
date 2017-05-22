@@ -6953,6 +6953,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
       componentName = TC.Context.Id_subscript;
       break;
 
+    case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
       // FIXME: Diagnose optional chaining and forcing properly.
