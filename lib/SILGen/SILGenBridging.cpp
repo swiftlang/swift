@@ -1238,7 +1238,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   // formally present in the constructor body.
   Type allocatorSelfType;
   if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    allocatorSelfType = forwardedParameters[0]->getType(getASTContext())
+    allocatorSelfType = forwardedParameters[0]
+      ->getInterfaceType(getASTContext())
       ->getLValueOrInOutObjectType();
     forwardedParameters = forwardedParameters.slice(1);
   }
