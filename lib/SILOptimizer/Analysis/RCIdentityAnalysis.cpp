@@ -182,7 +182,7 @@ static llvm::Optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
   NullablePtr<EnumElementDecl> Decl = SEI->getUniqueCaseForDestination(BB);
   if (Decl.isNull())
     return None;
-  return !Decl.get()->getArgumentInterfaceType();
+  return !Decl.get()->hasAssociatedValues();
 }
 
 bool RCIdentityFunctionInfo::

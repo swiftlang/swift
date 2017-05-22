@@ -4366,7 +4366,7 @@ RValue CallEmission::applyEnumElementConstructor(
 
   // Get the payload argument.
   ArgumentSource payload;
-  if (element->getArgumentInterfaceType()) {
+  if (element->hasAssociatedValues()) {
     assert(uncurriedSites.size() == 2);
     formalResultType = formalType.getResult();
     claimNextParamClause(origFormalType.getValue());
