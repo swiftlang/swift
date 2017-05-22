@@ -8,3 +8,7 @@ func foo(_ a : PropertyUserInterface) {
   a.setField(1)
   _ = a.field()
 }
+
+class C: PropertyUserInterface {
+  public override func field() -> Int32 { return 1 }
+}
