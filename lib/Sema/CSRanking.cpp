@@ -589,7 +589,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                        locator,
                        unused);
 
-        openedType2 = cs.openType(type2, locator, unused);
+        openedType2 = cs.openType(type2, unused);
       }
 
       // Get the type of a reference to the first declaration, swapping in
@@ -611,7 +611,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                        locator,
                        replacements);
 
-        openedType1 = cs.openType(type1, locator, replacements);
+        openedType1 = cs.openType(type1, replacements);
       }
 
       for (const auto &replacement : replacements) {

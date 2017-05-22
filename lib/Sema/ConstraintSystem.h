@@ -1881,29 +1881,33 @@ public:
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
 
-  /// \brief "Open" the given type by replacing any occurrences of generic
-  /// parameter types and dependent member types with fresh type variables.
+  /// \brief "Open" the given unbound type by introducing fresh type
+  /// variables for generic parameters and constructing a bound generic
+  /// type from these type variables.
+  ///
+  /// \param unbound The type to open.
+  ///
+  /// \returns The opened type.
+  Type openUnboundGenericType(UnboundGenericType *unbound,
+                              ConstraintLocatorBuilder locator,
+                              OpenedTypeMap &replacements);
+
+  /// \brief "Open" the given type by replacing any occurrences of unbound
+  /// generic types with bound generic types with fresh type variables as
+  /// generic arguments.
   ///
   /// \param type The type to open.
   ///
   /// \returns The opened type.
-  Type openType(Type type, ConstraintLocatorBuilder locator) {
-    OpenedTypeMap replacements;
-    return openType(type, locator, replacements);
-  }
+  Type openUnboundGenericType(Type type, ConstraintLocatorBuilder locator);
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
   ///
   /// \param type The type to open.
   ///
-  /// \param replacements The mapping from opened types to the type
-  /// variables to which they were opened.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type,
-                ConstraintLocatorBuilder locator,
-                OpenedTypeMap &replacements);
+  Type openType(Type type, OpenedTypeMap &replacements);
 
   /// \brief "Open" the given function type.
   ///
@@ -1932,18 +1936,6 @@ public:
       DeclContext *innerDC,
       DeclContext *outerDC,
       bool skipProtocolSelfConstraint);
-
-  /// \brief "Open" the given binding type by replacing any occurrences of
-  /// archetypes (including those implicit in unbound generic types) with
-  /// fresh type variables.
-  ///
-  /// This variant of \c openType() tweaks the result from \c openType() to
-  /// prefer arrays to slices.
-  /// FIXME: This is a bit of a hack.
-  ///
-  /// \param type The type to open.
-  /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openBindingType(Type type, ConstraintLocatorBuilder locator);
 
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
