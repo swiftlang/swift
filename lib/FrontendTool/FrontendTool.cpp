@@ -925,6 +925,9 @@ static bool performCompile(CompilerInstance &Instance,
     allSymbols = true;
     LLVM_FALLTHROUGH;
   case FrontendOptions::TBDValidationMode::MissingFromTBD: {
+    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
+      break;
+
     auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
     bool error;
     if (PrimarySourceFile)

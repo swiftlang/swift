@@ -60,6 +60,21 @@ bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
   return false;
 }
 
+bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
+  // Only things that involve an AST can have a TBD file computed, at the
+  // moment.
+  switch (kind) {
+  case InputFileKind::IFK_Swift:
+  case InputFileKind::IFK_Swift_Library:
+    return true;
+  case InputFileKind::IFK_None:
+  case InputFileKind::IFK_Swift_REPL:
+  case InputFileKind::IFK_SIL:
+  case InputFileKind::IFK_LLVM_IR:
+    return false;
+  }
+}
+
 static bool validateSymbolSet(DiagnosticEngine &diags,
                               llvm::StringSet<> symbols, llvm::Module &IRModule,
                               bool diagnoseExtraSymbolsInTBD) {
