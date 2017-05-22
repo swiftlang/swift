@@ -86,34 +86,43 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
                                                     DeclContext *context,
                                                     Type target,
                                                     ProtocolDecl *proto) {
-  // FIXME: Remove when conditional conformance lands.
-  // Some generic types in the stdlib currently conform to Codable even when
-  // the type they are generic on does not [Optional, Array, Set, Dictionary].
-  // For synthesizing conformance, we don't want to consider these types as
-  // Codable if the nested type is not Codable. Look through the generic type
-  // parameters of these types recursively to avoid synthesizing code that will
-  // crash at runtime.
-  if (!tc.conformsToProtocol(target, proto, context,
-                             ConformanceCheckFlags::Used))
-    return DoesNotConform;
-
-  // We only want to look through generic params for these types; other types
-  // may validly conform to Codable even if their generic param types do not.
+  // Some generic types need to be introspected to get at their "true" Codable
+  // conformance.
   auto canType = target->getCanonicalType();
   if (auto genericType = dyn_cast<BoundGenericType>(canType)) {
     auto *nominalTypeDecl = genericType->getAnyNominal();
-    if (nominalTypeDecl == tc.Context.getOptionalDecl() ||
-        nominalTypeDecl == tc.Context.getArrayDecl() ||
-        nominalTypeDecl == tc.Context.getSetDecl() ||
-        nominalTypeDecl == tc.Context.getDictionaryDecl()) {
+
+    // Implicitly unwrapped optionals need to be unwrapped;
+    // ImplicitlyUnwrappedOptional does not need to conform to Codable directly
+    // -- only its inner type does.
+    if (nominalTypeDecl == tc.Context.getImplicitlyUnwrappedOptionalDecl() ||
+         // FIXME: Remove the following when conditional conformance lands.
+         // Some generic types in the stdlib currently conform to Codable even
+         // when the type they are generic on does not [Optional, Array, Set,
+         // Dictionary].  For synthesizing conformance, we don't want to
+         // consider these types as Codable if the nested type is not Codable.
+         // Look through the generic type parameters of these types recursively
+         // to avoid synthesizing code that will crash at runtime.
+         //
+         // We only want to look through generic params for these types; other
+         // types may validly conform to Codable even if their generic param
+         // types do not.
+         nominalTypeDecl == tc.Context.getOptionalDecl() ||
+         nominalTypeDecl == tc.Context.getArrayDecl() ||
+         nominalTypeDecl == tc.Context.getSetDecl() ||
+         nominalTypeDecl == tc.Context.getDictionaryDecl()) {
       for (auto paramType : genericType->getGenericArgs()) {
         if (typeConformsToCodable(tc, context, paramType, proto) != Conforms)
           return DoesNotConform;
       }
+
+      return Conforms;
     }
   }
 
-  return Conforms;
+  return tc.conformsToProtocol(target, proto, context,
+                               ConformanceCheckFlags::Used) ? Conforms
+                                                            : DoesNotConform;
 }
 
 /// Returns whether the given variable conforms to the given {En,De}codable
@@ -613,7 +622,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = C.Id_encode;
     auto varType = cast<VarDecl>(matchingVars[0])->getType();
-    if (varType->getAnyNominal() == C.getOptionalDecl()) {
+    if (varType->getAnyNominal() == C.getOptionalDecl() ||
+        varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
       methodName = C.Id_encodeIfPresent;
     }
 
@@ -870,9 +880,11 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       // Potentially unwrap a layer of optionality from the var type. If the var
       // is Optional<T>, we want to decodeIfPresent(T.self, forKey: ...);
       // otherwise, we can just decode(T.self, forKey: ...).
+      // This is also true if the type is an ImplicitlyUnwrappedOptional.
       auto varType = varDecl->getType();
       auto methodName = C.Id_decode;
-      if (varType->getAnyNominal() == C.getOptionalDecl()) {
+      if (varType->getAnyNominal() == C.getOptionalDecl() ||
+          varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
         methodName = C.Id_decodeIfPresent;
 
         // The type we request out of decodeIfPresent needs to be unwrapped
