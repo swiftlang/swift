@@ -1478,3 +1478,11 @@ let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = Muta
     data: DataSourcePage<Int>.notLoaded,
     totalCount: 0
 ))
+
+// rdar://problem/32301091 - Make sure that in Swift 3 mode following expressions still compile just fine
+
+func rdar32301091_1(_ :((Int, Int) -> ())!) {}
+rdar32301091_1 { _ in } // Ok in Swift 3
+
+func rdar32301091_2(_ :(Int, Int) -> ()) {}
+rdar32301091_2 { _ in } // Ok in Swift 3
