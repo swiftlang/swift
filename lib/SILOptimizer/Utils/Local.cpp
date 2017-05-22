@@ -1461,13 +1461,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
-  // FIXME (rdar://problem/32319580): The code below handles a cast from a Swift
-  // value type to a subclass of its bridged type by emitting an unconditional
-  // cast, even if the cast is supposed to be conditional.
-  if (isConditional && !BridgedSourceTy->isEqual(BridgedTargetTy) &&
-      BridgedSourceTy->isBindableToSuperclassOf(BridgedTargetTy))
-    return nullptr;
-
   bool AddressOnlyType = false;
   if (!Src->getType().isLoadable(M) || !Dest->getType().isLoadable(M)) {
     AddressOnlyType = true;
@@ -1663,8 +1656,21 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       CastedValue = SILValue(
           (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
     } else if (ConvTy.isExactSuperclassOf(DestTy)) {
-      CastedValue = SILValue(
-          Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
+      // The downcast from a base class to derived class may fail.
+      if (isConditional) {
+        // In case of a conditional cast, we should handle it gracefully.
+        auto CondBrSuccessBB =
+            NewAI->getFunction()->createBasicBlock(NewAI->getParentBlock());
+        CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
+                                           nullptr);
+        Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
+                                        CondBrSuccessBB, FailureBB);
+        Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
+        CastedValue = CondBrSuccessBB->getArgument(0);
+      } else {
+        CastedValue = SILValue(
+            Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
+      }
     } else if (ConvTy.getSwiftRValueType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
                                               DestTy.getSwiftRValueType()) ||
@@ -1681,6 +1687,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
+    if (isConditional && NewI->getParentBlock() != NewAI->getParentBlock()) {
+      Builder.createBranch(Loc, SuccessBB);
+    }
   }
 
   if (Dest) {
