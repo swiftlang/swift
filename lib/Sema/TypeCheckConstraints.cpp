@@ -818,11 +818,13 @@ namespace {
       // For method selectors with unresolved sub-expressions,
       // resolve the expression but ignore local variables to allow
       // conflicting method names
-      if (auto selector = dyn_cast<ObjCSelectorExpr>(expr)) {
-        if (selector->isMethodSelector()) {
-          if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(selector->getSubExpr())) {
-            TC.checkForForbiddenPrefix(unresolved);
-            return finish(true, TC.resolveDeclRefExpr(unresolved, DC, /*ignoreLocalVariables=*/true));
+      if (!TC.getLangOpts().isSwiftVersion3()) { 
+        if (auto selector = dyn_cast<ObjCSelectorExpr>(expr)) {
+          if (selector->isMethodSelector()) {
+            if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(selector->getSubExpr())) {
+              TC.checkForForbiddenPrefix(unresolved);
+              return finish(true, TC.resolveDeclRefExpr(unresolved, DC, /*ignoreLocalVariables=*/true));
+            }
           }
         }
       }

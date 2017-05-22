@@ -148,6 +148,7 @@ default:
 }
 
 // SR-3174
+// REQUIRES: SWIFT_VERSION=4
 
 class D {
   func test() {
