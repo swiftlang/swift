@@ -1461,6 +1461,13 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
+  // FIXME (rdar://problem/32319580): The code below handles a cast from a Swift
+  // value type to a subclass of its bridged type by emitting an unconditional
+  // cast, even if the cast is supposed to be conditional.
+  if (isConditional && !BridgedSourceTy->isEqual(BridgedTargetTy) &&
+      BridgedSourceTy->isBindableToSuperclassOf(BridgedTargetTy))
+    return nullptr;
+
   bool AddressOnlyType = false;
   if (!Src->getType().isLoadable(M) || !Dest->getType().isLoadable(M)) {
     AddressOnlyType = true;
