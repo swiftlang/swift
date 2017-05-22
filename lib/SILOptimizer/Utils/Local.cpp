@@ -1847,9 +1847,10 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   // To apply the bridged optimizations, we should
   // ensure that types are not existential,
   // and that not both types are classes.
-  BridgedI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
-                                  true, Src, Dest, SourceType,
-                                  TargetType, SuccessBB, FailureBB);
+  BridgedI = optimizeBridgedCasts(
+      Inst, Inst->getConsumptionKind(),
+      /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
+      Src, Dest, SourceType, TargetType, SuccessBB, FailureBB);
 
   if (!BridgedI) {
     // If the cast may succeed or fail, and it can't be optimized into a
@@ -1960,9 +1961,10 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto Src = Inst->getOperand();
     auto Dest = SILValue();
     // Apply the bridged cast optimizations.
-    auto BridgedI = optimizeBridgedCasts(Inst,
-        CastConsumptionKind::CopyOnSuccess, false, Src, Dest, SourceType,
-        TargetType, nullptr, nullptr);
+    auto BridgedI = optimizeBridgedCasts(
+        Inst, CastConsumptionKind::CopyOnSuccess,
+        /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
+        Src, Dest, SourceType, TargetType, nullptr, nullptr);
 
     if (BridgedI) {
       CastedValue = BridgedI;
@@ -2044,8 +2046,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
     auto Dest = SILValue();
     // Apply the bridged cast optimizations.
     auto BridgedI = optimizeBridgedCasts(
-        Inst, CastConsumptionKind::CopyOnSuccess, false, Src, Dest,
-        SourceType, TargetType, nullptr, nullptr);
+        Inst, CastConsumptionKind::CopyOnSuccess,
+        /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
+        Src, Dest, SourceType, TargetType, nullptr, nullptr);
 
     if (BridgedI) {
       CastedValue = BridgedI;
