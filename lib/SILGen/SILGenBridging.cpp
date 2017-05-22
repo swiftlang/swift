@@ -1241,6 +1241,9 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     allocatorSelfType = forwardedParameters[0]
       ->getInterfaceType(getASTContext())
       ->getLValueOrInOutObjectType();
+    if (F.getGenericEnvironment())
+      allocatorSelfType = F.getGenericEnvironment()
+        ->mapTypeIntoContext(allocatorSelfType);
     forwardedParameters = forwardedParameters.slice(1);
   }
 
