@@ -6,3 +6,9 @@ open class Boom: NSObject {
   }
 }
 
+open class Badaboom<U>: NSBoom<NSString> {
+  public override required init() {
+    super.init()
+  }
+}
+
