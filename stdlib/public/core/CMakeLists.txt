@@ -114,7 +114,7 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift.gyb
-  Sort.swift
+  Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift
