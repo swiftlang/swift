@@ -568,7 +568,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   statements.push_back(containerDecl);
 
   // Now need to generate `try container.encode(x, forKey: .x)` for all
-  // existing properties.
+  // existing properties. Optional properties get `encodeIfPresent`.
   for (auto *elt : codingKeysEnum->getAllElements()) {
     // Only ill-formed code would produce multiple results for this lookup.
     // This would get diagnosed later anyway, so we're free to only look at
@@ -586,9 +586,15 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
     auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
     auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
 
-    // encode(_:forKey:)
+    // encode(_:forKey:)/encodeIfPresent(_:forKey:)
+    auto methodName = C.Id_encode;
+    auto varType = cast<VarDecl>(matchingVars[0])->getType();
+    if (varType->getAnyNominal() == C.getOptionalDecl()) {
+      methodName = C.Id_encodeIfPresent;
+    }
+
     SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-    DeclName name(C, C.Id_encode, argNames);
+    DeclName name(C, methodName, argNames);
     auto *encodeCall = new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
                                                  name, DeclNameLoc(),
                                                  /*Implicit=*/true);
@@ -825,8 +831,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     statements.push_back(bindingDecl);
     statements.push_back(containerDecl);
 
-    // Now need to generate `x = try container.encode(Type.self, forKey: .x)`
-    // for all existing properties.
+    // Now need to generate `x = try container.decode(Type.self, forKey: .x)`
+    // for all existing properties. Optional properties get `decodeIfPresent`.
     for (auto *elt : enumElements) {
       // Only ill-formed code would produce multiple results for this lookup.
       // This would get diagnosed later anyway, so we're free to only look at
@@ -838,8 +844,26 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
         continue;
 
-      // Type.self (where Type === type(of: x)
+      // Potentially unwrap a layer of optionality from the var type. If the var
+      // is Optional<T>, we want to decodeIfPresent(T.self, forKey: ...);
+      // otherwise, we can just decode(T.self, forKey: ...).
       auto varType = varDecl->getType();
+      auto methodName = C.Id_decode;
+      if (varType->getAnyNominal() == C.getOptionalDecl()) {
+        methodName = C.Id_decodeIfPresent;
+
+        // The type we request out of decodeIfPresent needs to be unwrapped
+        // one level.
+        // e.g. String? => decodeIfPresent(String.self, forKey: ...), not
+        //                 decodeIfPresent(String?.self, forKey: ...)
+        auto boundOptionalType =
+          dyn_cast<BoundGenericType>(varType->getCanonicalType());
+        varType = boundOptionalType->getGenericArgs()[0];
+      }
+
+      // Type.self (where Type === type(of: x))
+      // Calculating the metatype needs to happen after potential Optional
+      // unwrapping above.
       auto *metaTyRef = TypeExpr::createImplicit(varType, C);
       auto *targetExpr = new (C) DotSelfExpr(metaTyRef, SourceLoc(),
                                              SourceLoc(), varType);
@@ -849,9 +873,9 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
       auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
 
-      // container.decode(_:forKey:)
+      // decode(_:forKey:)/decodeIfPresent(_:forKey:)
       SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-      DeclName name(C, C.Id_decode, argNames);
+      DeclName name(C, methodName, argNames);
       auto *decodeCall = new (C) UnresolvedDotExpr(containerExpr, SourceLoc(),
                                                    name, DeclNameLoc(),
                                                    /*Implicit=*/true);
