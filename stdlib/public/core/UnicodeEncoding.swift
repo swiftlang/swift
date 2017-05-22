@@ -91,6 +91,23 @@ extension _UnicodeEncoding_ {
     return transcode(content, from: FromEncoding.self)
       ?? encodedReplacementCharacter
   }
+
+  internal static func _transcode<
+  Source: Sequence, SourceEncoding: Unicode.Encoding>(
+    _ source: Source,
+    from sourceEncoding: SourceEncoding.Type,
+    into processScalar: (EncodedScalar)->Void)
+  where Source.Element == SourceEncoding.CodeUnit {
+    var p = SourceEncoding.ForwardParser()
+    var i = source.makeIterator()
+    while true {
+      switch p.parseScalar(from: &i) {
+      case .valid(let e): processScalar(_transcode(e, from: sourceEncoding))
+      case .error(_): processScalar(encodedReplacementCharacter)
+      case .emptyInput: return
+      }
+    }
+  }
 }
 
 extension Unicode {

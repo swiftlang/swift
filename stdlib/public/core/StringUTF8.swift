@@ -198,7 +198,7 @@ extension String {
     internal func _index(atEncodedOffset n: Int) -> Index {
       if _fastPath(_core.isASCII) { return Index(encodedOffset: n) }
       var p = UTF16.ForwardParser()
-      var i = IndexingIterator(_elements: _core[n...])
+      var i = _core[n...].makeIterator()
       let s = p.parseScalar(from: &i)
       
       if case .valid(let u16) = s {
@@ -393,6 +393,116 @@ extension String.UTF8View : _SwiftStringView {
   var _persistentContent : String { return String(self._core) }
 }
 
+extension String.UTF8View {
+  public struct Iterator {
+    typealias _OutputBuffer = UInt64
+    internal let _source: _StringCore
+    internal var _sourceIndex: Int
+    internal var _buffer: _OutputBuffer
+  }
+  public func makeIterator() -> Iterator {
+    return Iterator(_core)
+  }
+}
+
+extension String.UTF8View.Iterator : IteratorProtocol {
+  internal init(_ source: _StringCore) {
+    _source = source
+    _sourceIndex = 0
+    _buffer = 0
+  }
+  
+  public mutating func next() -> Unicode.UTF8.CodeUnit? {
+    if _fastPath(_buffer != 0) {
+      let r = UInt8(extendingOrTruncating: _buffer) &- 1
+      _buffer >>= 8
+      return r
+    }
+    if _slowPath(_sourceIndex == _source.count) { return nil }
+
+    defer { _fixLifetime(_source) }
+    
+    if _fastPath(_source._unmanagedASCII != nil),
+    let ascii = _source._unmanagedASCII {
+      let result = ascii[_sourceIndex]
+      _sourceIndex += 1
+      for i in 0 ..< _OutputBuffer.bitWidth>>3 {
+        if _sourceIndex == _source.count { break }
+        _buffer |= _OutputBuffer(ascii[_sourceIndex] &+ 1) &<< (i << 3)
+        _sourceIndex += 1
+      }
+      return result
+    }
+    
+    if _fastPath(_source._unmanagedUTF16 != nil),
+    let utf16 = _source._unmanagedUTF16 {
+      return _next(refillingFrom: utf16)
+    }
+    return _next(refillingFrom: _source)
+  }
+
+  internal mutating func _next<Source: Collection>(
+    refillingFrom source: Source
+  ) -> Unicode.UTF8.CodeUnit?
+  where Source.Element == Unicode.UTF16.CodeUnit,
+  Source._Element == Unicode.UTF16.CodeUnit,
+  Source.Index == Int
+  {
+    _sanityCheck(_buffer == 0)
+    var shift = 0
+
+    // ASCII fastpath
+    while _sourceIndex != _source.endIndex && shift < _OutputBuffer.bitWidth {
+      let u = _source[_sourceIndex]
+      if u >= 0x80 { break }
+      _buffer |= _OutputBuffer(u &+ 1) &<< shift
+      _sourceIndex += 1
+      shift = shift &+ 8
+    }
+    
+    var i = IndexingIterator(_elements: source, _position: _sourceIndex)
+    var parser = Unicode.UTF16.ForwardParser()
+  Loop:
+    while true {
+      let u8: UTF8.EncodedScalar
+      switch parser.parseScalar(from: &i) {
+      case .valid(let s):
+        u8 = UTF8.transcode(s, from: UTF16.self)._unsafelyUnwrappedUnchecked
+      case .error(_):
+        u8 = UTF8.encodedReplacementCharacter
+      case .emptyInput:
+        break Loop
+      }
+      var newBuffer = _buffer
+      for x in u8 {
+        newBuffer |= _OutputBuffer(x &+ 1) &<< shift
+        shift = shift &+ 8
+      }
+      guard _fastPath(shift <= _OutputBuffer.bitWidth) else { break Loop }
+      _buffer = newBuffer
+      _sourceIndex = i._position &- parser._buffer.count
+    }
+    guard _fastPath(_buffer != 0) else { return nil }
+    let result = UInt8(extendingOrTruncating: _buffer) &- 1
+    _buffer >>= 8
+    return result
+  }
+}
+
+extension String.UTF8View {
+  public var count: Int {
+    if _fastPath(_core.isASCII) { return _core.count }
+    defer { _fixLifetime(_core) }
+    if _fastPath(_core._unmanagedUTF16 != nil), let b = _core._unmanagedUTF16 {
+      var result = 0
+      UTF8._transcode(b, from: UTF16.self) { result += $0.count }
+      return result
+    }
+    var result = 0
+    UTF8._transcode(_core, from: UTF16.self) { result += $0.count }
+    return result
+  }
+}
 
 // Index conversions
 extension String.UTF8View.Index {
