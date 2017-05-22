@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension String {
+  /// A position of a character or code unit in a string.
   public struct Index {
     internal var _compoundOffset : UInt64
     internal var _cache: _Cache
@@ -38,8 +39,11 @@ extension String.Index : Comparable {
 extension String.Index {
   internal typealias _Self = String.Index
   
-  public init(encodedOffset o: Int) {
-    _compoundOffset = UInt64(o << _Self._strideBits)
+  /// Creates a new index at the specified UTF-16 offset.
+  ///
+  /// - Parameter offset: An offset in UTF-16 code units.
+  public init(encodedOffset offset: Int) {
+    _compoundOffset = UInt64(offset << _Self._strideBits)
     _cache = .utf16
   }
   
@@ -55,6 +59,7 @@ extension String.Index {
     _compoundOffset = UInt64(x << _Self._strideBits)
   }
   
+  /// The offset into a string's UTF-16 encoding for this index.
   public var encodedOffset : Int {
     return Int(_compoundOffset >> numericCast(_Self._strideBits))
   }
