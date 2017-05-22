@@ -745,30 +745,11 @@ public:
 
     verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
 
-    // Scan the parent block of AI and check that the users of AI inside this
-    // block are inside the lifetime of the allocated memory.
-    SILBasicBlock *SBB = AI->getParent();
-    bool Allocated = true;
-    for (auto Inst = AI->getIterator(), E = SBB->end(); Inst != E; ++Inst) {
-      if (auto *LI = dyn_cast<LoadInst>(Inst))
-        if (LI->getOperand() == AI)
-          require(Allocated, "AllocStack used by Load outside its lifetime");
-
-      if (auto *SI = dyn_cast<StoreInst>(Inst))
-        if (SI->getDest() == AI)
-          require(Allocated, "AllocStack used by Store outside its lifetime");
-
-      if (auto *DSI = dyn_cast<DeallocStackInst>(Inst))
-        if (DSI->getOperand() == AI)
-          Allocated = false;
-    }
-
-    // If the AllocStackInst is also deallocated inside the allocation block
-    // then make sure that all the users are inside that block.
-    if (!Allocated) {
-      require(isSingleBlockUsage(AI, Dominance),
-              "AllocStack has users in other basic blocks after allocation");
-    }
+    // There used to be a check if all uses of ASI are inside the alloc-dealloc
+    // range. But apparently it can be the case that ASI has uses after the
+    // dealloc_stack. This can come up if the source contains a
+    // withUnsafePointer where the pointer escapes.
+    // It's illegal code but the compiler should not crash on it.
   }
 
   void checkAllocRefBase(AllocRefInstBase *ARI) {
