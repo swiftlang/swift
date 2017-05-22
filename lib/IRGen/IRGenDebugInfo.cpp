@@ -97,7 +97,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
   std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
   /// The set of imported modules.
-  llvm::DenseSet<ModuleDecl::ImportedModule> ImportedModules;
+  llvm::DenseSet<ModuleDecl *> ImportedModules;
 
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;                    /// The current working directory.
@@ -1558,7 +1558,7 @@ void IRGenDebugInfoImpl::finalize() {
   IGM.getSwiftModule()->getImportedModules(ModuleWideImports,
                                            ModuleDecl::ImportFilter::All);
   for (auto M : ModuleWideImports)
-    if (!ImportedModules.count(M))
+    if (!ImportedModules.count(M.second))
        DBuilder.createImportedModule(MainFile, getOrCreateModule(M), 0);
 
   // Finalize all replaceable forward declarations.
@@ -1731,7 +1731,7 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
-  ImportedModules.insert(Imported);
+  ImportedModules.insert(Imported.second);
 }
 
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
