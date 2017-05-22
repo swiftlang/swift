@@ -6691,5 +6691,5 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
       !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);
 
-  return ty;
+  return (!ty || ty->hasError()) ? Type() : ty;
 }
