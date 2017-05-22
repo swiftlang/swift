@@ -12,8 +12,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// UNSUPPORTED: OS=linux-gnu
-
 import StdlibUnittest
 
 
@@ -193,7 +191,6 @@ tests.test("ManagedBufferPointer") {
     let s = buf!
     expectEqual(0, s.count)
     expectLE(10, s.capacity)
-    expectGE(12, s.capacity)  // allow some over-allocation but not too much
     
     expectEqual(s.count, mgr.header.count.value)
     expectEqual(s.capacity, mgr.header.capacity)
