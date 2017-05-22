@@ -53,9 +53,9 @@ func eatDinnerConcrete(d: Pizzas<Pepper>.DeepDish,
 
 func badDiagnostic1() {
 
-  _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>( // expected-error {{expression type 'Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>' is ambiguous without more context}}
+  _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
       leftovers: Pizzas<ChiliFlakes>.NewYork(),
-      transformation: { _ in HotDog() })
+      transformation: { _ in HotDog() }) // expected-error {{cannot convert value of type 'HotDog' to closure result type '_'}}
 }
 
 func badDiagnostic2() {
