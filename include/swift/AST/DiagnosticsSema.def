@@ -1413,6 +1413,19 @@ ERROR(witness_self_non_subtype,none,
       "(%2) because it uses 'Self' in a non-parameter, non-result type "
       "position",
       (Type, DeclName, Type))
+ERROR(witness_self_same_type,none,
+      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
+      " (in protocol %5) due to same-type requirement involving 'Self'",
+      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
+       DeclName, Type))
+WARNING(witness_self_same_type_warn,none,
+      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
+      " (in protocol %5) due to same-type requirement involving 'Self'",
+      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
+       DeclName, Type))
+NOTE(witness_self_weaken_same_type,none,
+      "consider weakening the same-type requirement %0 == %1 to a superclass "
+      "requirement", (Type, Type))
 ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
