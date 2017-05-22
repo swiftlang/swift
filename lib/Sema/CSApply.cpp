@@ -6475,10 +6475,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     if (!argType)
       return nullptr;
 
-    // If the argument type is in error, we're done.
-    if (argType->hasError())
-      return nullptr;
-
     // Convert the literal to the non-builtin argument type via the
     // builtin protocol, first.
     // FIXME: Do we need an opened type here?
