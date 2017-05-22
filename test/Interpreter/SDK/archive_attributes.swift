@@ -7,6 +7,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: CPU=i386_or_x86_64
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
