@@ -80,24 +80,40 @@ extension String.Index {
 
 // SPI for Foundation
 extension String.Index {
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public // SPI(Foundation)    
   init(_position: Int) {
     self.init(encodedOffset: _position)
   }
   
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public // SPI(Foundation)    
   init(_offset: Int) {
     self.init(encodedOffset: _offset)
   }
   
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public // SPI(Foundation)    
   init(_base: String.Index, in c: String.CharacterView) {
     self = _base
   }
   
   /// The integer offset of this index in UTF-16 code units.
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
   public // SPI(Foundation)
   var _utf16Index: Int {
+    return self.encodedOffset
+  }
+
+  /// The integer offset of this index in UTF-16 code units.
+  @available(swift, deprecated: 3.2)
+  @available(swift, obsoleted: 4.0)
+  public // SPI(Foundation)
+  var _offset: Int {
     return self.encodedOffset
   }
 }
