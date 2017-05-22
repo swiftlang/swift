@@ -2753,7 +2753,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     case KeyPathExpr::Component::Kind::OptionalWrap:
       return unsupported("non-property key path component");
       
-    
+    case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
       llvm_unreachable("not resolved");

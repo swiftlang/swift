@@ -131,6 +131,11 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   let _: ReferenceWritableKeyPath<Prop, B> = \.nonMutatingProperty
 }
 
+func testDisembodiedStringInterpolation(x: Int) {
+  \(x) // expected-error{{string interpolation}}
+  \(x, radix: 16) // expected-error{{string interpolation}}
+}
+
 struct TupleStruct {
   var unlabeled: (Int, String)
   var labeled: (foo: Int, bar: String)

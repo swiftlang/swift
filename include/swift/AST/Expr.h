@@ -4607,6 +4607,7 @@ public:
   class Component {
   public:
     enum class Kind: unsigned {
+      Invalid,
       UnresolvedProperty,
       UnresolvedSubscript,
       Property,
@@ -4641,7 +4642,7 @@ public:
     {}
     
   public:
-    Component() : Component({}, nullptr, (Kind)0, Type(), SourceLoc()) {}
+    Component() : Component({}, nullptr, Kind::Invalid, Type(), SourceLoc()) {}
     
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclName UnresolvedName,
@@ -4745,12 +4746,17 @@ public:
       return SubscriptIndexExprAndKind.getInt();
     }
     
+    bool isValid() const {
+      return getKind() != Kind::Invalid;
+    }
+    
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
         return SubscriptIndexExprAndKind.getPointer();
         
+      case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
@@ -4765,6 +4771,7 @@ public:
       case Kind::UnresolvedProperty:
         return Decl.UnresolvedName;
 
+      case Kind::Invalid:
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
       case Kind::OptionalChain:
@@ -4781,6 +4788,7 @@ public:
       case Kind::Subscript:
         return Decl.ResolvedDecl;
 
+      case Kind::Invalid:
       case Kind::UnresolvedProperty:
       case Kind::UnresolvedSubscript:
       case Kind::OptionalChain:
