@@ -2226,12 +2226,16 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     initializer->setType(ErrorType::get(Context));
   }
 
-  if (hadError && !pattern->hasType()) {
+  if (hadError &&
+      (!pattern->hasType() ||
+       pattern->getType()->hasUnboundGenericType())) {
     pattern->setType(ErrorType::get(Context));
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      if (var->hasType() && !var->getType()->hasError())
+      if (var->hasType() &&
+          !var->getType()->hasUnboundGenericType() &&
+          !var->getType()->hasError())
         return;
 
       var->markInvalid();
