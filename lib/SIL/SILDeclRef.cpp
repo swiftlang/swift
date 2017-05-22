@@ -236,7 +236,7 @@ unsigned swift::getNaturalUncurryLevel(ValueDecl *vd) {
   } else if (isa<ConstructorDecl>(vd)) {
     return 1;
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    return ed->getArgumentInterfaceType() ? 1 : 0;
+    return ed->hasAssociatedValues() ? 1 : 0;
   } else if (isa<DestructorDecl>(vd)) {
     return 0;
   } else if (isa<ClassDecl>(vd)) {
