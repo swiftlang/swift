@@ -16,6 +16,8 @@ import ClangModule.SubModule
 
 // The Swift compiler uses an ugly hack that auto-imports a
 // submodule's top-level-module, even if we didn't ask for it.
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 // CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]])
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
 
 let bar = Bar()
