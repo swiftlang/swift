@@ -264,6 +264,9 @@ def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
+  
+def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
+  HelpText<"Enable Large Loadable types IRGen pass">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,

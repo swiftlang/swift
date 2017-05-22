@@ -149,6 +149,9 @@ public:
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;
 
+  /// \brief Enable large loadable types IRGen pass.
+  bool EnableLargeLoadableTypes = false;
+
   SILOptions() : Sanitize(SanitizerKind::None) {}
 
   /// Return a hash code of any components from these options that should
