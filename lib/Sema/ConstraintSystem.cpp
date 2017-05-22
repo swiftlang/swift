@@ -1005,17 +1005,24 @@ ConstraintSystem::getTypeOfMemberReference(
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
     if (baseObjTy->isExistentialType()) {
       auto memberTy = alias->getDeclaredInterfaceType();
+      // If we end up with a protocol typealias here, it's underlying
+      // type must be fully concrete.
+      assert(!memberTy->hasTypeParameter());
       auto openedType = FunctionType::get(baseObjTy, memberTy);
       return { openedType, memberTy };
     }
   }
 
-  // Handle associated type lookup as a special case, horribly.
-  // FIXME: This is an awful hack.
-  if (isa<AssociatedTypeDecl>(value)) {
-    // Refer to a member of the archetype directly.
-    auto archetype = baseObjTy->castTo<ArchetypeType>();
-    Type memberTy = archetype->getNestedType(value->getName());
+  if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
+    assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
+
+    auto memberTy = TC.substMemberTypeWithBase(DC->getParentModule(),
+                                               typeDecl, baseObjTy);
+
+    // Open the type if it was a reference to a generic type.
+    memberTy = openUnboundGenericType(memberTy, locator);
+
+    // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
     auto openedType = FunctionType::get(baseObjTy, memberTy);
@@ -1046,8 +1053,7 @@ ConstraintSystem::getTypeOfMemberReference(
   } else {
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.
-    assert(isa<AbstractStorageDecl>(value) ||
-           isa<TypeDecl>(value));
+    assert(isa<AbstractStorageDecl>(value));
 
     openedType = TC.getUnopenedTypeOfReference(value, baseTy, useDC, base,
                                                /*wantInterfaceType=*/true);
