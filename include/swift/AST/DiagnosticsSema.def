@@ -452,6 +452,8 @@ ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       (Type, Type))
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
+ERROR(unsupported_keypath_tuple_element_reference,none,
+      "key path cannot reference tuple elements", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
