@@ -1745,7 +1745,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
                                     /*diagnoseErrors*/ true, Resolver,
                                     UnsatisfiedDependency);
 
-  case TypeReprKind::Function:
+  case TypeReprKind::Function: {
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
       auto result =
@@ -1754,8 +1754,11 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
         return applyNonEscapingFromContext(DC, result, options);
       return result;
     }
+    auto extInfo = SILFunctionType::ExtInfo();
+    // FIXME: Should the noescape attribute be set by default for SIL functions?
+    //        SILFunctionType::ExtInfo().withNoEscape(true);
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
-
+  }
   case TypeReprKind::SILBox:
     assert((options & TR_SILType) && "SILBox repr in non-SIL type context?!");
     return resolveSILBoxType(cast<SILBoxTypeRepr>(repr), options);
@@ -1992,7 +1995,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // Resolve the function type directly with these attributes.
-    SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric));
+    SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
+                                     attrs.has(TAK_noescape));
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->hasError()) return ty;

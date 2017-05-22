@@ -3561,8 +3561,9 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, stableCalleeConvention,
-        stableRepresentation, fnTy->isPseudogeneric(), fnTy->hasErrorResult(),
-        fnTy->getParameters().size(), fnTy->getNumResults(), variableData);
+        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
+        fnTy->hasErrorResult(), fnTy->getParameters().size(),
+        fnTy->getNumResults(), variableData);
     if (sig)
       writeGenericRequirements(sig->getRequirements(),
                                DeclTypeAbbrCodes);
