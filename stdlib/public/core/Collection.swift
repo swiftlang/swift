@@ -58,15 +58,7 @@ public protocol _IndexableBase {
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   var endIndex: Index { get }
 
-  // The declaration of _Element and subscript here is a trick used to
-  // break a cyclic conformance/deduction that Swift can't handle.  We
-  // need something other than a Collection.Element that can
-  // be used as IndexingIterator<T>'s Element.  Here we arrange for
-  // the Collection itself to have an Element type that's deducible from
-  // its subscript.  Ideally we'd like to constrain this Element to be the same
-  // as Collection.Element (see below), but we have no way of
-  // expressing it today.
-  associatedtype _Element
+  associatedtype Element
 
   /// Accesses the element at the specified position.
   ///
@@ -87,7 +79,7 @@ public protocol _IndexableBase {
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> _Element { get }
+  subscript(position: Index) -> Element { get }
 
   // WORKAROUND: rdar://25214066
   // FIXME(ABI)#178 (Type checker)
@@ -422,7 +414,7 @@ public struct IndexingIterator<
   ///   exists; otherwise, `nil`.
   @_inlineable
   @inline(__always)
-  public mutating func next() -> Elements._Element? {
+  public mutating func next() -> Elements.Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
     _elements.formIndex(after: &_position)
@@ -1978,3 +1970,7 @@ extension Collection where Element : Equatable {
 @available(*, unavailable, message: "PermutationGenerator has been removed in Swift 3")
 public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
 
+extension _IndexableBase {
+  @available(swift, deprecated: 3.2, renamed: "Element")
+  public typealias _Element = Element
+}

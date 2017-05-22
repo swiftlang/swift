@@ -49,14 +49,14 @@ public protocol _RangeReplaceableIndexable : _Indexable {
   ///   - repeatedValue: The element to repeat.
   ///   - count: The number of times to repeat the value passed in the
   ///     `repeating` parameter. `count` must be zero or greater.
-  init(repeating repeatedValue: _Element, count: Int)
+  init(repeating repeatedValue: Element, count: Int)
 
   /// Creates a new instance of a collection containing the elements of a
   /// sequence.
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
   ///   `elements` must be finite.
-  init<S : Sequence>(_ elements: S) where S.Element == _Element
+  init<S : Sequence>(_ elements: S) where S.Element == Element
 
   /// Replaces the specified subrange of elements with the given collection.
   ///
@@ -97,7 +97,7 @@ public protocol _RangeReplaceableIndexable : _Indexable {
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Element == _Element
+  ) where C : Collection, C.Element == Element
 
   /// Inserts a new element into the collection at the specified position.
   ///
@@ -121,7 +121,7 @@ public protocol _RangeReplaceableIndexable : _Indexable {
   ///     valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func insert(_ newElement: _Element, at i: Index)
+  mutating func insert(_ newElement: Element, at i: Index)
 
   /// Inserts the elements of a sequence into the collection at the specified
   /// position.
@@ -152,7 +152,7 @@ public protocol _RangeReplaceableIndexable : _Indexable {
   ///   `newElements`.
   mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
-  ) where S.Element == _Element
+  ) where S.Element == Element
 
   /// Removes and returns the element at the specified position.
   ///
@@ -175,7 +175,7 @@ public protocol _RangeReplaceableIndexable : _Indexable {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @discardableResult
-  mutating func remove(at i: Index) -> _Element
+  mutating func remove(at i: Index) -> Element
 
   /// Removes the specified subrange of elements from the collection.
   ///
