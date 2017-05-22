@@ -1961,6 +1961,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto Src = Inst->getOperand();
     auto Dest = SILValue();
     // Apply the bridged cast optimizations.
+    // TODO: Bridged casts cannot be expressed by checked_cast_br yet.
+    // Should we ever support it, please review this code.
     auto BridgedI = optimizeBridgedCasts(
         Inst, CastConsumptionKind::CopyOnSuccess,
         /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
@@ -1968,6 +1970,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
     if (BridgedI) {
       CastedValue = BridgedI;
+      llvm_unreachable(
+        "Bridged casts cannot be expressed by checked_cast_br yet");
     } else {
       // If the cast may succeed or fail and can't be turned into a bridging
       // call, then let it be.
@@ -2045,6 +2049,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
     auto Src = Inst->getOperand();
     auto Dest = SILValue();
     // Apply the bridged cast optimizations.
+    // TODO: Bridged casts cannot be expressed by checked_cast_value_br yet.
+    // Once the support for opaque values has landed, please review this
+    // code.
     auto BridgedI = optimizeBridgedCasts(
         Inst, CastConsumptionKind::CopyOnSuccess,
         /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
@@ -2052,6 +2059,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
 
     if (BridgedI) {
       CastedValue = BridgedI;
+      llvm_unreachable(
+          "Bridged casts cannot be expressed by checked_cast_value_br yet");
     } else {
       // If the cast may succeed or fail and can't be turned into a bridging
       // call, then let it be.
