@@ -2690,8 +2690,6 @@ namespace {
 
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
-      case OverloadChoiceKind::TypeDecl:
-        llvm_unreachable("Nonsensical overload choice");
       }
 
     llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
@@ -7660,7 +7658,6 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
     = cs.getTypeOfMemberReference(base->getType(), witness, dc,
-                                  /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
                                   FunctionRefKind::DoubleApply,
                                   dotLocator);

@@ -149,10 +149,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
     return sameDecl(x.getDecl(), y.getDecl());
 
-  case OverloadChoiceKind::TypeDecl:
-    // FIXME: Compare types after substitution?
-    return sameDecl(x.getDecl(), y.getDecl());
-
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
@@ -893,7 +889,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
-    case OverloadChoiceKind::TypeDecl:
       continue;
 
     case OverloadChoiceKind::BaseType:

@@ -27,7 +27,6 @@
 
 namespace swift {
 
-class TypeDecl;
 class ValueDecl;
 
 namespace constraints {
@@ -42,9 +41,6 @@ enum class OverloadChoiceKind : int {
   /// found via dynamic lookup and, therefore, might not actually be
   /// available at runtime.
   DeclViaDynamic,
-  /// \brief The overload choice selects a particular declaration from a
-  /// set of declarations and treats it as a type.
-  TypeDecl,
   /// \brief The overload choice equates the member type with the
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to enum members with unit type.
@@ -113,16 +109,6 @@ public:
     
     DeclOrKind = reinterpret_cast<uintptr_t>(value);
   }
-  
-  OverloadChoice(Type base, TypeDecl *type, bool isSpecialized,
-                 FunctionRefKind functionRefKind)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
-      TheFunctionRefKind(functionRefKind) {
-    assert(!base || !base->hasTypeParameter());
-    assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
-           && "Badly aligned decl");
-    DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
-  }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
       : BaseAndBits(base, 0),
@@ -132,7 +118,6 @@ public:
     assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
            kind != OverloadChoiceKind::DeclViaDynamic &&
-           kind != OverloadChoiceKind::TypeDecl &&
            kind != OverloadChoiceKind::DeclViaBridge &&
            kind != OverloadChoiceKind::DeclViaUnwrappedOptional &&
            "wrong constructor for decl");
@@ -213,7 +198,6 @@ public:
 
       return OverloadChoiceKind::Decl;
       
-    case 0x01: return OverloadChoiceKind::TypeDecl;
     case 0x02: return OverloadChoiceKind::DeclViaDynamic;
     case 0x03: {
       uintptr_t value = DeclOrKind >> 2;
@@ -232,7 +216,6 @@ public:
     switch (getKind()) {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return true;
