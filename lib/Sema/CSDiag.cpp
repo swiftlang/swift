@@ -5474,13 +5474,22 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     // TODO: Is there any reason to check for CC_NonLValueInOut here?
 
     if (calleeInfo.closeness == CC_ExactMatch) {
-      // Otherwise, whatever the result type of the call happened to be must not
-      // have been what we were looking for.  Lets diagnose it as a conversion
-      // or ambiguity failure.
-      if (calleeInfo.size() == 1)
-        return false;
+      auto message = diag::ambiguous_subscript;
 
-      diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
+      // If there is an exact match on the argument with
+      // a single candidate, let's type-check subscript
+      // as a whole to figure out if there is any structural
+      // problem after all.
+      if (calleeInfo.size() == 1) {
+        Expr *expr = SE;
+        ConcreteDeclRef decl = nullptr;
+        message = diag::cannot_subscript_with_index;
+
+        if (CS->TC.getTypeOfExpressionWithoutApplying(expr, CS->DC, decl))
+          return false;
+      }
+
+      diagnose(SE->getLoc(), message, baseType, indexType)
           .highlight(indexExpr->getSourceRange())
           .highlight(baseExpr->getSourceRange());
 
