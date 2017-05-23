@@ -1,13 +1,17 @@
 // RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s | %FileCheck %s
 
+struct Value {}
+
 protocol P {
   init()
   static func staticMethod() -> Self
+  static var value: Value { get }
 }
 
 struct S: P {
   init() {}
   static func staticMethod() -> S { return S() }
+  static var value: Value { return Value() }
 }
 
 // CHECK-LABEL: sil hidden @_T021existential_metatypes0A8MetatypeyAA1P_pF
@@ -50,4 +54,19 @@ func existentialMetatypeUpcast1(_ x: PP.Type) -> P.Type {
 // CHECK:         return [[NEW]]
 func existentialMetatypeUpcast2(_ x: (P & Q).Type) -> P.Type {
   return x
+}
+
+// rdar://32288618
+// CHECK-LABEL: sil hidden @_T021existential_metatypes0A19MetatypeVarPropertyAA5ValueVyF : $@convention(thin) () -> Value
+func existentialMetatypeVarProperty() -> Value {
+  // CHECK:      [[BOX:%.*]] = alloc_box ${ var @thick P.Type }
+  // CHECK:      [[ADDR:%.*]] = project_box [[BOX]] : ${ var @thick P.Type }, 0
+  // CHECK:      [[T0:%.*]] = metatype $@thick S.Type
+  // CHECK:      [[T1:%.*]] = init_existential_metatype [[T0]]
+  // CHECK:      store [[T1]] to [trivial] [[ADDR]] :
+  // CHECK:      [[T0:%.*]] = begin_access [read] [unknown] [[ADDR]] :
+  // CHECK:      [[T1:%.*]] = load [trivial] [[T0]]
+  // CHECK:      open_existential_metatype [[T1]] :
+  var type: P.Type = S.self
+  return type.value
 }
