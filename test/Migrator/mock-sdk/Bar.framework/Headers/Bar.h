@@ -14,6 +14,7 @@ int barGlobalFuncOldName(int a);
 - (id)initWithOldLabel0:(int)frame;
 - (void) barInstanceFunc0;
 - (void) barInstanceFunc1:(int)info anotherValue:(int)info1 anotherValue1:(int)info2 anotherValue2:(int)info3;
+- (void) barInstanceFunc2:(int)info toRemove:(int)info1 toRemove1:(int)info2 toRemove2:(int)info3;
 @end
 
 enum BarForwardDeclaredEnum {

@@ -325,6 +325,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     unsigned Idx = 0;
     auto Ranges = getCallArgLabelRanges(SM, Arg,
                                         LabelRangeEndAt::LabelNameOnly);
+    llvm::SmallVector<uint8_t, 2> ToRemoveIndices;
     for (unsigned I = 0; I < Ranges.size(); I ++) {
       if (std::any_of(IgnoreArgIndex.begin(), IgnoreArgIndex.end(),
                       [I](unsigned Ig) { return Ig == I; }))
@@ -333,13 +334,22 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (Idx < NewName.argSize()) {
         auto Label = NewName.args()[Idx++];
 
-        // FIXME: We update only when args are consistently valid.
         if (Label != "_") {
           if (LR.getByteLength())
             Editor.replace(LR, Label);
           else
             Editor.insert(LR.getStart(), (llvm::Twine(Label) + ": ").str());
+        } else if (LR.getByteLength()){
+          // New label is "_" however the old label is explicit.
+          ToRemoveIndices.push_back(I);
         }
+      }
+    }
+    if (!ToRemoveIndices.empty()) {
+      auto Ranges = getCallArgLabelRanges(SM, Arg,
+                                         LabelRangeEndAt::BeforeElemStart);
+      for (auto I : ToRemoveIndices) {
+        Editor.remove(Ranges[I]);
       }
     }
   }
