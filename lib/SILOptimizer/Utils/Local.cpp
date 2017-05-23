@@ -1656,8 +1656,21 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       CastedValue = SILValue(
           (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
     } else if (ConvTy.isExactSuperclassOf(DestTy)) {
-      CastedValue = SILValue(
-          Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
+      // The downcast from a base class to derived class may fail.
+      if (isConditional) {
+        // In case of a conditional cast, we should handle it gracefully.
+        auto CondBrSuccessBB =
+            NewAI->getFunction()->createBasicBlock(NewAI->getParentBlock());
+        CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
+                                           nullptr);
+        Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
+                                        CondBrSuccessBB, FailureBB);
+        Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
+        CastedValue = CondBrSuccessBB->getArgument(0);
+      } else {
+        CastedValue = SILValue(
+            Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
+      }
     } else if (ConvTy.getSwiftRValueType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
                                               DestTy.getSwiftRValueType()) ||
@@ -1674,6 +1687,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
+    if (isConditional && NewI->getParentBlock() != NewAI->getParentBlock()) {
+      Builder.createBranch(Loc, SuccessBB);
+    }
   }
 
   if (Dest) {
@@ -1831,9 +1847,10 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
   // To apply the bridged optimizations, we should
   // ensure that types are not existential,
   // and that not both types are classes.
-  BridgedI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
-                                  true, Src, Dest, SourceType,
-                                  TargetType, SuccessBB, FailureBB);
+  BridgedI = optimizeBridgedCasts(
+      Inst, Inst->getConsumptionKind(),
+      /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
+      Src, Dest, SourceType, TargetType, SuccessBB, FailureBB);
 
   if (!BridgedI) {
     // If the cast may succeed or fail, and it can't be optimized into a
@@ -1944,12 +1961,17 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     auto Src = Inst->getOperand();
     auto Dest = SILValue();
     // Apply the bridged cast optimizations.
-    auto BridgedI = optimizeBridgedCasts(Inst,
-        CastConsumptionKind::CopyOnSuccess, false, Src, Dest, SourceType,
-        TargetType, nullptr, nullptr);
+    // TODO: Bridged casts cannot be expressed by checked_cast_br yet.
+    // Should we ever support it, please review this code.
+    auto BridgedI = optimizeBridgedCasts(
+        Inst, CastConsumptionKind::CopyOnSuccess,
+        /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
+        Src, Dest, SourceType, TargetType, nullptr, nullptr);
 
     if (BridgedI) {
       CastedValue = BridgedI;
+      llvm_unreachable(
+        "Bridged casts cannot be expressed by checked_cast_br yet");
     } else {
       // If the cast may succeed or fail and can't be turned into a bridging
       // call, then let it be.
@@ -2027,12 +2049,18 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
     auto Src = Inst->getOperand();
     auto Dest = SILValue();
     // Apply the bridged cast optimizations.
+    // TODO: Bridged casts cannot be expressed by checked_cast_value_br yet.
+    // Once the support for opaque values has landed, please review this
+    // code.
     auto BridgedI = optimizeBridgedCasts(
-        Inst, CastConsumptionKind::CopyOnSuccess, false, Src, Dest,
-        SourceType, TargetType, nullptr, nullptr);
+        Inst, CastConsumptionKind::CopyOnSuccess,
+        /* isConditional */ Feasibility == DynamicCastFeasibility::MaySucceed,
+        Src, Dest, SourceType, TargetType, nullptr, nullptr);
 
     if (BridgedI) {
       CastedValue = BridgedI;
+      llvm_unreachable(
+          "Bridged casts cannot be expressed by checked_cast_value_br yet");
     } else {
       // If the cast may succeed or fail and can't be turned into a bridging
       // call, then let it be.

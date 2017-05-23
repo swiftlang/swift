@@ -708,7 +708,7 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(caseBlock);
 
     ManagedValue input;
-    if (decl->getArgumentInterfaceType()) {
+    if (decl->hasAssociatedValues()) {
       // Pull the payload out if we have one.
       SILType inputType =
           optional.getType().getEnumElementType(decl, builder.getModule());

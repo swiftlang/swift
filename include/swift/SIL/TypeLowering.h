@@ -751,6 +751,9 @@ public:
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
                                                    CaptureInfo captureInfo);
 
+  /// Retrieve the set of generic parameters closed over by the context.
+  CanGenericSignature getEffectiveGenericSignature(DeclContext *dc);
+
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.
   ///

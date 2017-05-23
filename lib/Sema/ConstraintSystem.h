@@ -1953,13 +1953,6 @@ public:
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
-  void openGeneric(DeclContext *innerDC,
-                   DeclContext *outerDC,
-                   ArrayRef<GenericTypeParamType *> params,
-                   ArrayRef<Requirement> requirements,
-                   bool skipProtocolSelfConstraint,
-                   ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(

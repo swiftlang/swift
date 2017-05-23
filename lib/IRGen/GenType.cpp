@@ -1372,7 +1372,7 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->getArgumentInterfaceType() &&
+        if (elt->hasAssociatedValues() &&
             !elt->isIndirect() &&
             visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -1773,7 +1773,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->getArgumentInterfaceType())
+        && (*theCase)->hasAssociatedValues())
       return t.getEnumElementType(*theCase, IGM.getSILModule());
 
     return SILType();

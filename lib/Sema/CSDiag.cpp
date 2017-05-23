@@ -5474,13 +5474,22 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     // TODO: Is there any reason to check for CC_NonLValueInOut here?
 
     if (calleeInfo.closeness == CC_ExactMatch) {
-      // Otherwise, whatever the result type of the call happened to be must not
-      // have been what we were looking for.  Lets diagnose it as a conversion
-      // or ambiguity failure.
-      if (calleeInfo.size() == 1)
-        return false;
+      auto message = diag::ambiguous_subscript;
 
-      diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
+      // If there is an exact match on the argument with
+      // a single candidate, let's type-check subscript
+      // as a whole to figure out if there is any structural
+      // problem after all.
+      if (calleeInfo.size() == 1) {
+        Expr *expr = SE;
+        ConcreteDeclRef decl = nullptr;
+        message = diag::cannot_subscript_with_index;
+
+        if (CS->TC.getTypeOfExpressionWithoutApplying(expr, CS->DC, decl))
+          return false;
+      }
+
+      diagnose(SE->getLoc(), message, baseType, indexType)
           .highlight(indexExpr->getSourceRange())
           .highlight(baseExpr->getSourceRange());
 
@@ -6464,6 +6473,16 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   auto contextualType = CS->getContextualType();
+  // Look through IUO because it doesn't influence
+  // neither parameter nor return type diagnostics itself,
+  // but if we have function type inside, that might
+  // signficantly improve diagnostic quality.
+  if (contextualType) {
+    if (auto IUO =
+            CS->lookThroughImplicitlyUnwrappedOptionalType(contextualType))
+      contextualType = IUO;
+  }
+
   Type expectedResultType;
 
   // If we have a contextual type available for this closure, apply it to the
@@ -6487,9 +6506,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // inferred argument count.
     if (auto *argTupleTy = dyn_cast<TupleType>(inferredArgType.getPointer()))
       inferredArgCount = argTupleTy->getNumElements();
-    
-    // If the actual argument count is 1, it can match a tuple as a whole.
-    if (actualArgCount != 1 && actualArgCount != inferredArgCount) {
+
+    if (actualArgCount != inferredArgCount) {
       // If the closure didn't specify any arguments and it is in a context that
       // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
       if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
@@ -6659,8 +6677,31 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
       fnType = FunctionType::get(fnType->getInput(), fnType->getResult());
-      diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
-               fnType, inferredArgCount, actualArgCount, (actualArgCount == 1));
+      auto diag = diagnose(
+          params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+          inferredArgCount, actualArgCount, (actualArgCount == 1));
+
+      // If the number of parameters is less than number of inferred
+      // and all of the parameters are anonymous, let's suggest a fix-it
+      // with the rest of the missing parameters.
+      if (actualArgCount < inferredArgCount) {
+        bool onlyAnonymousParams =
+        std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
+          return !param->hasName();
+        });
+
+        SmallString<32> fixIt;
+        llvm::raw_svector_ostream OS(fixIt);
+
+        OS << ",";
+        auto numMissing = inferredArgCount - actualArgCount;
+        for (unsigned i = 0; i != numMissing; ++i) {
+          OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
+          OS << ((i == numMissing - 1) ? " " : ",");
+        }
+
+        diag.fixItInsertAfter(params->getEndLoc(), OS.str());
+      }
       return true;
     }
 
@@ -6778,6 +6819,25 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   }
 
   // Otherwise, we can't produce a specific diagnostic.
+  return false;
+}
+
+static bool diagnoseKeyPathUnsupportedOperations(TypeChecker &TC,
+                                                 KeyPathExpr *KPE) {
+  using ComponentKind = KeyPathExpr::Component::Kind;
+  const auto components = KPE->getComponents();
+
+  if (auto *rootType = KPE->getRootType()) {
+    if (isa<TupleTypeRepr>(rootType)) {
+      auto first = components.front();
+      if (first.getKind() == ComponentKind::UnresolvedProperty) {
+        TC.diagnose(first.getLoc(),
+                    diag::unsupported_keypath_tuple_element_reference);
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -6953,6 +7013,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
       componentName = TC.Context.Id_subscript;
       break;
 
+    case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
       // FIXME: Diagnose optional chaining and forcing properly.
@@ -7105,6 +7166,9 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
 }
 
 bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
+  if (diagnoseKeyPathUnsupportedOperations(CS->TC, KPE))
+    return true;
+
   auto contextualType = CS->getContextualType();
 
   auto components = KPE->getComponents();
@@ -7254,11 +7318,12 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
         }
       }
     }
-    
+
+    auto numElements = E->getNumElements();
     if (!Conformance) {
       // If the contextual type conforms to ExpressibleByDictionaryLiteral and
       // this is an empty array, then they meant "[:]".
-      if (E->getNumElements() == 0 &&
+      if (numElements == 0 &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
         diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
           .fixItInsert(E->getEndLoc(), ":");
@@ -7271,13 +7336,19 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
       // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
       // they wrote "x = [1,2]" but probably meant "x = [1:2]".
-      if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
+      if ((numElements & 1) == 0 && numElements > 0 &&
           isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
         auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
 
-        // Change every other comma into a colon.
-        for (unsigned i = 0, e = E->getElements().size()/2; i != e; ++i)
-          diag.fixItReplace(E->getCommaLocs()[i*2], ":");
+        // Change every other comma into a colon, only if the number
+        // of commas present matches the number of elements, because
+        // otherwise it might a structural problem with the expression
+        // e.g. ["a""b": 1].
+        const auto commaLocs = E->getCommaLocs();
+        if (commaLocs.size() == numElements - 1) {
+          for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+            diag.fixItReplace(commaLocs[i*2], ":");
+        }
       }
 
       return true;

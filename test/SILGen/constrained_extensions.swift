@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O %s
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s
 
 extension Array where Element == Int {
   // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlESaySiGyt1x_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
@@ -170,4 +170,56 @@ extension GenericClass where Y == () {
     get { while true {} }
     set {}
   }
+}
+
+protocol VeryConstrained {}
+
+struct AnythingGoes<T> {
+  // CHECK-LABEL: sil hidden [transparent] @_T022constrained_extensions12AnythingGoesV13meaningOfLifexSgvfi : $@convention(thin) <T> () -> @out Optional<T>
+  var meaningOfLife: T? = nil
+}
+
+extension AnythingGoes where T : VeryConstrained {
+  // CHECK-LABEL: sil hidden @_T022constrained_extensions12AnythingGoesVA2A15VeryConstrainedRzlEACyxGyt13fromExtension_tcfC : $@convention(method) <T where T : VeryConstrained> (@thin AnythingGoes<T>.Type) -> @out AnythingGoes<T> {
+
+  // CHECK: [[INIT:%.*]] = function_ref @_T022constrained_extensions12AnythingGoesV13meaningOfLifexSgvfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK: [[RESULT:%.*]] = alloc_stack $Optional<T>
+  // CHECK: apply [[INIT]]<T>([[RESULT]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK: return
+  init(fromExtension: ()) {}
+}
+
+extension Array where Element == Int {
+  struct Nested {
+    // CHECK-LABEL: sil hidden [transparent] @_T0Sa22constrained_extensionsSiRszlE6NestedV1eSiSgvfi : $@convention(thin) () -> Optional<Int>
+    var e: Element? = nil
+
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsSiRszlE6NestedV10hasDefaultySiSg1e_tFfA_ : $@convention(thin) () -> Optional<Int>
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsSiRszlE6NestedV10hasDefaultySiSg1e_tF : $@convention(method) (Optional<Int>, @inout Array<Int>.Nested) -> ()
+    mutating func hasDefault(e: Element? = nil) {
+      self.e = e
+    }
+  }
+}
+
+extension Array where Element == AnyObject {
+  class NestedClass {
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCfd : $@convention(method) (@guaranteed Array<AnyObject>.NestedClass) -> @owned Builtin.NativeObject
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCfD : $@convention(method) (@owned Array<AnyObject>.NestedClass) -> ()
+    deinit { }
+
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_GycfC : $@convention(method) (@thick Array<AnyObject>.NestedClass.Type) -> @owned Array<AnyObject>.NestedClass
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_Gycfc : $@convention(method) (@owned Array<AnyObject>.NestedClass) -> @owned Array<AnyObject>.NestedClass
+  }
+
+  class DerivedClass : NestedClass {
+    // CHECK-LABEL: sil hidden [transparent] @_T0Sa22constrained_extensionsyXlRszlE12DerivedClassC1eyXlSgvfi : $@convention(thin) () -> @owned Optional<AnyObject>
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE12DerivedClassCfE : $@convention(method) (@guaranteed Array<AnyObject>.DerivedClass) -> ()
+    var e: Element? = nil
+  }
+}
+
+func referenceNestedTypes() {
+  _ = Array<AnyObject>.NestedClass()
+  _ = Array<AnyObject>.DerivedClass()
 }

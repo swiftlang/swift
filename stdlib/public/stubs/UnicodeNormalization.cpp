@@ -317,6 +317,10 @@ int32_t ubrk_preceding(UBreakIterator *, int32_t);
 int32_t ubrk_following(UBreakIterator *, int32_t);
 void ubrk_setText(UBreakIterator *, const UChar *, int32_t, UErrorCode *);
 }
+
+// Force an autolink with ICU
+asm(".linker_option \"-licucore\"\n");
+
 #endif // defined(__APPLE__)
 
 void swift::__swift_stdlib_ubrk_close(

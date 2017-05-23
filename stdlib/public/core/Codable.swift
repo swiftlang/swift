@@ -154,105 +154,105 @@ public protocol KeyedEncodingContainerProtocol {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode<T : Encodable>(_ value: T?, forKey key: Key) throws
+    mutating func encode(_ value: Bool, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Bool?, forKey key: Key) throws
+    mutating func encode(_ value: Int, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int?, forKey key: Key) throws
+    mutating func encode(_ value: Int8, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int8?, forKey key: Key) throws
+    mutating func encode(_ value: Int16, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int16?, forKey key: Key) throws
+    mutating func encode(_ value: Int32, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int32?, forKey key: Key) throws
+    mutating func encode(_ value: Int64, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int64?, forKey key: Key) throws
+    mutating func encode(_ value: UInt, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt?, forKey key: Key) throws
+    mutating func encode(_ value: UInt8, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt8?, forKey key: Key) throws
+    mutating func encode(_ value: UInt16, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt16?, forKey key: Key) throws
+    mutating func encode(_ value: UInt32, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt32?, forKey key: Key) throws
+    mutating func encode(_ value: UInt64, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt64?, forKey key: Key) throws
+    mutating func encode(_ value: Float, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Float?, forKey key: Key) throws
+    mutating func encode(_ value: Double, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Double?, forKey key: Key) throws
+    mutating func encode(_ value: String, forKey key: Key) throws
 
     /// Encodes the given value for the given key.
     ///
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: String?, forKey key: Key) throws
+    mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws
 
     /// Encodes the given object weakly for the given key.
     ///
@@ -263,7 +263,112 @@ public protocol KeyedEncodingContainerProtocol {
     /// - parameter object: The object to encode.
     /// - parameter key: The key to associate the object with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws
+    mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Bool?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Int?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Int8?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Int16?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Int32?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Int64?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: UInt?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Float?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: Double?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws
+
+    /// Encodes the given value for the given key if it is not `nil`.
+    ///
+    /// - parameter value: The value to encode.
+    /// - parameter key: The key to associate the value with.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    mutating func encodeIfPresent<T : Encodable>(_ value: T?, forKey key: Key) throws
 
     /// Stores a keyed encoding container for the given key and returns it.
     ///
@@ -296,7 +401,7 @@ public protocol KeyedEncodingContainerProtocol {
 
 /// A concrete container that provides a view into an encoder's storage, making
 /// the encoded properties of an encodable type accessible by keys.
-public struct KeyedEncodingContainer<K : CodingKey> {
+public struct KeyedEncodingContainer<K : CodingKey> : KeyedEncodingContainerProtocol {
     public typealias Key = K
 
     /// The container for the concrete encoder. The type is _*Base so that it's generic on the key type.
@@ -321,7 +426,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Bool?, forKey key: Key) throws {
+    public mutating func encode(_ value: Bool, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -330,7 +435,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Int?, forKey key: Key) throws {
+    public mutating func encode(_ value: Int, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -339,7 +444,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Int8?, forKey key: Key) throws {
+    public mutating func encode(_ value: Int8, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -348,7 +453,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Int16?, forKey key: Key) throws {
+    public mutating func encode(_ value: Int16, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -357,7 +462,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Int32?, forKey key: Key) throws {
+    public mutating func encode(_ value: Int32, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -366,7 +471,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Int64?, forKey key: Key) throws {
+    public mutating func encode(_ value: Int64, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -375,7 +480,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: UInt?, forKey key: Key) throws {
+    public mutating func encode(_ value: UInt, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -384,7 +489,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: UInt8?, forKey key: Key) throws {
+    public mutating func encode(_ value: UInt8, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -393,7 +498,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: UInt16?, forKey key: Key) throws {
+    public mutating func encode(_ value: UInt16, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -402,7 +507,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: UInt32?, forKey key: Key) throws {
+    public mutating func encode(_ value: UInt32, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -411,7 +516,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: UInt64?, forKey key: Key) throws {
+    public mutating func encode(_ value: UInt64, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -420,7 +525,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Float?, forKey key: Key) throws {
+    public mutating func encode(_ value: Float, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -429,7 +534,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: Double?, forKey key: Key) throws {
+    public mutating func encode(_ value: Double, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -438,7 +543,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode(_ value: String?, forKey key: Key) throws {
+    public mutating func encode(_ value: String, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -447,7 +552,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter value: The value to encode.
     /// - parameter key: The key to associate the value with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
+    public mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
         try _box.encode(value, forKey: key)
     }
 
@@ -458,7 +563,7 @@ public struct KeyedEncodingContainer<K : CodingKey> {
     /// - parameter object: The object to encode.
     /// - parameter key: The key to associate the object with.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
+    public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T, forKey key: Key) throws {
         try _box.encodeWeak(object, forKey: key)
     }
 
@@ -1134,91 +1239,91 @@ public protocol UnkeyedEncodingContainer {
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode<T : Encodable>(_ value: T?) throws
+    mutating func encode(_ value: Bool) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Bool?) throws
+    mutating func encode(_ value: Int) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int?) throws
+    mutating func encode(_ value: Int8) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int8?) throws
+    mutating func encode(_ value: Int16) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int16?) throws
+    mutating func encode(_ value: Int32) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int32?) throws
+    mutating func encode(_ value: Int64) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Int64?) throws
+    mutating func encode(_ value: UInt) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt?) throws
+    mutating func encode(_ value: UInt8) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt8?) throws
+    mutating func encode(_ value: UInt16) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt16?) throws
+    mutating func encode(_ value: UInt32) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt32?) throws
+    mutating func encode(_ value: UInt64) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: UInt64?) throws
+    mutating func encode(_ value: Float) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Float?) throws
+    mutating func encode(_ value: Double) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: Double?) throws
+    mutating func encode(_ value: String) throws
 
     /// Encodes the given value.
     ///
     /// - parameter value: The value to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encode(_ value: String?) throws
+    mutating func encode<T : Encodable>(_ value: T) throws
 
     /// Encodes the given object weakly.
     ///
@@ -1228,7 +1333,7 @@ public protocol UnkeyedEncodingContainer {
     ///
     /// - parameter object: The object to encode.
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
-    mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T?) throws
+    mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T) throws
 
     /// Encodes the elements of the given sequence.
     ///
@@ -1635,6 +1740,12 @@ public protocol UnkeyedDecodingContainer {
 /// A container that can support the storage and direct encoding of a single
 /// non-keyed value.
 public protocol SingleValueEncodingContainer {
+    /// Encodes a null value.
+    ///
+    /// - throws: `EncodingError.invalidValue` if a null value is invalid in the current context for this format.
+    /// - precondition: May not be called after a previous `self.encode(_:)` call.
+    mutating func encodeNil() throws
+
     /// Encodes a single value of the given type.
     ///
     /// - parameter value: The value to encode.
@@ -1732,15 +1843,28 @@ public protocol SingleValueEncodingContainer {
     /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
     /// - precondition: May not be called after a previous `self.encode(_:)` call.
     mutating func encode(_ value: String) throws
+
+    /// Encodes a single value of the given type.
+    ///
+    /// - parameter value: The value to encode.
+    /// - throws: `EncodingError.invalidValue` if the given value is invalid in the current context for this format.
+    /// - precondition: May not be called after a previous `self.encode(_:)` call.
+    mutating func encode<T : Encodable>(_ value: T) throws
 }
 
 /// A `SingleValueDecodingContainer` is a container which can support the storage and direct decoding of a single non-keyed value.
 public protocol SingleValueDecodingContainer {
+    /// Decodes a null value.
+    ///
+    /// - returns: Whether the encountered value was null.
+    func decodeNil() -> Bool
+
     /// Decodes a single value of the given type.
     ///
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Bool.Type) throws -> Bool
 
     /// Decodes a single value of the given type.
@@ -1748,6 +1872,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Int.Type) throws -> Int
 
     /// Decodes a single value of the given type.
@@ -1755,6 +1880,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Int8.Type) throws -> Int8
 
     /// Decodes a single value of the given type.
@@ -1762,6 +1888,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Int16.Type) throws -> Int16
 
     /// Decodes a single value of the given type.
@@ -1769,6 +1896,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Int32.Type) throws -> Int32
 
     /// Decodes a single value of the given type.
@@ -1776,6 +1904,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Int64.Type) throws -> Int64
 
     /// Decodes a single value of the given type.
@@ -1783,6 +1912,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: UInt.Type) throws -> UInt
 
     /// Decodes a single value of the given type.
@@ -1790,6 +1920,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: UInt8.Type) throws -> UInt8
 
     /// Decodes a single value of the given type.
@@ -1797,6 +1928,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: UInt16.Type) throws -> UInt16
 
     /// Decodes a single value of the given type.
@@ -1804,6 +1936,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: UInt32.Type) throws -> UInt32
 
     /// Decodes a single value of the given type.
@@ -1811,6 +1944,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: UInt64.Type) throws -> UInt64
 
     /// Decodes a single value of the given type.
@@ -1818,6 +1952,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Float.Type) throws -> Float
 
     /// Decodes a single value of the given type.
@@ -1825,6 +1960,7 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: Double.Type) throws -> Double
 
     /// Decodes a single value of the given type.
@@ -1832,7 +1968,16 @@ public protocol SingleValueDecodingContainer {
     /// - parameter type: The type to decode as.
     /// - returns: A value of the requested type.
     /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode(_ type: String.Type) throws -> String
+
+    /// Decodes a single value of the given type.
+    ///
+    /// - parameter type: The type to decode as.
+    /// - returns: A value of the requested type.
+    /// - throws: `DecodingError.typeMismatch` if the encountered encoded value cannot be converted to the requested type.
+    /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
+    func decode<T : Decodable>(_ type: T.Type) throws -> T
 }
 
 //===----------------------------------------------------------------------===//
@@ -1954,97 +2099,187 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Bool?, forKey key: Key) throws {
+    internal func encode(_ value: Bool, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Int?, forKey key: Key) throws {
+    internal func encode(_ value: Int, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Int8?, forKey key: Key) throws {
+    internal func encode(_ value: Int8, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Int16?, forKey key: Key) throws {
+    internal func encode(_ value: Int16, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Int32?, forKey key: Key) throws {
+    internal func encode(_ value: Int32, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Int64?, forKey key: Key) throws {
+    internal func encode(_ value: Int64, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: UInt?, forKey key: Key) throws {
+    internal func encode(_ value: UInt, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: UInt8?, forKey key: Key) throws {
+    internal func encode(_ value: UInt8, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: UInt16?, forKey key: Key) throws {
+    internal func encode(_ value: UInt16, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: UInt32?, forKey key: Key) throws {
+    internal func encode(_ value: UInt32, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: UInt64?, forKey key: Key) throws {
+    internal func encode(_ value: UInt64, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Float?, forKey key: Key) throws {
+    internal func encode(_ value: Float, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: Double?, forKey key: Key) throws {
+    internal func encode(_ value: Double, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode(_ value: String?, forKey key: Key) throws {
+    internal func encode(_ value: String, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
+    internal func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
     @_inlineable
     @_versioned
-    internal func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
+    internal func encodeWeak<T : AnyObject & Encodable>(_ object: T, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Bool?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Int?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Int8?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Int16?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Int32?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Int64?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: UInt?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Float?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: Double?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent(_ value: String?, forKey key: Key) throws {
+        fatalError("_KeyedEncodingContainerBase cannot be used directly.")
+    }
+
+    @_inlineable
+    @_versioned
+    internal func encodeIfPresent<T : Encodable>(_ value: T?, forKey key: Key) throws {
         fatalError("_KeyedEncodingContainerBase cannot be used directly.")
     }
 
@@ -2095,98 +2330,188 @@ internal final class _KeyedEncodingContainerBox<Concrete : KeyedEncodingContaine
 
     @_inlineable
     @_versioned
-    override internal func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
+    override internal func encode(_ value: Bool, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Bool?, forKey key: Key) throws {
+    override internal func encode(_ value: Int, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Int?, forKey key: Key) throws {
+    override internal func encode(_ value: Int8, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Int8?, forKey key: Key) throws {
+    override internal func encode(_ value: Int16, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Int16?, forKey key: Key) throws {
+    override internal func encode(_ value: Int32, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Int32?, forKey key: Key) throws {
+    override internal func encode(_ value: Int64, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Int64?, forKey key: Key) throws {
+    override internal func encode(_ value: UInt, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: UInt?, forKey key: Key) throws {
+    override internal func encode(_ value: UInt8, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: UInt8?, forKey key: Key) throws {
+    override internal func encode(_ value: UInt16, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: UInt16?, forKey key: Key) throws {
+    override internal func encode(_ value: UInt32, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: UInt32?, forKey key: Key) throws {
+    override internal func encode(_ value: UInt64, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: UInt64?, forKey key: Key) throws {
+    override internal func encode(_ value: Float, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Float?, forKey key: Key) throws {
+    override internal func encode(_ value: Double, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: Double?, forKey key: Key) throws {
+    override internal func encode(_ value: String, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encode(_ value: String?, forKey key: Key) throws {
+    override internal func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
         try concrete.encode(value, forKey: key)
     }
 
     @_inlineable
     @_versioned
-    override internal func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
+    override internal func encodeWeak<T : AnyObject & Encodable>(_ object: T, forKey key: Key) throws {
         try concrete.encodeWeak(object, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Bool?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Int?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Int8?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Int16?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Int32?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Int64?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: UInt?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Float?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: Double?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent(_ value: String?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
+    }
+
+    @_inlineable
+    @_versioned
+    override internal func encodeIfPresent<T : Encodable>(_ value: T?, forKey key: Key) throws {
+        try concrete.encodeIfPresent(value, forKey: key)
     }
 
     @_inlineable
@@ -2908,7 +3233,44 @@ public extension RawRepresentable where RawValue == String, Self : Decodable {
 }
 
 //===----------------------------------------------------------------------===//
-// Collection Extensions
+// Optional Conformance
+//===----------------------------------------------------------------------===//
+
+// FIXME: Uncomment when conditional conformance is available.
+extension Optional : Encodable /* where Wrapped : Encodable */ {
+    public func encode(to encoder: Encoder) throws {
+        guard Wrapped.self is Encodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Encodable because \(Wrapped.self) does not conform to Encodable.")
+        }
+
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .none: try container.encodeNil()
+        case .some(let wrapped): try (wrapped as! Encodable).encode(to: encoder)
+        }
+    }
+}
+
+extension Optional : Decodable /* where Wrapped : Decodable */ {
+    public init(from decoder: Decoder) throws {
+        // Initialize self here so we can print type(of: self).
+        self = .none
+
+        guard Wrapped.self is Decodable.Type else {
+            preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Wrapped.self) does not conform to Decodable.")
+        }
+
+        let container = try decoder.singleValueContainer()
+        if !container.decodeNil() {
+            let metaType = (Wrapped.self as! Decodable.Type)
+            let element = try metaType.init(from: decoder)
+            self = .some(element as! Wrapped)
+        }
+    }
+}
+
+//===----------------------------------------------------------------------===//
+// Collection Conformances
 //===----------------------------------------------------------------------===//
 
 // FIXME: Uncomment when conditional conformance is available.
@@ -2930,7 +3292,9 @@ extension Array : Encodable /* where Element : Encodable */ {
 
 extension Array : Decodable /* where Element : Decodable */ {
     public init(from decoder: Decoder) throws {
+        // Initialize self here so we can print type(of: self).
         self.init()
+
         guard Element.self is Decodable.Type else {
             preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Element.self) does not conform to Decodable.")
         }
@@ -2965,6 +3329,7 @@ extension Set : Encodable /* where Element : Encodable */ {
 
 extension Set : Decodable /* where Element : Decodable */ {
     public init(from decoder: Decoder) throws {
+        // Initialize self here so we can print type(of: self).
         self.init()
 
         guard Element.self is Decodable.Type else {
@@ -3044,6 +3409,7 @@ extension Dictionary : Encodable /* where Key : Encodable, Value : Encodable */ 
 
 extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ {
     public init(from decoder: Decoder) throws {
+        // Initialize self here so we can print type(of: self).
         self.init()
 
         guard Key.self is Encodable.Type else {
@@ -3123,8 +3489,86 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
 
 // Default implementation for encodeWeak(_:forKey:) in terms of encode(_:forKey:)
 public extension KeyedEncodingContainerProtocol {
-    public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T?, forKey key: Key) throws {
+    public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T, forKey key: Key) throws {
         try encode(object, forKey: key)
+    }
+}
+
+// Default implementation for encodeIfPresent(_:forKey:) in terms of encode(_:forKey:)
+public extension KeyedEncodingContainerProtocol {
+    public mutating func encodeIfPresent(_ value: Bool?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Int?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Int8?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Int16?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Int32?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Int64?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: UInt?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Float?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: Double?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent(_ value: String?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
+    }
+
+    public mutating func encodeIfPresent<T : Encodable>(_ value: T?, forKey key: Key) throws {
+        guard let value = value else { return }
+        try encode(value, forKey: key)
     }
 }
 
@@ -3343,7 +3787,7 @@ public extension KeyedDecodingContainerProtocol {
 
 // Default implementation of encodeWeak(_:) in terms of encode(_:), and encode(contentsOf:) in terms of encode(_:) loop.
 public extension UnkeyedEncodingContainer {
-    public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T?) throws {
+    public mutating func encodeWeak<T : AnyObject & Encodable>(_ object: T) throws {
         try encode(object)
     }
 

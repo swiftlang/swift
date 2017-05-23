@@ -236,7 +236,7 @@ func test_as_1() {
 }
 func test_as_2() {
   let x: Int = 1
-  x as [] // expected-error {{expected element type}}
+  x as [] // expected-error {{expected element type}} {{9-9= <#type#>}}
 }
 
 func test_lambda() {

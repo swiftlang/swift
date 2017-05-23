@@ -1382,12 +1382,37 @@ public:
   static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
   
-  /// Return a TypeExpr for a TypeDecl and the specified location.
+  /// Create a TypeExpr for a TypeDecl at the specified location.
   static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
                                  bool isImplicit);
+
+  /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
+  static TypeExpr *createForMemberDecl(SourceLoc ParentNameLoc,
+                                       TypeDecl *Parent,
+                                       SourceLoc NameLoc,
+                                       TypeDecl *Decl);
+
+  /// Create a TypeExpr for a member TypeDecl of the given parent IdentTypeRepr.
+  static TypeExpr *createForMemberDecl(IdentTypeRepr *ParentTR,
+                                       SourceLoc NameLoc,
+                                       TypeDecl *Decl);
+
+  /// Create a TypeExpr for a generic TypeDecl with the given arguments applied
+  /// at the specified location.
   static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
                                             ArrayRef<TypeRepr*> args,
                                             SourceRange angleLocs);
+
+  /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
+  /// at the specified location.
+  ///
+  /// Returns nullptr if the reference cannot be formed, which is a hack due
+  /// to limitations in how we model generic typealiases.
+  static TypeExpr *createForSpecializedDecl(IdentTypeRepr *ParentTR,
+                                            ArrayRef<TypeRepr*> Args,
+                                            SourceRange AngleLocs,
+                                            ASTContext &C);
+
   TypeLoc &getTypeLoc() { return Info; }
   TypeLoc getTypeLoc() const { return Info; }
   TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
@@ -4582,6 +4607,7 @@ public:
   class Component {
   public:
     enum class Kind: unsigned {
+      Invalid,
       UnresolvedProperty,
       UnresolvedSubscript,
       Property,
@@ -4616,7 +4642,7 @@ public:
     {}
     
   public:
-    Component() : Component({}, nullptr, (Kind)0, Type(), SourceLoc()) {}
+    Component() : Component({}, nullptr, Kind::Invalid, Type(), SourceLoc()) {}
     
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclName UnresolvedName,
@@ -4720,12 +4746,17 @@ public:
       return SubscriptIndexExprAndKind.getInt();
     }
     
+    bool isValid() const {
+      return getKind() != Kind::Invalid;
+    }
+    
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
         return SubscriptIndexExprAndKind.getPointer();
         
+      case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
@@ -4740,6 +4771,7 @@ public:
       case Kind::UnresolvedProperty:
         return Decl.UnresolvedName;
 
+      case Kind::Invalid:
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
       case Kind::OptionalChain:
@@ -4756,6 +4788,7 @@ public:
       case Kind::Subscript:
         return Decl.ResolvedDecl;
 
+      case Kind::Invalid:
       case Kind::UnresolvedProperty:
       case Kind::UnresolvedSubscript:
       case Kind::OptionalChain:

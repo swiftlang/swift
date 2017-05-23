@@ -6653,3 +6653,13 @@ Swift 1.0
 [SE-0167]: <https://github.com/apple/swift-evolution/blob/master/proposals/0167-swift-encoders.md>
 [SE-0168]: <https://github.com/apple/swift-evolution/blob/master/proposals/0168-multi-line-string-literals.md>
 [SE-0169]: <https://github.com/apple/swift-evolution/blob/master/proposals/0169-improve-interaction-between-private-declarations-and-extensions.md>
+[SE-0170]: <https://github.com/apple/swift-evolution/blob/master/proposals/0170-nsnumber_bridge.md>
+[SE-0171]: <https://github.com/apple/swift-evolution/blob/master/proposals/0171-reduce-with-inout.md>
+[SE-0172]: <https://github.com/apple/swift-evolution/blob/master/proposals/0172-one-sided-ranges.md>
+[SE-0173]: <https://github.com/apple/swift-evolution/blob/master/proposals/0173-swap-indices.md>
+[SE-0174]: <https://github.com/apple/swift-evolution/blob/master/proposals/0174-filter-range-replaceable.md>
+[SE-0175]: <https://github.com/apple/swift-evolution/blob/master/proposals/0175-package-manager-revised-dependency-resolution.md>
+[SE-0176]: <https://github.com/apple/swift-evolution/blob/master/proposals/0176-enforce-exclusive-access-to-memory.md>
+[SE-0177]: <https://github.com/apple/swift-evolution/blob/master/proposals/0177-add-clamped-to-method.md>
+[SE-0178]: <https://github.com/apple/swift-evolution/blob/master/proposals/0178-character-unicode-view.md>
+[SE-0179]: <https://github.com/apple/swift-evolution/blob/master/proposals/0179-swift-run-command.md>

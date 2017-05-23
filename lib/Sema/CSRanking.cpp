@@ -481,6 +481,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     log << "\n";
   }
 
+  auto *innerDC1 = decl1->getInnermostDeclContext();
+  auto *innerDC2 = decl2->getInnermostDeclContext();
+
+  auto *outerDC1 = decl1->getDeclContext();
+  auto *outerDC2 = decl2->getDeclContext();
+
   if (!tc.specializedOverloadComparisonCache.count({decl1, decl2})) {
 
     auto compareSpecializations = [&] () -> bool {
@@ -516,18 +522,16 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       // Members of protocol extensions have special overloading rules.
-      ProtocolDecl *inProtocolExtension1 = decl1->getDeclContext()
+      ProtocolDecl *inProtocolExtension1 = outerDC1
                                              ->getAsProtocolExtensionContext();
-      ProtocolDecl *inProtocolExtension2 = decl2->getDeclContext()
+      ProtocolDecl *inProtocolExtension2 = outerDC2
                                              ->getAsProtocolExtensionContext();
       if (inProtocolExtension1 && inProtocolExtension2) {
         // Both members are in protocol extensions.
         // Determine whether the 'Self' type from the first protocol extension
         // satisfies all of the requirements of the second protocol extension.
-        DeclContext *dc1 = decl1->getDeclContext();
-        DeclContext *dc2 = decl2->getDeclContext();
-        bool better1 = isProtocolExtensionAsSpecializedAs(tc, dc1, dc2);
-        bool better2 = isProtocolExtensionAsSpecializedAs(tc, dc2, dc1);
+        bool better1 = isProtocolExtensionAsSpecializedAs(tc, outerDC1, outerDC2);
+        bool better2 = isProtocolExtensionAsSpecializedAs(tc, outerDC2, outerDC1);
         if (better1 != better2) {
           return better1;
         }
@@ -548,14 +552,14 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
         // Nothing to do: these have the curried 'self' already.
         if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
-          checkKind = elt->getArgumentInterfaceType() ? CheckInput : CheckAll;
+          checkKind = elt->hasAssociatedValues() ? CheckInput : CheckAll;
         } else {
           checkKind = CheckInput;
         }
       } else {
         // Add a curried 'self' type.
-        type1 = addCurriedSelfType(tc.Context, type1, decl1->getDeclContext());
-        type2 = addCurriedSelfType(tc.Context, type2, decl2->getDeclContext());
+        type1 = addCurriedSelfType(tc.Context, type1, outerDC1);
+        type2 = addCurriedSelfType(tc.Context, type2, outerDC2);
 
         // For a subscript declaration, only look at the input type (i.e., the
         // indices).
@@ -578,31 +582,44 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         openedType2 = cs.openFunctionType(
             funcType, /*numArgumentLabelsToRemove=*/0, locator,
             /*replacements=*/unused,
-            decl2->getInnermostDeclContext(),
-            decl2->getDeclContext(),
+            innerDC2,
+            outerDC2,
             /*skipProtocolSelfConstraint=*/false);
       } else {
+        cs.openGeneric(innerDC2,
+                       outerDC2,
+                       innerDC2->getGenericSignatureOfContext(),
+                       /*skipProtocolSelfConstraint=*/false,
+                       locator,
+                       unused);
+
         openedType2 = cs.openType(type2, locator, unused);
       }
 
       // Get the type of a reference to the first declaration, swapping in
       // archetypes for the dependent types.
       OpenedTypeMap replacements;
-      auto dc1 = decl1->getInnermostDeclContext();
       Type openedType1;
       if (auto *funcType = type1->getAs<AnyFunctionType>()) {
         openedType1 = cs.openFunctionType(
             funcType, /*numArgumentLabelsToRemove=*/0, locator,
             replacements,
-            dc1,
-            decl1->getDeclContext(),
+            innerDC1,
+            outerDC1,
             /*skipProtocolSelfConstraint=*/false);
       } else {
+        cs.openGeneric(innerDC1,
+                       outerDC1,
+                       innerDC1->getGenericSignatureOfContext(),
+                       /*skipProtocolSelfConstraint=*/false,
+                       locator,
+                       replacements);
+
         openedType1 = cs.openType(type1, locator, replacements);
       }
 
       for (const auto &replacement : replacements) {
-        if (auto mapped = dc1->mapTypeIntoContext(replacement.first)) {
+        if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
           cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                            locator);
         }
@@ -611,12 +628,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // Extract the self types from the declarations, if they have them.
       Type selfTy1;
       Type selfTy2;
-      if (decl1->getDeclContext()->isTypeContext()) {
+      if (outerDC1->isTypeContext()) {
         auto funcTy1 = openedType1->castTo<FunctionType>();
         selfTy1 = funcTy1->getInput()->getRValueInstanceType();
         openedType1 = funcTy1->getResult();
       }
-      if (decl2->getDeclContext()->isTypeContext()) {
+      if (outerDC2->isTypeContext()) {
         auto funcTy2 = openedType2->castTo<FunctionType>();
         selfTy2 = funcTy2->getInput()->getRValueInstanceType();
         openedType2 = funcTy2->getResult();
@@ -625,8 +642,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // Determine the relationship between the 'self' types and add the
       // appropriate constraints. The constraints themselves never fail, but
       // they help deduce type variables that were opened.
-      switch (computeSelfTypeRelationship(tc, dc, decl1->getDeclContext(),
-                                          decl2->getDeclContext())) {
+      switch (computeSelfTypeRelationship(tc, dc, outerDC1, outerDC2)) {
       case SelfTypeRelationship::Unrelated:
         // Skip the self types parameter entirely.
         break;
@@ -645,15 +661,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       case SelfTypeRelationship::ConformsTo:
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
-                         cast<ProtocolDecl>(decl2->getDeclContext())
-                           ->getDeclaredType(),
+                         cast<ProtocolDecl>(outerDC2)->getDeclaredType(),
                          locator);
         break;
 
       case SelfTypeRelationship::ConformedToBy:
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
-                         cast<ProtocolDecl>(decl1->getDeclContext())
-                           ->getDeclaredType(),
+                         cast<ProtocolDecl>(outerDC1)->getDeclaredType(),
                          locator);
         break;
       }
@@ -675,10 +689,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto funcTy2 = openedType2->castTo<FunctionType>();
         SmallVector<CallArgParam, 4> params1 =
           decomposeParamType(funcTy1->getInput(), decl1,
-                             decl1->getDeclContext()->isTypeContext());
+                             outerDC1->isTypeContext());
         SmallVector<CallArgParam, 4> params2 =
           decomposeParamType(funcTy2->getInput(), decl2,
-                             decl2->getDeclContext()->isTypeContext());
+                             outerDC2->isTypeContext());
 
         unsigned numParams1 = params1.size();
         unsigned numParams2 = params2.size();

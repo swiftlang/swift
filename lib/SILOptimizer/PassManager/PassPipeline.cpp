@@ -430,19 +430,17 @@ SILPassPipelinePlan::getLoweringPassPipeline() {
   return P;
 }
 
-/// Non-mandatory passes that should run as preparation for IRGen.
-static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
+SILPassPipelinePlan
+SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P;
   P.startPipeline("IRGen Preparation");
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
   P.addAllocStackHoisting();
-  //P.addLoadableByAddress();
-}
-
-SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
-  SILPassPipelinePlan P;
-  addIRGenPreparePipeline(P);
+  if (Options.EnableLargeLoadableTypes) {
+    P.addLoadableByAddress();
+  }
   return P;
 }
 

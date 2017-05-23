@@ -762,6 +762,19 @@ namespace {
     /// The expressions that are direct arguments of call expressions.
     llvm::SmallPtrSet<Expr *, 4> CallArgs;
 
+    /// Simplify expressions which are type sugar productions that got parsed
+    /// as expressions due to the parser not knowing which identifiers are
+    /// type names.
+    TypeExpr *simplifyTypeExpr(Expr *E);
+
+    /// Simplify unresolved dot expressions which are nested type productions.
+    TypeExpr *simplifyNestedTypeExpr(UnresolvedDotExpr *UDE);
+
+    TypeExpr *simplifyUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *USE);
+
+    /// Simplify a key path expression into a canonical form.
+    void resolveKeyPathExpr(KeyPathExpr *KPE);
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
@@ -830,37 +843,19 @@ namespace {
       ExprStack.pop_back();
 
       // Mark the direct callee as being a callee.
-      if (auto call = dyn_cast<CallExpr>(expr))
+      if (auto *call = dyn_cast<CallExpr>(expr))
         markDirectCallee(call->getFn());
 
       // Fold sequence expressions.
-      if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TC.foldSequence(seqExpr, DC);
         return result->walk(*this);
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
-      if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
-        for (TypeLoc &type : us->getUnresolvedParams()) {
-          if (TC.validateType(type, DC))
-            return nullptr;
-        }
-        
-        // If this is a reference type a specialized type, form a TypeExpr.
-        if (auto *dre = dyn_cast<DeclRefExpr>(us->getSubExpr())) {
-          if (auto *TD = dyn_cast<TypeDecl>(dre->getDecl())) {
-            SmallVector<TypeRepr*, 4> TypeReprs;
-            for (auto elt : us->getUnresolvedParams())
-              TypeReprs.push_back(elt.getTypeRepr());
-            auto angles = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
-            return TypeExpr::createForSpecializedDecl(dre->getLoc(),
-                                                      TD,
-                                            TC.Context.AllocateCopy(TypeReprs),
-                                                      angles);
-          }
-        }
-        
-        return expr;
+      if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+        if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
+          return typeExpr;
       }
       
       // If we're about to step out of a ClosureExpr, restore the DeclContext.
@@ -989,14 +984,6 @@ namespace {
       // Never walk into statements.
       return { false, stmt };
     }
-    
-    /// Simplify expressions which are type sugar productions that got parsed
-    /// as expressions due to the parser not knowing which identifiers are
-    /// type names.
-    TypeExpr *simplifyTypeExpr(Expr *E);
-
-    /// Simplify a key path expression into a canonical form.
-    void resolveKeyPathExpr(KeyPathExpr *KPE);
   };
 } // end anonymous namespace
 
@@ -1048,6 +1035,134 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   return true;
 }
 
+TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
+  if (!UDE->getName().isSimpleName())
+    return nullptr;
+
+  auto Name = UDE->getName().getBaseName();
+  auto NameLoc = UDE->getNameLoc().getBaseNameLoc();
+
+  // Qualified type lookup with a module base is represented as a DeclRefExpr
+  // and not a TypeExpr.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+    if (auto *TD = dyn_cast<TypeDecl>(DRE->getDecl())) {
+      auto lookupOptions = defaultMemberLookupOptions;
+      if (isa<AbstractFunctionDecl>(DC) ||
+          isa<AbstractClosureExpr>(DC))
+        lookupOptions |= NameLookupFlags::KnownPrivate;
+
+      // See if the type has a member type with this name.
+      auto Result = TC.lookupMemberType(DC,
+                                        TD->getDeclaredInterfaceType(),
+                                        Name,
+                                        lookupOptions);
+
+      // If there is no nested type with this name, we have a lookup of
+      // a non-type member, so leave the expression as-is.
+      if (Result.size() == 1) {
+        return TypeExpr::createForMemberDecl(
+          DRE->getNameLoc().getBaseNameLoc(), TD,
+          NameLoc, Result.front().first);
+      }
+    }
+
+    return nullptr;
+  }
+
+  auto *TyExpr = dyn_cast<TypeExpr>(UDE->getBase());
+  if (!TyExpr)
+    return nullptr;
+
+  auto *InnerTypeRepr = TyExpr->getTypeRepr();
+  if (!InnerTypeRepr)
+    return nullptr;
+
+  // Fold 'T.Protocol' into a protocol metatype.
+  if (Name == TC.Context.Id_Protocol) {
+    auto *NewTypeRepr =
+      new (TC.Context) ProtocolTypeRepr(InnerTypeRepr, NameLoc);
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
+  // Fold 'T.Type' into an existential metatype if 'T' is a protocol,
+  // or an ordinary metatype otherwise.
+  if (Name == TC.Context.Id_Type) {
+    auto *NewTypeRepr =
+      new (TC.Context) MetatypeTypeRepr(InnerTypeRepr, NameLoc);
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
+  // Fold 'T.U' into a nested type.
+  //
+  // FIXME: Also support this if 'T' is a generic parameter.
+  if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
+    // The last component should be bound already.
+    if (auto *D = ITR->getComponentRange().back()->getBoundDecl()) {
+      auto BaseTy = D->getDeclaredInterfaceType();
+      // The last component should be a module, nominal type, or a typealias
+      // whose underlying type is a nominal type, otherwise we cannot perform
+      // a type member lookup, which will be diagnosed later.
+      if (BaseTy->getAnyNominal() ||
+          BaseTy->is<ModuleType>()) {
+        auto lookupOptions = defaultMemberLookupOptions;
+        if (isa<AbstractFunctionDecl>(DC) ||
+            isa<AbstractClosureExpr>(DC))
+          lookupOptions |= NameLookupFlags::KnownPrivate;
+
+        // See if there is a member type with this name.
+        auto Result = TC.lookupMemberType(DC,
+                                          BaseTy,
+                                          Name,
+                                          lookupOptions);
+
+        // If there is no nested type with this name, we have a lookup of
+        // a non-type member, so leave the expression as-is.
+        if (Result.size() == 1) {
+          return TypeExpr::createForMemberDecl(ITR, NameLoc,
+                                               Result.front().first);
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
+    UnresolvedSpecializeExpr *us) {
+  SmallVector<TypeRepr *, 4> genericArgs;
+  for (auto &type : us->getUnresolvedParams()) {
+    genericArgs.push_back(type.getTypeRepr());
+  }
+
+  auto angleRange = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
+
+  // If this is a reference type a specialized type, form a TypeExpr.
+
+  // The base is either a DeclRefExpr pointing at a type...
+  if (auto *dre = dyn_cast<DeclRefExpr>(us->getSubExpr())) {
+    if (auto *TD = dyn_cast<TypeDecl>(dre->getDecl())) {
+      return TypeExpr::createForSpecializedDecl(
+        dre->getLoc(), TD,
+        TC.Context.AllocateCopy(genericArgs),
+        angleRange);
+    }
+  }
+
+  // Or a TypeExpr that we already resolved.
+  if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
+    if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
+      return TypeExpr::createForSpecializedDecl(
+        ITR,
+        TC.Context.AllocateCopy(genericArgs),
+        angleRange,
+        TC.Context);
+    }
+  }
+
+  return nullptr;
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
@@ -1056,32 +1171,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   // simplify away the required ParenExpr/TupleExpr.
   if (CallArgs.count(E) > 0) return nullptr;
 
-  // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
-  if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(MRE->getBase());
-    if (!TyExpr) return nullptr;
-    
-    auto *InnerTypeRepr = TyExpr->getTypeRepr();
-
-    if (MRE->getName() == TC.Context.Id_Protocol) {
-      assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-             "This doesn't work on implicit TypeExpr's, "
-             "TypeExpr should have been built correctly in the first place");
-      auto *NewTypeRepr =
-        new (TC.Context) ProtocolTypeRepr(InnerTypeRepr,
-                                          MRE->getNameLoc().getBaseNameLoc());
-      return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-    }
-    
-    if (MRE->getName() == TC.Context.Id_Type) {
-      assert(!TyExpr->isImplicit() && InnerTypeRepr &&
-             "This doesn't work on implicit TypeExpr's, "
-             "TypeExpr should have been built correctly in the first place");
-      auto *NewTypeRepr =
-        new (TC.Context) MetatypeTypeRepr(InnerTypeRepr,
-                                          MRE->getNameLoc().getBaseNameLoc());
-      return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-    }
+  // Fold member types.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+    return simplifyNestedTypeExpr(UDE);
   }
 
   // Fold T? into an optional type when T is a TypeExpr.
@@ -1324,7 +1416,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
             return nullptr;
         else
           return nullptr;
-      }
+      } else
+        return nullptr;
 
       // Add the rhs which is just a TypeExpr
       auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
@@ -1418,9 +1511,18 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
       } else {
-        if (emitErrors)
-          TC.diagnose(expr->getLoc(),
-                      diag::expr_swift_keypath_invalid_component);
+        if (emitErrors) {
+          // \(<expr>) may be an attempt to write a string interpolation outside
+          // of a string literal; diagnose this case specially.
+          if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
+            TC.diagnose(expr->getLoc(),
+                        diag::expr_string_interpolation_outside_string);
+          } else {
+            TC.diagnose(expr->getLoc(),
+                        diag::expr_swift_keypath_invalid_component);
+          }
+        }
+        components.push_back(KeyPathExpr::Component());
         return;
       }
     }

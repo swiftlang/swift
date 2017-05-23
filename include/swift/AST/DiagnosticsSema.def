@@ -450,6 +450,10 @@ ERROR(expr_swift_keypath_unimplemented_component,none,
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "KeyPath value type %0 cannot be converted to contextual type %1",
       (Type, Type))
+ERROR(expr_string_interpolation_outside_string,none,
+      "string interpolation can only appear inside a string literal", ())
+ERROR(unsupported_keypath_tuple_element_reference,none,
+      "key path cannot reference tuple elements", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -1413,6 +1417,19 @@ ERROR(witness_self_non_subtype,none,
       "(%2) because it uses 'Self' in a non-parameter, non-result type "
       "position",
       (Type, DeclName, Type))
+ERROR(witness_self_same_type,none,
+      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
+      " (in protocol %5) due to same-type requirement involving 'Self'",
+      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
+       DeclName, Type))
+WARNING(witness_self_same_type_warn,none,
+      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
+      " (in protocol %5) due to same-type requirement involving 'Self'",
+      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
+       DeclName, Type))
+NOTE(witness_self_weaken_same_type,none,
+      "consider weakening the same-type requirement %0 == %1 to a superclass "
+      "requirement", (Type, Type))
 ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
@@ -2035,7 +2052,7 @@ ERROR(broken_decodable_requirement,none,
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does match any stored properties", (Identifier))
 NOTE(codable_non_conforming_property_here,none,
-     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Identifier))
+     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
 NOTE(codable_non_decoded_property_here,none,
      "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
 NOTE(codable_codingkeys_type_is_not_an_enum_here,none,

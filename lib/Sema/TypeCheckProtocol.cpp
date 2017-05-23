@@ -2794,6 +2794,50 @@ witnessHasImplementsAttrForRequirement(ValueDecl *witness,
   return false;
 }
 
+/// Determine the given witness has a same-type constraint constraining the
+/// given 'Self' type, and return the
+///
+/// \returns None if there is no such constraint; a non-empty optional that
+/// may have the \c RequirementRepr for the actual constraint.
+static Optional<RequirementRepr *>
+getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
+  auto genericSig =
+    witness->getInnermostDeclContext()->getGenericSignatureOfContext();
+  if (!genericSig) return None;
+
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::SameType)
+      continue;
+
+    if (req.getFirstType()->getAnyNominal() == selfClass ||
+        req.getSecondType()->getAnyNominal() == selfClass) {
+      // Try to find the requirement-as-written.
+      GenericParamList *genericParams = nullptr;
+
+      if (auto func = dyn_cast<AbstractFunctionDecl>(witness))
+        genericParams = func->getGenericParams();
+      else if (auto subscript = dyn_cast<SubscriptDecl>(witness))
+        genericParams = subscript->getGenericParams();
+      if (genericParams) {
+        for (auto &req : genericParams->getRequirements()) {
+          if (req.getKind() != RequirementReprKind::SameType)
+            continue;
+
+          if (req.getFirstType()->getAnyNominal() == selfClass ||
+              req.getSecondType()->getAnyNominal() == selfClass)
+            return &req;
+        }
+      }
+
+      // Form an optional(nullptr) to indicate that we don't have the
+      // requirement itself.
+      return nullptr;
+    }
+  }
+
+  return None;
+}
+
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -3075,6 +3119,31 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                              requirement->getFullName(),
                              conformance->getType());
             });
+        }
+      } else if (selfKind.requirement) {
+        if (auto constraint = getAdopteeSelfSameTypeConstraint(classDecl,
+                                                               witness)) {
+          // A "Self ==" constraint works incorrectly with subclasses. Complain.
+          auto proto = Conformance->getProtocol();
+          auto &diags = proto->getASTContext().Diags;
+          diags.diagnose(witness->getLoc(),
+                         proto->getASTContext().LangOpts.isSwiftVersion3()
+                           ? diag::witness_self_same_type_warn
+                           : diag::witness_self_same_type,
+                         witness->getDescriptiveKind(),
+                         witness->getFullName(),
+                         Conformance->getType(),
+                         requirement->getDescriptiveKind(),
+                         requirement->getFullName(),
+                         proto->getDeclaredType());
+
+          if (auto requirementRepr = *constraint) {
+            diags.diagnose(requirementRepr->getEqualLoc(),
+                           diag::witness_self_weaken_same_type,
+                           requirementRepr->getFirstType(),
+                           requirementRepr->getSecondType())
+              .fixItReplace(requirementRepr->getEqualLoc(), ":");
+          }
         }
       }
 
@@ -6058,7 +6127,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           }
         }
 
-        if (kind && !hasExplicitObjCName(classDecl) &&
+        if (kind && getLangOpts().EnableNSKeyedArchiverDiagnostics &&
+            !hasExplicitObjCName(classDecl) &&
             !classDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>() &&
             !classDecl->getAttrs()
               .hasAttribute<NSKeyedArchiverEncodeNonGenericSubclassesOnlyAttr>()) {
@@ -6648,9 +6718,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   OpenedTypeMap replacements;
   auto genericSig = protocolExtension->getGenericSignature();
   
-  cs.openGeneric(protocolExtension, protocolExtension,
-                 genericSig->getGenericParams(),
-                 genericSig->getRequirements(), false,
+  cs.openGeneric(protocolExtension, protocolExtension, genericSig, false,
                  ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type variable to the provided type.
@@ -6692,5 +6760,5 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
       !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);
 
-  return ty;
+  return (!ty || ty->hasError()) ? Type() : ty;
 }

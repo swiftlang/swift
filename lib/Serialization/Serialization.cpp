@@ -1296,6 +1296,7 @@ void Serializer::writeNormalConformance(
 
   conformance->forEachValueWitness(nullptr,
     [&](ValueDecl *req, Witness witness) {
+      ++numValueWitnesses;
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
       assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
@@ -1319,11 +1320,10 @@ void Serializer::writeNormalConformance(
 
         // Requirements come at the end.
       } else {
-        data.push_back(0);
+        data.push_back(/*number of generic parameters*/0);
       }
 
       data.push_back(witness.getSubstitutions().size());
-      ++numValueWitnesses;
   });
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
@@ -1675,6 +1675,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::ExtensionDecl: {
     auto ext = cast<ExtensionDecl>(DC);
     Type baseTy = ext->getExtendedType();
+    assert(!baseTy->hasUnboundGenericType());
     writeCrossReference(baseTy->getAnyNominal(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
@@ -2424,6 +2425,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
+    assert(!baseTy->hasUnboundGenericType());
 
     // FIXME: Use the canonical type here in order to minimize circularity
     // issues at deserialization time. A known problematic case here is
@@ -2958,7 +2960,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addIdentifierRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getInterfaceType()),
-                                  !!elem->getArgumentInterfaceType(),
+                                  elem->hasAssociatedValues(),
                                   elem->isImplicit(),
                                   (unsigned)RawValueKind,
                                   Negative,
@@ -4430,6 +4432,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();
+        assert(!extendedTy->hasUnboundGenericType());
         const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
         extensionDecls[extendedNominal->getName()]
           .push_back({ extendedNominal, addDeclRef(D) });

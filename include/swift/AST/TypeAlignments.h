@@ -47,6 +47,7 @@ namespace swift {
   class Substitution;
   class TypeVariableType;
   class TypeBase;
+  class TypeDecl;
   class ValueDecl;
 
   /// We frequently use three tag bits on all of these types.
@@ -87,6 +88,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::AssociatedTypeDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericTypeParamDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::OperatorDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolDecl, swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ValueDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ExtensionDecl, swift::DeclAlignInBits)
 

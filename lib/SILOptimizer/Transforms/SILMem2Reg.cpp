@@ -865,8 +865,19 @@ bool MemoryToRegisters::run() {
         DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
                            << *ASI);
         I++;
-        ASI->eraseFromParent();
-        NumInstRemoved++;
+        if (ASI->use_empty()) {
+          // After removing all the allocation instructions the ASI should not
+          // have any uses.
+          ASI->eraseFromParent();
+          NumInstRemoved++;
+        } else {
+          // Handle a corner case where the ASI still has uses:
+          // This can come up if the source contains a withUnsafePointer where
+          // the pointer escapes. It's illegal code but we should not crash.
+          // Re-insert a dealloc_stack so that the verifier is happy.
+          B.setInsertionPoint(std::next(ASI->getIterator()));
+          B.createDeallocStack(ASI->getLoc(), ASI);
+        }
         Changed = true;
         continue;
       }
