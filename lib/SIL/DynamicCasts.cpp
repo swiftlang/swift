@@ -633,19 +633,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
   if (source->isBridgeableObjectType() && mayBridgeToObjectiveC(M, target)) {
     // Try to get the ObjC type which is bridged to target type.
     assert(!target.isAnyExistentialType());
-    if (Type ObjCTy = M->getASTContext().getBridgedToObjC(M, target)) {
-      // If the bridged ObjC type is known, check if
-      // source type can be cast into it.
-      auto canCastToBridgedType = classifyDynamicCast(M, source,
-          ObjCTy->getCanonicalType(),
-          /* isSourceTypeExact */ false, isWholeModuleOpts);
-      // Temper our enthusiasm if the bridge from the ObjC type to the target
-      // value type may fail.
-      if (canCastToBridgedType == DynamicCastFeasibility::WillSucceed
-          && M->getASTContext().isObjCClassWithMultipleSwiftBridgedTypes(ObjCTy))
-        return DynamicCastFeasibility::MaySucceed;
-      return canCastToBridgedType;
-    }
+    // ObjC-to-Swift casts may fail. And in most cases it is impossible to
+    // statically predict the outcome. So, let's be conservative here.
     return DynamicCastFeasibility::MaySucceed;
   }
   
