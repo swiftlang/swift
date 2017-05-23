@@ -298,6 +298,7 @@ func disallowSubscriptingOnIntegers() {
 
     r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
+
     r2[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
     r3[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
     (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
