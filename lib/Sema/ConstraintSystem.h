@@ -500,6 +500,9 @@ typedef std::pair<GenericTypeParamType *, TypeVariableType *> OpenedType;
 
 typedef llvm::DenseMap<GenericTypeParamType *, TypeVariableType *> OpenedTypeMap;
 
+typedef std::pair<UnboundGenericType *, ArrayRef<TypeVariableType *>>
+    OpenedUnboundGenericType;
+
 /// \brief A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -915,6 +918,12 @@ private:
   /// run through various diagnostics passes without actually mutating
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
+
+  /// Maps expressions that reference generic types to a pair consisting
+  /// of the original unbound generic type of the declaration, and the
+  /// type variables of the opened type.
+  llvm::DenseMap<const Expr *, OpenedUnboundGenericType>
+    OpenedUnboundGenericTypes;
 
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
@@ -1945,6 +1954,15 @@ public:
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
+
+  /// Record the set of opened types for the given locator.
+  void recordOpenedUnboundGenericType(
+    Expr *expr,
+    UnboundGenericType *unboundType,
+    OpenedTypeMap &replacements);
+
+  std::pair<UnboundGenericType *, ArrayRef<TypeVariableType *>>
+  getOpenedUnboundGenericType(Expr *expr);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(

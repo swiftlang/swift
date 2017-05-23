@@ -120,7 +120,7 @@ func f(a : MyTypeWithHashable<Int, Int>) {
 
 // Unqualified lookup of generic typealiases nested inside generic contexts
 class GenericClass<T> {
-  typealias TA<U> = MyType<T, U>
+  typealias TA<U> = MyType<T, U> // expected-note 4{{'U' declared as parameter to type 'GenericClass.TA'}}
   typealias TAI<U> = MyType<Int, U>
 
   func testCapture<S>(s: S, t: T) -> TA<S> {
@@ -225,62 +225,63 @@ let _: ConcreteStruct.O<Int> = ConcreteStruct.O<Int>(123)
 
 // Qualified lookup of generic typealiases nested inside generic contexts
 //
-// FIXME marks cases which still don't work correctly, and either produce a
-// spurious diagnostic, or are actually invalid and do not diagnose.
-//
-// This occurs because the constraint solver does the wrong thing with an
-// UnresolvedSpecializeExpr applied to a generic typealias.
-//
-// In the other cases, we manage to fold the UnresolvedSpecializeExpr in the
-// precheckExpression() phase, which handles generic typealiases correctly.
+// FIXME: Some of the diagnostics are crap.
 
-let _ = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
-let _ = GenericClass.TA<Float>(a: 1, b: 4.0)
+let _ = GenericClass.TA<String>(a: "", b: 1) // expected-error {{'Int' is not convertible to 'String'}}
+let _ = GenericClass.TA<String>(a: 1, b: "")
 
-let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _ = GenericClass<Int>.TA(a: 1, b: 4.0)
+let _ = GenericClass<Int>.TA(a: "", b: 1) // expected-error {{generic parameter 'U' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
 
-let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
+let _ = GenericClass<Int>.TA(a: 1, b: "")
 
-let _: GenericClass.TA = GenericClass.TA(a: 4.0, b: 1)
-let _: GenericClass.TA = GenericClass.TA(a: 1, b: 4.0)
+let _ = GenericClass<Int>.TA<String>(a: "", b: 1) // expected-error {{'String' is not convertible to 'Int'}}
+let _ = GenericClass<Int>.TA<String>(a: 1, b: "")
 
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
+let _: GenericClass.TA = GenericClass.TA(a: "", b: 1)
+let _: GenericClass.TA = GenericClass.TA(a: 1, b: "")
 
-let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
+let _: GenericClass.TA = GenericClass.TA<String>(a: "", b: 1) // expected-error {{'Int' is not convertible to 'String'}}
+let _: GenericClass.TA = GenericClass.TA<String>(a: 1, b: "")
 
-let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
+let _: GenericClass.TA = GenericClass<Int>.TA(a: "", b: 1) // expected-error {{generic parameter 'U' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
 
-let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA'}}
-let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: 4.0)
+let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: "")
 
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'GenericClass<Int>.TA'}}
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'GenericClass<Int>.TA'}}
+let _: GenericClass.TA = GenericClass<Int>.TA<String>(a: "", b: 1) // expected-error {{'(a: String, b: Int)' is not convertible to '(a: Int, b: String)'}}
+let _: GenericClass.TA = GenericClass<Int>.TA<String>(a: 1, b: "")
 
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
+let _: GenericClass<Int>.TA = GenericClass.TA(a: "", b: 1) // expected-error {{cannot convert value of type 'MyType<String, Int>' to specified type 'GenericClass<Int>.TA'}}
+let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: "")
 
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
+let _: GenericClass<Int>.TA = GenericClass.TA<String>(a: "", b: 1) // expected-error {{'Int' is not convertible to 'String'}}
+let _: GenericClass<Int>.TA = GenericClass.TA<String>(a: 1, b: "")
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'MyType<Int, Float>'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: "", b: 1) // expected-error {{generic parameter 'U' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'MyType<Int, Float>'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: "")
 
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA<String>(a: "", b: 1) // expected-error {{'(a: String, b: Int)' is not convertible to '(a: Int, b: String)'}}
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA<String>(a: 1, b: "")
 
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
+let _: GenericClass<Int>.TA<String> = GenericClass.TA(a: "", b: 1) // expected-error {{cannot convert value of type 'MyType<String, Int>' to specified type 'MyType<Int, String>'}}
+let _: GenericClass<Int>.TA<String> = GenericClass.TA(a: 1, b: "")
 
-func takesUnsugaredType2(m: MyType<Int, Float>) {}
-func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
+let _: GenericClass<Int>.TA<String> = GenericClass.TA<String>(a: "", b: 1) // expected-error {{'Int' is not convertible to 'String'}}
+let _: GenericClass<Int>.TA<String> = GenericClass.TA<String>(a: 1, b: "")
+
+let _: GenericClass<Int>.TA<String> = GenericClass<Int>.TA(a: "", b: 1) // expected-error {{generic parameter 'U' could not be inferred}}
+// expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+
+let _: GenericClass<Int>.TA<String> = GenericClass<Int>.TA(a: 1, b: "")
+
+let _: GenericClass<Int>.TA<String> = GenericClass<Int>.TA<String>(a: "", b: 1) // expected-error {{'(a: String, b: Int)' is not convertible to '(a: Int, b: String)'}}
+let _: GenericClass<Int>.TA<String> = GenericClass<Int>.TA<String>(a: 1, b: "")
+
+func takesUnsugaredType2(m: MyType<Int, String>) {}
+func takesSugaredType2(m: GenericClass<Int>.TA<String>) {
   takesUnsugaredType2(m: m)
 }
 

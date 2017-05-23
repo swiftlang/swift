@@ -636,6 +636,42 @@ void ConstraintSystem::recordOpenedTypes(
                        replacements.size()) });
 }
 
+/// Record the set of opened types for the given locator.
+void ConstraintSystem::recordOpenedUnboundGenericType(
+    Expr *expr,
+    UnboundGenericType *unboundType,
+    OpenedTypeMap &replacements) {
+  auto innerParams = unboundType->getDecl()->getGenericSignature()
+      ->getInnermostGenericParams();
+  auto typeVars
+    = Allocator.Allocate<TypeVariableType *>(innerParams.size());
+
+  for (unsigned i = 0, e = innerParams.size(); i < e; i++) {
+    auto paramTy = innerParams[i];
+    auto found = replacements.find(
+      cast<GenericTypeParamType>(paramTy->getCanonicalType()));
+    assert(found != replacements.end());
+    typeVars[i] = found->second;
+  }
+
+  auto typeVarArray = ArrayRef<TypeVariableType *>(typeVars,
+                                                   innerParams.size());
+  auto result = OpenedUnboundGenericTypes.insert(
+    std::make_pair(expr,
+                   std::make_pair(unboundType, typeVarArray)));
+  assert(result.second);
+  (void) result;
+}
+
+std::pair<UnboundGenericType *, ArrayRef<TypeVariableType *>>
+ConstraintSystem::getOpenedUnboundGenericType(Expr *expr) {
+  auto found = OpenedUnboundGenericTypes.find(expr);
+  if (found == OpenedUnboundGenericTypes.end())
+    return std::make_pair(nullptr, ArrayRef<TypeVariableType *>());
+
+  return found->second;
+}
+
 /// Determine how many levels of argument labels should be removed from the
 /// function type when referencing the given declaration.
 static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
@@ -744,12 +780,23 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                         TR_InExpression,
                                         isSpecialized);
 
-    // Open the type.
-    type = openUnboundGenericType(type, locator);
-
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
       return { type, type };
+
+    if (auto *unboundType = type->getAs<UnboundGenericType>()) {
+      // If the outermost type is an unbound generic, record the
+      // replacements so that UnresolvedSpecializeExpr can do its
+      // thing.
+      OpenedTypeMap replacements;
+      type = openUnboundGenericType(unboundType, locator, replacements);
+      auto *locatorPtr = getConstraintLocator(locator);
+      if (auto *anchor = locatorPtr->getAnchor())
+        recordOpenedUnboundGenericType(anchor, unboundType, replacements);
+    } else {
+      assert(!type->hasUnboundGenericType() &&
+             !type->hasTypeParameter());
+    }
 
     // If it's a value reference, refer to the metatype.
     type = MetatypeType::get(type);
@@ -1018,17 +1065,28 @@ ConstraintSystem::getTypeOfMemberReference(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
-    auto memberTy = TC.substMemberTypeWithBase(DC->getParentModule(),
-                                               typeDecl, baseObjTy);
+    auto type = TC.substMemberTypeWithBase(DC->getParentModule(),
+                                           typeDecl, baseObjTy);
 
-    // Open the type if it was a reference to a generic type.
-    memberTy = openUnboundGenericType(memberTy, locator);
+    if (auto *unboundType = type->getAs<UnboundGenericType>()) {
+      // If the outermost type is an unbound generic, record the
+      // replacements so that UnresolvedSpecializeExpr can do its
+      // thing.
+      OpenedTypeMap replacements;
+      type = openUnboundGenericType(unboundType, locator, replacements);
+      auto *locatorPtr = getConstraintLocator(locator);
+      if (auto *anchor = locatorPtr->getAnchor())
+        recordOpenedUnboundGenericType(anchor, unboundType, replacements);
+    } else {
+      assert(!type->hasUnboundGenericType() &&
+             !type->hasTypeParameter());
+    }
 
     // Wrap it in a metatype.
-    memberTy = MetatypeType::get(memberTy);
+    type = MetatypeType::get(type);
 
-    auto openedType = FunctionType::get(baseObjTy, memberTy);
-    return { openedType, memberTy };
+    auto openedType = FunctionType::get(baseObjTy, type);
+    return { openedType, type };
   }
 
   // Figure out the declaration context to use when opening this type.

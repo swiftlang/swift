@@ -1362,9 +1362,20 @@ namespace {
         type = E->getTypeLoc().getType();
       }
       if (!type || type->hasError()) return Type();
-      
+
       auto locator = CS.getConstraintLocator(E);
-      type = CS.openUnboundGenericType(type, locator);
+
+      if (auto *unboundType = type->getAs<UnboundGenericType>()) {
+        // If the outermost type is an unbound generic, record the
+        // replacements so that UnresolvedSpecializeExpr can do its
+        // thing.
+        OpenedTypeMap replacements;
+        type = CS.openUnboundGenericType(unboundType, locator, replacements);
+        CS.recordOpenedUnboundGenericType(E, unboundType, replacements);
+      } else {
+        type = CS.openUnboundGenericType(type, locator);
+      }
+
       E->getTypeLoc().setType(type, /*validated=*/true);
       return MetatypeType::get(type);
     }
@@ -1532,30 +1543,28 @@ namespace {
                     diag::while_parsing_as_left_angle_bracket);
         return Type();
       }
-      
+
       if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
-        if (BoundGenericType *bgt
-              = meta->getInstanceType()->getAs<BoundGenericType>()) {
-          ArrayRef<Type> typeVars = bgt->getGenericArgs();
+        auto locator = CS.getConstraintLocator(expr->getSubExpr());
+
+        auto openedTypes = CS.getOpenedUnboundGenericType(expr->getSubExpr());
+        if (openedTypes.first) {
           MutableArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.
-          if (specializations.size() > typeVars.size()) {
+          if (specializations.size() > openedTypes.second.size()) {
             tc.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
-                        bgt->getDecl()->getName(),
-                        typeVars.size(), specializations.size(),
+                        openedTypes.first->getDecl()->getName(),
+                        openedTypes.second.size(), specializations.size(),
                         false)
               .highlight(SourceRange(expr->getLAngleLoc(),
                                      expr->getRAngleLoc()));
-            tc.diagnose(bgt->getDecl(), diag::generic_type_declared_here,
-                        bgt->getDecl()->getName());
             return Type();
           }
 
           // Bind the specified generic arguments to the type variables in the
           // open type.
-          auto locator = CS.getConstraintLocator(expr);
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             if (tc.validateType(specializations[i], CS.DC,
                                 (TR_InExpression |
@@ -1563,10 +1572,13 @@ namespace {
               return Type();
 
             CS.addConstraint(ConstraintKind::Equal,
-                             typeVars[i], specializations[i].getType(),
+                             openedTypes.second[i],
+                             specializations[i].getType(),
                              locator);
           }
-          
+
+          // Return the original type unchanged -- but now some of the type
+          // variables have constraints placed on them.
           return baseTy;
         } else {
           tc.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type,
