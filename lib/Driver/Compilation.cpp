@@ -165,6 +165,9 @@ namespace driver {
     /// Cumulative result of PerformJobs(), accumulated from subprocesses.
     int Result = EXIT_SUCCESS;
 
+    /// True if any Job crashed.
+    bool AnyAbnormalExit = false;
+
     /// Timers for monitoring execution time of subprocesses.
     llvm::TimerGroup DriverTimerGroup {"driver", "Driver Compilation Time"};
     llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
@@ -470,6 +473,7 @@ namespace driver {
 
       // Since the task signalled, unconditionally set result to -2.
       Result = -2;
+      AnyAbnormalExit = true;
 
       return TaskFinishedResponse::StopExecution;
     }
@@ -689,6 +693,10 @@ namespace driver {
         Result = Comp.Diags.hadAnyError();
       return Result;
     }
+
+    bool hadAnyAbnormalExit() {
+      return AnyAbnormalExit;
+    }
   };
 } // namespace driver
 } // namespace swift
@@ -816,8 +824,7 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
   return true;
 }
 
-int Compilation::performJobsImpl() {
-
+int Compilation::performJobsImpl(bool &abnormalExit) {
   PerformJobsState State(*this);
 
   State.scheduleInitialJobs();
@@ -833,6 +840,7 @@ int Compilation::performJobsImpl() {
                            InputInfo);
   }
 
+  abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }
 
@@ -917,15 +925,14 @@ int Compilation::performJobs() {
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
-  
-  int result = performJobsImpl();
+
+  bool abnormalExit;
+  int result = performJobsImpl(abnormalExit);
 
   if (!SaveTemps) {
-    // FIXME: Do we want to be deleting temporaries even when a child process
-    // crashes?
-    for (auto &path : TempFilePaths) {
-      // Ignore the error code for removing temporary files.
-      (void)llvm::sys::fs::remove(path);
+    for (const auto &pathPair : TempFilePaths) {
+      if (!abnormalExit || pathPair.getValue() == PreserveOnSignal::No)
+        (void)llvm::sys::fs::remove(pathPair.getKey());
     }
   }
 
@@ -945,7 +952,7 @@ const char *Compilation::getAllSourcesPath() const {
       llvm::report_fatal_error("unable to create list of input sources");
     }
     auto *mutableThis = const_cast<Compilation *>(this);
-    mutableThis->addTemporaryFile(Buffer.str());
+    mutableThis->addTemporaryFile(Buffer.str(), PreserveOnSignal::Yes);
     mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
   }
   return AllSourceFilesPath;
