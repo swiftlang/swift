@@ -58,8 +58,9 @@ class TestJSONEncoder : TestJSONEncoderSuper {
 
   func testEncodingTopLevelStructuredClass() {
     // Person is a class with multiple fields.
+    let expectedJSON = "{\"name\":\"Johnny Appleseed\",\"email\":\"appleseed@apple.com\"}".data(using: .utf8)!
     let person = Person.testValue
-    _testRoundTrip(of: person)
+    _testRoundTrip(of: person, expectedJSON: expectedJSON)
   }
 
   func testEncodingTopLevelDeepStructuredType() {
@@ -471,13 +472,21 @@ fileprivate class Person : Codable, Equatable {
   let name: String
   let email: String
 
-  init(name: String, email: String) {
+  // FIXME: This property is present only in order to test the expected result of Codable synthesis in the compiler.
+  // We want to test against expected encoded output (to ensure this generates an encodeIfPresent call), but we need an output format for that.
+  // Once we have a VerifyingEncoder for compiler unit tests, we should move this test there.
+  let website: URL?
+
+  init(name: String, email: String, website: URL? = nil) {
     self.name = name
     self.email = email
+    self.website = website
   }
 
   static func ==(_ lhs: Person, _ rhs: Person) -> Bool {
-    return lhs.name == rhs.name && lhs.email == rhs.email
+    return lhs.name == rhs.name &&
+           lhs.email == rhs.email &&
+           lhs.website == rhs.website
   }
 
   static var testValue: Person {
