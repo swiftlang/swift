@@ -1457,6 +1457,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
                      Type BridgedTargetTy,
                      SILBasicBlock *SuccessBB,
                      SILBasicBlock *FailureBB) {
+  // FIXME (rdar://problem/32319580): The code below handles a cast from a Swift
+  // value type to a subclass of its bridged type by emitting an unconditional
+  // cast, even if the cast is supposed to be conditional.
+  if (BridgedSourceTy->isBindableToSuperclassOf(BridgedTargetTy))
+    return nullptr;
 
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
@@ -1663,8 +1668,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       CastedValue = SILValue(
           (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
     } else if (ConvTy.isExactSuperclassOf(DestTy)) {
-      CastedValue = SILValue(
-          Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
+      // FIXME (rdar://problem/32319580): Emit an unconditional cast if
+      // unconditional, or a conditional cast if conditional
+      llvm_unreachable("should have bailed out above");
     } else if (ConvTy.getSwiftRValueType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
                                               DestTy.getSwiftRValueType()) ||
