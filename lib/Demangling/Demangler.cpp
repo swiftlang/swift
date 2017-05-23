@@ -442,6 +442,10 @@ NodePointer Demangler::demangleMultiSubstitutions() {
   int RepeatCount = -1;
   while (true) {
     char c = nextChar();
+    if (c == 0) {
+      // End of text.
+      return nullptr;
+    }
     if (isLowerLetter(c)) {
       // It's a substitution with an index < 26.
       NodePointer Nd = pushMultiSubstitutions(RepeatCount, c - 'a');
