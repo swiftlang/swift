@@ -409,6 +409,72 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)PDFDocument(im)beginFindString:withOptions:",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "NSString.CompareOptions",
+    "ModuleName": "Quartz"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)PDFDocument(im)beginFindString:withOptions:",
+    "LeftComment": "beginFindString(_:withOptions:)",
+    "RightUsr": "",
+    "RightComment": "beginFindString(_:with:)",
+    "ModuleName": "Quartz"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)PDFDocument(im)beginFindStrings:withOptions:",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "NSString.CompareOptions",
+    "ModuleName": "Quartz"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)PDFDocument(im)beginFindStrings:withOptions:",
+    "LeftComment": "beginFind(_:withOptions:)",
+    "RightUsr": "",
+    "RightComment": "beginFind(_:with:)",
+    "ModuleName": "Quartz"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3",
+    "LeftUsr": "c:objc(cs)PDFDocument(im)findString:fromSelection:withOptions:",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "NSString.CompareOptions",
+    "ModuleName": "Quartz"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)PDFDocument(im)findString:fromSelection:withOptions:",
+    "LeftComment": "findString(_:from:withOptions:)",
+    "RightUsr": "",
+    "RightComment": "findString(_:from:with:)",
+    "ModuleName": "Quartz"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)PDFThumbnailView(im)selectedPages",
@@ -2510,6 +2576,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "Range<Int>",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1:0",
     "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs5RangeSc__S0_",
@@ -3448,6 +3536,28 @@
     "NodeAnnotation": "WrapOptional",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)EKEventStore(im)sourceWithIdentifier:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)defaultCalendarForNewReminders",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)calendarItemWithIdentifier:",
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "",
@@ -5285,6 +5395,28 @@
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSAnimationContext(cm)currentContext",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSAppearance(cm)currentAppearance",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "SetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSAppearance(cm)setCurrentAppearance:",
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "",
@@ -7548,6 +7680,39 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSDocument(cm)autosavesInPlace",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSDocument(cm)preservesVersions",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSDocument(cm)autosavesDrafts",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSDocument(im)printDocument:",
@@ -8592,17 +8757,6 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "1",
-    "LeftUsr": "c:objc(cs)NSGroupTouchBarItem(cm)groupItemWithIdentifier:items:",
-    "LeftComment": "NSTouchBarItemIdentifier",
-    "RightUsr": "",
-    "RightComment": "NSTouchBarItem.Identifier",
-    "ModuleName": "AppKit"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
@@ -9479,6 +9633,17 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSAccessibilityRole",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSMutableFontCollection(cm)fontCollectionWithAllAvailableDescriptors",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "AppKit"
   },
   {
@@ -10881,6 +11046,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "SetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSScrollView(cm)setRulerViewClass:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSScrollView(cm)rulerViewClass",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSScroller(cm)isCompatibleWithOverlayScrollers",
@@ -11005,6 +11192,50 @@
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)NSScrubberLayout(cm)layoutAttributesClass",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSScrubberLayout(im)scrubberContentSize",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSScrubberLayout(im)shouldInvalidateLayoutForSelectionChange",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSScrubberLayout(im)shouldInvalidateLayoutForHighlightChange",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AppKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSScrubberLayout(im)automaticallyMirrorsInRightToLeftLayout",
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "",
@@ -15705,6 +15936,28 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AVMediaCharacteristic",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVContentKeyRequest(im)makeStreamingContentKeyRequestDataForApp:contentIdentifier:options:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVContentKeySession(cm)contentKeySessionWithKeySystem:storageDirectoryAtURL:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "AVFoundation"
   },
   {
@@ -30793,11 +31046,6 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)XCTestCase(im)runActivityNamed:inScope:",
-    "Index": 2
-  },
-  {
-    "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)XCUIElement(cm)performWithKeyModifiers:block:",
     "Index": 2
   },
@@ -30862,6 +31110,10 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "s:8Dispatch0A4DataV9copyBytesys29UnsafeMutableRawBufferPointerV2to_s14CountableRangeVySiG4fromtF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)PDFDocument(im)findString:withOptions:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -31641,15 +31893,7 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:orientation:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:orientation:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",

@@ -1432,6 +1432,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)INImage(cm)imageWithURL:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Intents"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)INImage(cm)imageWithCGImage:",
@@ -3522,6 +3533,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVContentKeyRequest(im)makeStreamingContentKeyRequestDataForApp:contentIdentifier:options:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVContentKeySession(cm)contentKeySessionWithKeySystem:storageDirectoryAtURL:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AVMediaSelectionOption(im)hasMediaCharacteristic:",
@@ -3682,6 +3715,17 @@
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AVOutputSettingsPreset",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVPersistableContentKeyRequest(im)persistableContentKeyFromKeyVendorResponse:options:error:",
+    "LeftComment": "persistableContentKey(fromKeyVendorResponse:options:error:)",
+    "RightUsr": "",
+    "RightComment": "persistableContentKey(fromKeyVendorResponse:options:)",
     "ModuleName": "AVFoundation"
   },
   {
@@ -4699,6 +4743,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "Range<Int>",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1:0",
     "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs5RangeSc__S0_",
@@ -5546,6 +5612,83 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLBuffer(im)newTextureWithDescriptor:offset:bytesPerRow:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)blitCommandEncoder",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)renderCommandEncoderWithDescriptor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)computeCommandEncoder",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)parallelRenderCommandEncoderWithDescriptor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLCommandQueue(im)commandBuffer",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLCommandQueue(im)commandBufferWithUnretainedReferences",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBytes:length:atIndex:",
@@ -5645,6 +5788,105 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newCommandQueue",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newCommandQueueWithMaxCommandBufferCount:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newHeapWithDescriptor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newBufferWithLength:options:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newBufferWithBytes:length:options:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newBufferWithBytesNoCopy:length:options:deallocator:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newDepthStencilStateWithDescriptor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newTextureWithDescriptor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newSamplerStateWithDescriptor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLDevice(im)newDefaultLibrary",
@@ -5656,12 +5898,34 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLDevice(im)newFence",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)MTLFunctionConstantValues(im)setConstantValue:type:atIndex:",
     "LeftComment": "setConstantValue(_:type:at:)",
     "RightUsr": "",
     "RightComment": "setConstantValue(_:type:index:)",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLParallelRenderCommandEncoder(im)renderCommandEncoder",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
     "ModuleName": "Metal"
   },
   {
@@ -5861,6 +6125,61 @@
     "RightUsr": "",
     "RightComment": "setColorStoreAction(_:index:)",
     "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLTexture(im)newTextureViewWithPixelFormat:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)MTLTexture(im)newTextureViewWithPixelFormat:textureType:levels:slices:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SKCloudServiceSetupOptionsAffiliateTokenKey",
+    "LeftComment": "affiliateTokenKey",
+    "RightUsr": "",
+    "RightComment": "affiliateToken",
+    "ModuleName": "StoreKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SKCloudServiceSetupOptionsCampaignTokenKey",
+    "LeftComment": "campaignTokenKey",
+    "RightUsr": "",
+    "RightComment": "campaignToken",
+    "ModuleName": "StoreKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SKPaymentQueue(im)resumeDownloads:",
+    "LeftComment": "resume(_:)",
+    "RightUsr": "",
+    "RightComment": "resumeDownloads(_:)",
+    "ModuleName": "StoreKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -11962,11 +12281,6 @@
     "Index": 3
   },
   {
-    "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)XCTestCase(im)runActivityNamed:inScope:",
-    "Index": 2
-  },
-  {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MPSCNNBinaryKernel(im)encodeToCommandBuffer:primaryImage:secondaryImage:destinationImage:"
   },
@@ -12220,6 +12534,26 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLDevice(im)newTextureWithDescriptor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:options:reflection:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:options:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLFunction(im)newIndirectArgumentEncoderWithBufferIndex:"
   },
   {
@@ -12233,6 +12567,18 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setTileSamplerState:atIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setTileSamplerStates:withRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)MTLTexture(im)newTextureViewWithPixelFormat:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -12493,6 +12839,10 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)UITextDropDelegate(im)textDroppableView:willPerformDrop:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)UITextDropDelegate(im)textDroppableView:previewForDroppingAllItemsWithDefault:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -12905,6 +13255,14 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)PKPaymentAuthorizationViewControllerDelegate(im)paymentAuthorizationViewController:didSelectPaymentMethod:handler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CXCallController(im)requestTransactionWithActions:completion:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CXCallController(im)requestTransactionWithAction:completion:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",

@@ -12,28 +12,6 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2:1:0",
-    "LeftUsr": "c:objc(pl)INSearchCallHistoryIntentHandling(im)resolveCallTypeForSearchCallHistory:withCompletion:",
-    "LeftComment": "INCallRecordTypeResolutionResult",
-    "RightUsr": "",
-    "RightComment": "INCallRecordTypeOptionsResolutionResult",
-    "ModuleName": "Intents"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)INSearchCallHistoryIntentHandling(im)resolveCallTypeForSearchCallHistory:withCompletion:",
-    "LeftComment": "resolveCallType(forSearchCallHistory:with:)",
-    "RightUsr": "",
-    "RightComment": "resolveCallTypes(forSearchCallHistory:with:)",
-    "ModuleName": "Intents"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "3:0",
@@ -119,6 +97,149 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)defaultCalendarForNewReminders",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)calendarItemWithIdentifier:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioChannelLayout(im)initWithLayoutTag:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioConverter(im)initFromFormat:toFormat:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithStreamDescription:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithStreamDescription:channelLayout:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initStandardFormatWithSampleRate:channels:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithCommonFormat:sampleRate:channels:interleaved:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioFormat(im)initWithSettings:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioNode(im)nameForInputBus:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioNode(im)nameForOutputBus:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioPCMBuffer(im)initWithPCMFormat:frameCapacity:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)AVAudioTime(im)extrapolateTimeFromAnchor:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -262,6 +383,61 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)attributesAtIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)dataFromRange:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)fileWrapperFromRange:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentAttributeKey",
+    "ModuleName": "UIKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -531,12 +707,56 @@
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2:0:0",
     "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
     "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NSAttributedStringKey",
     "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)readFromURL:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedString.DocumentReadingOptionKey",
+    "ModuleName": "UIKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -816,6 +1036,171 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "Range<Int>",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs5RangeSc__S0_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs11ClosedRangeSc__S0_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFT12charactersInGVs5RangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFT12charactersInGVs11ClosedRangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFT12charactersInGVs5RangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFT12charactersInGVs11ClosedRangeSc__T_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFScT8insertedSb17memberAfterInsertSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6insertFScT8insertedSb17memberAfterInsertSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6updateFT4withSc_GSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6updateFT4withSc_GSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFScGSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet6removeFScGSqSc_",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FV10Foundation12CharacterSet8containsFScSb",
+    "LeftComment": "UnicodeScalar",
+    "RightUsr": "",
+    "RightComment": "Unicode.Scalar",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "UnwrapOptional",
     "ChildIndex": "0",
     "LeftUsr": "s:FOV10Foundation8URLError4CodecFT8rawValueSi_GSqS1__",
@@ -834,149 +1219,6 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "CoreMotion"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSUndefinedAttributeType",
-    "LeftComment": "undefinedAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSUndefinedAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSInteger16AttributeType",
-    "LeftComment": "integer16AttributeType",
-    "RightUsr": "",
-    "RightComment": "NSInteger16AttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSInteger32AttributeType",
-    "LeftComment": "integer32AttributeType",
-    "RightUsr": "",
-    "RightComment": "NSInteger32AttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSInteger64AttributeType",
-    "LeftComment": "integer64AttributeType",
-    "RightUsr": "",
-    "RightComment": "NSInteger64AttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSDecimalAttributeType",
-    "LeftComment": "decimalAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSDecimalAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSDoubleAttributeType",
-    "LeftComment": "doubleAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSDoubleAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSFloatAttributeType",
-    "LeftComment": "floatAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSFloatAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSStringAttributeType",
-    "LeftComment": "stringAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSStringAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSBooleanAttributeType",
-    "LeftComment": "booleanAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSBooleanAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSDateAttributeType",
-    "LeftComment": "dateAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSDateAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSBinaryDataAttributeType",
-    "LeftComment": "binaryDataAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSBinaryDataAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSTransformableAttributeType",
-    "LeftComment": "transformableAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSTransformableAttributeType",
-    "ModuleName": "CoreData"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Var",
-    "NodeAnnotation": "Rename",
-    "ChildIndex": "0",
-    "LeftUsr": "c:@E@NSAttributeType@NSObjectIDAttributeType",
-    "LeftComment": "objectIDAttributeType",
-    "RightUsr": "",
-    "RightComment": "NSObjectIDAttributeType",
-    "ModuleName": "CoreData"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -1418,6 +1660,146 @@
     "OldPrintedName": "HMSignificantEventSunset",
     "NewPrintedName": "sunset",
     "NewTypeName": "HMSignificantEvent"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextEffectLetterpressStyle",
+    "OldPrintedName": "NSTextEffectLetterpressStyle",
+    "NewPrintedName": "letterpressStyle",
+    "NewTypeName": "NSAttributedString.TextEffectStyle"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPlainTextDocumentType",
+    "OldPrintedName": "NSPlainTextDocumentType",
+    "NewPrintedName": "plain",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRTFTextDocumentType",
+    "OldPrintedName": "NSRTFTextDocumentType",
+    "NewPrintedName": "rtf",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSRTFDTextDocumentType",
+    "OldPrintedName": "NSRTFDTextDocumentType",
+    "NewPrintedName": "rtfd",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSHTMLTextDocumentType",
+    "OldPrintedName": "NSHTMLTextDocumentType",
+    "NewPrintedName": "html",
+    "NewTypeName": "NSAttributedString.DocumentType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionOrientation",
+    "OldPrintedName": "NSTextLayoutSectionOrientation",
+    "NewPrintedName": "orientation",
+    "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionRange",
+    "OldPrintedName": "NSTextLayoutSectionRange",
+    "NewPrintedName": "range",
+    "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDocumentTypeDocumentAttribute",
+    "OldPrintedName": "NSDocumentTypeDocumentAttribute",
+    "NewPrintedName": "documentType",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSCharacterEncodingDocumentAttribute",
+    "OldPrintedName": "NSCharacterEncodingDocumentAttribute",
+    "NewPrintedName": "characterEncoding",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultAttributesDocumentAttribute",
+    "OldPrintedName": "NSDefaultAttributesDocumentAttribute",
+    "NewPrintedName": "defaultAttributes",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPaperSizeDocumentAttribute",
+    "OldPrintedName": "NSPaperSizeDocumentAttribute",
+    "NewPrintedName": "paperSize",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSPaperMarginDocumentAttribute",
+    "OldPrintedName": "NSPaperMarginDocumentAttribute",
+    "NewPrintedName": "paperMargin",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewSizeDocumentAttribute",
+    "OldPrintedName": "NSViewSizeDocumentAttribute",
+    "NewPrintedName": "viewSize",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewZoomDocumentAttribute",
+    "OldPrintedName": "NSViewZoomDocumentAttribute",
+    "NewPrintedName": "viewZoom",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSViewModeDocumentAttribute",
+    "OldPrintedName": "NSViewModeDocumentAttribute",
+    "NewPrintedName": "viewMode",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSReadOnlyDocumentAttribute",
+    "OldPrintedName": "NSReadOnlyDocumentAttribute",
+    "NewPrintedName": "readOnly",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSBackgroundColorDocumentAttribute",
+    "OldPrintedName": "NSBackgroundColorDocumentAttribute",
+    "NewPrintedName": "backgroundColor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSHyphenationFactorDocumentAttribute",
+    "OldPrintedName": "NSHyphenationFactorDocumentAttribute",
+    "NewPrintedName": "hyphenationFactor",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSDefaultTabIntervalDocumentAttribute",
+    "OldPrintedName": "NSDefaultTabIntervalDocumentAttribute",
+    "NewPrintedName": "defaultTabInterval",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextLayoutSectionsAttribute",
+    "OldPrintedName": "NSTextLayoutSectionsAttribute",
+    "NewPrintedName": "textLayoutSections",
+    "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
@@ -1903,81 +2285,8 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)NSProgress(im)performAsCurrentWithPendingUnitCount:usingBlock:",
-    "Index": 2
-  },
-  {
-    "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:@F@CGPathApplyWithBlock",
     "Index": 1
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBCentralManagerDelegate(im)centralManager:willRestoreState:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBCentralManagerDelegate(im)centralManager:didConnectPeripheral:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CBPeripheral(im)readValueForCharacteristic:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CBPeripheral(im)writeValue:forCharacteristic:type:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CBPeripheral(im)readValueForDescriptor:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CBPeripheral(im)writeValue:forDescriptor:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didModifyServices:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didDiscoverServices:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didUpdateValueForCharacteristic:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didWriteValueForCharacteristic:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didUpdateValueForDescriptor:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didWriteValueForDescriptor:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:willRestoreState:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:central:didSubscribeToCharacteristic:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:central:didUnsubscribeFromCharacteristic:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:didReceiveReadRequest:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:didReceiveWriteRequests:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -1986,6 +2295,14 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)UIFontMetrics(im)scaledFontForFont:maximumPointSize:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioNode(im)nameForInputBus:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioNode(im)nameForOutputBus:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -2085,6 +2402,10 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSAttributedString(im)attributesAtIndex:effectiveRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:"
   },
   {
@@ -2093,11 +2414,39 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)NSProgress(im)performAsCurrentWithPendingUnitCount:usingBlock:"
+    "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromURL:options:documentAttributes:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "s:So8ProgressC10FoundationE16performAsCurrentxs5Int64V20withPendingUnitCount_xyKc5usingtKlF"
+    "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)NSURLSessionTaskDelegate(im)URLSession:taskIsWaitingForConnectivity:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6insertys5RangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6insertys11ClosedRangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6removeys5RangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6removeys11ClosedRangeVys7UnicodeO6ScalarVG12charactersIn_tF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6insertSb8inserted_s7UnicodeO6ScalarV17memberAfterInserttAIF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:10Foundation12CharacterSetV6removes7UnicodeO6ScalarVSgAHF"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -2106,5 +2455,101 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "s:10Foundation19PropertyListDecoderC6decodexxm_AA4DataV4fromSo0bC13SerializationC0bC6FormatOz6formattKs9DecodableRzlF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CLGeocoder(im)geocodePostalAddress:completionHandler:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)fetchHistoryAfterDate:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)fetchHistoryAfterToken:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)fetchHistoryAfterTransaction:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)deleteHistoryBeforeDate:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)deleteHistoryBeforeToken:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSPersistentHistoryChangeRequest(cm)deleteHistoryBeforeTransaction:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBCentralManagerDelegate(im)centralManager:willRestoreState:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBCentralManagerDelegate(im)centralManager:didConnectPeripheral:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)readValueForCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)writeValue:forCharacteristic:type:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)readValueForDescriptor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)writeValue:forDescriptor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didModifyServices:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didDiscoverServices:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didUpdateValueForCharacteristic:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didWriteValueForCharacteristic:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didUpdateValueForDescriptor:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didWriteValueForDescriptor:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:willRestoreState:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:central:didSubscribeToCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:central:didUnsubscribeFromCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:didReceiveReadRequest:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:didReceiveWriteRequests:"
   }
 ]
