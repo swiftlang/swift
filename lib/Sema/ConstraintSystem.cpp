@@ -499,14 +499,12 @@ Type ConstraintSystem::openFunctionType(
     auto resultTy = openType(genericFn->getResult(), replacements);
 
     // Build the resulting (non-generic) function type.
-    type = FunctionType::get(inputTy, resultTy,
-                             FunctionType::ExtInfo().
-                               withThrows(genericFn->throws()));
-  } else {
-    type = openType(funcType, replacements);
+    funcType = FunctionType::get(inputTy, resultTy,
+                                 FunctionType::ExtInfo().
+                                   withThrows(genericFn->throws()));
   }
 
-  return removeArgumentLabels(type, numArgumentLabelsToRemove);
+  return removeArgumentLabels(funcType, numArgumentLabelsToRemove);
 }
 
 Optional<Type> ConstraintSystem::isArrayType(Type type) {
@@ -717,12 +715,34 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     return { openedType, openedFnType->getResult() };
   }
 
-  // If we have a type declaration, resolve it within the current context.
+  // Unqualified reference to a local or global function.
+  if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
+    OpenedTypeMap replacements;
+
+    auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
+    auto openedType =
+      openFunctionType(
+        funcType,
+        getNumRemovedArgumentLabels(TC.Context, funcDecl,
+                                    /*isCurriedInstanceReference=*/false,
+                                    functionRefKind),
+        locator, replacements,
+        funcDecl->getInnermostDeclContext(),
+        funcDecl->getDeclContext(),
+        /*skipProtocolSelfConstraint=*/false);
+
+    // If we opened up any type variables, record the replacements.
+    recordOpenedTypes(locator, replacements);
+
+    return { openedType, openedType };
+  }
+
+  // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = getTypeChecker().resolveTypeInContext(typeDecl, DC,
-                                                      TR_InExpression,
-                                                      isSpecialized);
+    auto type = TC.resolveTypeInContext(typeDecl, DC,
+                                        TR_InExpression,
+                                        isSpecialized);
 
     // Open the type.
     type = openUnboundGenericType(type, locator);
@@ -736,18 +756,22 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     return { type, type };
   }
 
+  // Only remaining case: unqualified reference to a property.
+  auto *varDecl = cast<VarDecl>(value);
+
   // Determine the type of the value, opening up that type if necessary.
-  bool wantInterfaceType = true;
-  if (isa<VarDecl>(value))
-    wantInterfaceType = !value->getDeclContext()->isLocalContext();
-  Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC, base,
+  bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
+  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), DC, base,
                                                  wantInterfaceType);
+
+  assert(!valueType->hasUnboundGenericType() &&
+         !valueType->hasTypeParameter());
 
   // If this is a let-param whose type is a type variable, this is an untyped
   // closure param that may be bound to an inout type later. References to the
   // param should have lvalue type instead. Express the relationship with a new
   // constraint.
-  if (auto *param = dyn_cast<ParamDecl>(value)) {
+  if (auto *param = dyn_cast<ParamDecl>(varDecl)) {
     if (param->isLet() && valueType->is<TypeVariableType>()) {
       Type paramType = valueType;
       valueType = createTypeVariable(getConstraintLocator(locator),
@@ -755,28 +779,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       addConstraint(ConstraintKind::BindParam, paramType, valueType,
                     getConstraintLocator(locator));
     }
-  }
-
-  // Adjust the type of the reference.
-  if (auto funcType = valueType->getAs<AnyFunctionType>()) {
-    OpenedTypeMap replacements;
-
-    valueType =
-      openFunctionType(
-          funcType,
-          getNumRemovedArgumentLabels(TC.Context, value,
-                                      /*isCurriedInstanceReference=*/false,
-                                      functionRefKind),
-          locator, replacements,
-          value->getInnermostDeclContext(),
-          value->getDeclContext(),
-          /*skipProtocolSelfConstraint=*/false);
-
-    // If we opened up any type variables, record the replacements.
-    recordOpenedTypes(locator, replacements);
-  } else {
-    assert(!valueType->hasUnboundGenericType() &&
-           !valueType->hasTypeParameter());
   }
 
   return { valueType, valueType };
@@ -1042,36 +1044,21 @@ ConstraintSystem::getTypeOfMemberReference(
     getNumRemovedArgumentLabels(TC.Context, value, isCurriedInstanceReference,
                                 functionRefKind);
 
+  AnyFunctionType *funcType;
+
   if (isa<AbstractFunctionDecl>(value) ||
       isa<EnumElementDecl>(value)) {
     // This is the easy case.
-    auto funcType = value->getInterfaceType()->getAs<AnyFunctionType>();
-
-    openedType = openFunctionType(funcType, numRemovedArgumentLabels,
-                                  locator, replacements, innerDC, outerDC,
-                                  /*skipProtocolSelfConstraint=*/true);
+    funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
   } else {
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.
     assert(isa<AbstractStorageDecl>(value));
 
-    openedType = TC.getUnopenedTypeOfReference(value, baseTy, useDC, base,
-                                               /*wantInterfaceType=*/true);
+    auto refType = TC.getUnopenedTypeOfReference(value, baseTy, useDC, base,
+                                                 /*wantInterfaceType=*/true);
 
-    // Remove argument labels, if needed.
-    openedType = removeArgumentLabels(openedType, numRemovedArgumentLabels);
-
-    // Open up the generic parameter list for the container.
-    openGeneric(innerDC, outerDC, innerDC->getGenericSignatureOfContext(),
-                /*skipProtocolSelfConstraint=*/true,
-                locator, replacements);
-
-    // Open up the type of the member.
-    openedType = openType(openedType, replacements);
-
-    // Determine the object type of 'self'.
-    auto selfTy = openType(outerDC->getSelfInterfaceType(),
-                           replacements);
+    auto selfTy = outerDC->getSelfInterfaceType();
 
     // If self is a struct, properly qualify it based on our base
     // qualification.  If we have an lvalue coming in, we expect an inout.
@@ -1080,8 +1067,18 @@ ConstraintSystem::getTypeOfMemberReference(
         !selfTy->hasError())
       selfTy = InOutType::get(selfTy);
 
-    openedType = FunctionType::get(selfTy, openedType);
+    if (auto *sig = innerDC->getGenericSignatureOfContext()) {
+      funcType = GenericFunctionType::get(sig, selfTy, refType,
+                                          AnyFunctionType::ExtInfo());
+    } else {
+      funcType = FunctionType::get(selfTy, refType,
+                                   AnyFunctionType::ExtInfo());
+    }
   }
+
+  openedType = openFunctionType(funcType, numRemovedArgumentLabels,
+                                locator, replacements, innerDC, outerDC,
+                                /*skipProtocolSelfConstraint=*/true);
 
   if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
     // Class methods returning Self as well as constructors get the
