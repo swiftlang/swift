@@ -1326,7 +1326,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
       case FunctionSigSpecializationParamKind::ClosureProp: {
         size_t FixedChildren = Param->getNumChildren();
         while (NodePointer Ty = popNode(Node::Kind::Type)) {
-          assert(ParamKind == FunctionSigSpecializationParamKind::ClosureProp);
+          if (ParamKind != FunctionSigSpecializationParamKind::ClosureProp)
+            return nullptr;
           Param = addChild(Param, Ty);
         }
         NodePointer Name = popNode(Node::Kind::Identifier);
