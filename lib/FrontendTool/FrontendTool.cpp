@@ -53,6 +53,7 @@
 #include "swift/Migrator/Migrator.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
@@ -673,19 +674,30 @@ static bool performCompile(CompilerInstance &Instance,
          "All actions not requiring SILGen must have been handled!");
 
   std::unique_ptr<SILModule> SM = Instance.takeSILModule();
+  // Records whether the SIL is directly computed from the AST we have, meaning
+  // that it will exactly match the source. It might not if, for instance, some
+  // of the inputs are SIB with extra explicit SIL.
+  auto astGuaranteedToCorrespondToSIL = false;
   if (!SM) {
+    auto fileIsSIB = [](const FileUnit *File) -> bool {
+      auto SASTF = dyn_cast<SerializedASTFile>(File);
+      return SASTF && SASTF->isSIB();
+    };
     if (opts.PrimaryInput.hasValue() && opts.PrimaryInput.getValue().isFilename()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
         auto Index = opts.PrimaryInput.getValue().Index;
         PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
+      astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
                                 None, opts.SILSerializeAll);
     } else {
-      SM = performSILGeneration(Instance.getMainModule(), Invocation.getSILOptions(),
-                                opts.SILSerializeAll,
-                                true);
+      auto mod = Instance.getMainModule();
+      astGuaranteedToCorrespondToSIL =
+          llvm::none_of(mod->getFiles(), fileIsSIB);
+      SM = performSILGeneration(mod, Invocation.getSILOptions(),
+                                opts.SILSerializeAll, true);
     }
   }
 
@@ -925,7 +937,8 @@ static bool performCompile(CompilerInstance &Instance,
     allSymbols = true;
     LLVM_FALLTHROUGH;
   case FrontendOptions::TBDValidationMode::MissingFromTBD: {
-    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
+    if (!inputFileKindCanHaveTBDValidated(Invocation.getInputKind()) ||
+        !astGuaranteedToCorrespondToSIL)
       break;
 
     auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
