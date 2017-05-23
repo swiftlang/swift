@@ -33,15 +33,15 @@ extension String : StringProtocol {
     self.init(repeating: String(repeatedValue), count: count)
   }
 
-  // FIXME(strings): doc comment
   // This initializer disambiguates between the following intitializers, now
   // that String conforms to Collection:
   // - init<T>(_ value: T) where T : LosslessStringConvertible
   // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
-  public init<T : StringProtocol>(_ other: T) {
-    self.init(other.characters)
+  public init<S : Sequence & LosslessStringConvertible>(_ other: S)
+  where S.Element == Character {
+    self._core = CharacterView(other)._core
   }
-
+  
   // This initializer satisfies the LosslessStringConvertible conformance
   public init?(_ other: String) {
     self.init(other._core)
