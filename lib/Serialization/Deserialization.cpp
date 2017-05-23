@@ -3503,6 +3503,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto baseTy = getType(baseID);
     auto nominal = baseTy->getAnyNominal();
+    assert(!baseTy->hasUnboundGenericType());
     extension->getExtendedTypeLoc().setType(baseTy);
 
     if (isImplicit)
