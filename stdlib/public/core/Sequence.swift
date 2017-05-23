@@ -637,6 +637,7 @@ extension Sequence where Self.Iterator == Self {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
+  typealias SubSequence = [Element]
   /// Returns an array containing the results of mapping the given closure
   /// over the sequence's elements.
   ///
