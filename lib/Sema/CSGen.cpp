@@ -2757,11 +2757,26 @@ namespace {
         return ErrorType::get(CS.getASTContext());
       }
       
-      // If the key path contained any syntactically invalid components, bail
-      // out.
-      for (auto &c : E->getComponents())
-        if (!c.isValid())
+      for (auto &c : E->getComponents()) {
+        // If the key path contained any syntactically invalid components, bail
+        // out.
+        if (!c.isValid()) {
           return ErrorType::get(CS.getASTContext());
+        }
+        
+        // If a component is already resolved, then all of them should be
+        // resolved, and we can let the expression be. This might happen when
+        // re-checking a failed system for diagnostics.
+        if (c.isResolved()) {
+          assert([&]{
+            for (auto &c : E->getComponents())
+              if (!c.isResolved())
+                return false;
+            return true;
+          }());
+          return E->getType();
+        }
+      }
       
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.

@@ -4744,6 +4744,25 @@ public:
       return getKind() != Kind::Invalid;
     }
     
+    bool isResolved() const {
+      if (!getComponentType())
+        return false;
+      
+      switch (getKind()) {
+      case Kind::Subscript:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::Property:
+        return true;
+      
+      case Kind::UnresolvedSubscript:
+      case Kind::UnresolvedProperty:
+      case Kind::Invalid:
+        return false;
+      }
+    }
+    
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:

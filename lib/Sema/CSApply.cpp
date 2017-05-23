@@ -3986,6 +3986,20 @@ namespace {
       if (E->getType()->hasError())
         return E;
 
+      // If a component is already resolved, then all of them should be
+      // resolved, and we can let the expression be. This might happen when
+      // re-checking a failed system for diagnostics.
+      if (!E->getComponents().empty()
+          && E->getComponents().front().isResolved()) {
+        assert([&]{
+          for (auto &c : E->getComponents())
+            if (!c.isResolved())
+              return false;
+          return true;
+        }());
+        return E;
+      }
+
       SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
 
       // Resolve each of the components.
