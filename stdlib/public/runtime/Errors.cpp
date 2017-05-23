@@ -50,6 +50,10 @@
 #include <asl.h>
 #endif
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 namespace FatalErrorFlags {
 enum: uint32_t {
   ReportBacktrace = 1 << 0
@@ -230,6 +234,9 @@ reportNow(uint32_t flags, const char *message)
 #endif
 #ifdef __APPLE__
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#endif
+#ifdef __ANDROID__
+  __android_log_print(ANDROID_LOG_ERROR, "Swift", "%s", message);
 #endif
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
