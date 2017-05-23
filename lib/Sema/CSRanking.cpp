@@ -149,10 +149,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
     return sameDecl(x.getDecl(), y.getDecl());
 
-  case OverloadChoiceKind::TypeDecl:
-    // FIXME: Compare types after substitution?
-    return sameDecl(x.getDecl(), y.getDecl());
-
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
@@ -593,7 +589,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                        locator,
                        unused);
 
-        openedType2 = cs.openType(type2, locator, unused);
+        openedType2 = cs.openType(type2, unused);
       }
 
       // Get the type of a reference to the first declaration, swapping in
@@ -615,7 +611,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                        locator,
                        replacements);
 
-        openedType1 = cs.openType(type1, locator, replacements);
+        openedType1 = cs.openType(type1, replacements);
       }
 
       for (const auto &replacement : replacements) {
@@ -893,7 +889,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
-    case OverloadChoiceKind::TypeDecl:
       continue;
 
     case OverloadChoiceKind::BaseType:
