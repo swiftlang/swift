@@ -4020,10 +4020,14 @@ void SILGenFunction::emitOpenExistentialExprImpl(
     // Create a writeback scope for the access to the existential lvalue.
     writebackScope.emplace(*this);
 
+    Type formalRValueType =
+      E->getOpaqueValue()->getType()->getLValueOrInOutObjectType();
+
     accessKind = E->getExistentialValue()->getLValueAccessKind();
     auto lv = emitLValue(E->getExistentialValue(), accessKind);
     lv = emitOpenExistentialLValue(E, std::move(lv),
                                    CanArchetypeType(E->getOpenedArchetype()),
+                                   formalRValueType->getCanonicalType(),
                                    accessKind);
     auto addr = emitAddressOfLValue(E, std::move(lv), accessKind);
     state = {addr, false, false};

@@ -1305,6 +1305,7 @@ public:
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
+                                   CanType formalRValueType,
                                    AccessKind accessKind);
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
