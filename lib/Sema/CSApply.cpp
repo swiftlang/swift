@@ -72,10 +72,8 @@ void Solution::computeSubstitutions(
     return;
 
   TypeSubstitutionMap subs;
-  for (const auto &opened : openedTypes->second) {
-    subs[opened.first->castTo<GenericTypeParamType>()] =
-      getFixedType(opened.second);
-  }
+  for (const auto &opened : openedTypes->second)
+    subs[opened.first] = getFixedType(opened.second);
 
   auto &tc = getConstraintSystem().getTypeChecker();
 
