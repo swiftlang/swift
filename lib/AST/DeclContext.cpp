@@ -140,8 +140,9 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
   }
 
   if (type->is<UnboundGenericType>()) {
-    ED->getASTContext().getLazyResolver()->resolveExtension(
-      const_cast<ExtensionDecl *>(ED));
+    auto *resolver = ED->getASTContext().getLazyResolver();
+    assert(resolver && "Too late to resolve extensions");
+    resolver->resolveExtension(const_cast<ExtensionDecl *>(ED));
     type = ED->getExtendedType();
   }
 
