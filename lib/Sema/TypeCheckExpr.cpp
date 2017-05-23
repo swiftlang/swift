@@ -570,7 +570,8 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
       storage->isSetterNonMutating();
 }
 
-Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+Type TypeChecker::getUnopenedTypeOfReference(AbstractStorageDecl *value,
+                                             Type baseType,
                                              DeclContext *UseDC,
                                              const DeclRefExpr *base,
                                              bool wantInterfaceType) {
@@ -592,27 +593,18 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (auto *storage = dyn_cast<AbstractStorageDecl>(value)) {
-    if (doesStorageProduceLValue(*this, storage, baseType, UseDC, base)) {
-      // Vars are simply lvalues of their rvalue type.
-      if (isa<VarDecl>(storage))
-        return LValueType::get(requestedType);
+  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base)) {
+    // Vars are simply lvalues of their rvalue type.
+    if (isa<VarDecl>(value))
+      return LValueType::get(requestedType);
 
-      // Subscript decls have function type.  For the purposes of later type
-      // checker consumption, model this as returning an lvalue.
-      assert(isa<SubscriptDecl>(storage));
-      auto *RFT = requestedType->castTo<AnyFunctionType>();
-      return FunctionType::get(RFT->getInput(),
-                               LValueType::get(RFT->getResult()),
-                               RFT->getExtInfo());
-    }
-
-    // FIXME: Fix downstream callers.
-    if (auto *genericFn = requestedType->getAs<GenericFunctionType>()) {
-      return FunctionType::get(genericFn->getInput(),
-                               genericFn->getResult(),
-                               genericFn->getExtInfo());
-    }
+    // Subscript decls have function type.  For the purposes of later type
+    // checker consumption, model this as returning an lvalue.
+    assert(isa<SubscriptDecl>(value));
+    auto *RFT = requestedType->castTo<AnyFunctionType>();
+    return FunctionType::get(RFT->getInput(),
+                             LValueType::get(RFT->getResult()),
+                             RFT->getExtInfo());
   }
 
   return requestedType;

@@ -1053,9 +1053,9 @@ ConstraintSystem::getTypeOfMemberReference(
   } else {
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.
-    assert(isa<AbstractStorageDecl>(value));
+    auto *storage = cast<AbstractStorageDecl>(value);
 
-    auto refType = TC.getUnopenedTypeOfReference(value, baseTy, useDC, base,
+    auto refType = TC.getUnopenedTypeOfReference(storage, baseTy, useDC, base,
                                                  /*wantInterfaceType=*/true);
 
     auto selfTy = outerDC->getSelfInterfaceType();
