@@ -58,6 +58,8 @@ ERROR(ambiguous_subscript,none,
 ERROR(type_not_subscriptable,none,
       "type %0 has no subscript members",
       (Type))
+ERROR(use_brace_notation_for_subscript,none,
+      "brace notation is required when refering to subscript", ())
 
 ERROR(could_not_find_tuple_member,none,
       "value of tuple type %0 has no member %1", (Type, DeclName))
