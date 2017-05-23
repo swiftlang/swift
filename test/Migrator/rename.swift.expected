@@ -17,3 +17,7 @@ func foo(_ b: BarForwardDeclaredClass) {
   barGlobalFuncNewName(newlabel: 2)
   _ = NewEnum.enumElement
 }
+
+func foo1(_ b: BarForwardDeclaredClass) {
+  b.barNewInstanceFunc2(0,1,NotToRemove1:2,3)
+}

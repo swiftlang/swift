@@ -41,6 +41,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)BarForwardDeclaredClass(im)barInstanceFunc2:toRemove:toRemove1:toRemove2:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "barNewInstanceFunc2(_:_:NotToRemove1:_:)",
+    "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
