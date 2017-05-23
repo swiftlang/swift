@@ -455,7 +455,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     while _sourceIndex != _source.endIndex && shift < _OutputBuffer.bitWidth {
       let u = _source[_sourceIndex]
       if u >= 0x80 { break }
-      _buffer |= _OutputBuffer(u &+ 1) &<< shift
+      _buffer |= _OutputBuffer(UInt8(extendingOrTruncating: u &+ 1)) &<< shift
       _sourceIndex += 1
       shift = shift &+ 8
     }
