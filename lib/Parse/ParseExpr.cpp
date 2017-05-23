@@ -2067,13 +2067,7 @@ Expr *Parser::parseExprIdentifier() {
     unresolved->setSpecialized(hasGenericArgumentList);
     E = unresolved;
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    if (!hasGenericArgumentList)
-      E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*implicit*/false);
-    else
-      E = TypeExpr::createForSpecializedDecl(loc.getBaseNameLoc(), TD,
-                                             Context.AllocateCopy(args),
-                                             SourceRange(LAngleLoc,
-                                                         RAngleLoc));
+    E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*implicit*/false);
   } else {
     auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
     declRef->setGenericArgs(args);

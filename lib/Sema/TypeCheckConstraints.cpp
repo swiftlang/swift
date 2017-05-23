@@ -533,11 +533,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       ResultValues.push_back(D);
   }
 
-  // If we have an unambiguous reference to a type decl, form a TypeExpr.  This
-  // doesn't handle specialized decls since they are processed when the
-  // UnresolvedSpecializeExpr is seen.
-  if (!UDRE->isSpecialized() &&
-      ResultValues.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
+  // If we have an unambiguous reference to a type decl, form a TypeExpr.
+  if (ResultValues.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
       isa<TypeDecl>(ResultValues[0])) {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(ResultValues[0])) {
@@ -1139,17 +1136,7 @@ TypeExpr *PreCheckExpression::simplifyUnresolvedSpecializeExpr(
 
   // If this is a reference type a specialized type, form a TypeExpr.
 
-  // The base is either a DeclRefExpr pointing at a type...
-  if (auto *dre = dyn_cast<DeclRefExpr>(us->getSubExpr())) {
-    if (auto *TD = dyn_cast<TypeDecl>(dre->getDecl())) {
-      return TypeExpr::createForSpecializedDecl(
-        dre->getLoc(), TD,
-        TC.Context.AllocateCopy(genericArgs),
-        angleRange);
-    }
-  }
-
-  // Or a TypeExpr that we already resolved.
+  // The base should be a TypeExpr that we already resolved.
   if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
     if (auto *ITR = dyn_cast_or_null<IdentTypeRepr>(te->getTypeRepr())) {
       return TypeExpr::createForSpecializedDecl(
