@@ -188,3 +188,38 @@ extension AnythingGoes where T : VeryConstrained {
   // CHECK: return
   init(fromExtension: ()) {}
 }
+
+extension Array where Element == Int {
+  struct Nested {
+    // CHECK-LABEL: sil hidden [transparent] @_T0Sa22constrained_extensionsSiRszlE6NestedV1eSiSgvfi : $@convention(thin) () -> Optional<Int>
+    var e: Element? = nil
+
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsSiRszlE6NestedV10hasDefaultySiSg1e_tFfA_ : $@convention(thin) () -> Optional<Int>
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsSiRszlE6NestedV10hasDefaultySiSg1e_tF : $@convention(method) (Optional<Int>, @inout Array<Int>.Nested) -> ()
+    mutating func hasDefault(e: Element? = nil) {
+      self.e = e
+    }
+  }
+}
+
+extension Array where Element == AnyObject {
+  class NestedClass {
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCfd : $@convention(method) (@guaranteed Array<AnyObject>.NestedClass) -> @owned Builtin.NativeObject
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCfD : $@convention(method) (@owned Array<AnyObject>.NestedClass) -> ()
+    deinit { }
+
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_GycfC : $@convention(method) (@thick Array<AnyObject>.NestedClass.Type) -> @owned Array<AnyObject>.NestedClass
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE11NestedClassCACyyXl_Gycfc : $@convention(method) (@owned Array<AnyObject>.NestedClass) -> @owned Array<AnyObject>.NestedClass
+  }
+
+  class DerivedClass : NestedClass {
+    // CHECK-LABEL: sil hidden [transparent] @_T0Sa22constrained_extensionsyXlRszlE12DerivedClassC1eyXlSgvfi : $@convention(thin) () -> @owned Optional<AnyObject>
+    // CHECK-LABEL: sil hidden @_T0Sa22constrained_extensionsyXlRszlE12DerivedClassCfE : $@convention(method) (@guaranteed Array<AnyObject>.DerivedClass) -> ()
+    var e: Element? = nil
+  }
+}
+
+func referenceNestedTypes() {
+  _ = Array<AnyObject>.NestedClass()
+  _ = Array<AnyObject>.DerivedClass()
+}
