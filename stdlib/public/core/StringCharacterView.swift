@@ -19,8 +19,8 @@
 // allow performance optimizations of linear traversals.
 
 /// CR and LF are common special cases in grapheme breaking logic
-internal let _CR: UInt8 = 0x0d
-internal let _LF: UInt8 = 0x0a
+@_versioned internal let _CR: UInt8 = 0x0d
+@_versioned internal let _LF: UInt8 = 0x0a
 
 import SwiftShims
 
@@ -58,12 +58,14 @@ extension String {
   ///     }
   ///     // Prints "Marie"
   public struct CharacterView {
+    @_versioned
     internal var _core: _StringCore
 
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_StringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
     /// before that value is used as a `_core` index.
+    @_versioned
     internal var _coreOffset: Int
 
     /// Creates a view of the given string.
@@ -170,6 +172,7 @@ extension String.CharacterView : _SwiftStringView {
 /// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
+  @_versioned
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
@@ -269,7 +272,8 @@ extension String.CharacterView : BidirectionalCollection {
   }
 
   /// Fast check for a (stable) grapheme break between two UInt16 code units
-  @inline(__always)
+  @_inlineable
+  @_versioned
   internal static func _quickCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
@@ -289,6 +293,7 @@ extension String.CharacterView : BidirectionalCollection {
   // TODO: this is actually fine to inline into non-inlinable code
   //
   @inline(never) // @inline(resilient_only)
+  @_versioned
   internal static func _internalExtraCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
@@ -323,12 +328,12 @@ extension String.CharacterView : BidirectionalCollection {
     return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
   }
 
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
-  //
+  // NOTE: Because this function is inlineable, it should contain only the fast
+  // paths of grapheme breaking that we have high confidence won't change.
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never) // Don't remove, see above.
+  @_inlineable
+  @_versioned
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
@@ -362,10 +367,21 @@ extension String.CharacterView : BidirectionalCollection {
       // especially small tagged pointers.
     }
     
+    return _measureExtendedGraphemeClusterForward1(
+      from: start, relativeOffset: relativeOffset)
+  }
+  
+  // NOTE: don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  @_versioned
+  @inline(never)
+  func _measureExtendedGraphemeClusterForward1(
+    from start: UnicodeScalarView.Index, relativeOffset: Int
+  ) -> Int {
     let startIndexUTF16 = start._position
 
     // Last scalar is its own grapheme
-    if (startIndexUTF16+1 == end._position) {
+    if (startIndexUTF16+1 == unicodeScalars.endIndex._position) {
       return 1
     }
 
@@ -381,7 +397,7 @@ extension String.CharacterView : BidirectionalCollection {
       // TODO: Check for (potentially non-contiguous) UTF16 NSStrings,
       // especially small tagged pointers
     }
-
+    
     if _core._baseAddress != nil {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _core)
@@ -391,7 +407,7 @@ extension String.CharacterView : BidirectionalCollection {
       // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
       // string.
       let nextPosition =
-        ubrkFollowing == -1 ? end._position : Int(ubrkFollowing)
+        ubrkFollowing == -1 ? unicodeScalars.endIndex._position : Int(ubrkFollowing)
       return nextPosition - relativeOffset
     } else {
       // TODO: See if we can get fast character contents.
@@ -403,8 +419,8 @@ extension String.CharacterView : BidirectionalCollection {
     // CFString API available, or worst case we can map over it via UTextFuncs.
 
     return legacyGraphemeForward(
-      start: start, end: end, startIndexUTF16: startIndexUTF16
-    )
+      start: start, end: unicodeScalars.endIndex,
+      startIndexUTF16: start._position)
   }
 
   @inline(never)
@@ -441,12 +457,13 @@ extension String.CharacterView : BidirectionalCollection {
     return start._position - startIndexUTF16
   }
 
-  // NOTE: don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
+  // NOTE: Because this function is inlineable, it should contain only the fast
+  // paths of grapheme breaking that we have high confidence won't change.
   //
   /// Returns the length of the previous extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never) // Don't remove, see above.
+  @_inlineable
+  @_versioned
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {
@@ -480,11 +497,23 @@ extension String.CharacterView : BidirectionalCollection {
 
       return 1
     }
+    return _measureExtendedGraphemeClusterBackward1(
+      from: start, endOffset: endOffset, lastOffset: lastOffset)
+  }
+  
+  // NOTE: don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  //
+  @inline(never)
+  @_versioned
+  func _measureExtendedGraphemeClusterBackward1(
+    from end: UnicodeScalarView.Index, endOffset: Int, lastOffset: Int
+  ) -> Int {
     
     let endIndexUTF16 = end._position
 
     // First scalar is its own grapheme
-    if (endIndexUTF16-1 == start._position) {
+    if (endIndexUTF16-1 == unicodeScalars.startIndex._position) {
       return 1
     }
 
@@ -506,8 +535,9 @@ extension String.CharacterView : BidirectionalCollection {
       )
       // ubrk_following may return UBRK_DONE (-1). Treat that as the rest of the
       // string.
-      let priorPosition =
-        ubrkPreceding == -1 ? start._position : Int(ubrkPreceding)
+      let priorPosition = ubrkPreceding == -1
+        ? unicodeScalars.startIndex._position : Int(ubrkPreceding)
+
       return endOffset - priorPosition
     } else {
       // TODO: See if we can get fast character contents.
@@ -519,8 +549,8 @@ extension String.CharacterView : BidirectionalCollection {
     // CFString API available, or worst case we can map over it via UTextFuncs.
 
     return legacyGraphemeBackward(
-      start: start, end: end, endIndexUTF16: endIndexUTF16
-    )
+      start: unicodeScalars.startIndex, end: unicodeScalars.endIndex,
+      endIndexUTF16: unicodeScalars.endIndex._position)
   }
 
   @inline(never)
