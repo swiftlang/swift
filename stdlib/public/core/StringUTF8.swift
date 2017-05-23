@@ -492,8 +492,29 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 extension String.UTF8View {
   public var count: Int {
     if _fastPath(_core.isASCII) { return _core.count }
+    let b = _core._unmanagedUTF16
+    if _fastPath(b != nil) {
+      defer { _fixLifetime(_core) }
+      return _count(fromUTF16: b!)
+    }
+    return _count(fromUTF16: self._core)
+  }
+
+  internal func _count<Source: Sequence>(fromUTF16 source: Source) -> Int
+  where Source.Element == Unicode.UTF16.CodeUnit
+  {
     var result = 0
-    for _ in self { result += 1 }
+    var prev: Unicode.UTF16.CodeUnit = 0
+    for u in source {
+      switch u {
+      case 0..<0x80: result += 1
+      case 0x80..<0x800: result += 2
+      case 0x800..<0xDC00: result += 3
+      case 0xDC00..<0xE000: result += UTF16.isLeadSurrogate(prev) ? 1 : 3
+      default: result += 3
+      }
+      prev = u
+    }
     return result
   }
 }
