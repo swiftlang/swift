@@ -74,3 +74,9 @@ var minor = GLint(0)
 
 // TODO: (major, minor) = NSOpenGLContext.openGLVersion
 // NSOpenGLGetVersion(&major, &minor)
+
+class MyDocument : NSDocument {
+  override class func autosavesInPlace() -> Bool {
+    return false
+  }
+}
