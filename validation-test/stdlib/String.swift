@@ -58,7 +58,7 @@ StringTests.test("AssociatedTypes-UTF8View") {
   typealias View = String.UTF8View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
+    iteratorType: View.Iterator.self,
     subSequenceType: Slice<View>.self,
     indexType: View.Index.self,
     indexDistanceType: Int.self,
