@@ -1,7 +1,3 @@
-// FIXME(integer): with new integer protocols implemented the overflows are no
-// longer caught: <rdar://problem/29937936>
-// XFAIL: *
-
 // RUN: not %target-swift-frontend -emit-sil %s 2>&1 | %FileCheck --check-prefix=CHECK-%target-ptrsize %s
 
 // FIXME: This test should be merged back into
@@ -356,15 +352,15 @@ func testArithmeticOverflow_Int_64bit() {
     // Right shift.
     var t1: Int = 0 >> 0
     var t2: Int = 0 >> 1
-    var t3: Int = 0 >> (-1)
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
+    var t3: Int = 0 &>> (-1)
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19622485> 'Builtin.Int64' leaks into diagnostics
 
     var t4: Int = 123 >> 0
     var t5: Int = 123 >> 1
     var t6: Int = 123 >> (-1)
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19622485> 'Builtin.Int64' leaks into diagnostics
 
@@ -373,9 +369,9 @@ func testArithmeticOverflow_Int_64bit() {
 
     var t9: Int = 0x7fff_ffff_ffff_ffff >> 63
     var t10: Int = 0x7fff_ffff_ffff_ffff >> 64
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff_ffff_ffff >> 65
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
   do {
@@ -383,14 +379,14 @@ func testArithmeticOverflow_Int_64bit() {
     var t1: Int = 0 << 0
     var t2: Int = 0 << 1
     var t3: Int = 0 << (-1)
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19622485> 'Builtin.Int64' leaks into diagnostics
 
     var t4: Int = 123 << 0
     var t5: Int = 123 << 1
     var t6: Int = 123 << (-1)
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: negative integer cannot be converted to unsigned type 'Builtin.Int64'{{$}}
     // FIXME: Bad diagnostic:
     // <rdar://problem/19622485> 'Builtin.Int64' leaks into diagnostics
 
@@ -399,9 +395,9 @@ func testArithmeticOverflow_Int_64bit() {
 
     var t9: Int = 0x7fff_ffff_ffff_ffff << 63
     var t10: Int = 0x7fff_ffff_ffff_ffff << 64
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t11: Int = 0x7fff_ffff_ffff_ffff << 65
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 }
 
@@ -499,9 +495,9 @@ func testArithmeticOverflow_UInt_64bit() {
 
     var t7: UInt = 0x7fff_ffff_ffff_ffff >> 63 // OK
     var t8: UInt = 0x7fff_ffff_ffff_ffff >> 64
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff_ffff_ffff >> 65
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 
   do {
@@ -517,9 +513,9 @@ func testArithmeticOverflow_UInt_64bit() {
 
     var t7: UInt = 0x7fff_ffff_ffff_ffff << 63 // OK
     var t8: UInt = 0x7fff_ffff_ffff_ffff << 64
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
     var t9: UInt = 0x7fff_ffff_ffff_ffff << 65
-    // CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
+    // NO-CHECK-64-DAG: .swift:[[@LINE-1]]:{{[0-9]+}}: error: shift amount is greater than or equal to type size in bits{{$}}
   }
 }
 

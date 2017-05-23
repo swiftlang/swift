@@ -1,7 +1,3 @@
-// FIXME(integer): with new integer protocols implemented the overflows are no
-// longer caught: <rdar://problem/29937936>
-// XFAIL: *
-
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 
 // REQUIRES: PTRSIZE=64
@@ -79,7 +75,7 @@ func testConvertOverflow() {
   let uint32_plus_two  : UInt32 = (2)
   var _ /*uint64_minus_two*/ : UInt64 = (-2) // expected-error {{negative integer '-2' overflows when stored into unsigned type 'UInt64'}}
   var _ /*uint64_plus_two*/  : UInt64 = (2)
-  var _ /*convert_s_to_u_minus_two*/ = UInt8(int_minus_two)  // expected-error {{integer overflows when converted from 'Int' to 'UInt8'}}
+  var _ /*convert_s_to_u_minus_two*/ = UInt8(int_minus_two)  // expected-error {{negative integer cannot be converted to unsigned type 'UInt8'}}
   var _ /*convert_s_to_u_plus_two*/  = UInt8(int_plus_two)
   var _ /*convert_u_to_s_plus_two*/  = Int8(uint32_plus_two)
 
@@ -220,7 +216,7 @@ func intConversionWrapperForLiteral() -> Int8 {
   return 255 // expected-error {{integer literal '255' overflows when stored into 'Int8'}}
 }
 func testFallBackDiagnosticMessages() {
-  _ = intConversionWrapperForUSCheckedConversion(255, 30) // expected-error {{integer overflows when converted from unsigned 'Builtin.Int8' to signed 'Builtin.Int8'}}
+    _ = intConversionWrapperForUSCheckedConversion(255, 30) // expected-error {{integer overflows when converted from 'UInt8' to 'Int8'}}
   _ = intConversionWrapperForLiteral() // expected-error {{integer literal '255' overflows when stored into signed 'Builtin.Int8'}}
 }
 
