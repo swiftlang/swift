@@ -1967,16 +1967,12 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \param isTypeReference Whether it's a reference to this declaration
-  /// as a type.
-  ///
   /// \param isSpecialized Whether this declaration is immediately specialized.
   ///
   /// \returns a pair containing the full opened type (if applicable) and
   /// opened type of a reference to declaration.
   std::pair<Type, Type> getTypeOfReference(
                           ValueDecl *decl,
-                          bool isTypeReference,
                           bool isSpecialized,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
@@ -1989,9 +1985,6 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isTypeReference Indicates that we want to refer to the declared
-  /// type of the type declaration rather than referring to it as a value.
-  ///
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
@@ -1999,7 +1992,6 @@ public:
   /// base) and opened type of a reference to this member.
   std::pair<Type, Type> getTypeOfMemberReference(
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
-                          bool isTypeReference,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,

@@ -714,7 +714,6 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
 
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     bool isTypeReference,
                                      bool isSpecialized,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
@@ -770,8 +769,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
 
-    // If it's a type reference or it's a module type, we're done.
-    if (isTypeReference || type->is<ModuleType>())
+    // Module types are not wrapped in metatypes.
+    if (type->is<ModuleType>())
       return { type, type };
 
     // If it's a value reference, refer to the metatype.
@@ -1023,7 +1022,6 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
-    bool isTypeReference,
     bool isDynamicResult,
     FunctionRefKind functionRefKind,
     ConstraintLocatorBuilder locator,
@@ -1039,7 +1037,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false,
+    return getTypeOfReference(value, /*isSpecialized=*/false,
                               functionRefKind, locator, base);
   }
 
@@ -1098,10 +1096,6 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // Remove argument labels, if needed.
     openedType = removeArgumentLabels(openedType, numRemovedArgumentLabels);
-
-    // If we have a type reference, look through the metatype.
-    if (isTypeReference)
-      openedType = openedType->castTo<AnyMetatypeType>()->getInstanceType();
 
     // Open up the generic parameter list for the container.
     openGeneric(innerDC, outerDC, innerDC->getGenericSignatureOfContext(),
@@ -1396,10 +1390,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::TypeDecl: {
-  
-    bool isTypeReference = choice.getKind() == OverloadChoiceKind::TypeDecl;
+  case OverloadChoiceKind::DeclViaUnwrappedOptional: {
     bool isDynamicResult
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
@@ -1425,12 +1416,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto base = getDotBase(anchor);
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(baseTy, choice.getDecl(), useDC,
-                                   isTypeReference, isDynamicResult,
+                                   isDynamicResult,
                                    choice.getFunctionRefKind(),
                                    locator, base, nullptr);
     } else {
       std::tie(openedFullType, refType)
-        = getTypeOfReference(choice.getDecl(), isTypeReference,
+        = getTypeOfReference(choice.getDecl(),
                              choice.isSpecialized(),
                              choice.getFunctionRefKind(), locator);
     }
@@ -1716,7 +1707,6 @@ DeclName OverloadChoice::getName() const {
   switch (getKind()) {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return getDecl()->getFullName();

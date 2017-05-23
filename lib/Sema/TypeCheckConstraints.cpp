@@ -2980,7 +2980,6 @@ void Solution::dump(raw_ostream &out) const {
     switch (choice.getKind()) {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       choice.getDecl()->dumpRef(out);
@@ -3150,7 +3149,6 @@ void ConstraintSystem::print(raw_ostream &out) {
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaDynamic:
-      case OverloadChoiceKind::TypeDecl:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
