@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O %s
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s
 
 extension Array where Element == Int {
   // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlESaySiGyt1x_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
@@ -170,4 +170,21 @@ extension GenericClass where Y == () {
     get { while true {} }
     set {}
   }
+}
+
+protocol VeryConstrained {}
+
+struct AnythingGoes<T> {
+  // CHECK-LABEL: sil hidden [transparent] @_T022constrained_extensions12AnythingGoesV13meaningOfLifexSgvfi : $@convention(thin) <T> () -> @out Optional<T>
+  var meaningOfLife: T? = nil
+}
+
+extension AnythingGoes where T : VeryConstrained {
+  // CHECK-LABEL: sil hidden @_T022constrained_extensions12AnythingGoesVA2A15VeryConstrainedRzlEACyxGyt13fromExtension_tcfC : $@convention(method) <T where T : VeryConstrained> (@thin AnythingGoes<T>.Type) -> @out AnythingGoes<T> {
+
+  // CHECK: [[INIT:%.*]] = function_ref @_T022constrained_extensions12AnythingGoesV13meaningOfLifexSgvfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK: [[RESULT:%.*]] = alloc_stack $Optional<T>
+  // CHECK: apply [[INIT]]<T>([[RESULT]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK: return
+  init(fromExtension: ()) {}
 }
