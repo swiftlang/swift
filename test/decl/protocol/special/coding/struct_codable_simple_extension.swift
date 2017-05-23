@@ -2,7 +2,7 @@
 
 // Simple structs where Codable conformance is added in extensions should not
 // derive conformance yet.
-struct SimpleStruct { // expected-note {{did you mean 'init'?}}
+struct SimpleStruct { // expected-note {{did you mean 'init(x:y:)'?}}
   var x: Int
   var y: Double
   static var z: String = "foo"

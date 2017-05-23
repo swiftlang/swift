@@ -119,3 +119,8 @@ func takesAnyObjectArchetype<T : AnyObject>(_ t: T) {
   _ = t.rawPointer
   // expected-error@-1 {{value of type 'T' has no member 'rawPointer'}}
 }
+
+func someFunction() {} //expected-note{{did you mean 'someFunction'?}}
+func someFunction(_ x: Int, y: Bool) {} //expected-note{{did you mean 'someFunction(_:y:)'?}}
+
+_ = someFunction(_:) //expected-error {{use of unresolved identifier 'someFunction(_:)'}}

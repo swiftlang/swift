@@ -620,13 +620,29 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
 }
 
 static InFlightDiagnostic
-diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
+diagnoseTypoCorrection(TypeChecker &tc, DeclName name,
+                       DeclNameLoc loc, ValueDecl *decl,
+                       SmallVectorImpl<char> &nameBuffer,
+                       StringRef &outName) {
+  
+  // If we're typo-correcting two names that share a base name with different
+  // argument names, then display the full decl name if the decl has any
+  // arguments.
+  if (name.getBaseName() == decl->getBaseName() &&
+      !decl->getFullName().getArgumentNames().empty()) {
+    outName = decl->getFullName().getString(nameBuffer);
+    return tc.diagnose(decl, diag::note_typo_candidate,
+                       outName);
+  }
+  
+  outName = decl->getName().str();
+  
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Suggest 'self' at the use point instead of pointing at the start
     // of the function.
     if (var->isSelfParameter())
       return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         var->getName().str());
+                         outName);
   }
 
   if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
@@ -641,25 +657,26 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
 
       // TODO: Handle special names
       return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getBaseName().getIdentifier().str(), kind);
+                         outName, kind);
     }
   }
 
-  // TODO: Handle special names
-  return tc.diagnose(decl, diag::note_typo_candidate,
-                     decl->getBaseName().getIdentifier().str());
+  return tc.diagnose(decl, diag::note_typo_candidate, outName);
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
                                      const LookupResult::Result &suggestion) {
   auto decl = suggestion.Decl;
-  auto &&diagnostic = diagnoseTypoCorrection(*this, loc, decl);
+  
+  SmallString<10> nameBuffer;
+  StringRef outName;
+  auto &&diagnostic = diagnoseTypoCorrection(*this, writtenName, loc,
+                                             decl, nameBuffer, outName);
 
   DeclName declName = decl->getFullName();
 
-  if (writtenName.getBaseName() != declName.getBaseName())
-    diagnostic.fixItReplace(loc.getBaseNameLoc(),
-                            declName.getBaseIdentifier().str());
+  if (writtenName != declName)
+    diagnostic.fixItReplace(loc.getSourceRange(), outName);
 
   // TODO: add fix-its for typo'ed argument labels.  This is trickier
   // because of the reordering rules.

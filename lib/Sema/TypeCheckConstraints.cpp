@@ -451,8 +451,20 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     performTypoCorrection(DC, UDRE->getRefKind(), Type(), Name, Loc,
                           lookupOptions, Lookup);
+    
+    // Check if any lookups share a basename. If that's the case, we need
+    // to disambiguate the diagnostic by printing the UDRE's full name.
+    StringRef nameStr = Name.getBaseName().str();
+    for (auto &result : Lookup) {
+      if (result->getBaseName() == Name.getBaseName()) {
+        llvm::SmallString<10> scratch;
+        Name.getString(scratch);
+        nameStr = scratch.str();
+        break;
+      }
+    }
 
-    diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
+    diagnose(Loc, diag::use_unresolved_identifier, nameStr, Name.isOperator())
       .highlight(UDRE->getSourceRange());
 
     Identifier simpleName = Name.getBaseIdentifier();

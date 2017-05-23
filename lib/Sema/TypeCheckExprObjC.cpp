@@ -257,7 +257,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                  currentType, componentName);
       else
         diagnose(componentNameLoc, diag::use_unresolved_identifier,
-                 componentName, false);
+                 componentName.str(), false);
 
       // Note all the correction candidates.
       for (auto &result : lookup) {

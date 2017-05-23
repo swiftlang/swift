@@ -2,7 +2,7 @@
 
 // Stupid Swift 3 unqualified lookup quirk
 
-func f3(_ x: Int, _ y: Int, z: Int) { } // expected-note{{did you mean 'f3'?}}
+func f3(_ x: Int, _ y: Int, z: Int) { } // expected-note{{did you mean 'f3(_:_:z:)'?}}
 
 struct S0 {
   func testS0() {

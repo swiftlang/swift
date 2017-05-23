@@ -7194,7 +7194,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
                     currentType, componentName);
       else
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
-                    componentName, false);
+                    componentName.str(), false);
 
       // Note all the correction candidates.
       for (auto &result : lookup) {
