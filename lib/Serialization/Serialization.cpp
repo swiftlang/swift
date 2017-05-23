@@ -2323,22 +2323,13 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 /// - \p decl is declared in an extension of a type that depends on
 ///   \p problemContext
 static bool contextDependsOn(const NominalTypeDecl *decl,
-                             const DeclContext *problemContext) {
-  const DeclContext *dc = decl;
-  do {
-    if (dc == problemContext)
-      return true;
-    if (auto *extension = dyn_cast<ExtensionDecl>(dc))
-      dc = extension->getAsNominalTypeOrNominalTypeExtensionContext();
-    else
-      dc = dc->getParent();
-  } while (!dc->isModuleScopeContext());
-  return false;
+                             const ModuleDecl *problemModule) {
+  return decl->getParentModule() == problemModule;
 }
 
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
-                                        const DeclContext *excluding) {
+                                        const ModuleDecl *excluding) {
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
@@ -2712,7 +2703,7 @@ void Serializer::writeDecl(const Decl *D) {
         continue;
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
-                                  /*excluding*/theEnum);
+                                  /*excluding*/theEnum->getParentModule());
     }
     for (Type ty : dependencyTypes)
       inheritedAndDependencyTypes.push_back(addTypeRef(ty));
