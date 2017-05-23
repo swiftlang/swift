@@ -1145,7 +1145,7 @@ public enum UnboundedRange_ {
 }
 public typealias UnboundedRange = (UnboundedRange_)->()
 
-extension _Indexable {
+extension Collection {
   @_inlineable
   public subscript<R: RangeExpression>(r: R)
   -> SubSequence where R.Bound == Index {
@@ -1157,7 +1157,7 @@ extension _Indexable {
     return self[startIndex...]
   }
 }
-extension _MutableIndexable {
+extension MutableCollection {
   @_inlineable
   public subscript<R: RangeExpression>(r: R) -> SubSequence
   where R.Bound == Index {
