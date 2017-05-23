@@ -1962,7 +1962,7 @@ Type TypeExpr::getInstanceType(
 TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid());
+  assert(Loc.isValid() || isImplicit);
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
   Repr->setValue(Decl);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
@@ -2015,17 +2015,6 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
 
   auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
   return new (C) TypeExpr(TypeLoc(NewTypeRepr, Type()));
-}
-
-TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
-                                             ArrayRef<TypeRepr*> args,
-                                             SourceRange AngleLocs) {
-  ASTContext &C = D->getASTContext();
-  assert(Loc.isValid());
-  auto *Repr = new (C) GenericIdentTypeRepr(Loc, D->getName(),
-                                            args, AngleLocs);
-  Repr->setValue(D);
-  return new (C) TypeExpr(TypeLoc(Repr, Type()));
 }
 
 TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,

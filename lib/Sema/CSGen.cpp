@@ -1364,7 +1364,7 @@ namespace {
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
-      type = CS.openType(type, locator);
+      type = CS.openUnboundGenericType(type, locator);
       E->getTypeLoc().setType(type, /*validated=*/true);
       return MetatypeType::get(type);
     }
@@ -1927,7 +1927,7 @@ namespace {
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
-          Type openedType = CS.openType(type, locator);
+          Type openedType = CS.openUnboundGenericType(type, locator);
           param->setType(openedType);
           param->setInterfaceType(openedType);
           continue;
@@ -2000,7 +2000,8 @@ namespace {
       case PatternKind::Typed: {
         auto typedPattern = cast<TypedPattern>(pattern);
         // FIXME: Need a better locator for a pattern as a base.
-        Type openedType = CS.openType(typedPattern->getType(), locator);
+        Type openedType = CS.openUnboundGenericType(typedPattern->getType(),
+                                                    locator);
         if (auto weakTy = openedType->getAs<WeakStorageType>())
           openedType = weakTy->getReferentType();
 
@@ -2496,8 +2497,8 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(fromExpr);
@@ -2519,8 +2520,8 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(expr->getSubExpr());
@@ -2544,8 +2545,8 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(fromExpr);
@@ -2564,8 +2565,8 @@ namespace {
 
       // Open up the type we're checking.
       // FIXME: Locator for the cast type?
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // Add a checked cast constraint.
@@ -2772,7 +2773,7 @@ namespace {
         auto rootObjectTy = resolveTypeReferenceInExpression(rootRepr);
         if (!rootObjectTy || rootObjectTy->hasError())
           return Type();
-        rootObjectTy = CS.openType(rootObjectTy, locator);
+        rootObjectTy = CS.openUnboundGenericType(rootObjectTy, locator);
         CS.addConstraint(ConstraintKind::Bind, root, rootObjectTy,
                          locator);
       }

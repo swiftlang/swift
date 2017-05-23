@@ -348,23 +348,95 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-namespace {
-  /// Function object that replaces all occurrences of archetypes and
-  /// dependent types with type variables.
-  class ReplaceDependentTypes {
-    ConstraintSystem &cs;
-    ConstraintLocatorBuilder &locator;
-    OpenedTypeMap &replacements;
+Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
+                                              ConstraintLocatorBuilder locator,
+                                              OpenedTypeMap &replacements) {
+  auto unboundDecl = unbound->getDecl();
+  if (unboundDecl->isInvalid())
+    return ErrorType::get(getASTContext());
 
-  public:
-    ReplaceDependentTypes(
-        ConstraintSystem &cs,
-        ConstraintLocatorBuilder &locator,
-        OpenedTypeMap &replacements)
-      : cs(cs), locator(locator), replacements(replacements) { }
+  // If the unbound decl hasn't been validated yet, we have a circular
+  // dependency that isn't being diagnosed properly.
+  if (!unboundDecl->getGenericSignature()) {
+    TC.diagnose(unboundDecl, diag::circular_reference);
+    return ErrorType::get(unbound);
+  }
 
-    Type operator()(Type type) {
-      // Swift only supports rank-1 polymorphism.
+  auto parentTy = unbound->getParent();
+  if (parentTy) {
+    parentTy = openUnboundGenericType(parentTy, locator);
+    unbound = UnboundGenericType::get(unboundDecl, parentTy,
+                                      getASTContext());
+  }
+
+  // Open up the generic type.
+  openGeneric(unboundDecl->getInnermostDeclContext(),
+              unboundDecl->getDeclContext(),
+              unboundDecl->getGenericSignature(),
+              /*skipProtocolSelfConstraint=*/false,
+              locator,
+              replacements);
+
+  if (parentTy) {
+    auto subs = parentTy->getContextSubstitutions(
+      parentTy->getAnyNominal());
+    for (auto pair : subs) {
+      auto found = replacements.find(
+        cast<GenericTypeParamType>(pair.first));
+      assert(found != replacements.end() &&
+             "Missing generic parameter?");
+      addConstraint(ConstraintKind::Equal, found->second, pair.second,
+                    locator);
+    }
+  }
+        
+  // Map the generic parameters to their corresponding type variables.
+  llvm::SmallVector<TypeLoc, 4> arguments;
+  for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
+    auto found = replacements.find(
+      cast<GenericTypeParamType>(gp->getCanonicalType()));
+    assert(found != replacements.end() &&
+           "Missing generic parameter?");
+    arguments.push_back(TypeLoc::withoutLoc(found->second));
+  }
+
+  // FIXME: For some reason we can end up with unbound->getDecl()
+  // pointing at a generic TypeAliasDecl here. If we find a way to
+  // handle generic TypeAliases elsewhere, this can just become a
+  // call to BoundGenericType::get().
+  return TC.applyUnboundGenericArguments(
+      unbound, unboundDecl,
+      SourceLoc(), DC, arguments,
+      /*options*/TypeResolutionOptions(),
+      /*resolver*/nullptr,
+      /*unsatisfiedDependency*/nullptr);
+}
+
+Type ConstraintSystem::openUnboundGenericType(
+       Type type,
+       ConstraintLocatorBuilder locator) {
+  assert(!type->hasTypeParameter());
+
+  if (!type->hasUnboundGenericType())
+    return type;
+
+  return type.transform([&](Type type) -> Type {
+      if (auto unbound = type->getAs<UnboundGenericType>()) {
+        OpenedTypeMap replacements;
+        return openUnboundGenericType(unbound, locator, replacements);
+      }
+
+      return type;
+    });
+}
+
+Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
+  assert(!type->hasUnboundGenericType());
+
+  if (!type->hasTypeParameter())
+    return type;
+
+  return type.transform([&](Type type) -> Type {
       assert(!type->is<GenericFunctionType>());
 
       // Replace a generic type parameter with its corresponding type variable.
@@ -375,98 +447,8 @@ namespace {
         return known->second;
       }
 
-      // Replace a dependent member with a fresh type variable and make it a
-      // member of its base type.
-      if (auto dependentMember = type->getAs<DependentMemberType>()) {
-        // Replace type parameters in the base type.
-        if (auto base =
-            ((*this)(dependentMember->getBase()))->getAs<TypeVariableType>()) {
-          return
-            DependentMemberType::get(base, dependentMember->getAssocType());
-        }
-      }
-
-      // Open up unbound generic types, turning them into bound generic
-      // types with type variables for each parameter.
-      if (auto unbound = type->getAs<UnboundGenericType>()) {
-        auto unboundDecl = unbound->getDecl();
-        if (unboundDecl->isInvalid())
-          return ErrorType::get(cs.getASTContext());
-        
-        auto parentTy = unbound->getParent();
-        if (parentTy) {
-          parentTy = parentTy.transform(*this);
-          unbound = UnboundGenericType::get(unboundDecl, parentTy,
-                                            cs.getASTContext());
-        }
-
-        // If the unbound decl hasn't been validated yet, we have a circular
-        // dependency that isn't being diagnosed properly.
-        if (!unboundDecl->getGenericSignature()) {
-          cs.TC.diagnose(unboundDecl, diag::circular_reference);
-          return ErrorType::get(type);
-        }
-
-        OpenedTypeMap unboundReplacements;
-
-        // Open up the generic type.
-        cs.openGeneric(unboundDecl->getInnermostDeclContext(),
-                       unboundDecl->getDeclContext(),
-                       unboundDecl->getGenericSignature(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
-                       unboundReplacements);
-
-        if (parentTy) {
-          auto subs = parentTy->getContextSubstitutions(
-            parentTy->getAnyNominal());
-          for (auto pair : subs) {
-            auto found = unboundReplacements.find(
-              cast<GenericTypeParamType>(pair.first));
-            assert(found != unboundReplacements.end() &&
-                  "Missing generic parameter?");
-            cs.addConstraint(ConstraintKind::Equal, found->second, pair.second,
-                             locator);
-          }
-        }
-        
-        // Map the generic parameters to their corresponding type variables.
-        llvm::SmallVector<TypeLoc, 4> arguments;
-        for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
-          auto found = unboundReplacements.find(
-            cast<GenericTypeParamType>(gp->getCanonicalType()));
-          assert(found != unboundReplacements.end() &&
-                 "Missing generic parameter?");
-          arguments.push_back(TypeLoc::withoutLoc(found->second));
-        }
-
-        // FIXME: For some reason we can end up with unbound->getDecl()
-        // pointing at a generic TypeAliasDecl here. If we find a way to
-        // handle generic TypeAliases elsewhere, this can just become a
-        // call to BoundGenericType::get().
-        return cs.TC.applyUnboundGenericArguments(
-                                             unbound, unboundDecl,
-                                             SourceLoc(), cs.DC, arguments,
-                                             /*options*/TypeResolutionOptions(),
-                                             /*resolver*/nullptr,
-                                             /*unsatisfiedDependency*/nullptr);
-      }
-      
       return type;
-    }
-  };
-} // end anonymous namespace
-
-Type ConstraintSystem::openType(
-       Type startingType,
-       ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements) {
-  if (!startingType->hasTypeParameter() &&
-      !startingType->hasUnboundGenericType())
-    return startingType;
-
-  ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements);
-  return startingType.transform(replaceDependentTypes);
+    });
 }
 
 /// Remove argument labels from the function type.
@@ -513,15 +495,15 @@ Type ConstraintSystem::openFunctionType(
                 replacements);
 
     // Transform the input and output types.
-    auto inputTy = openType(genericFn->getInput(), locator, replacements);
-    auto resultTy = openType(genericFn->getResult(), locator, replacements);
+    auto inputTy = openType(genericFn->getInput(), replacements);
+    auto resultTy = openType(genericFn->getResult(), replacements);
 
     // Build the resulting (non-generic) function type.
     type = FunctionType::get(inputTy, resultTy,
                              FunctionType::ExtInfo().
                                withThrows(genericFn->throws()));
   } else {
-    type = openType(funcType, locator, replacements);
+    type = openType(funcType, replacements);
   }
 
   return removeArgumentLabels(type, numArgumentLabelsToRemove);
@@ -567,27 +549,6 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
   }
 
   return false;
-}
-
-Type ConstraintSystem::openBindingType(Type type, 
-                                       ConstraintLocatorBuilder locator) {
-  Type result = openType(type, locator);
-  
-  if (isArrayType(type)) {
-    auto boundStruct = type->getAs<BoundGenericStructType>();
-    if (auto replacement = getTypeChecker().getArraySliceType(
-                             SourceLoc(), boundStruct->getGenericArgs()[0])) {
-      return replacement;
-    }
-  }
-
-  if (auto dict = isDictionaryType(type)) {
-    if (auto replacement = getTypeChecker().getDictionaryType(
-                             SourceLoc(), dict->first, dict->second))
-      return replacement;
-  }
-
-  return result;
 }
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
@@ -714,17 +675,16 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
 
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     bool isTypeReference,
                                      bool isSpecialized,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      const DeclRefExpr *base) {
-  OpenedTypeMap replacements;
-
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
+
+    OpenedTypeMap replacements;
 
     auto openedType = openFunctionType(
             func->getInterfaceType()->castTo<AnyFunctionType>(),
@@ -734,7 +694,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
             func->getDeclContext(),
             /*skipProtocolSelfConstraint=*/false);
     auto openedFnType = openedType->castTo<FunctionType>();
-    
+
+    // If we opened up any type variables, record the replacements.
+    recordOpenedTypes(locator, replacements);
+
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
     if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
@@ -750,9 +713,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       openedFnType = openedType->castTo<FunctionType>();
     }
 
-    // If we opened up any type variables, record the replacements.
-    recordOpenedTypes(locator, replacements);
-
     // The reference implicitly binds 'self'.
     return { openedType, openedFnType->getResult() };
   }
@@ -765,13 +725,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                                       isSpecialized);
 
     // Open the type.
-    type = openType(type, locator, replacements);
+    type = openUnboundGenericType(type, locator);
 
-    // If we opened up any type variables, record the replacements.
-    recordOpenedTypes(locator, replacements);
-
-    // If it's a type reference or it's a module type, we're done.
-    if (isTypeReference || type->is<ModuleType>())
+    // Module types are not wrapped in metatypes.
+    if (type->is<ModuleType>())
       return { type, type };
 
     // If it's a value reference, refer to the metatype.
@@ -802,6 +759,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Adjust the type of the reference.
   if (auto funcType = valueType->getAs<AnyFunctionType>()) {
+    OpenedTypeMap replacements;
+
     valueType =
       openFunctionType(
           funcType,
@@ -812,12 +771,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
           value->getInnermostDeclContext(),
           value->getDeclContext(),
           /*skipProtocolSelfConstraint=*/false);
-  } else {
-    valueType = openType(valueType, locator, replacements);
-  }
 
-  // If we opened up any type variables, record the replacements.
-  recordOpenedTypes(locator, replacements);
+    // If we opened up any type variables, record the replacements.
+    recordOpenedTypes(locator, replacements);
+  } else {
+    assert(!valueType->hasUnboundGenericType() &&
+           !valueType->hasTypeParameter());
+  }
 
   return { valueType, valueType };
 }
@@ -924,8 +884,6 @@ void ConstraintSystem::openGeneric(
     (void) result;
   }
 
-  ReplaceDependentTypes replaceDependentTypes(*this, locator, replacements);
-
   // Remember that any new constraints generated by opening this generic are
   // due to the opening.
   locatorPtr = getConstraintLocator(
@@ -937,7 +895,7 @@ void ConstraintSystem::openGeneric(
   for (auto req : sig->getRequirements()) {
   switch (req.getKind()) {
     case RequirementKind::Conformance: {
-      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
+      auto subjectTy = openType(req.getFirstType(), replacements);
       auto proto = req.getSecondType()->castTo<ProtocolType>();
       auto protoDecl = proto->getDecl();
 
@@ -954,7 +912,7 @@ void ConstraintSystem::openGeneric(
     }
 
     case RequirementKind::Layout: {
-      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
+      auto subjectTy = openType(req.getFirstType(), replacements);
       auto layoutConstraint = req.getLayoutConstraint();
 
       if (layoutConstraint->isClass())
@@ -968,15 +926,15 @@ void ConstraintSystem::openGeneric(
     }
 
     case RequirementKind::Superclass: {
-      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
-      auto boundTy = req.getSecondType().transform(replaceDependentTypes);
+      auto subjectTy = openType(req.getFirstType(), replacements);
+      auto boundTy = openType(req.getSecondType(), replacements);
       addConstraint(ConstraintKind::Subtype, subjectTy, boundTy, locatorPtr);
       break;
     }
 
     case RequirementKind::SameType: {
-      auto firstTy = req.getFirstType().transform(replaceDependentTypes);
-      auto secondTy = req.getSecondType().transform(replaceDependentTypes);
+      auto firstTy = openType(req.getFirstType(), replacements);
+      auto secondTy = openType(req.getSecondType(), replacements);
       addConstraint(ConstraintKind::Bind, firstTy, secondTy, locatorPtr);
       break;
     }
@@ -1023,7 +981,6 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
-    bool isTypeReference,
     bool isDynamicResult,
     FunctionRefKind functionRefKind,
     ConstraintLocatorBuilder locator,
@@ -1039,7 +996,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false,
+    return getTypeOfReference(value, /*isSpecialized=*/false,
                               functionRefKind, locator, base);
   }
 
@@ -1059,8 +1016,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // Refer to a member of the archetype directly.
     auto archetype = baseObjTy->castTo<ArchetypeType>();
     Type memberTy = archetype->getNestedType(value->getName());
-    if (!isTypeReference)
-      memberTy = MetatypeType::get(memberTy);
+    memberTy = MetatypeType::get(memberTy);
 
     auto openedType = FunctionType::get(baseObjTy, memberTy);
     return { openedType, memberTy };
@@ -1099,20 +1055,16 @@ ConstraintSystem::getTypeOfMemberReference(
     // Remove argument labels, if needed.
     openedType = removeArgumentLabels(openedType, numRemovedArgumentLabels);
 
-    // If we have a type reference, look through the metatype.
-    if (isTypeReference)
-      openedType = openedType->castTo<AnyMetatypeType>()->getInstanceType();
-
     // Open up the generic parameter list for the container.
     openGeneric(innerDC, outerDC, innerDC->getGenericSignatureOfContext(),
                 /*skipProtocolSelfConstraint=*/true,
                 locator, replacements);
 
     // Open up the type of the member.
-    openedType = openType(openedType, locator, replacements);
+    openedType = openType(openedType, replacements);
 
     // Determine the object type of 'self'.
-    auto selfTy = openType(outerDC->getSelfInterfaceType(), locator,
+    auto selfTy = openType(outerDC->getSelfInterfaceType(),
                            replacements);
 
     // If self is a struct, properly qualify it based on our base
@@ -1396,10 +1348,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::TypeDecl: {
-  
-    bool isTypeReference = choice.getKind() == OverloadChoiceKind::TypeDecl;
+  case OverloadChoiceKind::DeclViaUnwrappedOptional: {
     bool isDynamicResult
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
@@ -1425,12 +1374,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       auto base = getDotBase(anchor);
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(baseTy, choice.getDecl(), useDC,
-                                   isTypeReference, isDynamicResult,
+                                   isDynamicResult,
                                    choice.getFunctionRefKind(),
                                    locator, base, nullptr);
     } else {
       std::tie(openedFullType, refType)
-        = getTypeOfReference(choice.getDecl(), isTypeReference,
+        = getTypeOfReference(choice.getDecl(),
                              choice.isSpecialized(),
                              choice.getFunctionRefKind(), locator);
     }
@@ -1716,7 +1665,6 @@ DeclName OverloadChoice::getName() const {
   switch (getKind()) {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
       return getDecl()->getFullName();

@@ -618,7 +618,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   return requestedType;
 }
 
-Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
+Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
   AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
