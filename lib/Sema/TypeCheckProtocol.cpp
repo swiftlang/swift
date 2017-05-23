@@ -6467,6 +6467,8 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
             if (!storageReq)
               continue;
             req = storageReq->getAccessorFunction(accessorKind);
+            if (!req)
+              continue;
           }
           result.push_back(req);
           if (anySingleRequirement) return result;
