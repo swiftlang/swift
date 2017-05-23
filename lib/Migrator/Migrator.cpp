@@ -112,6 +112,12 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   CompilerInvocation Invocation { StartInvocation };
   Invocation.clearInputs();
   Invocation.getLangOptions().EffectiveLanguageVersion = SwiftLanguageVersion;
+  auto &LLVMArgs = Invocation.getFrontendOptions().LLVMArgs;
+  auto aarch64_use_tbi = std::find(LLVMArgs.begin(), LLVMArgs.end(),
+                                   "-aarch64-use-tbi");
+  if (aarch64_use_tbi != LLVMArgs.end()) {
+    LLVMArgs.erase(aarch64_use_tbi);
+  }
 
   // SE-0160: When migrating, always use the Swift 3 @objc inference rules,
   // which drives warnings with the "@objc" Fix-Its.
