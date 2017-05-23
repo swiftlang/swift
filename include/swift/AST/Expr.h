@@ -1397,12 +1397,6 @@ public:
                                        SourceLoc NameLoc,
                                        TypeDecl *Decl);
 
-  /// Create a TypeExpr for a generic TypeDecl with the given arguments applied
-  /// at the specified location.
-  static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
-                                            ArrayRef<TypeRepr*> args,
-                                            SourceRange angleLocs);
-
   /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
   /// at the specified location.
   ///
