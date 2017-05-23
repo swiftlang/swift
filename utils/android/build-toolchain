@@ -26,10 +26,10 @@ SWIFT_LINUX_DIR="${SRC_DIR}/../build/Ninja-ReleaseAssert/swift-linux-x86_64"
     --android \
     --android-ndk "${ANDROID_NDK_DIR}" \
     --android-api-level 21 \
-    --android-icu-uc "${ANDROID_NDK_DIR}/armeabi-v7a" \
-    --android-icu-uc-include "${ANDROID_NDK_DIR}/armeabi-v7a/icu/source/common" \
-    --android-icu-i18n "${ANDROID_NDK_DIR}/armeabi-v7a" \
-    --android-icu-i18n-include "${ANDROID_NDK_DIR}/armeabi-v7a/icu/source/i18n" || exit
+    --android-icu-uc "${ANDROID_ICU_DIR}/armeabi-v7a" \
+    --android-icu-uc-include "${ANDROID_ICU_DIR}/armeabi-v7a/icu/source/common" \
+    --android-icu-i18n "${ANDROID_ICU_DIR}/armeabi-v7a" \
+    --android-icu-i18n-include "${ANDROID_ICU_DIR}/armeabi-v7a/icu/source/i18n" || exit
 
 test -e ${SWIFT_LINUX_DIR} || exit
 rm -rf ${SWIFT_TOOLCHAIN_DIR}
