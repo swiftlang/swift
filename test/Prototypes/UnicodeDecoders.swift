@@ -39,8 +39,7 @@ extension Unicode {
   struct DefaultScalarView<
     CodeUnits: BidirectionalCollection,
     Encoding: Unicode.Encoding
-  > where CodeUnits.Element == Encoding.CodeUnit, 
-          CodeUnits._Element == CodeUnits.Element {
+  > where CodeUnits.Element == Encoding.CodeUnit {
     var codeUnits: CodeUnits
     init(
       _ codeUnits: CodeUnits,
