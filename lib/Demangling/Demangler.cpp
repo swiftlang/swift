@@ -1263,7 +1263,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
                                : Node::Kind::KeyPathSetterThunkHelper;
       auto type = popNode();
       auto sigOrDecl = popNode();
-      if (sigOrDecl->getKind() == Node::Kind::DependentGenericSignature) {
+      if (sigOrDecl &&
+          sigOrDecl->getKind() == Node::Kind::DependentGenericSignature) {
         auto decl = popNode();
         return createWithChildren(nodeKind, decl, sigOrDecl, type);
       } else {
