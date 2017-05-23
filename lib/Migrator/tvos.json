@@ -1597,6 +1597,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVContentKeyRequest(im)makeStreamingContentKeyRequestDataForApp:contentIdentifier:options:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)AVContentKeySession(cm)contentKeySessionWithKeySystem:storageDirectoryAtURL:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AVMediaSelectionOption(im)hasMediaCharacteristic:",
@@ -2774,6 +2796,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FE10FoundationVSC8_NSRangecFGVs5RangeSi_S0_",
+    "LeftComment": "Range<Int>",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1:0",
     "LeftUsr": "s:FV10Foundation12CharacterSetcFT12charactersInGVs5RangeSc__S0_",
@@ -3694,6 +3738,39 @@
     "RightUsr": "",
     "RightComment": "setColorStoreAction(_:index:)",
     "ModuleName": "Metal"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SKCloudServiceSetupOptionsAffiliateTokenKey",
+    "LeftComment": "affiliateTokenKey",
+    "RightUsr": "",
+    "RightComment": "affiliateToken",
+    "ModuleName": "StoreKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SKCloudServiceSetupOptionsCampaignTokenKey",
+    "LeftComment": "campaignTokenKey",
+    "RightUsr": "",
+    "RightComment": "campaignToken",
+    "ModuleName": "StoreKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SKPaymentQueue(im)resumeDownloads:",
+    "LeftComment": "resume(_:)",
+    "RightUsr": "",
+    "RightComment": "resumeDownloads(_:)",
+    "ModuleName": "StoreKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -9322,6 +9399,21 @@
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(pl)UIDataSourceTranslating(im)performUsingPresentationValues:",
+    "Index": 1
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(pl)UIDataSourceTranslating(im)performUsingPresentationValues:",
+    "Index": 1
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(pl)UIDataSourceTranslating(im)performUsingPresentationValues:",
+    "Index": 1
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:@F@CGPathApplyWithBlock",
     "Index": 1
   },
@@ -9389,11 +9481,6 @@
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)XCTestCase(im)measureMetrics:automaticallyStartMeasuring:forBlock:",
     "Index": 3
-  },
-  {
-    "DiffItemKind": "NoEscapeFuncParam",
-    "Usr": "c:objc(cs)XCTestCase(im)runActivityNamed:inScope:",
-    "Index": 2
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -9881,15 +9968,7 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:orientation:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:orientation:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
