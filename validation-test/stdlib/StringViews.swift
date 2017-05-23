@@ -106,14 +106,18 @@ tests.test("index-mapping/character-to-utf8") {
       }
     }, sameValue: ==)
 
-  expectEqual(winter.utf8.endIndex, winter.endIndex.samePosition(in: winter.utf8))
+  expectEqual(
+    winter.utf8.endIndex, winter.endIndex.samePosition(in: winter.utf8))
   
   expectEqualSequence(
     summerBytes,
-    summer.characters.indices.map { summer.utf8[$0.samePosition(in: summer.utf8)] }
+    summer.characters.indices.map {
+      summer.utf8[$0.samePosition(in: summer.utf8)]
+    }
   )
   
-  expectEqual(summer.utf8.endIndex, summer.endIndex.samePosition(in: summer.utf8))
+  expectEqual(
+    summer.utf8.endIndex, summer.endIndex.samePosition(in: summer.utf8))
 }
 
 tests.test("index-mapping/unicode-scalar-to-utf8") {
@@ -639,7 +643,7 @@ tests.test("UTF8 indexes") {
       //===--- while loop -------------------------------------------------===//
       // Advance an index from u8i0 over ds Unicode scalars (thus
       // reaching u8i1) by counting leading bytes traversed
-      var u8i0a = u8i0
+      var u8i0a = u8i0! // <========== NOTE SOURCE COMPATIBILITY BREAKAGE
       var dsa = 0      // number of Unicode scalars it has advanced over
       
       while true {
@@ -742,25 +746,8 @@ tests.test("UnicodeScalars->String") {
   }
 }
 
-#if _runtime(_ObjC)
-tests.test("String.UTF16View.Index/Strideable")
-  .forEach(in: utfTests) {
-  test in
-
-  func allIndices<C : Collection>(of c: C) -> [C.Index]
-  where C.Indices.Iterator.Element == C.Index
-  {
-    var result = Array(c.indices)
-    result.append(c.endIndex)
-    return result
-  }
-
-  checkStrideable(
-    instances: allIndices(of: test.string.utf16),
-    distances: Array(0..<test.string.utf16.count),
-    distanceOracle: { $1 - $0 })
-}
-#endif
+// Note: Strideable conformance for UTF16View.Index when Foundation is imported
+// has been dropped for Swift 4.
 
 tests.test("String.UTF8View/Collection")
   .forEach(in: utfTests) {

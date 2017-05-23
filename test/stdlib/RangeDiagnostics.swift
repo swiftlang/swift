@@ -292,16 +292,17 @@ func disallowSubscriptingOnIntegers() {
 
     r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0..<4]   // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[0..<4]   // expected-error {{ambiguous reference to member 'subscript'}}
+    // FIXME: Note diagnostic quality degradation
+    r2[0..<4]   // expected-error {{ambiguous reference to member '..<'}}
+    r3[0..<4]   // expected-error {{ambiguous reference to member '..<'}}
     (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
     (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableRange<_>'}}
     // expected-note@-1 {{overloads for 'subscript'}}
 
     r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0...4]   // expected-error {{ambiguous reference to member 'subscript'}}
-    r3[0...4]   // expected-error {{ambiguous reference to member 'subscript'}} 
+    r2[0...4]   // expected-error {{ambiguous reference to member '...'}}
+    r3[0...4]   // expected-error {{ambiguous reference to member '...'}} 
     (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableClosedRange<_>'}} expected-note {{overloads for 'subscript' exist with these partially matching parameter lists: (ClosedRangeIndex<Bound>), (Range<ClosedRangeIndex<Bound>>), (Range<Self.Index>), (R), ((UnboundedRange_) -> ()), (ClosedRange<Self.Index>), (CountableRange<Self.Index>), (CountableClosedRange<Self.Index>)}}
     (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<_>' with an index of type 'CountableClosedRange<_>'}} expected-note {{overloads for 'subscript' exist with these partially matching parameter lists: (ClosedRangeIndex<Bound>), (Range<ClosedRangeIndex<Bound>>), (Range<Self.Index>), (R), ((UnboundedRange_) -> ()), (ClosedRange<Self.Index>), (CountableRange<Self.Index>), (CountableClosedRange<Self.Index>)}}
 
