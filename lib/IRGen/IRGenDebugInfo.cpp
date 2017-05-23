@@ -1998,13 +1998,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
-    auto *ParentBB = Alloca->getParent();
-    auto InsertBefore = std::next(Alloca->getIterator());
-    if (InsertBefore != ParentBB->end())
-      DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
-    else
-      DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
+  if (isa<llvm::AllocaInst>(Storage)) {
+    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
     return;
   }
 
