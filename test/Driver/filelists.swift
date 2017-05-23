@@ -32,6 +32,15 @@
 // CHECK-WMO-THREADED-NEXT: ...with output!
 // CHECK-WMO-THREADED-NOT: Handled
 
+// RUN: mkdir -p %t/tmp-fail/
+// RUN: (cd %t && not env TMPDIR="%t/tmp-fail/" %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/fail.py -c ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json -force-single-frontend-invocation -num-threads 1)
+// RUN: not ls %t/tmp-fail/sources-*
+// RUN: not ls %t/tmp-fail/outputs-*
+
+// RUN: mkdir -p %t/tmp-crash/
+// RUN: (cd %t && not env TMPDIR="%t/tmp-crash/" %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/crash.py -c ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json -force-single-frontend-invocation -num-threads 1)
+// RUN: ls %t/tmp-crash/sources-* %t/tmp-crash/outputs-*
+
 
 // RUN: (cd %t && env PATH=%t/bin/:$PATH %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json 2>&1 | %FileCheck -check-prefix=CHECK-LINK %s)
 // RUN: (cd %t && env PATH=%t/bin/:$PATH %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json -force-single-frontend-invocation -num-threads 1 2>&1 | %FileCheck -check-prefix=CHECK-LINK %s)

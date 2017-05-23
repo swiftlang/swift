@@ -118,6 +118,17 @@ public:
       return false;
     }
   }
+
+  bool isToPropertyChange() const {
+    switch (DiffKind) {
+    case NodeAnnotation::GetterToProperty:
+    case NodeAnnotation::SetterToProperty:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   StringRef getNewName() const { assert(isRename()); return RightComment; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
