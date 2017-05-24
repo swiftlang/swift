@@ -729,7 +729,7 @@ public:
     if (!Alloca.isValid())
       Alloca = createAlloca(Ty, Align, Name+".addr");
 
-    ArtificialLocation AutoRestore(getDebugScope(), IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
@@ -769,7 +769,7 @@ public:
     Alignment align(layout->getAlignment());
 
     auto alloca = createAlloca(aggregateType, align, Name + ".debug");
-    ArtificialLocation AutoRestore(getDebugScope(), IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     size_t i = 0;
     for (auto val : vals) {
       auto addr = Builder.CreateStructGEP(alloca, i,
