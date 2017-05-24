@@ -614,5 +614,14 @@ tests.test("signum/concrete") {
 % end
 }
 
+tests.test("no literal overflows") {
+  // these expressions should use the homogeneous versions of comparison
+  // operators and not result in compile-time overflow errors.
+  let u64: UInt64 = 42
+% for op in ['==', '!=', '<', '<=', '>', '>=']:
+  _ = u64 ${op} 0xFFFF_FFFF_FFFF_FFFF
+% end
+}
+
 
 runAllTests()
