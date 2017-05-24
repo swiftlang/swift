@@ -1363,7 +1363,7 @@ public protocol BinaryInteger :
   /// - Parameter source: A floating-point value to convert to an integer.
   init?<T : FloatingPoint>(exactly source: T)
 
-  /// Creates an integer from the given floating-point value rounded toward
+  /// Creates an integer from the given floating-point value, rounding toward
   /// zero.
   ///
   ///     let x = Int(21.5)
