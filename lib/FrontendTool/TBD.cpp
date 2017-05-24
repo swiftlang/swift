@@ -60,9 +60,24 @@ bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
   return false;
 }
 
+bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
+  // Only things that involve an AST can have a TBD file computed, at the
+  // moment.
+  switch (kind) {
+  case InputFileKind::IFK_Swift:
+  case InputFileKind::IFK_Swift_Library:
+    return true;
+  case InputFileKind::IFK_None:
+  case InputFileKind::IFK_Swift_REPL:
+  case InputFileKind::IFK_SIL:
+  case InputFileKind::IFK_LLVM_IR:
+    return false;
+  }
+}
+
 static bool validateSymbolSet(DiagnosticEngine &diags,
-                              llvm::StringSet<> symbols,
-                              llvm::Module &IRModule) {
+                              llvm::StringSet<> symbols, llvm::Module &IRModule,
+                              bool diagnoseExtraSymbolsInTBD) {
   auto error = false;
 
   // Diff the two sets of symbols, flagging anything outside their intersection.
@@ -96,31 +111,37 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
     error = true;
   }
 
-  for (auto &name : sortSymbols(symbols)) {
-    diags.diagnose(SourceLoc(), diag::symbol_in_tbd_not_in_ir, name,
-                   Demangle::demangleSymbolAsString(name));
-    error = true;
+  if (diagnoseExtraSymbolsInTBD) {
+    // Look for any extra symbols.
+    for (auto &name : sortSymbols(symbols)) {
+      diags.diagnose(SourceLoc(), diag::symbol_in_tbd_not_in_ir, name,
+                     Demangle::demangleSymbolAsString(name));
+      error = true;
+    }
   }
 
   return error;
 }
 
 bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
-                        bool hasMultipleIRGenThreads) {
+                        bool hasMultipleIRGenThreads,
+                        bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
   for (auto file : M->getFiles())
     enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
                            /*isWholeModule=*/true);
 
-  return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule);
+  return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule,
+                           diagnoseExtraSymbolsInTBD);
 }
 
 bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule,
-                        bool hasMultipleIRGenThreads) {
+                        bool hasMultipleIRGenThreads,
+                        bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
   enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
                          /*isWholeModule=*/false);
 
   return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
-                           symbols, IRModule);
+                           symbols, IRModule, diagnoseExtraSymbolsInTBD);
 }
