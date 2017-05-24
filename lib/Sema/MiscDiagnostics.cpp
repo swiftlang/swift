@@ -3114,7 +3114,26 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName().str();
+        // Only print the type name if the function is implemented outside the
+        // current class.
+        {
+          auto shouldAddNominalTypeName = [&]() {
+            if (auto innerDC = DC->getInnermostTypeContext()) {
+              if (auto innerClass = innerDC->getAsClassOrClassExtensionContext()) {
+                if (innerClass->findImplementingMethod(bestMethod)) {
+                  return false;
+                }
+              }
+            }
+            return true;
+          };
+
+          if (shouldAddNominalTypeName()) {
+            out << nominal->getName().str() << ".";
+          }
+        }
+
+        out << name.getBaseName().str();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument

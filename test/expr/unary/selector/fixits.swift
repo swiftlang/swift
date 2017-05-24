@@ -109,3 +109,56 @@ func testSelectorConstruction() {
   // Note: from Foundation
   _ = Selector("initWithArray:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-33=#selector(NSSet.init(array:))}}
 }
+
+extension Bar {
+  func testDeprecatedStringLiteralSelectorExcludesTypeName() {
+    let sel1: Selector = "methodWithValue:label:" // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{26-50=#selector(method(_:label:))}}
+    _ = sel1
+
+    _ = "methodWithValue:label:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-45=#selector(method(_:label:))}}
+    _ = "property" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-31=#selector(getter: property)}}
+    _ = "setProperty:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-35=#selector(setter: property)}}
+    _ = "unknownMethodWithValue:label:" as Selector // expected-warning{{no method declared with Objective-C selector 'unknownMethodWithValue:label:'}}{{9-9=Selector(}}{{40-52=)}}
+    _ = "badSelector:label" as Selector // expected-warning{{string literal is not a valid Objective-C selector}}
+    _ = "method2WithValue:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-40=#selector(method2(_:))}}
+    _ = "method3" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-30=#selector(method3)}}
+
+    // Overloaded cases
+    _ = "overloadedWithInt:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-41=#selector(overloaded(_:) as (Bar) -> (Int) -> ())}}
+    _ = "overloadedWithString:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-44=#selector(overloaded(_:) as (Bar) -> (String) -> ())}}
+
+    _ = "staticOverloadedWithInt:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-47=#selector(staticOverloaded(_:) as (Int) -> ())}}
+    _ = "staticOverloadedWithString:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-50=#selector(staticOverloaded(_:) as (String) -> ())}}
+
+    // We don't need coercion here because we get the right selector
+    // from the static method.
+    _ = "staticOrNonStatic:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-41=#selector(staticOrNonStatic(_:))}}
+
+    // We need coercion here because we asked for a selector from an
+    // instance method with the same name as (but a different selector
+    // from) a static method.
+    _ = "theInstanceOne:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-38=#selector(staticOrNonStatic2(_:) as (Bar) -> (Int) -> ())}}
+
+    // Note: from Foundation
+    _ = "initWithArray:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-37=#selector(NSSet.init(array:))}}
+
+    // Note: from Foundation overlay
+    _ = "methodIntroducedInOverlay" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-48=#selector(NSArray.introducedInOverlay)}}
+  }
+
+  func testSelectorConstructionExcludesTypeName() {
+    _ = Selector("methodWithValue:label:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{9-43=#selector(method(_:label:))}}
+    _ = Selector("property") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{9-29=#selector(getter: property)}}
+    _ = Selector("setProperty:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{9-33=#selector(setter: property)}}
+
+    _ = Selector("unknownMethodWithValue:label:") // expected-warning{{no method declared with Objective-C selector 'unknownMethodWithValue:label:'}}
+    // expected-note@-1{{wrap the selector name in parentheses to suppress this warning}}{{18-18=(}}{{49-49=)}}
+    _ = Selector(("unknownMethodWithValue:label:"))
+    _ = Selector("badSelector:label") // expected-warning{{string literal is not a valid Objective-C selector}}
+    _ = Selector("method2WithValue:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{9-38=#selector(method2(_:))}}
+    _ = Selector("method3") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{9-28=#selector(method3)}}
+
+    // Note: from Foundation
+    _ = Selector("initWithArray:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{9-35=#selector(NSSet.init(array:))}}
+  }
+}
