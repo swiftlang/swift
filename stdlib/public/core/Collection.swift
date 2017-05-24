@@ -499,7 +499,7 @@ public struct IndexingIterator<
 /// and shares the original collection's semantics.
 ///
 /// The following example creates a `firstWord` constant by using the
-/// `prefix(where:)` method to get a slice of the `text` string.
+/// `prefix(while:)` method to get a slice of the `text` string.
 ///
 ///     let firstWord = text.prefix(while: { $0 != " " })
 ///     print(firstWord)

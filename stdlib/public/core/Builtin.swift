@@ -831,7 +831,7 @@ public func type<T, Metatype>(of value: T) -> Metatype {
 ///         }
 ///     }
 ///
-/// - Important: The escapable copy of `closure` passed as `body` is only valid
+/// - Important: The escapable copy of `closure` passed to `body` is only valid
 ///   during the call to `withoutActuallyEscaping(_:do:)`. It is undefined
 ///   behavior for the escapable closure to be stored, referenced, or executed
 ///   after the function returns.

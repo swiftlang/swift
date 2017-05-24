@@ -5439,11 +5439,10 @@ extension ${Self} {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
-/// Used to access the members in an instance of `Set<Element>`."""
+/// The position of an element in a set."""
 elif Self == 'Dictionary':
   SubscriptingWithIndexDoc = """\
-/// Used to access the key-value pairs in an instance of
-/// `Dictionary<Key, Value>`.
+/// The position of a key-value pair in a dictionary.
 ///
 /// Dictionary has two subscripting interfaces:
 ///
