@@ -258,21 +258,22 @@ extension Unicode.UTF8 : UnicodeCodec {
   ///   - input: The Unicode scalar value to encode.
   ///   - processCodeUnit: A closure that processes one code unit argument at a
   ///     time.
+  @inline(__always)
   public static func encode(
     _ input: Unicode.Scalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var s = encode(input)!._storage
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    var s = encode(input)!._biasedBits
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
     s &>>= 8
     if _fastPath(s == 0) { return }
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
     s &>>= 8
     if _fastPath(s == 0) { return }
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
     s &>>= 8
     if _fastPath(s == 0) { return }
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
   }
 
   /// Returns a Boolean value indicating whether the specified code unit is a
