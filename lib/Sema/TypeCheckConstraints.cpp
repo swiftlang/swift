@@ -454,12 +454,17 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     
     // Check if any lookups share a basename. If that's the case, we need
     // to disambiguate the diagnostic by printing the UDRE's full name.
+    //
+    // We need to build a string here because the default printing behavior for
+    // DeclNames skips printing arguments if all the names are empty. Because
+    // we want to be explicit if there is any ambiguity in the unresolved
+    // identifiers, we explicitly get the full serialized DeclName for this
+    // diagnostic.
     StringRef nameStr = Name.getBaseName().str();
     for (auto &result : Lookup) {
       if (result->getBaseName() == Name.getBaseName()) {
         llvm::SmallString<10> scratch;
-        Name.getString(scratch);
-        nameStr = scratch.str();
+        nameStr = Name.getString(scratch);
         break;
       }
     }
