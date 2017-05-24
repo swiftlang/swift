@@ -649,7 +649,12 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   if (value->isInvalid())
     return ErrorType::get(Context);
 
-  Type requestedType = getTypeOfRValue(value, wantInterfaceType);
+  Type requestedType = (wantInterfaceType
+                        ? value->getInterfaceType()
+                        : value->getType());
+
+  requestedType = requestedType->getLValueOrInOutObjectType()
+    ->getReferenceStorageReferent();
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.

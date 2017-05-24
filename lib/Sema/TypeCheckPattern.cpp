@@ -1108,7 +1108,7 @@ recur:
       NP->getDecl()->setLet(false);
     }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
-      type = getTypeOfRValue(var, false);
+      type = var->getType()->getReferenceStorageReferent();
     else if (!var->isInvalid())
       type = var->getType();
     P->setType(type);

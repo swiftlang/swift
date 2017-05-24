@@ -492,23 +492,6 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   return makeBinOp(TC, op1.op, LHS, RHS, op1.precedence, S.empty());
 }
 
-Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
-
-  Type type;
-  if (wantInterfaceType) {
-    if (!value->hasInterfaceType())
-      validateDecl(value);
-    type = value->getInterfaceType();
-  } else {
-    auto *var = cast<VarDecl>(value);
-    if (!var->hasType())
-      validateDecl(var);
-    type = var->getType();
-  }
-
-  return type->getLValueOrInOutObjectType()->getReferenceStorageReferent();
-}
-
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
   if (Context.hasOptionalIntrinsics(this)) return false;
 

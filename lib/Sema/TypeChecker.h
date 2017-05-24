@@ -1705,9 +1705,6 @@ public:
                                   const DeclRefExpr *base = nullptr,
                                   bool wantInterfaceType = false);
 
-  /// Return the non-lvalue type-of-reference of the given value.
-  Type getTypeOfRValue(ValueDecl *value, bool wantInterfaceType = false);
-
   /// \brief Retrieve the default type for the given protocol.
   ///
   /// Some protocols, particularly those that correspond to literals, have
