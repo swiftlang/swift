@@ -1689,8 +1689,7 @@ public:
   static void contextualizeTopLevelCode(TopLevelContext &TLC,
                                         ArrayRef<Decl*> topLevelDecls);
 
-  /// Return the type-of-reference of the given value.  This does not
-  /// open values of polymorphic function type.
+  /// Return the type-of-reference of the given value.
   ///
   /// \param baseType if non-null, return the type of a member reference to
   ///   this value when the base has the given type
@@ -1701,7 +1700,7 @@ public:
   /// \param base The optional base expression of this value reference
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
-  Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   const DeclRefExpr *base = nullptr,
                                   bool wantInterfaceType = false);

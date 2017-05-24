@@ -641,7 +641,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
       storage->isSetterNonMutating();
 }
 
-Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                              DeclContext *UseDC,
                                              const DeclRefExpr *base,
                                              bool wantInterfaceType) {
@@ -663,27 +663,8 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (auto *storage = dyn_cast<AbstractStorageDecl>(value)) {
-    if (doesStorageProduceLValue(*this, storage, baseType, UseDC, base)) {
-      // Vars are simply lvalues of their rvalue type.
-      if (isa<VarDecl>(storage))
-        return LValueType::get(requestedType);
-
-      // Subscript decls have function type.  For the purposes of later type
-      // checker consumption, model this as returning an lvalue.
-      assert(isa<SubscriptDecl>(storage));
-      auto *RFT = requestedType->castTo<AnyFunctionType>();
-      return FunctionType::get(RFT->getInput(),
-                               LValueType::get(RFT->getResult()),
-                               RFT->getExtInfo());
-    }
-
-    // FIXME: Fix downstream callers.
-    if (auto *genericFn = requestedType->getAs<GenericFunctionType>()) {
-      return FunctionType::get(genericFn->getInput(),
-                               genericFn->getResult(),
-                               genericFn->getExtInfo());
-    }
+  if (doesStorageProduceLValue(*this, value, baseType, UseDC, base)) {
+    return LValueType::get(requestedType);
   }
 
   return requestedType;
@@ -1139,22 +1120,35 @@ ConstraintSystem::getTypeOfMemberReference(
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
   } else {
-    // If we're not coming from something function-like, prepend the type
-    // for 'self' to the type.
-    assert(isa<AbstractStorageDecl>(value));
+    // For a property, build a function (Self) -> PropType.
+    // For a subscript, build a function (Self) -> (Indices...) -> ElementType.
+    //
+    // If the access is mutating, wrap the storage type in an lvalue type.
+    Type refType;
+    if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
+      auto elementTy = subscript->getElementInterfaceType();
+      if (doesStorageProduceLValue(TC, subscript, baseTy, useDC, base))
+        elementTy = LValueType::get(elementTy);
 
-    auto refType = TC.getUnopenedTypeOfReference(value, baseTy, useDC, base,
-                                                 /*wantInterfaceType=*/true);
+      auto indicesTy = subscript->getIndicesInterfaceType();
+      refType = FunctionType::get(elementTy, indicesTy,
+                                  AnyFunctionType::ExtInfo());
+    } else {
+      refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value),
+                                              baseTy, useDC, base,
+                                              /*wantInterfaceType=*/true);
+    }
 
     auto selfTy = outerDC->getSelfInterfaceType();
 
-    // If self is a struct, properly qualify it based on our base
-    // qualification.  If we have an lvalue coming in, we expect an inout.
+    // If self is a value type and the base type is an lvalue, wrap it in an
+    // inout type.
     if (!outerDC->getDeclaredTypeOfContext()->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
       selfTy = InOutType::get(selfTy);
 
+    // If the storage is generic, add a generic signature.
     if (auto *sig = innerDC->getGenericSignatureOfContext()) {
       funcType = GenericFunctionType::get(sig, selfTy, refType,
                                           AnyFunctionType::ExtInfo());
