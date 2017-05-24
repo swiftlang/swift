@@ -133,6 +133,10 @@ struct StructWithFixits {
     // expected-error@+2{{simultaneous accesses}}{{5-75=localOfGenericType.swapAt(paramIndex, paramIndex)}}
     // expected-note@+1{{conflicting access is here}}
     swap(&localOfGenericType[paramIndex], &localOfGenericType[paramIndex])
+
+    // expected-error@+2{{simultaneous accesses}}{{5-39=array1.swapAt(i, j)}}
+    // expected-note@+1{{conflicting access is here}}
+    Swift.swap(&array1[i], &array1[j]) // no-crash
   }
 
   mutating
