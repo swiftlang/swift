@@ -1120,18 +1120,31 @@ ConstraintSystem::getTypeOfMemberReference(
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
   } else {
-    // For a property, build a function (Self) -> PropType.
-    // For a subscript, build a function (Self) -> (Indices...) -> ElementType.
+    // For a property, build a type (Self) -> PropType.
+    // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
     //
     // If the access is mutating, wrap the storage type in an lvalue type.
     Type refType;
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
+
       if (doesStorageProduceLValue(TC, subscript, baseTy, useDC, base))
         elementTy = LValueType::get(elementTy);
 
+      // See ConstraintSystem::resolveOverload() -- optional and dynamic
+      // subscripts are a special case, because the optionality is
+      // applied to the result type and not the type of the reference.
+      if (!isRequirementOrWitness(locator)) {
+        if (subscript->getAttrs().hasAttribute<OptionalAttr>())
+          elementTy = OptionalType::get(elementTy->getRValueType());
+        else if (isDynamicResult) {
+          elementTy = ImplicitlyUnwrappedOptionalType::get(
+            elementTy->getRValueType());
+        }
+      }
+
       auto indicesTy = subscript->getIndicesInterfaceType();
-      refType = FunctionType::get(elementTy, indicesTy,
+      refType = FunctionType::get(indicesTy, elementTy,
                                   AnyFunctionType::ExtInfo());
     } else {
       refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value),
@@ -1207,27 +1220,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Compute the type of the reference.
   Type type;
-  if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    // For a subscript, turn the element type into an (@unchecked)
-    // optional or lvalue, depending on whether the result type is
-    // optional/dynamic, is settable, or is not.
-    auto fnType = openedFnType->getResult()->castTo<FunctionType>();
-    auto elementTy = fnType->getResult();
-    if (!isRequirementOrWitness(locator)) {
-      if (subscript->getAttrs().hasAttribute<OptionalAttr>())
-        elementTy = OptionalType::get(elementTy->getRValueType());
-      else if (isDynamicResult) {
-        elementTy = ImplicitlyUnwrappedOptionalType::get(
-                      elementTy->getRValueType());
-      }
-    }
-
-    type = FunctionType::get(fnType->getInput(), elementTy);
-  } else if (!value->isInstanceMember() || isInstance) {
-    // For a constructor, enum element, static method, static property,
-    // or an instance method referenced through an instance, we've consumed the
-    // curried 'self' already. For a type, strip off the 'self' we artificially
-    // added.
+  if (!value->isInstanceMember() || isInstance) {
+    // For a static member referenced through a metatype or an instance
+    // member referenced through an instance, strip off the 'self'.
     type = openedFnType->getResult();
   } else if (isDynamicResult && isa<AbstractFunctionDecl>(value)) {
     // For a dynamic result referring to an instance function through
