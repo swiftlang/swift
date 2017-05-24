@@ -234,14 +234,10 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
 
   // If any other prefixes are accepted, please update Mangler::verify.
 
+  if (!parseAndPushNodes())
+    return nullptr;
+
   NodePointer topLevel = createNode(Node::Kind::Global);
-
-  parseAndPushNodes();
-
-  // Let a trailing '_' be part of the not demangled suffix.
-  popNode(Node::Kind::FirstElementMarker);
-
-  size_t EndPos = (NodeStack.empty() ? 0 : NodeStack.back().Pos);
 
   NodePointer Parent = topLevel;
   while (NodePointer FuncAttr = popNode(isFunctionAttr)) {
@@ -250,8 +246,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
         FuncAttr->getKind() == Node::Kind::PartialApplyObjCForwarder)
       Parent = FuncAttr;
   }
-  for (const NodeWithPos &NWP : NodeStack) {
-    NodePointer Nd = NWP.Node;
+  for (Node *Nd : NodeStack) {
     switch (Nd->getKind()) {
       case Node::Kind::Type:
         Parent->addChild(Nd->getFirstChild(), *this);
@@ -263,10 +258,6 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   }
   if (topLevel->getNumChildren() == 0)
     return nullptr;
-
-  if (EndPos < Text.size()) {
-    topLevel->addChild(createNode(Node::Kind::Suffix, Text.substr(EndPos)), *this);
-  }
 
   return topLevel;
 }
@@ -282,15 +273,16 @@ NodePointer Demangler::demangleType(StringRef MangledName) {
   return createNode(Node::Kind::Suffix, Text);
 }
 
-void Demangler::parseAndPushNodes() {
+bool Demangler::parseAndPushNodes() {
   int Idx = 0;
-  while (!Text.empty()) {
+  while (Pos < Text.size()) {
     NodePointer Node = demangleOperator();
     if (!Node)
-      break;
+      return false;
     pushNode(Node);
     Idx++;
   }
+  return true;
 }
 
 NodePointer Demangler::addChild(NodePointer Parent, NodePointer Child) {
