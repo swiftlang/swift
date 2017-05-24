@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims
 
-// TODO: API review
 /// A type representing an error value that can be thrown.
 ///
 /// Any type that declares conformance to the `Error` protocol can be used to
@@ -167,7 +166,7 @@ public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: T)
 }
 
 @_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
-public func _stdlib_getErrorDefaultUserInfo(_ error: Error) -> AnyObject?
+public func _stdlib_getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?
 
 // Known function for the compiler to use to coerce `Error` instances
 // to `NSError`.
