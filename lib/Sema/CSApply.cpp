@@ -305,6 +305,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       // when indexing a Dictionary or NSDictionary by string, or when applying
       // a mapping subscript operation to Array/Set or NSArray/NSSet.
       return false;
+    case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
       // Don't bother building the key path string if the key path didn't even
@@ -2689,8 +2690,6 @@ namespace {
 
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
-      case OverloadChoiceKind::TypeDecl:
-        llvm_unreachable("Nonsensical overload choice");
       }
 
     llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
@@ -3987,6 +3986,20 @@ namespace {
       if (E->getType()->hasError())
         return E;
 
+      // If a component is already resolved, then all of them should be
+      // resolved, and we can let the expression be. This might happen when
+      // re-checking a failed system for diagnostics.
+      if (!E->getComponents().empty()
+          && E->getComponents().front().isResolved()) {
+        assert([&]{
+          for (auto &c : E->getComponents())
+            if (!c.isResolved())
+              return false;
+          return true;
+        }());
+        return E;
+      }
+
       SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
 
       // Resolve each of the components.
@@ -4123,6 +4136,7 @@ namespace {
         case KeyPathExpr::Component::Kind::Property:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:
+        case KeyPathExpr::Component::Kind::Invalid:
           llvm_unreachable("already resolved");
         }
 
@@ -6473,10 +6487,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     if (!argType)
       return nullptr;
 
-    // If the argument type is in error, we're done.
-    if (argType->hasError())
-      return nullptr;
-
     // Convert the literal to the non-builtin argument type via the
     // builtin protocol, first.
     // FIXME: Do we need an opened type here?
@@ -7662,7 +7672,6 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   Type openedFullType, openedType;
   std::tie(openedFullType, openedType)
     = cs.getTypeOfMemberReference(base->getType(), witness, dc,
-                                  /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false,
                                   FunctionRefKind::DoubleApply,
                                   dotLocator);

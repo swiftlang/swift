@@ -6,4 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol P extension P{var f=A.a}extension P{struct A{func a:Self
+protocol P{{}typealias e:a{}}class a:P=extension P{typealias e:Self

@@ -117,7 +117,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next8_ElementQzSgyF : $@convention(method)
+// CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
 // CHECK:   [[GET_ELT_STACK:%.*]] = alloc_stack $Optional<Int>
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<Int>>
 // CHECK:   apply [[FUNC_REF]]<[Int]>([[GET_ELT_STACK]], [[WRITE]])
@@ -223,7 +223,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next8_ElementQzSgyF : $@convention(method)
+// CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<P>> // users: %16, %15
 // CHECK:   apply [[FUNC_REF]]<[P]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -388,7 +388,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next8_ElementQzSgyF : $@convention(method)
+// CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<GenericStruct<T>>>
 // CHECK:   apply [[FUNC_REF]]<[GenericStruct<T>]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]

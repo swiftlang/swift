@@ -3071,7 +3071,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       continue;
 
     // We don't yet support raw values on payload cases.
-    if (elt->getArgumentInterfaceType()) {
+    if (elt->hasAssociatedValues()) {
       TC.diagnose(elt->getLoc(),
                   diag::enum_with_raw_type_case_with_argument);
       TC.diagnose(ED->getInherited().front().getSourceRange().Start,
@@ -6570,10 +6570,9 @@ public:
       return;
 
     // Require the carried type to be materializable.
-    if (EED->getArgumentInterfaceType() &&
-        !EED->getArgumentInterfaceType()->isMaterializable()) {
-      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable,
-                  EED->getArgumentInterfaceType());
+    auto IFacTy = EED->getArgumentInterfaceType();
+    if (IFacTy && !IFacTy->isMaterializable()) {
+      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable, IFacTy);
       EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
@@ -7229,6 +7228,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateGenericTypeSignature(proto);
     proto->setIsBeingValidated(false);
 
+    // See the comment in validateDeclForNameLookup(); we may have validated
+    // the alias before we built the protocol's generic environment.
+    //
+    // FIXME: Hopefully this can all go away with the ITC.
+    for (auto member : proto->getMembers()) {
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+        if (!aliasDecl->isGeneric())
+          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+      }
+    }
+
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
 
@@ -7504,6 +7514,13 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         typealias->setUnderlyingType(
                                 typealias->getUnderlyingTypeLoc().getType());
 
+        // Note that this doesn't set the generic environment of the alias yet,
+        // because we haven't built one for the protocol.
+        //
+        // See how validateDecl() sets the generic environment on alias members
+        // explicitly.
+        //
+        // FIXME: Hopefully this can all go away with the ITC.
         return;
       }
     }

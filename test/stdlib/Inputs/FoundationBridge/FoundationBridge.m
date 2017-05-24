@@ -89,53 +89,10 @@
     return self;
 }
 
-- (void)dealloc {
-    [_verifier release];
-    [_data release];
-    [super dealloc];
-}
-
-- (id)retain {
-    [_verifier appendAction:ObjectBehaviorActionRetain];
-    return [super retain];
-}
-
-- (id)copyWithZone:(NSZone *)zone {
-    [_verifier appendAction:ObjectBehaviorActionCopy];
-    return [super retain];
-}
-
-- (id)mutableCopyWithZone:(NSZone *)zone {
-    [_verifier appendAction:ObjectBehaviorActionMutableCopy];
-    return [[MutableDataVerifier alloc] initWithData:_data];
-}
-
-- (NSUInteger)length {
-    return _data.length;
-}
-
-- (const void *)bytes {
-    return _data.bytes;
-}
-
-@end
-
-@implementation MutableDataVerifier
-
-- (instancetype)init {
+- (instancetype)initWithData:(NSData *)data verifier:(ObjectBehaviorVerifier *)verifier {
     self = [super init];
     if (self) {
-        _verifier = [[ObjectBehaviorVerifier alloc] init];
-        char *bytes = "hello world";
-        _data = [[NSMutableData alloc] initWithBytes:bytes length:strlen(bytes)];
-    }
-    return self;
-}
-
-- (instancetype)initWithData:(NSData *)data {
-    self = [super init];
-    if (self) {
-        _verifier = [[ObjectBehaviorVerifier alloc] init];
+        _verifier = [verifier retain];
         _data = [data mutableCopyWithZone:nil];
     }
     return self;
@@ -159,7 +116,63 @@
 
 - (id)mutableCopyWithZone:(NSZone *)zone {
     [_verifier appendAction:ObjectBehaviorActionMutableCopy];
-    return [[MutableDataVerifier alloc] initWithData:_data];
+    return [[MutableDataVerifier alloc] initWithData:_data verifier:_verifier];
+}
+
+- (NSUInteger)length {
+    return _data.length;
+}
+
+- (const void *)bytes {
+    return _data.bytes;
+}
+
+- (NSData *)subdataWithRange:(NSRange)range {
+    return [_data subdataWithRange:range];
+}
+
+@end
+
+@implementation MutableDataVerifier
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _verifier = [[ObjectBehaviorVerifier alloc] init];
+        char *bytes = "hello world";
+        _data = [[NSMutableData alloc] initWithBytes:bytes length:strlen(bytes)];
+    }
+    return self;
+}
+
+- (instancetype)initWithData:(NSData *)data verifier:(ObjectBehaviorVerifier *)verifier {
+    self = [super init];
+    if (self) {
+        _verifier = [verifier retain];
+        _data = [data mutableCopyWithZone:nil];
+    }
+    return self;
+}
+
+- (void)dealloc {
+    [_verifier release];
+    [_data release];
+    [super dealloc];
+}
+
+- (id)retain {
+    [_verifier appendAction:ObjectBehaviorActionRetain];
+    return [super retain];
+}
+
+- (id)copyWithZone:(NSZone *)zone {
+    [_verifier appendAction:ObjectBehaviorActionCopy];
+    return [[ImmutableDataVerifier alloc] initWithData:_data verifier:_verifier];
+}
+
+- (id)mutableCopyWithZone:(NSZone *)zone {
+    [_verifier appendAction:ObjectBehaviorActionMutableCopy];
+    return [[MutableDataVerifier alloc] initWithData:_data verifier:_verifier];
 }
 
 - (NSUInteger)length {
@@ -176,6 +189,14 @@
 
 - (void *)mutableBytes {
     return _data.mutableBytes;
+}
+
+- (void)appendBytes:(const void *)bytes length:(NSUInteger)length {
+    [_data appendBytes:bytes length:length];
+}
+
+- (NSData *)subdataWithRange:(NSRange)range {
+    return [_data subdataWithRange:range];
 }
 
 @end

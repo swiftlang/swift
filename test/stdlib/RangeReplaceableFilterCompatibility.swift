@@ -35,5 +35,10 @@ tests.test("String.filter can return [Character]") {
   expectEqualSequence("HW", filtered)
 }
 
+tests.test("lazy.flatMap.filter ambiguity") {
+  // this expression should compile without ambiguity
+  _ = Array(0..<10).lazy.flatMap { .some($0) }.filter { _ in false }
+}
+
 runAllTests()
 

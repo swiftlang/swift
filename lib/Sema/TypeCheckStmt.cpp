@@ -656,6 +656,9 @@ public:
                                       *conformance,
                                       TC.Context.Id_Iterator,
                                       diag::sequence_protocol_broken);
+
+      if (!generatorTy)
+        return nullptr;
       
       Expr *getIterator
         = TC.callWitness(sequence, DC, sequenceProto, *conformance,

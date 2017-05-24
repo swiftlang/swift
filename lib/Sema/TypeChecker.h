@@ -1759,7 +1759,8 @@ public:
   /// \param brokenProtocolDiag Diagnostic to emit if the type cannot be
   /// accessed.
   ///
-  /// \return the witness type, or null if an error occurs.
+  /// \return the witness type, or null if an error occurs or the type
+  /// returned would contain an ErrorType.
   Type getWitnessType(Type type, ProtocolDecl *protocol,
                       ProtocolConformanceRef conformance,
                       Identifier name,
@@ -2036,7 +2037,7 @@ public:
                                  ValueDecl *decl2);
 
   /// \brief Build a type-checked reference to the given value.
-  Expr *buildCheckedRefExpr(ValueDecl *D, DeclContext *UseDC,
+  Expr *buildCheckedRefExpr(VarDecl *D, DeclContext *UseDC,
                             DeclNameLoc nameLoc, bool Implicit);
 
   /// \brief Build a reference to a declaration, where name lookup returned

@@ -134,7 +134,9 @@ func typeOfShadowing() {
   // TODO: Errors need improving here.
   _ = type(of: Gen<Foo>.Bar) // expected-error{{argument labels '(of:)' do not match any available overloads}}
                              // expected-note@-1{{overloads for 'type' exist with these partially matching parameter lists: (T.Type), (fo: T.Type)}}
-  _ = type(Gen<Foo>.Bar) // expected-warning{{missing '.self' for reference to metatype of type 'Gen<Foo>.Bar'}}
+  _ = type(Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
+  // expected-note@-1{{add arguments after the type to construct a value of the type}}
+  // expected-note@-2{{use '.self' to reference the type object}}
   _ = type(of: Gen<Foo>.Bar.self, flag: false) // No error here.
   _ = type(fo: Foo.Bar.self) // No error here.
   _ = type(of: Foo.Bar.self, [1, 2, 3]) // No error here.
@@ -300,3 +302,41 @@ func complexSequence() {
 }
 
 func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
+
+func takesOneArg<T>(_: T.Type) {}
+func takesTwoArgs<T>(_: T.Type, _: Int) {}
+
+func testMissingSelf() {
+  // None of these were not caught in Swift 3.
+  // See test/Compatibility/type_expr.swift.
+
+  takesOneArg(Int)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  takesOneArg(Swift.Int)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  takesTwoArgs(Int, 0)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  takesTwoArgs(Swift.Int, 0)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  Swift.Int // expected-warning {{expression of type 'Int.Type' is unused}}
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  _ = Swift.Int
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+}

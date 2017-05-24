@@ -1327,7 +1327,9 @@ static bool tryTypeVariableBindings(
           if (anySolved)
             break;
         }
-        type = cs.openBindingType(type, typeVar->getImpl().getLocator());
+        type = cs.openUnboundGenericType(type,
+                                         typeVar->getImpl().getLocator());
+        type = type->reconstituteSugar(/*recursive=*/false);
       }
 
       // FIXME: We want the locator that indicates where the binding came

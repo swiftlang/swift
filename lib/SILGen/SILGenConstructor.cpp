@@ -385,7 +385,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the exploded constructor argument.
   ArgumentSource payload;
-  if (element->getArgumentInterfaceType()) {
+  if (element->hasAssociatedValues()) {
     RValue arg = emitImplicitValueConstructorArg
       (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
        element->getDeclContext());
@@ -908,14 +908,13 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Cleanup after this initialization.
         FullExpr scope(Cleanups, entry.getPattern());
 
-        // Get the substitutions for the constructor context.
+        // We want a substitution list written in terms of the generic
+        // signature of the type, with replacement archetypes from the
+        // constructor's context (which might be in an extension of
+        // the type, which adds additional generic requirements).
         SubstitutionList subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
-
-        DeclContext *typeDC = dc;
-        while (!typeDC->isTypeContext())
-          typeDC = typeDC->getParent();
-        auto typeGenericSig = typeDC->getGenericSignatureOfContext();
+        auto typeGenericSig = nominal->getGenericSignatureOfContext();
 
         if (genericEnv && typeGenericSig) {
           // Generate a set of substitutions for the initialization function,

@@ -199,6 +199,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // ObjC keypaths only support named segments.
     // TODO: Perhaps we can map subscript components to dictionary keys.
     switch (auto kind = component.getKind()) {
+    case KeyPathExpr::Component::Kind::Invalid:
+      continue;
+
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
       break;
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:

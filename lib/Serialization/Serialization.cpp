@@ -1296,6 +1296,7 @@ void Serializer::writeNormalConformance(
 
   conformance->forEachValueWitness(nullptr,
     [&](ValueDecl *req, Witness witness) {
+      ++numValueWitnesses;
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
       assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
@@ -1319,11 +1320,10 @@ void Serializer::writeNormalConformance(
 
         // Requirements come at the end.
       } else {
-        data.push_back(0);
+        data.push_back(/*number of generic parameters*/0);
       }
 
       data.push_back(witness.getSubstitutions().size());
-      ++numValueWitnesses;
   });
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
@@ -1675,6 +1675,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::ExtensionDecl: {
     auto ext = cast<ExtensionDecl>(DC);
     Type baseTy = ext->getExtendedType();
+    assert(!baseTy->hasUnboundGenericType());
     writeCrossReference(baseTy->getAnyNominal(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
@@ -2323,29 +2324,22 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 /// - \p decl is declared in an extension of a type that depends on
 ///   \p problemContext
 static bool contextDependsOn(const NominalTypeDecl *decl,
-                             const DeclContext *problemContext) {
-  const DeclContext *dc = decl;
-  do {
-    if (dc == problemContext)
-      return true;
-    if (auto *extension = dyn_cast<ExtensionDecl>(dc))
-      dc = extension->getAsNominalTypeOrNominalTypeExtensionContext();
-    else
-      dc = dc->getParent();
-  } while (!dc->isModuleScopeContext());
-  return false;
+                             const ModuleDecl *problemModule) {
+  return decl->getParentModule() == problemModule;
 }
 
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
-                                        const DeclContext *excluding) {
+                                        const ModuleDecl *excluding) {
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
       return;
-    // FIXME: The child context case is still important for enums. It's
+    // FIXME: Types in the same module are still important for enums. It's
     // possible an enum element has a payload that references a type declaration
-    // nested within the enum that can't be imported (for whatever reason).
+    // from the same module that can't be imported (for whatever reason).
+    // However, we need a more robust handling of deserialization dependencies
+    // that can handle circularities. rdar://problem/32359173
     if (contextDependsOn(nominal, excluding))
       return;
     seen.insert(nominal->getDeclaredInterfaceType());
@@ -2424,6 +2418,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
+    assert(!baseTy->hasUnboundGenericType());
 
     // FIXME: Use the canonical type here in order to minimize circularity
     // issues at deserialization time. A known problematic case here is
@@ -2712,7 +2707,7 @@ void Serializer::writeDecl(const Decl *D) {
         continue;
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
-                                  /*excluding*/theEnum);
+                                  /*excluding*/theEnum->getParentModule());
     }
     for (Type ty : dependencyTypes)
       inheritedAndDependencyTypes.push_back(addTypeRef(ty));
@@ -2958,7 +2953,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addIdentifierRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getInterfaceType()),
-                                  !!elem->getArgumentInterfaceType(),
+                                  elem->hasAssociatedValues(),
                                   elem->isImplicit(),
                                   (unsigned)RawValueKind,
                                   Negative,
@@ -4430,6 +4425,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();
+        assert(!extendedTy->hasUnboundGenericType());
         const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
         extensionDecls[extendedNominal->getName()]
           .push_back({ extendedNominal, addDeclRef(D) });

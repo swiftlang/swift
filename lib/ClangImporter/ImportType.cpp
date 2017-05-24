@@ -1540,6 +1540,34 @@ Type ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc,
     const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
+
+  // Hardcode handling of certain result types for builtins.
+  auto builtinID = clangDecl->getBuiltinID();
+  switch (builtinID) {
+  case clang::Builtin::NotBuiltin:
+    break;
+  case clang::Builtin::BIstrxfrm:
+  case clang::Builtin::BIstrcspn:
+  case clang::Builtin::BIstrspn:
+  case clang::Builtin::BIstrlen:
+  case clang::Builtin::BIstrlcpy:
+  case clang::Builtin::BIstrlcat:
+    // This is a list of all built-ins with a result type of 'size_t' that
+    // existed in Swift 3. We didn't have special handling for builtins at
+    // that time, and so these had a result type of UInt.
+    if (SwiftContext.isSwiftVersion3())
+      break;
+    LLVM_FALLTHROUGH;
+  default:
+    switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
+    case 'z': // size_t
+    case 'Y': // ptrdiff_t
+      return SwiftContext.getIntDecl()->getDeclaredType();
+    default:
+      break;
+    }
+  }
+
   // CF function results can be managed if they are audited or
   // the ownership convention is explicitly declared.
   assert(clangDecl && "expected to have a decl to import");

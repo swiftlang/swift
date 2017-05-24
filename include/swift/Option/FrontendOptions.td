@@ -264,6 +264,9 @@ def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
+  
+def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
+  HelpText<"Enable Large Loadable types IRGen pass">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
@@ -303,6 +306,13 @@ def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+
+def enable_nskeyedarchiver_diagnostics :
+  Flag<["-"], "enable-nskeyedarchiver-diagnostics">,
+  HelpText<"Diagnose classes with unstable mangled names adopting NSCoding">;
+def disable_nskeyedarchiver_diagnostics :
+  Flag<["-"], "disable-nskeyedarchiver-diagnostics">,
+  HelpText<"Allow classes with unstable mangled names to adopt NSCoding">;
 
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,

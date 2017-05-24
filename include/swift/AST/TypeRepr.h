@@ -33,7 +33,7 @@ namespace swift {
   class DeclContext;
   class GenericEnvironment;
   class IdentTypeRepr;
-  class ValueDecl;
+  class TypeDecl;
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
@@ -243,7 +243,7 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   ///
   /// The initial parsed representation is always an identifier, and
   /// name binding will resolve this to a specific declaration.
-  llvm::PointerUnion<Identifier, ValueDecl *> IdOrDecl;
+  llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
 
 protected:
   ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
@@ -258,11 +258,11 @@ public:
   void overwriteIdentifier(Identifier newId) { IdOrDecl = newId; }
 
   /// Return true if this has been name-bound already.
-  bool isBound() const { return IdOrDecl.is<ValueDecl *>(); }
+  bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
 
-  ValueDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<ValueDecl*>(); }
+  TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
 
-  void setValue(ValueDecl *VD) { IdOrDecl = VD; }
+  void setValue(TypeDecl *TD) { IdOrDecl = TD; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||

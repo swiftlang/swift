@@ -9,7 +9,8 @@ enum E {
 
   static func testE(e: E) {
     switch e {
-    case A<UndefinedTy>(): // expected-error {{use of undeclared type 'UndefinedTy'}}
+    case A<UndefinedTy>(): // expected-error {{cannot specialize a non-generic definition}}
+    // expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
       break
     case B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
       break
@@ -21,7 +22,8 @@ enum E {
 
 func testE(e: E) {
   switch e {
-  case E.A<UndefinedTy>(): // expected-error {{use of undeclared type 'UndefinedTy'}}
+  case E.A<UndefinedTy>(): // expected-error {{cannot specialize a non-generic definition}}
+  // expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
     break
   case E.B<Int>(): // expected-error {{cannot specialize a non-generic definition}} expected-note {{while parsing this '<' as a type parameter bracket}}
     break

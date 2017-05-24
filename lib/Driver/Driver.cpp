@@ -1753,6 +1753,8 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
+  auto ShouldPreserveOnSignal = PreserveOnSignal::No;
+
   // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
   // use the -o arg) even though, based on ownership considerations within the
   // driver, it is stored as a "top level" JobAction.
@@ -1761,6 +1763,7 @@ static StringRef getOutputFilename(Compilation &C,
     // the filename to use for the PCH.
     assert(!PCHAct->isPersistentPCH());
     AtTopLevel = false;
+    ShouldPreserveOnSignal = PreserveOnSignal::Yes;
   }
 
   // We don't have an output from an Action-specific command line option,
@@ -1795,7 +1798,7 @@ static StringRef getOutputFilename(Compilation &C,
                      EC.message());
       return {};
     }
-    C.addTemporaryFile(Buffer.str());
+    C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
 
     return Buffer.str();
   }

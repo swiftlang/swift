@@ -1,3 +1,5 @@
+// RUN: rm -rf %t && mkdir -p %t
+
 // RUN: %swiftc_driver -typecheck -driver-print-actions -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=YESPCHACT
 // YESPCHACT: 0: input, "{{.*}}Inputs/bridging-header.h", objc-header
 // YESPCHACT: 1: generate-pch, {0}, pch
@@ -17,6 +19,10 @@
 
 // RUN: echo "{\"\": {\"swift-dependencies\": \"master.swiftdeps\"}}" > %t.json
 // RUN: %swiftc_driver -typecheck -incremental -enable-bridging-pch -output-file-map %t.json -import-objc-header %S/Inputs/bridging-header.h %s
+
+// RUN: mkdir %t/tmp
+// RUN: not env TMPDIR="%t/tmp/" %swiftc_driver -typecheck -import-objc-header %S/../Inputs/empty.h -driver-use-frontend-path %S/Inputs/crash-after-generating-pch.py %s
+// RUN: ls %t/tmp/*.pch
 
 // Test persistent PCH
 

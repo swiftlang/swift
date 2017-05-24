@@ -1364,7 +1364,7 @@ namespace {
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
-      type = CS.openType(type, locator);
+      type = CS.openUnboundGenericType(type, locator);
       E->getTypeLoc().setType(type, /*validated=*/true);
       return MetatypeType::get(type);
     }
@@ -1537,7 +1537,7 @@ namespace {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
-          ArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
+          MutableArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
 
           // If we have too many generic arguments, complain.
           if (specializations.size() > typeVars.size()) {
@@ -1557,6 +1557,11 @@ namespace {
           // open type.
           auto locator = CS.getConstraintLocator(expr);
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
+            if (tc.validateType(specializations[i], CS.DC,
+                                (TR_InExpression |
+                                 TR_AllowUnboundGenerics)))
+              return Type();
+
             CS.addConstraint(ConstraintKind::Equal,
                              typeVars[i], specializations[i].getType(),
                              locator);
@@ -1922,7 +1927,7 @@ namespace {
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
-          Type openedType = CS.openType(type, locator);
+          Type openedType = CS.openUnboundGenericType(type, locator);
           param->setType(openedType);
           param->setInterfaceType(openedType);
           continue;
@@ -1995,7 +2000,8 @@ namespace {
       case PatternKind::Typed: {
         auto typedPattern = cast<TypedPattern>(pattern);
         // FIXME: Need a better locator for a pattern as a base.
-        Type openedType = CS.openType(typedPattern->getType(), locator);
+        Type openedType = CS.openUnboundGenericType(typedPattern->getType(),
+                                                    locator);
         if (auto weakTy = openedType->getAs<WeakStorageType>())
           openedType = weakTy->getReferentType();
 
@@ -2491,8 +2497,8 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(fromExpr);
@@ -2514,8 +2520,8 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(expr->getSubExpr());
@@ -2539,8 +2545,8 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(fromExpr);
@@ -2559,8 +2565,8 @@ namespace {
 
       // Open up the type we're checking.
       // FIXME: Locator for the cast type?
-      auto toType = CS.openType(expr->getCastTypeLoc().getType(),
-                                CS.getConstraintLocator(expr));
+      auto toType = CS.openUnboundGenericType(expr->getCastTypeLoc().getType(),
+                                              CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // Add a checked cast constraint.
@@ -2750,7 +2756,28 @@ namespace {
         CS.TC.diagnose(E->getLoc(), diag::expr_keypath_no_keypath_type);
         return ErrorType::get(CS.getASTContext());
       }
-
+      
+      for (auto &c : E->getComponents()) {
+        // If the key path contained any syntactically invalid components, bail
+        // out.
+        if (!c.isValid()) {
+          return ErrorType::get(CS.getASTContext());
+        }
+        
+        // If a component is already resolved, then all of them should be
+        // resolved, and we can let the expression be. This might happen when
+        // re-checking a failed system for diagnostics.
+        if (c.isResolved()) {
+          assert([&]{
+            for (auto &c : E->getComponents())
+              if (!c.isResolved())
+                return false;
+            return true;
+          }());
+          return E->getType();
+        }
+      }
+      
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.
       auto locator = CS.getConstraintLocator(E);
@@ -2761,7 +2788,7 @@ namespace {
         auto rootObjectTy = resolveTypeReferenceInExpression(rootRepr);
         if (!rootObjectTy || rootObjectTy->hasError())
           return Type();
-        rootObjectTy = CS.openType(rootObjectTy, locator);
+        rootObjectTy = CS.openUnboundGenericType(rootObjectTy, locator);
         CS.addConstraint(ConstraintKind::Bind, root, rootObjectTy,
                          locator);
       }
@@ -2773,6 +2800,9 @@ namespace {
       for (unsigned i : indices(E->getComponents())) {
         auto &component = E->getComponents()[i];
         switch (auto kind = component.getKind()) {
+        case KeyPathExpr::Component::Kind::Invalid:
+          llvm_unreachable("should have bailed out");
+        
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
           auto memberTy = CS.createTypeVariable(locator, TVO_CanBindToLValue);
           auto refKind = component.getUnresolvedDeclName().isSimpleName()

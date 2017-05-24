@@ -1514,3 +1514,15 @@ func r32214649_2<X>(_ a: [X], _ f: (X) -> Bool) -> [X] {
 func r32214649_3<X>(_ a: [X]) -> [X] {
   return a.filter { _ in return true }
 }
+
+// rdar://problem/32301091 - [SE-0110] causes errors when passing a closure with a single underscore to a block accepting multiple parameters
+
+func rdar32301091_1(_ :((Int, Int) -> ())!) {}
+rdar32301091_1 { _ in }
+// expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,_ }}
+
+func rdar32301091_2(_ :(Int, Int) -> ()) {}
+rdar32301091_2 { _ in }
+// expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,_ }}
+rdar32301091_2 { x in }
+// expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,<#arg#> }}

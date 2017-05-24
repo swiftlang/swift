@@ -792,7 +792,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
       [&SGF, &loc, &eltDecl, &subInit, &value](ManagedValue mv,
                                                SwitchCaseFullExpr &expr) {
         // If the enum case has no bound value, we're done.
-        if (!eltDecl->getArgumentInterfaceType()) {
+        if (!eltDecl->hasAssociatedValues()) {
           assert(
               subInit == nullptr &&
               "Cannot have a subinit when there is no value to match against");

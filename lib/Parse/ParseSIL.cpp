@@ -775,8 +775,8 @@ namespace {
       auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
       auto Comp = T->getComponentRange().front();
       if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
-        if (isa<TypeDecl>(Entry)) {
-          Comp->setValue(Entry);
+        if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
+          Comp->setValue(TD);
           return false;
         }
       return true;
