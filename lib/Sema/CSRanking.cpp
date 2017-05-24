@@ -778,6 +778,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         << tc.specializedOverloadComparisonCache[{decl1, decl2}] << "\n";
   }
 
+  if (tc.getLangOpts().DebugConstraintSolver) {
+    auto &log = tc.Context.TypeCheckerDebug->getStream();
+    auto result = tc.specializedOverloadComparisonCache[{decl1, decl2}];
+    log << "comparison result: " << (result ? "better" : "not better") << "\n";
+  }
+
   return tc.specializedOverloadComparisonCache[{decl1, decl2}];
 }
 
