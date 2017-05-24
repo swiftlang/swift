@@ -2131,7 +2131,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   class BindingListener : public ExprTypeCheckListener {
     Pattern *&pattern;
     Expr *&initializer;
-    DeclContext *DC;
     bool skipClosures;
 
     /// The locator we're using.
@@ -2139,12 +2138,14 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     /// The type of the initializer.
     Type InitType;
-    
+
   public:
     explicit BindingListener(Pattern *&pattern, Expr *&initializer,
-                             DeclContext *DC, bool skipClosures)
-      : pattern(pattern), initializer(initializer), DC(DC),
-        skipClosures(skipClosures) { }
+                             bool skipClosures)
+      : pattern(pattern), initializer(initializer),
+        skipClosures(skipClosures), Locator(nullptr) { }
+
+    Type getInitType() const { return InitType; }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
@@ -2164,12 +2165,15 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return false;
     }
 
-    Expr *appliedSolution(Solution &solution, Expr *expr) override {
+    Expr *foundSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      auto &cs = solution.getConstraintSystem();
-      auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(InitType);
 
+      // Just keep going.
+      return expr;
+    }
+
+    Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
       // ignoreTopLevelInjection = Binding->isConditional()
       expr = solution.coerceToType(expr, InitType, Locator,
@@ -2179,29 +2183,15 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return nullptr;
       }
 
-      // Force the initializer to be materializable.
-      // FIXME: work this into the constraint system
-      expr = tc.coerceToMaterializable(expr);
+      assert(expr->getType()->isEqual(InitType));
 
-      // Apply the solution to the pattern as well.
-      Type patternType = expr->getType();
-
-      TypeResolutionOptions options;
-      options |= TR_OverrideType;
-      options |= TR_InExpression;
-      if (isa<EditorPlaceholderExpr>(expr->getSemanticsProvidingExpr())) {
-        options |= TR_EditorPlaceholder;
-      }
-      if (tc.coercePatternToType(pattern, DC, patternType, options)) {
-        return nullptr;
-      }
       initializer = expr;
       return expr;
     }
   };
 
   assert(initializer && "type-checking an uninitialized binding?");
-  BindingListener listener(pattern, initializer, DC, skipClosures);
+  BindingListener listener(pattern, initializer, skipClosures);
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
@@ -2230,11 +2220,27 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                      contextualPurpose,
                                      flags,
                                      &listener);
-  
-  if (hadError && !initializer->getType()) {
-    initializer->setType(ErrorType::get(Context));
+
+  if (!hadError) {
+    TypeResolutionOptions options;
+    options |= TR_OverrideType;
+    options |= TR_InExpression;
+    if (isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())) {
+      options |= TR_EditorPlaceholder;
+    }
+
+    // Apply the solution to the pattern as well.
+    if (coercePatternToType(pattern, DC, listener.getInitType(), options)) {
+      return true;
+    }
   }
 
+  if (hadError && !initializer->getType())
+    initializer->setType(ErrorType::get(Context));
+
+  // If the type of the pattern is inferred, assign error types to the pattern
+  // and its variables, to prevent it from being referenced by the constraint
+  // system.
   if (hadError &&
       (!pattern->hasType() ||
        pattern->getType()->hasUnboundGenericType())) {
