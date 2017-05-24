@@ -1542,6 +1542,14 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
     traversePath(root, /*isInParsedPath=*/false);
   }
 
+  // Key paths must have at least one component.
+  if (components.empty()) {
+    TC.diagnose(KPE->getLoc(), diag::expr_swift_keypath_empty);
+    // Passes further down the pipeline expect keypaths to always have at least
+    // one component, so stuff an invalid component in the AST for recovery.
+    components.push_back(KeyPathExpr::Component());
+  }
+
   std::reverse(components.begin(), components.end());
 
   KPE->setRootType(rootType);

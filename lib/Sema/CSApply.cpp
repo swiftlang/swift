@@ -4133,10 +4133,14 @@ namespace {
                                                         origComponent.getLoc());
           break;
         }
+        case KeyPathExpr::Component::Kind::Invalid:
+          component = origComponent;
+          component.setComponentType(leafTy);
+          break;
+          
         case KeyPathExpr::Component::Kind::Property:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:
-        case KeyPathExpr::Component::Kind::Invalid:
           llvm_unreachable("already resolved");
         }
 

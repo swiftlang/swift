@@ -2757,27 +2757,6 @@ namespace {
         return ErrorType::get(CS.getASTContext());
       }
       
-      for (auto &c : E->getComponents()) {
-        // If the key path contained any syntactically invalid components, bail
-        // out.
-        if (!c.isValid()) {
-          return ErrorType::get(CS.getASTContext());
-        }
-        
-        // If a component is already resolved, then all of them should be
-        // resolved, and we can let the expression be. This might happen when
-        // re-checking a failed system for diagnostics.
-        if (c.isResolved()) {
-          assert([&]{
-            for (auto &c : E->getComponents())
-              if (!c.isResolved())
-                return false;
-            return true;
-          }());
-          return E->getType();
-        }
-      }
-      
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.
       auto locator = CS.getConstraintLocator(E);
@@ -2793,6 +2772,19 @@ namespace {
                          locator);
       }
       
+      // If a component is already resolved, then all of them should be
+      // resolved, and we can let the expression be. This might happen when
+      // re-checking a failed system for diagnostics.
+      if (E->getComponents().front().isResolved()) {
+        assert([&]{
+          for (auto &c : E->getComponents())
+            if (!c.isResolved())
+              return false;
+          return true;
+        }());
+        return E->getType();
+      }
+      
       bool didOptionalChain = false;
       // We start optimistically from an lvalue base.
       Type base = LValueType::get(root);
@@ -2801,7 +2793,7 @@ namespace {
         auto &component = E->getComponents()[i];
         switch (auto kind = component.getKind()) {
         case KeyPathExpr::Component::Kind::Invalid:
-          llvm_unreachable("should have bailed out");
+          break;
         
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
           auto memberTy = CS.createTypeVariable(locator, TVO_CanBindToLValue);
