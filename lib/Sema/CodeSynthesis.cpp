@@ -89,13 +89,14 @@ static ParamDecl *buildInOutArgument(SourceLoc loc, DeclContext *DC,
 }
 
 static Type getTypeOfStorage(AbstractStorageDecl *storage,
-                             TypeChecker &TC,
                              bool wantInterfaceType) {
-  if (auto var = dyn_cast<VarDecl>(storage))
-    return TC.getTypeOfRValue(var, wantInterfaceType);
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    auto type = (wantInterfaceType
+                 ? var->getInterfaceType()
+                 : var->getType());
+    return type->getReferenceStorageReferent();
+  }
 
-  // None of the transformations done by getTypeOfRValue are
-  // necessary for subscripts.
   auto subscript = cast<SubscriptDecl>(storage);
   auto type = subscript->getElementInterfaceType();
   if (!wantInterfaceType)
@@ -156,7 +157,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
       staticLoc = var->getLoc();
   }
 
-  auto storageInterfaceType = getTypeOfStorage(storage, TC, true);
+  auto storageInterfaceType = getTypeOfStorage(storage, true);
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
@@ -199,8 +200,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   }
   
   // Add a "(value : T, indices...)" argument list.
-  auto storageType = getTypeOfStorage(storage, TC, false);
-  auto storageInterfaceType = getTypeOfStorage(storage, TC, true);
+  auto storageType = getTypeOfStorage(storage, false);
+  auto storageInterfaceType = getTypeOfStorage(storage, true);
   valueDecl = buildLetArgument(storage->getLoc(),
                                storage->getDeclContext(), "value",
                                storageType,
@@ -615,7 +616,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // We support @NSCopying on class types (which conform to NSCopying),
   // protocols which conform, and option types thereof.
-  Type UnderlyingType = TC.getTypeOfRValue(VD, /*want interface type*/false);
+  Type UnderlyingType = VD->getType()->getReferenceStorageReferent();
 
   bool isOptional = false;
   if (Type optionalEltTy = UnderlyingType->getAnyOptionalObjectType()) {
@@ -1930,8 +1931,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      auto varType = tc.getTypeOfRValue(var, false);
-      auto varInterfaceType = tc.getTypeOfRValue(var, true);
+      auto varType = var->getType()
+        ->getReferenceStorageReferent();
+      auto varInterfaceType = var->getInterfaceType()
+        ->getReferenceStorageReferent();
 
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
