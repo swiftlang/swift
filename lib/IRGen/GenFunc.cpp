@@ -820,6 +820,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
           IGM.getTypeInfo(outTypeParamSILType).nativeParameterValueSchema(IGM);
       Explosion nativeParam;
       origParams.transferInto(nativeParam, nativeSchemaOutTypeParam.size());
+
+      bindPolymorphicParameter(subIGF, origType, substType, nativeParam, i);
+
       Explosion nonNativeParam = nativeSchemaOutTypeParam.mapFromNative(
           subIGF.IGM, subIGF, nativeParam, outTypeParamSILType);
       assert(nativeParam.empty());
@@ -903,7 +906,32 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
-  if (hasPolymorphicParameters(origType)) {
+
+  // If we have a layout we might have to bind polymorphic arguments from the
+  // captured arguments which we will do later. Otherwise, we have to
+  // potentially bind polymorphic arguments from the context if it was a
+  // partially applied argument.
+  bool hasPolymorphicParams = hasPolymorphicParameters(origType);
+  if (!layout && hasPolymorphicParams) {
+    assert(conventions.size() == 1);
+    // We could have either partially applied an argument from the function
+    // signature or otherwise we could have a closure context to forward. We only
+    // care for the former for the purpose of reconstructing polymorphic
+    // parameters from regular arguments.
+    if (!calleeHasContext) {
+      unsigned paramI = substType->getParameters().size() - 1;
+      assert(substType->getParameters().size() -
+                     outType->getParameters().size() ==
+                 1 &&
+             "Expect one partially applied argument");
+      auto paramInfo = substType->getParameters()[paramI];
+      auto &ti = IGM.getTypeInfoForLowered(paramInfo.getType());
+      Explosion param;
+      param.add(subIGF.Builder.CreateBitCast(rawData, ti.getStorageType()));
+      bindPolymorphicParameter(subIGF, origType, substType, param, paramI);
+      (void)param.claimAll();
+    }
+
     SubstitutionMap subMap;
     if (auto genericSig = origType->getGenericSignature())
       subMap = genericSig->getSubstitutionMap(subs);
@@ -1081,6 +1109,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       if (origParamI < origType->getParameters().size()) {
         Explosion origParam;
         auto origParamInfo = origType->getParameters()[origParamI];
+        if (hasPolymorphicParams)
+          bindPolymorphicParameter(subIGF, origType, substType, param,
+                                   origParamI);
         emitApplyArgument(subIGF, origParamInfo,
                           substType->getParameters()[origParamI],
                           param, origParam);
@@ -1101,6 +1132,16 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData)
       subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+
+    // Now that we have bound generic parameters from the captured arguments
+    // emit the polymorphic arguments.
+    if (hasPolymorphicParameters(origType)) {
+      SubstitutionMap subMap;
+      if (auto genericSig = origType->getGenericSignature())
+        subMap = genericSig->getSubstitutionMap(subs);
+      emitPolymorphicArguments(subIGF, origType, substType, subMap,
+                               &witnessMetadata, polyArgs);
+    }
   }
 
   // Derive the callee function pointer.  If we found a function
