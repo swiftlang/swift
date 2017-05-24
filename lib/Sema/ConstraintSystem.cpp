@@ -601,6 +601,94 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
   return type;
 }
 
+/// Does a var or subscript produce an l-value?
+///
+/// \param baseType - the type of the base on which this object
+///   is being accessed; must be null if and only if this is not
+///   a type member
+static bool doesStorageProduceLValue(TypeChecker &TC,
+                                     AbstractStorageDecl *storage,
+                                     Type baseType, DeclContext *useDC,
+                                     const DeclRefExpr *base = nullptr) {
+  // Unsettable storage decls always produce rvalues.
+  if (!storage->isSettable(useDC, base))
+    return false;
+  
+  if (TC.Context.LangOpts.EnableAccessControl &&
+      !storage->isSetterAccessibleFrom(useDC))
+    return false;
+
+  // If there is no base, or if the base isn't being used, it is settable.
+  // This is only possible for vars.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (!baseType || var->isStatic())
+      return true;
+  }
+
+  // If the base is an lvalue, then a reference produces an lvalue.
+  if (baseType->is<LValueType>())
+    return true;
+
+  // Stored properties of reference types produce lvalues.
+  if (baseType->hasReferenceSemantics() && storage->hasStorage())
+    return true;
+
+  // So the base is an rvalue type. The only way an accessor can
+  // produce an lvalue is if we have a property where both the
+  // getter and setter are nonmutating.
+  return !storage->hasStorage() &&
+      !storage->isGetterMutating() &&
+      storage->isSetterNonMutating();
+}
+
+Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+                                             DeclContext *UseDC,
+                                             const DeclRefExpr *base,
+                                             bool wantInterfaceType) {
+  validateDecl(value);
+  if (value->isInvalid())
+    return ErrorType::get(Context);
+
+  Type requestedType = getTypeOfRValue(value, wantInterfaceType);
+
+  // If we're dealing with contextual types, and we referenced this type from
+  // a different context, map the type.
+  if (!wantInterfaceType && requestedType->hasArchetype()) {
+    auto valueDC = value->getDeclContext();
+    if (valueDC != UseDC) {
+      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      requestedType = UseDC->mapTypeIntoContext(mapped);
+    }
+  }
+
+  // Qualify storage declarations with an lvalue when appropriate.
+  // Otherwise, they yield rvalues (and the access must be a load).
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(value)) {
+    if (doesStorageProduceLValue(*this, storage, baseType, UseDC, base)) {
+      // Vars are simply lvalues of their rvalue type.
+      if (isa<VarDecl>(storage))
+        return LValueType::get(requestedType);
+
+      // Subscript decls have function type.  For the purposes of later type
+      // checker consumption, model this as returning an lvalue.
+      assert(isa<SubscriptDecl>(storage));
+      auto *RFT = requestedType->castTo<AnyFunctionType>();
+      return FunctionType::get(RFT->getInput(),
+                               LValueType::get(RFT->getResult()),
+                               RFT->getExtInfo());
+    }
+
+    // FIXME: Fix downstream callers.
+    if (auto *genericFn = requestedType->getAs<GenericFunctionType>()) {
+      return FunctionType::get(genericFn->getInput(),
+                               genericFn->getResult(),
+                               genericFn->getExtInfo());
+    }
+  }
+
+  return requestedType;
+}
+
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
        const OpenedTypeMap &replacements) {
