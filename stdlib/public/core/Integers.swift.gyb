@@ -1363,25 +1363,22 @@ public protocol BinaryInteger :
   /// - Parameter source: A floating-point value to convert to an integer.
   init?<T : FloatingPoint>(exactly source: T)
 
-  /// Creates an integer from the given floating-point value, truncating any
-  /// fractional part.
-  ///
-  /// Truncating the fractional part of `source` is equivalent to rounding
-  /// toward zero.
+  /// Creates an integer from the given floating-point value rounded toward
+  /// zero.
   ///
   ///     let x = Int(21.5)
   ///     // x == 21
   ///     let y = Int(-21.5)
   ///     // y == -21
   ///
-  /// If `source` is outside the bounds of this type after truncation, a
-  /// runtime error may occur.
+  /// If `source` is outside the bounds of this type after rounding toward
+  /// zero, a runtime error may occur.
   ///
   ///     let z = UInt(-21.5)
   ///     // Error: ...the result would be less than UInt.min
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  ///   `source` must be representable in this type after truncation.
+  ///   `source` must be representable in this type after rounding toward zero.
   init<T : FloatingPoint>(_ source: T)
 
   /// Creates a new instance from the given integer.
