@@ -460,8 +460,7 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT:     ClassDecl name=LazyProperties
 // CHECK-SEARCHES-NEXT:       Initializer PatternBinding {{.*}} #0
 
-// FIXME: Re-enable the binding below
-// CHECK-SEARCHES-NOT: Local bindings: self
+// CHECK-SEARCHES-NEXT: Local bindings: self
 
 // CHECK-SEARCHES-LABEL: ***Complete scope map***
 // CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - [[EOF:[0-9]+:[0-9]+]]] unexpanded

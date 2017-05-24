@@ -22,6 +22,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
@@ -143,10 +144,25 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   SmallVector<ParameterList*, 2> getterParams;
 
   // The implicit 'self' argument if in a type context.
-  if (storage->getDeclContext()->isTypeContext())
-    getterParams.push_back(ParameterList::createSelf(loc,
-                                                     storage->getDeclContext(),
-                                                     /*isStatic*/false));
+  if (storage->getDeclContext()->isTypeContext()) {
+    ParamDecl *selfDecl;
+
+    // For lazy properties, steal the 'self' from the initializer context.
+    if (storage->getAttrs().hasAttribute<LazyAttr>()) {
+      auto *varDecl = cast<VarDecl>(storage);
+      auto *bindingDecl = varDecl->getParentPatternBinding();
+      auto *bindingInit = cast<PatternBindingInitializer>(
+        bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
+
+      selfDecl = bindingInit->getImplicitSelfDecl();
+    } else {
+      selfDecl = ParamDecl::createSelf(loc,
+                                       storage->getDeclContext(),
+                                       /*isStatic*/false);
+    }
+
+    getterParams.push_back(ParameterList::create(TC.Context, selfDecl));
+  }
     
   // Add an index-forwarding clause.
   getterParams.push_back(buildIndexForwardingParamList(storage, {}));
@@ -1145,7 +1161,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
   InitValue->walk(RecontextualizeClosures(Get));
-
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
   Tmp2PBDPattern = new (Ctx) TypedPattern(Tmp2PBDPattern,
