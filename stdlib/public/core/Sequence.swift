@@ -693,7 +693,7 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
 /// A sequence that only consumes up to `n` elements from an underlying
 /// `Base` iterator.
 ///
-/// The underlying iterator's sequence may be infinite
+/// The underlying iterator's sequence may be infinite.
 @_fixed_layout
 @_versioned
 internal struct _PrefixSequence<Base : IteratorProtocol>
