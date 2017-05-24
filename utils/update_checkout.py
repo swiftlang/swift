@@ -42,11 +42,15 @@ def confirm_tag_in_repo(tag, repo_name):
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
     base_args = ["git", "log", "-1", "--format=%H",
                  '--before=' + timestamp]
-    # Prefer the most-recent change _made by swift-ci_ before the timestamp,
-    # falling back to most-recent in general if there is none by swift-ci.
-    rev = shell.capture(base_args + ['--author', 'swift-ci', refspec]).strip()
-    if rev:
-        return rev
+    # On repos with regular batch-automerges from swift-ci -- namely clang,
+    # llvm and lldb -- prefer the most-recent change _made by swift-ci_
+    # before the timestamp, falling back to most-recent in general if there
+    # is none by swift-ci.
+    if repo_name in ["llvm", "clang", "lldb"]:
+        rev = shell.capture(base_args +
+                            ['--author', 'swift-ci', refspec]).strip()
+        if rev:
+            return rev
     rev = shell.capture(base_args + [refspec]).strip()
     if rev:
         return rev
