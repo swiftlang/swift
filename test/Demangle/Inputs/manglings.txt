@@ -257,4 +257,5 @@ _T0Ix_IyB_Tr ---> {T:} reabstraction thunk from @callee_owned () -> () to @calle
 _T0Rml ---> _T0Rml
 _T0Tk ---> _T0Tk
 _T0A8 ---> _T0A8
+_T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n ---> _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n
 

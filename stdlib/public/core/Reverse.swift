@@ -52,7 +52,7 @@ public struct _ReverseIndexingIterator<
   
   @_inlineable
   @inline(__always)
-  public mutating func next() -> Elements._Element? {
+  public mutating func next() -> Elements.Element? {
     guard _fastPath(_position != _elements.startIndex) else { return nil }
     _position = _elements.index(before: _position)
     return _elements[_position]

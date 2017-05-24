@@ -266,13 +266,14 @@ void SerializedDiagnosticConsumer::addLocToRecord(SourceLoc Loc,
     return;
   }
 
+  auto bufferId = SM.findBufferContainingLoc(Loc);
   unsigned line, col;
   std::tie(line, col) = SM.getLineAndColumn(Loc);
 
   Record.push_back(getEmitFile(Filename));
   Record.push_back(line);
   Record.push_back(col);
-  Record.push_back(0);
+  Record.push_back(SM.getLocOffsetInBuffer(Loc, bufferId));
 }
 
 void SerializedDiagnosticConsumer::addRangeToRecord(CharSourceRange Range,

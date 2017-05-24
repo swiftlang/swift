@@ -315,7 +315,7 @@ public struct DispatchDataIterator : IteratorProtocol, Sequence {
 
 	/// Advance to the next element and return it, or `nil` if no next
 	/// element exists.
-	public mutating func next() -> DispatchData._Element? {
+	public mutating func next() -> DispatchData.Element? {
 		if _position == _count { return nil }
 		let element = _ptr.load(fromByteOffset: _position, as: UInt8.self)
 		_position = _position + 1

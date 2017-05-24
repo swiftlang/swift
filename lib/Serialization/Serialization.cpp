@@ -2324,29 +2324,22 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 /// - \p decl is declared in an extension of a type that depends on
 ///   \p problemContext
 static bool contextDependsOn(const NominalTypeDecl *decl,
-                             const DeclContext *problemContext) {
-  const DeclContext *dc = decl;
-  do {
-    if (dc == problemContext)
-      return true;
-    if (auto *extension = dyn_cast<ExtensionDecl>(dc))
-      dc = extension->getAsNominalTypeOrNominalTypeExtensionContext();
-    else
-      dc = dc->getParent();
-  } while (!dc->isModuleScopeContext());
-  return false;
+                             const ModuleDecl *problemModule) {
+  return decl->getParentModule() == problemModule;
 }
 
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
-                                        const DeclContext *excluding) {
+                                        const ModuleDecl *excluding) {
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
       return;
-    // FIXME: The child context case is still important for enums. It's
+    // FIXME: Types in the same module are still important for enums. It's
     // possible an enum element has a payload that references a type declaration
-    // nested within the enum that can't be imported (for whatever reason).
+    // from the same module that can't be imported (for whatever reason).
+    // However, we need a more robust handling of deserialization dependencies
+    // that can handle circularities. rdar://problem/32359173
     if (contextDependsOn(nominal, excluding))
       return;
     seen.insert(nominal->getDeclaredInterfaceType());
@@ -2714,7 +2707,7 @@ void Serializer::writeDecl(const Decl *D) {
         continue;
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
-                                  /*excluding*/theEnum);
+                                  /*excluding*/theEnum->getParentModule());
     }
     for (Type ty : dependencyTypes)
       inheritedAndDependencyTypes.push_back(addTypeRef(ty));
