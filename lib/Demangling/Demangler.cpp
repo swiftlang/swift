@@ -442,6 +442,10 @@ NodePointer Demangler::demangleMultiSubstitutions() {
   int RepeatCount = -1;
   while (true) {
     char c = nextChar();
+    if (c == 0) {
+      // End of text.
+      return nullptr;
+    }
     if (isLowerLetter(c)) {
       // It's a substitution with an index < 26.
       NodePointer Nd = pushMultiSubstitutions(RepeatCount, c - 'a');
@@ -1322,7 +1326,8 @@ NodePointer Demangler::demangleFunctionSpecialization() {
       case FunctionSigSpecializationParamKind::ClosureProp: {
         size_t FixedChildren = Param->getNumChildren();
         while (NodePointer Ty = popNode(Node::Kind::Type)) {
-          assert(ParamKind == FunctionSigSpecializationParamKind::ClosureProp);
+          if (ParamKind != FunctionSigSpecializationParamKind::ClosureProp)
+            return nullptr;
           Param = addChild(Param, Ty);
         }
         NodePointer Name = popNode(Node::Kind::Identifier);
