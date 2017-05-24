@@ -3255,7 +3255,60 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   public init?<T : FloatingPoint>(exactly source: T) {
     fatalError()
   }
+    
+  public init<T : BinaryFloatingPoint>(_ source: T)
+    where T.RawSignificand : FixedWidthInteger
+  {
+    assert(source.isFinite, "Can't create a DoubleWidth<\(Base.self)> from infinity")
+    assert(!source.isNaN, "Can't create a DoubleWidth<\(Base.self)> from a NaN")
+    self.init(exactly: source.rounded(.towardZero))!
+  }
+    
+  public init?<T : BinaryFloatingPoint>(exactly source: T)
+    where T.RawSignificand : FixedWidthInteger
+  {
+    // Need a finite value
+    guard source.isFinite && !source.isNaN else { return nil }
 
+    // Don't need to go further with zero
+    if source.isZero {
+      self.init(0)
+      return
+    }
+
+    // Need a value with a non-negative exponent
+    guard source.exponent >= 0 else { return nil }
+
+    typealias Raw = T.RawSignificand
+    let bitPattern: Raw = source.significandBitPattern | ((1 as Raw) &<< Raw(T.significandBitCount))
+    let offset: Int = T.significandBitCount - Int(source.exponent)
+    
+    // FIXME: spurious compile error when 'where' clause above is removed:
+    // error: non-nominal type 'T.RawSignificand' does not support explicit initialization
+    let fractionPart: Raw = bitPattern &<< Raw(Int(Raw.bitWidth - offset))
+    guard fractionPart == 0 else {
+      return nil
+    }
+
+    let integerPart: Raw = bitPattern &>> Raw(offset)
+
+    // Exit early for zero
+    guard integerPart > 0 else {
+      self.init(0)
+      return
+    }
+
+    if source.sign == .minus {
+      if !DoubleWidth.isSigned || integerPart &- 1 > DoubleWidth.max {
+        return nil
+      }
+      self.init(integerPart &- 1)
+      self = 0 &- self &- 1
+    } else {
+      self.init(exactly: integerPart)
+    }
+  }
+    
   public func _word(at n: Int) -> UInt {
     if Base.bitWidth < ${word_bits} {
       if ${word_bits} % Base.bitWidth != 0 {

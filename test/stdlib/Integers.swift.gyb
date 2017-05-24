@@ -778,6 +778,67 @@ dwTests.test("MultiplyMinByMinusOne") {
   _ = f(Int1024.min)
 }
 
-// FIXME: Need more tests of DoubleWidth
+typealias DWI16 = DoubleWidth<Int8>
+typealias DWU16 = DoubleWidth<UInt8>
+
+dwTests.test("Conversions") {
+    expectTrue(DWI16(1 << 15 - 1) == Int(1 << 15 - 1))
+    expectTrue(DWI16(-1 << 15) == Int(-1 << 15))
+    expectTrue(DWU16(1 << 16 - 1) == Int(1 << 16 - 1))
+    expectTrue(DWU16(0) == Int(0))
+    
+    expectTrue(DWI16(Double(1 << 15 - 1)) == Int(1 << 15 - 1))
+    expectTrue(DWI16(Double(-1 << 15)) == Int(-1 << 15))
+    expectTrue(DWU16(Double(1 << 16 - 1)) == Int(1 << 16 - 1))
+    expectTrue(DWU16(Double(0)) == Int(0))
+    
+    expectTrue(DWI16(Double(1 << 15 - 1) + 0.9) == Int(1 << 15 - 1))
+    expectTrue(DWI16(Double(-1 << 15) - 0.9) == Int(-1 << 15))
+    expectTrue(DWU16(Double(1 << 16 - 1) + 0.9) == Int(1 << 16 - 1))
+    expectTrue(DWU16(Double(0) - 0.9) == Int(0))
+
+    expectEqual(DWI16(0.00001), 0)
+    expectEqual(DWU16(0.00001), 0)
+}
+
+dwTests.test("Exact Conversions") {
+    expectEqual(DWI16(Double(1 << 15 - 1)), DWI16(exactly: Double(1 << 15 - 1))!)
+    expectEqual(DWI16(Double(-1 << 15)), DWI16(exactly: Double(-1 << 15))!)
+    expectEqual(DWU16(Double(1 << 16 - 1)), DWU16(exactly: Double(1 << 16 - 1))!)
+    expectEqual(DWU16(Double(0)), DWU16(exactly: Double(0))!)
+    
+    expectNil(DWI16(exactly: Double(1 << 15 - 1) + 0.9))
+    expectNil(DWI16(exactly: Double(-1 << 15) - 0.9))
+    expectNil(DWU16(exactly: Double(1 << 16 - 1) + 0.9))
+    expectNil(DWU16(exactly: Double(0) - 0.9))
+    
+    expectNil(DWI16(exactly: Double(1 << 15)))
+    expectNil(DWI16(exactly: Double(-1 << 15) - 1))
+    expectNil(DWU16(exactly: Double(1 << 16)))
+    expectNil(DWU16(exactly: Double(-1)))
+
+    expectNil(DWI16(exactly: 0.00001))
+    expectNil(DWU16(exactly: 0.00001))
+}
+
+dwTests.test("Conversions/SignedMax+1") {
+    expectCrashLater()
+    _ = DWI16(1 << 15)
+}
+
+dwTests.test("Conversions/SignedMin-1") {
+    expectCrashLater()
+    _ = DWI16(-1 << 15 - 1)
+}
+
+dwTests.test("Conversions/UnsignedMax+1") {
+    expectCrashLater()
+    _ = DWU16(1 << 16)
+}
+
+dwTests.test("Conversions/Unsigned-1") {
+    expectCrashLater()
+    _ = DWU16(-1)
+}
 
 runAllTests()
