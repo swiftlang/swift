@@ -104,8 +104,8 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
-Solution ConstraintSystem::finalize(
-           FreeTypeVariableBinding allowFreeTypeVariables) {
+Optional<Solution>
+ConstraintSystem::finalize(FreeTypeVariableBinding allowFreeTypeVariables) {
   // Create the solution.
   Solution solution(*this, CurrentScore);
 
@@ -142,7 +142,19 @@ Solution ConstraintSystem::finalize(
 
   // For each of the type variables, get its fixed type.
   for (auto tv : TypeVariables) {
-    solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
+    auto simplified = simplifyType(tv)->reconstituteSugar(false);
+    // There are possible situations (at least) with generic parameters
+    // and associated types, which might introduce errors into a solution,
+    // if that happens consider this solution as failed.
+    // One of the reasons why this might happen is related to conformance
+    // to protocols, which is validated lazily and too late for constraint
+    // system to know about failures, which means that some of the associated
+    // types might be ErrorType, which presents their proper sustitution
+    // to form a valid solution.
+    if (simplified->hasError())
+      return None;
+
+    solution.typeBindings[tv] = simplified;
   }
 
   // For each of the overload sets, get its overload choice.
@@ -209,7 +221,7 @@ Solution ConstraintSystem::finalize(
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
-  return solution;
+  return Optional<Solution>(std::move(solution));
 }
 
 void ConstraintSystem::applySolution(const Solution &solution) {
@@ -2087,13 +2099,16 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       return true;
 
     auto solution = finalize(allowFreeTypeVariables);
+    if (!solution)
+      return true;
+
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth * 2)
         << "(found solution " << CurrentScore << ")\n";
     }
 
-    solutions.push_back(std::move(solution));
+    solutions.push_back(std::move(*solution));
     return false;
   }
 
@@ -2294,6 +2309,9 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     if (!worseThanBestSolution()) {
       // Finalize this solution.
       auto solution = finalize(allowFreeTypeVariables);
+      if (!solution)
+        continue;
+
       if (TC.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log.indent(solverState->depth * 2)
@@ -2301,8 +2319,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       }
 
       // Save this solution.
-      solutions.push_back(std::move(solution));
-
+      solutions.push_back(std::move(*solution));
       anySolutions = true;
     }
     
@@ -2488,12 +2505,15 @@ bool ConstraintSystem::solveSimplified(
     }
 
     auto solution = finalize(allowFreeTypeVariables);
+    if (!solution)
+      return true;
+
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth * 2) << "(found solution)\n";
     }
 
-    solutions.push_back(std::move(solution));
+    solutions.push_back(std::move(*solution));
     return false;
   }
 

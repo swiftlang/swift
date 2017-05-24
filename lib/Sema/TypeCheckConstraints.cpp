@@ -2489,7 +2489,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   // lvalue.  Emit them if present.
   if (!Fixes.empty()) {
     auto solution = finalize(FreeTypeVariableBinding::Allow);
-    if (applySolutionFixes(dest, solution))
+    if (solution && applySolutionFixes(dest, *solution))
       return Type();
   }
 
