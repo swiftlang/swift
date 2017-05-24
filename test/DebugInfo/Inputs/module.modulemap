@@ -6,3 +6,12 @@ module ClangModule {
     export *
   }
 }
+
+module OtherClangModule {
+  header "OtherClangModule.h"
+  export *
+  explicit module SubModule {
+    header "OtherSubModule.h"
+    export *
+  }
+}
