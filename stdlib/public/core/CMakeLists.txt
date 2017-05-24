@@ -151,6 +151,7 @@ set(SWIFTLIB_ESSENTIAL
   UTF16.swift
   UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
+  ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
   )
 
