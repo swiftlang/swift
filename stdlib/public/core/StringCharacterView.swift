@@ -425,7 +425,7 @@ extension String.CharacterView : BidirectionalCollection {
     return legacyGraphemeForward(
       start: start, end: end, startIndexUTF16: startIndexUTF16
     )
-	}
+  }
 
   @inline(never)
   func legacyGraphemeForward(
