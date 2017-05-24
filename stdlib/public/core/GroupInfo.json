@@ -34,7 +34,8 @@
     "UTFEncoding.swift",
     "UTF8.swift",
     "UTF16.swift",
-    "UTF32.swift"
+    "UTF32.swift",
+    "ValidUTF8Buffer.swift"
   ],
   "Bool": [
     "Bool.swift"
