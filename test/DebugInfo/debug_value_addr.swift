@@ -10,8 +10,8 @@
 // CHECK: define {{.*}}_T016debug_value_addr4testyxlF
 // CHECK: entry:
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
-// CHECK: store %swift.opaque* %0, %swift.opaque** %[[TADDR:.*]], align
 // CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]
+// CHECK: store %swift.opaque* %0, %swift.opaque** %[[TADDR:.*]], align
 
 struct S<T> {
   var a : T
