@@ -728,7 +728,6 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
     case DAK_SetterAccessibility:
     // Ignore these.
     case DAK_ShowInInterface:
-    case DAK_RawDocComment:
       continue;
     default:
       break;
