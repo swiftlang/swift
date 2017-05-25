@@ -15,27 +15,27 @@
 NS_BEGIN_DECLS
 
 NS_INLINE NS_RETURNS_RETAINED NS_NON_BRIDGED(NSCharacterSet *) _NSURLComponentsGetURLUserAllowedCharacterSet(void) {
-	return NSCharacterSet.URLUserAllowedCharacterSet;
+    return NSCharacterSet.URLUserAllowedCharacterSet;
 }
 
 NS_INLINE NS_RETURNS_RETAINED NS_NON_BRIDGED(NSCharacterSet *) _NSURLComponentsGetURLPasswordAllowedCharacterSet(void) {
-	return NSCharacterSet.URLPasswordAllowedCharacterSet;
+    return NSCharacterSet.URLPasswordAllowedCharacterSet;
 }
 
 NS_INLINE NS_RETURNS_RETAINED NS_NON_BRIDGED(NSCharacterSet *) _NSURLComponentsGetURLHostAllowedCharacterSet(void) {
-	return NSCharacterSet.URLHostAllowedCharacterSet;
+    return NSCharacterSet.URLHostAllowedCharacterSet;
 }
 
 NS_INLINE NS_RETURNS_RETAINED NS_NON_BRIDGED(NSCharacterSet *) _NSURLComponentsGetURLPathAllowedCharacterSet(void) {
-	return NSCharacterSet.URLPathAllowedCharacterSet;
+    return NSCharacterSet.URLPathAllowedCharacterSet;
 }
 
 NS_INLINE NS_RETURNS_RETAINED NS_NON_BRIDGED(NSCharacterSet *) _NSURLComponentsGetURLQueryAllowedCharacterSet(void) {
-	return NSCharacterSet.URLQueryAllowedCharacterSet;
+    return NSCharacterSet.URLQueryAllowedCharacterSet;
 }
 
 NS_INLINE NS_RETURNS_RETAINED NS_NON_BRIDGED(NSCharacterSet *) _NSURLComponentsGetURLFragmentAllowedCharacterSet(void) {
-	return NSCharacterSet.URLFragmentAllowedCharacterSet;
+    return NSCharacterSet.URLFragmentAllowedCharacterSet;
 }
 
 NS_END_DECLS
