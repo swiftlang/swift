@@ -3157,6 +3157,7 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
 //===--- DoubleWidth ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+/// A fixed-width integer that is twice the size of its base type.
 public struct DoubleWidth<Base : FixedWidthInteger> :
   FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral {
 
