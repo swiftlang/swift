@@ -1229,9 +1229,6 @@ public:
     handleExternalDecl(nominal);
   }
 
-  /// Introduce the accessors for a 'lazy' variable.
-  void introduceLazyVarAccessors(VarDecl *var) override;
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 

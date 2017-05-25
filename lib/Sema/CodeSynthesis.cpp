@@ -1688,10 +1688,6 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   addMaterializeForSet(storage, TC);
 }
 
-void TypeChecker::introduceLazyVarAccessors(VarDecl *var) {
-  maybeAddAccessorsToVariable(var, *this);
-}
-
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getGetter())
     return;
