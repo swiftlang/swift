@@ -2999,8 +2999,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, ctor, /*isSpecialized=*/false,
-                                      functionRefKind));
+      result.addViable(OverloadChoice(baseTy, ctor, functionRefKind));
     }
 
 
@@ -3160,9 +3159,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                     functionRefKind));
     } else {
-      result.addViable(OverloadChoice(ovlBaseTy, cand,
-                                      /*isSpecialized=*/false,
-                                      functionRefKind));
+      result.addViable(OverloadChoice(ovlBaseTy, cand, functionRefKind));
     }
   };
 
@@ -3776,7 +3773,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
   auto tryMatchRootAndValueFromKeyPathType =
-    [&](BoundGenericType *bgt) -> SolutionKind {
+    [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
       Type boundRoot, boundValue;
       
       // We can get root and value from a concrete key path type.
@@ -3786,9 +3783,13 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
       } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
-        // We can still get the root from a PartialKeyPath.
-        boundRoot = bgt->getGenericArgs()[0];
-        boundValue = Type();
+        if (allowPartial) {
+          // We can still get the root from a PartialKeyPath.
+          boundRoot = bgt->getGenericArgs()[0];
+          boundValue = Type();
+        } else {
+          return SolutionKind::Error;
+        }
       } else {
         // We can't bind anything from this type.
         return SolutionKind::Solved;
@@ -3804,14 +3805,26 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       
       return SolutionKind::Solved;
     };
-  
-  // If the key path type is bound from context, feed that into the root and
-  // value types.
+
+  // If we're fixed to a bound generic type, trying harvesting context from it.
+  // However, we don't want a solution that fixes the expression type to
+  // PartialKeyPath; we'd rather that be represented using an upcast conversion.
   if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
-    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT) == SolutionKind::Error)
+    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
+          == SolutionKind::Error)
       return SolutionKind::Error;
   }
 
+  // If the expression has contextual type information, try using that too.
+  if (auto contextualTy = getContextualType(keyPath)) {
+    if (auto contextualBGT = contextualTy->getAs<BoundGenericType>()) {
+      if (tryMatchRootAndValueFromKeyPathType(contextualBGT,
+                                              /*allowPartial*/true)
+            == SolutionKind::Error)
+        return SolutionKind::Error;
+    }
+  }
+  
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -3824,7 +3837,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Invalid:
-      return SolutionKind::Error;
+      break;
       
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {

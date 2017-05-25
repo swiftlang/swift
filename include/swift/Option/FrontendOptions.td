@@ -421,8 +421,9 @@ def group_info_path : Separate<["-"], "group-info-path">,
 def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
 HelpText<"Diagnostics will be used in editor">;
 
-def validate_tbd_against_ir: Flag<["-"], "validate-tbd-against-ir">,
-    HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">;
+def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
+    HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">,
+    MetaVarName<"<level>">;
 
 // FIXME: Remove this flag when void subscripts are implemented.
 // This is used to guard preemptive testing for the fix-it.

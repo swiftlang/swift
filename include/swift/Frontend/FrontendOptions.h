@@ -271,8 +271,15 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// The different modes for validating TBD against the LLVM IR.
+  enum class TBDValidationMode {
+    None,           ///< Do no validation.
+    MissingFromTBD, ///< Only check for symbols that are in IR but not TBD.
+    All, ///< Check for symbols that are in IR but not TBD and TBD but not IR.
+  };
+
   /// Compare the symbols in the IR against the TBD file we would generate.
-  bool ValidateTBDAgainstIR = false;
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {

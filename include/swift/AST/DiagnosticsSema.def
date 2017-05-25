@@ -450,6 +450,8 @@ ERROR(expr_swift_keypath_unimplemented_component,none,
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "KeyPath value type %0 cannot be converted to contextual type %1",
       (Type, Type))
+ERROR(expr_swift_keypath_empty, none,
+      "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
 ERROR(unsupported_keypath_tuple_element_reference,none,

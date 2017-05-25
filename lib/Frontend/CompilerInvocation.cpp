@@ -191,7 +191,20 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.StatsOutputDir = A->getValue();
   }
 
-  Opts.ValidateTBDAgainstIR |= Args.hasArg(OPT_validate_tbd_against_ir);
+  if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
+    using Mode = FrontendOptions::TBDValidationMode;
+    StringRef value = A->getValue();
+    if (value == "none") {
+      Opts.ValidateTBDAgainstIR = Mode::None;
+    } else if (value == "missing") {
+      Opts.ValidateTBDAgainstIR = Mode::MissingFromTBD;
+    } else if (value == "all") {
+      Opts.ValidateTBDAgainstIR = Mode::All;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     A->getOption().getPrefixedName(), value);
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
     unsigned attempt;

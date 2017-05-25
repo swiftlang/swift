@@ -499,7 +499,7 @@ public protocol Sequence {
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
   func prefix(_ maxLength: Int) -> SubSequence
-  
+
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -615,7 +615,7 @@ public protocol Sequence {
   /// in the same order.
   func _copyToContiguousArray() -> ContiguousArray<Element>
 
-  /// Copy `self` into an unsafe buffer, returning a partially-consumed 
+  /// Copy `self` into an unsafe buffer, returning a partially-consumed
   /// iterator with any elements that didn't fit remaining.
   func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Element>
@@ -637,12 +637,9 @@ extension Sequence where Self.Iterator == Self {
 /// `Base` iterator before possibly returning the first available element.
 ///
 /// The underlying iterator's sequence may be infinite.
-///
-/// This is a class - we require reference semantics to keep track
-/// of how many elements we've already dropped from the underlying sequence.
 @_versioned
 @_fixed_layout
-internal class _DropFirstSequence<Base : IteratorProtocol>
+internal struct _DropFirstSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
 
   @_versioned
@@ -668,7 +665,7 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func next() -> Base.Element? {
+  internal mutating func next() -> Base.Element? {
     while _dropped < _limit {
       if _iterator.next() == nil {
         _dropped = _limit
@@ -697,12 +694,9 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
 /// `Base` iterator.
 ///
 /// The underlying iterator's sequence may be infinite.
-///
-/// This is a class - we require reference semantics to keep track
-/// of how many elements we've already taken from the underlying sequence.
 @_fixed_layout
 @_versioned
-internal class _PrefixSequence<Base : IteratorProtocol>
+internal struct _PrefixSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
   @_versioned
   internal let _maxLength: Int
@@ -727,7 +721,7 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func next() -> Base.Element? {
+  internal mutating func next() -> Base.Element? {
     if _taken >= _maxLength { return nil }
     _taken += 1
 
@@ -754,14 +748,11 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 /// `Base` iterator before possibly returning the first available element.
 ///
 /// The underlying iterator's sequence may be infinite.
-///
-/// This is a class - we require reference semantics to keep track
-/// of how many elements we've already dropped from the underlying sequence.
 @_fixed_layout
 @_versioned
-internal class _DropWhileSequence<Base : IteratorProtocol>
+internal struct _DropWhileSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
-      
+
       typealias Element = Base.Element
 
   @_versioned
@@ -778,7 +769,7 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
   ) rethrows {
     self._iterator = iterator
     self._nextElement = nextElement ?? _iterator.next()
-    
+
     while try _nextElement.flatMap(predicate) == true {
       _nextElement = _iterator.next()
     }
@@ -792,11 +783,11 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func next() -> Element? {
+  internal mutating func next() -> Element? {
     guard _nextElement != nil else {
       return _iterator.next()
     }
-    
+
     let next = _nextElement
     _nextElement = nil
     return next
@@ -973,7 +964,7 @@ extension Sequence {
   ///
   ///     print(
   ///         line.split(
-  ///             omittingEmptySubsequences: false, 
+  ///             omittingEmptySubsequences: false,
   ///             whereSeparator: { $0 == " " }
   ///         ).map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
@@ -1277,7 +1268,7 @@ extension Sequence where
     }
     return AnySequence(result)
   }
-  
+
   /// Returns a subsequence by skipping the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -1337,7 +1328,7 @@ extension Sequence where
     return AnySequence(
       _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
   }
-  
+
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -1403,7 +1394,7 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
-  /// The sequence must be finite. 
+  /// The sequence must be finite.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())

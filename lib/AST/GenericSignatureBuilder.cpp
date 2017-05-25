@@ -930,9 +930,13 @@ bool FloatingRequirementSource::isExplicit() const {
     return false;
 
   case AbstractProtocol:
+    // Requirements implied by other protocol conformance requirements are
+    // implicit, except when computing a requirement signature, where
+    // non-inferred ones are explicit, to allow flagging of redundant
+    // requirements.
     switch (storage.get<const RequirementSource *>()->kind) {
     case RequirementSource::RequirementSignatureSelf:
-      return true;
+      return !protocolReq.inferred;
 
     case RequirementSource::Concrete:
     case RequirementSource::Explicit:

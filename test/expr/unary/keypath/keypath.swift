@@ -82,26 +82,28 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   // expected-error@+1{{}}
   _ = \(() -> ()).noMember
 
-  // FIXME crash let _: PartialKeyPath<A> = \.property
+  let _: PartialKeyPath<A> = \.property
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
 
-  // FIXME crash let _: PartialKeyPath<A> = \[sub]
+  // FIXME: shouldn't be ambiguous
+  // expected-error@+1{{ambiguous}}
+  let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
 
-  // FIXME crash let _: PartialKeyPath<A> = \.optProperty?
+  let _: PartialKeyPath<A> = \.optProperty?
   let _: KeyPath<A, Prop?> = \.optProperty?
   // expected-error@+1{{cannot convert}}
   let _: WritableKeyPath<A, Prop?> = \.optProperty?
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
-  // FIXME crash let _: PartialKeyPath<A> = \.optProperty?[sub]
+  let _: PartialKeyPath<A> = \.optProperty?[sub]
   let _: KeyPath<A, A?> = \.optProperty?[sub]
   // expected-error@+1{{cannot convert}}
   let _: WritableKeyPath<A, A?> = \.optProperty?[sub]
@@ -113,27 +115,55 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty!
   let _: KeyPath<A, A?> = \.property[optSub]?.optProperty![sub]
 
-  // FIXME crash let _: PartialKeyPath<C<A>> = \.value
+  let _: PartialKeyPath<C<A>> = \.value
   let _: KeyPath<C<A>, A> = \.value
   let _: WritableKeyPath<C<A>, A> = \.value
   // expected-error@+1{{ambiguous}} (need to improve diagnostic)
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
 
-  // FIXME crash let _: PartialKeyPath<C<A>> = \C, .value
+  let _: PartialKeyPath<C<A>> = \C.value
   let _: KeyPath<C<A>, A> = \C.value
   let _: WritableKeyPath<C<A>, A> = \C.value
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
-  // FIXME crash let _: PartialKeyPath<Prop> = \.nonMutatingProperty
+  let _: PartialKeyPath<Prop> = \.nonMutatingProperty
   let _: KeyPath<Prop, B> = \.nonMutatingProperty
   let _: WritableKeyPath<Prop, B> = \.nonMutatingProperty
   let _: ReferenceWritableKeyPath<Prop, B> = \.nonMutatingProperty
+
+  var m = [\A.property, \A.[sub], \A.optProperty!]
+  expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
+
+  // FIXME: shouldn't be ambiguous
+  // expected-error@+1{{ambiguous}}
+  var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
+  expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
+
+  // FIXME: shouldn't be ambiguous
+  // expected-error@+1{{ambiguous}}
+  let _: [PartialKeyPath<A>] = [\.property, \.optProperty, \.[sub], \.optProperty!]
+
+  var o = [\A.property, \C<A>.value]
+  expect(&o, toHaveType: Exactly<[AnyKeyPath]>.self)
+
+  let _: AnyKeyPath = \A.property
+  let _: AnyKeyPath = \C<A>.value
+  let _: AnyKeyPath = \.property // expected-error{{ambiguous}}
+  let _: AnyKeyPath = \C.value // expected-error{{cannot convert}} (need to improve diagnostic)
+  let _: AnyKeyPath = \.value // expected-error{{ambiguous}}
 }
 
 func testDisembodiedStringInterpolation(x: Int) {
-  \(x) // expected-error{{string interpolation}}
-  \(x, radix: 16) // expected-error{{string interpolation}}
+  \(x) // expected-error{{string interpolation}} expected-error{{}}
+  \(x, radix: 16) // expected-error{{string interpolation}} expected-error{{}}
+
+  _ = \(Int, Int).0 // expected-error{{cannot reference tuple elements}}
+}
+
+func testNoComponents() {
+  let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
+  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
 }
 
 struct TupleStruct {
@@ -178,6 +208,30 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   writable[keyPath: wkp] = sink
   readonly[keyPath: rkp] = sink
   writable[keyPath: rkp] = sink
+
+  // TODO: PartialKeyPath and AnyKeyPath application
+
+  /*
+  let pkp: PartialKeyPath = rkp
+
+  var anySink1 = readonly[keyPath: pkp]
+  expect(&anySink1, toHaveType: Exactly<Any>.self)
+  var anySink2 = writable[keyPath: pkp]
+  expect(&anySink2, toHaveType: Exactly<Any>.self)
+
+  readonly[keyPath: pkp] = anySink1 // e/xpected-error{{cannot assign to immutable}}
+  writable[keyPath: pkp] = anySink2 // e/xpected-error{{cannot assign to immutable}}
+
+  let akp: AnyKeyPath = pkp
+
+  var anyqSink1 = readonly[keyPath: akp]
+  expect(&anyqSink1, toHaveType: Exactly<Any?>.self)
+  var anyqSink2 = writable[keyPath: akp]
+  expect(&anyqSink2, toHaveType: Exactly<Any?>.self)
+
+  readonly[keyPath: akp] = anyqSink1 // e/xpected-error{{cannot assign to immutable}}
+  writable[keyPath: akp] = anyqSink2 // e/xpected-error{{cannot assign to immutable}}
+  */
 }
 
 func testKeyPathSubscriptMetatype(readonly: Z.Type, writable: inout Z.Type,

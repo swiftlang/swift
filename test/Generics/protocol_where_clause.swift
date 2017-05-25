@@ -66,3 +66,14 @@ struct BadConcreteNestedConforms: NestedConforms {
   // expected-error@-1 {{type 'ConcreteParentNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
   typealias U = ConcreteParentNonFoo2
 }
+
+
+// SR4693:
+protocol P1 {}
+struct X: P1 {}
+struct Y<T: P1> {}
+
+protocol P2 {
+  associatedtype AT
+}
+protocol P3: P2 where AT == Y<X> {}
