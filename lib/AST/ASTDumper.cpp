@@ -840,6 +840,8 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
+      if (EED->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>())
+        OS << "@_downgrade_exhaustivity_check";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
