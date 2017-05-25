@@ -1727,6 +1727,29 @@ extension _BinaryInteger where Self : BinaryInteger {
     return lhs == Self(extendingOrTruncating: rhs)
   }
 
+  /// Returns a Boolean value indicating whether the two given values are not
+  /// equal.
+  ///
+  /// You can check the inequality of instances of any `BinaryInteger` types
+  /// using the not-equal-to operator (`!=`). For example, you can test
+  /// whether the first `UInt8` value in a string's UTF-8 encoding is not
+  /// equal to the first `UInt32` value in its Unicode scalar view:
+  ///
+  ///     let gameName = "Red Light, Green Light"
+  ///     if let firstUTF8 = gameName.utf8.first,
+  ///         let firstScalar = gameName.unicodeScalars.first?.value {
+  ///         print("First code values are different: \(firstUTF8 != firstScalar)")
+  ///     }
+  ///     // Prints "First code values are different: false"
+  ///
+  /// - Parameters:
+  ///   - lhs: An integer to compare.
+  ///   - rhs: Another integer to compare.
+  @_transparent
+  public static func != <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+    return !(lhs == rhs)
+  }
+
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than that of the second argument.
   ///
@@ -1767,29 +1790,6 @@ extension _BinaryInteger where Self : BinaryInteger {
     }
 
     return Other(extendingOrTruncating: lhs) < rhs
-  }
-
-  /// Returns a Boolean value indicating whether the two given values are not
-  /// equal.
-  ///
-  /// You can check the inequality of instances of any `BinaryInteger` types
-  /// using the not-equal-to operator (`!=`). For example, you can test
-  /// whether the first `UInt8` value in a string's UTF-8 encoding is not
-  /// equal to the first `UInt32` value in its Unicode scalar view:
-  ///
-  ///     let gameName = "Red Light, Green Light"
-  ///     if let firstUTF8 = gameName.utf8.first,
-  ///         let firstScalar = gameName.unicodeScalars.first?.value {
-  ///         print("First code values are different: \(firstUTF8 != firstScalar)")
-  ///     }
-  ///     // Prints "First code values are different: false"
-  ///
-  /// - Parameters:
-  ///   - lhs: An integer to compare.
-  ///   - rhs: Another integer to compare.
-  @_transparent
-  public static func != <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
-    return !(lhs == rhs)
   }
 
   /// Returns a Boolean value indicating whether the value of the first
