@@ -729,6 +729,7 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
+    case DAK_DowngradeExhaustivityCheck:
       continue;
     default:
       break;

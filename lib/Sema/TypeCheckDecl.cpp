@@ -6103,6 +6103,7 @@ public:
     UNINTERESTING_ATTR(NSKeyedArchiverClassName)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
+    UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
