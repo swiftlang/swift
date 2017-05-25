@@ -2476,12 +2476,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
     break;
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
-    if (TC.conformsToProtocol(type, protocol, DC,
-                              ConformanceCheckFlags::InExpression))
+    auto conformance = TC.conformsToProtocol(
+        type, protocol, DC, ConformanceCheckFlags::InExpression);
+
+    if (conformance) {
+      CheckedConformances.push_back(
+          {getConstraintLocator(locator), std::move(*conformance)});
       return SolutionKind::Solved;
+    }
     break;
+  }
+
   default:
     llvm_unreachable("bad constraint kind");
   }

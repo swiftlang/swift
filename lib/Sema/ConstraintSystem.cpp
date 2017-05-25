@@ -1732,15 +1732,13 @@ Type Solution::simplifyType(Type type) const {
 }
 
 size_t Solution::getTotalMemory() const {
-  return sizeof(*this) +
-    typeBindings.getMemorySize() +
-    overloadChoices.getMemorySize() +
-    ConstraintRestrictions.getMemorySize() +
-    llvm::capacity_in_bytes(Fixes) +
-    DisjunctionChoices.getMemorySize() +
-    OpenedTypes.getMemorySize() +
-    OpenedExistentialTypes.getMemorySize() +
-    (DefaultedConstraints.size() * sizeof(void*));
+  return sizeof(*this) + typeBindings.getMemorySize() +
+         overloadChoices.getMemorySize() +
+         ConstraintRestrictions.getMemorySize() +
+         llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
+         OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
+         (DefaultedConstraints.size() * sizeof(void *)) +
+         llvm::capacity_in_bytes(Conformances);
 }
 
 DeclName OverloadChoice::getName() const {

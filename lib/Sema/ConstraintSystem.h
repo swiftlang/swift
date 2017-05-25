@@ -559,6 +559,9 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
 
+  llvm::SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
+      Conformances;
+
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(Type type) const;
@@ -963,6 +966,9 @@ private:
   SmallVector<std::pair<ConstraintLocator *, ArchetypeType *>, 4>
     OpenedExistentialTypes;
 
+  SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
+      CheckedConformances;
+
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
@@ -1315,6 +1321,8 @@ public:
 
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
+
+    unsigned numCheckedConformances;
 
     /// The previous score.
     Score PreviousScore;

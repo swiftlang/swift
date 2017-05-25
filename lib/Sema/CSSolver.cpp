@@ -209,6 +209,9 @@ Solution ConstraintSystem::finalize(
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
+  for (auto &e : CheckedConformances)
+    solution.Conformances.push_back({e.first, e.second});
+
   return solution;
 }
 
@@ -268,6 +271,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the defaulted type variables.
   DefaultedConstraints.append(solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
+
+  // Register the conformances checked along the way to arrive to solution.
+  for (auto &conformance : solution.Conformances)
+    CheckedConformances.push_back(conformance);
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
@@ -460,6 +467,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
+  numCheckedConformances = cs.CheckedConformances.size();
   PreviousScore = cs.CurrentScore;
 
   cs.solverState->registerScope(this);
@@ -510,7 +518,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any defaulted type variables.
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
-  
+
+  // Remove any conformances checked along the current path.
+  truncate(cs.CheckedConformances, numCheckedConformances);
+
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
 
