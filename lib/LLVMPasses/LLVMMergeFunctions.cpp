@@ -864,7 +864,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   // a name which can be demangled in a meaningful way.
   Function *NewFunction = Function::Create(funcType,
                                            FirstF->getLinkage(),
-                                           FirstF->getName() + "_merged");
+                                           FirstF->getName() + "Tm");
   NewFunction->copyAttributesFrom(FirstF);
   // NOTE: this function is not externally available, do ensure that we reset
   // the DLL storage

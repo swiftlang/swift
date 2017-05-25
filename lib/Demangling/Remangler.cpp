@@ -1063,6 +1063,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicAttribute:
       case Node::Kind::VTableAttribute:
       case Node::Kind::DirectMethodReferenceAttribute:
+      case Node::Kind::MergedFunction:
         mangleInReverseOrder = true;
         break;
       default:
@@ -1366,6 +1367,10 @@ void Remangler::manglePartialApplyForwarder(Node *node) {
 void Remangler::manglePartialApplyObjCForwarder(Node *node) {
   mangleChildNodesReversed(node);
   Buffer << "Ta";
+}
+
+void Remangler::mangleMergedFunction(Node *node) {
+  Buffer << "Tm";
 }
 
 void Remangler::manglePostfixOperator(Node *node) {
