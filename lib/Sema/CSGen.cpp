@@ -3338,8 +3338,15 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
         createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Layout:
-        // FIXME FIXME FIXME
-        createMemberConstraint(Req, ConstraintKind::ConformsTo);
+        if (Req.getLayoutConstraint()->isClass()) {
+          auto First = resolveType(Req.getFirstType());
+          CS.addConstraint(ConstraintKind::ConformsTo, First,
+                           CS.getASTContext().getAnyObjectType(),
+                           Loc);
+        }
+
+        // Nothing else can appear outside of @_specialize yet, and Sema
+        // doesn't know how to check.
         break;
       case RequirementKind::Superclass:
         createMemberConstraint(Req, ConstraintKind::Subtype);
