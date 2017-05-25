@@ -747,7 +747,6 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
 
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     bool isSpecialized,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      const DeclRefExpr *base) {
@@ -816,7 +815,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // Resolve the reference to this type declaration in our current context.
     auto type = TC.resolveTypeInContext(typeDecl, DC,
                                         TR_InExpression,
-                                        isSpecialized);
+                                        /*isSpecialized=*/false);
 
     // Open the type.
     type = openUnboundGenericType(type, locator);
@@ -1072,8 +1071,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, /*isSpecialized=*/false,
-                              functionRefKind, locator, base);
+    return getTypeOfReference(value, functionRefKind, locator, base);
   }
 
   // Don't open existentials when accessing typealias members of
@@ -1465,7 +1463,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(),
-                             choice.isSpecialized(),
                              choice.getFunctionRefKind(), locator);
     }
 

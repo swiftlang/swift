@@ -522,22 +522,16 @@ Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 DeclContext *UseDC, DeclNameLoc NameLoc,
-                                bool Implicit, bool isSpecialized,
-                                FunctionRefKind functionRefKind) {
+                                bool Implicit, FunctionRefKind functionRefKind) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
     AccessSemantics semantics = Decls[0]->getAccessSemanticsFromContext(UseDC);
-    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit,
-                                            semantics);
-    if (isSpecialized)
-      result->setSpecialized();
-    return result;
+    return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
   }
 
   Decls = Context.AllocateCopy(Decls);
   auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, 
-                                                    isSpecialized,
                                                     functionRefKind,
                                                     Implicit);
   return result;
