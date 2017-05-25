@@ -224,6 +224,9 @@ enum class TypeCheckExprFlags {
   /// Set if the client prefers fixits to be in the form of force unwrapping
   /// or optional chaining to return an optional.
   PreferForceUnwrapToOptional = 0x80,
+
+  /// If set, don't apply a solution.
+  SkipApplyingSolution = 0x100,
 };
 
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -324,6 +327,13 @@ public:
   /// \returns true if an error occurred that is not itself part of the
   /// constraint system, or false otherwise.
   virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
+
+  /// Callback invoked once a solution has been found.
+  ///
+  /// The callback may further alter the expression, returning either a
+  /// new expression (to replace the result) or a null pointer to indicate
+  /// failure.
+  virtual Expr *foundSolution(constraints::Solution &solution, Expr *expr);
 
   /// Callback invokes once the chosen solution has been applied to the
   /// expression.
@@ -1667,9 +1677,9 @@ public:
   
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
-                        bool skipClosures);
+                        bool skipApplyingSolution);
   bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
-                               bool skipClosures);
+                               bool skipApplyingSolution);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);

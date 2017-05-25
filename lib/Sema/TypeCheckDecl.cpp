@@ -1198,11 +1198,11 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    bool skipClosures = false;
+    bool skipApplyingSolution = false;
     if (auto var = binding->getSingleVar())
-      skipClosures = var->getAttrs().hasAttribute<LazyAttr>();
+      skipApplyingSolution = var->getAttrs().hasAttribute<LazyAttr>();
 
-    if (tc.typeCheckPatternBinding(binding, entryNumber, skipClosures))
+    if (tc.typeCheckPatternBinding(binding, entryNumber, skipApplyingSolution))
       return;
   }
 
@@ -4047,7 +4047,7 @@ public:
     if (!IsFirstPass) {
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
         if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
-          TC.typeCheckPatternBinding(PBD, i, /*skipClosures*/false);
+          TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
       }
     }
 
@@ -4078,7 +4078,7 @@ public:
             // If we got a default initializer, install it and re-type-check it
             // to make sure it is properly coerced to the pattern type.
             PBD->setInit(i, defaultInit);
-            TC.typeCheckPatternBinding(PBD, i, /*skipClosures*/false);
+            TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
           }
         }
       }
