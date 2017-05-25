@@ -78,6 +78,8 @@ extension _UnicodeEncoding_ {
   /// Converts from encoding-independent to encoded representation, returning
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
+  @_versioned
+  @inline(__always)
   internal static func _encode(_ content: Unicode.Scalar) -> EncodedScalar {
     return encode(content) ?? encodedReplacementCharacter
   }
@@ -85,6 +87,8 @@ extension _UnicodeEncoding_ {
   /// Converts a scalar from another encoding's representation, returning
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
+  @_versioned
+  @inline(__always)
   internal static func _transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar {
@@ -92,6 +96,8 @@ extension _UnicodeEncoding_ {
       ?? encodedReplacementCharacter
   }
 
+  @_versioned
+  @inline(__always)
   internal static func _transcode<
   Source: Sequence, SourceEncoding: Unicode.Encoding>(
     _ source: Source,

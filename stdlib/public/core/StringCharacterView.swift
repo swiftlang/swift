@@ -658,8 +658,10 @@ extension String.CharacterView : RangeReplaceableCollection {
   public mutating func append(_ c: Character) {
     switch c._representation {
     case .small(let _63bits):
-      let bytes = Character._smallValue(_63bits)
-      _core.append(contentsOf: Character._SmallUTF16(bytes))
+      var i = c._smallUTF8!.makeIterator()
+      UTF8.ForwardParser._decode(&i, repairingIllFormedSequences: false) {
+        self._core.append($0)
+      }
     case .large(_):
       _core.append(String(c)._core)
     }

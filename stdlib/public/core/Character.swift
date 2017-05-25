@@ -84,24 +84,13 @@ public struct Character :
   ///
   /// - Parameter scalar: The Unicode scalar value to convert into a character.
   public init(_ scalar: Unicode.Scalar) {
-    var asInt: UInt64 = 0
-    var shift: UInt64 = 0
-
-    let output: (UTF8.CodeUnit) -> Void = {
-      asInt |= UInt64($0) &<< shift
-      shift += 8
-    }
-
-    UTF8.encode(scalar, into: output)
-    asInt |= (~0) &<< shift
-    _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
+    let bits = UTF8.encode(scalar)._unsafelyUnwrappedUnchecked._biasedBits
+    _representation = .small(Builtin.zext_Int32_Int63(bits._value))
   }
 
   @effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = Character(
-      String._fromWellFormedCodeUnitSequence(
-        UTF32.self, input: CollectionOfOne(UInt32(value))))
+    self = Character(UnicodeScalar(_unchecked: UInt32(value)))
   }
 
   // Inlining ensures that the whole constructor can be folded away to a single
@@ -113,26 +102,16 @@ public struct Character :
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    // Most character literals are going to be fewer than eight UTF-8 code
-    // units; for those, build the small character representation directly.
-    let maxCodeUnitCount = MemoryLayout<UInt64>.size
-    if _fastPath(Int(utf8CodeUnitCount) <= maxCodeUnitCount) {
-      var buffer: UInt64 = ~0
-      _memcpy(
-        dest: UnsafeMutableRawPointer(Builtin.addressof(&buffer)),
-        src: UnsafeMutableRawPointer(start),
-        size: UInt(utf8CodeUnitCount))
-      // Copying the bytes directly from the literal into an integer assumes
-      // little endianness, so convert the copied data into host endianness.
-      let utf8Chunk = UInt64(littleEndian: buffer)
-      let bits = maxCodeUnitCount &* 8 &- 1
-      // Verify that the highest bit isn't set so that we can truncate it to
-      // 63 bits.
-      if _fastPath(utf8Chunk & (1 &<< numericCast(bits)) != 0) {
-        _representation = .small(Builtin.trunc_Int64_Int63(utf8Chunk._value))
-        return
-      }
+    let input = UnsafeBufferPointer<UInt8>(
+      start: UnsafePointer(start),
+      count: Int(utf8CodeUnitCount)
+    )
+    
+    if let smallRepresentation = Character(_smallValidUTF8: input) {
+      self = smallRepresentation
+      return
     }
+    
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
     self = Character(_largeRepresentationString:
@@ -140,6 +119,19 @@ public struct Character :
         _builtinExtendedGraphemeClusterLiteral: start,
         utf8CodeUnitCount: utf8CodeUnitCount,
         isASCII: isASCII))
+  }
+
+  @inline(__always)
+  public init?<Input: Collection>(_smallValidUTF8 input: Input)
+  where Input.Element == UInt8 {
+    guard _fastPath(input.count <= MemoryLayout<UInt64>.size) else {
+      return nil
+    }
+    let bits = _ValidUTF8Buffer<UInt64>(input)._biasedBits
+    guard _fastPath(Int64(extendingOrTruncating: bits) >= 0) else {
+      return nil
+    }
+    _representation = .small(Builtin.trunc_Int64_Int63(bits._value))
   }
 
   /// Creates a character with the specified value.
@@ -184,17 +176,11 @@ public struct Character :
       s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
-    // Notice that the result of sizeof() is a small non-zero number and can't
-    // overflow when multiplied by 8.
-    let bits = MemoryLayout.size(ofValue: initialUTF8) &* 8 &- 1
-    if _fastPath(
-      count == s._core.count && (initialUTF8 & (1 &<< numericCast(bits))) != 0) {
-      _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
+    if let smallRepresentation = Character(_smallValidUTF8: s.utf8) {
+      self = smallRepresentation
+      return
     }
-    else {
-      self = Character(_largeRepresentationString: s)
-    }
+    self = Character(_largeRepresentationString: s)
   }
 
   /// Creates a Character from a String that is already known to require the
@@ -229,132 +215,13 @@ public struct Character :
     return 8
   }
 
-  static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
-    return UInt64(Builtin.zext_Int63_Int64(value)) | (1 &<< 63)
-  }
-
-  internal struct _SmallUTF8 : RandomAccessCollection {
-    typealias Indices = CountableRange<Int>
-    
-    var indices: CountableRange<Int> {
-      return startIndex..<endIndex
+  var _smallUTF8 : _ValidUTF8Buffer<UInt64>? {
+    switch _representation {
+    case .large(_): return nil
+    case .small(let _63bits):
+      return _ValidUTF8Buffer(
+        _biasedBits: UInt64(Builtin.zext_Int63_Int64(_63bits)))
     }
-
-    init(_ u8: UInt64) {
-      let utf8Count = Character._smallSize(u8)
-      _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
-      self._count = UInt16(utf8Count)
-      self._data = u8
-    }
-
-    /// The position of the first element in a non-empty collection.
-    ///
-    /// In an empty collection, `startIndex == endIndex`.
-    var startIndex: Int {
-      return 0
-    }
-
-    /// The collection's "past the end" position.
-    ///
-    /// `endIndex` is not a valid argument to `subscript`, and is always
-    /// reachable from `startIndex` by zero or more applications of
-    /// `index(after:)`.
-    var endIndex: Int {
-      return Int(_count)
-    }
-
-    /// Access the code unit at `position`.
-    ///
-    /// - Precondition: `position` is a valid position in `self` and
-    ///   `position != endIndex`.
-    subscript(position: Int) -> UTF8.CodeUnit {
-      _sanityCheck(position >= startIndex)
-      _sanityCheck(position < endIndex)
-      // Note: using unchecked arithmetic because overflow cannot happen if the
-      // above sanity checks hold.
-      return UTF8.CodeUnit(
-        extendingOrTruncating: _data &>> (UInt64(position) &* 8))
-    }
-
-    internal struct Iterator : IteratorProtocol {
-      init(_ data: UInt64) {
-        self._data = data
-      }
-
-      internal mutating func next() -> UInt8? {
-        let result = UInt8(extendingOrTruncating: _data)
-        if result == 0xFF {
-          return nil
-        }
-        _data = (_data &>> 8) | 0xFF00_0000_0000_0000
-        return result
-      }
-
-      internal var _data: UInt64
-    }
-
-    internal func makeIterator() -> Iterator {
-      return Iterator(_data)
-    }
-
-    var _count: UInt16
-    var _data: UInt64
-  }
-
-  struct _SmallUTF16 : RandomAccessCollection {
-    typealias Indices = CountableRange<Int>
-    
-    init(_ u8: UInt64) {
-      let count = UTF16.transcodedLength(
-        of: _SmallUTF8(u8).makeIterator(),
-        decodedAs: UTF8.self,
-        repairingIllFormedSequences: true)!.0
-      _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
-      self._count = UInt16(count)
-      var u16: UInt64 = 0
-      let output: (UTF16.CodeUnit) -> Void = {
-        u16 = u16 &<< 16
-        u16 = u16 | UInt64(extendingOrTruncating: $0)
-      }
-      _ = transcode(
-        _SmallUTF8(u8).makeIterator(),
-        from: UTF8.self, to: UTF16.self,
-        stoppingOnError: false,
-        into: output)
-      self._data = u16
-    }
-
-    /// The position of the first element in a non-empty collection.
-    ///
-    /// In an empty collection, `startIndex == endIndex`.
-    var startIndex: Int {
-      return 0
-    }
-
-    /// The collection's "past the end" position.
-    ///
-    /// `endIndex` is not a valid argument to `subscript`, and is always
-    /// reachable from `startIndex` by zero or more applications of
-    /// `successor()`.
-    var endIndex: Int {
-      return Int(_count)
-    }
-
-    /// Access the code unit at `position`.
-    ///
-    /// - Precondition: `position` is a valid position in `self` and
-    ///   `position != endIndex`.
-    subscript(position: Int) -> UTF16.CodeUnit {
-      _sanityCheck(position >= startIndex)
-      _sanityCheck(position < endIndex)
-      // Note: using unchecked arithmetic because overflow cannot happen if the
-      // above sanity checks hold.
-      return UTF16.CodeUnit(extendingOrTruncating:
-        _data &>> ((UInt64(_count) &- UInt64(position) &- 1) &* 16))
-    }
-
-    var _count: UInt16
-    var _data: UInt64
   }
 
   /// The character's hash value.
@@ -398,10 +265,8 @@ extension String {
   public init(_ c: Character) {
     switch c._representation {
     case let .small(_63bits):
-      let value = Character._smallValue(_63bits)
-      let smallUTF8 = Character._SmallUTF8(value)
       self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: smallUTF8)
+        UTF8.self, input: c._smallUTF8!)
     case let .large(value):
       self = String(_StringCore(_StringBuffer(value)))
     }

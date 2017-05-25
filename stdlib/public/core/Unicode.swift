@@ -577,7 +577,7 @@ public func transcode<
     case .valid(let s):
       let t = OutputEncoding.transcode(s, from: inputEncoding)
       guard _fastPath(t != nil), let s = t else { break }
-      s.forEach(processCodeUnit)
+      for x in s { processCodeUnit(x) }
       continue loop
     case .emptyInput:
       return hadError
@@ -585,7 +585,7 @@ public func transcode<
       if _slowPath(stopOnError) { return true }
       hadError = true
     }
-    OutputEncoding.encodedReplacementCharacter.forEach(processCodeUnit)
+    for x in OutputEncoding.encodedReplacementCharacter { processCodeUnit(x) }
   }
 }
 
