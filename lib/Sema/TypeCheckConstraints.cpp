@@ -2181,7 +2181,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         return nullptr;
       }
 
-      assert(expr->getType()->isEqual(InitType));
+      assert(solution.getConstraintSystem().getType(expr)->isEqual(InitType));
 
       initializer = expr;
       return expr;
