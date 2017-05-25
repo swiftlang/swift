@@ -277,4 +277,41 @@ keyPath.test("computed properties") {
   }
 }
 
+class AB {
+}
+class ABC: AB {
+  var a = LifetimeTracked(1)
+  var b = LifetimeTracked(2)
+  var c = LifetimeTracked(3)
+}
+
+keyPath.test("dynamically-typed application") {
+  let cPaths = [\ABC.a, \ABC.b, \ABC.c]
+
+  let subject = ABC()
+
+  do {
+    let fields = cPaths.map { subject[keyPath: $0] }
+    expectTrue(fields[0] as! AnyObject === subject.a)
+    expectTrue(fields[1] as! AnyObject === subject.b)
+    expectTrue(fields[2] as! AnyObject === subject.c)
+  }
+
+  let erasedSubject: AB = subject
+  let erasedPaths: [AnyKeyPath] = cPaths
+  let wrongSubject = AB()
+
+  do {
+    let fields = erasedPaths.map { erasedSubject[keyPath: $0] }
+    expectTrue(fields[0]! as! AnyObject === subject.a)
+    expectTrue(fields[1]! as! AnyObject === subject.b)
+    expectTrue(fields[2]! as! AnyObject === subject.c)
+
+    let wrongFields = erasedPaths.map { wrongSubject[keyPath: $0] }
+    expectTrue(wrongFields[0] == nil)
+    expectTrue(wrongFields[1] == nil)
+    expectTrue(wrongFields[2] == nil)
+  }
+}
+
 runAllTests()

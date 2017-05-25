@@ -220,3 +220,24 @@ func reabstracted(readonly: @escaping () -> (),
   readonly[keyPath: rkp] = value
   writable[keyPath: rkp] = value
 }
+
+// CHECK-LABEL: sil hidden @{{.*}}partial
+func partial<A>(valueA: A,
+                valueB: Int,
+                pkpA: PartialKeyPath<A>,
+                pkpB: PartialKeyPath<Int>,
+                akp: AnyKeyPath) {
+  // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}projectKeyPathAny
+  // CHECK: apply [[PROJECT]]<A>
+  _ = valueA[keyPath: akp]
+  // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}projectKeyPathPartial
+  // CHECK: apply [[PROJECT]]<A>
+  _ = valueA[keyPath: pkpA]
+
+  // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}projectKeyPathAny
+  // CHECK: apply [[PROJECT]]<Int>
+  _ = valueB[keyPath: akp]
+  // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}projectKeyPathPartial
+  // CHECK: apply [[PROJECT]]<Int>
+  _ = valueB[keyPath: pkpB]
+}

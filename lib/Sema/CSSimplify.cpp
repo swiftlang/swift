@@ -3936,13 +3936,21 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Unsolved;
   };
   
+  if (auto clas = keyPathTy->getAs<NominalType>()) {
+    if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
+      // Read-only keypath, whose projected value is upcast to `Any?`.
+      // The root type can be anything.
+      Type resultTy = ProtocolCompositionType::get(getASTContext(), {},
+                                                  /*explicit AnyObject*/ false);
+      resultTy = OptionalType::get(resultTy);
+      return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
+                        subflags, locator);
+    }
+  }
+  
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
-    if (bgt->getGenericArgs().size() < 2)
-      return SolutionKind::Error;
-
     // We have the key path type. Match it to the other ends of the constraint.
     auto kpRootTy = bgt->getGenericArgs()[0];
-    auto kpValueTy = bgt->getGenericArgs()[1];
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
@@ -3957,7 +3965,19 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     case SolutionKind::Unsolved:
       llvm_unreachable("should have generated constraints");
     }
-    
+
+    if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+      // Read-only keypath, whose projected value is upcast to `Any`.
+      auto resultTy = ProtocolCompositionType::get(getASTContext(), {},
+                                                  /*explicit AnyObject*/ false);
+      return matchTypes(resultTy, valueTy,
+                        ConstraintKind::Bind, subflags, locator);
+    }
+
+    if (bgt->getGenericArgs().size() < 2)
+      return SolutionKind::Error;
+    auto kpValueTy = bgt->getGenericArgs()[1];
+
     /// Solve for an rvalue base.
     auto solveRValue = [&]() -> ConstraintSystem::SolutionKind {
       return matchTypes(kpValueTy, valueTy,
@@ -3976,6 +3996,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return matchTypes(LValueType::get(kpValueTy), valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
+
   
     if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
       // Read-only keypath.
