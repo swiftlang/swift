@@ -1339,7 +1339,7 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable, _BinaryInteger {
+  /* Hashable, Numeric, CustomStringConvertible, Strideable, */ _BinaryInteger {
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
@@ -1777,6 +1777,18 @@ public protocol _BinaryInteger :
 }
 
 extension _BinaryInteger {
+  public static func == <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
+    fatalError("not implemented")
+  }
+
+  public static func < <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
+    fatalError("not implemented")
+  }
+
   /// Returns a Boolean value indicating whether the two given values are not
   /// equal.
   ///
