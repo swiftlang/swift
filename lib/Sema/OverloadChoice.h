@@ -65,8 +65,6 @@ enum class OverloadChoiceKind : int {
 /// 
 class OverloadChoice {
   enum : unsigned {
-    /// Indicates whether this overload was immediately specialized.
-    IsSpecializedBit = 0x01,
     /// Indicates whether this declaration was bridged, turning a
     /// "Decl" kind into "DeclViaBridge" kind.
     IsBridgedBit = 0x02,
@@ -81,9 +79,7 @@ class OverloadChoice {
   };
 
   /// \brief The base type to be used when referencing the declaration
-  /// along with two bits: the low bit indicates whether this overload
-  /// was immediately specialized and the second lowest bit indicates
-  /// whether the declaration was bridged.
+  /// along with the two bits above.
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndBits;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
@@ -99,9 +95,9 @@ public:
     : BaseAndBits(nullptr, 0), DeclOrKind(0),
       TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
-  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
+  OverloadChoice(Type base, ValueDecl *value,
                  FunctionRefKind functionRefKind)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+    : BaseAndBits(base, 0),
       TheFunctionRefKind(functionRefKind) {
     assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
@@ -178,14 +174,6 @@ public:
 
   /// \brief Retrieve the base type used to refer to the declaration.
   Type getBaseType() const { return BaseAndBits.getPointer(); }
-
-  /// \brief Determine whether the referenced declaration was immediately
-  /// specialized with <...>.
-  ///
-  /// This value only has meaning when there is no base type.
-  bool isSpecialized() const { 
-    return BaseAndBits.getInt() & IsSpecializedBit;
-  }
   
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {

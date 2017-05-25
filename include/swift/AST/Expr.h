@@ -179,10 +179,9 @@ class alignas(8) Expr {
     friend class UnresolvedDeclRefExpr;
     unsigned : NumExprBits;
     unsigned DeclRefKind : 2;
-    unsigned IsSpecialized : 1;
     unsigned FunctionRefKind : 2;
   };
-  enum { NumUnresolvedDeclRefExprBits = NumExprBits + 5 };
+  enum { NumUnresolvedDeclRefExprBits = NumExprBits + 4 };
   static_assert(NumUnresolvedDeclRefExprBits <= 32, "fits in an unsigned");
 
   class MemberRefExprBitfields {
@@ -271,14 +270,6 @@ class alignas(8) Expr {
   };
   enum { NumOverloadSetRefExprBits = NumExprBits + 2};
   static_assert(NumOverloadSetRefExprBits <= 32, "fits in an unsigned");
-
-  class OverloadedDeclRefExprBitfields {
-    friend class OverloadedDeclRefExpr;
-    unsigned : NumOverloadSetRefExprBits;
-    unsigned IsSpecialized : 1;
-  };
-  enum { NumOverloadedDeclRefExprBits = NumOverloadSetRefExprBits + 1 };
-  static_assert(NumOverloadedDeclRefExprBits <= 32, "fits in an unsigned");
 
   class BooleanLiteralExprBitfields {
     friend class BooleanLiteralExpr;
@@ -432,7 +423,6 @@ protected:
     DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
     UnresolvedMemberExprBitfields UnresolvedMemberExprBits;
     OverloadSetRefExprBitfields OverloadSetRefExprBits;
-    OverloadedDeclRefExprBitfields OverloadedDeclRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     ObjectLiteralExprBitfields ObjectLiteralExprBits;
@@ -1249,27 +1239,15 @@ public:
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
-  /// This is used when the reference is specialized, e.g "GenCls<Int>", to
-  /// hold information about the generic arguments.
-  struct SpecializeInfo {
-    ConcreteDeclRef D;
-    ArrayRef<TypeRepr*> GenericArgs;
-  };
-
-  /// \brief The declaration pointer or SpecializeInfo pointer if it was
-  /// explicitly specialized with <...>.
-  llvm::PointerUnion<ConcreteDeclRef, SpecializeInfo *> DOrSpecialized;
+  /// \brief The declaration pointer.
+  ConcreteDeclRef D;
   DeclNameLoc Loc;
-
-  SpecializeInfo *getSpecInfo() const {
-    return DOrSpecialized.dyn_cast<SpecializeInfo*>();
-  }
 
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
               AccessSemantics semantics = AccessSemantics::Ordinary,
               Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {
+    : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc) {
     DeclRefExprBits.Semantics = (unsigned) semantics;
     DeclRefExprBits.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
@@ -1289,29 +1267,9 @@ public:
 
   /// Retrieve the concrete declaration reference.
   ConcreteDeclRef getDeclRef() const {
-    if (auto Spec = getSpecInfo())
-      return Spec->D;
-    return DOrSpecialized.get<ConcreteDeclRef>();
+    return D;
   }
 
-  void setSpecialized();
-
-  /// \brief Determine whether this declaration reference was immediately
-  /// specialized by <...>.
-  bool isSpecialized() const { return getSpecInfo() != nullptr; }
-
-  /// Set the generic arguments.
-  ///
-  /// This copies the array using ASTContext's allocator.
-  void setGenericArgs(ArrayRef<TypeRepr*> GenericArgs);
-
-  /// Returns the generic arguments if it was specialized or an empty array
-  /// otherwise.
-  ArrayRef<TypeRepr *> getGenericArgs() const {
-    if (auto Spec = getSpecInfo())
-      return Spec->GenericArgs;
-    return ArrayRef<TypeRepr *>();
-  }
   SourceRange getSourceRange() const { return Loc.getSourceRange(); }
   SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -1507,24 +1465,16 @@ class OverloadedDeclRefExpr final : public OverloadSetRefExpr {
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, DeclNameLoc Loc,
-                        bool isSpecialized,
                         FunctionRefKind functionRefKind,
                         bool Implicit, Type Ty = Type())
       : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, functionRefKind,
                            Implicit, Ty),
         Loc(Loc) {
-    OverloadedDeclRefExprBits.IsSpecialized = isSpecialized;
   }
   
   DeclNameLoc getNameLoc() const { return Loc; }
   SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
   SourceRange getSourceRange() const { return Loc.getSourceRange(); }
-
-  /// \brief Determine whether this declaration reference was immediately
-  /// specialized by <...>.
-  bool isSpecialized() const {
-    return OverloadedDeclRefExprBits.IsSpecialized;
-  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
@@ -1545,7 +1495,6 @@ public:
       : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
         Name(name), Loc(loc) {
     UnresolvedDeclRefExprBits.DeclRefKind = static_cast<unsigned>(refKind);
-    UnresolvedDeclRefExprBits.IsSpecialized = false;
     UnresolvedDeclRefExprBits.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
@@ -1557,14 +1506,6 @@ public:
   DeclRefKind getRefKind() const {
     return static_cast<DeclRefKind>(UnresolvedDeclRefExprBits.DeclRefKind);
   }
-
-  void setSpecialized(bool specialized) {
-    UnresolvedDeclRefExprBits.IsSpecialized = specialized;
-  }
-
-  /// \brief Determine whether this declaration reference was immediately
-  /// specialized by <...>.
-  bool isSpecialized() const { return UnresolvedDeclRefExprBits.IsSpecialized; }
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {

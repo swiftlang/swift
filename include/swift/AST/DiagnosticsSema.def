@@ -3724,6 +3724,10 @@ NOTE(missing_particular_case,none,
 WARNING(redundant_particular_case,none,
         "case is already handled by previous patterns; consider removing it",())
 
+// HACK: Downgrades the above to warnings if any of the cases is marked
+// @_downgrade_exhaustivity_check.
+WARNING(non_exhaustive_switch_warn_swift3,none, "switch must be exhaustive", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

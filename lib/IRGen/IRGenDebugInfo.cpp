@@ -89,7 +89,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
   llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
-  llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
+  llvm::DenseMap<const void *, llvm::TrackingMDNodeRef> DIModuleCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   TrackingDIRefMap DIRefMap;
   /// @}
@@ -554,28 +554,7 @@ private:
            isa<ConstructorDecl>(DeclCtx);
   }
 
-  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M) {
-    StringRef Path = getFilenameFromDC(M.second);
-    if (M.first.empty()) {
-      StringRef Name = M.second->getName().str();
-      return getOrCreateModule(Name, TheCU, Name, Path);
-    }
-
-    unsigned I = 0;
-    SmallString<128> AccessPath;
-    llvm::DIScope *Scope = TheCU;
-    llvm::raw_svector_ostream OS(AccessPath);
-    for (auto elt : M.first) {
-      auto Component = elt.first.str();
-      if (++I > 1)
-        OS << '.';
-      OS << Component;
-      Scope = getOrCreateModule(AccessPath, Scope, Component, Path);
-    }
-    return cast<llvm::DIModule>(Scope);
-  }
-
-  llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
+  llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     StringRef ConfigMacros = StringRef()) {
     // Look in the cache first.
@@ -595,18 +574,28 @@ private:
     // Handle Clang modules.
     if (const clang::Module *ClangModule = Desc.getModuleOrNull()) {
       llvm::DIModule *Parent = nullptr;
-      if (ClangModule->Parent) {
-        clang::ExternalASTSource::ASTSourceDescriptor PM(*ClangModule->Parent);
-        Parent = getOrCreateModule(PM);
-      }
-      return getOrCreateModule(ClangModule->getFullModuleName(), Parent,
+      if (ClangModule->Parent)
+        Parent = getOrCreateModule(*ClangModule->Parent);
+
+      return getOrCreateModule(ClangModule, Parent,
                                Desc.getModuleName(), Desc.getPath(),
                                ConfigMacros);
     }
     // Handle PCH.
-    return getOrCreateModule(Desc.getASTFile(), nullptr, Desc.getModuleName(),
-                             Desc.getPath(), ConfigMacros);
+    return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
+                             Desc.getModuleName(), Desc.getPath(),
+                             ConfigMacros);
   };
+
+  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule IM) {
+    ModuleDecl *M = IM.second;
+    if (auto *ClangModule = M->findUnderlyingClangModule())
+      return getOrCreateModule(*ClangModule);
+
+    StringRef Path = getFilenameFromDC(M);
+    StringRef Name = M->getName().str();
+    return getOrCreateModule(M, TheCU, Name, Path);
+  }
 
   TypeAliasDecl *getMetadataType() {
     if (!MetadataTypeDecl) {
@@ -1526,8 +1515,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   llvm::sys::path::remove_filename(AbsMainFile);
-  MainModule =
-      getOrCreateModule(Opts.ModuleName, TheCU, Opts.ModuleName, AbsMainFile);
+  MainModule = getOrCreateModule(IGM.getSwiftModule(), TheCU, Opts.ModuleName,
+                                 AbsMainFile);
   DBuilder.createImportedModule(MainFile, MainModule, 1);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
@@ -1559,7 +1548,7 @@ void IRGenDebugInfoImpl::finalize() {
                                            ModuleDecl::ImportFilter::All);
   for (auto M : ModuleWideImports)
     if (!ImportedModules.count(M.second))
-       DBuilder.createImportedModule(MainFile, getOrCreateModule(M), 0);
+      DBuilder.createImportedModule(MainFile, getOrCreateModule(M), 0);
 
   // Finalize all replaceable forward declarations.
   for (auto &Ty : ReplaceMap) {

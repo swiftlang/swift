@@ -2063,15 +2063,11 @@ Expr *Parser::parseExprIdentifier() {
       return parseExprEditorPlaceholder(IdentTok, name.getBaseName());
 
     auto refKind = DeclRefKind::Ordinary;
-    auto unresolved = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-    unresolved->setSpecialized(hasGenericArgumentList);
-    E = unresolved;
+    E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
     E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*implicit*/false);
   } else {
-    auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-    declRef->setGenericArgs(args);
-    E = declRef;
+    E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
   }
   
   if (hasGenericArgumentList) {

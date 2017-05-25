@@ -2458,6 +2458,104 @@ void CastOptimizer::deleteInstructionsAfterUnreachable(
   }
 }
 
+/// TODO: Move to emitSuccessfulIndirectUnconditionalCast?
+///
+/// Peephole to avoid runtime calls:
+/// unconditional_checked_cast_addr T in %0 : $*T to P in %1 : $*P
+/// ->
+/// %addr = init_existential_addr %1 : $*P, T
+/// copy_addr %0 to %addr
+///
+/// where T is a type statically known to conform to P.
+///
+/// In caase P is a class existential type, it generates:
+/// %val = load %0 : $*T
+/// %existential = init_existential_ref %val : $T, $T, P
+/// store %existential to %1 : $*P
+///
+/// Returns true if the optimization was possible and false otherwise.
+static bool optimizeStaticallyKnownProtocolConformance(
+    UnconditionalCheckedCastAddrInst *Inst) {
+  auto Loc = Inst->getLoc();
+  auto Src = Inst->getSrc();
+  auto Dest = Inst->getDest();
+  auto SourceType = Inst->getSourceType();
+  auto TargetType = Inst->getTargetType();
+  auto &Mod = Inst->getModule();
+
+  if (TargetType->isAnyExistentialType() &&
+      !SourceType->isAnyExistentialType()) {
+    auto &Ctx = Mod.getASTContext();
+    auto *SM = Mod.getSwiftModule();
+
+    auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
+    if (Proto) {
+      auto Conformance = SM->lookupConformance(SourceType, Proto, nullptr);
+      if (Conformance.hasValue()) {
+        // SourceType is a non-existential type conforming to a
+        // protocol represented by the TargetType.
+        SILBuilder B(Inst);
+        SmallVector<ProtocolConformanceRef, 1> NewConformances;
+        NewConformances.push_back(Conformance.getValue());
+        ArrayRef<ProtocolConformanceRef> Conformances =
+            Ctx.AllocateCopy(NewConformances);
+
+        auto ExistentialRepr =
+            Dest->getType().getPreferredExistentialRepresentation(Mod,
+                                                                  SourceType);
+
+        switch (ExistentialRepr) {
+        default:
+          return false;
+        case ExistentialRepresentation::Opaque: {
+          auto ExistentialAddr = B.createInitExistentialAddr(
+              Loc, Dest, SourceType, Src->getType().getObjectType(),
+              Conformances);
+          B.createCopyAddr(
+              Loc, Src, ExistentialAddr,
+              (Inst->getConsumptionKind() != CastConsumptionKind::CopyOnSuccess)
+                  ? IsTake_t::IsTake
+                  : IsTake_t::IsNotTake,
+              IsInitialization_t::IsInitialization);
+          break;
+        }
+        case ExistentialRepresentation::Class: {
+          auto Value = B.createLoad(Loc, Src,
+                                    swift::LoadOwnershipQualifier::Unqualified);
+          if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
+            B.createRetainValue(Loc, Value, B.getDefaultAtomicity());
+          auto Existential =
+              B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
+                                         SourceType, Value, Conformances);
+          B.createStore(Loc, Existential, Dest,
+                        swift::StoreOwnershipQualifier::Unqualified);
+          break;
+        }
+        case ExistentialRepresentation::Boxed: {
+          auto AllocBox = B.createAllocExistentialBox(Loc, Dest->getType(),
+                                                      SourceType, Conformances);
+          auto Projection =
+              B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
+          auto Value = B.createLoad(Loc, Src,
+                                    swift::LoadOwnershipQualifier::Unqualified);
+          if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
+            B.createRetainValue(Loc, Value, B.getDefaultAtomicity());
+          B.createStore(Loc, Value, Projection,
+                        swift::StoreOwnershipQualifier::Unqualified);
+          B.createStore(Loc, AllocBox, Dest,
+                        swift::StoreOwnershipQualifier::Unqualified);
+          break;
+        }
+        };
+
+        Inst->replaceAllUsesWithUndef();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 SILInstruction *
 CastOptimizer::
 optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst) {
@@ -2512,18 +2610,24 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
   if (Feasibility == DynamicCastFeasibility::WillSucceed ||
       Feasibility == DynamicCastFeasibility::MaySucceed) {
 
+    // Check if a result of a cast is unused. If this is the case, the cast can
+    // be removed even if the cast may fail at runtime.
+    // Swift optimizer does not claim to be crash-preserving.
     bool ResultNotUsed = isa<AllocStackInst>(Dest);
     DestroyAddrInst *DestroyDestInst = nullptr;
-    for (auto Use : Dest->getUses()) {
-      auto *User = Use->getUser();
-      if (isa<DeallocStackInst>(User) || User == Inst)
-        continue;
-      if (isa<DestroyAddrInst>(User) && !DestroyDestInst) {
-        DestroyDestInst = cast<DestroyAddrInst>(User);
-        continue;
+    if (ResultNotUsed) {
+      for (auto Use : Dest->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<DeallocStackInst>(User) || User == Inst)
+          continue;
+        if (isa<DestroyAddrInst>(User) && !DestroyDestInst) {
+          DestroyDestInst = cast<DestroyAddrInst>(User);
+          continue;
+        }
+        ResultNotUsed = false;
+        DestroyDestInst = nullptr;
+        break;
       }
-      ResultNotUsed = false;
-      break;
     }
 
     if (ResultNotUsed) {
@@ -2544,23 +2648,33 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
       return nullptr;
     }
 
-    // Try to apply the bridged casts optimizations
+    // Try to apply the bridged casts optimizations.
     auto NewI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
                                      false, Src, Dest, SourceType,
                                      TargetType, nullptr, nullptr);
     if (NewI) {
-        WillSucceedAction();
-        return nullptr;
+      WillSucceedAction();
+      return nullptr;
+    }
+
+    if (Feasibility == DynamicCastFeasibility::MaySucceed)
+      return nullptr;
+
+    assert(Feasibility == DynamicCastFeasibility::WillSucceed);
+
+    if (optimizeStaticallyKnownProtocolConformance(Inst)) {
+      EraseInstAction(Inst);
+      WillSucceedAction();
+      return nullptr;
     }
 
     if (isBridgingCast(SourceType, TargetType))
       return nullptr;
 
     SILBuilderWithScope Builder(Inst);
-    if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
-                                            Loc, Inst->getConsumptionKind(),
-                                            Src, SourceType,
-                                            Dest, TargetType, Inst)) {
+    if (!emitSuccessfulIndirectUnconditionalCast(
+            Builder, Mod.getSwiftModule(), Loc, Inst->getConsumptionKind(), Src,
+            SourceType, Dest, TargetType, Inst)) {
       // No optimization was possible.
       return nullptr;
     }

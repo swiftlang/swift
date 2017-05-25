@@ -58,15 +58,15 @@ public:
     if (!Expr->hasAnonymousClosureVars())
       return;
     References.clear();
-    for(auto *Param: *Expr->getParameters()) {
+    for (auto *Param: *Expr->getParameters()) {
       References[Param] = {};
     }
     Expr->walk(*this);
   }
 
   void forEachReference(llvm::function_ref<void(Expr*, ParamDecl*)> Callback) {
-    for(auto Entry: References) {
-      for(auto *Expr : Entry.getSecond()) {
+    for (auto Entry: References) {
+      for (auto *Expr : Entry.getSecond()) {
         Callback(Expr, Entry.getFirst());
       }
     }

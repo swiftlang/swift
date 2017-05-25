@@ -89,14 +89,23 @@ classifyDynamicCastToProtocol(CanType source,
   if (source == target)
     return DynamicCastFeasibility::WillSucceed;
 
-  auto *SourceNominalTy = source.getAnyNominal();
-
-  if (!SourceNominalTy)
-    return DynamicCastFeasibility::MaySucceed;
-
   auto *TargetProtocol = target.getAnyNominal();
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
+
+  auto *SourceNominalTy = source.getAnyNominal();
+
+  if (!SourceNominalTy) {
+    if (auto Archetype = dyn_cast<ArchetypeType>(source)) {
+      auto SourceProtocols = Archetype->getConformsTo();
+      // Check all protocols implemented by the archetype.
+      for (auto *Protocol : SourceProtocols) {
+        if (Protocol == TargetProtocol)
+          return DynamicCastFeasibility::WillSucceed;
+      }
+    }
+    return DynamicCastFeasibility::MaySucceed;
+  }
 
   auto SourceProtocols = SourceNominalTy->getAllProtocols();
 
@@ -330,11 +339,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
   if (source->hasArchetype() || source.isExistentialType() ||
       target->hasArchetype() || target.isExistentialType()) {
 
-    auto *SourceNominalTy = source.getAnyNominal();
-
     // Check conversions from non-protocol types into protocol types.
     if (!source.isExistentialType() &&
-        SourceNominalTy &&
         target.isExistentialType())
       return classifyDynamicCastToProtocol(source, target, isWholeModuleOpts);
 

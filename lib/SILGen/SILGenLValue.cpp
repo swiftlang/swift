@@ -859,7 +859,7 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
   if (auto *dre1 = dyn_cast<DeclRefExpr>(e1)) {
     auto *dre2 = cast<DeclRefExpr>(e2);
     return dre1->getDecl() == dre2->getDecl() &&
-           dre1->getGenericArgs() == dre2->getGenericArgs();
+           dre1->getType()->isEqual(dre2->getType());
   }
 
   // Compare a variety of literals.

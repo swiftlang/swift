@@ -1308,25 +1308,6 @@ StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   llvm_unreachable("unspecified literal");
 }
 
-void DeclRefExpr::setSpecialized() {
-  if (isSpecialized())
-    return;
-
-  ConcreteDeclRef ref = getDeclRef();
-  void *Mem = ref.getDecl()->getASTContext().Allocate(sizeof(SpecializeInfo),
-                                                      alignof(SpecializeInfo));
-  auto Spec = new (Mem) SpecializeInfo;
-  Spec->D = ref;
-  DOrSpecialized = Spec;
-}
-
-void DeclRefExpr::setGenericArgs(ArrayRef<TypeRepr*> GenericArgs) {
-  ValueDecl *D = getDecl();
-  assert(D);
-  setSpecialized();
-  getSpecInfo()->GenericArgs = D->getASTContext().AllocateCopy(GenericArgs);
-}
-
 ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
   return cast_or_null<ConstructorDecl>(Ctor.getDecl());
 }

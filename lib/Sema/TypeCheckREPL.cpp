@@ -97,15 +97,13 @@ public:
   Expr *buildPrintRefExpr(SourceLoc loc) {
     assert(!C.PrintDecls.empty());
     return TC.buildRefExpr(C.PrintDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true, /*isSpecialized=*/false,
-                           FunctionRefKind::Compound);
+                           /*Implicit=*/true, FunctionRefKind::Compound);
   }
 
   Expr *buildDebugPrintlnRefExpr(SourceLoc loc) {
     assert(!C.DebugPrintlnDecls.empty());
     return TC.buildRefExpr(C.DebugPrintlnDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true, /*isSpecialized=*/false,
-                           FunctionRefKind::Compound);
+                           /*Implicit=*/true, FunctionRefKind::Compound);
   }
 };
 } // unnamed namespace
@@ -119,7 +117,6 @@ void StmtBuilder::printLiteralString(StringRef Str, SourceLoc Loc) {
 void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
   Expr *DebugPrintlnFn = buildDebugPrintlnRefExpr(Loc);
   Expr *ArgRef = TC.buildRefExpr(Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true,
-                                 /*isSpecialized=*/false,
                                  FunctionRefKind::Compound);
   addToBody(CallExpr::createImplicit(Context, DebugPrintlnFn, { ArgRef }, { }));
 }

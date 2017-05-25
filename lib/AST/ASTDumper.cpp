@@ -840,6 +840,8 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
+      if (EED->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>())
+        OS << "@_downgrade_exhaustivity_check";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -1792,13 +1794,7 @@ public:
       PrintWithColorRAII(OS, AccessibilityColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
     PrintWithColorRAII(OS, ExprModifierColor)
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind())
-      << " specialized=" << (E->isSpecialized()? "yes" : "no");
-
-    for (auto TR : E->getGenericArgs()) {
-      OS << '\n';
-      printRec(TR);
-    }
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitSuperRefExpr(SuperRefExpr *E) {
@@ -1827,7 +1823,6 @@ public:
     printCommon(E, "overloaded_decl_ref_expr")
       << " name=" << E->getDecls()[0]->getName()
       << " #decls=" << E->getDecls().size()
-      << " specialized=" << (E->isSpecialized()? "yes" : "no")
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
 
     for (ValueDecl *D : E->getDecls()) {
@@ -1841,7 +1836,6 @@ public:
     printCommon(E, "unresolved_decl_ref_expr");
     PrintWithColorRAII(OS, IdentifierColor) << " name=" << E->getName();
     PrintWithColorRAII(OS, ExprModifierColor)
-      << " specialized=" << (E->isSpecialized()? "yes" : "no")
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

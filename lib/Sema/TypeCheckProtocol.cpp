@@ -1193,19 +1193,16 @@ matchWitness(TypeChecker &tc,
     witnessLocator = cs->getConstraintLocator(
                        static_cast<Expr *>(nullptr),
                        LocatorPathElt(ConstraintLocator::Witness, witness));
-    OpenedTypeMap witnessReplacements;
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
                                        /*isDynamicResult=*/false,
                                        FunctionRefKind::DoubleApply,
                                        witnessLocator,
-                                       /*base=*/nullptr,
-                                       &witnessReplacements);
+                                       /*base=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfReference(witness,
-                                 /*isSpecialized=*/false,
                                  FunctionRefKind::DoubleApply,
                                  witnessLocator,
                                  /*base=*/nullptr);
@@ -6017,7 +6014,7 @@ static bool hasGenericAncestry(ClassDecl *classDecl) {
 /// Infer the attribute tostatic-initialize the Objective-C metadata for the
 /// given class, if needed.
 static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl,
-                                               bool requiresNSCodingAttr) {
+                                              bool requiresNSCodingAttr) {
   // If we already have the attribute, there's nothing to do.
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;

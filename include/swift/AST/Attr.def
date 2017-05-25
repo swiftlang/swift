@@ -286,6 +286,11 @@ SIMPLE_DECL_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly,
                  OnClass | NotSerialized | LongAttribute,
                  /*Not serialized */ 70)
 
+// HACK: Attribute needed to preserve source compatibility by downgrading errors
+// due to an SDK change in Dispatch
+SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
+                 OnEnumElement | LongAttribute | UserInaccessible, 71)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

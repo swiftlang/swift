@@ -22,6 +22,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
@@ -89,13 +90,14 @@ static ParamDecl *buildInOutArgument(SourceLoc loc, DeclContext *DC,
 }
 
 static Type getTypeOfStorage(AbstractStorageDecl *storage,
-                             TypeChecker &TC,
                              bool wantInterfaceType) {
-  if (auto var = dyn_cast<VarDecl>(storage))
-    return TC.getTypeOfRValue(var, wantInterfaceType);
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    auto type = (wantInterfaceType
+                 ? var->getInterfaceType()
+                 : var->getType());
+    return type->getReferenceStorageReferent();
+  }
 
-  // None of the transformations done by getTypeOfRValue are
-  // necessary for subscripts.
   auto subscript = cast<SubscriptDecl>(storage);
   auto type = subscript->getElementInterfaceType();
   if (!wantInterfaceType)
@@ -142,10 +144,25 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   SmallVector<ParameterList*, 2> getterParams;
 
   // The implicit 'self' argument if in a type context.
-  if (storage->getDeclContext()->isTypeContext())
-    getterParams.push_back(ParameterList::createSelf(loc,
-                                                     storage->getDeclContext(),
-                                                     /*isStatic*/false));
+  if (storage->getDeclContext()->isTypeContext()) {
+    ParamDecl *selfDecl;
+
+    // For lazy properties, steal the 'self' from the initializer context.
+    if (storage->getAttrs().hasAttribute<LazyAttr>()) {
+      auto *varDecl = cast<VarDecl>(storage);
+      auto *bindingDecl = varDecl->getParentPatternBinding();
+      auto *bindingInit = cast<PatternBindingInitializer>(
+        bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
+
+      selfDecl = bindingInit->getImplicitSelfDecl();
+    } else {
+      selfDecl = ParamDecl::createSelf(loc,
+                                       storage->getDeclContext(),
+                                       /*isStatic*/false);
+    }
+
+    getterParams.push_back(ParameterList::create(TC.Context, selfDecl));
+  }
     
   // Add an index-forwarding clause.
   getterParams.push_back(buildIndexForwardingParamList(storage, {}));
@@ -156,7 +173,7 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
       staticLoc = var->getLoc();
   }
 
-  auto storageInterfaceType = getTypeOfStorage(storage, TC, true);
+  auto storageInterfaceType = getTypeOfStorage(storage, true);
 
   auto getter = FuncDecl::create(
       TC.Context, staticLoc, StaticSpellingKind::None, loc, Identifier(), loc,
@@ -199,8 +216,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
   }
   
   // Add a "(value : T, indices...)" argument list.
-  auto storageType = getTypeOfStorage(storage, TC, false);
-  auto storageInterfaceType = getTypeOfStorage(storage, TC, true);
+  auto storageType = getTypeOfStorage(storage, false);
+  auto storageInterfaceType = getTypeOfStorage(storage, true);
   valueDecl = buildLetArgument(storage->getLoc(),
                                storage->getDeclContext(), "value",
                                storageType,
@@ -615,7 +632,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // We support @NSCopying on class types (which conform to NSCopying),
   // protocols which conform, and option types thereof.
-  Type UnderlyingType = TC.getTypeOfRValue(VD, /*want interface type*/false);
+  Type UnderlyingType = VD->getType()->getReferenceStorageReferent();
 
   bool isOptional = false;
   if (Type optionalEltTy = UnderlyingType->getAnyOptionalObjectType()) {
@@ -1145,7 +1162,6 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // realize that they are in the getter function.
   InitValue->walk(RecontextualizeClosures(Get));
 
-
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
   Tmp2PBDPattern = new (Ctx) TypedPattern(Tmp2PBDPattern,
                                           TypeLoc::withoutLoc(VD->getType()),
@@ -1672,10 +1688,6 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   addMaterializeForSet(storage, TC);
 }
 
-void TypeChecker::introduceLazyVarAccessors(VarDecl *var) {
-  maybeAddAccessorsToVariable(var, *this);
-}
-
 void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getGetter())
     return;
@@ -1930,8 +1942,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      auto varType = tc.getTypeOfRValue(var, false);
-      auto varInterfaceType = tc.getTypeOfRValue(var, true);
+      auto varType = var->getType()
+        ->getReferenceStorageReferent();
+      auto varInterfaceType = var->getInterfaceType()
+        ->getReferenceStorageReferent();
 
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
