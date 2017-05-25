@@ -4097,6 +4097,10 @@ public:
 
   FuncDecl *getAccessorFunction(AccessorKind accessor) const;
 
+  /// \brief Push all of the accessor functions associated with this VarDecl
+  /// onto `decls`.
+  void getAllAccessorFunctions(SmallVectorImpl<Decl *> &decls) const;
+
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
                     FuncDecl *MaterializeForSet, SourceLoc RBraceLoc);
