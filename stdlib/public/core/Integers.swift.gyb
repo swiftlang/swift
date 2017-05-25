@@ -1339,7 +1339,7 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable {
+  Hashable, Numeric, CustomStringConvertible, Strideable, _BinaryInteger {
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
@@ -1866,7 +1866,7 @@ extension _BinaryInteger {
 //
 //     <T : BinaryInteger>(T, T) -> Bool
 
-extension BinaryInteger : _BinaryInteger {
+extension BinaryInteger {
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
