@@ -439,8 +439,7 @@ namespace {
   public:
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, DeclNameLoc loc, Type openedType,
-                       ConstraintLocatorBuilder locator,
-                       bool specialized, bool implicit,
+                       ConstraintLocatorBuilder locator, bool implicit,
                        FunctionRefKind functionRefKind,
                        AccessSemantics semantics) {
       // Determine the declaration selected for this overloaded reference.
@@ -2342,7 +2341,7 @@ namespace {
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
       return buildDeclRef(decl, expr->getNameLoc(), selected->openedFullType,
-                          locator, expr->isSpecialized(),
+                          locator,
                           expr->isImplicit(),
                           expr->getFunctionRefKind(),
                           expr->getAccessSemantics());
@@ -2362,7 +2361,6 @@ namespace {
     }
 
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
-      assert(!expr->getDeclRef().isSpecialized());
       cs.setType(expr, expr->getDecl()->getInitializerInterfaceType());
       return expr;
     }
@@ -2379,7 +2377,7 @@ namespace {
       auto decl = choice.getDecl();
 
       return buildDeclRef(decl, expr->getNameLoc(), selected.openedFullType,
-                          locator, expr->isSpecialized(), expr->isImplicit(),
+                          locator, expr->isImplicit(),
                           choice.getFunctionRefKind(),
                           AccessSemantics::Ordinary);
     }
@@ -2392,16 +2390,6 @@ namespace {
 
     Expr *visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       // Our specializations should have resolved the subexpr to the right type.
-      if (auto DRE = dyn_cast<DeclRefExpr>(expr->getSubExpr())) {
-        assert(DRE->getGenericArgs().empty() ||
-            DRE->getGenericArgs().size() == expr->getUnresolvedParams().size());
-        if (DRE->getGenericArgs().empty()) {
-          SmallVector<TypeRepr *, 8> GenArgs;
-          for (auto TL : expr->getUnresolvedParams())
-            GenArgs.push_back(TL.getTypeRepr());
-          DRE->setGenericArgs(GenArgs);
-        }
-      }
       return expr->getSubExpr();
     }
 
