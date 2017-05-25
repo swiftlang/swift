@@ -1663,7 +1663,15 @@ extension Int {
 //===--- Heterogeneous comparison -----------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-extension BinaryInteger {
+/// This protocol is an implementation detail of `BinaryInteger`. Do not use it
+/// directly.
+public protocol _BinaryInteger :
+  Hashable, Numeric, CustomStringConvertible, Strideable {
+  // FIXME(integers): This protocol is necessary for breaking ambiguities in
+  // generic code.
+}
+
+extension _BinaryInteger where Self : BinaryInteger {
   /// Returns a Boolean value indicating whether the two given values are
   /// equal.
   ///
@@ -1683,9 +1691,7 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @inline(__always)
-  public static func == <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
+  public static func == <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     let lhsNegative = Self.isSigned && lhs < (0 as Self)
     let rhsNegative = Other.isSigned && rhs < (0 as Other)
 
@@ -1762,32 +1768,6 @@ extension BinaryInteger {
 
     return Other(extendingOrTruncating: lhs) < rhs
   }
-}
-
-//===----------------------------------------------------------------------===//
-//===--- Ambiguity breakers -----------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-/// This protocol is an implementation detail of `BinaryInteger`. Do not use it
-/// directly.
-public protocol _BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable {
-  // FIXME(integers): This protocol is necessary for breaking ambiguities in
-  // generic code.
-}
-
-extension _BinaryInteger {
-  public static func == <
-    Other : _BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
-    fatalError("not implemented")
-  }
-
-  public static func < <
-    Other : _BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
-    fatalError("not implemented")
-  }
 
   /// Returns a Boolean value indicating whether the two given values are not
   /// equal.
@@ -1808,9 +1788,7 @@ extension _BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @_transparent
-  public static func != <
-    Other : _BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
+  public static func != <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(lhs == rhs)
   }
 
@@ -1826,9 +1804,7 @@ extension _BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func <= <
-    Other : _BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
+  public static func <= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(rhs < lhs)
   }
 
@@ -1844,9 +1820,7 @@ extension _BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func >= <
-    Other : _BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
+  public static func >= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(lhs < rhs)
   }
 
@@ -1862,7 +1836,7 @@ extension _BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func > <Other : _BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func > <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return rhs < lhs
   }
 }
