@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
 
+import Swift
 import Builtin
 
 struct UInt {
@@ -691,4 +692,255 @@ bb2:
   dealloc_stack %32: $*AnObject
   dealloc_stack %31 : $*AnObject
   br bb1
+}
+
+public protocol P {
+}
+
+public protocol PP {
+}
+
+struct X : P {
+}
+
+struct Y<T>: P {
+  var x : T
+}
+
+class Z: P {
+  init()
+}
+
+// Do not optimize casts to unrelated protocols.
+// CHECK-LABEL: sil @dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential
+// CHECK: unconditional_checked_cast_addr
+// CHECK: end sil function 'dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential'
+sil @dont_replace_unconditional_check_cast_addr_for_type_to_unrelated_existential : $@convention(thin) (@in X) -> (@out PP) {
+bb0(%0 : $*PP, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to PP in %0 : $*PP
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Do not optimize casts between existentials.
+// CHECK-LABEL: sil @dont_replace_unconditional_check_cast_addr_for_existential_to_existential
+// CHECK: unconditional_checked_cast_addr
+// CHECK: end sil function 'dont_replace_unconditional_check_cast_addr_for_existential_to_existential'
+sil @dont_replace_unconditional_check_cast_addr_for_existential_to_existential : $@convention(thin) (@in PP) -> (@out P) {
+bb0(%0 : $*P, %1 : $*PP):
+  unconditional_checked_cast_addr take_always PP in %1 : $*PP to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check that an unconditional_checked_cast_addr from a non-existential loadable type to a protocol
+// can be replaced by a more efficient code sequence if it is statitcally known that this
+// type conforms to this protocol.
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential
+// CHECK-NOT: store
+// CHECK: copy_addr
+// CHECK-NOT: destroy_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_type_to_existential : $@convention(thin) (@in X) -> (@out P) {
+bb0(%0 : $*P, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_class_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_class_to_existential : $@convention(thin) (@in Z) -> (@out P) {
+bb0(%0 : $*P, %1 : $*Z):
+  unconditional_checked_cast_addr take_always Z in %1 : $*Z to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_archetype_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_archetype_to_existential : $@convention(thin) <X:P> (@in X) -> (@out P) {
+bb0(%0 : $*P, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_generic_type_to_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+sil @replace_unconditional_check_cast_addr_for_generic_type_to_existential : $@convention(thin) <X:P> (@in Y<X>) -> (@out P) {
+bb0(%0 : $*P, %1 : $*Y<X>):
+  unconditional_checked_cast_addr take_always Y<X> in %1 : $*Y<X> to P in %0 : $*P
+  %2 = tuple ()
+  return %2 : $()
+}
+
+protocol Q : class {
+}
+
+class V : Q {
+  init()
+}
+
+class W<T>: Q {
+  var x : T
+  init()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_class_existential : $@convention(thin) (@in V) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*V):
+  unconditional_checked_cast_addr take_always V in %1 : $*V to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_class_existential_copy_on_success
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_class_existential_copy_on_success : $@convention(thin) (@in V) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*V):
+  unconditional_checked_cast_addr copy_on_success V in %1 : $*V to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_archetype_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_archetype_to_class_existential : $@convention(thin) <X:Q> (@in X) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_to_class_existential
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK-NOT: retain_value
+// CHECK: init_existential_ref
+// CHECK-NOT: retain_value
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_to_class_existential : $@convention(thin) <X:Q> (@in W<X>) -> (@out Q) {
+bb0(%0 : $*Q, %1 : $*W<X>):
+  unconditional_checked_cast_addr take_always W<X> in %1 : $*W<X> to Q in %0 : $*Q
+  %2 = tuple ()
+  return %2 : $()
+}
+
+public protocol MyError : Error {
+}
+
+public class E1 : MyError {
+  init()
+}
+
+public class E2<T> : MyError {
+  init()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential : $@convention(thin) (@in E1) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E1):
+  unconditional_checked_cast_addr take_always E1 in %1 : $*E1 to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential_copy_on_success
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// There should be no [take] in copy_addr! 
+// CHECK: copy_addr %{{.}} to [initialization]
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_myerror_existential_copy_on_success : $@convention(thin) (@in E1) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E1):
+  unconditional_checked_cast_addr copy_on_success E1 in %1 : $*E1 to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_archetype_to_myerror_existentia
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_archetype_to_myerror_existential : $@convention(thin) <X:MyError> (@in X) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*X):
+  unconditional_checked_cast_addr take_always X in %1 : $*X to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_to_myerror_existential 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: init_existential_addr
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_to_myerror_existential : $@convention(thin) <X:MyError> (@in E2<X>) -> (@out MyError) {
+bb0(%0 : $*MyError, %1 : $*E2<X>):
+  unconditional_checked_cast_addr take_always E2<X> in %1 : $*E2<X> to MyError in %0 : $*MyError
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check casts to Error.
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_error_existential 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $Error, $E1
+// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $Error
+// CHECK: [[VAL:%.*]] = load %1 : $*E1
+// CHECK: store [[VAL]] to [[PROJ]]
+// CHECK: store [[ALLOC_BOX]] to %0 : $*Error
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_error_existential : $@convention(thin) (@in E1) -> (@out Error) {
+bb0(%0 : $*Error, %1 : $*E1):
+  unconditional_checked_cast_addr take_always E1 in %1 : $*E1 to Error in %0 : $*Error
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Check casts to Error.
+// CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_error_existential_copy_on_success 
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: [[ALLOC_BOX:%.*]] = alloc_existential_box $Error, $E1
+// CHECK: [[PROJ:%.*]] = project_existential_box $E1 in [[ALLOC_BOX]] : $Error
+// CHECK: [[VAL:%.*]] = load %1 : $*E1
+// CHECK: retain_value [[VAL]]
+// CHECK: store [[VAL]] to [[PROJ]]
+// CHECK: store [[ALLOC_BOX]] to %0 : $*Error
+// CHECK: return
+sil @replace_unconditional_check_cast_addr_for_type_to_error_existential_copy_on_success : $@convention(thin) (@in E1) -> (@out Error) {
+bb0(%0 : $*Error, %1 : $*E1):
+  unconditional_checked_cast_addr copy_on_success E1 in %1 : $*E1 to Error in %0 : $*Error
+  %2 = tuple ()
+  return %2 : $()
 }
