@@ -1342,9 +1342,6 @@ public protocol BinaryInteger :
   Hashable, Numeric, CustomStringConvertible, Strideable
   where Magnitude : BinaryInteger, Magnitude.Magnitude == Magnitude
 {
-  // FIXME(ABI) (Recursive Protocol Constraints): should add:
-  // where Magnitude : BinaryInteger
-
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// *Signed* integer types can represent both positive and negative values.
@@ -2929,6 +2926,7 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   /// A representation of this integer with the byte order swapped.
+  @_transparent
   public var byteSwapped: ${Self} {
 %   if bits <= 8:
     return self
@@ -3186,10 +3184,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     self.init((0, 0))
   }
 
-  // integer
+  // BinaryInteger
   //
   public var magnitude: DoubleWidth<Low> {
-    if Base.isSigned && _storage.high < 0 {
+    if Base.isSigned && _storage.high < (0 as High) {
       return self == .min
         ? DoubleWidth.max.magnitude &+ 1
         : (0 - self).magnitude
@@ -3216,18 +3214,18 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
     return lhs._storage.low < rhs._storage.low
   }
-    
+
   public init<T : BinaryInteger>(_ source: T) {
     self.init(exactly: source)!
   }
 
   public init?<T : BinaryInteger>(exactly source: T) {
     // Can't represent a negative 'source' if Base is unsigned
-    guard source >= 0 || DoubleWidth<Base>.isSigned else { return nil }
+    guard source >= 0 || DoubleWidth.isSigned else { return nil }
     
     // Is 'source' is entirely representable in Low?
     if let low = Low(exactly: source.magnitude) {
-      if source < 0 {
+      if source < (0 as T) {
         self.init((~0, ~low + 1))
       } else {
         self.init((0, low))
@@ -3243,7 +3241,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       self.init((high, low))
     }
   }
-    
+
   public init<T : FloatingPoint>(_ source: T) {
     fatalError()
   }
@@ -3255,8 +3253,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   public init<T : BinaryFloatingPoint>(_ source: T)
     where T.RawSignificand : FixedWidthInteger
   {
-    assert(source.isFinite, "Can't create a DoubleWidth<\(Base.self)> from infinity")
-    assert(!source.isNaN, "Can't create a DoubleWidth<\(Base.self)> from a NaN")
+    _precondition(source.isFinite, "Can't create a DoubleWidth from a non-finite value")
     self.init(exactly: source.rounded(.towardZero))!
   }
     
@@ -3264,9 +3261,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     where T.RawSignificand : FixedWidthInteger
   {
     // Need a finite value
-    guard source.isFinite && !source.isNaN else { return nil }
+    guard source.isFinite else { return nil }
 
-    // Don't need to go further with zero
+    // Don't need to go further with zero.
     if source.isZero {
       self.init(0)
       return
@@ -3276,28 +3273,29 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     guard source.exponent >= 0 else { return nil }
 
     typealias Raw = T.RawSignificand
-    let bitPattern: Raw = source.significandBitPattern | ((1 as Raw) &<< Raw(T.significandBitCount))
-    let offset: Int = T.significandBitCount - Int(source.exponent)
+    let bitPattern = source.significandBitPattern |
+      ((1 as Raw) &<< Raw(T.significandBitCount))
+    let offset = T.significandBitCount - Int(source.exponent)
     
     // FIXME: spurious compile error when 'where' clause above is removed:
     // error: non-nominal type 'T.RawSignificand' does not support explicit initialization
-    let fractionPart: Raw = bitPattern &<< Raw(Int(Raw.bitWidth - offset))
+    let fractionPart: Raw = bitPattern &<< Raw(Raw.bitWidth - offset)
     guard fractionPart == 0 else {
       return nil
     }
 
     let integerPart: Raw = bitPattern &>> Raw(offset)
 
-    // Exit early for zero
-    guard integerPart > 0 else {
-      self.init(0)
-      return
-    }
+    // Should have caught any actual zero values above
+    _sanityCheck(integerPart > (0 as Raw))
 
     if source.sign == .minus {
       if !DoubleWidth.isSigned || integerPart &- 1 > DoubleWidth.max {
         return nil
       }
+      // Have to juggle, or else the intermediate step of creating a value
+      // with Self.min's magnitude will overflow. It's okay to use wrapping
+      // subtraction because integerPart > 0.
       self.init(integerPart &- 1)
       self = 0 &- self &- 1
     } else {
@@ -3311,9 +3309,12 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
         fatalError("word(at:) is not supported on this type")
       }
       if n > 0 {
+        // Since `Base` is narrower than word, any non-zero word will give us
+        // the correct value here (0 or ~0).
         return _storage.high._word(at: n)
       }
-      return _storage.low._word(at: 0) | _storage.high._word(at: 0) << numericCast(Base.bitWidth)
+      return _storage.low._word(at: 0) |
+        (_storage.high._word(at: 0) << numericCast(Base.bitWidth))
     } else {
       // multiples of ${word_bits} only
       if Base.bitWidth % ${word_bits} != 0 {
@@ -3321,10 +3322,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       }
 
       // TODO: move to Int128 just like init(_builtinIntegerLiteral:) ?
-      let wordsInBase = Base.bitWidth / ${word_bits}
-      return (n < wordsInBase) ?
+      return (n < _storage.low.countRepresentedWords) ?
         _storage.low._word(at: n) :
-        _storage.high._word(at: n - wordsInBase)
+        _storage.high._word(at: n - _storage.low.countRepresentedWords)
     }
   }
 
@@ -3356,7 +3356,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let (high, highOverflow) =
       _storage.high.${x.name}ReportingOverflow(rhs._storage.high)
     let isLowOverflow = lowOverflow == .overflow
-    let result = (high &${x.operator} (isLowOverflow ? High(1) : High(0)), low)
+    let result = (high &${x.operator} (isLowOverflow ? 1 : 0), low)
     let overflow = ArithmeticOverflow(
       highOverflow == .overflow ||
       high == ${highAffectedByLowOverflow} && isLowOverflow
@@ -3372,7 +3372,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let (carry, product) = multipliedFullWidth(by: rhs)
     let result = DoubleWidth(extendingOrTruncating: product)
     
-    let isNegative = (self < 0) != (rhs < 0)
+    let isNegative = (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
     let didCarry = isNegative ? carry != ~0 : carry != 0
     let hadPositiveOverflow = !isNegative &&
       DoubleWidth.isSigned && product.leadingZeroBitCount == 0
@@ -3382,7 +3382,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   public func quotientAndRemainder(dividingBy other: DoubleWidth)
     -> (quotient: DoubleWidth, remainder: DoubleWidth) {
-    let isNegative = (self < 0) != (other < 0)
+    let isNegative = (self < (0 as DoubleWidth)) != (other < (0 as DoubleWidth))
 
     let rhs = other.magnitude
     var q = self.magnitude
@@ -3394,8 +3394,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     
     // Calculate the number of bits before q and rhs line up,
     // we can skip that many bits of iteration.
-    let initialOffset = q.leadingZeroBitCount + (DoubleWidth.bitWidth - rhs.leadingZeroBitCount) - 1
+    let initialOffset = q.leadingZeroBitCount +
+      (DoubleWidth.bitWidth - rhs.leadingZeroBitCount) - 1
 
+    // TODO(performance): Use &>> instead here?
     // Start with remainder capturing the high bits of q.
     var r = q >> Magnitude(DoubleWidth.bitWidth - initialOffset)
     q <<= Magnitude(initialOffset)
@@ -3415,7 +3417,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
 
     // Sign of remainder matches dividend
-    let remainder = self < 0
+    let remainder = self < (0 as DoubleWidth)
       ? 0 - DoubleWidth(r)
       : DoubleWidth(r)
 
@@ -3428,7 +3430,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   public func dividedReportingOverflow(by other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
-    if other == 0 || (other < 0 && self == .min) {
+    if other == 0 || (DoubleWidth.isSigned && other == -1 && self == .min) {
       return (self, .overflow)
     }
 
@@ -3437,7 +3439,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   public func remainderReportingOverflow(dividingBy other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
-    if other == 0 {
+    if other == 0 || (DoubleWidth.isSigned && other == -1 && self == .min) {
       return (self, .overflow)
     }
 
@@ -3446,7 +3448,8 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   public func multipliedFullWidth(by other: DoubleWidth)
     -> (high: DoubleWidth, low: DoubleWidth.Magnitude) {
-    let isNegative = DoubleWidth.isSigned && (self < DoubleWidth()) != (other < DoubleWidth())
+    let isNegative = DoubleWidth.isSigned &&
+      (self < (0 as DoubleWidth)) != (other < (0 as DoubleWidth))
 
     func mul(_ x: Low, _ y: Low) -> (partial: Low, carry: Low) {
       let (high, low) = x.multipliedFullWidth(by: y)
@@ -3473,7 +3476,8 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let mid2 = sum(b.carry, c.carry, d.partial)
         
     let low = DoubleWidth<Low>((mid1.partial, a.partial))
-    let high = DoubleWidth((High(mid2.carry + d.carry), mid1.carry + mid2.partial))
+    let high = DoubleWidth(
+      (High(mid2.carry + d.carry), mid1.carry + mid2.partial))
         
     if isNegative {
       let (lowComplement, overflow) = (~low).addingReportingOverflow(1)
@@ -3504,19 +3508,19 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 % end
 
   public static func <<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    if rhs < DoubleWidth((0, 0)) {
-      lhs >>= DoubleWidth((0, 0)) - rhs
+    if rhs < (0 as DoubleWidth) {
+      lhs >>= 0 - rhs
       return
     }
     
-    if rhs._storage.high != 0 as High || rhs._storage.low >= DoubleWidth.bitWidth {
-      lhs = DoubleWidth((0, 0))
+    if rhs._storage.high != 0 || rhs._storage.low >= DoubleWidth.bitWidth {
+      lhs = 0
       return
     }
     
     // Shift is exactly the width of `Base`, so low -> high.
-    if Int(rhs._storage.low) == Base.bitWidth {
-      lhs = DoubleWidth((High(extendingOrTruncating: lhs._storage.low), numericCast(0)))
+    if rhs._storage.low == Base.bitWidth {
+      lhs = DoubleWidth((High(extendingOrTruncating: lhs._storage.low), 0))
       return
     }
     
@@ -3524,21 +3528,21 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
   
   public static func >>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
-    if rhs < DoubleWidth((0, 0)) {
-      lhs <<= DoubleWidth((0, 0)) - rhs
+    if rhs < (0 as DoubleWidth) {
+      lhs <<= 0 - rhs
       return
     }
 
     // Shift is larger than this type's bit width.
-    if rhs._storage.high != 0 as High || rhs._storage.low >= DoubleWidth.bitWidth {
-      lhs = lhs < 0 ? ~0 : 0
+    if rhs._storage.high != 0 || rhs._storage.low >= DoubleWidth.bitWidth {
+      lhs = lhs < (0 as DoubleWidth) ? ~0 : 0
       return
     }
     
     // Shift is exactly the width of `Base`, so high -> low.
-    if rhs._storage.low == numericCast(Base.bitWidth) {
+    if rhs._storage.low == Base.bitWidth {
       lhs = DoubleWidth(
-        (lhs < 0 ? ~0 : 0, Low(extendingOrTruncating: lhs._storage.high)))
+        (lhs < (0 as DoubleWidth) ? ~0 : 0, Low(extendingOrTruncating: lhs._storage.high)))
       return
     }
 
@@ -3602,8 +3606,8 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   // other
   //
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    // FIXME: This won't work if `x` is out of range for `Int`
-    self.init(Int(_builtinIntegerLiteral: x))
+    // FIXME: This won't work if `x` is out of range for `Int64`
+    self.init(Int64(_builtinIntegerLiteral: x))
   }
 
   public var description: String {
@@ -3630,6 +3634,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     return _mixInt(high.hashValue) ^ low.hashValue
   }
 
+  @_transparent
   public var byteSwapped: DoubleWidth {
     return DoubleWidth((High(extendingOrTruncating: low.byteSwapped),
       Low(extendingOrTruncating: high.byteSwapped)))
