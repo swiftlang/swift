@@ -160,10 +160,6 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   // currently need to refer to them by symbol for their own vtable.
   switch (declRef.getSubclassScope()) {
   case SubclassScope::External:
-    // Allocating constructors retain their normal linkage behavior.
-    if (declRef.kind == SILDeclRef::Kind::Allocator)
-      break;
-
     // Unlike the "truly" public things, private things have public symbols
     // unconditionally, even if they're theoretically SIL only.
     if (isPrivate) {
