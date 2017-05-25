@@ -3373,10 +3373,11 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let result = DoubleWidth(extendingOrTruncating: product)
     
     let isNegative = (self < 0) != (rhs < 0)
-    let overflow = isNegative
-      ? carry != ~0
-      : carry != 0
-    return (result, ArithmeticOverflow(overflow))
+    let didCarry = isNegative ? carry != ~0 : carry != 0
+    let hadPositiveOverflow = !isNegative &&
+      DoubleWidth.isSigned && product.leadingZeroBitCount == 0
+
+    return (result, ArithmeticOverflow(didCarry || hadPositiveOverflow))
   }
 
   public func quotientAndRemainder(dividingBy other: DoubleWidth)
