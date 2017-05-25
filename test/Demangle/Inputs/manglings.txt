@@ -258,4 +258,5 @@ _T0Rml ---> _T0Rml
 _T0Tk ---> _T0Tk
 _T0A8 ---> _T0A8
 _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n ---> _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n
+_T03abc6testitySiFTm ---> merged abc.testit(Swift.Int) -> ()
 

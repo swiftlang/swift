@@ -653,6 +653,10 @@ void Remangler::manglePartialApplyObjCForwarder(Node *node) {
   mangleSingleChildNode(node); // global
 }
 
+void Remangler::mangleMergedFunction(Node *node) {
+  Out << "Tm";
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {

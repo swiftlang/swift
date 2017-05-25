@@ -9,7 +9,7 @@
 ; Test the most trivial example.
 
 ; CHECK-LABEL: define i32 @simple_func1(i32 %x, i32 %y)
-; CHECK: %1 = tail call i32 @simple_func1_merged(i32 %x, i32 %y, i32* @g1)
+; CHECK: %1 = tail call i32 @simple_func1Tm(i32 %x, i32 %y, i32* @g1)
 ; CHECK: ret i32 %1
 define i32 @simple_func1(i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -20,7 +20,7 @@ define i32 @simple_func1(i32 %x, i32 %y) {
 }
 
 ; CHECK-LABEL: define i32 @simple_func2(i32 %x, i32 %y)
-; CHECK: %1 = tail call i32 @simple_func1_merged(i32 %x, i32 %y, i32* @g2)
+; CHECK: %1 = tail call i32 @simple_func1Tm(i32 %x, i32 %y, i32* @g2)
 ; CHECK: ret i32 %1
 define i32 @simple_func2(i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -30,7 +30,7 @@ define i32 @simple_func2(i32 %x, i32 %y) {
   ret i32 %sum3
 }
 
-; CHECK-LABEL: define internal i32 @simple_func1_merged(i32, i32, i32*)
+; CHECK-LABEL: define internal i32 @simple_func1Tm(i32, i32, i32*)
 ; CHECK: %l = load i32, i32* %2
 ; CHECK: ret
 
@@ -38,7 +38,7 @@ define i32 @simple_func2(i32 %x, i32 %y) {
 ; Merge 3 functions with 3 types of differing instructions: load, store and call.
 
 ; CHECK-LABEL: define i32 @func1_of_3(i32 %x)
-; CHECK: %1 = tail call i32 @func1_of_3_merged(i32 %x, i32* @g1, i32* @g1, void (i32)* @callee1)
+; CHECK: %1 = tail call i32 @func1_of_3Tm(i32 %x, i32* @g1, i32* @g1, void (i32)* @callee1)
 ; CHECK: ret i32 %1
 define i32 @func1_of_3(i32 %x) {
   %l1 = load i32, i32* @g1, align 4
@@ -52,7 +52,7 @@ define i32 @func1_of_3(i32 %x) {
 }
 
 ; CHECK-LABEL: define i32 @func2_of_3(i32 %x)
-; CHECK: %1 = tail call i32 @func1_of_3_merged(i32 %x, i32* @g2, i32* @g2, void (i32)* @callee2)
+; CHECK: %1 = tail call i32 @func1_of_3Tm(i32 %x, i32* @g2, i32* @g2, void (i32)* @callee2)
 ; CHECK: ret i32 %1
 define i32 @func2_of_3(i32 %x) {
   %l1 = load i32, i32* @g2, align 4
@@ -66,7 +66,7 @@ define i32 @func2_of_3(i32 %x) {
 }
 
 ; CHECK-LABEL: define i32 @func3_of_3(i32 %x)
-; CHECK: %1 = tail call i32 @func1_of_3_merged(i32 %x, i32* @g3, i32* @g1, void (i32)* @callee3)
+; CHECK: %1 = tail call i32 @func1_of_3Tm(i32 %x, i32* @g3, i32* @g1, void (i32)* @callee3)
 ; CHECK: ret i32 %1
 define i32 @func3_of_3(i32 %x) {
   %l1 = load i32, i32* @g3, align 4
@@ -79,7 +79,7 @@ define i32 @func3_of_3(i32 %x) {
   ret i32 %sum3
 }
 
-; CHECK-LABEL: define internal i32 @func1_of_3_merged(i32, i32*, i32*, void (i32)*)
+; CHECK-LABEL: define internal i32 @func1_of_3Tm(i32, i32*, i32*, void (i32)*)
 ; CHECK: %l1 = load i32, i32* %1
 ; CHECK: %l2 = load i32, i32* %2
 ; CHECK: store i32 %sum2, i32* %1
@@ -93,7 +93,7 @@ declare void @callee3(i32 %x)
 ; Preserve attributes
 
 ; CHECK-LABEL: define void @sret_func1(i32* sret %p, i32 %x, i32 %y)
-; CHECK: tail call void @sret_func1_merged(i32* sret %p, i32 %x, i32 %y, i32* @g1)
+; CHECK: tail call void @sret_func1Tm(i32* sret %p, i32 %x, i32 %y, i32* @g1)
 ; CHECK: ret void
 define void @sret_func1(i32* sret %p, i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -104,7 +104,7 @@ define void @sret_func1(i32* sret %p, i32 %x, i32 %y) {
 }
 
 ; CHECK-LABEL: define void @sret_func2(i32* sret %p, i32 %x, i32 %y)
-; CHECK: tail call void @sret_func1_merged(i32* sret %p, i32 %x, i32 %y, i32* @g2)
+; CHECK: tail call void @sret_func1Tm(i32* sret %p, i32 %x, i32 %y, i32* @g2)
 ; CHECK: ret void
 define void @sret_func2(i32* sret %p, i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -114,7 +114,7 @@ define void @sret_func2(i32* sret %p, i32 %x, i32 %y) {
   ret void
 }
 
-; CHECK-LABEL: define internal void @sret_func1_merged(i32* sret, i32, i32, i32*)
+; CHECK-LABEL: define internal void @sret_func1Tm(i32* sret, i32, i32, i32*)
 ; CHECK: %l = load i32, i32* %3, align 4
 ; CHECK: store i32 %sum2, i32* %0
 ; CHECK: ret
@@ -124,7 +124,7 @@ define void @sret_func2(i32* sret %p, i32 %x, i32 %y) {
 ; Instead merge those functions which match best.
 
 ; CHECK-LABEL: define i32 @func1_merged_with3(i32 %x)
-; CHECK: %1 = tail call i32 @func1_merged_with3_merged(i32 %x, i32* @g1)
+; CHECK: %1 = tail call i32 @func1_merged_with3Tm(i32 %x, i32* @g1)
 ; CHECK: ret i32 %1
 define i32 @func1_merged_with3(i32 %x) {
   %l1 = load i32, i32* @g1, align 4
@@ -141,7 +141,7 @@ define i32 @func1_merged_with3(i32 %x) {
 }
 
 ; CHECK-LABEL: define i32 @func2_merged_with4(i32 %x)
-; CHECK: %1 = tail call i32 @func2_merged_with4_merged(i32 %x, i32* @g2)
+; CHECK: %1 = tail call i32 @func2_merged_with4Tm(i32 %x, i32* @g2)
 ; CHECK: ret i32 %1
 define i32 @func2_merged_with4(i32 %x) {
   %l1 = load i32, i32* @g2, align 4
@@ -158,7 +158,7 @@ define i32 @func2_merged_with4(i32 %x) {
 }
 
 ; CHECK-LABEL: define i32 @func3_merged_with1(i32 %x)
-; CHECK: %1 = tail call i32 @func1_merged_with3_merged(i32 %x, i32* @g2)
+; CHECK: %1 = tail call i32 @func1_merged_with3Tm(i32 %x, i32* @g2)
 ; CHECK: ret i32 %1
 define i32 @func3_merged_with1(i32 %x) {
   %l1 = load i32, i32* @g2, align 4
@@ -174,7 +174,7 @@ define i32 @func3_merged_with1(i32 %x) {
   ret i32 %sum5
 }
 
-; CHECK-LABEL: define internal i32 @func1_merged_with3_merged(i32, i32*)
+; CHECK-LABEL: define internal i32 @func1_merged_with3Tm(i32, i32*)
 ; CHECK: load i32, i32* %1, align 4
 ; CHECK: load i32, i32* @g2, align 4
 ; CHECK: load i32, i32* @g3, align 4
@@ -183,7 +183,7 @@ define i32 @func3_merged_with1(i32 %x) {
 ; CHECK: ret i32
 
 ; CHECK-LABEL: define i32 @func4_merged_with2(i32 %x) {
-; CHECK: %1 = tail call i32 @func2_merged_with4_merged(i32 %x, i32* @g1)
+; CHECK: %1 = tail call i32 @func2_merged_with4Tm(i32 %x, i32* @g1)
 ; CHECK: ret i32 %1
 define i32 @func4_merged_with2(i32 %x) {
   %l1 = load i32, i32* @g1, align 4
@@ -205,7 +205,7 @@ define i32 @func4_merged_with2(i32 %x) {
 ; Also check that the calling convention is preserved.
 
 ; CHECK-LABEL: define fastcc i32 @callee1_a(i32 %x, i32 %y)
-; CHECK: %1 = tail call fastcc i32 @callee1_a_merged(i32 %x, i32 %y, i32* @g1)
+; CHECK: %1 = tail call fastcc i32 @callee1_aTm(i32 %x, i32 %y, i32* @g1)
 ; CHECK: ret i32 %1
 define fastcc i32 @callee1_a(i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -216,7 +216,7 @@ define fastcc i32 @callee1_a(i32 %x, i32 %y) {
 }
 
 ; CHECK-LABEL: define fastcc i32 @callee1_b(i32 %x, i32 %y)
-; CHECK: %1 = tail call fastcc i32 @callee1_a_merged(i32 %x, i32 %y, i32* @g2)
+; CHECK: %1 = tail call fastcc i32 @callee1_aTm(i32 %x, i32 %y, i32* @g2)
 ; CHECK: ret i32 %1
 define fastcc i32 @callee1_b(i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -226,8 +226,8 @@ define fastcc i32 @callee1_b(i32 %x, i32 %y) {
   ret i32 %sum3
 }
 
-; CHECK-LABEL: define internal fastcc i32 @callee1_a_merged(i32, i32, i32*)
-; CHECK: call i32 @callee2_a_merged(i32 %sum2, i32 %1, i32* %2)
+; CHECK-LABEL: define internal fastcc i32 @callee1_aTm(i32, i32, i32*)
+; CHECK: call i32 @callee2_aTm(i32 %sum2, i32 %1, i32* %2)
 ; CHECK: ret
 
 ; CHECK-NOT: @callee2_a(
@@ -249,7 +249,7 @@ define internal i32 @callee2_b(i32 %x, i32 %y) {
 }
 
 ; CHECK-LABEL: define i32 @caller_a(i32 %x, i32 %y)
-; CHECK: %1 = tail call i32 @caller_a_merged(i32 %x, i32 %y, i32* @g1)
+; CHECK: %1 = tail call i32 @caller_aTm(i32 %x, i32 %y, i32* @g1)
 ; CHECK: ret i32 %1
 define i32 @caller_a(i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -260,7 +260,7 @@ define i32 @caller_a(i32 %x, i32 %y) {
 }
 
 ; CHECK-LABEL: define i32 @caller_b(i32 %x, i32 %y)
-; CHECK: %1 = tail call i32 @caller_a_merged(i32 %x, i32 %y, i32* @g2)
+; CHECK: %1 = tail call i32 @caller_aTm(i32 %x, i32 %y, i32* @g2)
 ; CHECK: ret i32 %1
 define i32 @caller_b(i32 %x, i32 %y) {
   %sum = add i32 %x, %y
@@ -270,8 +270,8 @@ define i32 @caller_b(i32 %x, i32 %y) {
   ret i32 %sum3
 }
 
-; CHECK-LABEL: define internal i32 @caller_a_merged(i32, i32, i32*)
-; CHECK: call fastcc i32 @callee1_a_merged(i32 %sum2, i32 %1, i32* %2)
+; CHECK-LABEL: define internal i32 @caller_aTm(i32, i32, i32*)
+; CHECK: call fastcc i32 @callee1_aTm(i32 %sum2, i32 %1, i32* %2)
 ; CHECK: ret
 
 
@@ -327,7 +327,7 @@ done:
 ; Check self recursive functions
 
 ; CHECK-LABEL: define internal void @recursive1(i32 %x, i32 %y)
-; CHECK: tail call void @recursive1_merged(i32 %x, i32 %y, i32* @g1, void (i32, i32)* @recursive1)
+; CHECK: tail call void @recursive1Tm(i32 %x, i32 %y, i32* @g1, void (i32, i32)* @recursive1)
 ; CHECK: ret void
 define internal void @recursive1(i32 %x, i32 %y) {
   br i1 undef, label %bb1, label %bb2
@@ -342,7 +342,7 @@ bb2:
 }
 
 ; CHECK-LABEL: define internal void @recursive2(i32 %x, i32 %y)
-; CHECK: tail call void @recursive1_merged(i32 %x, i32 %y, i32* @g2, void (i32, i32)* @recursive2)
+; CHECK: tail call void @recursive1Tm(i32 %x, i32 %y, i32* @g2, void (i32, i32)* @recursive2)
 ; CHECK: ret void
 define internal void @recursive2(i32 %x, i32 %y) {
   br i1 undef, label %bb1, label %bb2
@@ -355,14 +355,14 @@ bb1:
 bb2:
   ret void
 }
-; CHECK-LABEL: define internal void @recursive1_merged(i32, i32, i32*, void (i32, i32)*)
+; CHECK-LABEL: define internal void @recursive1Tm(i32, i32, i32*, void (i32, i32)*)
 ; CHECK: load i32, i32* %2
 ; CHECK: call void %3(i32 %0, i32 %1)
 ; CHECK: ret void
 
 
 ; CHECK-LABEL: define internal void @another_recursive_func(i32 %x)
-; CHECK: tail call void @another_recursive_func_merged(i32 %x, i32* @g1, void (i32)* @another_recursive_func)
+; CHECK: tail call void @another_recursive_funcTm(i32 %x, i32* @g1, void (i32)* @another_recursive_func)
 ; CHECK: ret void
 define internal void @another_recursive_func(i32 %x) {
   br i1 undef, label %bb1, label %bb2
@@ -377,7 +377,7 @@ bb2:
 }
 ; CHECK-NOT: @not_really_recursive(
 
-; CHECK-LABEL: define internal void @another_recursive_func_merged(i32, i32*, void (i32)*)
+; CHECK-LABEL: define internal void @another_recursive_funcTm(i32, i32*, void (i32)*)
 ; CHECK: store i32 %0, i32* %1
 ; CHECK: call void %2(i32 %0)
 ; CHECK: ret void
@@ -398,7 +398,7 @@ bb2:
 ; CHECK: call void @recursive1(i32 %x, i32 %x)
 ; CHECK: call void @recursive2(i32 %x, i32 %x)
 ; CHECK: call void @another_recursive_func(i32 %x)
-; CHECK: call void @another_recursive_func_merged(i32 %x, i32* @g2, void (i32)* @callee1)
+; CHECK: call void @another_recursive_funcTm(i32 %x, i32* @g2, void (i32)* @callee1)
 ; CHECK: ret void
 define void @call_recursive_funcs(i32 %x) {
   call void @recursive1(i32 %x, i32 %x)
