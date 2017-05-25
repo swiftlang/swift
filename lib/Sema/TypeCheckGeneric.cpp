@@ -42,6 +42,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      DeclContext *DC,
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
+#if true
   auto archetype =
     Builder.resolveArchetype(baseTy, ArchetypeResolutionKind::AlwaysPartial);
   assert(archetype && "Bad generic context nesting?");
@@ -49,17 +50,14 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   return archetype
            ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(GenericParams, /*allowUnresolved=*/true);
+#else
+  return DependentMemberType::get(baseTy, ref->getIdentifier());
+#endif
 }
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
-  auto archetype =
-    Builder.resolveArchetype(selfTy, ArchetypeResolutionKind::AlwaysPartial);
-  assert(archetype && "Bad generic context nesting?");
-  
-  return archetype
-           ->getNestedType(assocType, Builder)
-           ->getDependentType(GenericParams, /*allowUnresolved=*/true);
+  return DependentMemberType::get(selfTy, assocType);
 }
 
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -74,14 +72,8 @@ bool DependentGenericTypeResolver::areSameType(Type type1, Type type2) {
   if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
     return type1->isEqual(type2);
 
-  auto pa1 =
-    Builder.resolveArchetype(type1, ArchetypeResolutionKind::AlwaysPartial);
-  auto pa2 =
-    Builder.resolveArchetype(type2, ArchetypeResolutionKind::AlwaysPartial);
-  if (pa1 && pa2)
-    return pa1->isInSameEquivalenceClassAs(pa2);
-
-  return type1->isEqual(type2);
+  // Conservative answer: they could be the same.
+  return true;
 }
 
 void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
@@ -281,11 +273,12 @@ bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
   if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
     return type1->isEqual(type2);
 
-  // FIXME: Want CompleteWellFormed here?
   auto pa1 =
-    Builder.resolveArchetype(type1, ArchetypeResolutionKind::AlwaysPartial);
+    Builder.resolveArchetype(type1,
+                             ArchetypeResolutionKind::CompleteWellFormed);
   auto pa2 =
-    Builder.resolveArchetype(type2, ArchetypeResolutionKind::AlwaysPartial);
+    Builder.resolveArchetype(type2,
+                             ArchetypeResolutionKind::CompleteWellFormed);
   if (pa1 && pa2)
     return pa1->isInSameEquivalenceClassAs(pa2);
 
