@@ -461,9 +461,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // identifiers, we explicitly get the full serialized DeclName for this
     // diagnostic.
     StringRef nameStr = Name.getBaseName().str();
+    llvm::SmallString<10> scratch;
     for (auto &result : Lookup) {
       if (result->getBaseName() == Name.getBaseName()) {
-        llvm::SmallString<10> scratch;
         nameStr = Name.getString(scratch);
         break;
       }
