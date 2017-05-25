@@ -429,10 +429,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
-    for (auto Ty : E->getGenericArgs()) {
-      if (doIt(Ty))
-        return nullptr;
-    }
     return E;
   }
   

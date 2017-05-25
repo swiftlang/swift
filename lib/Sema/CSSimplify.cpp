@@ -2999,8 +2999,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, ctor, /*isSpecialized=*/false,
-                                      functionRefKind));
+      result.addViable(OverloadChoice(baseTy, ctor, functionRefKind));
     }
 
 
@@ -3160,9 +3159,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                     functionRefKind));
     } else {
-      result.addViable(OverloadChoice(ovlBaseTy, cand,
-                                      /*isSpecialized=*/false,
-                                      functionRefKind));
+      result.addViable(OverloadChoice(ovlBaseTy, cand, functionRefKind));
     }
   };
 

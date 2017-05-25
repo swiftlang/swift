@@ -997,7 +997,7 @@ public:
   ///
   /// \param typeDecl The type declaration found by name lookup.
   /// \param fromDC The declaration context in which the name lookup occurred.
-  /// \param isSpecialized Whether this type is immediately specialized.
+  /// \param isSpecialized Whether the type will have generic arguments applied.
   /// \param resolver The resolver for generic types.
   ///
   /// \returns the resolved type.
@@ -2047,7 +2047,6 @@ public:
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
-                     bool isSpecialized,
                      FunctionRefKind functionRefKind);
   /// @}
 

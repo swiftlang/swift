@@ -1955,13 +1955,10 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \param isSpecialized Whether this declaration is immediately specialized.
-  ///
   /// \returns a pair containing the full opened type (if applicable) and
   /// opened type of a reference to declaration.
   std::pair<Type, Type> getTypeOfReference(
                           ValueDecl *decl,
-                          bool isSpecialized,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);

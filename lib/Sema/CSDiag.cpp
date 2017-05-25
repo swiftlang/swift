@@ -4737,7 +4737,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
         continue;
 
       OverloadChoice choice(base ? base->getInterfaceType() : nullptr,
-                            candidate, false, UDE->getFunctionRefKind());
+                            candidate, UDE->getFunctionRefKind());
 
       if (base) { // Let's group all of the candidates have a common base.
         candidates[base].push_back(choice);
@@ -5694,7 +5694,6 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
   SmallVector<OverloadChoice, 2> choices;
   for (auto &unviable : results.UnviableCandidates)
     choices.push_back(OverloadChoice(baseType, unviable.first,
-                                     /*isSpecialized=*/false,
                                      UDE->getFunctionRefKind()));
 
   CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
