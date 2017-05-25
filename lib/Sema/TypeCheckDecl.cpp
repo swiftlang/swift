@@ -7320,6 +7320,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       checkDeclAttributesEarly(VD);
       validateAttributes(*this, VD);
 
+      // Synthesize accessors as necessary.
+      maybeAddAccessorsToVariable(VD, *this);
+
       // FIXME: Guarding the rest of these things together with early attribute
       // validation is a hack. It's necessary because properties can get types
       // before validateDecl is called.
@@ -7395,9 +7398,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           }
         }
       }
-
-      // Synthesize accessors as necessary.
-      maybeAddAccessorsToVariable(VD, *this);
 
       // Make sure the getter and setter have valid types, since they will be
       // used by SILGen for any accesses to this variable.
