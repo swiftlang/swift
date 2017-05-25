@@ -27,21 +27,20 @@ class TestClass {
 
   lazy var (e, f) = (1,2)  // expected-error {{'lazy' cannot destructure an initializer}} {{3-8=}}
 
-  lazy var g : Int = { 0 }()   // single-expr closure
+  lazy var g = { 0 }()   // single-expr closure
 
-  lazy var h : Int = { return 0 }()+1  // multi-stmt closure
+  lazy var h : Int = { 0 }()   // single-expr closure
 
-  lazy var i : Int = 42 {  // expected-error {{lazy properties may not have observers}} {{3-8=}}
+  lazy var i = { () -> Int in return 0 }()+1  // multi-stmt closure
+
+  lazy var j : Int = { return 0 }()+1  // multi-stmt closure
+
+  lazy var k : Int = { () -> Int in return 0 }()+1  // multi-stmt closure
+
+  lazy var l : Int = 42 {  // expected-error {{lazy properties may not have observers}} {{3-8=}}
     didSet {
     }
   }
-
-  // Lazy values can have observers, be NSCopying, etc.
-/*  lazy var d : Int = 42 {
-    didSet {
-      print("set me")
-    }
-  }*/
 
   init() {
     lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
@@ -90,4 +89,33 @@ class WeShouldNotReTypeCheckStatements {
     _ = ()
     _ = ()
   }
+}
+
+protocol MyProtocol {
+  func f() -> Int
+}
+
+struct MyStruct : MyProtocol {
+  func f() -> Int { return 0 }
+}
+
+struct Outer {
+  static let p: MyProtocol = MyStruct()
+
+  struct Inner {
+    lazy var x = p.f()
+
+    lazy var y = {_ = 3}()
+    // expected-warning@-1 {{variable 'y' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+  }
+}
+
+// https://bugs.swift.org/browse/SR-2616
+struct Construction {
+  init(x: Int, y: Int? = 42) { }
+}
+
+class Constructor {
+  lazy var myQ = Construction(x: 3)
 }
