@@ -88,6 +88,10 @@ public struct Substring : StringProtocol {
     _slice = RangeReplaceableBidirectionalSlice()
   }
 
+  internal init(_slice: RangeReplaceableBidirectionalSlice<String>) {
+    self._slice = _slice
+  }
+  
   /// Creates a substring with the specified bounds within the given string.
   ///
   /// - Parameters:
@@ -455,53 +459,21 @@ extension Substring : ExpressibleByStringLiteral {
   }
 }
 
-// The purpose of this protocol is backward compatibility with Swift 3 code,
-// where String subscripts returned String.
-// Since the Substring returning subscripts are introduced by the protocol
-// extension, they will be less specific than the String-returning ones
-// declared on the String type itself, thus avoiding ambiguity.
-public protocol _RangeSubscriptableString {
-  associatedtype Index : Comparable
-  func _subscript(_ bounds: Range<Index>) -> Substring
-  func _subscript(_ bounds: ClosedRange<Index>) -> Substring
-}
-
-// Without the `where` subscripts will be ambiguous
-extension _RangeSubscriptableString where Self : RangeReplaceableCollection {
-% for Range in ['Range', 'ClosedRange']:
-  public subscript(bounds: ${Range}<Index>) -> Substring {
-    return _subscript(bounds)
-  }
-% end
-}
-
-extension String : _RangeSubscriptableString {
-% for Range in ['Range', 'ClosedRange']:
-  /// Accesses the text in the given range.
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public func _subscript(_ bounds: ${Range}<Index>) -> Substring {
-    return Substring(_base: String(self._core), bounds)
-  }
-% end
-}
-
-extension Substring : _RangeSubscriptableString {
-% for Range in ['Range', 'ClosedRange']:
-  public func _subscript(_ bounds: ${Range}<Index>) -> Substring {
-    let subSlice = _slice[bounds]
-    let bounds = (lower: subSlice.startIndex, upper: subSlice.endIndex)
-%   if Range == 'ClosedRange':
-    // Creating Substring using the half-open range, since subSlice already
-    // handled the ClosedRange case.
-%   end
-    return Substring(_base: _slice._base, Range(uncheckedBounds: bounds))
-  }
-% end
-}
-
+//===--- String/Substring Slicing Support ---------------------------------===//
+/// In Swift 3.2, in the absence of type context,
+///
+///     someString[someString.startIndex..<someString.endIndex]
+///
+/// was deduced to be of type `String`.  Therefore have a more-specific
+/// Swift-3-only `subscript` overload on `String` (and `Substring`) that
+/// continues to produce `String`.
 extension String {
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> Substring {
+    return Substring(
+      _slice: RangeReplaceableBidirectionalSlice(base: self, bounds: r))
+  }
+
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
     return String(characters[bounds])
@@ -514,6 +486,11 @@ extension String {
 }
 
 extension Substring {
+  @available(swift, introduced: 4)
+  public subscript(r: Range<Index>) -> Substring {
+    return Substring(_slice: _slice[r])
+  }
+
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
     return String(characters[bounds])
@@ -524,3 +501,4 @@ extension Substring {
     return String(characters[bounds])
   }
 }
+//===----------------------------------------------------------------------===//
