@@ -501,6 +501,29 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
   llvm_unreachable("param not found");
 }
 
+static StringRef getPrivateDiscriminatorIfNecessary(const ValueDecl *decl) {
+  if (!decl->hasAccessibility() ||
+      decl->getFormalAccess() > Accessibility::FilePrivate ||
+      isInPrivateOrLocalContext(decl)) {
+    return StringRef();
+  }
+
+  // Mangle non-local private declarations with a textual discriminator
+  // based on their enclosing file.
+  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
+  auto fileUnit = cast<FileUnit>(topLevelContext);
+
+  Identifier discriminator =
+      fileUnit->getDiscriminatorForPrivateValue(decl);
+  assert(!discriminator.empty());
+  assert(!isNonAscii(discriminator.str()) &&
+         "discriminator contains non-ASCII characters");
+  (void)&isNonAscii;
+  assert(!clang::isDigit(discriminator.str().front()) &&
+         "not a valid identifier");
+  return discriminator.str();
+}
+
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
   if (decl->isOperator()) {
     appendIdentifier(translateOperator(decl->getName().str()));
@@ -534,27 +557,10 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     // Mangle local declarations with a numeric discriminator.
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }
-  if (decl->hasAccessibility() &&
-      decl->getFormalAccess() <= Accessibility::FilePrivate &&
-      !isInPrivateOrLocalContext(decl)) {
-    // Mangle non-local private declarations with a textual discriminator
-    // based on their enclosing file.
 
-    // The first <identifier> is a discriminator string unique to the decl's
-    // original source file.
-    auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-    auto fileUnit = cast<FileUnit>(topLevelContext);
-
-    Identifier discriminator =
-      fileUnit->getDiscriminatorForPrivateValue(decl);
-    assert(!discriminator.empty());
-    assert(!isNonAscii(discriminator.str()) &&
-           "discriminator contains non-ASCII characters");
-    (void)&isNonAscii;
-    assert(!clang::isDigit(discriminator.str().front()) &&
-           "not a valid identifier");
-
-    appendIdentifier(discriminator.str());
+  StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator.str());
     return appendOperator("LL");
   }
 }
@@ -1800,6 +1806,11 @@ void ASTMangler::appendConstructorEntity(const ConstructorDecl *ctor,
                                          bool isAllocating) {
   appendContextOf(ctor);
   appendDeclType(ctor);
+  StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(ctor);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator);
+    appendOperator("Ll");
+  }
   appendOperator(isAllocating ? "fC" : "fc");
 }
 

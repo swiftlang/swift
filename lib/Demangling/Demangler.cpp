@@ -641,6 +641,10 @@ NodePointer Demangler::demangleLocalIdentifier() {
     NodePointer name = popNode(isDeclName);
     return createWithChildren(Node::Kind::PrivateDeclName, discriminator, name);
   }
+  if (nextIf('l')) {
+    NodePointer discriminator = popNode(Node::Kind::Identifier);
+    return createWithChild(Node::Kind::PrivateDeclName, discriminator);
+  }
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer name = popNode(isDeclName);
   return createWithChildren(Node::Kind::LocalDeclName, discriminator, name);
@@ -1672,7 +1676,14 @@ NodePointer Demangler::demangleMetatypeRepresentation() {
 }
 
 NodePointer Demangler::demangleFunctionEntity() {
-  enum { None, Type, TypeAndName, TypeAndIndex, Index } Args;
+  enum {
+    None,
+    Type,
+    TypeAndName,
+    TypeAndMaybePrivateName,
+    TypeAndIndex,
+    Index
+  } Args;
 
   Node::Kind Kind = Node::Kind::EmptyList;
   switch (nextChar()) {
@@ -1681,8 +1692,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'E': Args = None; Kind = Node::Kind::IVarDestroyer; break;
     case 'e': Args = None; Kind = Node::Kind::IVarInitializer; break;
     case 'i': Args = None; Kind = Node::Kind::Initializer; break;
-    case 'C': Args = Type; Kind = Node::Kind::Allocator; break;
-    case 'c': Args = Type; Kind = Node::Kind::Constructor; break;
+    case 'C':
+      Args = TypeAndMaybePrivateName; Kind = Node::Kind::Allocator; break;
+    case 'c':
+      Args = TypeAndMaybePrivateName; Kind = Node::Kind::Constructor; break;
     case 'g': Args = TypeAndName; Kind = Node::Kind::Getter; break;
     case 'G': Args = TypeAndName; Kind = Node::Kind::GlobalGetter; break;
     case 's': Args = TypeAndName; Kind = Node::Kind::Setter; break;
@@ -1727,6 +1740,10 @@ NodePointer Demangler::demangleFunctionEntity() {
       Child2 = popNode(Node::Kind::Type);
       Child1 = popNode(isDeclName);
       break;
+    case TypeAndMaybePrivateName:
+      Child1 = popNode(Node::Kind::PrivateDeclName);
+      Child2 = popNode(Node::Kind::Type);
+      break;
     case TypeAndIndex:
       Child1 = demangleIndexAsNode();
       Child2 = popNode(Node::Kind::Type);
@@ -1742,6 +1759,11 @@ NodePointer Demangler::demangleFunctionEntity() {
     case Type:
     case Index:
       Entity = addChild(Entity, Child1);
+      break;
+    case TypeAndMaybePrivateName:
+      if (Child1)
+        Entity = addChild(Entity, Child1);
+      Entity = addChild(Entity, Child2);
       break;
     case TypeAndName:
     case TypeAndIndex:
