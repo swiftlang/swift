@@ -950,30 +950,43 @@ namespace {
       // missing case '(.some(_), .none)'
       if (InEditor) {
         Buffer.clear();
+        SmallVector<Space, 8> emittedSpaces;
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
           for (auto &flat : flats) {
+            if (flat.isSubspace(Space(emittedSpaces), TC)) {
+              continue;
+            }
+            
             OS << tok::kw_case << " ";
             flat.show(OS);
             OS << ":\n" << Placeholder << "\n";
+            
+            emittedSpaces.push_back(flat);
           }
         }
 
-        TC.Context.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
-        TC.Context.Diags.diagnose(StartLoc, diag::missing_several_cases, false)
+        TC.diagnose(StartLoc, diag::non_exhaustive_switch);
+        TC.diagnose(StartLoc, diag::missing_several_cases, false)
           .fixItInsert(EndLoc, Buffer.str());
       } else {
         TC.Context.Diags.diagnose(StartLoc, diag::non_exhaustive_switch);
 
+        SmallVector<Space, 8> emittedSpaces;
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
           for (auto &flat : flats) {
+            if (flat.isSubspace(Space(emittedSpaces), TC)) {
+              continue;
+            }
+            
             Buffer.clear();
             flat.show(OS);
-            TC.Context.Diags.diagnose(StartLoc, diag::missing_particular_case,
-                               Buffer.str());
+            TC.diagnose(StartLoc, diag::missing_particular_case, Buffer.str());
+            
+            emittedSpaces.push_back(flat);
           }
         }
       }
