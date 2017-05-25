@@ -693,27 +693,18 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// 
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Element == Character {
-    reserveCapacity(_core.count + newElements.underestimatedCount)
-    for c in newElements {
-      self.append(c)
-    }
-  }
-
-  /// Creates a new character view containing the characters in the given
-  /// sequence.
-  ///
-  /// - Parameter characters: A sequence of characters.
-  public init<S : Sequence>(_ characters: S)
   where S.Element == Character {
-    let v0 = characters as? _SwiftStringView
-    if _fastPath(v0 != nil), let v = v0 {
-      self = v._persistentContent.characters
+    if _fastPath(newElements is _SwiftStringView) {
+      let v = newElements as! _SwiftStringView
+      if _fastPath(_core.count == 0) {
+        _core = v._persistentContent._core
+        return
+      }
+      _core.append(v._ephemeralContent._core)
+      return
     }
-    else {
-      self = String.CharacterView()
-      self.append(contentsOf: characters)
-    }
+    reserveCapacity(_core.count + newElements.underestimatedCount)
+    for c in newElements { self.append(c) }
   }
 }
 
