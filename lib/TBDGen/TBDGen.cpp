@@ -96,6 +96,8 @@ public:
       addMembers(ED->getMembers());
     else if (auto NTD = dyn_cast<NominalTypeDecl>(D))
       addMembers(NTD->getMembers());
+    else if (auto VD = dyn_cast<VarDecl>(D))
+      VD->getAllAccessorFunctions(members);
 
     for (auto member : members) {
       ASTVisitor::visit(member);
@@ -221,9 +223,11 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     // like globals.
     if (!FileHasEntryPoint)
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
-  }
 
-  visitMembers(VD);
+    // In this case, the members of the VarDecl don't also appear as top-level
+    // decls, so we need to explicitly walk them.
+    visitMembers(VD);
+  }
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
