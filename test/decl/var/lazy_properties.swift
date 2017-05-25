@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 3
+// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 4
 
 lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}} {{1-6=}}
 
@@ -72,7 +73,8 @@ struct StructTest {
 
 // <rdar://problem/16889110> capture lists in lazy member properties cannot use self
 class CaptureListInLazyProperty {
-  lazy var closure: () -> Int = { [weak self] in return self!.i }
+  lazy var closure1 = { [weak self] in return self!.i }
+  lazy var closure2: () -> Int = { [weak self] in return self!.i }
   var i = 42
 }
 
@@ -118,4 +120,36 @@ struct Construction {
 
 class Constructor {
   lazy var myQ = Construction(x: 3)
+}
+
+
+// Problems with self references
+class BaseClass {
+  var baseInstanceProp = 42
+  static var baseStaticProp = 42
+}
+
+class ReferenceSelfInLazyProperty : BaseClass {
+  lazy var refs = (i, f())
+  lazy var trefs: (Int, Int) = (i, f())
+
+  lazy var qrefs = (self.i, self.f())
+  lazy var qtrefs: (Int, Int) = (self.i, self.f())
+
+  lazy var crefs = { (i, f()) }()
+  lazy var ctrefs: (Int, Int) = { (i, f()) }()
+
+  lazy var cqrefs = { (self.i, self.f()) }()
+  lazy var cqtrefs: (Int, Int) = { (self.i, self.f()) }()
+
+  lazy var mrefs = { () -> (Int, Int) in return (i, f()) }()
+  // expected-error@-1 {{call to method 'f' in closure requires explicit 'self.' to make capture semantics explicit}}
+  // expected-error@-2 {{reference to property 'i' in closure requires explicit 'self.' to make capture semantics explicit}}
+  lazy var mtrefs: (Int, Int) = { return (i, f()) }()
+
+  lazy var mqrefs = { () -> (Int, Int) in (self.i, self.f()) }()
+  lazy var mqtrefs: (Int, Int) = { return (self.i, self.f()) }()
+
+  var i = 42
+  func f() -> Int { return 0 }
 }
