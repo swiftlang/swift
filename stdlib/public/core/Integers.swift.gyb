@@ -2877,13 +2877,9 @@ ${assignmentOperatorComment(x.operator, True)}
   public func multipliedFullWidth(by other: ${Self})
   -> (high: ${Self}, low: ${Self}.Magnitude) {
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   #if word_bits == 32 and bits == 64:
-%   if bits == 64:
-    let lhs_ = DoubleWidth<${Self}>(self)
-    let rhs_ = DoubleWidth<${Self}>(other)
-    let result = lhs_ * rhs_
-
-    return (result.high, result.low)
+%   if word_bits == 32 and bits == 64:
+    // FIXME(integers): implement
+    fatalError("Operation is not supported")
 %   else:
     let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
     let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
