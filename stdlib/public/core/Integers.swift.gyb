@@ -1721,31 +1721,6 @@ extension BinaryInteger {
     return lhs == Self(extendingOrTruncating: rhs)
   }
 
-  /// Returns a Boolean value indicating whether the two given values are not
-  /// equal.
-  ///
-  /// You can check the inequality of instances of any `BinaryInteger` types
-  /// using the not-equal-to operator (`!=`). For example, you can test
-  /// whether the first `UInt8` value in a string's UTF-8 encoding is not
-  /// equal to the first `UInt32` value in its Unicode scalar view:
-  ///
-  ///     let gameName = "Red Light, Green Light"
-  ///     if let firstUTF8 = gameName.utf8.first,
-  ///         let firstScalar = gameName.unicodeScalars.first?.value {
-  ///         print("First code values are different: \(firstUTF8 != firstScalar)")
-  ///     }
-  ///     // Prints "First code values are different: false"
-  ///
-  /// - Parameters:
-  ///   - lhs: An integer to compare.
-  ///   - rhs: Another integer to compare.
-  @_transparent
-  public static func != <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
-    return !(lhs == rhs)
-  }
-
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than that of the second argument.
   ///
@@ -1787,6 +1762,45 @@ extension BinaryInteger {
 
     return Other(extendingOrTruncating: lhs) < rhs
   }
+}
+
+//===----------------------------------------------------------------------===//
+//===--- Ambiguity breakers -----------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+/// This protocol is an implementation detail of `BinaryInteger`. Do not use it
+/// directly.
+public protocol _BinaryInteger :
+  Hashable, Numeric, CustomStringConvertible, Strideable {
+  // FIXME(integers): This protocol is necessary for breaking ambiguities in
+  // generic code.
+}
+
+extension _BinaryInteger {
+  /// Returns a Boolean value indicating whether the two given values are not
+  /// equal.
+  ///
+  /// You can check the inequality of instances of any `BinaryInteger` types
+  /// using the not-equal-to operator (`!=`). For example, you can test
+  /// whether the first `UInt8` value in a string's UTF-8 encoding is not
+  /// equal to the first `UInt32` value in its Unicode scalar view:
+  ///
+  ///     let gameName = "Red Light, Green Light"
+  ///     if let firstUTF8 = gameName.utf8.first,
+  ///         let firstScalar = gameName.unicodeScalars.first?.value {
+  ///         print("First code values are different: \(firstUTF8 != firstScalar)")
+  ///     }
+  ///     // Prints "First code values are different: false"
+  ///
+  /// - Parameters:
+  ///   - lhs: An integer to compare.
+  ///   - rhs: Another integer to compare.
+  @_transparent
+  public static func != <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
+    return !(lhs == rhs)
+  }
 
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than or equal to that of the second argument.
@@ -1800,7 +1814,9 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func <= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func <= <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
     return !(rhs < lhs)
   }
 
@@ -1816,7 +1832,9 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func >= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func >= <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
     return !(lhs < rhs)
   }
 
@@ -1832,27 +1850,23 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func > <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func > <Other : _BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return rhs < lhs
   }
 }
 
-//===----------------------------------------------------------------------===//
-//===--- Ambiguity breakers -----------------------------------------------===//
 // These two versions of the operators are not ordered with respect to one
 // another, but the compiler choses the second one, and that results in infinite
 // recursion.
 //
 //     <T : Comparable>(T, T) -> Bool
-//     <T : BinaryInteger, U : BinaryInteger>(T, U) -> Bool
+//     <T : _BinaryInteger, U : _BinaryInteger>(T, U) -> Bool
 //
 // so we define:
 //
 //     <T : BinaryInteger>(T, T) -> Bool
-//
-//===----------------------------------------------------------------------===//
 
-extension BinaryInteger {
+extension BinaryInteger : _BinaryInteger {
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
