@@ -107,6 +107,7 @@ public:
   IGNORED_ATTR(NSKeyedArchiverClassName)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
+  IGNORED_ATTR(DowngradeExhaustivityCheck)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -784,6 +785,7 @@ public:
     IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
+    IGNORED_ATTR(DowngradeExhaustivityCheck)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

@@ -6014,7 +6014,7 @@ static bool hasGenericAncestry(ClassDecl *classDecl) {
 /// Infer the attribute tostatic-initialize the Objective-C metadata for the
 /// given class, if needed.
 static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl,
-                                               bool requiresNSCodingAttr) {
+                                              bool requiresNSCodingAttr) {
   // If we already have the attribute, there's nothing to do.
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
