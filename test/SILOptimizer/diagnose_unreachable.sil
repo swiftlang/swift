@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnose-unreachable | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
 
 import Builtin
 import Swift
@@ -387,19 +387,24 @@ bb2(%3 : $Error):
   throw %3 : $Error
 }
 
+sil_scope 0 { loc "f.swift":1:1 parent @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error Error }
+// CHECK: sil_scope [[F:[0-9]+]] { loc "f.swift":1:1 parent @try_apply_2
+sil_scope 1 { loc "f.swift":2:1 parent 0 }
+// CHECK: sil_scope [[S:[0-9]+]] { loc "f.swift":2:1 parent [[F]] }
 // CHECK-LABEL:sil @try_apply_2
-// CHECK:    bb3(
-// CHECK-NEXT: {{ unreachable}}
+// CHECK:    bb3({{.*}}$Never):
+// CHECK-NEXT: {{ unreachable }}, scope [[S]]
 // CHECK:    bb4(
 // CHECK-NEXT: throw
+
 sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error Error {
 bb0(%0 : $Builtin.Int1):
   %1 = function_ref @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
   cond_br %0, bb1, bb2
 bb1:
-  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4
+  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4, scope 0
 bb2:
-  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4
+  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4, scope 1
 bb3(%2 : $Never):
   %3 = tuple ()
   return %3 : $()
