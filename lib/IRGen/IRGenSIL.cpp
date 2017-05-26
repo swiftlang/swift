@@ -1647,8 +1647,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   bool InCleanupBlock = false;
   bool KeepCurrentLocation = false;
 
-  for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
-    auto &I = *InsnIter;
+  for (auto &I : *BB) {
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
       SILLocation ILoc = I.getLoc();
@@ -1664,7 +1663,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           InCleanupBlock = true;
           // Scan ahead to see if this is the final cleanup block in
           // this basic block.
-          auto It = InsnIter;
+          auto It = I.getIterator();
           do ++It; while (It != BB->end() &&
                           It->getLoc().is<CleanupLocation>());
           // We are still in the middle of a basic block?
@@ -1694,9 +1693,14 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       // Set the builder's debug location.
       if (DS && !KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-      else
+      else {
+        // Reuse the last scope for an easier-to-read line table.
+        auto Prev = --I.getIterator();
+        if (Prev != BB->end())
+          DS = Prev->getDebugScope();
         // Use an artificial (line 0) location.
         IGM.DebugInfo->setCurrentLoc(Builder, DS);
+      }
 
       if (isa<TermInst>(&I))
         emitDebugVariableRangeExtension(BB);
