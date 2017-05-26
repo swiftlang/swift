@@ -49,9 +49,6 @@
 ///    that the release occurs in the epilog after any retains associated with
 ///    @owned return values.
 ///
-/// 3. Handling addresses. We currently do not handle address types. We can in
-///    the future by introducing alloc_stacks.
-///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "closure-specialization"
@@ -67,6 +64,7 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
@@ -247,7 +245,8 @@ public:
   }
 
   /// Extend the lifetime of 'Arg' to the lifetime of the closure.
-  void extendArgumentLifetime(SILValue Arg) const;
+  void extendArgumentLifetime(SILValue Arg,
+                              SILArgumentConvention ArgConvention) const;
 };
 } // end anonymous namespace
 
@@ -266,6 +265,80 @@ struct ClosureInfo {
 
 SILInstruction *CallSiteDescriptor::getClosure() const {
   return CInfo->Closure;
+}
+
+/// Returns true if the specialized function should gets its own copy
+/// of the closure argument.
+static bool isCopyRequiredForSILArgument(SILValue Arg,
+                                         SILArgumentConvention ArgConvention) {
+  if (Arg->getType().isObject())
+    return false;
+
+  return ArgConvention == SILArgumentConvention::Indirect_In ||
+         ArgConvention == SILArgumentConvention::Indirect_In_Guaranteed;
+}
+
+/// Generates code to create a copy of the provided closure argument to be
+/// used by a given invocation of the closure. The copy is created
+/// just before the closure creation. And it is destroyed right after
+/// the invocation of the specialized function.
+static SILValue
+copyArgumentAroundClosureCall(SILBuilder &Builder, SILInstruction *Closure,
+                              ApplySite AI, SILValue Arg,
+                              SILArgumentConvention ArgConvention) {
+  SILModule &M = AI.getModule();
+  auto CreateLoc = Closure->getLoc();
+  auto DestroyLoc = AI.getInstruction()->getLoc();
+  auto ArgTy = Arg->getType();
+
+  // Create a copy of the argument before the closure creation.
+  Builder.setInsertionPoint(Closure);
+  auto Copy =
+    Builder.createAllocStack(CreateLoc, ArgTy.getObjectType());
+
+  if (Arg->getType().isLoadable(M)) {
+    bool isTrivial = Arg->getType().isTrivial(M);
+    auto Value = Builder.createLoad(CreateLoc, Arg,
+                                    swift::LoadOwnershipQualifier::Unqualified);
+    // Expand copy_addr into load, retain, store to help the ARC optimizer.
+    if (!isTrivial) {
+      Builder.createRetainValue(CreateLoc, Value,
+                                Builder.getDefaultAtomicity());
+    }
+
+    Builder.createStore(CreateLoc, Value, Copy,
+                        swift::StoreOwnershipQualifier::Unqualified);
+    // Destroy the copy right after the invocation of the specialized
+    // function.
+    Builder.setInsertionPoint(
+      std::next(AI.getInstruction()->getIterator()));
+    if (ArgConvention == SILArgumentConvention::Indirect_In_Guaranteed) {
+      // Expand destroy_addr into load and release to help the ARC optimizer.
+      if (!isTrivial) {
+#if 0
+      auto LoadedValue = Builder.createLoad(
+          DestroyLoc, Copy, swift::LoadOwnershipQualifier::Unqualified);
+      Builder.createReleaseValue(DestroyLoc, LoadedValue,
+                                 Builder.getDefaultAtomicity());
+#endif
+        Builder.createReleaseValue(DestroyLoc, Value,
+                                   Builder.getDefaultAtomicity());
+      }
+    }
+    Builder.createDeallocStack(DestroyLoc, Copy);
+    return Copy;
+  }
+
+  // This is a non-loadable type.
+  Builder.createCopyAddr(CreateLoc, Arg, Copy, IsTake_t::IsNotTake,
+                         IsInitialization_t::IsInitialization);
+  // Destroy the copy right after the invocation of the specialized
+  // function.
+  Builder.setInsertionPoint(std::next(AI.getInstruction()->getIterator()));
+  if (ArgConvention == SILArgumentConvention::Indirect_In_Guaranteed)
+    Builder.emitDestroyAddrAndFold(DestroyLoc, Copy);
+  Builder.createDeallocStack(DestroyLoc, Copy);
+  return Copy;
 }
 
 /// Update the callsite to pass in the correct arguments.
@@ -290,14 +363,20 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // implicit release of all captured arguments that occurs when the partial
   // apply is destroyed.
   SILModule &M = NewF->getModule();
+  unsigned ClosureArgIdx = 0;
+  auto ClosureCalleeConv = CSDesc.getClosureCallee()->getConventions();
   for (auto Arg : CSDesc.getArguments()) {
-    NewArgs.push_back(Arg);
-
     SILType ArgTy = Arg->getType();
 
     // If our argument is of trivial type, continue...
-    if (ArgTy.isTrivial(M))
+    if (ArgTy.isTrivial(M) && ArgTy.isObject()) {
+      NewArgs.push_back(Arg);
+      ++ClosureArgIdx;
       continue;
+    }
+
+    auto ArgConvention =
+        ClosureCalleeConv.getSILArgumentConvention(ClosureArgIdx);
 
     // TODO: When we support address types, this code path will need to be
     // updated.
@@ -338,17 +417,40 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     //               release %arg
     //
     if (AI.getParent() != Closure->getParent()) {
+      Builder.setInsertionPoint(AI.getInstruction());
+      if (ArgTy.isObject()) {
+        // Emit the retain that matches the captured argument by the
+        // partial_apply
+        // in the callee that is consumed by the partial_apply.
+        Builder.createRetainValue(Closure->getLoc(), Arg,
+                                  Builder.getDefaultAtomicity());
+      }
+      if (isCopyRequiredForSILArgument(Arg, ArgConvention)) {
+        // Arg = copyArgumentAroundClosureCall(Builder, Closure, AI, Arg,
+        // ArgConvention);
+        Builder.setInsertionPoint(AI.getInstruction());
+        Builder.createRetainValueAddr(Closure->getLoc(), Arg,
+                                      Builder.getDefaultAtomicity());
+      }
       // Emit the retain and release that keeps the argument life across the
       // callee using the closure.
-      CSDesc.extendArgumentLifetime(Arg);
-
-      // Emit the retain that matches the captured argument by the partial_apply
-      // in the callee that is consumed by the partial_apply.
-      Builder.setInsertionPoint(AI.getInstruction());
-      Builder.createRetainValue(Closure->getLoc(), Arg, Builder.getDefaultAtomicity());
+      //if (ArgTy.isObject()) //???
+      CSDesc.extendArgumentLifetime(Arg, ArgConvention);
     } else {
-      Builder.createRetainValue(Closure->getLoc(), Arg, Builder.getDefaultAtomicity());
+      if (ArgTy.isObject())
+        Builder.createRetainValue(Closure->getLoc(), Arg,
+                                  Builder.getDefaultAtomicity());
+      if (isCopyRequiredForSILArgument(Arg, ArgConvention)) {
+        Arg = copyArgumentAroundClosureCall(Builder, Closure, AI, Arg,
+                                            ArgConvention);
+        Builder.setInsertionPoint(AI.getInstruction());
+        //Builder.createRetainValueAddr(Closure->getLoc(), Arg,
+        //                              Builder.getDefaultAtomicity());
+      }
     }
+
+    NewArgs.push_back(Arg);
+    ++ClosureArgIdx;
   }
 
   Builder.setInsertionPoint(AI.getInstruction());
@@ -409,16 +511,50 @@ std::string CallSiteDescriptor::createName() const {
   return Mangler.mangle();
 }
 
-void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
+void CallSiteDescriptor::extendArgumentLifetime(
+    SILValue Arg, SILArgumentConvention ArgConvention) const {
   assert(!CInfo->LifetimeFrontier.empty() &&
          "Need a post-dominating release(s)");
 
+  auto ArgTy = Arg->getType();
   // Extend the lifetime of a captured argument to cover the callee.
   SILBuilderWithScope Builder(getClosure());
-  Builder.createRetainValue(getClosure()->getLoc(), Arg, Builder.getDefaultAtomicity());
-  for (auto *I : CInfo->LifetimeFrontier) {
-    Builder.setInsertionPoint(I);
-    Builder.createReleaseValue(getClosure()->getLoc(), Arg, Builder.getDefaultAtomicity());
+
+  if (isCopyRequiredForSILArgument(Arg, ArgConvention)) {
+    // Create a copy of the argument before every invocation of a specialized
+    // function.
+#if 0
+    auto Copy =
+      Builder.createAllocStack(getClosure()->getLoc(), ArgTy.getObjectType());
+    Builder.createCopyAddr(getClosure()->getLoc(), Arg, Copy,
+                           IsTake_t::IsNotTake,
+                           IsInitialization_t::IsInitialization);
+    // Destroy the copy after each invocation of the specialized function.
+    for (auto *I : CInfo->LifetimeFrontier) {
+      Builder.setInsertionPoint(I);
+      Builder.createDestroyAddr(getClosure()->getLoc(), Copy);
+      Builder.createDeallocStack(getClosure()->getLoc(), Copy);
+    }
+#endif
+    Builder.createRetainValueAddr(getClosure()->getLoc(), Arg,
+                              Builder.getDefaultAtomicity());
+    for (auto *I : CInfo->LifetimeFrontier) {
+      Builder.setInsertionPoint(I);
+      Builder.createReleaseValueAddr(getClosure()->getLoc(), Arg,
+                                 Builder.getDefaultAtomicity());
+    }
+
+    return;
+  }
+
+  if (ArgTy.isObject()) {
+    Builder.createRetainValue(getClosure()->getLoc(), Arg,
+                              Builder.getDefaultAtomicity());
+    for (auto *I : CInfo->LifetimeFrontier) {
+      Builder.setInsertionPoint(I);
+      Builder.createReleaseValue(getClosure()->getLoc(), Arg,
+                                 Builder.getDefaultAtomicity());
+    }
   }
 }
 
@@ -436,12 +572,6 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     // And it has substitutions, return false.
     if (PAI->hasSubstitutions())
       return false;
-
-    // If any arguments are not objects, return false. This is a temporary
-    // limitation.
-    for (SILValue Arg : PAI->getArguments())
-      if (!Arg->getType().isObject())
-        return false;
 
     // Ok, it is a closure we support, set Callee.
     Callee = PAI->getCallee();
@@ -503,23 +633,27 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
   SILModule &M = ClosureUser->getModule();
 
   // Captured parameters are always appended to the function signature. If the
-  // type of the captured argument is trivial, pass the argument as
-  // Direct_Unowned. Otherwise pass it as Direct_Owned.
+  // type of the captured argument is:
+  // - direct and trivial, pass the argument as Direct_Unowned.
+  // - direct and non-trivial, pass the argument as Direct_Owned.
+  // - indirect, pass the argument using the same parameter convention as in the
+  // original closure.
   //
   // We use the type of the closure here since we allow for the closure to be an
   // external declaration.
   unsigned NumTotalParams = ClosedOverFunConv.getNumParameters();
   unsigned NumNotCaptured = NumTotalParams - CallSiteDesc.getNumArguments();
   for (auto &PInfo : ClosedOverFunConv.getParameters().slice(NumNotCaptured)) {
-    if (ClosedOverFunConv.getSILType(PInfo).isTrivial(M)) {
-      SILParameterInfo NewPInfo(PInfo.getType(),
-                                ParameterConvention::Direct_Unowned);
-      NewParameterInfoList.push_back(NewPInfo);
-      continue;
+    ParameterConvention ParamConv;
+    if (PInfo.isFormalIndirect()) {
+      ParamConv = PInfo.getConvention();
+    } else {
+      ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(M)
+                      ? ParameterConvention::Direct_Unowned
+                      : ParameterConvention::Direct_Owned;
     }
 
-    SILParameterInfo NewPInfo(PInfo.getType(),
-                              ParameterConvention::Direct_Owned);
+    SILParameterInfo NewPInfo(PInfo.getType(), ParamConv);
     NewParameterInfoList.push_back(NewPInfo);
   }
 
@@ -694,6 +828,9 @@ void SILClosureSpecializerTransform::run() {
 
   if (!specialize(F, PropagatedClosures))
     return;
+
+  StackNesting SN;
+  SN.correctStackNesting(F);
 
   // If for testing purposes we were asked to not eliminate dead closures,
   // return.
@@ -883,6 +1020,8 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       // directly.
       if (!NewF) {
         NewF = ClosureSpecCloner::cloneFunction(CSDesc, NewFName);
+        StackNesting SN;
+        SN.correctStackNesting(NewF);
         notifyAddFunction(NewF, CSDesc.getApplyCallee());
       }
 

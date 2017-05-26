@@ -126,14 +126,15 @@ bb0(%0 : $Int):
   return %9999 : $()                                 // id: %7
 }
 
-// We don't handle closures that close over address types (*NOTE* this includes
-// address and non-address only types). This is a temporary limitation.
 // CHECK-LABEL: sil @address_closure : $@convention(thin) (@in Int) -> () {
 sil @address_closure : $@convention(thin) (@in Int) -> () {
 bb0(%0 : $*Int):
   %6 = tuple()
   return %6 : $()
 }
+
+// Check that specialization was produced.
+// CHECK-LABEL: specialized address_closure_user
 
 // CHECK-LABEL: sil @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
 sil @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> () {

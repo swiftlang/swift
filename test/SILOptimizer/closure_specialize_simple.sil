@@ -191,9 +191,9 @@ bb2:
 // CHECK-NOT: partial_apply [[CLOSUREFUN]]()
 
 // We don't handle captured indirect parameters yet.
-// CHECK: [[CLOSURE2:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
-// CHECK: [[CLOSURE3:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
-// CHECK: [[CLOSURE4:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
+// CHECK-NOT: [[CLOSURE2:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
+// CHECK-NOT: [[CLOSURE3:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
+// CHECK-NOT: [[CLOSURE4:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
 
 // CHECK:  [[CALLER1:%.*]] = function_ref @indirect_parameter_partial_apply_caller1
 // CHECK:  [[CALLER2:%.*]] = function_ref @indirect_parameter_partial_apply_caller2
