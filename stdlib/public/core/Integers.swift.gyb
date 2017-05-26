@@ -1663,7 +1663,15 @@ extension Int {
 //===--- Heterogeneous comparison -----------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-extension BinaryInteger {
+/// This protocol is an implementation detail of concrete binary integer types.
+/// Do not use it directly.
+public protocol _BinaryInteger : BinaryInteger {
+  // FIXME(integers): This protocol is necessary to permit heterogeneous
+  // comparison on concrete types without defaulting to heterogeneous
+  // comparison with literals in generic code.
+}
+
+extension _BinaryInteger {
   /// Returns a Boolean value indicating whether the two given values are
   /// equal.
   ///
@@ -1684,7 +1692,7 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @inline(__always)
   public static func == <
-    Other : BinaryInteger
+    Other : _BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
     let lhsNegative = Self.isSigned && lhs < (0 as Self)
     let rhsNegative = Other.isSigned && rhs < (0 as Other)
@@ -1741,7 +1749,7 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   public static func != <
-    Other : BinaryInteger
+    Other : _BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
     return !(lhs == rhs)
   }
@@ -1757,7 +1765,7 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @inline(__always)
-  public static func < <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func < <Other : _BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     let lhsNegative = Self.isSigned && lhs < (0 as Self)
     let rhsNegative = Other.isSigned && rhs < (0 as Other)
     if lhsNegative != rhsNegative { return lhsNegative }
@@ -1800,7 +1808,9 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func <= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func <= <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
     return !(rhs < lhs)
   }
 
@@ -1816,7 +1826,9 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func >= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func >= <
+    Other : _BinaryInteger
+  >(lhs: Self, rhs: Other) -> Bool {
     return !(lhs < rhs)
   }
 
@@ -1832,7 +1844,7 @@ extension BinaryInteger {
   ///   - rhs: Another integer to compare.
   @_transparent
   //@inline(__always)
-  public static func > <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
+  public static func > <Other : _BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return rhs < lhs
   }
 }
@@ -1844,15 +1856,15 @@ extension BinaryInteger {
 // recursion.
 //
 //     <T : Comparable>(T, T) -> Bool
-//     <T : BinaryInteger, U : BinaryInteger>(T, U) -> Bool
+//     <T : _BinaryInteger, U : _BinaryInteger>(T, U) -> Bool
 //
 // so we define:
 //
-//     <T : BinaryInteger>(T, T) -> Bool
+//     <T : _BinaryInteger>(T, T) -> Bool
 //
 //===----------------------------------------------------------------------===//
 
-extension BinaryInteger {
+extension _BinaryInteger {
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
@@ -2572,7 +2584,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   end
 @_fixed_layout
 public struct ${Self}
-  : FixedWidthInteger, ${Unsigned}Integer,
+  : _BinaryInteger, FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
 
   @_transparent
@@ -2644,6 +2656,33 @@ public struct ${Self}
   @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
+  }
+
+  // FIXME(integers): these overloads are here in order for the compiler to
+  // prefer them to the generic ones on _BinaryInteger, in cases like the
+  // following, where choosing Int as a literal type leads to overflow:
+  //
+  //   UInt64() > 0x8000_0000_0000_0000
+  //   UInt64() != 0xFFFF_FFFF_FFFF_FFFF
+
+  @_transparent
+  public static func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs == rhs)
+  }
+
+  @_transparent
+  public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  @_transparent
+  public static func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs < rhs)
+  }
+
+  @_transparent
+  public static func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return rhs < lhs
   }
 
 // FIXME(integers): pending optimizer work on handling the case where the
