@@ -279,3 +279,23 @@ class ConcreteOverrideOfDynamicMethod : GenericOverrideOfDynamicMethod<Int> {
 // CHECK: Goodbye from ConcreteOverrideOfDynamicMethod with T = Int
 // CHECK: Goodbye from ConcreteOverrideOfDynamicMethod
 ConcreteOverrideOfDynamicMethod.funkyTown()
+
+class Foo {}
+class Bar {}
+class DependOnAlignOf<T> : HasHiddenIvars2 {
+  var first = Foo()
+  var second = Bar()
+  var third: T?
+}
+
+let ad = DependOnAlignOf<Double>()
+let ai = DependOnAlignOf<Int>()
+
+let fd = { (ad.x, ad.first, ad.second, ad.third) }
+let fi = { (ai.x, ai.first, ai.second, ai.third) }
+
+// CHECK: (nil, a.Foo, a.Bar, nil)
+print(fd())
+
+// CHECK: (nil, a.Foo, a.Bar, nil)
+print(fi())
