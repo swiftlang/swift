@@ -209,9 +209,6 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   readonly[keyPath: rkp] = sink
   writable[keyPath: rkp] = sink
 
-  // TODO: PartialKeyPath and AnyKeyPath application
-
-  /*
   let pkp: PartialKeyPath = rkp
 
   var anySink1 = readonly[keyPath: pkp]
@@ -219,8 +216,8 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   var anySink2 = writable[keyPath: pkp]
   expect(&anySink2, toHaveType: Exactly<Any>.self)
 
-  readonly[keyPath: pkp] = anySink1 // e/xpected-error{{cannot assign to immutable}}
-  writable[keyPath: pkp] = anySink2 // e/xpected-error{{cannot assign to immutable}}
+  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign to immutable}}
+  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign to immutable}}
 
   let akp: AnyKeyPath = pkp
 
@@ -229,9 +226,8 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   var anyqSink2 = writable[keyPath: akp]
   expect(&anyqSink2, toHaveType: Exactly<Any?>.self)
 
-  readonly[keyPath: akp] = anyqSink1 // e/xpected-error{{cannot assign to immutable}}
-  writable[keyPath: akp] = anyqSink2 // e/xpected-error{{cannot assign to immutable}}
-  */
+  readonly[keyPath: akp] = anyqSink1 // expected-error{{cannot assign to immutable}}
+  writable[keyPath: akp] = anyqSink2 // expected-error{{cannot assign to immutable}}
 }
 
 func testKeyPathSubscriptMetatype(readonly: Z.Type, writable: inout Z.Type,
