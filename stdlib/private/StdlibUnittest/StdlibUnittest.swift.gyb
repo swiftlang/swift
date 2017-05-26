@@ -2423,7 +2423,7 @@ public func expectEqualsUnordered<
 public func expectEqualsUnordered<T : Strideable>(
   _ expected: CountableRange<T>, _ actual: [T], ${TRACE}
 ) {
-  if expected.count != actual.count {
+  if Int(exactly: expected.count) != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
