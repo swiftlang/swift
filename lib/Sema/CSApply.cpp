@@ -1303,24 +1303,53 @@ namespace {
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
         // The index argument should be (keyPath: KeyPath<Root, Value>).
-        auto keyPathTy = index->getType()->castTo<TupleType>()
-          ->getElementType(0)->castTo<BoundGenericType>();
-        auto valueTy = keyPathTy->getGenericArgs()[1];
+        auto keyPathTTy = index->getType()->castTo<TupleType>()
+          ->getElementType(0);
         
-        // The result may be an lvalue based on the base and key path kind.
+        Type valueTy;
         bool resultIsLValue;
-        if (keyPathTy->getDecl() == cs.getASTContext().getKeyPathDecl()) {
-          resultIsLValue = false;
-          base = cs.coerceToRValue(base);
-        } else if (keyPathTy->getDecl() ==
-                     cs.getASTContext().getWritableKeyPathDecl()) {
-          resultIsLValue = base->getType()->isLValueType();
-        } else if (keyPathTy->getDecl() ==
-                   cs.getASTContext().getReferenceWritableKeyPathDecl()) {
-          resultIsLValue = true;
-          base = cs.coerceToRValue(base);
+        
+        if (auto nom = keyPathTTy->getAs<NominalType>()) {
+          // AnyKeyPath is <T> rvalue T -> rvalue Any?
+          if (nom->getDecl() == cs.getASTContext().getAnyKeyPathDecl()) {
+            valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
+                                                  /*explicit anyobject*/ false);
+            valueTy = OptionalType::get(valueTy);
+            resultIsLValue = false;
+            base = cs.coerceToRValue(base);
+          } else {
+            llvm_unreachable("unknown key path class!");
+          }
         } else {
-          llvm_unreachable("unknown key path class!");
+          auto keyPathBGT = keyPathTTy->castTo<BoundGenericType>();
+          
+          if (keyPathBGT->getDecl()
+                == cs.getASTContext().getPartialKeyPathDecl()) {
+            // PartialKeyPath<T> is rvalue T -> rvalue Any
+            valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
+                                                 /*explicit anyobject*/ false);
+            resultIsLValue = false;
+            base = cs.coerceToRValue(base);
+          } else {
+            // *KeyPath<T, U> is T -> U, with rvalueness based on mutability
+            // of base and keypath
+            valueTy = keyPathBGT->getGenericArgs()[1];
+        
+            // The result may be an lvalue based on the base and key path kind.
+            if (keyPathBGT->getDecl() == cs.getASTContext().getKeyPathDecl()) {
+              resultIsLValue = false;
+              base = cs.coerceToRValue(base);
+            } else if (keyPathBGT->getDecl() ==
+                         cs.getASTContext().getWritableKeyPathDecl()) {
+              resultIsLValue = base->getType()->isLValueType();
+            } else if (keyPathBGT->getDecl() ==
+                       cs.getASTContext().getReferenceWritableKeyPathDecl()) {
+              resultIsLValue = true;
+              base = cs.coerceToRValue(base);
+            } else {
+              llvm_unreachable("unknown key path class!");
+            }
+          }
         }
         if (resultIsLValue)
           valueTy = LValueType::get(valueTy);

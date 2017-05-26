@@ -1132,6 +1132,39 @@ internal struct KeyPathBuffer {
 
 // MARK: Library intrinsics for projecting key paths.
 
+@_inlineable
+public // COMPILER_INTRINSIC
+func _projectKeyPathPartial<Root>(
+  root: Root,
+  keyPath: PartialKeyPath<Root>
+) -> Any {
+  func open<Value>(_: Value.Type) -> Any {
+    return _projectKeyPathReadOnly(root: root,
+      keyPath: unsafeDowncast(keyPath, to: KeyPath<Root, Value>.self))
+  }
+  return _openExistential(type(of: keyPath).valueType, do: open)
+}
+
+@_inlineable
+public // COMPILER_INTRINSIC
+func _projectKeyPathAny<RootValue>(
+  root: RootValue,
+  keyPath: AnyKeyPath
+) -> Any? {
+  let (keyPathRoot, keyPathValue) = type(of: keyPath)._rootAndValueType
+  func openRoot<KeyPathRoot>(_: KeyPathRoot.Type) -> Any? {
+    guard let rootForKeyPath = root as? KeyPathRoot else {
+      return nil
+    }
+    func openValue<Value>(_: Value.Type) -> Any {
+      return _projectKeyPathReadOnly(root: rootForKeyPath,
+        keyPath: unsafeDowncast(keyPath, to: KeyPath<KeyPathRoot, Value>.self))
+    }
+    return _openExistential(keyPathValue, do: openValue)
+  }
+  return _openExistential(keyPathRoot, do: openRoot)
+}
+
 public // COMPILER_INTRINSIC
 func _projectKeyPathReadOnly<Root, Value>(
   root: Root,
