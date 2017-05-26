@@ -274,7 +274,8 @@ public struct Unsafe${Mutable}RawBufferPointer
   @_inlineable
   public func copyBytes<C : Collection>(from source: C
   ) where C.Element == UInt8 {
-    _debugPrecondition(source.count <= self.count,
+    let count = Int(exactly: source.count)
+    _debugPrecondition(count != nil && count! <= self.count,
       "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
       return

@@ -24,7 +24,7 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   else if _fastPath(upper ~= u) { d = u &- upper.lowerBound &+ 10 }
   else if _fastPath(lower ~= u) { d = u &- lower.lowerBound &+ 10 }
   else { return nil }
-  guard _fastPath(d < radix) else { return nil }
+  guard _fastPath(Result(clamping: d) < radix) else { return nil }
   return Result(extendingOrTruncating: d)
 }
 
@@ -67,13 +67,15 @@ internal func _parseASCII<
 where CodeUnits.Element : UnsignedInteger {
   let c0_ = codeUnits.next()
   guard _fastPath(c0_ != nil), let c0 = c0_ else { return nil }
-  if _fastPath(c0 != _ascii16("+") && c0 != _ascii16("-")) {
+  let plus = CodeUnits.Element(exactly: _ascii16("+"))
+  let minus = CodeUnits.Element(exactly: _ascii16("-"))
+  if _fastPath(c0 != plus && c0 != minus) {
     return _parseUnsignedASCII(
       first: c0, rest: &codeUnits, radix: radix, positive: true)
   }
   let c1_ = codeUnits.next()
   guard _fastPath(c1_ != nil), let c1 = c1_ else { return nil }
-  if _fastPath(c0 == _ascii16("-")) {
+  if _fastPath(c0 == minus) {
     return _parseUnsignedASCII(
       first: c1, rest: &codeUnits, radix: radix, positive: false)
   }
