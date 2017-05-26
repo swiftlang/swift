@@ -2486,6 +2486,18 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
+  
+  // Upcast a class instance to the property's declared type if necessary.
+  if (auto propertyClass = dyn_cast<ClassDecl>(property->getDeclContext())) {
+    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+      do {
+        baseType = baseType->getSuperclass()->getCanonicalType();
+      } while (baseType->getClassOrBoundGenericClass() != propertyClass);
+      paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
+                                     SILType::getPrimitiveObjectType(baseType));
+    }
+  }
+  
   auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
                property->getInnermostDeclContext()->getInnermostTypeContext());
   SmallVector<Substitution, 4> subsList;
@@ -2594,6 +2606,17 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
     auto baseSubst = subSGF.emitOrigToSubstValue(loc, baseOrig,
                                                  AbstractionPattern::getOpaque(),
                                                  baseType);
+    // Upcast a class instance to the property's declared type if necessary.
+    if (auto propertyClass = dyn_cast<ClassDecl>(property->getDeclContext())) {
+      if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+        do {
+          baseType = baseType->getSuperclass()->getCanonicalType();
+        } while (baseType->getClassOrBoundGenericClass() != propertyClass);
+        baseSubst = subSGF.B.createUpcast(loc, baseSubst,
+                                     SILType::getPrimitiveObjectType(baseType));
+      }
+    }
+
     lv = LValue::forValue(baseSubst, baseType);
   } else {
     auto baseOrig = ManagedValue::forLValue(baseArg);

@@ -161,3 +161,13 @@ func keyPathsWithSpecificGenericInstance() {
   _ = \Concrete.z
   _ = \S<Concrete>.computed
 }
+
+class AA<T> {
+  var a: Int { get { return 0 } set { } }
+}
+class BB<U, V>: AA<V> {
+}
+
+func keyPathForInheritedMember() {
+  _ = \BB<Int, String>.a
+}
