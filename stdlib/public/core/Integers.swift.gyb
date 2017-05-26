@@ -3234,7 +3234,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     } else {
       // At this point we know source's bitWidth > Base.bitWidth, or else
       // we would've taken the first branch.
-      let lowInT = source & T(~Low(0))
+      let lowInT = source & T(~0 as Low)
       let highInT = source &>> numericCast(High.bitWidth)
       
       let low = Low(lowInT.magnitude)
@@ -3281,7 +3281,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     // FIXME: spurious compile error when 'where' clause above is removed:
     // error: non-nominal type 'T.RawSignificand' does not support explicit initialization
     let fractionPart: Raw = bitPattern &<< Raw(Raw.bitWidth - offset)
-    guard fractionPart == 0 else {
+    guard fractionPart == (0 as Raw) else {
       return nil
     }
 
@@ -3374,7 +3374,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let result = DoubleWidth(extendingOrTruncating: product)
     
     let isNegative = (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
-    let didCarry = isNegative ? carry != ~0 : carry != 0
+    let didCarry = isNegative ? carry != ~(0 as DoubleWidth) : carry != (0 as DoubleWidth)
     let hadPositiveOverflow = !isNegative &&
       DoubleWidth.isSigned && product.leadingZeroBitCount == 0
 
@@ -3406,7 +3406,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let highBit = ~(~0 >> 1) as Magnitude
     for _ in initialOffset..<DoubleWidth.bitWidth {
       r <<= 1
-      if q & highBit != 0 {
+      if q & highBit != (0 as Magnitude) {
         r += 1 as Magnitude
       }
       q <<= 1
@@ -3431,7 +3431,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   public func dividedReportingOverflow(by other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
-    if other == 0 || (DoubleWidth.isSigned && other == -1 && self == .min) {
+    if other == (0 as DoubleWidth) ||
+      (DoubleWidth.isSigned && other == (-1 as Int) && self == .min)
+    {
       return (self, .overflow)
     }
 
@@ -3440,7 +3442,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   public func remainderReportingOverflow(dividingBy other: DoubleWidth)
     -> (partialValue: DoubleWidth, overflow: ArithmeticOverflow) {
-    if other == 0 || (DoubleWidth.isSigned && other == -1 && self == .min) {
+    if other == 0 ||
+      (DoubleWidth.isSigned && other == -1 && self == .min)
+    {
       return (self, .overflow)
     }
 
@@ -3460,8 +3464,8 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     func sum(_ x: Low, _ y: Low, _ z: Low) -> (partial: Low, carry: Low) {
       let (sum1, overflow1) = x.addingReportingOverflow(y)
       let (sum2, overflow2) = sum1.addingReportingOverflow(z)
-      let carry: Low = (overflow1 == .overflow ? Low(1) : Low(0))
-        + (overflow2 == .overflow ? Low(1) : Low(0))
+      let carry: Low = (overflow1 == .overflow ? 1 : 0) +
+        (overflow2 == .overflow ? 1 : 0)
       return (sum2, carry)
     }
         
@@ -3535,7 +3539,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
 
     // Shift is larger than this type's bit width.
-    if rhs._storage.high != 0 || rhs._storage.low >= DoubleWidth.bitWidth {
+    if rhs._storage.high != (0 as High) ||
+      rhs._storage.low >= DoubleWidth.bitWidth
+    {
       lhs = lhs < (0 as DoubleWidth) ? ~0 : 0
       return
     }
@@ -3616,13 +3622,13 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
   }
 
   public var leadingZeroBitCount: Int {
-    return high == 0
+    return high == (0 as High)
       ? Base.bitWidth + low.leadingZeroBitCount
       : high.leadingZeroBitCount
   }
 
   public var trailingZeroBitCount: Int {
-    return low == 0
+    return low == (0 as Low)
       ? Base.bitWidth + high.trailingZeroBitCount
       : low.trailingZeroBitCount
   }
