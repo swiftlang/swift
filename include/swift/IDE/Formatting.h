@@ -81,11 +81,6 @@ public:
     else if (Line >= StartLine + Length) {
       Length = Line - StartLine + 1;
     }
-    else if (Line < StartLine) {
-      unsigned Delta = StartLine - Line;
-      StartLine -= Delta;
-      Length += Delta;
-    }
   }
 
 };

@@ -206,13 +206,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         break;
       }
 
-      case tok::unknown:
-        if (Tok.getText().startswith("\"")) {
-          // invalid string literal
-          Kind = SyntaxNodeKind::String;
-          break;
-        }
-        continue;
       default:
         continue;
       }
