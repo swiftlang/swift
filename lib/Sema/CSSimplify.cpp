@@ -4986,3 +4986,26 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
 }
+
+void ConstraintSystem::simplifyDisjunctionChoice(Constraint *choice) {
+  // Simplify this term in the disjunction.
+  switch (simplifyConstraint(*choice)) {
+  case ConstraintSystem::SolutionKind::Error:
+    if (!failedConstraint)
+      failedConstraint = choice;
+    solverState->retireConstraint(choice);
+    break;
+
+  case ConstraintSystem::SolutionKind::Solved:
+    solverState->retireConstraint(choice);
+    break;
+
+  case ConstraintSystem::SolutionKind::Unsolved:
+    InactiveConstraints.push_back(choice);
+    CG.addConstraint(choice);
+    break;
+  }
+
+  // Record this as a generated constraint.
+  solverState->addGeneratedConstraint(choice);
+}

@@ -844,6 +844,7 @@ public:
   friend class Fix;
   friend class OverloadChoice;
   friend class ConstraintGraph;
+  friend class DisjunctionChoice;
 
   class SolverScope;
 
@@ -2327,6 +2328,8 @@ public:
 
   /// \brief Simplify the given constraint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
+  /// \brief Simplify the given disjunction choice.
+  void simplifyDisjunctionChoice(Constraint *choice);
 
 private:
   /// \brief Add a constraint to the constraint system.
@@ -2654,6 +2657,45 @@ void simplifyLocator(Expr *&anchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
 
+class DisjunctionChoice {
+  ConstraintSystem *CS;
+  Constraint *Choice;
+
+public:
+  DisjunctionChoice(ConstraintSystem *const cs, Constraint *constraint)
+      : CS(cs), Choice(constraint) {}
+
+  Constraint *operator&() const { return Choice; }
+
+  Constraint *getConstraint() const { return Choice; }
+
+  Constraint *operator->() const { return Choice; }
+
+  bool isDisabled() const { return Choice->isDisabled(); }
+
+  // FIXME: Both of the accessors below are required to support
+  //        performance optimization hacks in constraint solver.
+
+  bool isGenericOperatorOrUnavailable() const;
+  bool isSymmetricOperator() const;
+
+  /// \brief Apply given choice to the system and try to solve it.
+  bool solve(SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables);
+
+private:
+  static ValueDecl *getOperatorDecl(Constraint *constraint) {
+    if (constraint->getKind() != ConstraintKind::BindOverload)
+      return nullptr;
+
+    auto choice = constraint->getOverloadChoice();
+    if (choice.getKind() != OverloadChoiceKind::Decl)
+      return nullptr;
+
+    auto *decl = choice.getDecl();
+    return decl->isOperator() ? decl : nullptr;
+  }
+};
 } // end namespace constraints
 
 template<typename ...Args>
