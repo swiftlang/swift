@@ -2454,6 +2454,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     else
                         dispatch_build_variant_arg="debug"
                     fi
+
+                    if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
+                        libdispatch_enable_static="--enable-static=yes"
+                    else
+                        libdispatch_enable_static=""
+                    fi
+
                     call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
@@ -2461,7 +2468,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
                             "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
                             --with-build-variant=$dispatch_build_variant_arg \
-                            --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
+                            --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})" ${libdispatch_enable_static}
                 else
                     echo "Skipping reconfiguration of libdispatch"
                 fi
@@ -3050,10 +3057,16 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Installing ${product} ---"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 XCTEST_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib/swift/${LIB_TARGET}"
+                if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
+                    XCTEST_STATIC_INSTALL_PREFIX="${host_install_destdir}${host_install_prefix}/lib/swift_static/${LIB_TARGET}"
+                    xctest_static_install="--static-library-install-path=${XCTEST_STATIC_INSTALL_PREFIX}"
+                else
+                    xctest_static_install=""
+                fi
                 # Note that installing directly to /usr/lib/swift usually
                 # requires root permissions.
                 call "${XCTEST_SOURCE_DIR}"/build_script.py install \
-                    --library-install-path="${XCTEST_INSTALL_PREFIX}" \
+                    --library-install-path="${XCTEST_INSTALL_PREFIX}" ${xctest_static_install} \
                     --module-install-path="${XCTEST_INSTALL_PREFIX}"/"${SWIFT_HOST_VARIANT_ARCH}" \
                     "${XCTEST_BUILD_DIR}"
 
@@ -3093,6 +3106,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                     call make install
+                DISPATCH_LIBDIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
+                DISPATCH_LIBDIR_STATIC="${host_install_destdir}${host_install_prefix}/lib/swift_static/${SWIFT_HOST_VARIANT}"
+                if [ -f "$DISPATCH_LIBDIR/libdispatch.a" ]; then
+                    mv "$DISPATCH_LIBDIR/libdispatch.a" "$DISPATCH_LIBDIR_STATIC"
+                fi
 
                 # As libdispatch installation is self-contained, we break early here.
                 continue
