@@ -6824,6 +6824,9 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 
 static bool diagnoseKeyPathUnsupportedOperations(TypeChecker &TC,
                                                  KeyPathExpr *KPE) {
+  if (KPE->isObjC())
+    return false;
+
   using ComponentKind = KeyPathExpr::Component::Kind;
   const auto components = KPE->getComponents();
 
