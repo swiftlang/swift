@@ -2407,7 +2407,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   auto fnLocator = getConstraintLocator(locator,
                                         ConstraintLocator::ApplyFunction);
   auto tv = createTypeVariable(applyLocator,
-                               TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+                               TVO_CanBindToLValue |
+                               TVO_CanBindToInOut |
+                               TVO_PrefersSubtypeBinding);
 
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
@@ -4535,7 +4537,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
 
     auto constraintLocator = getConstraintLocator(locator);
-    auto tv = createTypeVariable(constraintLocator, TVO_PrefersSubtypeBinding);
+    auto tv = createTypeVariable(constraintLocator,
+                                 TVO_PrefersSubtypeBinding |
+                                 TVO_CanBindToInOut);
     
     addConstraint(ConstraintKind::ConformsTo, tv,
                   hashableProtocol->getDeclaredType(), constraintLocator);
