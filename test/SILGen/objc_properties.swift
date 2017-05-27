@@ -225,3 +225,24 @@ class NonObjCBaseClass : NSObject {
 
 // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySifgTo
 // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12ObjCSubclassC8propertySifsTo
+
+// Make sure lazy properties that witness @objc protocol requirements are
+// correctly formed
+//
+// <https://bugs.swift.org/browse/SR-1825>
+
+@objc protocol HasProperty {
+    @objc var window: NSObject? { get set }
+}
+
+class HasLazyProperty : NSObject, HasProperty {
+  func instanceMethod() -> NSObject? {
+    return nil
+  }
+
+  lazy var window = instanceMethod()
+}
+
+// CHECK-LABEL: sil hidden @_T015objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgfg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
+// CHECK: class_method %0 : $HasLazyProperty, #HasLazyProperty.instanceMethod!1 : (HasLazyProperty) -> () -> NSObject?
+// CHECK: return
