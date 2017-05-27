@@ -3589,8 +3589,9 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
         // so we can't tell whether there's a contradiction
         // yet.
         auto newWitness = result.second->getCanonicalType();
-        if (!newWitness->hasTypeParameter()
-            && !existingWitness->isEqual(newWitness)) {
+        if (!newWitness->hasTypeParameter() &&
+            !newWitness->hasDependentMember() &&
+            !existingWitness->isEqual(newWitness)) {
           DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
                                 "rejecting inference from this decl\n");
           goto next_witness;
@@ -4313,7 +4314,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
         // to do.
         auto known = typeWitnesses.begin(assocType);
         assert(known != typeWitnesses.end());
-        if (!known->first->hasTypeParameter())
+        if (!known->first->hasTypeParameter() &&
+            !known->first->hasDependentMember())
           continue;
 
         Type replaced = known->first.transform(foldDependentMemberTypes);
@@ -4490,9 +4492,12 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
           // If one has a type parameter remaining but the other does not,
           // drop the one with the type parameter.
-          if (known->first->hasTypeParameter()
-              != typeWitness.second->hasTypeParameter()) {
-            if (typeWitness.second->hasTypeParameter())
+          if ((known->first->hasTypeParameter() ||
+               known->first->hasDependentMember())
+              != (typeWitness.second->hasTypeParameter() ||
+                  typeWitness.second->hasDependentMember())) {
+            if (typeWitness.second->hasTypeParameter() ||
+                typeWitness.second->hasDependentMember())
               continue;
 
             known->first = typeWitness.second;
@@ -4650,11 +4655,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
       auto replacement = typeWitnesses[assocType].first;
       // FIXME: We can end up here with dependent types that were not folded
       // away for some reason.
-      if (replacement.findIf([](Type t) -> bool {
-            return isa<DependentMemberType>(t.getPointer());
-          })) {
+      if (replacement->hasDependentMember())
         replacement = ErrorType::get(TC.Context);
-      }
       recordTypeWitness(assocType, replacement, nullptr, true);
     }
 
