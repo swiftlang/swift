@@ -24,6 +24,18 @@ extension Unicode {
   /// error (the length of the longest prefix of a valid encoding
   /// sequence that could be recognized).
   case error(length: Int)
+
+    @_versioned
+    internal var _valid: T? {
+      if case .valid(let result) = self { return result }
+      return nil
+    }
+
+    @_versioned
+    internal var _error: Int? {
+      if case .error(let result) = self { return result }
+      return nil
+    }
   }
 }
 
