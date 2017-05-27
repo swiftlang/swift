@@ -916,22 +916,27 @@ extension UTF16 {
   ) -> (count: Int, isASCII: Bool)?
     where Encoding.CodeUnit == Input.Element {
 
+    var utf16Count = 0
     var i = input
-    var isASCII = true
-    var count = 0
-    let errorCount = Encoding.ForwardParser._parse(
-      &i, repairingIllFormedSequences: repairingIllFormedSequences
-    ) {
-      if isASCII {
-        isASCII = Unicode.ASCII.transcode($0, from: Encoding.self) != nil
+    var d = Encoding.ForwardParser()
+    var utf16BitUnion: CodeUnit = 0
+    while true {
+      let s = d.parseScalar(from: &i)
+      if _fastPath(s._valid != nil), let scalarContent = s._valid {
+        let utf16 = transcode(scalarContent, from: sourceEncoding)
+          ._unsafelyUnwrappedUnchecked
+        utf16Count += utf16.count
+        for x in utf16 { utf16BitUnion |= x }
       }
-      count += numericCast(self._transcode($0, from: Encoding.self).count)
+      else if let _ = s._error {
+        guard _fastPath(repairingIllFormedSequences) else { return nil }
+        utf16Count += 1
+        utf16BitUnion |= 0xFFFD
+      }
+      else {
+        return (utf16Count, utf16BitUnion < 0x80)
+      }
     }
-    
-    if _fastPath(errorCount == 0 || repairingIllFormedSequences) {
-      return (count: count, isASCII: isASCII)
-    }
-    else { return nil }
   }
 }
 
