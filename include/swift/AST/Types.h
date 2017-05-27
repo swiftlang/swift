@@ -81,7 +81,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 10 };
+  enum { BitWidth = 11 };
 
   /// A single property.
   ///
@@ -120,6 +120,9 @@ public:
     /// This type contains an Error type.
     HasError             = 0x200,
 
+    /// This type contains a DependentMemberType.
+    HasDependentMember   = 0x400,
+
     IsNotMaterializable  = (HasInOut | IsLValue)
   };
 
@@ -157,6 +160,10 @@ public:
 
   /// Does this type contain an error?
   bool hasError() const { return Bits & HasError; }
+
+  /// Does this type contain a dependent member type, possibly with a
+  /// non-type parameter base, such as a type variable or concrete type?
+  bool hasDependentMember() const { return Bits & HasDependentMember; }
 
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
@@ -197,6 +204,11 @@ public:
   /// Remove the HasTypeParameter property from this set.
   void removeHasTypeParameter() {
     Bits &= ~HasTypeParameter;
+  }
+
+  /// Remove the HasDependentMember property from this set.
+  void removeHasDependentMember() {
+    Bits &= ~HasDependentMember;
   }
 
   /// Test for a particular property in this set.
@@ -562,6 +574,12 @@ public:
   /// Determine whether this type contains an error type.
   bool hasError() const {
     return getRecursiveProperties().hasError();
+  }
+
+  /// Does this type contain a dependent member type, possibly with a
+  /// non-type parameter base, such as a type variable or concrete type?
+  bool hasDependentMember() const {
+    return getRecursiveProperties().hasDependentMember();
   }
 
   /// \brief Check if this type is a valid type for the LHS of an assignment.
