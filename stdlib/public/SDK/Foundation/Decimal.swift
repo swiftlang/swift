@@ -153,30 +153,15 @@ extension Decimal : Hashable, Comparable {
             return Double.nan
         }
         
-        for i in 0..<8 {
-            let index = 8 - i - 1
-            switch index {
-            case 0:
-                d = d * 65536 + Double(_mantissa.0)
-            case 1:
-                d = d * 65536 + Double(_mantissa.1)
-            case 2:
-                d = d * 65536 + Double(_mantissa.2)
-            case 3:
-                d = d * 65536 + Double(_mantissa.3)
-            case 4:
-                d = d * 65536 + Double(_mantissa.4)
-            case 5:
-                d = d * 65536 + Double(_mantissa.5)
-            case 6:
-                d = d * 65536 + Double(_mantissa.6)
-            case 7:
-                d = d * 65536 + Double(_mantissa.7)
-            default:
-                fatalError("conversion overflow")
-            }
-        }
-
+        d = d * 65536 + Double(_mantissa.7)
+        d = d * 65536 + Double(_mantissa.6)
+        d = d * 65536 + Double(_mantissa.5)
+        d = d * 65536 + Double(_mantissa.4)
+        d = d * 65536 + Double(_mantissa.3)
+        d = d * 65536 + Double(_mantissa.2)
+        d = d * 65536 + Double(_mantissa.1)
+        d = d * 65536 + Double(_mantissa.0)
+        
         if _exponent < 0 {
             for _ in _exponent..<0 {
                 d /= 10.0
