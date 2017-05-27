@@ -2602,7 +2602,7 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToInOut);
+      auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
       return LValueType::get(typeVar);
     }
     
@@ -2616,10 +2616,9 @@ namespace {
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return Type();
-      if (destTy->getRValueType()->is<UnresolvedType>()) {
+      if (destTy->is<UnresolvedType>()) {
         return CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                     TVO_CanBindToLValue |
-                                     TVO_CanBindToInOut);
+                                     /*options=*/0);
       }
       
       // The source must be convertible to the destination.
