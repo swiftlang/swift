@@ -2037,7 +2037,9 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Add type variable for the code-completion expression.
   auto tvRHS =
-      CS.createTypeVariable(CS.getConstraintLocator(CCE), TVO_CanBindToLValue);
+      CS.createTypeVariable(CS.getConstraintLocator(CCE),
+                            TVO_CanBindToLValue |
+                            TVO_CanBindToInOut);
   CCE->setType(tvRHS);
 
   if (auto generated = CS.generateConstraints(expr)) {
@@ -2333,7 +2335,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       SequenceType =
-        cs.createTypeVariable(Locator, /*options=*/TVO_MustBeMaterializable);
+        cs.createTypeVariable(Locator, /*options=*/0);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
@@ -2406,8 +2408,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator,
-                                            TVO_MustBeMaterializable);
+        elementType = cs.createTypeVariable(elementLocator, /*options=*/0);
       }
 
       // Add a conversion constraint between the element type of the sequence
@@ -2492,7 +2493,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     // Newly allocated type should be explicitly materializable,
     // it's invalid to use non-materializable types as assignment destination.
     auto objectTv = createTypeVariable(getConstraintLocator(dest),
-                                       TVO_MustBeMaterializable);
+                                       /*options=*/0);
     auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Bind, typeVar, refTv,
                   getConstraintLocator(dest));
@@ -2712,7 +2713,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
           return Type();
 
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator, 0);
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToInOut);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2729,7 +2731,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator, 0);
+      auto replacement = cs.createTypeVariable(locator,
+                                               TVO_CanBindToInOut);
       types[origType] = replacement;
       return replacement;
     },
@@ -3109,8 +3112,8 @@ void ConstraintSystem::print(raw_ostream &out) {
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
-    if (tv->getImpl().mustBeMaterializable())
-      out << " [must be materializable]";
+    if (tv->getImpl().canBindToInOut())
+      out << " [inout allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {

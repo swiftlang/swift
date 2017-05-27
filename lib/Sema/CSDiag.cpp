@@ -5551,7 +5551,9 @@ namespace {
         cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
 
       auto tv = cs.createTypeVariable(inputLocator,
-                                 TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+                                      TVO_CanBindToLValue |
+                                      TVO_CanBindToInOut |
+                                      TVO_PrefersSubtypeBinding);
 
       // In order to make this work, we pick the most general function type and
       // use a conversion constraint.  This gives us:
@@ -7224,7 +7226,7 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 
       bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
         auto *locator = cs.getConstraintLocator(expr);
-        auto valueType = cs.createTypeVariable(locator, /* options */ 0);
+        auto valueType = cs.createTypeVariable(locator, TVO_CanBindToInOut);
 
         auto keyPathType =
             BoundGenericClassType::get(Decl, ParentType, {RootType, valueType});

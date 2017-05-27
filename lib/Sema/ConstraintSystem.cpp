@@ -871,7 +871,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (param->isLet() && valueType->is<TypeVariableType>()) {
       Type paramType = valueType;
       valueType = createTypeVariable(getConstraintLocator(locator),
-                                     TVO_CanBindToLValue);
+                                     TVO_CanBindToLValue |
+                                     TVO_CanBindToInOut);
       addConstraint(ConstraintKind::BindParam, paramType, valueType,
                     getConstraintLocator(locator));
     }
@@ -973,8 +974,7 @@ void ConstraintSystem::openGeneric(
           locator.withPathElement(LocatorPathElt(archetype)));
 
     auto typeVar = createTypeVariable(locatorPtr,
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_MustBeMaterializable);
+                                      TVO_PrefersSubtypeBinding);
     auto result = replacements.insert(
       std::make_pair(cast<GenericTypeParamType>(gp->getCanonicalType()),
                      typeVar));
@@ -1353,9 +1353,11 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // existentials (as seen from the current abstraction level), which can't
     // be expressed in the type system currently.
     auto input = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+      TVO_CanBindToInOut);
     auto output = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+      TVO_CanBindToInOut);
     
     auto inputArg = TupleTypeElt(input, CS.getASTContext().getIdentifier("of"));
     auto inputTuple = TupleType::get(inputArg, CS.getASTContext());
@@ -1371,14 +1373,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // receives a copy of the argument closure that is temporarily made
     // @escaping.
     auto noescapeClosure = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+      TVO_CanBindToInOut);
     auto escapeClosure = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+      TVO_CanBindToInOut);
     CS.addConstraint(ConstraintKind::EscapableFunctionOf,
          escapeClosure, noescapeClosure,
          CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
     auto result = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+      TVO_CanBindToInOut);
     auto bodyClosure = FunctionType::get(
       ParenType::get(CS.getASTContext(), escapeClosure), result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1403,14 +1408,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // The body closure receives a freshly-opened archetype constrained by the
     // existential type as its input.
     auto openedTy = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+      TVO_CanBindToInOut);
     auto existentialTy = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+      TVO_CanBindToInOut);
     CS.addConstraint(ConstraintKind::OpenedExistentialOf,
          openedTy, existentialTy,
          CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
     auto result = CS.createTypeVariable(
-      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult), 0);
+      CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+      TVO_CanBindToInOut);
     auto bodyClosure = FunctionType::get(
       ParenType::get(CS.getASTContext(), openedTy), result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1543,12 +1551,15 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // The element type is T or @lvalue T based on the key path subtype and
     // the mutability of the base.
     auto keyPathIndexTy = createTypeVariable(
-      getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+      getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+      TVO_CanBindToInOut);
     auto elementTy = createTypeVariable(
             getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue);
+            TVO_CanBindToLValue |
+            TVO_CanBindToInOut);
     auto elementObjTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument), 0);
+        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToInOut);
     addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
     
     // The element result is an lvalue or rvalue based on the key path class.
