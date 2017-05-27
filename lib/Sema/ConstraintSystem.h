@@ -122,12 +122,12 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to an lvalue type or not.
   TVO_CanBindToLValue = 0x01,
 
+  /// Whether the type variable can be bound to an inout type or not.
+  TVO_CanBindToInOut = 0x02,
+
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x02,
-
-  /// Whether the variable must be bound to a materializable type.
-  TVO_MustBeMaterializable = 0x04
+  TVO_PrefersSubtypeBinding = 0x04
 };
 
 /// \brief The implementation object for a type variable used within the
@@ -170,6 +170,9 @@ public:
   /// Whether this type variable can bind to an lvalue type.
   bool canBindToLValue() const { return Options & TVO_CanBindToLValue; }
 
+  /// Whether this type variable can bind to an inout type.
+  bool canBindToInOut() const { return Options & TVO_CanBindToInOut; }
+
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
   bool prefersSubtypeBinding() const {
@@ -177,7 +180,7 @@ public:
   }
 
   bool mustBeMaterializable() const {
-    return Options & TVO_MustBeMaterializable;
+    return !(Options & TVO_CanBindToInOut) && !(Options & TVO_CanBindToLValue);
   }
 
   /// \brief Retrieve the type variable associated with this implementation.
@@ -297,7 +300,8 @@ public:
     if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
       if (record)
         recordBinding(*record);
-      Options |= TVO_MustBeMaterializable;
+      Options &= ~TVO_CanBindToLValue;
+      Options &= ~TVO_CanBindToInOut;
     }
   }
 
@@ -338,7 +342,8 @@ public:
     if (!rep->getImpl().mustBeMaterializable()) {
       if (record)
         rep->getImpl().recordBinding(*record);
-      rep->getImpl().Options |= TVO_MustBeMaterializable;
+      rep->getImpl().Options &= ~TVO_CanBindToLValue;
+      rep->getImpl().Options &= ~TVO_CanBindToInOut;
     }
   }
 
