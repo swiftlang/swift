@@ -1,5 +1,6 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
+// XFAIL: broken_std_regex
 
 // CHECK: <kw>let</kw> x = <str>"""
 // CHECK-NEXT: This is an unterminated
