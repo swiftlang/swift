@@ -712,30 +712,53 @@ void ConstraintSystem::recordOpenedTypes(
 
 /// Determine how many levels of argument labels should be removed from the
 /// function type when referencing the given declaration.
-static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
+static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
+  unsigned numParameterLists = 0;
+
+  // Enum element with associated value has to be treated
+  // as regular function value and all of the labels have to be
+  // stripped from its parameters.
+  //
+  // enum E {
+  //   case foo(a: Int)
+  // }
+  // let bar: [Int] = []
+  // bar.map(E.foo)
+  //
+  // `E.foo` has to act as a regular function type passed as a value.
+  if (!TC.getLangOpts().isSwiftVersion3()) {
+    if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
+      numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
+    }
+  }
+
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
-  auto func = dyn_cast<AbstractFunctionDecl>(decl);
-  if (!func) return 0;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    numParameterLists = func->getNumParameterLists();
+
+  if (numParameterLists == 0)
+    return 0;
 
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
   case FunctionRefKind::Compound:
     // Always remove argument labels from unapplied references and references
     // that use a compound name.
-    return func->getNumParameterLists();
+    return numParameterLists;
 
   case FunctionRefKind::SingleApply:
     // If we have fewer than two parameter lists, leave the labels.
-    if (func->getNumParameterLists() < 2) return 0;
+    if (numParameterLists < 2)
+      return 0;
 
     // If this is a curried reference to an instance method, where 'self' is
     // being applied, e.g., "ClassName.instanceMethod(self)", remove the
     // argument labels from the resulting function type. The 'self' parameter is
     // always unlabeled, so this operation is a no-op for the actual application.
-    return isCurriedInstanceReference ? func->getNumParameterLists() : 1;
+    return isCurriedInstanceReference ? numParameterLists : 1;
 
   case FunctionRefKind::DoubleApply:
     // Never remove argument labels from a double application.
@@ -796,7 +819,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto openedType =
       openFunctionType(
         funcType,
-        getNumRemovedArgumentLabels(TC.Context, funcDecl,
+        getNumRemovedArgumentLabels(TC, funcDecl,
                                     /*isCurriedInstanceReference=*/false,
                                     functionRefKind),
         locator, replacements,
@@ -1113,7 +1136,7 @@ ConstraintSystem::getTypeOfMemberReference(
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
   bool isCurriedInstanceReference = value->isInstanceMember() && !isInstance;
   unsigned numRemovedArgumentLabels =
-    getNumRemovedArgumentLabels(TC.Context, value, isCurriedInstanceReference,
+    getNumRemovedArgumentLabels(TC, value, isCurriedInstanceReference,
                                 functionRefKind);
 
   AnyFunctionType *funcType;
