@@ -1,9 +1,9 @@
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
    ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}"))
 
+  set(swift_runtime_test_extra_libraries)
   if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-    set(swift_runtime_test_extra_sources
-      "${CMAKE_CURRENT_SOURCE_DIR}/../../stdlib/public/runtime/ImageInspectionELF.cpp")
+    list(APPEND swift_runtime_test_extra_libraries swiftImageInspectionShared)
   endif()
 
   add_subdirectory(LongTests)
@@ -32,6 +32,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   endif()
 
   add_swift_unittest(SwiftRuntimeTests
+    Exclusivity.cpp
     Metadata.cpp
     Mutex.cpp
     Enum.cpp
@@ -43,13 +44,13 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
-    ${swift_runtime_test_extra_sources}
     )
 
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeTests
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
+    ${swift_runtime_test_extra_libraries}
     )
 endif()
 

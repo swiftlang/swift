@@ -3,6 +3,7 @@ set(datafiles
   ios.json
   tvos.json
   watchos.json
+  overlay.json
 )
 set(SWIFTLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
@@ -35,12 +36,14 @@ swift_install_in_component(compiler
 DESTINATION "lib/swift/migrator")
 
 add_swift_library(swiftMigrator STATIC
+  APIDiffMigratorPass.cpp
   EditorAdapter.cpp
   FixitApplyDiagnosticConsumer.cpp
   Migrator.cpp
   MigrationState.cpp
   RewriteBufferEditsReceiver.cpp
-  SyntacticMigratorPass.cpp
+  TupleSplatMigratorPass.cpp
+  TypeOfMigratorPass.cpp
   LINK_LIBRARIES swiftSyntax swiftIDE)
 
 add_dependencies(swiftMigrator

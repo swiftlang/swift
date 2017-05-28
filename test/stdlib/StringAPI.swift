@@ -361,8 +361,9 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   )
 }
 
-StringTests.test("String.init(_:String)") {
-  let _: String = String("" as String) // should compile without ambiguities
+StringTests.test("[String].joined() -> String") {
+  let s = ["hello", "world"].joined()
+  _ = s == "" // should compile without error
 }
 
 var CStringTests = TestSuite("CStringTests")

@@ -812,7 +812,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
 
 bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
   for (Decl *member : cd->getMembers()) {
-    VarDecl *vd = dyn_cast<VarDecl>(member);
+    auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
     const TypeLowering &ti = Types.getTypeLowering(vd->getType());
@@ -852,10 +852,8 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the ivar initializer, if needed.
   if (requiresIVarInitialization(*this, cd)) {
-    SILDeclRef ivarInitializer(cd, SILDeclRef::Kind::IVarInitializer,
-                               SILDeclRef::ConstructAtBestResilienceExpansion,
-                               SILDeclRef::ConstructAtNaturalUncurryLevel,
-                               /*isForeign=*/true);
+    auto ivarInitializer = SILDeclRef(cd, SILDeclRef::Kind::IVarInitializer)
+      .asForeign();
     SILFunction *f = getFunction(ivarInitializer, ForDefinition);
     preEmitFunction(ivarInitializer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor ivar initializer", f);
@@ -865,10 +863,8 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the ivar destroyer, if needed.
   if (hasNonTrivialIVars(cd)) {
-    SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
-                             SILDeclRef::ConstructAtBestResilienceExpansion,
-                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             /*isForeign=*/true);
+    auto ivarDestroyer = SILDeclRef(cd, SILDeclRef::Kind::IVarDestroyer)
+      .asForeign();
     SILFunction *f = getFunction(ivarDestroyer, ForDefinition);
     preEmitFunction(ivarDestroyer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
@@ -882,10 +878,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   
   // Emit the ivar destroyer, if needed.
   if (requiresIVarDestroyer(cd)) {
-    SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
-                             SILDeclRef::ConstructAtBestResilienceExpansion,
-                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             /*isForeign=*/false);
+    SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer);
     SILFunction *f = getFunction(ivarDestroyer, ForDefinition);
     preEmitFunction(ivarDestroyer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
@@ -1018,10 +1011,7 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
 }
 
 void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
-  SILDeclRef thunk(method,
-                   SILDeclRef::ConstructAtBestResilienceExpansion,
-                   SILDeclRef::ConstructAtNaturalUncurryLevel,
-                   /*isObjC*/ true);
+  auto thunk = SILDeclRef(method).asForeign();
 
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
@@ -1043,10 +1033,8 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   if (!prop->getGetter() || !requiresObjCMethodEntryPoint(prop->getGetter()))
     return;
 
-  SILDeclRef getter(prop->getGetter(), SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*isObjC*/ true);
+  auto getter = SILDeclRef(prop->getGetter(), SILDeclRef::Kind::Func)
+    .asForeign();
 
   // Don't emit the thunks if they already exist.
   if (hasFunction(getter))
@@ -1070,10 +1058,8 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
     return;
 
   // FIXME: Add proper location.
-  SILDeclRef setter(prop->getSetter(), SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*isObjC*/ true);
+  auto setter = SILDeclRef(prop->getSetter(), SILDeclRef::Kind::Func)
+    .asForeign();
 
   SILFunction *f = getFunction(setter, ForDefinition);
   preEmitFunction(setter, prop, f, ThunkBodyLoc);
@@ -1085,11 +1071,8 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
 }
 
 void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
-  SILDeclRef thunk(constructor,
-                   SILDeclRef::Kind::Initializer,
-                   SILDeclRef::ConstructAtBestResilienceExpansion,
-                   SILDeclRef::ConstructAtNaturalUncurryLevel,
-                   /*isObjC*/ true);
+  auto thunk = SILDeclRef(constructor, SILDeclRef::Kind::Initializer)
+    .asForeign();
 
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
@@ -1107,11 +1090,8 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
 }
 
 void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
-  SILDeclRef thunk(destructor,
-                   SILDeclRef::Kind::Deallocator,
-                   SILDeclRef::ConstructAtBestResilienceExpansion,
-                   SILDeclRef::ConstructAtNaturalUncurryLevel,
-                   /*isObjC*/ true);
+  auto thunk = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator)
+    .asForeign();
 
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
@@ -1171,10 +1151,10 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
  
   for (auto &ESD : td->getBody()->getElements()) {
     if (!TopLevelSGF->B.hasValidInsertionPoint()) {
-      if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+      if (auto *S = ESD.dyn_cast<Stmt*>()) {
         if (S->isImplicit())
           continue;
-      } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+      } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         if (E->isImplicit())
           continue;
       }
@@ -1184,9 +1164,9 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
       return;
     }
 
-    if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+    if (auto *S = ESD.dyn_cast<Stmt*>()) {
       TopLevelSGF->emitStmt(S);
-    } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+    } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       TopLevelSGF->emitIgnoredExpr(E);
     } else {
       TopLevelSGF->visit(ESD.get<Decl*>());

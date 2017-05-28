@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify -enable-experimental-subclass-existentials -swift-version 4 %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify -swift-version 4 %s
 
 // REQUIRES: objc_interop
 
@@ -383,4 +383,12 @@ func getContainerForPanda() -> AnimalContainer<Animal> {
 
 func getContainerForFungiblePanda() -> FungibleAnimalContainer<Animal & Fungible> {
   return Panda.getFungibleContainer()
+}
+
+// rdar://problem/30832766 - Infinite recursion while checking conformance
+// to AnyObject
+let third: Third! = Third()
+
+func useThird() {
+  _ = third.description
 }

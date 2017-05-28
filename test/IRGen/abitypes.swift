@@ -22,20 +22,20 @@ class Foo {
   // x86_64-macosx: define hidden { <2 x float>, <2 x float> } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(i8*, i8*) unnamed_addr {{.*}} {
   // x86_64-ios: define hidden swiftcc { i64, i64 } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-ios: define hidden { <2 x float>, <2 x float> } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(i8*, i8*) unnamed_addr {{.*}} {
-  // i386-ios: define hidden swiftcc void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%TSo6MyRectV* noalias nocapture sret, %T8abitypes3FooC* swiftself) {{.*}} {
-  // i386-ios: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSo6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // i386-ios: define hidden swiftcc void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%TSC6MyRectV* noalias nocapture sret, %T8abitypes3FooC* swiftself) {{.*}} {
+  // i386-ios: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSC6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
   // armv7-ios: define hidden swiftcc { float, float, float, float } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
-  // armv7-ios: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSo6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // armv7-ios: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSC6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
   // armv7s-ios: define hidden swiftcc { float, float, float, float } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
-  // armv7s-ios: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSo6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // armv7s-ios: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSC6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
   // arm64-ios: define hidden swiftcc { i64, i64 } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
   // arm64-ios: define hidden [[ARM64_MYRECT]] @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(i8*, i8*) unnamed_addr {{.*}} {
   // x86_64-tvos: define hidden swiftcc { i64, i64 } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-tvos: define hidden { <2 x float>, <2 x float> } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(i8*, i8*) unnamed_addr {{.*}} {
   // arm64-tvos: define hidden swiftcc { i64, i64 }  @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
   // arm64-tvos: define hidden [[ARM64_MYRECT]] @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(i8*, i8*) unnamed_addr {{.*}} {
-  // i386-watchos: define hidden swiftcc void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%TSo6MyRectV* noalias nocapture sret, %T8abitypes3FooC* swiftself) {{.*}} {
-  // i386-watchos: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSo6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // i386-watchos: define hidden swiftcc void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%TSC6MyRectV* noalias nocapture sret, %T8abitypes3FooC* swiftself) {{.*}} {
+  // i386-watchos: define hidden void @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(%TSC6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
   // armv7k-watchos: define hidden swiftcc { float, float, float, float } @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
   // armv7k-watchos: define hidden [[ARMV7K_MYRECT]] @_T08abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo(i8*, i8*) unnamed_addr {{.*}} {
   dynamic func bar() -> MyRect {
@@ -44,7 +44,7 @@ class Foo {
 
 
   // x86_64-macosx: define hidden swiftcc double @_T08abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F(double, double, double, double, %T8abitypes3FooC* swiftself) {{.*}} {
-  // x86_64-macosx: define hidden double @_T08abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, %TSo6CGRectV* byval align 8) unnamed_addr {{.*}} {
+  // x86_64-macosx: define hidden double @_T08abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, %TSC6CGRectV* byval align 8) unnamed_addr {{.*}} {
   // armv7-ios: define hidden swiftcc double @_T08abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F(float, float, float, float, %T8abitypes3FooC* swiftself) {{.*}} {
   // armv7-ios: define hidden double @_T08abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, [4 x i32]) unnamed_addr {{.*}} {
   // armv7s-ios: define hidden swiftcc double @_T08abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F(float, float, float, float, %T8abitypes3FooC* swiftself) {{.*}} {
@@ -107,7 +107,7 @@ class Foo {
   }
 
   // Ensure that MyRect is passed as an indirect-byval on x86_64 because we run out of registers for direct arguments
-  // x86_64-macosx: define hidden float @_T08abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, float, float, float, float, float, float, float, %TSo6MyRectV* byval align 4) unnamed_addr {{.*}} {
+  // x86_64-macosx: define hidden float @_T08abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, float, float, float, float, float, float, float, %TSC6MyRectV* byval align 4) unnamed_addr {{.*}} {
   dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
@@ -168,7 +168,7 @@ class Foo {
   }
 
   // x86_64-macosx: define hidden swiftcc { double, double, double } @_T08abitypes3FooC3baz{{[_0-9a-zA-Z]*}}F(%T8abitypes3FooC* swiftself) {{.*}} {
-  // x86_64-macosx: define hidden void @_T08abitypes3FooC3baz{{[_0-9a-zA-Z]*}}FTo(%TSo4TrioV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // x86_64-macosx: define hidden void @_T08abitypes3FooC3baz{{[_0-9a-zA-Z]*}}FTo(%TSC4TrioV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
   dynamic func baz() -> Trio {
     return Trio(i: 1.0, j: 2.0, k: 3.0)
   }
@@ -176,7 +176,7 @@ class Foo {
   // x86_64-macosx:      define hidden swiftcc double @_T08abitypes3FooC4bazc{{[_0-9a-zA-Z]*}}F(%TSo13StructReturnsC*, %T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-macosx:      load i8*, i8** @"\01L_selector(newTrio)", align 8
   // x86_64-macosx:      [[CAST:%[0-9]+]] = bitcast {{%.*}}* %0
-  // x86_64-macosx:      call void bitcast (void ()* @objc_msgSend_stret to void (%TSo4TrioV*, [[OPAQUE:.*]]*, i8*)*)
+  // x86_64-macosx:      call void bitcast (void ()* @objc_msgSend_stret to void (%TSC4TrioV*, [[OPAQUE:.*]]*, i8*)*)
   func bazc(_ p: StructReturns) -> Double {
     return p.newTrio().j
   }
@@ -510,10 +510,10 @@ class Foo {
   }
 
   // arm64-ios: define hidden swiftcc { i64, i64, i64, i64 } @_T08abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F(%TSo13StructReturnsC*, i64, i64, i64, i64, %T8abitypes3FooC* swiftself) {{.*}} {
-  // arm64-ios: define hidden void @_T08abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo(%TSo9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSo9BigStructV*) unnamed_addr {{.*}} {
+  // arm64-ios: define hidden void @_T08abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo(%TSC9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSC9BigStructV*) unnamed_addr {{.*}} {
   //
   // arm64-tvos: define hidden swiftcc { i64, i64, i64, i64 } @_T08abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F(%TSo13StructReturnsC*, i64, i64, i64, i64, %T8abitypes3FooC* swiftself) {{.*}} {
-  // arm64-tvos: define hidden void @_T08abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo(%TSo9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSo9BigStructV*) unnamed_addr {{.*}} {
+  // arm64-tvos: define hidden void @_T08abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo(%TSC9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSC9BigStructV*) unnamed_addr {{.*}} {
   dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
@@ -530,11 +530,11 @@ class Foo {
 // armv7k-watchos: define internal %struct.One @makeOne(float %f, float %s)
 
 // rdar://17631440 - Expand direct arguments that are coerced to aggregates.
-// x86_64-macosx: define{{( protected)?}} swiftcc float @_T08abitypes13testInlineAggSfSo6MyRectVF(i64, i64) {{.*}} {
-// x86_64-macosx: [[COERCED:%.*]] = alloca %TSo6MyRectV, align 8
+// x86_64-macosx: define{{( protected)?}} swiftcc float @_T08abitypes13testInlineAggSfSC6MyRectVF(i64, i64) {{.*}} {
+// x86_64-macosx: [[COERCED:%.*]] = alloca %TSC6MyRectV, align 8
 // x86_64-macosx: store i64 %
 // x86_64-macosx: store i64 %
-// x86_64-macosx: [[CAST:%.*]] = bitcast %TSo6MyRectV* [[COERCED]] to { <2 x float>, <2 x float> }*
+// x86_64-macosx: [[CAST:%.*]] = bitcast %TSC6MyRectV* [[COERCED]] to { <2 x float>, <2 x float> }*
 // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 0
 // x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, <2 x float>* [[T0]], align 8
 // x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, { <2 x float>, <2 x float> }* [[CAST]], i32 0, i32 1
@@ -548,8 +548,8 @@ public func testInlineAgg(_ rect: MyRect) -> Float {
 // We need to allocate enough memory on the stack to hold the argument value we load.
 // arm64-ios: define swiftcc void @_T08abitypes14testBOOLStructyyF()
 // arm64-ios:  [[COERCED:%.*]] = alloca i64
-// arm64-ios:  [[STRUCTPTR:%.*]] = bitcast i64* [[COERCED]] to %TSo14FiveByteStructV
-// arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds %TSo14FiveByteStructV, %TSo14FiveByteStructV* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
+// arm64-ios:  [[STRUCTPTR:%.*]] = bitcast i64* [[COERCED]] to %TSC14FiveByteStructV
+// arm64-ios:  [[PTR0:%.*]] = getelementptr inbounds %TSC14FiveByteStructV, %TSC14FiveByteStructV* [[STRUCTPTR]], {{i.*}} 0, {{i.*}} 0
 // arm64-ios:  [[PTR1:%.*]] = getelementptr inbounds %T10ObjectiveC8ObjCBoolV, %T10ObjectiveC8ObjCBoolV* [[PTR0]], {{i.*}} 0, {{i.*}} 0
 // arm64-ios:  [[PTR2:%.*]] = getelementptr inbounds %TSb, %TSb* [[PTR1]], {{i.*}} 0, {{i.*}} 0
 // arm64-ios:  store i1 false, i1* [[PTR2]], align 8

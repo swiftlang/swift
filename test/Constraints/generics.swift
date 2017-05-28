@@ -260,7 +260,7 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 6 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 6 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 11 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
 
 struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
@@ -299,11 +299,11 @@ func testFixIts() {
   _ = FullyGeneric<Any>()
 
   _ = AnyClassBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<AnyObject>}}
-  _ = AnyClassBound<Any>() // expected-error {{type 'Any' does not conform to protocol 'AnyObject'}}
+  _ = AnyClassBound<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
   _ = AnyClassBound<AnyObject>()
 
   _ = AnyClassBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{21-21=<AnyObject>}}
-  _ = AnyClassBound2<Any>() // expected-error {{type 'Any' does not conform to protocol 'AnyObject'}}
+  _ = AnyClassBound2<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
   _ = AnyClassBound2<AnyObject>()
 
   _ = ProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{17-17=<<#Foo: SubProto#>>}}
@@ -324,8 +324,8 @@ func testFixIts() {
   _ = ProtosBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{19-19=<<#Foo: NSCopyish & SubProto#>>}}
   _ = ProtosBound3() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{19-19=<<#Foo: NSCopyish & SubProto#>>}}
 
-  _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: AnyObject & SubProto#>>}}
-  _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: AnyObject & SubProto#>>}}
+  _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
+  _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
   _ = ClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<<#Foo: X & SubProto#>>}}
 
@@ -369,21 +369,24 @@ func testFixItTypePosition() {
 }
 
 func testFixItNested() {
-  _ = Array<FullyGeneric>() // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{25-25=<Any>}}
+  _ = Array<FullyGeneric>() // expected-error {{generic parameter 'Foo' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{25-25=<Any>}}
   _ = [FullyGeneric]() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any>}}
 
-  _ = FullyGeneric<FullyGeneric>() // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{32-32=<Any>}}
+  _ = FullyGeneric<FullyGeneric>() // expected-error {{generic parameter 'Foo' could not be inferred}}
 
-  _ = Pair<
-    FullyGeneric, // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+    FullyGeneric,
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric // FIXME: We could diagnose both of these, but we don't.
   >()
-  _ = Pair<
+  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
     FullyGeneric<Any>,
-    FullyGeneric // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+    FullyGeneric
   >()
-  _ = Pair<
-    FullyGeneric, // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+    FullyGeneric,
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric<Any>
   >()
 

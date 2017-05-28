@@ -19,23 +19,23 @@ extension String {
   /// For example, use this initializer to create a string with ten `"0"`
   /// scalars in a row.
   ///
-  ///     let zeroes = String("0" as UnicodeScalar, count: 10)
+  ///     let zeroes = String("0" as Unicode.Scalar, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
   @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
+  public init(repeating repeatedValue: Unicode.Scalar, count: Int) {
     Builtin.unreachable()
   }
 
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
-  /// For example, use this initializer to create a string with ten `"00"`
+  /// For example, use this initializer to create a string with ten `"ab"`
   /// strings in a row.
   ///
-  ///     let zeroes = String(repeating: "00", count: 10)
+  ///     let zeroes = String(repeating: "ab", count: 10)
   ///     print(zeroes)
-  ///     // Prints "00000000000000000000"
+  ///     // Prints "abababababababababab"
   ///
   /// - Parameters:
   ///   - repeatedValue: The string to repeat.
@@ -61,7 +61,7 @@ extension String {
     return _split(separator: "\n")
   }
   
-  public func _split(separator: UnicodeScalar) -> [String] {
+  public func _split(separator: Unicode.Scalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
@@ -73,7 +73,7 @@ extension String {
 }
 
 extension String {
-  public init(_ _c: UnicodeScalar) {
+  public init(_ _c: Unicode.Scalar) {
     self = String._fromWellFormedCodeUnitSequence(
       UTF32.self,
       input: repeatElement(_c.value, count: 1))
@@ -125,7 +125,7 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
-  /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
+  /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
@@ -183,7 +183,7 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
-  /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
+  /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
@@ -228,7 +228,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -266,7 +266,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -305,7 +305,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -343,7 +343,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -381,7 +381,7 @@ extension String {
   /// prints its length:
   ///
   ///     let max = String(Int.max)
-  ///     print("\(max) has \(max.utf16.count) digits.")
+  ///     print("\(max) has \(max.count) digits.")
   ///     // Prints "9223372036854775807 has 19 digits."
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
@@ -414,51 +414,13 @@ extension String {
 }
 
 extension String {
-  /// Split the given string at the given delimiter character, returning the
-  /// strings before and after that character (neither includes the character
-  /// found) and a boolean value indicating whether the delimiter was found.
-  public func _splitFirst(separator delim: UnicodeScalar)
-    -> (before: String, after: String, wasFound : Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
-                String(rng[rng.index(after: i)..<rng.endIndex]),
-                true)
-      }
-    }
-    return (self, "", false)
-  }
-
-  /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
-  /// character that matches, the string after that character,
-  /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(_ predicate: (UnicodeScalar) -> Bool)
-    -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if predicate(rng[i]) {
-        return (String(rng[rng.startIndex..<i]),
-                rng[i], 
-                String(rng[rng.index(after: i)..<rng.endIndex]),
-                true)
-      }
-    }
-    return (self, "🎃", String(), false)
-  }
-}
-
-extension String {
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
   public init(count: Int, repeatedValue c: Character) {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
+  public init(count: Int, repeatedValue c: Unicode.Scalar) {
     Builtin.unreachable()
   }
 }

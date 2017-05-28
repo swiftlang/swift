@@ -320,12 +320,12 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// A type that can be initialized with a string literal containing a single
 /// Unicode scalar value.
 ///
-/// The `String`, `StaticString`, `Character`, and `UnicodeScalar` types all
+/// The `String`, `StaticString`, `Character`, and `Unicode.Scalar` types all
 /// conform to the `ExpressibleByUnicodeScalarLiteral` protocol. You can
 /// initialize a variable of any of these types using a string literal that
 /// holds a single Unicode scalar.
 ///
-///     let ñ: UnicodeScalar = "ñ"
+///     let ñ: Unicode.Scalar = "ñ"
 ///     print(ñ)
 ///     // Prints "ñ"
 ///
@@ -337,7 +337,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
-  /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
+  /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
   /// `Character`, `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
@@ -580,9 +580,9 @@ extension ExpressibleByStringLiteral
 ///     }
 public protocol ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
-  associatedtype Element
+  associatedtype ArrayLiteralElement
   /// Creates an instance initialized with the given elements.
-  init(arrayLiteral elements: Element...)
+  init(arrayLiteral elements: ArrayLiteralElement...)
 }
 
 /// A type that can be initialized using a dictionary literal.

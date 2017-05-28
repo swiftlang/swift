@@ -56,7 +56,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
     DeclContext* DC = Target->getInnermostDeclContext();
     Type BaseTy = Target->getDeclaredTypeInContext();
-    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+    const auto *FD = dyn_cast<FuncDecl>(D);
     if (!FD)
       return true;
     ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
@@ -203,7 +203,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   unsigned countInherits(ExtensionDecl *ED) {
     unsigned Count = 0;
     for (auto TL : ED->getInherited()) {
-      if (shouldPrint(TL.getType()->getAnyNominal(), Options))
+      auto *nominal = TL.getType()->getAnyNominal();
+      if (nominal && shouldPrint(nominal, Options))
         Count ++;
     }
     return Count;
@@ -610,60 +611,6 @@ uint8_t swift::getKeywordLen(tok keyword) {
 }
 
 StringRef swift::getCodePlaceholder() { return "<#code#>"; }
-
-void swift::
-printEnumElementsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
-                         llvm::raw_ostream &OS) {
-  // Sort the missing elements to a vector because set does not guarantee orders.
-  SmallVector<EnumElementDecl*, 4> SortedElements;
-  SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),
-                        UnhandledElements.end());
-  std::sort(SortedElements.begin(),SortedElements.end(),
-            [](EnumElementDecl *LHS, EnumElementDecl *RHS) {
-              return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
-            });
-
-  auto printPayloads = [](EnumElementDecl *EE, llvm::raw_ostream &OS) {
-    // If the enum element has no payloads, return.
-    auto TL = EE->getArgumentTypeLoc();
-    if (TL.isNull())
-      return;
-    TypeRepr* TR = EE->getArgumentTypeLoc().getTypeRepr();
-    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
-      SmallVector<Identifier, 4> NameBuffer;
-      ArrayRef<Identifier> Names;
-      if (TTR->hasElementNames()) {
-        // Get the name from the tuple repr, if exist.
-        Names = TTR->getElementNames();
-      } else {
-        // Create same amount of empty names to the elements.
-        NameBuffer.resize(TTR->getNumElements());
-        Names = llvm::makeArrayRef(NameBuffer);
-      }
-      OS << "(";
-      // Print each element in the pattern match.
-      for (unsigned I = 0, N = Names.size(); I < N; I ++) {
-        auto Id = Names[I];
-        if (Id.empty())
-          OS << "_";
-        else
-          OS << tok::kw_let << " " << Id.str();
-        if (I + 1 != N) {
-          OS << ", ";
-        }
-      }
-      OS << ")";
-    }
-  };
-
-  // Print each enum element name.
-  std::for_each(SortedElements.begin(), SortedElements.end(),
-                [&](EnumElementDecl *EE) {
-                  OS << tok::kw_case << " ." << EE->getNameStr();
-                  printPayloads(EE, OS);
-                  OS <<": " << getCodePlaceholder() << "\n";
-                });
-}
 
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   SmallString<16> Buffer;
@@ -1680,7 +1627,7 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
     return true;
   NominalTypeDecl *Target = Options.TransformContext->getNominal();
   Type BaseTy = Target->getDeclaredTypeInContext();
-  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  const auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
     return true;
   ResolvedMemberResult Result = resolveValueMember(*Target->getDeclContext(),
@@ -1696,6 +1643,9 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
+
+  if (Options.SkipMissingMemberPlaceholders && isa<MissingMemberDecl>(D))
+    return false;
 
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
@@ -2101,11 +2051,6 @@ void PrintAST::printInherited(const Decl *decl,
   if (inherited.empty() && superclass.isNull() && !explicitClass) {
     if (protos.empty())
       return;
-    // If only conforms to AnyObject protocol, nothing to print.
-    if (protos.size() == 1) {
-      if (protos.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))
-        return;
-    }
   }
 
   if (inherited.empty()) {
@@ -2129,8 +2074,6 @@ void PrintAST::printInherited(const Decl *decl,
 
     for (auto Proto : protos) {
       if (!shouldPrint(Proto))
-        continue;
-      if (Proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
         continue;
       if (auto Enum = dyn_cast<EnumDecl>(decl)) {
         // Conformance to RawRepresentable is implied by having a raw type.
@@ -3275,6 +3218,12 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
 
+void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
+  Printer << "/* placeholder for ";
+  recordDeclLoc(decl, [&]{ Printer << decl->getFullName(); });
+  Printer << " */";
+}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   Printer << "{";
   printASTNodes(stmt->getElements());
@@ -4113,6 +4062,7 @@ public:
       Printer << "@callee_guaranteed ";
       return;
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -4460,6 +4410,8 @@ std::string GenericSignature::getAsString() const {
 static StringRef getStringForParameterConvention(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In: return "@in ";
+  case ParameterConvention::Indirect_In_Constant:
+    return "@in_constant ";
   case ParameterConvention::Indirect_In_Guaranteed:  return "@in_guaranteed ";
   case ParameterConvention::Indirect_Inout: return "@inout ";
   case ParameterConvention::Indirect_InoutAliasable: return "@inout_aliasable ";

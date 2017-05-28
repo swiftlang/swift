@@ -89,14 +89,23 @@ classifyDynamicCastToProtocol(CanType source,
   if (source == target)
     return DynamicCastFeasibility::WillSucceed;
 
-  auto *SourceNominalTy = source.getAnyNominal();
-
-  if (!SourceNominalTy)
-    return DynamicCastFeasibility::MaySucceed;
-
   auto *TargetProtocol = target.getAnyNominal();
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
+
+  auto *SourceNominalTy = source.getAnyNominal();
+
+  if (!SourceNominalTy) {
+    if (auto Archetype = dyn_cast<ArchetypeType>(source)) {
+      auto SourceProtocols = Archetype->getConformsTo();
+      // Check all protocols implemented by the archetype.
+      for (auto *Protocol : SourceProtocols) {
+        if (Protocol == TargetProtocol)
+          return DynamicCastFeasibility::WillSucceed;
+      }
+    }
+    return DynamicCastFeasibility::MaySucceed;
+  }
 
   auto SourceProtocols = SourceNominalTy->getAllProtocols();
 
@@ -217,8 +226,8 @@ bool swift::isError(ModuleDecl *M, CanType Ty) {
       M->getASTContext().getProtocol(KnownProtocolKind::Error);
 
   if (errorTypeProto) {
-    // Find the conformance of the value type to _BridgedToObjectiveC.
-    // Check whether the type conforms to _BridgedToObjectiveC.
+    // Find the conformance of the value type to Error.
+    // Check whether the type conforms to Error.
     auto conformance = M->lookupConformance(Ty, errorTypeProto, nullptr);
     return conformance.hasValue();
   }
@@ -330,11 +339,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
   if (source->hasArchetype() || source.isExistentialType() ||
       target->hasArchetype() || target.isExistentialType()) {
 
-    auto *SourceNominalTy = source.getAnyNominal();
-
     // Check conversions from non-protocol types into protocol types.
     if (!source.isExistentialType() &&
-        SourceNominalTy &&
         target.isExistentialType())
       return classifyDynamicCastToProtocol(source, target, isWholeModuleOpts);
 
@@ -633,13 +639,8 @@ swift::classifyDynamicCast(ModuleDecl *M,
   if (source->isBridgeableObjectType() && mayBridgeToObjectiveC(M, target)) {
     // Try to get the ObjC type which is bridged to target type.
     assert(!target.isAnyExistentialType());
-    if (Type ObjCTy = M->getASTContext().getBridgedToObjC(M, target)) {
-      // If the bridged ObjC type is known, check if
-      // source type can be cast into it.
-      return classifyDynamicCast(M, source,
-          ObjCTy->getCanonicalType(),
-          /* isSourceTypeExact */ false, isWholeModuleOpts);
-    }
+    // ObjC-to-Swift casts may fail. And in most cases it is impossible to
+    // statically predict the outcome. So, let's be conservative here.
     return DynamicCastFeasibility::MaySucceed;
   }
   

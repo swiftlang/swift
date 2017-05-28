@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -1326,7 +1327,9 @@ static bool tryTypeVariableBindings(
           if (anySolved)
             break;
         }
-        type = cs.openBindingType(type, typeVar->getImpl().getLocator());
+        type = cs.openUnboundGenericType(type,
+                                         typeVar->getImpl().getLocator());
+        type = type->reconstituteSugar(/*recursive=*/false);
       }
 
       // FIXME: We want the locator that indicates where the binding came
@@ -1509,6 +1512,22 @@ bool ConstraintSystem::Candidate::solve() {
     return true;
   }
 
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+    log << "--- Solving candidate for shrinking at ";
+    auto R = E->getSourceRange();
+    if (R.isValid()) {
+      R.print(log, TC.Context.SourceMgr, /*PrintText=*/ false);
+    } else {
+      log << "<invalid range>";
+    }
+    log << " ---\n";
+
+    E->print(log);
+    log << '\n';
+    cs.print(log);
+  }
+
   // If there is contextual type present, add an explicit "conversion"
   // constraint to the system.
   if (!CT.isNull()) {
@@ -1529,6 +1548,20 @@ bool ConstraintSystem::Candidate::solve() {
     // would try to deduce the best solution, which we don't
     // really want. Instead, we want the reduced set of domain choices.
     cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
+  }
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
+    if (solutions.empty()) {
+      log << "--- No Solutions ---\n";
+    } else {
+      log << "--- Solutions ---\n";
+      for (unsigned i = 0, n = solutions.size(); i != n; ++i) {
+        auto &solution = solutions[i];
+        log << "--- Solution #" << i << " ---\n";
+        solution.dump(log);
+      }
+    }
   }
 
   // Record found solutions as suggestions.
@@ -1741,11 +1774,12 @@ void ConstraintSystem::shrink(Expr *expr) {
     ///
     /// \param collection The type of the collection container.
     ///
-    /// \returns ErrorType on failure, properly constructed type otherwise.
+    /// \returns Null type, ErrorType or UnresolvedType on failure,
+    /// properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
-      if (collection.isNull() || collection->hasError())
-        return ErrorType::get(ctx);
+      if (!collection || collection->hasError())
+        return collection;
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
@@ -1757,19 +1791,19 @@ void ConstraintSystem::shrink(Expr *expr) {
       if (auto array = dyn_cast<ArraySliceType>(base)) {
         auto elementType = array->getBaseType();
         // If base type is invalid let's return error type.
-        return isInvalidType(elementType) ? ErrorType::get(ctx) : elementType;
+        return elementType;
       }
 
       // Map or Set or any other associated collection type.
       if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
         if (boundGeneric->hasUnresolvedType())
-          return ErrorType::get(ctx);
+          return boundGeneric;
 
         llvm::SmallVector<TupleTypeElt, 2> params;
         for (auto &type : boundGeneric->getGenericArgs()) {
           // One of the generic arguments in invalid or unresolved.
           if (isInvalidType(type))
-            return ErrorType::get(ctx);
+            return type;
 
           params.push_back(type);
         }
@@ -1781,7 +1815,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         return TupleType::get(params, ctx);
       }
 
-      return ErrorType::get(ctx);
+      return Type();
     }
 
     bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
@@ -1862,7 +1896,9 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (elementType->hasError())
+        if (!elementType ||
+            elementType->hasError() ||
+            elementType->hasUnresolvedType())
           return;
 
         contextualType = elementType;
@@ -2326,27 +2362,6 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (constraint->getKind() == ConstraintKind::CheckedCast)
     return true;
 
-  // Binding an operator overloading to a generic operator is weaker than
-  // binding to a non-generic operator, always.
-  // FIXME: this is a hack to improve performance when we're dealing with
-  // overloaded operators.
-  if (constraint->getKind() == ConstraintKind::BindOverload &&
-      constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
-      constraint->getOverloadChoice().getDecl()->isOperator() &&
-      successfulConstraint->getKind() == ConstraintKind::BindOverload &&
-      successfulConstraint->getOverloadChoice().getKind()
-        == OverloadChoiceKind::Decl &&
-      successfulConstraint->getOverloadChoice().getDecl()->isOperator()) {
-    auto decl = constraint->getOverloadChoice().getDecl();
-    auto successfulDecl = successfulConstraint->getOverloadChoice().getDecl();
-    auto &ctx = decl->getASTContext();
-    if (decl->getInterfaceType()->is<GenericFunctionType>() &&
-        !successfulDecl->getInterfaceType()->is<GenericFunctionType>() &&
-        (!successfulDecl->getAttrs().isUnavailable(ctx) ||
-         decl->getAttrs().isUnavailable(ctx)))
-      return true;
-  }
-
   return false;
 }
 
@@ -2387,6 +2402,43 @@ determineBestBindings(ConstraintSystem &CS) {
   }
 
   return std::make_pair(bestBindings, bestTypeVar);
+}
+
+// Is this constraint a bind overload to a generic operator or one
+// that is unavailable?
+static bool isGenericOperatorOrUnavailable(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::BindOverload ||
+      constraint->getOverloadChoice().getKind() != OverloadChoiceKind::Decl ||
+      !constraint->getOverloadChoice().getDecl()->isOperator())
+    return false;
+
+  auto decl = constraint->getOverloadChoice().getDecl();
+  auto &ctx = decl->getASTContext();
+
+  return decl->getInterfaceType()->is<GenericFunctionType>() ||
+    decl->getAttrs().isUnavailable(ctx);
+}
+
+/// Whether this constraint refers to a symmetric operator.
+static bool isSymmetricOperator(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::BindOverload ||
+      constraint->getOverloadChoice().getKind() != OverloadChoiceKind::Decl ||
+      !constraint->getOverloadChoice().getDecl()->isOperator())
+    return false;
+
+  // If it's a binary operator, check that the types on both sides are the
+  // same. Otherwise, don't perform this optimization.
+  auto func = dyn_cast<FuncDecl>(constraint->getOverloadChoice().getDecl());
+  auto paramList =
+  func->getParameterList(func->getDeclContext()->isTypeContext());
+  if (paramList->size() != 2)
+    return true;
+
+  auto firstType =
+    paramList->get(0)->getInterfaceType()->getLValueOrInOutObjectType();
+  auto secondType =
+    paramList->get(1)->getInterfaceType()->getLValueOrInOutObjectType();
+  return firstType->isEqual(secondType);
 }
 
 bool ConstraintSystem::solveSimplified(
@@ -2474,6 +2526,7 @@ bool ConstraintSystem::solveSimplified(
 
   // Try each of the constraints within the disjunction.
   Constraint *firstSolvedConstraint = nullptr;
+  Constraint *firstNonGenericOperatorSolution = nullptr;
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
   for (auto index : indices(constraints)) {
@@ -2489,12 +2542,24 @@ bool ConstraintSystem::solveSimplified(
       continue;
     }
 
+    // Don't attempt to solve for generic operators if we already have
+    // a non-generic solution.
+
+    // FIXME: Less-horrible but still horrible hack to attempt to
+    //        speed things up. Skip the generic operators if we
+    //        already have a solution involving non-generic operators,
+    //        but continue looking for a better non-generic operator
+    //        solution.
+    if (firstNonGenericOperatorSolution &&
+        isGenericOperatorOrUnavailable(constraint))
+      continue;
+
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (firstSolvedConstraint &&
         shortCircuitDisjunctionAt(constraint, firstSolvedConstraint))
       break;
-    
+
     // If the expression was deemed "too complex", stop now and salvage.
     if (getExpressionTooComplex(solutions))
       break;
@@ -2540,6 +2605,11 @@ bool ConstraintSystem::solveSimplified(
     solverState->addGeneratedConstraint(constraint);
 
     if (!solveRec(solutions, allowFreeTypeVariables)) {
+      if (!firstNonGenericOperatorSolution &&
+          !isGenericOperatorOrUnavailable(constraint) &&
+          isSymmetricOperator(constraint))
+        firstNonGenericOperatorSolution = constraint;
+
       firstSolvedConstraint = constraint;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.

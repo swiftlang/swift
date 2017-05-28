@@ -10,28 +10,28 @@ class KeyClass : Hashable {
 }
 func ==(lhs: KeyClass, rhs: KeyClass) -> Bool { return true }
 
-// CHECK-LABEL: sil hidden @{{.*}}arrayUpCast{{.*}} <Ct where Ct : MyClass>
+// CHECK-LABEL: sil shared @{{.*}}arrayUpCast{{.*}} <Ct where Ct : MyClass>
 func arrayUpCast<Ct: MyClass>(_ arr: [Ct]) -> [MyClass] {
   // CHECK: apply %{{[0-9]*}}<Ct, MyClass>(%{{[0-9]*}})
   return arr
   // CHECK: return	  
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}arrayDownCast{{.*}} <Ct where Ct : MyClass>
+// CHECK-LABEL: sil shared @{{.*}}arrayDownCast{{.*}} <Ct where Ct : MyClass>
 func arrayDownCast<Ct: MyClass>(_ arr: [MyClass]) -> [Ct] {
   // CHECK: apply %{{[0-9]*}}<MyClass, Ct>(%{{[0-9]*}})
   return arr as! [Ct]
   // CHECK: return	  
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}dictUpCast{{.*}} <Ct where Ct : MyClass>
+// CHECK-LABEL: sil shared @{{.*}}dictUpCast{{.*}} <Ct where Ct : MyClass>
 func dictUpCast<Ct: MyClass>(_ dict: [KeyClass:Ct]) -> [KeyClass:MyClass] {
   // CHECK: apply %{{[0-9]*}}<KeyClass, Ct, KeyClass, MyClass>(%{{[0-9]*}})
   return dict as [KeyClass:MyClass]
   // CHECK: return	  
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}dictDownCast{{.*}} <Ct where Ct : MyClass>
+// CHECK-LABEL: sil shared @{{.*}}dictDownCast{{.*}} <Ct where Ct : MyClass>
 func dictDownCast<Ct: MyClass>(_ dict: [KeyClass:MyClass]) -> [KeyClass:Ct] {
   // CHECK: apply %{{[0-9]*}}<KeyClass, MyClass, KeyClass, Ct>(%{{[0-9]*}})
   return dict as! [KeyClass:Ct]

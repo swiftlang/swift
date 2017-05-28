@@ -43,10 +43,6 @@ class PerformanceTestResult:
         return (0 if self.samples < 2 else
                 sqrt(self.S_runtime / (self.samples - 1)))
 
-    @property
-    def cv(self):  # Coeficient of Variation (%)
-        return self.sd / self.mean
-
     # Compute running variance, B. P. Welford's method
     # See Knuth TAOCP vol 2, 3rd edition, page 232, or
     # https://www.johndcook.com/blog/standard_deviation/
@@ -79,7 +75,7 @@ class PerformanceTestResult:
     # (name, min value, max value, mean value, max_rss)
     def values(self):
         return (self.name, str(self.min), str(self.max), str(int(self.mean)),
-                str(self.max_rss) if self.max_rss else '—')
+                str(self.max_rss) if self.max_rss else '-')
 
 
 class ResultComparison:
@@ -254,7 +250,7 @@ class ReportFormatter:
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <style>
         body {{ font-family: -apple-system, sans-serif; font-size: 14px; }}
-        table {{ border-spacing: 2px; border-color: grey; border-spacing: 0;
+        table {{ border-spacing: 2px; border-color: gray; border-spacing: 0;
                 border-collapse: collapse; }}
         table tr {{ background-color: #fff; border-top: 1px solid #c6cbd1; }}
         table th, table td {{ padding: 6px 13px; border: 1px solid #dfe2e5; }}
@@ -299,7 +295,6 @@ class ReportFormatter:
                 name, old, new, delta, speedup_color, speedup)
 
         def header(contents):
-            # exit(contents)
             return self.HTML_HEADER_ROW.format(* contents)
 
         def table(title, results, speedup_color):

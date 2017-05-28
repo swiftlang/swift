@@ -366,7 +366,8 @@ func rdar20868864(_ s: String) {
 func r22058555() {
   var firstChar: UInt8 = 0
   "abc".withCString { chars in
-    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
+    // FIXME https://bugs.swift.org/browse/SR-4836: was {{cannot assign value of type 'Int8' to type 'UInt8'}}
+    firstChar = chars[0]  // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
   }
 }
 
@@ -512,8 +513,7 @@ func returnsArray() -> [Int] { return [] }
 
 returnsArray().flatMap { $0 }.flatMap { }
 // expected-warning@-1 {{expression of type 'Int' is unused}}
-// expected-warning@-2 {{Please use map instead.}}
-// expected-warning@-3 {{result of call to 'flatMap' is unused}}
+// expected-warning@-2 {{result of call to 'flatMap' is unused}}
 
 // rdar://problem/30271695
 _ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }

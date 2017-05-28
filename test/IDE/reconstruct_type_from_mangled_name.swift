@@ -6,6 +6,8 @@ struct Mystruct1 {
 // CHECK: decl: func s1f1() -> Int
   var intField = 3
 // CHECK: decl: var intField: Int
+// CHECK: decl: init(intField: Int)
+// CHECK: decl: init()
 }
 struct MyStruct2 {
 // CHECK: decl: struct MyStruct2
@@ -21,15 +23,14 @@ class Myclass1 {
 // CHECK: decl: class Myclass1
   var intField = 4
 // CHECK: decl: var intField: Int
+// CHECK: decl: init()
 }
 
 func f1() {
 // CHECK: decl: func f1()
   var s1ins = Mystruct1() // Implicit ctor
 // CHECK: decl: var s1ins: Mystruct1
-// CHECK: dref: init() for 'Mystruct1'
   _ = Mystruct1(intField: 1) // Implicit ctor
-// CHECK: dref: init(intField: Int)	for 'Mystruct1'
 
   s1ins.intField = 34
 // CHECK: type: Mystruct1
@@ -37,7 +38,6 @@ func f1() {
 
   var c1ins = Myclass1()
 // CHECK: decl: var c1ins: Myclass1
-// CHECK: dref: init()	for 'Myclass1'
 // CHECK: type: Myclass1
 
   c1ins.intField = 3
@@ -191,10 +191,9 @@ func foo2(p: P1 & P2) {
   foo2(p: p)
 }
 
-// CHECK: func foo3(p: AnyObject & P1)
+// CHECK: func foo3(p: P1 & AnyObject)
 func foo3(p: P1 & AnyObject) {
-// CHECK: decl: let p: AnyObject & P1
-// CHECK: dref: {{(@objc )?}}protocol AnyObject
+// CHECK: decl: let p: P1 & AnyObject
   foo3(p: p)
 }
 
@@ -205,7 +204,7 @@ func foo4(p: P1 & P2 & Myclass1) {
 }
 
 func genericFunction<T : AnyObject>(t: T) {
-// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_ts9AnyObjectRzlF1TL_xmfp
+// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_tRlzClF1TL_xmfp
   genericFunction(t: t)
 }
 
@@ -258,13 +257,12 @@ func hasLocalDecls() {
 
   // FIXME
   // CHECK: decl: FAILURE for 'LocalType'
+  // The following is the implicit ctor
+  // CHECK: decl: FAILURE for ''
   struct LocalType {}
 
   // CHECK: decl: FAILURE for 'LocalAlias'
   typealias LocalAlias = LocalType
-
-  // CHECK: dref: FAILURE for 'LocalType'
-  let x: LocalAlias = LocalType()
 }
 
 fileprivate struct VeryPrivateData {}

@@ -49,7 +49,7 @@ namespace {
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl,
                                        SILValue DefOfEnum = SILValue()) {
-  assert(EnumDecl->getArgumentInterfaceType() &&
+  assert(EnumDecl->hasAssociatedValues() &&
          "We assume enumdecl has an argument type");
 
   SILModule &Mod = I->getModule();
@@ -123,7 +123,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
     return false;
 
   // Make sure it is a release on a SILArgument of the current basic block..
-  SILArgument *SA = dyn_cast<SILArgument>(Head->getOperand(0));
+  auto *SA = dyn_cast<SILArgument>(Head->getOperand(0));
   if (!SA || SA->getParent() != BB)
     return false;
 
@@ -203,7 +203,7 @@ enum OperandRelation {
 static SILValue findValueShallowRoot(const SILValue &In) {
   // If this is a basic block argument with a single caller
   // then we know exactly which value is passed to the argument.
-  if (SILArgument *Arg = dyn_cast<SILArgument>(In)) {
+  if (auto *Arg = dyn_cast<SILArgument>(In)) {
     SILBasicBlock *Parent = Arg->getParent();
     SILBasicBlock *Pred = Parent->getSinglePredecessorBlock();
     if (!Pred) return In;
@@ -309,15 +309,15 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   // This will further enable to sink strong_retain_unowned instructions,
   // which provides more opportunities for the unowned-optimization in
   // LLVMARCOpts.
-  UnownedToRefInst *UTORI1 = dyn_cast<UnownedToRefInst>(First);
-  UnownedToRefInst *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
+  auto *UTORI1 = dyn_cast<UnownedToRefInst>(First);
+  auto *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
   if (UTORI1 && UTORI2) {
     return 0;
   }
 
   // TODO: Add more cases than Struct
-  StructInst *FirstStruct = dyn_cast<StructInst>(First);
-  StructInst *SecondStruct = dyn_cast<StructInst>(Second);
+  auto *FirstStruct = dyn_cast<StructInst>(First);
+  auto *SecondStruct = dyn_cast<StructInst>(Second);
 
   if (!FirstStruct || !SecondStruct)
     return None;
@@ -408,7 +408,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   SILBasicBlock *FirstPred = *BB->pred_begin();
   TermInst *FirstTerm = FirstPred->getTerminator();
   auto FirstPredArg = FirstTerm->getOperand(ArgNum);
-  SILInstruction *FSI = dyn_cast<SILInstruction>(FirstPredArg);
+  auto *FSI = dyn_cast<SILInstruction>(FirstPredArg);
 
   // The list of identical instructions.
   SmallVector<SILValue, 8> Clones;
@@ -443,7 +443,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
     // Find the Nth argument passed to BB.
     SILValue Arg = TI->getOperand(ArgNum);
-    SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
+    auto *SI = dyn_cast<SILInstruction>(Arg);
     if (!SI || !hasOneNonDebugUse(SI))
       return false;
     if (SI->isIdenticalTo(FSI)) {
@@ -495,7 +495,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
       assert((isa<BranchInst>(TI) || isa<CondBranchInst>(TI)) &&
              "Branch instruction required");
 
-      SILInstruction *CloneInst = dyn_cast<SILInstruction>(*CloneIt);
+      auto *CloneInst = dyn_cast<SILInstruction>(*CloneIt);
       TI->setOperand(ArgNum, CloneInst->getOperand(*DifferentOperandIndex));
       // Now delete the clone as we only needed it operand.
       if (CloneInst != FSI)
@@ -755,7 +755,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     EnumElementDecl *Enum = Case.first;
     SILBasicBlock *Succ = Case.second;
     Builder.setInsertionPoint(&*Succ->begin());
-    if (Enum->getArgumentInterfaceType())
+    if (Enum->hasAssociatedValues())
       createRefCountOpForPayload(Builder, &*RV, Enum, Switch->getOperand());
   }
 
@@ -841,7 +841,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
     EnumElementDecl *Enum = Elts[i];
     SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
     Builder.setInsertionPoint(&*Succ->begin());
-    if (Enum->getArgumentInterfaceType())
+    if (Enum->hasAssociatedValues())
       createRefCountOpForPayload(Builder, &*I, Enum, SEI->getEnumOperand());
   }
 
@@ -1078,7 +1078,7 @@ void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
 
 void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
 
-  SelectEnumInst *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
+  auto *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
   if (!EITI)
     return;
 
@@ -1304,7 +1304,7 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
     return false;
 
   // If we do not have any argument, kill the retain_value.
-  if (!(*FindResult)->second->getArgumentInterfaceType()) {
+  if (!(*FindResult)->second->hasAssociatedValues()) {
     RVI->eraseFromParent();
     return true;
   }
@@ -1324,7 +1324,7 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
     return false;
 
   // If we do not have any argument, just delete the release value.
-  if (!(*FindResult)->second->getArgumentInterfaceType()) {
+  if (!(*FindResult)->second->hasAssociatedValues()) {
     RVI->eraseFromParent();
     return true;
   }
@@ -1415,7 +1415,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
     for (auto P : EnumBBCaseList) {
       // If we don't have an argument for this case, there is nothing to
       // do... continue...
-      if (!P.second->getArgumentInterfaceType())
+      if (!P.second->hasAssociatedValues())
         continue;
 
       // Otherwise create the release_value before the terminator of the
@@ -1480,7 +1480,7 @@ findRetainsSinkableFromSwitchRegionForEnum(
 
     // If the case does not have an argument type, skip the predecessor since
     // there will not be a retain to sink.
-    if (!Decl->getArgumentInterfaceType())
+    if (!Decl->hasAssociatedValues())
       continue;
 
     // Ok, we found a payloaded predecessor. Look backwards through the

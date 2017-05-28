@@ -21,10 +21,10 @@ void ConstantTracker::trackInst(SILInstruction *inst) {
     SILValue baseAddr = scanProjections(LI->getOperand());
     if (SILInstruction *loadLink = getMemoryContent(baseAddr))
       links[LI] = loadLink;
-  } else if (StoreInst *SI = dyn_cast<StoreInst>(inst)) {
+  } else if (auto *SI = dyn_cast<StoreInst>(inst)) {
     SILValue baseAddr = scanProjections(SI->getOperand(1));
     memoryContent[baseAddr] = SI;
-  } else if (CopyAddrInst *CAI = dyn_cast<CopyAddrInst>(inst)) {
+  } else if (auto *CAI = dyn_cast<CopyAddrInst>(inst)) {
     if (!CAI->isTakeOfSrc()) {
       // Treat a copy_addr as a load + store
       SILValue loadAddr = scanProjections(CAI->getOperand(0));
@@ -109,7 +109,7 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
 
   // Track the value up the dominator tree.
   for (;;) {
-    if (SILInstruction *inst = dyn_cast<SILInstruction>(val)) {
+    if (auto *inst = dyn_cast<SILInstruction>(val)) {
       if (Projection::isObjectProjection(inst)) {
         // Extract a member from a struct/tuple/enum.
         projStack.push_back(Projection(inst));
@@ -254,14 +254,14 @@ ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val, int depth) 
 // Returns the taken block of a terminator instruction if the condition turns
 // out to be constant.
 SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(term)) {
+  if (auto *CBI = dyn_cast<CondBranchInst>(term)) {
     IntConst condConst = getIntConst(CBI->getCondition());
     if (condConst.isFromCaller) {
       return condConst.value != 0 ? CBI->getTrueBB() : CBI->getFalseBB();
     }
     return nullptr;
   }
-  if (SwitchValueInst *SVI = dyn_cast<SwitchValueInst>(term)) {
+  if (auto *SVI = dyn_cast<SwitchValueInst>(term)) {
     IntConst switchConst = getIntConst(SVI->getOperand());
     if (switchConst.isFromCaller) {
       for (unsigned Idx = 0; Idx < SVI->getNumCases(); ++Idx) {
@@ -278,9 +278,9 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
     }
     return nullptr;
   }
-  if (SwitchEnumInst *SEI = dyn_cast<SwitchEnumInst>(term)) {
+  if (auto *SEI = dyn_cast<SwitchEnumInst>(term)) {
     if (SILInstruction *def = getDefInCaller(SEI->getOperand())) {
-      if (EnumInst *EI = dyn_cast<EnumInst>(def)) {
+      if (auto *EI = dyn_cast<EnumInst>(def)) {
         for (unsigned Idx = 0; Idx < SEI->getNumCases(); ++Idx) {
           auto enumCase = SEI->getCase(Idx);
           if (enumCase.first == EI->getElement())
@@ -292,9 +292,9 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
     }
     return nullptr;
   }
-  if (CheckedCastBranchInst *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
+  if (auto *CCB = dyn_cast<CheckedCastBranchInst>(term)) {
     if (SILInstruction *def = getDefInCaller(CCB->getOperand())) {
-      if (UpcastInst *UCI = dyn_cast<UpcastInst>(def)) {
+      if (auto *UCI = dyn_cast<UpcastInst>(def)) {
         SILType castType = UCI->getOperand()->getType();
         if (CCB->getCastType().isExactSuperclassOf(castType)) {
           return CCB->getSuccessBB();
@@ -533,4 +533,206 @@ void ShortestPathAnalysis::Weight::updateBenefit(int &Benefit,
   // We don't accumulate the benefit instead we max it.
   if (newBenefit > Benefit)
     Benefit = newBenefit;
+}
+
+// Return true if the callee has self-recursive calls.
+static bool calleeIsSelfRecursive(SILFunction *Callee) {
+  for (auto &BB : *Callee)
+    for (auto &I : BB)
+      if (auto Apply = FullApplySite::isa(&I))
+        if (Apply.getReferencedFunction() == Callee)
+          return true;
+  return false;
+}
+
+// Returns true if the callee contains a partial apply instruction,
+// whose substitutions list would contain opened existentials after
+// inlining.
+static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
+  if (!AI.hasSubstitutions())
+    return false;
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  auto Subs = AI.getSubstitutions();
+
+  // Bail if there are no open existentials in the list of substitutions.
+  bool HasNoOpenedExistentials = true;
+  for (auto Sub : Subs) {
+    if (Sub.getReplacement()->hasOpenedExistential()) {
+      HasNoOpenedExistentials = false;
+      break;
+    }
+  }
+
+  if (HasNoOpenedExistentials)
+    return false;
+
+  auto SubsMap = Callee->getLoweredFunctionType()
+    ->getGenericSignature()->getSubstitutionMap(Subs);
+
+  for (auto &BB : *Callee) {
+    for (auto &I : BB) {
+      if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
+        auto PAISubs = PAI->getSubstitutions();
+        if (PAISubs.empty())
+          continue;
+
+        // Check if any of substitutions would contain open existentials
+        // after inlining.
+        auto PAISubMap = PAI->getOrigCalleeType()
+          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        PAISubMap = PAISubMap.subst(SubsMap);
+        if (PAISubMap.hasOpenedExistential())
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Returns the callee of an apply_inst if it is basically inlineable.
+SILFunction *swift::getEligibleFunction(FullApplySite AI,
+                                        InlineSelection WhatToInline) {
+
+  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *EligibleCallee = nullptr;
+
+  if (!Callee) {
+    return nullptr;
+  }
+
+  // Don't inline functions that are marked with the @_semantics or @effects
+  // attribute if the inliner is asked not to inline them.
+  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
+    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
+      ArraySemanticsCall ASC(AI.getInstruction());
+      if (!ASC.canInlineEarly())
+        return nullptr;
+    }
+    // The "availability" semantics attribute is treated like global-init.
+    if (Callee->hasSemanticsAttrs() &&
+        WhatToInline != InlineSelection::Everything &&
+        Callee->hasSemanticsAttrThatStartsWith("availability")) {
+      return nullptr;
+    }
+  } else if (Callee->isGlobalInit()) {
+    if (WhatToInline != InlineSelection::Everything) {
+      return nullptr;
+    }
+  }
+
+  // We can't inline external declarations.
+  if (Callee->empty() || Callee->isExternalDeclaration()) {
+    return nullptr;
+  }
+
+  // Explicitly disabled inlining.
+  if (Callee->getInlineStrategy() == NoInline) {
+    return nullptr;
+  }
+
+  if (!Callee->shouldOptimize()) {
+    return nullptr;
+  }
+
+  SILFunction *Caller = AI.getFunction();
+
+  // We don't support inlining a function that binds dynamic self because we
+  // have no mechanism to preserve the original function's local self metadata.
+  if (mayBindDynamicSelf(Callee)) {
+    // Check if passed Self is the same as the Self of the caller.
+    // In this case, it is safe to inline because both functions
+    // use the same Self.
+    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
+      auto CalleeSelf = stripCasts(AI.getSelfArgument());
+      auto CallerSelf = Caller->getSelfArgument();
+      if (CalleeSelf != SILValue(CallerSelf))
+        return nullptr;
+    } else
+      return nullptr;
+  }
+
+  // Detect self-recursive calls.
+  if (Caller == Callee) {
+    return nullptr;
+  }
+
+  // A non-fragile function may not be inlined into a fragile function.
+  if (Caller->isSerialized() &&
+      !Callee->hasValidLinkageForFragileInline()) {
+    if (!Callee->hasValidLinkageForFragileRef()) {
+      llvm::errs() << "caller: " << Caller->getName() << "\n";
+      llvm::errs() << "callee: " << Callee->getName() << "\n";
+      llvm_unreachable("Should never be inlining a resilient function into "
+                       "a fragile function");
+    }
+    return nullptr;
+  }
+
+  // Inlining self-recursive functions into other functions can result
+  // in excessive code duplication since we run the inliner multiple
+  // times in our pipeline
+  if (calleeIsSelfRecursive(Callee)) {
+    return nullptr;
+  }
+
+  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
+    // Inlining of generics is not allowed unless it is an @inline(__always)
+    // or transparent function.
+    if (Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
+      return nullptr;
+  }
+
+  // IRGen cannot handle partial_applies containing opened_existentials
+  // in its substitutions list.
+  if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
+    return nullptr;
+  }
+
+  EligibleCallee = Callee;
+  return EligibleCallee;
+}
+
+/// Returns true if a given value is constant.
+/// The value is considered to be constant if it is:
+/// - a literal
+/// - a tuple or a struct whose fields are all constants
+static bool isConstantValue(SILValue V) {
+  if (isa<LiteralInst>(V))
+    return true;
+  if (auto *TI = dyn_cast<TupleInst>(V)) {
+    for (auto E : TI->getElements()) {
+      if (!isConstantValue(E))
+        return false;
+    }
+    return true;
+  }
+  if (auto *SI = dyn_cast<StructInst>(V)) {
+    for (auto E : SI->getElements()) {
+      if (!isConstantValue(E))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+
+bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
+  // If a call has only constant arguments and the call is pure, i.e. has
+  // no side effects, then we should always inline it.
+  SideEffectAnalysis::FunctionEffects ApplyEffects;
+  SEA->getEffects(ApplyEffects, AI);
+  auto GE = ApplyEffects.getGlobalEffects();
+  if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
+    return false;
+  // Check if all parameters are constant.
+  auto Args = AI.getArgumentsWithoutIndirectResults();
+  for (auto Arg : Args) {
+    if (!isConstantValue(Arg)) {
+      return false;
+    }
+  }
+  return true;
 }

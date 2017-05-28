@@ -107,7 +107,7 @@ class DCE : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
 
-    auto* DA = PM->getAnalysis<PostDominanceAnalysis>();
+    auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
     PDT = DA->get(F);
 
     // If we have a function that consists of nothing but a

@@ -61,7 +61,7 @@ public:
     return {true, E};
   }
   bool walkToDeclPre(Decl *D) override {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError()) {
         error = true;
         return false;

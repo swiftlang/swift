@@ -81,19 +81,19 @@ protocol SuperREPLPrintable : REPLPrintable {
 }
 
 protocol FooProtocol {
-  func format(_ kind: UnicodeScalar, layout: String) -> String
+  func format(_ kind: Unicode.Scalar, layout: String) -> String
 }
 
 struct SuperPrint : REPLPrintable, FooProtocol, SuperREPLPrintable {
   func replPrint() {}
   func superReplPrint() {}
-  func format(_ kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: Unicode.Scalar, layout: String) -> String {}
 }
 
 struct Struct1 {}
 extension Struct1 : REPLPrintable, FooProtocol {
   func replPrint() {}
-  func format(_ kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: Unicode.Scalar, layout: String) -> String {}
 }
 
 func accept_manyPrintable(_: REPLPrintable & FooProtocol) {}
@@ -161,5 +161,15 @@ struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-nam
 
 // SR-3124 - Protocol Composition Often Migrated Incorrectly
 struct S3124<T: protocol<P1, P3>> {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{17-34=P1 & P3>}}
-func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-warning {{'where' clause}}
+func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-error {{'where' clause}}
 func f3124_2<U : protocol<P1>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{18-31=P1>}}
+
+// Make sure we correctly form compositions in expression context
+func takesP1AndP2(_: [AnyObject & P1 & P2]) {}
+
+takesP1AndP2([AnyObject & P1 & P2]())
+takesP1AndP2([Swift.AnyObject & P1 & P2]())
+takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
+takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
+takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
+takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}

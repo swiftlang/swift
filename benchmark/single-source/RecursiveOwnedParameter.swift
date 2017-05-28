@@ -52,6 +52,5 @@ public func run_RecursiveOwnedParameter(_ N: Int) {
     }
   }
   let refResult = 100*N
-  CheckResults(result == refResult,
-    "IncorrectResults in RecursiveOwnedParameter: \(result) != \(refResult)")
+  CheckResults(result == refResult)
 }

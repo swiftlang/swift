@@ -292,12 +292,14 @@ def dump_repo_hashes(config):
     fmt = "{:<%r}{}" % (max_len + 5)
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
-        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                         dry_run=False,
-                         echo=False):
-            h = shell.capture(["git", "log", "--oneline", "-n", "1"],
-                              echo=False).strip()
-            print(fmt.format(repo_name, h))
+        repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
+        if os.path.isdir(repo_path):
+            with shell.pushd(repo_path, dry_run=False, echo=False):
+                h = shell.capture(["git", "log", "--oneline", "-n", "1"],
+                                  echo=False).strip()
+                print(fmt.format(repo_name, h))
+        else:
+            print(fmt.format(repo_name, "(not checked out)"))
 
 
 def dump_hashes_config(args, config):

@@ -27,12 +27,15 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
+/// A type-erased key path, from any root type to any resulting value type.
 public class AnyKeyPath: Hashable, _AppendKeyPath {
+  /// The root type for this key path.
   @_inlineable
   public static var rootType: Any.Type {
     return _rootAndValueType.root
   }
 
+  /// The value type for this key path.
   @_inlineable
   public static var valueType: Any.Type {
     return _rootAndValueType.value
@@ -138,11 +141,14 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 }
 
+/// A partially type-erased key path, from a concrete root type to any
+/// resulting value type.
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
 internal enum KeyPathKind { case readOnly, value, reference }
 
+/// A key path from a specific root type to a specific resulting value type.
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   public typealias _Root = Root
   public typealias _Value = Value
@@ -219,6 +225,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
 }
 
+/// A key path that supports reading from and writing to the resulting value.
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // MARK: Implementation detail
   
@@ -268,6 +275,8 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 
 }
 
+/// A key path that supports reading from and writing to the resulting value
+/// with reference semantics.
 public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value> {
   // MARK: Implementation detail
 
@@ -623,8 +632,18 @@ internal struct RawKeyPathComponent {
     static var computedHasArgumentsFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
     }
-    static var computedUnresolvedIDFlag: UInt32 {
-      return _SwiftKeyPathComponentHeader_ComputedUnresolvedIDFlag
+
+    static var computedIDResolutionMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDResolutionMask
+    }
+    static var computedIDResolved: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDResolved
+    }
+    static var computedIDUnresolvedFieldOffset: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
+    }
+    static var computedIDUnresolvedIndirectPointer: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
     }
     
     var _value: UInt32
@@ -1414,7 +1433,8 @@ public func _appendingKeyPaths<
 }
 
 // The distance in bytes from the address point of a KeyPath object to its
-// buffer header. Includes the size of the Swift heap object header and
+// buffer header. Includes the size of the Swift heap object header and the
+// pointer to the KVC string.
 
 internal var keyPathObjectHeaderSize: Int {
   return MemoryLayout<HeapObject>.size + MemoryLayout<Int>.size
@@ -1422,8 +1442,8 @@ internal var keyPathObjectHeaderSize: Int {
 
 // Runtime entry point to instantiate a key path object.
 @_cdecl("swift_getKeyPath")
-public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
-                             arguments: UnsafeRawPointer)
+public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
+                              arguments: UnsafeRawPointer)
     -> UnsafeRawPointer {
   // The key path pattern is laid out like a key path object, with a few
   // modifications:
@@ -1437,7 +1457,7 @@ public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   //   global object will itself always have the "trivial" bit set, since it
   //   never needs to be destroyed.)
   // - Components may have unresolved forms that require instantiation.
-  // - The component type metadata pointers are unresolved, and instead
+  // - Type metadata pointers are unresolved, and instead
   //   point to accessor functions that instantiate the metadata.
   //
   // The pattern never precomputes the capabilities of the key path (readonly/
@@ -1649,7 +1669,7 @@ internal func _instantiateKeyPathBuffer(
 ) {
   // NB: patternBuffer and destData alias when the pattern is instantiable
   // in-line. Therefore, do not read from patternBuffer after the same position
-  // in destBuffer has been written to.
+  // in destData has been written to.
 
   var patternBuffer = origPatternBuffer
   let destHeaderPtr = origDestData.baseAddress.unsafelyUnwrapped
@@ -1732,16 +1752,29 @@ internal func _instantiateKeyPathBuffer(
       // property.
       var newHeader = header
       var id = patternBuffer.pop(Int.self)
-      if header.payload
-          & RawKeyPathComponent.Header.computedUnresolvedIDFlag != 0 {
+      switch header.payload
+                         & RawKeyPathComponent.Header.computedIDResolutionMask {
+      case RawKeyPathComponent.Header.computedIDResolved:
+        // Nothing to do.
+        break
+      case RawKeyPathComponent.Header.computedIDUnresolvedFieldOffset:
+        // The value in the pattern is an offset into the type metadata that
+        // points to the field offset for the stored property identifying the
+        // component.
         _sanityCheck(header.payload
             & RawKeyPathComponent.Header.computedIDByStoredPropertyFlag != 0,
-          "only stored property IDs should need resolution")
-        newHeader.payload &=
-          ~RawKeyPathComponent.Header.computedUnresolvedIDFlag
+          "only stored property IDs should need offset resolution")
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
         id = metadataPtr.load(fromByteOffset: id, as: Int.self)
+      case RawKeyPathComponent.Header.computedIDUnresolvedIndirectPointer:
+        // The value in the pattern is a pointer to the actual unique word-sized
+        // value in memory.
+        let idPtr = UnsafeRawPointer(bitPattern: id).unsafelyUnwrapped
+        id = idPtr.load(as: Int.self)
+      default:
+        _sanityCheckFailure("unpossible")
       }
+      newHeader.payload &= ~RawKeyPathComponent.Header.computedIDResolutionMask
       pushDest(newHeader)
       pushDest(id)
       // Carry over the accessors.

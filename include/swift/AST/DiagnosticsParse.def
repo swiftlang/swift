@@ -107,7 +107,9 @@ ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
 ERROR(lex_invalid_curly_quote,none,
       "unicode curly quote found, replace with '\"'", ())
-
+NOTE(lex_confusable_character,none,
+      "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
+      (StringRef, StringRef))
 
 ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())
@@ -129,14 +131,17 @@ ERROR(lex_invalid_unicode_scalar,none,
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
 ERROR(lex_illegal_multiline_string_start,none,
-      "invalid start of multi-line string literal", ())
+      "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,
-      "invalid end of multi-line string literal", ())
-ERROR(lex_ambiguous_string_indent,none,
-      "invalid mix of multi-line string literal indentation", ())
-ERROR(lex_multiline_inside_interpolation,none,
-      "multi-line string literals are not allowed inside an interpolation", ())
-
+      "multi-line string literal closing delimiter must begin on a new line", ())
+ERROR(lex_multiline_string_indent_inconsistent,none,
+      "%select{unexpected space in|unexpected tab in|insufficient}2 indentation of "
+      "%select{line|next %1 lines}0 in multi-line string literal", 
+      (bool, unsigned, unsigned))
+NOTE(lex_multiline_string_indent_should_match_here,none,
+      "should match %select{space|tab}0 here", (unsigned))
+NOTE(lex_multiline_string_indent_change_line,none,
+      "change indentation of %select{this line|these lines}0 to match closing delimiter", (bool))
 
 ERROR(lex_invalid_character,none,
        "invalid character in source file", ())
@@ -1066,6 +1071,8 @@ ERROR(anon_closure_arg_in_closure_with_args,none,
 ERROR(anon_closure_arg_in_closure_with_args_typo,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments; did you mean '%0'?", (StringRef))
+ERROR(anon_closure_tuple_param_destructuring,none,
+      "closure tuple parameter does not support destructuring", ())
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_capture_specifier,none,
@@ -1169,15 +1176,14 @@ ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
 // Keypath expressions.
-ERROR(expr_keypath_invalid_component,PointsToFirstBadToken,
-      "key path can only contain property, subscript, optional chaining, or "
-      "optional force-unwrapping components", ())
 ERROR(expr_keypath_expected_lparen,PointsToFirstBadToken,
       "expected '(' following '#keyPath'", ())
 ERROR(expr_keypath_expected_property_or_type,PointsToFirstBadToken,
       "expected property or type name within '#keyPath(...)'", ())
 ERROR(expr_keypath_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#keyPath' expression", ())
+ERROR(expr_keypath_expected_expr,none,
+      "expected expression path in Swift key path",())
 
 // Selector expressions.
 ERROR(expr_selector_expected_lparen,PointsToFirstBadToken,
@@ -1403,9 +1409,11 @@ ERROR(where_without_generic_params,none,
       "'where' clause cannot be attached to "
       "%select{a non-generic|a protocol|an associated type}0 "
       "declaration", (unsigned))
-WARNING(where_inside_brackets,none,
+WARNING(swift3_where_inside_brackets,none,
         "'where' clause next to generic parameters is deprecated "
         "and will be removed in the future version of Swift", ())
+ERROR(where_inside_brackets,none,
+        "'where' clause next to generic parameters is obsoleted", ())
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics
@@ -1427,14 +1435,17 @@ ERROR(unsupported_platform_runtime_condition_argument,none,
 ERROR(unsupported_platform_condition_argument,none,
       "unexpected platform condition argument: expected %0",
       (StringRef))
-ERROR(unexpected_version_comparison_operator,none,
-      "expected '>=' prefix operator on a version requirement",
-      ())
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
 WARNING(swift3_unsupported_conditional_compilation_expression_type,none,
         "ignoring invalid conditional compilation expression, "
         "which will be rejected in future version of Swift", ())
+WARNING(swift3_conditional_compilation_expression_compound,none,
+        "ignoring parentheses in compound name, "
+        "which will be rejected in future version of Swift", ())
+WARNING(swift3_conditional_compilation_expression_precedence,none,
+        "future version of Swift have different rule for evaluating condition; "
+        "add parentheses to make the condition compatible with Swift4", ())
 ERROR(unsupported_conditional_compilation_integer,none,
       "'%0' is not a valid conditional compilation expression, use '%1'",
       (StringRef, StringRef))
@@ -1473,6 +1484,13 @@ ERROR(avail_query_unrecognized_platform_name,
 
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
+
+ERROR(avail_query_argument_and_shorthand_mix_not_allowed, PointsToFirstBadToken,
+      "'%0' can't be combined with shorthand specification '%1'",
+      (StringRef, StringRef))
+
+NOTE(avail_query_meant_introduced,PointsToFirstBadToken,
+     "did you mean to specify an introduction version?", ())
 
 ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())

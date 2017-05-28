@@ -68,10 +68,10 @@ UIntMax = 'UInt%s' % int_max_bits
 
 // FIXME(integers): remove these two aliases
 /// The largest native signed integer type.
-@available(swift, obsoleted: 4.0)
+@available(swift, obsoleted: 4.0, renamed: "${IntMax}")
 public typealias IntMax = ${IntMax}
 /// The largest native unsigned integer type.
-@available(swift, obsoleted: 4.0)
+@available(swift, obsoleted: 4.0, renamed: "${UIntMax}")
 public typealias UIntMax = ${UIntMax}
 
 infix operator &<< : BitwiseShiftPrecedence
@@ -978,8 +978,8 @@ def unsafeOperationComment(operator):
 /// The following example declares a method that calculates the total of any
 /// sequence with `Numeric` elements.
 ///
-///     extension Sequence where Iterator.Element: Numeric {
-///         func sum() -> Iterator.Element {
+///     extension Sequence where Element: Numeric {
+///         func sum() -> Element {
 ///             return reduce(0, +)
 ///         }
 ///     }
@@ -1016,7 +1016,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   ///     let y = Int8(exactly: 1_000)
   ///     // y == nil
   ///
-  /// - Parameter source: A floating-point value to convert to an integer.
+  /// - Parameter source: A value to convert to this type of integer.
   init?<T : BinaryInteger>(exactly source: T)
 
   // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just
@@ -1246,7 +1246,7 @@ extension Numeric {
 /// value is representable in the resulting type.
 ///
 ///     let e = Int8(exactly: 23.0)       // integral value, representable
-///     // e == Optional(127)
+///     // e == Optional(23)
 ///
 ///     let f = Int8(exactly: 23.75)      // fractional value, representable
 ///     // f == nil
@@ -1363,25 +1363,22 @@ public protocol BinaryInteger :
   /// - Parameter source: A floating-point value to convert to an integer.
   init?<T : FloatingPoint>(exactly source: T)
 
-  /// Creates an integer from the given floating-point value, truncating any
-  /// fractional part.
-  ///
-  /// Truncating the fractional part of `source` is equivalent to rounding
-  /// toward zero.
+  /// Creates an integer from the given floating-point value, rounding toward
+  /// zero.
   ///
   ///     let x = Int(21.5)
   ///     // x == 21
   ///     let y = Int(-21.5)
   ///     // y == -21
   ///
-  /// If `source` is outside the bounds of this type after truncation, a
-  /// runtime error may occur.
+  /// If `source` is outside the bounds of this type after rounding toward
+  /// zero, a runtime error may occur.
   ///
   ///     let z = UInt(-21.5)
   ///     // Error: ...the result would be less than UInt.min
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  ///   `source` must be representable in this type after truncation.
+  ///   `source` must be representable in this type after rounding toward zero.
   init<T : FloatingPoint>(_ source: T)
 
   /// Creates a new instance from the given integer.
@@ -1570,14 +1567,11 @@ extension BinaryInteger {
   public init?<T : FloatingPoint>(exactly source: T) {
     // FIXME(integers): implement
     fatalError()
-    return nil
   }
 
   @_transparent
   public func signum() -> Self {
-    if self < (0 as Self) { return -1 }
-    if self > (0 as Self) { return 1 }
-    return 0
+    return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
   }
 
   /// The number of words used for the current binary representation of this
@@ -1979,12 +1973,12 @@ public enum ArithmeticOverflow {
 ///     extension FixedWidthInteger {
 ///         var binaryString: String {
 ///             var result: [String] = []
-///             for i in Swift.stride(from: 0, to: Self.bitWidth, by: 8) {
-///                 let wordValue = UInt8(extendingOrTruncating: self >> i)
-///                 let word = String(wordValue, radix: 2)
+///             for i in 0..<(Self.bitWidth / 8) {
+///                 let byte = UInt8(extendingOrTruncating: self >> (i * 8))
+///                 let byteString = String(byte, radix: 2)
 ///                 let padding = String(repeating: "0",
-///                                      count: 8 - word.characters.count)
-///                 result.append(padding + word)
+///                                      count: 8 - byteString.count)
+///                 result.append(padding + byteString)
 ///             }
 ///             return "0b" + result.reversed().joined(separator: "_")
 ///         }
@@ -2012,9 +2006,9 @@ public enum ArithmeticOverflow {
 ///         return result
 ///     }
 ///
-///     let (x, y): (Int8, Int8) = (10, 100)
+///     let (x, y): (Int8, Int8) = (9, 123)
 ///     print(squared(x))
-///     // Prints "Optional(100)"
+///     // Prints "Optional(81)"
 ///     print(squared(y))
 ///     // Prints "nil"
 ///
@@ -2406,14 +2400,14 @@ extension UnsignedInteger {
   @_transparent
   internal func renderNonZeroDescription() -> String {
     let ascii0 = 48
-    var buf: [UnicodeScalar] = []
+    var buf: [Unicode.Scalar] = []
 
     var x = self
     repeat {
       let r = x % 10
       x /= 10
       buf.append(
-        UnicodeScalar(
+        Unicode.Scalar(
           ascii0 + Int(UInt(extendingOrTruncating: r)._value))!)
     }
     while x != (0 as Self)
@@ -2565,6 +2559,17 @@ extension SignedInteger where Self : FixedWidthInteger {
 %   u = 's' if signed else 'u'
 %   U = 'U' if signed else ''
 %   z = 's' if signed else 'z'
+
+%   Article = 'An' if bits == 8 else 'A'
+%   if bits == word_bits:
+/// ${'A ' if signed else 'An un'}signed integer value type.
+///
+/// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and
+/// on 64-bit platforms, `${Self}` is the same size as `${Self}64`.
+%   else:
+/// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
+/// type.
+%   end
 @_fixed_layout
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
@@ -2640,92 +2645,6 @@ public struct ${Self}
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
   }
-
-// FIXME(integers): it should be possible to turn this into an optimizer pass
-%   if Self != 'Int':
-  @_transparent
-  public static func < (lhs: ${Self}, rhs: Int) -> Bool {
-%     if not signed:
-    if rhs < 0 { return false }
-%     end
-
-%     if bits < word_bits:
-    let lhs_ = Int(_truncatingBits: lhs._lowUWord)
-    return lhs_ < rhs
-%     elif bits == word_bits:
-    return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
-%     else:
-    let rhs_ = ${Self}(_truncatingBits: rhs._lowUWord)
-    return lhs < rhs_
-%     end
-  }
-
-  @_transparent
-  public static func < (lhs: Int, rhs: ${Self}) -> Bool {
-%     if not signed:
-    if lhs < 0 { return true }
-%     end
-%     if bits < word_bits:
-    let rhs_ = Int(_truncatingBits: rhs._lowUWord)
-    return lhs < rhs_
-%     elif bits == word_bits:
-    return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
-%     else:
-    let lhs_ = ${Self}(_truncatingBits: lhs._lowUWord)
-    return lhs_ < rhs
-%     end
-  }
-
-%     for Args in ['lhs: %s, rhs: Int' % Self, 'lhs: Int, rhs: %s' % Self]:
-  @_transparent
-  public static func > (${Args}) -> Bool {
-    return rhs < lhs
-  }
-
-  @_transparent
-  public static func <= (${Args}) -> Bool {
-    return !(rhs < lhs)
-  }
-
-  @_transparent
-  public static func >= (${Args}) -> Bool {
-    return !(lhs < rhs)
-  }
-
-%     end
-
-%   else: # if Self != 'Int'
-
-  // FIXME(integers): Comparable default implementations should really be
-  // chosen by the compiler. <rdar://problem/29340480>
-  @_transparent
-  public static func > (lhs: Int, rhs: Int) -> Bool {
-    return rhs < lhs
-  }
-
-  @_transparent
-  public static func <= (lhs: Int, rhs: Int) -> Bool {
-    return !(rhs < lhs)
-  }
-
-  @_transparent
-  public static func >= (lhs: Int, rhs: Int) -> Bool {
-    return !(lhs < rhs)
-  }
-
-%   end # if Self != 'Int'
-
-// FIXME(integers): pending compiler improvements.
-// Basically, most simple arithmetic expressions become too complex when `+`
-// gets defined on the protocol rather than on concrete type.
-%       for x in chain(*binaryArithmetic.values()):
-  @_transparent
-  public static func ${x.operator}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
-%       end
 
 // FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
@@ -2836,6 +2755,7 @@ public struct ${Self}
 % end
 
 % for x in maskingShifts:
+
 ${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
@@ -2844,16 +2764,6 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
   }
 
-${operatorComment(x.operator, True)}
-  // FIXME(integers): this overload is not necessary, as there is one in the
-  // protocol extension. But omitting it makes a lot of expressions too complex
-  // to typecheck.
-  @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
-    var lhs = lhs
-    lhs ${x.operator}= rhs
-    return lhs
-  }
 % end
 
   @_transparent
@@ -3110,6 +3020,13 @@ ${operatorComment(x.operator, True)}
 
   @available(swift, obsoleted: 4)
   public static var _sizeInBytes: ${Self} { return ${bits}/8 }
+
+  @inline(__always)
+  public func signum() -> ${Self} {
+    let isPositive = ${Self}(Builtin.zext_Int1_Int${bits}(
+      (self > (0 as ${Self}))._value))
+    return isPositive | (self &>> ${bits - 1})
+  }
 }
 %# end of concrete type: ${Self}
 
@@ -3198,6 +3115,48 @@ extension ${Self} {
 }
 %   end
 % end
+
+
+// FIXME(integers): this section here is to help the typechecker,
+// as it seems to have problems with a pattern where the nonmutating operation
+// is defined on a protocol in terms of a mutating one that is itself defined
+// on concrete types.
+extension ${Self} {
+
+%   for x in binaryBitwise + maskingShifts + list(chain(*binaryArithmetic.values())):
+
+  @_transparent
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
+    return lhs
+  }
+
+%   end
+
+%   for op in maskingShifts:
+
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> ${Self} {
+    var lhs = lhs
+    ${op.helper}Generic(&lhs, rhs)
+    return lhs
+  }
+
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}=(
+    lhs: inout ${Self}, rhs: ${Self}
+  ) {
+    ${op.helper}Generic(&lhs, rhs)
+  }
+
+%   end
+}
+
 
 % if signed:
 // TODO: Consider removing the underscore.
@@ -3554,7 +3513,7 @@ public typealias Integer = BinaryInteger
 public typealias IntegerArithmetic = BinaryInteger
 
 @available(swift, obsoleted: 4)
-public typealias SignedNumber = SignedNumeric
+public typealias SignedNumber = SignedNumeric & Comparable
 
 @available(swift, obsoleted: 4)
 public typealias AbsoluteValuable = SignedNumeric & Comparable

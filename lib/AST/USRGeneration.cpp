@@ -149,18 +149,13 @@ static bool shouldUseObjCUSR(const Decl *D) {
                  isa<TypeDecl>(D))) // nested types aren't supported
     return false;
 
-  if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (auto *PD = dyn_cast<ProtocolDecl>(D))
-      if (auto known = PD->getKnownProtocolKind())
-        if (known == KnownProtocolKind::AnyObject)
-          return false;
-
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
     if (isa<EnumElementDecl>(VD))
       return true;
     return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);
   }
 
-  if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (auto ExtendedType = ED->getExtendedType()) {
       auto baseClass = ExtendedType->getClassOrBoundGenericClass();
       return baseClass && shouldUseObjCUSR(baseClass) && !baseClass->isForeign();

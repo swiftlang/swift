@@ -12,8 +12,8 @@
 # ----------------------------------------------------------------------------
 #
 # Fails if the input file is named "bad.swift" or "crash.swift"; otherwise
-# dispatches to update-dependencies.py. "crash.swift" gives an exit code
-# other than 1.
+# dispatches to update-dependencies.py. "crash.swift" results in an
+# exit-by-SIGKILL
 #
 # ----------------------------------------------------------------------------
 
@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import os
 import shutil
+import signal
 import sys
 
 assert sys.argv[1] == '-frontend'
@@ -42,7 +43,8 @@ if (os.path.basename(primaryFile) == 'bad.swift' or
     if os.path.basename(primaryFile) == 'bad.swift':
         sys.exit(1)
     else:
-        sys.exit(129)
+        sys.stdout.flush()
+        os.kill(os.getpid(), signal.SIGKILL)
 
 execDir = os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(execDir, "update-dependencies.py")).read())

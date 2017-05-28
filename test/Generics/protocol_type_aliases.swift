@@ -62,7 +62,7 @@ protocol Q3: P3 {
 protocol P3_1 {
     typealias T = Float // expected-error{{type alias 'T' requires types 'P3.T' (aka 'Int') and 'Float' to be the same}}
 }
-protocol Q3_1: P3, P3_1 {}
+protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types 'Float'}}
 
 // FIXME: these shouldn't be necessary to trigger the errors above, but are, due to
 // the 'recursive decl validation' FIXME in GenericSignatureBuilder.cpp.

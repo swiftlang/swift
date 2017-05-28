@@ -101,3 +101,14 @@ typedef id <Fungible> FungibleObject;
 + (FungibleAnimalContainer *)getFungibleContainer;
 
 @end
+
+@interface First<__covariant T> : NSObject
+@end
+
+@interface Second<__covariant T> : First<T>
+@end
+
+@class Third;
+
+@interface Third : Second<Third *>
+@end

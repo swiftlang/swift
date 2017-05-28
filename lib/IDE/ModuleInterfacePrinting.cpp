@@ -450,12 +450,12 @@ void swift::ide::printSubmoduleInterface(
 
   // Sort imported declarations in source order *within a submodule*.
   for (auto &P : ClangDecls) {
-    std::sort(P.second.begin(), P.second.end(),
-              [&](std::pair<Decl *, clang::SourceLocation> LHS,
-                  std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
-                return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
-                                                                    RHS.second);
-              });
+    std::stable_sort(P.second.begin(), P.second.end(),
+                     [&](std::pair<Decl *, clang::SourceLocation> LHS,
+                         std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
+      return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
+                                                          RHS.second);
+    });
   }
 
   // Sort Swift declarations so that we print them in a consistent order.

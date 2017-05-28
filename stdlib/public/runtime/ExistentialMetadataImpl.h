@@ -232,6 +232,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         // Move dest value asside so we can destroy it later.
         destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
 
+        src->copyTypeInto(dest, args...);
         if (srcVwt->isValueInline()) {
           // Inline src value.
 
@@ -252,6 +253,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         auto *destRef =
             *reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
 
+        src->copyTypeInto(dest, args...);
         if (srcVwt->isValueInline()) {
 
           // initWithCopy.
@@ -329,6 +331,8 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
 
         // Move dest value asside.
         destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
+
+        src->copyTypeInto(dest, args...);
         if (srcVwt->isValueInline()) {
           // Inline src value.
 
@@ -349,6 +353,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         auto *destRef =
             *reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
 
+        src->copyTypeInto(dest, args...);
         if (srcVwt->isValueInline()) {
           // initWithCopy.
 

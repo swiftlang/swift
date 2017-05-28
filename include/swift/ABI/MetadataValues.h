@@ -226,10 +226,8 @@ enum class SpecialProtocol: uint8_t {
   ///
   /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
   None = 0,
-  /// The AnyObject protocol.
-  AnyObject = 1,
   /// The Error protocol.
-  Error = 2,
+  Error = 1,
 };
 
 /// Identifiers for protocol method dispatch strategies.
@@ -244,10 +242,6 @@ enum class ProtocolDispatchStrategy: uint8_t {
   /// To invoke methods of this protocol, a pointer to a protocol witness table
   /// corresponding to the protocol conformance must be available.
   Swift = 1,
-  
-  /// The protocol guarantees that it has no methods to dispatch. It requires
-  /// neither Objective-C metadata nor a witness table.
-  Empty = 2,
 };
 
 /// Flags in a generic nominal type descriptor.
@@ -375,7 +369,6 @@ public:
   static bool needsWitnessTable(ProtocolDispatchStrategy strategy) {
     switch (strategy) {
     case ProtocolDispatchStrategy::ObjC:
-    case ProtocolDispatchStrategy::Empty:
       return false;
     case ProtocolDispatchStrategy::Swift:
       return true;
@@ -410,8 +403,8 @@ class ExistentialTypeFlags {
   };
   int_type Data;
 
-  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
 public:
+  constexpr ExistentialTypeFlags(int_type Data) : Data(Data) {}
   constexpr ExistentialTypeFlags() : Data(0) {}
   constexpr ExistentialTypeFlags withNumWitnessTables(unsigned numTables) const {
     return ExistentialTypeFlags((Data & ~NumWitnessTablesMask) | numTables);
@@ -577,11 +570,27 @@ public:
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
   Modify           = 0x1,
-  ActionMask       = 0x1
+  // Leave space for other actions.
+  // Don't rely on ActionMask in stable ABI.
+  ActionMask       = 0x1,
+
+  // Downgrade exclusivity failures to a warning.
+  WarningOnly      = 0x10
 };
+static inline ExclusivityFlags operator|(ExclusivityFlags lhs,
+                                         ExclusivityFlags rhs) {
+  return ExclusivityFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline ExclusivityFlags &operator|=(ExclusivityFlags &lhs,
+                                           ExclusivityFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
 static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
   return ExclusivityFlags(uintptr_t(flags)
                         & uintptr_t(ExclusivityFlags::ActionMask));
+}
+static inline bool isWarningOnly(ExclusivityFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 
 } // end namespace swift

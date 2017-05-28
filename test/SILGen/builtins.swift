@@ -792,7 +792,7 @@ func refcast_generic_any<T>(_ o: T) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins17refcast_class_anys9AnyObject_pAA1ACF :
+// CHECK-LABEL: sil hidden @_T08builtins17refcast_class_anyyXlAA1ACF :
 // CHECK: bb0([[ARG:%.*]] : $A):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -800,7 +800,7 @@ func refcast_generic_any<T>(_ o: T) -> AnyObject {
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[ARG_COPY_CASTED]]
-// CHECK: } // end sil function '_T08builtins17refcast_class_anys9AnyObject_pAA1ACF'
+// CHECK: } // end sil function '_T08builtins17refcast_class_anyyXlAA1ACF'
 func refcast_class_any(_ o: A) -> AnyObject {
   return Builtin.castReference(o)
 }
@@ -811,7 +811,7 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_T08builtins18refcast_pclass_anys9AnyObject_pAA6PClass_pF :
+// CHECK-LABEL: sil hidden @_T08builtins18refcast_pclass_anyyXlAA6PClass_pF :
 // CHECK: bb0([[ARG:%.*]] : $PClass):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -819,7 +819,7 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[ARG_COPY_CAST]]
-// CHECK: } // end sil function '_T08builtins18refcast_pclass_anys9AnyObject_pAA6PClass_pF'
+// CHECK: } // end sil function '_T08builtins18refcast_pclass_anyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
   return Builtin.castReference(o)
 }

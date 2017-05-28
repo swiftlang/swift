@@ -235,6 +235,8 @@ namespace {
     /// deserialization if the function body for F should be deserialized.
     bool shouldEmitFunctionBody(const SILFunction *F, bool isReference = true);
 
+    IdentifierID addSILFunctionRef(SILFunction *F);
+
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
                   llvm::BitstreamWriter &Out, bool serializeAll)
@@ -466,8 +468,15 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
   ListOfValues.push_back(S.addDeclRef(Ref.getDecl()));
   ListOfValues.push_back((unsigned)Ref.kind);
   ListOfValues.push_back((unsigned)Ref.getResilienceExpansion());
-  ListOfValues.push_back(Ref.uncurryLevel);
+  ListOfValues.push_back(Ref.getUncurryLevel());
   ListOfValues.push_back(Ref.isForeign);
+}
+
+/// Get an identifier ref for a SILFunction and add it to the list of referenced
+/// functions.
+IdentifierID SILSerializer::addSILFunctionRef(SILFunction *F) {
+  addReferencedSILFunction(F);
+  return S.addIdentifierRef(Ctx.getIdentifier(F->getName()));
 }
 
 /// Helper function to update ListOfValues for MethodInst. Format:
@@ -1042,12 +1051,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::CondFailInst:
   case ValueKind::RetainValueInst:
+  case ValueKind::RetainValueAddrInst:
   case ValueKind::UnmanagedRetainValueInst:
   case ValueKind::EndBorrowArgumentInst:
   case ValueKind::CopyValueInst:
   case ValueKind::CopyUnownedValueInst:
   case ValueKind::DestroyValueInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::ReleaseValueAddrInst:
   case ValueKind::UnmanagedReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
   case ValueKind::UnmanagedAutoreleaseValueInst:
@@ -1108,10 +1119,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(FRI->getType().getSwiftRValueType()),
         (unsigned)FRI->getType().getCategory(),
-        S.addIdentifierRef(Ctx.getIdentifier(ReferencedFunction->getName())));
+        addSILFunctionRef(ReferencedFunction));
 
-    // Make sure we declare the referenced function.
-    addReferencedSILFunction(ReferencedFunction);
     break;
   }
   case ValueKind::DeallocPartialRefInst:
@@ -1819,8 +1828,93 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case ValueKind::KeyPathInst: {
+    auto KPI = cast<KeyPathInst>(&SI);
+    SmallVector<ValueID, 6> ListOfValues;
+
+    auto pattern = KPI->getPattern();
+    ListOfValues.push_back(S.addTypeRef(pattern->getRootType()));
+    ListOfValues.push_back(S.addTypeRef(pattern->getValueType()));
+    ListOfValues.push_back(pattern->getComponents().size());
+    ListOfValues.push_back(pattern->getNumOperands());
+    ListOfValues.push_back(KPI->getSubstitutions().size());
+    
+    ListOfValues.push_back(
+       S.addIdentifierRef(Ctx.getIdentifier(pattern->getObjCString())));
+
+    ArrayRef<Requirement> reqts;
+    if (auto sig = pattern->getGenericSignature()) {
+      ListOfValues.push_back(sig->getGenericParams().size());
+      for (auto param : sig->getGenericParams())
+        ListOfValues.push_back(S.addTypeRef(param));
+      reqts = sig->getRequirements();
+    } else {
+      ListOfValues.push_back(0);
+    }
+    
+    for (auto &component : pattern->getComponents()) {
+      auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
+        ListOfValues.push_back((unsigned)kind);
+        ListOfValues.push_back(S.addTypeRef(component.getComponentType()));
+      };
+      auto handleComputedId = [&](KeyPathPatternComponent::ComputedPropertyId id) {
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          ListOfValues.push_back(
+            (unsigned)KeyPathComputedComponentIdKindEncoding::Property);
+          ListOfValues.push_back(S.addDeclRef(id.getProperty()));
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          ListOfValues.push_back(
+            (unsigned)KeyPathComputedComponentIdKindEncoding::Function);
+          ListOfValues.push_back(addSILFunctionRef(id.getFunction()));
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef:
+          ListOfValues.push_back(
+            (unsigned)KeyPathComputedComponentIdKindEncoding::DeclRef);
+          handleSILDeclRef(S, id.getDeclRef(), ListOfValues);
+          break;
+        }
+      };
+    
+      switch (component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty:
+        handleComponentCommon(KeyPathComponentKindEncoding::StoredProperty);
+        ListOfValues.push_back(S.addDeclRef(component.getStoredPropertyDecl()));
+        break;
+      case KeyPathPatternComponent::Kind::GettableProperty:
+        handleComponentCommon(KeyPathComponentKindEncoding::GettableProperty);
+        handleComputedId(component.getComputedPropertyId());
+        ListOfValues.push_back(
+                      addSILFunctionRef(component.getComputedPropertyGetter()));
+        assert(component.getComputedPropertyIndices().empty()
+               && "indices not implemented");
+        break;
+      case KeyPathPatternComponent::Kind::SettableProperty:
+        handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
+        handleComputedId(component.getComputedPropertyId());
+        ListOfValues.push_back(
+                      addSILFunctionRef(component.getComputedPropertyGetter()));
+        ListOfValues.push_back(
+                      addSILFunctionRef(component.getComputedPropertySetter()));
+        assert(component.getComputedPropertyIndices().empty()
+               && "indices not implemented");
+        break;
+      }
+    }
+    
+    assert(KPI->getAllOperands().empty() && "operands not implemented yet");
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+         SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+         S.addTypeRef(KPI->getType().getSwiftRValueType()),
+         (unsigned)KPI->getType().getCategory(),
+         ListOfValues);
+    S.writeGenericRequirements(reqts, SILAbbrCodes);
+    S.writeSubstitutions(KPI->getSubstitutions(), SILAbbrCodes);
+
+    break;
+  }
   case ValueKind::MarkUninitializedBehaviorInst:
-  case ValueKind::KeyPathInst:
     llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.

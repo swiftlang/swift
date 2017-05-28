@@ -52,10 +52,10 @@ getValueFromSwiftValue(_SwiftValue *v);
 /// or nil if it is not.
 _SwiftValue *getAsSwiftValue(id object);
 
-/// Find conformances for SwiftValue to the given list of protocols.
+/// Find conformances for SwiftValue to the given existential type.
 ///
 /// Returns true if SwiftValue does conform to all the protocols.
-bool findSwiftValueConformances(const ProtocolDescriptorList &protocols,
+bool findSwiftValueConformances(const ExistentialTypeMetadata *existentialType,
                                 const WitnessTable **tablesBuffer);
 
 } // namespace swift

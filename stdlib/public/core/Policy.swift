@@ -250,22 +250,12 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 ///     // Prints "The value of 'obj' is 100"
 ///
 /// - SeeAlso: `AnyClass`
-@objc
-public protocol AnyObject : class {}
 #else
 /// The protocol to which all classes implicitly conform.
 ///
 /// - SeeAlso: `AnyClass`
-public protocol AnyObject : class {}
 #endif
-// Implementation note: the `AnyObject` protocol *must* not have any method or
-// property requirements.
-
-// FIXME: AnyObject should have an alternate version for non-objc without
-// the @objc attribute, but AnyObject needs to be not be an address-only
-// type to be able to be the target of castToNativeObject and an empty
-// non-objc protocol appears not to be. There needs to be another way to make
-// this the right kind of object.
+public typealias AnyObject = Builtin.AnyObject
 
 /// The protocol to which all class types implicitly conform.
 ///
@@ -660,6 +650,9 @@ infix operator   ^ : AdditionPrecedence
 // FIXME: is this the right precedence level for "..." ?
 infix operator  ... : RangeFormationPrecedence
 infix operator  ..< : RangeFormationPrecedence
+postfix operator ...
+prefix operator ...
+prefix operator ..<
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:

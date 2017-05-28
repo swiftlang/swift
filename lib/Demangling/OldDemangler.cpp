@@ -32,12 +32,6 @@ using namespace Demangle;
 using llvm::Optional;
 using llvm::None;
 
-[[noreturn]]
-static void unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
-
 namespace {
   struct FindPtr {
     FindPtr(Node *v) : Target(v) {}
@@ -575,7 +569,8 @@ private:
       return true;
     }
 
-    unreachable("Unknown constant prop specialization");
+    // Unknown constant prop specialization
+    return false;
   }
 
   bool demangleFuncSigSpecializationClosureProp(NodePointer parent) {
@@ -863,8 +858,7 @@ private:
     if (Mangled.nextIf('o'))
       return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     if (Mangled.nextIf('C'))
-      return Factory.createNode(Node::Kind::Module,
-                                MANGLING_MODULE_CLANG_IMPORTER);
+      return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_C);
     if (Mangled.nextIf('a'))
       return createSwiftType(Node::Kind::Structure, "Array");
     if (Mangled.nextIf('b'))
@@ -1484,7 +1478,8 @@ private:
       return Factory.createNode(Node::Kind::MetatypeRepresentation,
                                  "@objc_metatype");
 
-    unreachable("Unhandled metatype representation");
+    // Unknown metatype representation
+    return nullptr;
   }
   
   NodePointer demangleGenericRequirement() {
@@ -1547,7 +1542,7 @@ private:
           return nullptr;
         name = "m";
       } else {
-        unreachable("Unknown layout constraint");
+        return nullptr;
       }
 
       NodePointer second = Factory.createNode(kind, name);
@@ -2115,7 +2110,7 @@ private:
       case ImplConventionContext::Parameter: return (FOR_PARAMETER); \
       case ImplConventionContext::Result: return (FOR_RESULT);       \
       }                                                              \
-      unreachable("bad context");                               \
+      return StringRef();                                            \
     }
     auto Nothing = StringRef();
     CASE('a',   Nothing,                Nothing,         "@autoreleased")
@@ -2178,18 +2173,18 @@ private:
         return nullptr;
       kind = Node::Kind::ImplErrorResult;
     }
-  
-    auto getContext = [](Node::Kind kind) -> ImplConventionContext {
-      if (kind == Node::Kind::ImplParameter)
-        return ImplConventionContext::Parameter;
-      else if (kind == Node::Kind::ImplResult
-               || kind == Node::Kind::ImplErrorResult)
-        return ImplConventionContext::Result;
-      else
-        unreachable("unexpected node kind");
-    };
 
-    auto convention = demangleImplConvention(getContext(kind));
+    ImplConventionContext ConvCtx;
+    if (kind == Node::Kind::ImplParameter) {
+      ConvCtx = ImplConventionContext::Parameter;
+    } else if (kind == Node::Kind::ImplResult
+               || kind == Node::Kind::ImplErrorResult) {
+      ConvCtx = ImplConventionContext::Result;
+    } else {
+      return nullptr;
+    }
+
+    auto convention = demangleImplConvention(ConvCtx);
     if (convention.empty()) return nullptr;
     auto type = demangleType();
     if (!type) return nullptr;

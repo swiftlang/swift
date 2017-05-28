@@ -911,7 +911,8 @@ public:
                   ImportTypeKind kind,
                   bool allowNSUIntegerAsInt,
                   bool canFullyBridgeTypes,
-                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
+                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
+                  bool resugarNSErrorPointer = true);
 
   /// \brief Import the given function type.
   ///
@@ -1128,6 +1129,8 @@ public:
       ASD->setSetterAccessibility(access);
     // All imported decls are constructed fully validated.
     D->setValidationStarted();
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
+      AFD->setNeedsNewVTableEntry(false);
     return D;
   }
 
@@ -1167,6 +1170,23 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
 
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context that
+  /// will eventually reference that declaration, the contexts will still be
+  /// considered distinct.
+  ///
+  /// The names are generated in the same order as
+  /// forEachImportNameVersionFromCurrent. The current name is always first.
+  void forEachDistinctName(
+      const clang::NamedDecl *decl,
+      llvm::function_ref<void(importer::ImportedName,
+                              importer::ImportNameVersion)> action);
+
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
 
@@ -1193,6 +1213,32 @@ namespace importer {
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
+
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
+    if (!alias->isCompatibilityAlias())
+      return nullptr;
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  }
+  return dyn_cast_or_null<T>(D);
+}
+
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *castIgnoringCompatibilityAlias(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
+    assert(alias->isCompatibilityAlias() &&
+           "non-compatible typealias found where nominal was expected");
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  }
+  return cast_or_null<T>(D);
+}
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;

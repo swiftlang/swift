@@ -145,13 +145,15 @@ public:
 
   /// Retrieve the type witness for the given associated type.
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      LazyResolver *resolver) const;
+                      LazyResolver *resolver,
+                      SubstOptions options = None) const;
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        LazyResolver *resolver) const;
+                        LazyResolver *resolver,
+                        SubstOptions options = None) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
@@ -399,7 +401,8 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        LazyResolver *resolver) const;
+                        LazyResolver *resolver,
+                        SubstOptions options = None) const;
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
@@ -568,7 +571,8 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        LazyResolver *resolver) const;
+                        LazyResolver *resolver,
+                        SubstOptions options = None) const;
 
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
@@ -662,8 +666,10 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        LazyResolver *resolver) const {
-    return InheritedConformance->getTypeWitnessAndDecl(assocType, resolver);
+                        LazyResolver *resolver,
+                        SubstOptions options = None) const {
+    return InheritedConformance->getTypeWitnessAndDecl(assocType, resolver,
+                                                       options);
   }
 
   /// Given that the requirement signature of the protocol directly states

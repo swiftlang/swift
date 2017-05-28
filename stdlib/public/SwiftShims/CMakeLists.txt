@@ -29,11 +29,13 @@ set(sources
   FoundationOverlayShims.h
   FoundationShimSupport.h
   NSCalendarShims.h
+  NSCharacterSetShims.h
   NSCoderShims.h
   NSDataShims.h
   NSDictionaryShims.h
   NSErrorShims.h
   NSFileManagerShims.h
+  NSIndexPathShims.h
   NSIndexSetShims.h
   NSKeyedArchiverShims.h
   NSLocaleShims.h

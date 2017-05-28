@@ -711,22 +711,73 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
-  return clang::ASTReader::isAcceptableASTFile(PCHFilename,
-    Impl.Instance->getFileManager(),
-    Impl.Instance->getPCHContainerReader(),
-    Impl.Instance->getLangOpts(),
-    Impl.Instance->getTargetOpts(),
-    Impl.Instance->getPreprocessorOpts(),
-    Impl.Instance->getSpecificModuleCachePath());
+  if (!llvm::sys::fs::exists(PCHFilename))
+    return false;
+
+  // FIXME: The following attempts to do an initial ReadAST invocation to verify
+  // the PCH, without affecting the existing CompilerInstance.
+  // Look into combining creating the ASTReader along with verification + update
+  // if necesary, so that we can create and use one ASTReader in the common case
+  // when there is no need for update.
+
+  CompilerInstance &CI = *Impl.Instance;
+  auto clangDiags = CompilerInstance::createDiagnostics(
+                                              new clang::DiagnosticOptions());
+  clang::SourceManager clangSrcMgr(*clangDiags, CI.getFileManager());
+  auto FID = clangSrcMgr.createFileID(
+                        llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
+  clangSrcMgr.setMainFileID(FID);
+  clang::Preprocessor PP(CI.getInvocation().getPreprocessorOptsPtr(),
+                         *clangDiags,
+                         CI.getLangOpts(),
+                         clangSrcMgr,
+                         CI.getPCMCache(),
+                         CI.getPreprocessor().getHeaderSearchInfo(), CI,
+                         /*IILookup=*/nullptr,
+                         /*OwnsHeaderSearch=*/false);
+  PP.Initialize(CI.getTarget());
+  clang::ASTContext ctx(CI.getLangOpts(), clangSrcMgr,
+                        PP.getIdentifierTable(), PP.getSelectorTable(),
+                        PP.getBuiltinInfo());
+
+  std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
+      PP, ctx, CI.getPCHContainerReader(),
+      CI.getFrontendOpts().ModuleFileExtensions,
+      CI.getHeaderSearchOpts().Sysroot,
+      /*DisableValidation*/ false,
+      /*AllowPCHWithCompilerErrors*/ false,
+      /*AllowConfigurationMismatch*/ false,
+      /*ValidateSystemInputs*/ true));
+  ctx.InitBuiltinTypes(CI.getTarget());
+
+  auto result = Reader->ReadAST(PCHFilename,
+                  clang::serialization::MK_PCH,
+                  clang::SourceLocation(),
+                  clang::ASTReader::ARR_None);
+  switch (result) {
+  case clang::ASTReader::Success:
+    return true;
+  case clang::ASTReader::Failure:
+  case clang::ASTReader::Missing:
+  case clang::ASTReader::OutOfDate:
+  case clang::ASTReader::VersionMismatch:
+    return false;
+  case clang::ASTReader::ConfigurationMismatch:
+  case clang::ASTReader::HadErrors:
+    assert(0 && "unexpected ASTReader failure for PCH validation");
+    return false;
+  }
 }
 
 Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                              const std::string &SwiftPCHHash) {
+                              StringRef SwiftPCHHash, bool &isExplicit) {
   if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
         .endswith(PCH_EXTENSION)) {
+    isExplicit = true;
     return ImporterOptions.BridgingHeader;
   }
+  isExplicit = false;
 
   const auto &BridgingHeader = ImporterOptions.BridgingHeader;
   const auto &PCHOutputDir = ImporterOptions.PrecompiledHeaderOutputDir;
@@ -740,7 +791,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   PCHBasename.append(SwiftPCHHash);
   PCHBasename.append("-clang_");
   PCHBasename.append(getClangModuleHash());
-  llvm::sys::path::replace_extension(PCHBasename, ".pch");
+  PCHBasename.append(".pch");
   SmallString<256> PCHFilename { PCHOutputDir };
   llvm::sys::path::append(PCHFilename, PCHBasename);
   return PCHFilename.str().str();
@@ -749,21 +800,24 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
 
 Optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              const std::string &SwiftPCHHash) {
-  auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash);
+                              StringRef SwiftPCHHash) {
+  bool isExplicit;
+  auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
+                                    isExplicit);
   if (!PCHFilename.hasValue()) {
     return None;
   }
-  if (!canReadPCH(PCHFilename.getValue())) {
-    SmallString<256> Message;
-    llvm::raw_svector_ostream OS(Message);
-    auto Diags = new clang::TextDiagnosticPrinter {
-      llvm::errs(),
-      &Impl.Instance->getDiagnosticOpts()
-    };
+  if (!isExplicit && !ImporterOptions.PCHDisableValidation &&
+      !canReadPCH(PCHFilename.getValue())) {
+    StringRef parentDir = llvm::sys::path::parent_path(PCHFilename.getValue());
+    std::error_code EC = llvm::sys::fs::create_directories(parentDir);
+    if (EC) {
+      llvm::errs() << "failed to create directory '" << parentDir << "': "
+        << EC.message();
+      return None;
+    }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.getValue(),
-                                        Diags);
+                                        PCHFilename.getValue());
     if (FailedToEmit) {
       return None;
     }
@@ -1244,8 +1298,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
 bool
 ClangImporter::emitBridgingPCH(StringRef headerPath,
-                               StringRef outputPCHPath,
-                               clang::DiagnosticConsumer *Diags) {
+                               StringRef outputPCHPath) {
   auto invocation = std::make_shared<clang::CompilerInvocation>
     (clang::CompilerInvocation(*Impl.Invocation));
   invocation->getFrontendOpts().DisableFree = false;
@@ -1258,12 +1311,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations());
   emitInstance.setInvocation(std::move(invocation));
-
-  auto ReusingDiags = Diags == nullptr;
-  if (ReusingDiags) {
-    Diags = &Impl.Instance->getDiagnosticClient();
-  }
-  emitInstance.createDiagnostics(Diags, /*ShouldOwnClient=*/!ReusingDiags);
+  emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
+                                 /*ShouldOwnClient=*/false);
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   emitInstance.setFileManager(&fileManager);
@@ -2584,7 +2633,7 @@ clang::CodeGenOptions &ClangImporter::getClangCodeGenOpts() const {
 }
 
 std::string ClangImporter::getClangModuleHash() const {
-  return Impl.Invocation->getModuleHash();
+  return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
@@ -2953,7 +3002,7 @@ void ClangImporter::Implementation::lookupValue(
           auto alternateNamedDecl =
               cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
                                                      nameVersion));
-          if (!alternateNamedDecl)
+          if (!alternateNamedDecl || alternateNamedDecl == decl)
             return;
           assert(alternateNamedDecl->getFullName().matchesRef(name) &&
                  "importFullName behaved differently from importDecl");
@@ -2992,37 +3041,30 @@ void ClangImporter::Implementation::lookupObjCMembers(
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
-    // Import the declaration.
-    auto decl =
-        cast_or_null<ValueDecl>(importDeclReal(clangDecl, CurrentVersion));
-    if (!decl)
-      continue;
+    forEachDistinctName(clangDecl,
+                        [&](ImportedName importedName,
+                            ImportNameVersion nameVersion) {
+      // Import the declaration.
+      auto decl =
+          cast_or_null<ValueDecl>(importDeclReal(clangDecl, nameVersion));
+      if (!decl)
+        return;
 
-    // If the name we found matches, report the declaration.
-    bool matchedAny = false;
-    if (decl->getFullName().matchesRef(name)) {
-      consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
-      matchedAny = true;
-    }
-
-    // Check for an alternate declaration; if it's name matches,
-    // report it.
-    for (auto alternate : getAlternateDecls(decl)) {
-      if (alternate->getFullName().matchesRef(name)) {
-        consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
-        matchedAny = true;
+      // If the name we found matches, report the declaration.
+      // FIXME: If we didn't need to check alternate decls here, we could avoid
+      // importing the member at all by checking importedName ahead of time.
+      if (decl->getFullName().matchesRef(name)) {
+        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
       }
-    }
 
-    // If we didn't find anything, try under the Swift 2 name.
-    if (!matchedAny) {
-      if (auto swift2Decl = cast_or_null<ValueDecl>(
-                              importDeclReal(clangDecl, Version::Swift2))) {
-        if (swift2Decl->getFullName().matchesRef(name)) {
-          consumer.foundDecl(swift2Decl, DeclVisibilityKind::DynamicLookup);
+      // Check for an alternate declaration; if its name matches,
+      // report it.
+      for (auto alternate : getAlternateDecls(decl)) {
+        if (alternate->getFullName().matchesRef(name)) {
+          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
         }
       }
-    }
+    });
   }
 }
 

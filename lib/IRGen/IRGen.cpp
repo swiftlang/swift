@@ -646,12 +646,19 @@ void swift::irgen::deleteIRGenModule(
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
   SILPassManager PM(&Module, &IRModule);
+  bool largeLoadable = Module.getOptions().EnableLargeLoadableTypes;
 #define PASS(ID, Tag, Name)
 #define IRGEN_PASS(ID, Tag, Name)                                              \
-  PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
+  if (swift::PassKind::ID == swift::PassKind::LoadableByAddress) {             \
+    if (largeLoadable) {                                                       \
+      PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());          \
+    }                                                                          \
+  } else {                                                                     \
+    PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());            \
+  }
 #include "swift/SILOptimizer/PassManager/Passes.def"
   PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getIRGenPreparePassPipeline());
+      SILPassPipelinePlan::getIRGenPreparePassPipeline(Module.getOptions()));
 }
 
 /// Generates LLVM IR, runs the LLVM passes and produces the output file.
@@ -715,6 +722,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
+      irgen.emitNSArchiveClassNameRegistration();
     }
 
     // Emit symbols for eliminated dead methods.
@@ -876,7 +884,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   irgen.emitGlobalTopLevel();
   
   for (auto *File : M->getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(File)) {
+    if (auto *SF = dyn_cast<SourceFile>(File)) {
       IRGenModule *IGM = irgen.getGenModule(SF);
       IGM->emitSourceFile(*SF, 0);
     } else {
@@ -892,6 +900,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   irgen.emitProtocolConformances();
 
   irgen.emitReflectionMetadataVersion();
+
+  irgen.emitNSArchiveClassNameRegistration();
 
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();

@@ -75,7 +75,7 @@ struct P5Conformer : P5 { // expected-error {{does not conform}}
 
 
 protocol P6Base {
-  associatedtype Foo // expected-note {{protocol requires nested type 'Foo'; do you want to add it?}}
+  associatedtype Foo
   func foo()
   func bar() -> Foo
 }
@@ -88,7 +88,7 @@ extension P6 {
   func bar() -> Bar? { return nil }
 }
 
-struct P6Conformer : P6 { // expected-error 2 {{does not conform}}
+struct P6Conformer : P6 { // expected-error {{does not conform}}
   func foo() {}
 }
 
@@ -112,3 +112,14 @@ struct BadCase1 : PA { // expected-error {{type 'BadCase1' does not conform to p
 struct BadCase2 : PA { // expected-error {{type 'BadCase2' does not conform to protocol 'PA'}}
   typealias A<T> = T
 }
+
+// rdar://problem/32215763
+extension UInt32: ExpressibleByStringLiteral {}
+// expected-error@-1 {{type 'UInt32' does not conform to protocol 'ExpressibleByStringLiteral'}}
+// expected-error@-2 {{type 'UInt32' does not conform to protocol 'ExpressibleByExtendedGraphemeClusterLiteral'}}
+// expected-error@-3 {{type 'UInt32' does not conform to protocol 'ExpressibleByUnicodeScalarLiteral'}}
+
+// After successfully type-checking this (due to the presumption of
+// the type actually conforming), do not crash when failing to find
+// the associated witness type.
+let diagnose: UInt32 = "reta"

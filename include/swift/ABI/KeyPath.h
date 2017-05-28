@@ -1,4 +1,4 @@
-//===--- KeyPath.h - ABI constants for key path objects ----------*- C++ *-===//
+//===--- KeyPath.h - ABI constants for key path objects ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -164,10 +164,17 @@ public:
   };
   
   enum ComputedPropertyIDKind {
-    Getter,
+    Pointer,
     StoredPropertyOffset,
     VTableOffset,
   };
+  
+  constexpr static uint32_t
+  getResolutionStrategy(ComputedPropertyIDKind idKind) {
+    return idKind == Pointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
+         : idKind == StoredPropertyOffset ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
+         : (assert("no resolution strategy implemented" && false), 0);
+  }
   
   constexpr static KeyPathComponentHeader
   forComputedProperty(ComputedPropertyKind kind,
@@ -186,7 +193,8 @@ public:
       | (idKind == VTableOffset
            ? _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag : 0)
       | (hasArguments ? _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag : 0)
-      | (resolvedID ? 0 : _SwiftKeyPathComponentHeader_ComputedUnresolvedIDFlag));
+      | (resolvedID ? _SwiftKeyPathComponentHeader_ComputedIDResolved
+                    : getResolutionStrategy(idKind)));
   }
   
   constexpr uint32_t getData() const { return Data; }

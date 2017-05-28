@@ -7,6 +7,17 @@ import Builtin
 import Swift
 import SwiftShims
 
+sil_global public @sil_global1 : $Builtin.Int32
+
+sil @update_global: $@convention(thin) () -> () {
+bb0:
+  %sil_global1_addr = global_addr @sil_global1 : $*Builtin.Int32
+  %1 = integer_literal $Builtin.Int32, 1
+  store %1 to %sil_global1_addr : $*Builtin.Int32
+  %4 = tuple ()
+  return %4 : $()
+}
+
 sil @callee : $@convention(thin) () -> () {
 bb0:
   // make it a non-trivial function
@@ -172,6 +183,10 @@ bb0:
   %c28 = builtin "assert_configuration"() : $Builtin.Int32
   %c29 = builtin "assert_configuration"() : $Builtin.Int32
   %c30 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %f = function_ref @update_global: $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+
   %r = tuple ()
   return %r : $()
 }

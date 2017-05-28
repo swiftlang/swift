@@ -470,8 +470,62 @@ extension Decimal : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDecimalNumber?) -> Decimal {
-        var result: Decimal?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0, 0, 0, 0, 0, 0, 0, 0)) }
+        return src.decimalValue
+    }
+}
+
+extension Decimal : Codable {
+    private enum CodingKeys : Int, CodingKey {
+        case exponent
+        case length
+        case isNegative
+        case isCompact
+        case mantissa
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let exponent = try container.decode(CInt.self, forKey: .exponent)
+        let length = try container.decode(CUnsignedInt.self, forKey: .length)
+        let isNegative = try container.decode(Bool.self, forKey: .isNegative)
+        let isCompact = try container.decode(Bool.self, forKey: .isCompact)
+
+        var mantissaContainer = try container.nestedUnkeyedContainer(forKey: .mantissa)
+        var mantissa: (CUnsignedShort, CUnsignedShort, CUnsignedShort, CUnsignedShort,
+                       CUnsignedShort, CUnsignedShort, CUnsignedShort, CUnsignedShort) = (0,0,0,0,0,0,0,0)
+        mantissa.0 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.1 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.2 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.3 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.4 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.5 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.6 = try mantissaContainer.decode(CUnsignedShort.self)
+        mantissa.7 = try mantissaContainer.decode(CUnsignedShort.self)
+
+        self.init(_exponent: exponent,
+                  _length: length,
+                  _isNegative: CUnsignedInt(isNegative ? 1 : 0),
+                  _isCompact: CUnsignedInt(isCompact ? 1 : 0),
+                  _reserved: 0,
+                  _mantissa: mantissa)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(_exponent, forKey: .exponent)
+        try container.encode(_length, forKey: .length)
+        try container.encode(_isNegative == 0 ? false : true, forKey: .isNegative)
+        try container.encode(_isCompact == 0 ? false : true, forKey: .isCompact)
+
+        var mantissaContainer = container.nestedUnkeyedContainer(forKey: .mantissa)
+        try mantissaContainer.encode(_mantissa.0)
+        try mantissaContainer.encode(_mantissa.1)
+        try mantissaContainer.encode(_mantissa.2)
+        try mantissaContainer.encode(_mantissa.3)
+        try mantissaContainer.encode(_mantissa.4)
+        try mantissaContainer.encode(_mantissa.5)
+        try mantissaContainer.encode(_mantissa.6)
+        try mantissaContainer.encode(_mantissa.7)
     }
 }

@@ -19,6 +19,9 @@ import Foundation
 // CHECK: [[@LINE-1]]:20 | class/Swift | MyCls1 | [[MyCls1_USR:.*]] | Def
   @objc public func someMeth() {}
   // CHECK: [[@LINE-1]]:21 | instance-method/Swift | someMeth() | [[MyCls1_someMeth_USR:.*]] | Def
+  // CHECK: [[@LINE-4]]:38 | constructor/Swift | init() | [[MyCls1_init_USR:.*]] | Def,Impl,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | constructor/Swift | init() | c:objc(cs)NSObject(im)init
+  // CHECK-NEXT: RelChild | class/Swift | MyCls1 | [[MyCls1_USR]]
 }
 
 @objc public class MyCls2 : NSObject {

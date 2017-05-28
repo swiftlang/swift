@@ -224,6 +224,7 @@ public:
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
+  void visitMissingMemberDecl(MissingMemberDecl *d) {}
 
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
@@ -273,9 +274,7 @@ public:
                                 ArrayRef<ParameterList*> paramLists);
 
   /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(ValueDecl *fd,
-                      SILDeclRef entryPoint,
-                      SILDeclRef nextEntryPoint);
+  void emitCurryThunk(SILDeclRef thunk);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);

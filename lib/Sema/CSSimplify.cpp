@@ -1418,7 +1418,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       // Provide a fixed type for the type variable.
-      bool wantRvalue = kind == ConstraintKind::Equal;
       if (typeVar1) {
         // Simplify the right-hand type and perform the "occurs" check.
         typeVar1 = getRepresentative(typeVar1);
@@ -1426,9 +1425,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (typeVarOccursInType(typeVar1, type2))
           return formUnsolvedResult();
 
-        // If we want an rvalue, get the rvalue.
-        if (wantRvalue)
+        // Equal constraints allow mixed LValue/RValue bindings, but
+        // if we bind a type to a type variable that can bind to
+        // LValues as part of simplifying the Equal constraint we may
+        // later block a binding of the opposite "LValue-ness" to the
+        // same type variable that happens as part of simplifying
+        // another constraint.
+        if (kind == ConstraintKind::Equal) {
+          if (typeVar1->getImpl().canBindToLValue())
+            return formUnsolvedResult();
+
           type2 = type2->getRValueType();
+        }
 
         // If the left-hand type variable cannot bind to an lvalue,
         // but we still have an lvalue, fail.
@@ -1467,9 +1475,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (typeVarOccursInType(typeVar2, type1))
         return formUnsolvedResult();
 
-      // If we want an rvalue, get the rvalue.
-      if (wantRvalue)
+      // Equal constraints allow mixed LValue/RValue bindings, but
+      // if we bind a type to a type variable that can bind to
+      // LValues as part of simplifying the Equal constraint we may
+      // later block a binding of the opposite "LValue-ness" to the
+      // same type variable that happens as part of simplifying
+      // another constraint.
+      if (kind == ConstraintKind::Equal) {
+        if (typeVar2->getImpl().canBindToLValue())
+          return formUnsolvedResult();
+
         type1 = type1->getRValueType();
+      }
 
       if (!typeVar2->getImpl().canBindToLValue() &&
           type1->isLValueType()) {
@@ -2811,8 +2828,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   result.OverallResult = MemberLookupResult::HasResults;
   
   // If we're looking for a subscript, consider key path operations.
-  if (memberName.isSimpleName(getASTContext().Id_subscript)
-      && getASTContext().LangOpts.EnableExperimentalKeyPaths) {
+  if (memberName.isSimpleName(getASTContext().Id_subscript)) {
     result.ViableCandidates.push_back(
         OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
   }
@@ -2983,8 +2999,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, ctor, /*isSpecialized=*/false,
-                                      functionRefKind));
+      result.addViable(OverloadChoice(baseTy, ctor, functionRefKind));
     }
 
 
@@ -3144,9 +3159,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
                                                     functionRefKind));
     } else {
-      result.addViable(OverloadChoice(ovlBaseTy, cand,
-                                      /*isSpecialized=*/false,
-                                      functionRefKind));
+      result.addViable(OverloadChoice(ovlBaseTy, cand, functionRefKind));
     }
   };
 
@@ -3542,7 +3555,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // We accepted these coercions in Swift 3 mode, so we have to live with
       // them (but give a warning) in that language mode.
       if (!TC.Context.LangOpts.isSwiftVersion3()
-          && TC.isObjCClassWithMultipleSwiftBridgedTypes(objcClass, DC))
+          && TC.Context.isObjCClassWithMultipleSwiftBridgedTypes(objcClass))
         return SolutionKind::Error;
 
       // If the bridged value type is generic, the generic arguments
@@ -3666,9 +3679,6 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
 
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   if (auto fn2 = type2->getAs<FunctionType>()) {
-    // We should have the noescape end of the relation.
-    if (!fn2->getExtInfo().isNoEscape())
-      return SolutionKind::Error;
     // Solve forward by binding the other type variable to the escapable
     // variation of this type.
     auto fn1 = fn2->withExtInfo(fn2->getExtInfo().withNoEscape(false));
@@ -3763,7 +3773,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
   auto tryMatchRootAndValueFromKeyPathType =
-    [&](BoundGenericType *bgt) -> SolutionKind {
+    [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
       Type boundRoot, boundValue;
       
       // We can get root and value from a concrete key path type.
@@ -3773,9 +3783,13 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
       } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
-        // We can still get the root from a PartialKeyPath.
-        boundRoot = bgt->getGenericArgs()[0];
-        boundValue = Type();
+        if (allowPartial) {
+          // We can still get the root from a PartialKeyPath.
+          boundRoot = bgt->getGenericArgs()[0];
+          boundValue = Type();
+        } else {
+          return SolutionKind::Error;
+        }
       } else {
         // We can't bind anything from this type.
         return SolutionKind::Solved;
@@ -3791,14 +3805,26 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       
       return SolutionKind::Solved;
     };
-  
-  // If the key path type is bound from context, feed that into the root and
-  // value types.
+
+  // If we're fixed to a bound generic type, trying harvesting context from it.
+  // However, we don't want a solution that fixes the expression type to
+  // PartialKeyPath; we'd rather that be represented using an upcast conversion.
   if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
-    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT) == SolutionKind::Error)
+    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
+          == SolutionKind::Error)
       return SolutionKind::Error;
   }
 
+  // If the expression has contextual type information, try using that too.
+  if (auto contextualTy = getContextualType(keyPath)) {
+    if (auto contextualBGT = contextualTy->getAs<BoundGenericType>()) {
+      if (tryMatchRootAndValueFromKeyPathType(contextualBGT,
+                                              /*allowPartial*/true)
+            == SolutionKind::Error)
+        return SolutionKind::Error;
+    }
+  }
+  
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -3810,6 +3836,9 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     auto &component = keyPath->getComponents()[i];
     
     switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::Invalid:
+      break;
+      
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
       // If no choice was made, leave the constraint unsolved.
@@ -3822,6 +3851,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
           return SolutionKind::Solved;
         }
         return SolutionKind::Unsolved;
+      }
+      
+      // Discarded unsupported non-decl member lookups.
+      if (!choices[i].isDecl()) {
+        return SolutionKind::Error;
       }
       
       auto storage = cast<AbstractStorageDecl>(choices[i].getDecl());

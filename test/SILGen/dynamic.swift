@@ -70,8 +70,8 @@ protocol Proto {
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC10objcMethod{{[_0-9a-zA-Z]*}}FTo
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSifgTo
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSifsTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfgTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfsTo
+// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSiyXl4objc_tcfgTo
+// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSiyXl4objc_tcfsTo
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden @_T07dynamic3{{[_0-9a-zA-Z]*}}fC
@@ -107,9 +107,9 @@ protocol Proto {
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!getter.1 :
 // CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP8objcPropSifsTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!setter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptSis9AnyObject_p4objc_tcfgTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptSiyXl4objc_tcfgTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
-// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptSis9AnyObject_p4objc_tcfsTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptSiyXl4objc_tcfsTW
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
 
 // Dynamic witnesses use objc dispatch:
@@ -194,11 +194,11 @@ class Subclass: Foo {
 
   override subscript(objc objc: AnyObject) -> Int {
     get { return super[objc: objc] }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptSis9AnyObject_p4objc_tcfg
-    // CHECK:         function_ref @_T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg : $@convention(method) (@owned AnyObject, @guaranteed Foo) -> Int
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptSiyXl4objc_tcfg
+    // CHECK:         function_ref @_T07dynamic3FooC9subscriptSiyXl4objc_tcfg : $@convention(method) (@owned AnyObject, @guaranteed Foo) -> Int
     set { super[objc: objc] = newValue }
-    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptSis9AnyObject_p4objc_tcfs
-    // CHECK:         function_ref @_T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs : $@convention(method) (Int, @owned AnyObject, @guaranteed Foo) -> ()
+    // CHECK-LABEL: sil hidden @_T07dynamic8SubclassC9subscriptSiyXl4objc_tcfs
+    // CHECK:         function_ref @_T07dynamic3FooC9subscriptSiyXl4objc_tcfs : $@convention(method) (Int, @owned AnyObject, @guaranteed Foo) -> ()
   }
 
   // Dynamic methods are super-dispatched by objc_msgSend
@@ -233,6 +233,23 @@ class Subclass: Foo {
   }
 
   dynamic override func overriddenByDynamic() {}
+}
+
+class SubclassWithInheritedInits: Foo {
+  // CHECK-LABEL: sil hidden @_T07dynamic26SubclassWithInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         super_method [volatile] {{%.*}} : $SubclassWithInheritedInits, #Foo.init!initializer.1.foreign :
+}
+class GrandchildWithInheritedInits: SubclassWithInheritedInits {
+  // CHECK-LABEL: sil hidden @_T07dynamic28GrandchildWithInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         super_method [volatile] {{%.*}} : $GrandchildWithInheritedInits, #SubclassWithInheritedInits.init!initializer.1.foreign :
+}
+class GrandchildOfInheritedInits: SubclassWithInheritedInits {
+  // Dynamic methods are super-dispatched by objc_msgSend
+  override init(dynamic: Int) {
+    super.init(dynamic: dynamic)
+  }
+  // CHECK-LABEL: sil hidden @_T07dynamic26GrandchildOfInheritedInitsC{{[_0-9a-zA-Z]*}}fc
+  // CHECK:         super_method [volatile] {{%.*}} : $GrandchildOfInheritedInits, #SubclassWithInheritedInits.init!initializer.1.foreign :
 }
 
 // CHECK-LABEL: sil hidden @_T07dynamic20nativeMethodDispatchyyF : $@convention(thin) () -> ()
@@ -496,8 +513,8 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifg  // dynamic.Foo.objcProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifs  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSiyXl4objc_tcfg // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSiyXl4objc_tcfs // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet
 // CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
@@ -506,6 +523,25 @@ public class ConcreteDerived : GenericBase<Int> {
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
 // CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK: }
+
+// Check vtables for implicitly-inherited initializers
+// CHECK-LABEL: sil_vtable SubclassWithInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26SubclassWithInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
+// CHECK-LABEL: sil_vtable GrandchildWithInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic28GrandchildWithInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
+// CHECK: }
+
+// CHECK-LABEL: sil_vtable GrandchildOfInheritedInits {
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsCACSi6native_tcfc
+// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : _T07dynamic26GrandchildOfInheritedInitsCACSi4objc_tcfc
+// CHECK-NOT: .init!
 // CHECK: }
 
 // No vtable entry for override of @objc extension property

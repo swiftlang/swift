@@ -74,8 +74,8 @@ struct MigrationState : public llvm::ThreadSafeRefCountedBase<MigrationState> {
   /// input file, output file, replacements, syntax trees, etc.
   bool print(size_t StateNumber, StringRef OutDir) const;
 
-  bool outputDiffersFromInput() const {
-    return InputBufferID != OutputBufferID;
+  bool noChangesOccurred() const {
+    return InputBufferID == OutputBufferID;
   }
 
   static RC<MigrationState>

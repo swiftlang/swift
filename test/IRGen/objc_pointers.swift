@@ -14,7 +14,7 @@ import Foundation
                               z: UnsafePointer<Int>,
                               w: AutoreleasingUnsafeMutablePointer<Foo?>) {}
 
-  // CHECK: define internal void @_T013objc_pointers3FooC24pointerMetatypeArgumentsys33AutoreleasingUnsafeMutablePointerVys9AnyObject_pXpG1x_AFysAG_pXpSgG1ytFTo(%0*, i8*, i8**, i8**)
+  // CHECK: define internal void @_T013objc_pointers3FooC24pointerMetatypeArgumentsys33AutoreleasingUnsafeMutablePointerVyyXlXpG1x_AFyyXlXpSgG1ytFTo(%0*, i8*, i8**, i8**)
   @objc func pointerMetatypeArguments(x: AutoreleasingUnsafeMutablePointer<AnyClass>,
                                       y: AutoreleasingUnsafeMutablePointer<AnyClass?>) {}
 }

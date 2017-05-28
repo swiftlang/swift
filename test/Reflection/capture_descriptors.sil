@@ -207,8 +207,8 @@ bb0(%a: $A, %b: $B):
 }
 
 // CHECK:      - Capture types:
-// CHECK-NEXT:   (protocol Swift.AnyObject)
-// CHECK-NEXT:   (protocol Swift.AnyObject)
+// CHECK-NEXT:   (protocol_composition any_object)
+// CHECK-NEXT:   (protocol_composition any_object)
 // CHECK-NEXT: - Metadata sources:
 
 

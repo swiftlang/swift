@@ -81,6 +81,7 @@ ValueOwnershipKind::ValueOwnershipKind(SILModule &M, SILType Type,
     : Value() {
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
+  case SILArgumentConvention::Indirect_In_Constant:
     Value = SILModuleConventions(M).useLoweredAddresses()
       ? ValueOwnershipKind::Trivial
       : ValueOwnershipKind::Owned;

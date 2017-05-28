@@ -14,7 +14,7 @@ import gizmo
 // CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type
-// CHECK: [[NSRECT:%TSo6NSRectV]] = type
+// CHECK: [[NSRECT:%TSC6NSRectV]] = type
 
 class Hoozit : Gizmo {
   // CHECK: define hidden swiftcc void @_T010objc_super6HoozitC4frobyyF([[HOOZIT]]* swiftself) {{.*}} {
@@ -37,7 +37,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSo6NSRectVyF(%T10objc_super6HoozitC* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSC6NSRectVyF(%T10objc_super6HoozitC* swiftself) {{.*}} {
   override func frame() -> NSRect {
     // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
@@ -78,10 +78,30 @@ class PartialApply : Gizmo {
     acceptFn(super.frob)
   }
   // CHECK: }
-
-  // CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself) #0 {
-  // CHECK: call %swift.type* @_T010objc_super12PartialApplyCMa()
-  // CHECK: @"\01L_selector(frob)"
-  // CHECK: call void bitcast (void ()* @objc_msgSendSuper2
-  // CHECK: }
 }
+
+class GenericRuncer<T> : Gizmo {
+  // CHECK: define hidden swiftcc void @_T010objc_super13GenericRuncerC5runceyyFZ(%swift.type* swiftself) {{.*}} {
+  override class func runce() {
+    // CHECK:      [[CLASS:%.*]] = call %swift.type* @_T010objc_super13GenericRuncerCMa(%swift.type* %T)
+    // CHECK-NEXT: [[CLASS1:%.*]] = bitcast %swift.type* [[CLASS]] to %objc_class*
+    // CHECK-NEXT: [[CLASS2:%.*]] = bitcast %objc_class* [[CLASS1]] to i64*
+    // CHECK-NEXT: [[ISA:%.*]] = load i64, i64* [[CLASS2]], align 8
+    // CHECK-NEXT: [[ISA_MASK:%.*]] = load i64, i64* @swift_isaMask, align 8
+    // CHECK-NEXT: [[ISA_MASKED:%.*]] = and i64 [[ISA]], [[ISA_MASK]]
+    // CHECK-NEXT: [[ISA_PTR:%.*]] = inttoptr i64 [[ISA_MASKED]] to %swift.type*
+    // CHECK-NEXT: [[METACLASS:%.*]] = bitcast %swift.type* [[ISA_PTR]] to %objc_class*
+    // CHECK:      [[METACLASS_ADDR:%.*]] = getelementptr %objc_super, %objc_super* %objc_super, i32 0, i32 1
+    // CHECK-NEXT: store %objc_class* [[METACLASS]], %objc_class** [[METACLASS_ADDR]], align 8
+    // CHECK-NEXT: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
+    // CHECK-NEXT: call void bitcast (void ()* @objc_msgSendSuper2 to void (%objc_super*, i8*)*)(%objc_super* %objc_super, i8* [[SELECTOR]])
+    // CHECK-NEXT: ret void
+    super.runce()
+  }
+}
+
+// CHECK: define internal swiftcc void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted* swiftself) #0 {
+// CHECK: call %swift.type* @_T010objc_super12PartialApplyCMa()
+// CHECK: @"\01L_selector(frob)"
+// CHECK: call void bitcast (void ()* @objc_msgSendSuper2
+// CHECK: }

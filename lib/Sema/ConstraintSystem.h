@@ -575,9 +575,6 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
-  /// \param skipClosures Whether to skip bodies of non-single expression
-  /// closures.
-  ///
   /// \param typeFromPattern Optionally, the caller can specify the pattern
   /// from where the toType is derived, so that we can deliver better fixit.
   ///
@@ -585,7 +582,6 @@ public:
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
-                     bool skipClosures = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.
@@ -1881,29 +1877,33 @@ public:
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
 
-  /// \brief "Open" the given type by replacing any occurrences of generic
-  /// parameter types and dependent member types with fresh type variables.
+  /// \brief "Open" the given unbound type by introducing fresh type
+  /// variables for generic parameters and constructing a bound generic
+  /// type from these type variables.
+  ///
+  /// \param unbound The type to open.
+  ///
+  /// \returns The opened type.
+  Type openUnboundGenericType(UnboundGenericType *unbound,
+                              ConstraintLocatorBuilder locator,
+                              OpenedTypeMap &replacements);
+
+  /// \brief "Open" the given type by replacing any occurrences of unbound
+  /// generic types with bound generic types with fresh type variables as
+  /// generic arguments.
   ///
   /// \param type The type to open.
   ///
   /// \returns The opened type.
-  Type openType(Type type, ConstraintLocatorBuilder locator) {
-    OpenedTypeMap replacements;
-    return openType(type, locator, replacements);
-  }
+  Type openUnboundGenericType(Type type, ConstraintLocatorBuilder locator);
 
   /// \brief "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
   ///
   /// \param type The type to open.
   ///
-  /// \param replacements The mapping from opened types to the type
-  /// variables to which they were opened.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openType(Type type,
-                ConstraintLocatorBuilder locator,
-                OpenedTypeMap &replacements);
+  Type openType(Type type, OpenedTypeMap &replacements);
 
   /// \brief "Open" the given function type.
   ///
@@ -1933,30 +1933,11 @@ public:
       DeclContext *outerDC,
       bool skipProtocolSelfConstraint);
 
-  /// \brief "Open" the given binding type by replacing any occurrences of
-  /// archetypes (including those implicit in unbound generic types) with
-  /// fresh type variables.
-  ///
-  /// This variant of \c openType() tweaks the result from \c openType() to
-  /// prefer arrays to slices.
-  /// FIXME: This is a bit of a hack.
-  ///
-  /// \param type The type to open.
-  /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openBindingType(Type type, ConstraintLocatorBuilder locator);
-
   /// Open the generic parameter list and its requirements, creating
   /// type variables for each of the type parameters.
   void openGeneric(DeclContext *innerDC,
                    DeclContext *outerDC,
                    GenericSignature *signature,
-                   bool skipProtocolSelfConstraint,
-                   ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements);
-  void openGeneric(DeclContext *innerDC,
-                   DeclContext *outerDC,
-                   ArrayRef<GenericTypeParamType *> params,
-                   ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
@@ -1974,17 +1955,10 @@ public:
   ///
   /// \param decl The declarations whose type is being computed.
   ///
-  /// \param isTypeReference Whether it's a reference to this declaration
-  /// as a type.
-  ///
-  /// \param isSpecialized Whether this declaration is immediately specialized.
-  ///
   /// \returns a pair containing the full opened type (if applicable) and
   /// opened type of a reference to declaration.
   std::pair<Type, Type> getTypeOfReference(
                           ValueDecl *decl,
-                          bool isTypeReference,
-                          bool isSpecialized,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
@@ -1996,9 +1970,6 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isTypeReference Indicates that we want to refer to the declared
-  /// type of the type declaration rather than referring to it as a value.
-  ///
   /// \param isDynamicResult Indicates that this declaration was found via
   /// dynamic lookup.
   ///
@@ -2006,7 +1977,6 @@ public:
   /// base) and opened type of a reference to this member.
   std::pair<Type, Type> getTypeOfMemberReference(
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
-                          bool isTypeReference,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,

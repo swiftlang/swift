@@ -269,6 +269,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
         break;
         
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -292,6 +293,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
 
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("indirect arguments to blocks not supported");
@@ -1041,10 +1043,30 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
 
     if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
+      // If @objc was inferred based on the Swift 3 @objc inference rules, but
+      // we aren't compiling in Swift 3 compatibility mode, emit a call to
+      // Builtin.swift3ImplicitObjCEntrypoint() to enable runtime logging of
+      // the uses of such entrypoints.
       if (attr->isSwift3Inferred() &&
-          !decl->getAttrs().hasAttribute<DynamicAttr>()) {
-        B.createBuiltin(loc, getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
-            getModule().Types.getEmptyTupleType(), { }, { });
+          !decl->getAttrs().hasAttribute<DynamicAttr>() &&
+          !getASTContext().LangOpts.isSwiftVersion3()) {
+        
+        // Get the starting source location of the declaration so we can say
+        // exactly where to stick '@objc'.
+        SourceLoc objcInsertionLoc =
+          decl->getAttributeInsertionLoc(/*modifier*/ false);
+
+        auto objcInsertionLocArgs
+          = emitSourceLocationArgs(objcInsertionLoc, loc);
+        
+        B.createBuiltin(loc,
+          getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
+          getModule().Types.getEmptyTupleType(), { }, {
+            objcInsertionLocArgs.filenameStartPointer.forward(*this),
+            objcInsertionLocArgs.filenameLength.forward(*this),
+            objcInsertionLocArgs.line.forward(*this),
+            objcInsertionLocArgs.column.forward(*this)
+          });
       }
     }
   }
@@ -1216,8 +1238,12 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   // formally present in the constructor body.
   Type allocatorSelfType;
   if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    allocatorSelfType = forwardedParameters[0]->getType(getASTContext())
+    allocatorSelfType = forwardedParameters[0]
+      ->getInterfaceType(getASTContext())
       ->getLValueOrInOutObjectType();
+    if (F.getGenericEnvironment())
+      allocatorSelfType = F.getGenericEnvironment()
+        ->mapTypeIntoContext(allocatorSelfType);
     forwardedParameters = forwardedParameters.slice(1);
   }
 
@@ -1295,6 +1321,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = ManagedValue::forLValue(paramValue);
           break;
         case ParameterConvention::Indirect_In:
+        case ParameterConvention::Indirect_In_Constant:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
         case ParameterConvention::Indirect_In_Guaranteed:

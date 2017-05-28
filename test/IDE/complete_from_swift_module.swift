@@ -72,8 +72,8 @@ func testCompleteModuleQualified4() {
   foo_swift_module.BarGenericSwiftStruct2#^MODULE_QUALIFIED_4^#
 }
 // MODULE_QUALIFIED_4: Begin completions
-// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: BarProtocol#}, {#u: U#})[#BarGenericSwiftStruct2<BarProtocol, U>#]
-// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<BarProtocol, U>#})[#() -> Void#]
+// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: BarProtocol#}, {#u: BarProtocol#})[#BarGenericSwiftStruct2<BarProtocol, BarProtocol>#]
+// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<BarProtocol, BarProtocol>#})[#() -> Void#]
 // MODULE_QUALIFIED_4: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#Any.Type?#}[#Bool#];
 // MODULE_QUALIFIED_4-NEXT: End completions
 

@@ -245,7 +245,7 @@ static IndexRawPointerInst *
 matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
                           BuiltinInst *&TruncOrBitCast, SILValue &Ptr,
                           SILValue &Distance) {
-  IndexRawPointerInst *Res = dyn_cast<IndexRawPointerInst>(I);
+  auto *Res = dyn_cast<IndexRawPointerInst>(I);
   if (!Res)
     return nullptr;
 

@@ -190,8 +190,8 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
   ///   initialized.
   public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
     guard !isEmpty else { return (makeIterator(),buffer.startIndex) }
 
     guard count <= buffer.count, let ptr = buffer.baseAddress else {
@@ -297,6 +297,20 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _end = start.map { $0 + count }
   }
 
+  /// Creates a buffer pointer starting at `start` and extending up to the last
+  /// addressable pointer to `Element` in the memory space
+  @_inlineable
+  public init(_unboundedStartingAt start: Unsafe${Mutable}Pointer<Element>) {
+    _position = start
+    _end = type(of: start)._max
+  }
+
+  @_inlineable
+  public init(_empty: ()) {
+    _position = Unsafe${Mutable}Pointer._max
+    _end = _position
+  }
+  
 %  if not Mutable:
   /// Creates a buffer over the same memory as the given buffer slice.
   ///
@@ -395,7 +409,7 @@ extension UnsafeMutableBufferPointer {
   ///   initialized.
   @_inlineable
   public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
-    where S.Iterator.Element == Iterator.Element {
+    where S.Element == Element {
     return source._copyContents(initializing: self)
   }
 }

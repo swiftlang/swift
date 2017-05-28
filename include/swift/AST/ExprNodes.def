@@ -168,6 +168,7 @@ UNCHECKED_EXPR(UnresolvedPattern, Expr)
 EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
+UNCHECKED_EXPR(KeyPathDot, Expr)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

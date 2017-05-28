@@ -91,7 +91,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
-  assert(decl->getArgumentInterfaceType());
+  assert(decl->hasAssociatedValues());
   assert(!decl->hasClangNode());
 
   // This cannot be implemented correctly for Optional.Some.

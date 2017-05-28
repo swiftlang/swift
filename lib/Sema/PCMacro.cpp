@@ -126,12 +126,12 @@ public:
                                             // See the elseif.swift test.
       Stmt *NES = transformStmt(ES);
       if (ElseLoc.isValid()) {
-        if (BraceStmt *BS = dyn_cast<BraceStmt>(NES)) {
+        if (auto *BS = dyn_cast<BraceStmt>(NES)) {
           BraceStmt *NBS = prependLoggerCall(BS, ElseLoc);
           if (NBS != ES) {
             IS->setElseStmt(NBS);
           }
-        } else if (IfStmt *EIS = dyn_cast<IfStmt>(NES)) {
+        } else if (auto *EIS = dyn_cast<IfStmt>(NES)) {
           // FIXME: here we should use the old range to show a better highlight
           // (including the previous else)
           if (EIS != ES) {
@@ -270,7 +270,7 @@ public:
   }
 
   DoStmt *transformDoStmt(DoStmt *DS) {
-    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
+    if (auto *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
       BraceStmt *NB = transformBraceStmt(B);
       if (NB != B) {
         DS->setBody(NB);
@@ -280,14 +280,14 @@ public:
   }
 
   DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
-    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
+    if (auto *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
       BraceStmt *NB = transformBraceStmt(B);
       if (NB != B) {
         DCS->setBody(NB);
       }
     }
     for (CatchStmt *C : DCS->getCatches()) {
-      if (BraceStmt *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
+      if (auto *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
         BraceStmt *NCB = transformBraceStmt(CB);
         if (NCB != CB) {
           C->setBody(NCB);
@@ -300,7 +300,7 @@ public:
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
       return D;
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getBody()) {
         BraceStmt *NB = transformBraceStmt(B);
         // Since it would look strange going straight to the first line in a
@@ -341,7 +341,7 @@ public:
 
     for (size_t EI = 0; EI != Elements.size(); ++EI) {
       swift::ASTNode &Element = Elements[EI];
-      if (Expr *E = Element.dyn_cast<Expr *>()) {
+      if (auto *E = Element.dyn_cast<Expr *>()) {
         E->walk(CF);
 
         Added<Stmt *> LogBefore = buildLoggerCall(E->getSourceRange(), true);
@@ -353,9 +353,9 @@ public:
           Elements.insert(Elements.begin() + (EI + 2), *LogAfter);
           EI += 2;
         }
-      } else if (Stmt *S = Element.dyn_cast<Stmt *>()) {
+      } else if (auto *S = Element.dyn_cast<Stmt *>()) {
         S->walk(CF);
-        if (ReturnStmt *RS = dyn_cast<ReturnStmt>(S)) {
+        if (auto *RS = dyn_cast<ReturnStmt>(S)) {
           if (RS->hasResult()) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(RS->getResult());
@@ -392,7 +392,7 @@ public:
               EI += 2;
             }
           }
-        } else if (ContinueStmt *CS = dyn_cast<ContinueStmt>(S)) {
+        } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
           Added<Stmt *> LogBefore = buildLoggerCall(CS->getSourceRange(), true);
           Added<Stmt *> LogAfter = buildLoggerCall(CS->getSourceRange(), false);
           if (*LogBefore && *LogAfter) {
@@ -402,7 +402,7 @@ public:
             EI += 2;
           }
 
-        } else if (BreakStmt *BS = dyn_cast<BreakStmt>(S)) {
+        } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
           Added<Stmt *> LogBefore = buildLoggerCall(BS->getSourceRange(), true);
           Added<Stmt *> LogAfter = buildLoggerCall(BS->getSourceRange(), false);
           if (*LogBefore && *LogAfter) {
@@ -412,7 +412,7 @@ public:
             EI += 2;
           }
 
-        } else if (FallthroughStmt *FS = dyn_cast<FallthroughStmt>(S)) {
+        } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
           Added<Stmt *> LogBefore = buildLoggerCall(FS->getSourceRange(), true);
           Added<Stmt *> LogAfter = buildLoggerCall(FS->getSourceRange(), false);
           if (*LogBefore && *LogAfter) {
@@ -428,7 +428,7 @@ public:
             Elements[EI] = NS;
           }
         }
-      } else if (Decl *D = Element.dyn_cast<Decl *>()) {
+      } else if (auto *D = Element.dyn_cast<Decl *>()) {
         D->walk(CF);
         if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
           // FIXME: Should iterate all var decls
@@ -684,7 +684,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
     ExpressionFinder(TopLevelContext &TLC) : TLC(TLC) {}
 
     bool walkToDeclPre(Decl *D) override {
-      if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (FD->getBody()) {
             ASTContext &ctx = FD->getASTContext();
@@ -698,7 +698,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             return false;
           }
         }
-      } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             ASTContext &ctx = static_cast<Decl *>(TLCD)->getASTContext();

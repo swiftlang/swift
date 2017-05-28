@@ -28,7 +28,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/CommandLine.h"
 
 #ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOR_H
 #error "Included non ownership header?!"
@@ -891,10 +890,10 @@ void LifetimeChecker::handleLoadUse(unsigned UseID) {
   // If this is an OpenExistentialAddrInst in preparation for applying
   // a witness method, analyze its use to make sure, that no mutation of
   // lvalue let constants occurs.
-  auto* OEAI = dyn_cast<OpenExistentialAddrInst>(LoadInst);
+  auto *OEAI = dyn_cast<OpenExistentialAddrInst>(LoadInst);
   if (OEAI != nullptr && TheMemory.isElementLetProperty(Use.FirstElement)) {
     for (auto OEAUse : OEAI->getUses()) {
-      auto* AI = dyn_cast<ApplyInst>(OEAUse->getUser());
+      auto *AI = dyn_cast<ApplyInst>(OEAUse->getUser());
 
       if (AI == nullptr)
         // User is not an ApplyInst

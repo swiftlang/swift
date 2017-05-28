@@ -51,8 +51,7 @@ public func run_DropWhile${Name}(_ N: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropWhile${Name}: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 % end

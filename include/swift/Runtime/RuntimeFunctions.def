@@ -61,7 +61,7 @@ FUNCTION(MakeBoxUnique,
          DefaultCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
-         ATTRS(NoUnwind, ZExt))
+         ATTRS(NoUnwind))
 
 FUNCTION(DeallocBox, swift_deallocBox, DefaultCC,
          RETURNS(VoidTy),
@@ -1092,7 +1092,7 @@ FUNCTION(RegisterTypeMetadataRecords,
 // void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
 FUNCTION(BeginAccess, swift_beginAccess, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy),
+         ARGS(Int8PtrTy, getFixedBufferTy()->getPointerTo(), SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // void swift_endAccess(ValueBuffer *scratch);
@@ -1217,6 +1217,14 @@ FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
          ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+// func _registerClassNameForArchiving(_ nameOrNull: UnsafePointer<CChar>?,
+//                                     _ c: AnyClass)
+FUNCTION(RegisterClassNameForArchiving, swift_registerClassNameForArchiving,
+         SwiftCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:
@@ -1234,7 +1242,7 @@ FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreserv
 FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
          DefaultCC,
          RETURNS(VoidTy),
-         ARGS(ObjCPtrTy, ObjCSELTy),
+         ARGS(ObjCPtrTy, ObjCSELTy, Int8PtrTy, SizeTy, SizeTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 #endif

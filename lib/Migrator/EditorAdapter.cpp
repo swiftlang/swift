@@ -13,6 +13,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Migrator/EditorAdapter.h"
+#include "swift/Parse/Lexer.h"
 #include "clang/Basic/SourceManager.h"
 
 using namespace swift;
@@ -60,12 +61,27 @@ translateCharSourceRange(CharSourceRange SwiftSourceSourceRange) const {
   return clang::CharSourceRange::getCharRange(ClangStartLoc, ClangEndLoc);
 }
 
+bool EditorAdapter::insert(SourceLoc Loc, StringRef Text, bool AfterToken,
+                           bool BeforePreviousInsertions) {
+  // We don't have tokens on the clang side, so handle AfterToken in Swift
+  if (AfterToken)
+    Loc = Lexer::getLocForEndOfToken(SwiftSrcMgr, Loc);
+
+  auto ClangLoc = translateSourceLoc(Loc);
+  return Edits.insert(ClangLoc, Text, /*AfterToken=*/false, BeforePreviousInsertions);
+}
+
 bool EditorAdapter::insertFromRange(SourceLoc Loc, CharSourceRange Range,
                                     bool AfterToken,
                                     bool BeforePreviousInsertions) {
+  // We don't have tokens on the clang side, so handle AfterToken in Swift
+  if (AfterToken)
+    Loc = Lexer::getLocForEndOfToken(SwiftSrcMgr, Loc);
+
   auto ClangLoc = translateSourceLoc(Loc);
   auto ClangCharRange = translateCharSourceRange(Range);
-  return Edits.insertFromRange(ClangLoc, ClangCharRange, AfterToken,
+
+  return Edits.insertFromRange(ClangLoc, ClangCharRange, /*AfterToken=*/false,
                                BeforePreviousInsertions);
 }
 
@@ -100,32 +116,40 @@ bool EditorAdapter::replaceText(SourceLoc Loc, StringRef Text,
 bool EditorAdapter::insertFromRange(SourceLoc Loc, SourceRange TokenRange,
                      bool AfterToken,
                      bool BeforePreviousInsertions) {
-  CharSourceRange CharRange { SwiftSrcMgr, TokenRange.Start, TokenRange.End };
+  auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr, TokenRange);
   return insertFromRange(Loc, CharRange,
                          AfterToken, BeforePreviousInsertions);
 }
 
 bool EditorAdapter::insertWrap(StringRef Before, SourceRange TokenRange,
                                StringRef After) {
-  CharSourceRange CharRange { SwiftSrcMgr, TokenRange.Start, TokenRange.End };
+  auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr, TokenRange);
   return insertWrap(Before, CharRange, After);
 }
 
+bool EditorAdapter::remove(SourceLoc TokenLoc) {
+  return remove(Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr,
+                                                         TokenLoc));
+}
+
 bool EditorAdapter::remove(SourceRange TokenRange) {
-  CharSourceRange CharRange { SwiftSrcMgr, TokenRange.Start, TokenRange.End };
+  auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr, TokenRange);
   return remove(CharRange);
 }
 
 bool EditorAdapter::replace(SourceRange TokenRange, StringRef Text) {
-  CharSourceRange CharRange { SwiftSrcMgr, TokenRange.Start, TokenRange.End };
+  auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr,TokenRange);
   return replace(CharRange, Text);
 }
 
 bool EditorAdapter::replaceWithInner(SourceRange TokenRange,
                                      SourceRange TokenInnerRange) {
-  CharSourceRange CharRange { SwiftSrcMgr, TokenRange.Start, TokenRange.End };
-  CharSourceRange CharInnerRange {
-    SwiftSrcMgr, TokenInnerRange.Start, TokenInnerRange.End
-  };
+  auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr, TokenRange);
+  auto CharInnerRange = Lexer::getCharSourceRangeFromSourceRange(SwiftSrcMgr, TokenInnerRange);
   return replaceWithInner(CharRange, CharInnerRange);
+}
+
+bool EditorAdapter::replaceToken(SourceLoc TokenLoc, StringRef Text) {
+  return replace(Lexer::getTokenAtLocation(SwiftSrcMgr, TokenLoc).getRange(),
+    Text);
 }

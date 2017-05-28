@@ -494,8 +494,6 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
     ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
-  bool UpdateCode =
-    ArgList->hasArg(options::OPT_update_code);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -671,10 +669,9 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   buildJobs(Actions, OI, OFM.get(), *TC, *C);
 
-  // For updating code we need to go through all the files and pick up changes,
-  // even if they have compiler errors. Also for getting bulk fixits, or for when
-  // users explicitly request to continue building despite errors.
-  if (UpdateCode || ContinueBuildingAfterErrors)
+  // For getting bulk fixits, or for when users explicitly request to continue
+  // building despite errors.
+  if (ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
@@ -1126,11 +1123,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
-    case options::OPT_update_code:
-      OI.CompilerOutputType = types::TY_Remapping;
-      OI.LinkAction = LinkKind::None;
-      break;
-
     case options::OPT_parse:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
@@ -1334,7 +1326,12 @@ void Driver::buildActions(const ToolChain &TC,
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == types::TY_ObjCHeader) {
           std::unique_ptr<Action> HeaderInput(new InputAction(*A, Ty));
-          PCH = new GeneratePCHJobAction(HeaderInput.release());
+          StringRef PersistentPCHDir;
+          if (const Arg *A = Args.getLastArg(options::OPT_pch_output_dir)) {
+            PersistentPCHDir = A->getValue();
+          }
+          PCH = new GeneratePCHJobAction(HeaderInput.release(),
+                                         PersistentPCHDir);
           Actions.push_back(PCH);
         }
       }
@@ -1756,11 +1753,17 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
+  auto ShouldPreserveOnSignal = PreserveOnSignal::No;
+
   // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
   // use the -o arg) even though, based on ownership considerations within the
   // driver, it is stored as a "top level" JobAction.
-  if (isa<GeneratePCHJobAction>(JA)) {
+  if (auto *PCHAct = dyn_cast<GeneratePCHJobAction>(JA)) {
+    // For a persistent PCH we don't use an output, the frontend determines
+    // the filename to use for the PCH.
+    assert(!PCHAct->isPersistentPCH());
     AtTopLevel = false;
+    ShouldPreserveOnSignal = PreserveOnSignal::Yes;
   }
 
   // We don't have an output from an Action-specific command line option,
@@ -1795,7 +1798,7 @@ static StringRef getOutputFilename(Compilation &C,
                      EC.message());
       return {};
     }
-    C.addTemporaryFile(Buffer.str());
+    C.addTemporaryFile(Buffer.str(), ShouldPreserveOnSignal);
 
     return Buffer.str();
   }
@@ -2068,6 +2071,27 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     }
   }
 
+  if (C.getArgs().hasArg(options::OPT_update_code) &&
+      isa<CompileJobAction>(JA)) {
+    StringRef OFMFixitsOutputPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_Remapping);
+      if (iter != OutputMap->end())
+        OFMFixitsOutputPath = iter->second;
+    }
+    if (!OFMFixitsOutputPath.empty()) {
+      Output->setAdditionalOutputForType(types::ID::TY_Remapping,
+                                         OFMFixitsOutputPath);
+    } else {
+      llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
+      bool isTempFile = C.isTemporaryFile(Path);
+      llvm::sys::path::replace_extension(Path, "remap");
+      Output->setAdditionalOutputForType(types::ID::TY_Remapping, Path);
+      if (isTempFile)
+        C.addTemporaryFile(Path);
+    }
+  }
+
   if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
@@ -2242,7 +2266,7 @@ static unsigned printActions(const Action *A,
   llvm::raw_string_ostream os(str);
 
   os << Action::getClassName(A->getKind()) << ", ";
-  if (const InputAction *IA = dyn_cast<InputAction>(A)) {
+  if (const auto *IA = dyn_cast<InputAction>(A)) {
     os << "\"" << IA->getInputArg().getValue() << "\"";
   } else {
     os << "{";

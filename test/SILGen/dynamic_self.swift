@@ -111,7 +111,7 @@ func testExistentialDispatchClass(cp: CP) {
   @objc func method() -> Self { return self }
 }
 
-// CHECK-LABEL: sil hidden @_T012dynamic_self21testAnyObjectDispatchys0dE0_p1o_tF : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK-LABEL: sil hidden @_T012dynamic_self21testAnyObjectDispatchyyXl1o_tF : $@convention(thin) (@owned AnyObject) -> () {
 func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
@@ -120,7 +120,7 @@ func testAnyObjectDispatch(o: AnyObject) {
   // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
   var _ = o.method
 }
-// CHECK: } // end sil function '_T012dynamic_self21testAnyObjectDispatchys0dE0_p1o_tF'
+// CHECK: } // end sil function '_T012dynamic_self21testAnyObjectDispatchyyXl1o_tF'
 
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.

@@ -124,6 +124,7 @@ UIdent sourcekitd::KeyUnpopular("key.unpopular");
 UIdent sourcekitd::KeyHide("key.hide");
 UIdent sourcekitd::KeySimplified("key.simplified");
 UIdent sourcekitd::KeyRangeContent("key.rangecontent");
+UIdent sourcekitd::KeyCancelOnSubsequentRequest("key.cancel_on_subsequent_request");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
@@ -144,6 +145,9 @@ UIdent sourcekitd::KeyArgNames("key.argnames");
 UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
 UIdent sourcekitd::KeyNameKind("key.namekind");
 UIdent sourcekitd::KeyLocalizationKey("key.localization_key");
+UIdent sourcekitd::KeyIsZeroArgSelector("key.is_zero_arg_selector");
+
+UIdent sourcekitd::KeySwiftVersion("key.swift_version");
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
@@ -243,7 +247,10 @@ static UIdent *OrderedKeys[] = {
   &KeyArgNames,
   &KeySelectorPieces,
   &KeyNameKind,
+  &KeyLocalizationKey,
+  &KeyIsZeroArgSelector,
 
+  &KeySwiftVersion,
 };
 
 static unsigned findPrintOrderForDictKey(UIdent Key) {

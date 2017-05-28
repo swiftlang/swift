@@ -12,28 +12,96 @@
 
 extension String {
   // FIXME(strings): at least temporarily remove it to see where it was applied
+  /// Creates a new string from the given substring.
+  ///
+  /// - Parameter substring: A substring to convert to a standalone `String`
+  ///   instance.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of `substring`.
   public init(_ substring: Substring) {
     self = String(substring._slice)
   }
 }
 
-public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
+/// A slice of a string.
+///
+/// When you create a slice of a string, a `Substring` instance is the result.
+/// Operating on substrings is fast and efficient because a substring shares
+/// its storage with the original string. The `Substring` type presents the
+/// same interface as `String`, so you can avoid or defer any copying of the
+/// string's contents.
+///
+/// The following example creates a `greeting` string, and then finds the
+/// substring of the first sentence:
+///
+///     let greeting = "Hi there! It's nice to meet you! 👋"
+///     let endOfSentence = greeting.index(of: "!")!
+///     let firstSentence = greeting[...endOfSentence]
+///     // firstSentence == "Hi there!"
+///
+/// You can perform many string operations on a substring. Here, we find the
+/// length of the first sentence and create an uppercase version.
+///
+///     print("'\(firstSentence)' is \(firstSentence.count) characters long.")
+///     // Prints "'Hi there!' is 9 characters long."
+///
+///     let shoutingSentence = firstSentence.uppercased()
+///     // shoutingSentence == "HI THERE!"
+///
+/// Converting a Substring to a String
+/// ==================================
+///
+/// This example defines a `rawData` string with some unstructured data, and
+/// then uses the string's `prefix(while:)` method to create a substring of
+/// the numeric prefix:
+///
+///     let rawInput = "126 a.b 22219 zzzzzz"
+///     let numericPrefix = rawInput.prefix(while: { "0"..."9" ~= $0 })
+///     // numericPrefix is the substring "126"
+///
+/// When you need to store a substring or pass it to a function that requires a
+/// `String` instance, convert it using the `String.init(_:)` initializer.
+///
+///     _ = Int(numericPrefix, radix: 10)
+///     // error: cannot convert value...
+///     let prefix = Int(String(numericPrefix), radix: 10)
+///     // prefix == 126
+///
+/// Calling this initializer copies the contents of the substring to a new
+/// string.
+///
+/// - Important: Don't store substrings longer than you need to perform a
+///   specific operation. A substring holds a reference to the entire storage
+///   of the string it came from, not just to the portion it presents, even
+///   when there is no other reference to the original string. Storing
+///   substrings may therefore prolong the lifetime of string data that is no
+///   longer otherwise accessible, which can appear to be memory leakage.
+public struct Substring : StringProtocol {
   public typealias Index = String.Index
   public typealias IndexDistance = String.IndexDistance
   public typealias SubSequence = Substring
 
   internal var _slice: RangeReplaceableBidirectionalSlice<String>
 
+  /// Creates an empty substring.
   public init() {
     _slice = RangeReplaceableBidirectionalSlice()
   }
 
+  /// Creates a substring with the specified bounds within the given string.
+  ///
+  /// - Parameters:
+  ///   - base: The string to create a substring of.
+  ///   - bounds: The range of `base` to use for the substring. The lower and
+  ///     upper bounds of `bounds` must be valid indices of `base`.
   public init(_base base: String, _ bounds: Range<Index>) {
     _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
   }
 
-  internal init(_base base: String, _ bounds: ClosedRange<Index>) {
-    self.init(_base: base, base._makeHalfOpen(bounds))
+  internal init<R: RangeExpression>(
+    _base base: String, _ bounds: R
+  ) where R.Bound == Index {
+    self.init(_base: base, bounds.relative(to: base))
   }
 
   public var startIndex: Index { return _slice.startIndex }
@@ -57,7 +125,7 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
     let result = _slice.index(i, offsetBy: n)
     // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(
-      (_slice._startIndex ..< _slice.endIndex).contains(result),
+      (_slice._startIndex ... _slice.endIndex).contains(result),
       "Operation results in an invalid index")
     return result
   }
@@ -68,7 +136,7 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
     let result = _slice.index(i, offsetBy: n, limitedBy: limit)
     // FIXME(strings): slice types currently lack necessary bound checks
     _precondition(result.map {
-        (_slice._startIndex ..< _slice.endIndex).contains($0)
+        (_slice._startIndex ... _slice.endIndex).contains($0)
       } ?? true,
       "Operation results in an invalid index")
     return result
@@ -99,8 +167,121 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
   }
 
 % end
+
+  /// Creates a string from the given Unicode code units in the specified
+  /// encoding.
+  ///
+  /// - Parameters:
+  ///   - codeUnits: A collection of code units encoded in the ecoding
+  ///     specified in `sourceEncoding`.
+  ///   - sourceEncoding: The encoding in which `codeUnits` should be
+  ///     interpreted.
+  public init<C: Collection, Encoding: _UnicodeEncoding>(
+    decoding codeUnits: C, as sourceEncoding: Encoding.Type
+  ) where C.Iterator.Element == Encoding.CodeUnit {
+    self.init(String(decoding: codeUnits, as: sourceEncoding))
+  }
+
+  /// Creates a string from the null-terminated, UTF-8 encoded sequence of
+  /// bytes at the given pointer.
+  ///
+  /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
+  ///   UTF-8 encoded bytes ending just before the first zero byte.
+  public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
+    self.init(String(cString: nullTerminatedUTF8))
+  }
+
+  /// Creates a string from the null-terminated sequence of bytes at the given
+  /// pointer.
+  ///
+  /// - Parameters:
+  ///   - nullTerminatedCodeUnits: A pointer to a sequence of contiguous code
+  ///     units in the encoding specified in `sourceEncoding`, ending just
+  ///     before the first zero code unit.
+  ///   - sourceEncoding: The encoding in which the code units should be
+  ///     interpreted.
+  public init<Encoding: _UnicodeEncoding>(
+    decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    as sourceEncoding: Encoding.Type
+  ) {
+    self.init(
+      String(decodingCString: nullTerminatedCodeUnits, as: sourceEncoding))
+  }
+
+  /// Calls the given closure with a pointer to the contents of the string,
+  /// represented as a null-terminated sequence of UTF-8 code units.
+  ///
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withCString(_:)`. Do not store or return the pointer for
+  /// later use.
+  ///
+  /// - Parameter body: A closure with a pointer parameter that points to a
+  ///   null-terminated sequence of UTF-8 code units. If `body` has a return
+  ///   value, it is used as the return value for the `withCString(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method's execution.
+  /// - Returns: The return value of the `body` closure parameter, if any.
+  public func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+    return try _slice._base._core._withCSubstringAndLength(
+      in: startIndex._base._position..<endIndex._base._position,
+      encoding: UTF8.self) {
+      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
+        try body($0)
+      }
+    }
+  }
+
+  /// Calls the given closure with a pointer to the contents of the string,
+  /// represented as a null-terminated sequence of code units.
+  ///
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withCString(encodedAs:_:)`. Do not store or return the
+  /// pointer for later use.
+  ///
+  /// - Parameters:
+  ///   - body: A closure with a pointer parameter that points to a
+  ///     null-terminated sequence of code units. If `body` has a return
+  ///     value, it is used as the return value for the
+  ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
+  ///     only for the duration of the method's execution.
+  ///   - targetEncoding: The encoding in which the code units should be interpreted.
+  /// - Returns: The return value of the `body` closure parameter, if any.
+  public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
+    encodedAs targetEncoding: TargetEncoding.Type,
+    _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
+  ) rethrows -> Result {
+    return try _slice._base._core._withCSubstring(
+      in: startIndex._base._position..<endIndex._base._position,
+      encoding: targetEncoding, body)
+  }
 }
 
+extension Substring : _SwiftStringView {
+  var _persistentContent : String {
+    let wholeCore = _slice._base._core
+    let native = wholeCore.nativeBuffer
+    if _fastPath(native != nil), let n = native {
+      if _fastPath(
+        n.start == wholeCore._baseAddress && n.usedCount == wholeCore.count) {
+        return String(wholeCore)
+      }
+    }
+    var r = String()
+    r._core.append(_ephemeralContent._core)
+    _sanityCheck(r._core._owner !== _ephemeralContent._core._owner)
+    return r
+  }
+  
+  var _ephemeralContent : String {
+    let wholeCore = _slice._base._core
+    let subCore : _StringCore = wholeCore[
+      startIndex._base._position..<endIndex._base._position]
+    // check that we haven't allocated a new buffer for the result
+    _sanityCheck(subCore._owner === wholeCore._owner)
+    return String(subCore)
+  }
+}
 
 extension Substring : CustomReflectable {
   public var customMirror: Mirror {
@@ -127,8 +308,8 @@ extension Substring : CustomDebugStringConvertible {
 }
 
 extension Substring : LosslessStringConvertible {
-  public init?(_ description: String) {
-    self.init(_base: description, description.startIndex ..< description.endIndex)
+  public init(_ content: String) {
+    self.init(_base: content, content.startIndex ..< content.endIndex)
   }
 }
 
@@ -204,6 +385,36 @@ extension Substring {
 }
 
 #endif
+
+extension Substring : RangeReplaceableCollection {
+  public init<S : Sequence>(_ elements: S)
+  where S.Element == Character {
+    let e0 = elements as? _SwiftStringView
+    if _fastPath(e0 != nil), let e = e0 {
+      self = e._ephemeralContent[...]
+    }
+    else {
+      self = String(elements)[...]
+    }
+  }
+  
+  public mutating func append<S : Sequence>(contentsOf elements: S)
+  where S.Element == Character {
+    var c = self._ephemeralContent._core
+    self = Substring()
+    
+    let e0 = elements as? _SwiftStringView
+    if _fastPath(e0 != nil), let e1 = e0 {
+      c.append(contentsOf: e1._ephemeralContent.utf16)
+      self = String(c)[...]
+    }
+    else {
+      var s = String(c)
+      s.append(contentsOf: elements)
+      self = s[...]
+    }
+  }
+}
 
 extension Substring {
   public func lowercased() -> String {
@@ -305,11 +516,11 @@ extension String {
 extension Substring {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(self[bounds])
+    return String(characters[bounds])
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(self[bounds])
+    return String(characters[bounds])
   }
 }

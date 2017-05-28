@@ -515,7 +515,7 @@ ConsumedResultToEpilogueRetainMatcher::
 findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V) {
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
     // Handle self-recursion.
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(&*II))
+    if (auto *AI = dyn_cast<ApplyInst>(&*II))
       if (AI->getCalleeFunction() == BB->getParent()) 
         return std::make_pair(FindRetainKind::Recursion, AI);
     
@@ -557,7 +557,7 @@ findMatchingRetains(SILBasicBlock *BB) {
   // return value.
   SILValue RV = SILValue();
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
-    if (ReturnInst *RI = dyn_cast<ReturnInst>(&*II)) {
+    if (auto *RI = dyn_cast<ReturnInst>(&*II)) {
       RV = RI->getOperand();
       break;
     }

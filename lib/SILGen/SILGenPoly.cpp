@@ -795,6 +795,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     return gen.emitManagedRValueWithCleanup(paramValue);
 
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
     if (gen.silConv.useLoweredAddresses())
       return gen.emitManagedBufferWithCleanup(paramValue);
     return gen.emitManagedRValueWithCleanup(paramValue);
@@ -1338,6 +1339,7 @@ namespace {
         abort();
       }
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
         if (SGF.silConv.useLoweredAddresses()) {
           // We need to translate into a temporary.
@@ -1953,7 +1955,7 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
   // outerOrigType can be a tuple if we're doing something like
   // injecting into an optional tuple.
 
-  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
@@ -2052,7 +2054,7 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
                                          SILResultInfo outerResult) {
   assert(innerOrigType.isTuple());
 
-  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   // If the outer type is not a tuple, it must be optional or we are under
   // opaque value mode
@@ -2263,7 +2265,7 @@ void ResultPlanner::planTupleFromDirectResult(AbstractionPattern innerOrigType,
                                               SILResultInfo innerResult) {
 
   assert(!innerOrigType.isTuple());
-  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   assert(outerSubstTupleType && "Outer type must be a tuple");
   assert(innerSubstType->getNumElements() ==
@@ -2671,9 +2673,9 @@ buildThunkSignature(SILGenFunction &gen,
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(newRequirement, source, nullptr);
 
-  builder.finalize(SourceLoc(), {newGenericParam},
-                   /*allowConcreteGenericParams=*/true);
-  GenericSignature *genericSig = builder.getGenericSignature();
+  GenericSignature *genericSig =
+    builder.computeGenericSignature(SourceLoc(),
+                                    /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->createGenericEnvironment(*mod);
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)

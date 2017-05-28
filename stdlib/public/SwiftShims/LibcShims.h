@@ -33,7 +33,7 @@ namespace swift { extern "C" {
 
 // This declaration is not universally correct.  We verify its correctness for
 // the current platform in the runtime code.
-#if defined(__linux__) && defined (__arm__) && !defined(__android__)
+#if defined(__linux__) && defined (__arm__) && !defined(__ANDROID__)
 typedef           int __swift_ssize_t;
 #elif defined(_WIN32)
 #if defined(_M_ARM) || defined(_M_IX86)
@@ -110,6 +110,30 @@ static inline SWIFT_ALWAYS_INLINE
 double _swift_stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
 }
+
+// TLS - thread local storage
+
+#if defined(__ANDROID__)
+typedef int __swift_pthread_key_t;
+#elif defined(__linux__)
+typedef unsigned int __swift_pthread_key_t;
+#else
+typedef unsigned long __swift_pthread_key_t;
+#endif
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_pthread_key_create(
+  __swift_pthread_key_t * _Nonnull key, void
+  (* _Nullable destructor)(void * _Nullable )
+);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void * _Nullable _swift_stdlib_pthread_getspecific(__swift_pthread_key_t key);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_pthread_setspecific(
+  __swift_pthread_key_t key, const void * _Nullable value
+);
 
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER

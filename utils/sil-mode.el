@@ -76,6 +76,9 @@
    `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
    '("\\(end_borrow\\) %[[:alnum:]]+ \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
+   ;; SIL Instructions - Exclusivity
+   `(,(regexp-opt '("begin_access" "end_access") 'words) . font-lock-keyword-face)
+
    ;; SIL Instructions - ownership
    `(,(regexp-opt '("unchecked_ownership_conversion") 'words) . font-lock-keyword-face)
 
@@ -108,7 +111,8 @@
                     "existential_metatype" "init_existential_metatype")
                   'words) . font-lock-keyword-face)
    ;; Aggregate Types
-   `(,(regexp-opt '("retain_value" "release_value" "tuple" "tuple_extract"
+   `(,(regexp-opt '("retain_value" "release_value_addr" "retain_value"
+                    "release_value_addr" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr"
                     "autorelease_value" "copy_value" "destroy_value"

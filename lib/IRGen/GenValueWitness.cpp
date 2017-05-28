@@ -1634,7 +1634,7 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
   // The stride of a Swift type may not match its LLVM size. If we know we have
   // a fixed stride different from our size, or we have a dynamic size,
   // do a byte-level GEP with the proper stride.
-  const FixedTypeInfo *fixedTI = dyn_cast<FixedTypeInfo>(this);
+  const auto *fixedTI = dyn_cast<FixedTypeInfo>(this);
 
   llvm::Value *destValue = nullptr;
   Size stride(1);

@@ -13,16 +13,16 @@ import gizmo
 // CHECK: [[MYBLAMMO:%T4objc8MyBlammoC]] = type
 // CHECK: [[TEST2:%T4objc5Test2C]] = type
 // CHECK: [[OBJC:%objc_object]] = type
-// CHECK: [[ID:%T4objc2idV]] = type <{ %Ts9AnyObjectP }>
+// CHECK: [[ID:%T4objc2idV]] = type <{ %AnyObject }>
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type
-// CHECK: [[RECT:%TSo4RectV]] = type
+// CHECK: [[RECT:%TSC4RectV]] = type
 // CHECK: [[FLOAT:%TSf]] = type
 
 // CHECK: @"\01L_selector_data(bar)" = private global [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
-// CHECK: @_T0So4RectVMn = linkonce_odr hidden constant
-// CHECK: @_T0So4RectVN = linkonce_odr hidden global
+// CHECK: @_T0SC4RectVMn = linkonce_odr hidden constant
+// CHECK: @_T0SC4RectVN = linkonce_odr hidden global
 
 // CHECK: @"\01L_selector_data(acquiesce)"
 // CHECK-NOT: @"\01L_selector_data(disharmonize)"
@@ -124,8 +124,8 @@ func test10(_ g: Gizmo, r: Rect) {
 // Force the emission of the Rect metadata.
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
-// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11ySo4RectVF
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0So4RectVN
+// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11ySC4RectVF
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0SC4RectVN
 func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {
@@ -142,6 +142,6 @@ class WeakObjC {
 // CHECK:  i32 1, !"Objective-C Version", i32 2}
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA, __objc_imageinfo, regular, no_dead_strip"}
-//   512 == (2 << 8).  2 is the Swift ABI version.
-// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 1024}
-// CHECK:  i32 1, !"Swift Version", i32 4}
+//   1280 == (5 << 8).  5 is the Swift ABI version.
+// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 1280}
+// CHECK:  i32 1, !"Swift Version", i32 5}

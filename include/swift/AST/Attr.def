@@ -50,6 +50,7 @@ TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
+TYPE_ATTR(in_constant)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -271,6 +272,19 @@ DECL_ATTR(_implements, Implements,
           OnFunc | OnVar | OnSubscript | OnTypeAlias
           | NotSerialized | UserInaccessible,
           /* Not serialized */ 67)
+
+DECL_ATTR(NSKeyedArchiverClassName, NSKeyedArchiverClassName,
+          OnClass | NotSerialized | LongAttribute,
+          /*Not serialized */ 68)
+
+SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
+                 OnClass | NotSerialized | LongAttribute | RejectByParser,
+                 /*Not serialized */ 69)
+
+SIMPLE_DECL_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly,
+                 NSKeyedArchiverEncodeNonGenericSubclassesOnly,
+                 OnClass | NotSerialized | LongAttribute,
+                 /*Not serialized */ 70)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

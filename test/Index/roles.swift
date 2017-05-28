@@ -74,6 +74,10 @@ func aCalledFunction(a: Int, b: inout Int) {
   // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
   // CHECK: [[@LINE-3]]:7 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
   // CHECK-NEXT: RelCont | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+
+  _ = { ignored in ignored + 1}
+  // CHECK-NOT: [[@LINE-1]]:9 {{.*}} | ignored | {{.*}}
+
 }
 
 aCalledFunction(a: 1, b: &z)
@@ -225,7 +229,10 @@ protocol X {
   // CHECK-NEXT  RelChild,RelAcc | instance-property/Swift | reqProp_USR | [[reqProp_USR]]
 }
 
-class ImplementsX : X {
+protocol Y {}
+// CHECK: [[@LINE-1]]:10 | protocol/Swift | Y | [[Y_USR:.*]] | Def | rel: 0
+
+class ImplementsX : X, Y {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ImplementsX | [[ImplementsX_USR:.*]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:21 | protocol/Swift | X | [[X_USR]] | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | class/Swift | ImplementsX | [[ImplementsX_USR]]
@@ -244,15 +251,20 @@ func TestX(x: X) {
 protocol AProtocol {
   // CHECK: [[@LINE-1]]:10 | protocol/Swift | AProtocol | [[AProtocol_USR:.*]] | Def | rel: 0
 
-  associatedtype T : X
-  // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | T | s:14swift_ide_test9AProtocolP1T | Def,RelChild | rel: 1
+  associatedtype T : X where T:Y
+  // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | T | [[AProtocol_T_USR:.*]] | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | protocol/Swift | AProtocol | [[AProtocol_USR]]
   // CHECK: [[@LINE-3]]:22 | protocol/Swift | X | [[X_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-4]]:30 | type-alias/associated-type/Swift | T | [[AProtocol_T_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-5]]:32 | protocol/Swift | Y | [[Y_USR]] | Ref | rel: 0
 
   func foo() -> Int
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo() | s:14swift_ide_test9AProtocolP3fooSiyF | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP
 }
+
+protocol Q where Self: AProtocol {}
+// CHECK: [[@LINE-1]]:24 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
 
 class ASubClass : AClass, AProtocol {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Def | rel: 0

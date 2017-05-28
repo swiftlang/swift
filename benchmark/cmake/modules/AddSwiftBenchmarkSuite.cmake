@@ -42,6 +42,7 @@ function (swift_benchmark_compile_archopts)
   set(bench_flags "${${benchvar}}")
 
   set(common_options
+      "-swift-version" "3" # FIXME: Force Swift 3 version compatibility.
       "-c"
       "-sdk" "${sdk}"
       "-target" "${target}"

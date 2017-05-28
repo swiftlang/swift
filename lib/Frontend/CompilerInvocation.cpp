@@ -191,7 +191,20 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.StatsOutputDir = A->getValue();
   }
 
-  Opts.ValidateTBDAgainstIR |= Args.hasArg(OPT_validate_tbd_against_ir);
+  if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
+    using Mode = FrontendOptions::TBDValidationMode;
+    StringRef value = A->getValue();
+    if (value == "none") {
+      Opts.ValidateTBDAgainstIR = Mode::None;
+    } else if (value == "missing") {
+      Opts.ValidateTBDAgainstIR = Mode::MissingFromTBD;
+    } else if (value == "all") {
+      Opts.ValidateTBDAgainstIR = Mode::All;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                     A->getOption().getPrefixedName(), value);
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
     unsigned attempt;
@@ -323,8 +336,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::REPL;
     } else if (Opt.matches(OPT_interpret)) {
       Action = FrontendOptions::Immediate;
-    } else if (Opt.matches(OPT_update_code)) {
-      Action = FrontendOptions::UpdateCode;
     } else {
       llvm_unreachable("Unhandled mode option");
     }
@@ -562,10 +573,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Suffix = "importedmodules";
       break;
 
-    case FrontendOptions::UpdateCode:
-      Suffix = REMAP_EXTENSION;
-      break;
-
     case FrontendOptions::EmitTBD:
       if (Opts.OutputFilenames.empty())
         Opts.setSingleOutputFilename("-");
@@ -716,7 +723,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
       return true;
     case FrontendOptions::Parse:
@@ -749,7 +755,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
       return true;
     case FrontendOptions::Parse:
@@ -781,7 +786,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(),
                      diag::error_mode_cannot_emit_loaded_module_trace);
       return true;
@@ -818,7 +822,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-    case FrontendOptions::UpdateCode:
       if (!Opts.ModuleOutputPath.empty())
         Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
       else
@@ -894,6 +897,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// This is used to guard preemptive testing for the fix-it.
+  if (Args.hasArg(OPT_fix_string_substring_conversion)) {
+    Opts.FixStringToSubstringConversions = true;
+  }
+
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
@@ -912,22 +921,23 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
-  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode);
+  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
+                                            OPT_serialize_diagnostics_path);
 
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
-  Opts.EnableExperimentalKeyPaths |=
-    Args.hasArg(OPT_enable_experimental_keypaths);
-
-  Opts.EnableExperimentalSubclassExistentials |=
-    Args.hasArg(OPT_enable_experimental_subclass_existentials);
+  Opts.EnableExperimentalKeyPathComponents |=
+    Args.hasArg(OPT_enable_experimental_keypath_components);
 
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
 
-  Opts.EnableDeserializationRecovery |=
-    Args.hasArg(OPT_enable_experimental_deserialization_recovery);
+  if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
+                               OPT_disable_deserialization_recovery)) {
+    Opts.EnableDeserializationRecovery
+      = A->getOption().matches(OPT_enable_deserialization_recovery);
+  }
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -1024,12 +1034,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
-  Opts.WarnSwift3ObjCInference |= Args.hasArg(OPT_warn_swift3_objc_inference);
 
   Opts.EnableSwift3ObjCInference =
     Args.hasFlag(OPT_enable_swift3_objc_inference,
                  OPT_disable_swift3_objc_inference,
                  Opts.isSwiftVersion3());
+
+  if (Opts.EnableSwift3ObjCInference) {
+    if (const Arg *A = Args.getLastArg(
+                                   OPT_warn_swift3_objc_inference_minimal,
+                                   OPT_warn_swift3_objc_inference_complete)) {
+      if (A->getOption().getID() == OPT_warn_swift3_objc_inference_minimal)
+        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Minimal;
+      else
+        Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
+    }
+  }
+
+  Opts.EnableNSKeyedArchiverDiagnostics =
+      Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
+                   OPT_disable_nskeyedarchiver_diagnostics,
+                   Opts.EnableNSKeyedArchiverDiagnostics);
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
@@ -1125,6 +1150,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
+    Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
   return false;
@@ -1250,6 +1276,12 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
+  if (Opts.Optimization > SILOptions::SILOptMode::None
+      && Opts.EnforceExclusivityDynamic) {
+    Diags.diagnose(SourceLoc(),
+                   diag::warning_argument_not_supported_with_optimization,
+                   A->getOption().getPrefixedName() + A->getValue());
+  }
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
@@ -1364,8 +1396,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
-  Opts.SuppressStaticExclusivitySwap |=
-      Args.hasArg(OPT_suppress_static_exclusivity_swap);
+  Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
@@ -1459,6 +1490,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugCompilationDir = cwd.str();
     }
   }
+
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xcc),
+                                 Args.filtered_end())) {
+    StringRef Opt = A->getValue();
+    if (Opt.startswith("-D") || Opt.startswith("-U"))
+      Opts.ClangDefines.push_back(Opt);
+  }
+
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
                                  Args.filtered_end())) {
@@ -1591,11 +1630,15 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
                        DiagnosticEngine &Diags) {
   using namespace options;
 
-  Opts.AddObjC |= Args.hasArg(OPT_warn_swift3_objc_inference);
+  Opts.KeepObjcVisibility |= Args.hasArg(OPT_migrate_keep_objc_visibility);
   Opts.DumpUsr = Args.hasArg(OPT_dump_usr);
 
   if (Args.hasArg(OPT_disable_migrator_fixits)) {
     Opts.EnableMigratorFixits = false;
+  }
+
+  if (auto RemapFilePath = Args.getLastArg(OPT_emit_remap_file_path)) {
+    Opts.EmitRemapFilePath = RemapFilePath->getValue();
   }
 
   if (auto MigratedFilePath = Args.getLastArg(OPT_emit_migrated_file_path)) {
@@ -1607,7 +1650,7 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
   }
 
   if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
-    Opts.APIDigesterDataStorePath = DataPath->getValue();
+    Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
   } else {
     bool Supported = true;
     llvm::SmallString<128> dataPath(ResourcePath);
@@ -1622,9 +1665,16 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
       llvm::sys::path::append(dataPath, "watchos.json");
     else
       Supported = false;
-    if (Supported)
-      Opts.APIDigesterDataStorePath = dataPath.str();
+    if (Supported) {
+      llvm::SmallString<128> authoredDataPath(ResourcePath);
+      llvm::sys::path::append(authoredDataPath, "migrator");
+      llvm::sys::path::append(authoredDataPath, "overlay.json");
+      // Add authored list first to take higher priority.
+      Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
+      Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
+    }
   }
+
   return false;
 }
 

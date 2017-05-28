@@ -128,7 +128,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       if (decls.size() != 1)
         return CanType();
 
-      const TypeDecl *typeDecl = dyn_cast<TypeDecl>(decls.front());
+      const auto *typeDecl = dyn_cast<TypeDecl>(decls.front());
       if (!typeDecl)
         return CanType();
 
@@ -521,7 +521,7 @@ enum class ConventionsKind : uint8_t {
       }
 
       // Okay, handle 'self'.
-      if (CanTupleType substTupleType = dyn_cast<TupleType>(substType)) {
+      if (auto substTupleType = dyn_cast<TupleType>(substType)) {
         unsigned numEltTypes = substTupleType.getElementTypes().size();
         assert(numEltTypes > 0);
 
@@ -1398,7 +1398,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
 
 /// Try to find a clang method declaration for the given function.
 static const clang::Decl *findClangMethod(ValueDecl *method) {
-  if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
+  if (auto *methodFn = dyn_cast<FuncDecl>(method)) {
     if (auto *decl = methodFn->getClangDecl())
       return decl;
 
@@ -1406,7 +1406,7 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
       return findClangMethod(overridden);
   }
 
-  if (ConstructorDecl *constructor = dyn_cast<ConstructorDecl>(method)) {
+  if (auto *constructor = dyn_cast<ConstructorDecl>(method)) {
     if (auto *decl = constructor->getClangDecl())
       return decl;
   }
@@ -1640,9 +1640,10 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
 CanSILFunctionType TypeConverter::
 getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                       CanAnyFunctionType origInterfaceType) {
-  auto origLoweredInterfaceType = getLoweredASTFunctionType(origInterfaceType,
-                                                            constant.uncurryLevel,
-                                                            constant);
+  auto origLoweredInterfaceType =
+    getLoweredASTFunctionType(origInterfaceType,
+                              constant.getUncurryLevel(),
+                              constant);
   return ::getUncachedSILFunctionTypeForConstant(M, constant,
                                                  origLoweredInterfaceType);
 }
@@ -1685,8 +1686,13 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
-  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
+  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
+    // Use the regular method convention for foreign-to-native thunks.
+    if (c.isForeignToNativeThunk())
+      return SILFunctionTypeRepresentation::Method;
+    assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
     return getProtocolWitnessRepresentation(proto);
+  }
 
   switch (c.kind) {
     case SILDeclRef::Kind::GlobalAccessor:
@@ -1729,7 +1735,8 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
   auto loweredInterfaceType =
-    getLoweredASTFunctionType(formalInterfaceType, constant.uncurryLevel,
+    getLoweredASTFunctionType(formalInterfaceType,
+                              constant.getUncurryLevel(),
                               constant);
 
   // The SIL type encodes conventions according to the original type.
@@ -1778,14 +1785,15 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
   return ty->getParameters().back();
 }
 
-bool TypeConverter::requiresNewVTableEntry(SILDeclRef method) {
-  auto found = RequiresVTableEntry.find(method);
-  if (found != RequiresVTableEntry.end())
-    return found->second;
-
-  auto result = requiresNewVTableEntryUncached(method);
-  RequiresVTableEntry.insert(std::make_pair(method, result));
-  return result;
+static bool requiresNewVTableEntry(SILDeclRef method) {
+  if (cast<AbstractFunctionDecl>(method.getDecl())->needsNewVTableEntry())
+    return true;
+  if (method.kind == SILDeclRef::Kind::Allocator) {
+    auto *ctor = cast<ConstructorDecl>(method.getDecl());
+    if (ctor->isRequired() && !ctor->getOverriddenDecl()->isRequired())
+      return true;
+  }
+  return false;
 }
 
 // This check duplicates TypeConverter::checkForABIDifferences(),
@@ -1795,128 +1803,8 @@ bool TypeConverter::requiresNewVTableEntry(SILDeclRef method) {
 // @guaranteed or whatever.
 static bool checkASTTypeForABIDifferences(CanType type1,
                                           CanType type2) {
-  // Unwrap optionals, but remember that we did.
-  bool type1WasOptional = false;
-  bool type2WasOptional = false;
-  if (auto object = type1.getAnyOptionalObjectType()) {
-    type1WasOptional = true;
-    type1 = object;
-  }
-  if (auto object = type2.getAnyOptionalObjectType()) {
-    type2WasOptional = true;
-    type2 = object;
-  }
-
-  // Forcing IUOs always requires a new vtable entry.
-  if (type1WasOptional && !type2WasOptional)
-    return true;
-
-  // Except for the above case, we should not be making a value less optional.
-
-  // If we're introducing a level of optionality, only certain types are
-  // ABI-compatible -- check below.
-  bool optionalityChange = (!type1WasOptional && type2WasOptional);
-
-  // If the types are identical and there was no optionality change,
-  // we're done.
-  if (type1 == type2 && !optionalityChange)
-    return false;
-
-  // Classes, class-constrained archetypes, and pure-ObjC existential types
-  // all have single retainable pointer representation; optionality change
-  // is allowed.
-  if ((type1->mayHaveSuperclass() ||
-       type1->isObjCExistentialType()) &&
-      (type2->mayHaveSuperclass() ||
-       type2->isObjCExistentialType()))
-    return false;
-
-  // Class metatypes are ABI-compatible even under optionality change.
-  if (auto metaTy1 = dyn_cast<MetatypeType>(type1)) {
-    if (auto metaTy2 = dyn_cast<MetatypeType>(type2)) {
-      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
-          metaTy2.getInstanceType().getClassOrBoundGenericClass())
-        return false;
-    }
-  }
-
-  if (!optionalityChange) {
-    // Function parameters are ABI compatible if their differences are
-    // trivial.
-    if (auto fnTy1 = dyn_cast<AnyFunctionType>(type1)) {
-      if (auto fnTy2 = dyn_cast<AnyFunctionType>(type2)) {
-        return (
-            checkASTTypeForABIDifferences(fnTy2.getInput(), fnTy1.getInput()) ||
-            checkASTTypeForABIDifferences(fnTy1.getResult(), fnTy2.getResult()));
-      }
-    }
-
-    // Tuple types are ABI-compatible if their elements are.
-    if (auto tuple1 = dyn_cast<TupleType>(type1)) {
-      if (auto tuple2 = dyn_cast<TupleType>(type2)) {
-        if (tuple1->getNumElements() != tuple2->getNumElements())
-          return true;
-
-        for (unsigned i = 0, e = tuple1->getNumElements(); i < e; i++) {
-          if (checkASTTypeForABIDifferences(tuple1.getElementType(i),
-                                            tuple2.getElementType(i)))
-            return true;
-        }
-
-        // Tuple lengths and elements match
-        return false;
-      }
-    }
-  }
-
-  // The types are different, or there was an optionality change resulting
-  // in a change in representation.
-  return true;
-}
-
-bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef derived) {
-  auto *decl = derived.getDecl();
-
-  // Final members are always be called directly.
-  // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic())
-    return false;
-
-  // Special case -- materializeForSet on dynamic storage is not
-  // itself dynamic, but should be treated as such for the
-  // purpose of constructing the vtable.
-  if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-    if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet &&
-        fd->getAccessorStorageDecl()->isDynamic())
-      return false;
-  }
-
-  // If the method overrides something, we only need a new entry if the
-  // override has a more general AST type. However an abstraction
-  // change is OK; we don't want to add a whole new vtable entry just
-  // because an @in parameter because @owned, or whatever.
-  if (auto base = derived.getNextOverriddenVTableEntry()) {
-    auto baseInfo = getConstantInfo(base);
-    auto derivedInfo = getConstantInfo(derived);
-
-    auto baseInterfaceTy = baseInfo.FormalInterfaceType;
-    auto derivedInterfaceTy = derivedInfo.FormalInterfaceType;
-
-    auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
-
-    auto overrideInterfaceTy =
-        selfInterfaceTy->adjustSuperclassMemberDeclType(
-            base.getDecl(), derived.getDecl(), baseInterfaceTy)
-      ->getCanonicalType();
-
-    if (checkASTTypeForABIDifferences(derivedInterfaceTy, overrideInterfaceTy))
-      return true;
-
-    return false;
-  }
-
-  // We need a new entry.
-  return true;
+  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible,
+                         /*resolver*/nullptr);
 }
 
 SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
@@ -2046,7 +1934,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // Lower the formal AST type.
   auto overrideLoweredInterfaceTy = getLoweredASTFunctionType(
       cast<AnyFunctionType>(overrideInterfaceTy->getCanonicalType()),
-      derived.uncurryLevel, derived);
+      derived.getUncurryLevel(), derived);
 
   if (!checkASTTypeForABIDifferences(derivedInfo.LoweredInterfaceType,
                                      overrideLoweredInterfaceTy)) {
@@ -2247,12 +2135,14 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
                                   const SubstitutionMap &subs) {
+  if (!isPolymorphic()) {
+    return CanSILFunctionType(this);
+  }
+  
   if (subs.empty()) {
-    assert(!isPolymorphic() && "no args for polymorphic substitution");
     return CanSILFunctionType(this);
   }
 
-  assert(isPolymorphic());
   return substGenericArgs(silModule,
                           QuerySubstitutionMap{subs},
                           LookUpConformanceInSubstitutionMap(subs));

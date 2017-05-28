@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift
@@ -67,6 +67,17 @@ sil @use_Int : $@convention(thin) (Int) -> ()
 sil @use_Int64 : $@convention(thin) (Int64) -> ()
 sil @use_Generic : $@convention(thin) <T>(@in_guaranteed T) -> ()
 
+
+sil_global public @sil_global1 : $Builtin.Int32
+
+sil @update_global: $@convention(thin) () -> () {
+bb0:
+  %sil_global1_addr = global_addr @sil_global1 : $*Builtin.Int32
+  %1 = integer_literal $Builtin.Int32, 1
+  store %1 to %sil_global1_addr : $*Builtin.Int32
+  %4 = tuple ()
+  return %4 : $()
+}
 
 // CHECK-LABEL: sil [thunk] [always_inline] @argument_with_incomplete_epilogue_release
 // CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $goo, #goo.top
@@ -328,6 +339,8 @@ bb0(%0 : $boo):
   %3 = struct_extract %1 : $baz, #baz.end
   release_value  %2 : $foo
   release_value  %3 : $foo
+  %f = function_ref @update_global: $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   %4 = tuple ()
   return %4 : $()
 }
@@ -1460,6 +1473,10 @@ bb0(%0 : $Builtin.Int32):
 
   %1 = function_ref @s1 : $@convention(thin) (Builtin.Int32) -> ()
   apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+
+  %f = function_ref @update_global: $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+
   %9999 = tuple()
   return %9999 : $()
 }

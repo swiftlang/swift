@@ -471,11 +471,6 @@ static void lookupVisibleProtocolMemberDecls(
     Type BaseTy, ProtocolType *PT, VisibleDeclConsumer &Consumer,
     const DeclContext *CurrDC, LookupState LS, DeclVisibilityKind Reason,
     LazyResolver *TypeResolver, VisitedSet &Visited) {
-  if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-    // Handle AnyObject in a special way.
-    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
-    return;
-  }
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
@@ -527,6 +522,12 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
+  // If the base is AnyObject, we are doing dynamic lookup.
+  if (BaseTy->isAnyObject()) {
+    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
+    return;
+  }
+
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
@@ -567,7 +568,7 @@ static void lookupVisibleMemberDeclsImpl(
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, TypeResolver, Visited);
     // If we have a class type, look into its superclass.
-    ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
+    auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
       assert(BaseTy.getPointer() != CurClass->getSuperclass().getPointer() &&

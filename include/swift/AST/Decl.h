@@ -140,6 +140,7 @@ enum class DescriptiveDeclKind : uint8_t {
   DidSet,
   EnumElement,
   Module,
+  MissingMember,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -365,8 +366,14 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether the function body throws.
     unsigned Throws : 1;
+
+    /// Whether this function requires a new vtable entry.
+    unsigned NeedsNewVTableEntry : 1;
+
+    /// Whether NeedsNewVTableEntry is valid.
+    unsigned HasComputedNeedsNewVTableEntry : 1;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 11 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 13 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -378,15 +385,8 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
-
-    /// Whether this function is a 'mutating' method.
-    unsigned Mutating : 1;
-
-    /// Whether this function has a dynamic Self return type.
-    unsigned HasDynamicSelf : 1;
-    
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 3 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -399,17 +399,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
-
-    /// Whether this initializer is a stub placed into a subclass to
-    /// catch invalid delegations to a designated initializer not
-    /// overridden by the subclass. A stub will always trap at runtime.
-    ///
-    /// Initializer stubs can be invoked from Objective-C or through
-    /// the Objective-C runtime; there is no way to directly express
-    /// an object construction that will invoke a stub.
-    unsigned HasStubImplementation : 1;
   };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 4 };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 3 };
   static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitfields {
@@ -436,8 +427,11 @@ class alignas(1 << DeclAlignInBits) Decl {
   class TypeAliasDeclBitfields {
     friend class TypeAliasDecl;
     unsigned : NumGenericTypeDeclBits;
+
+    /// Whether the typealias forwards perfectly to its underlying type.
+    unsigned IsCompatibilityAlias : 1;
   };
-  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits };
+  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
 
   class NominalTypeDeclBitFields {
@@ -452,17 +446,10 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
 
-    /// \brief Whether or not this declaration has a failable initializer member,
-    /// and whether or not we've actually searched for one.
-    unsigned HasFailableInits : 1;
-
-    /// Whether we have already searched for failable initializers.
-    unsigned SearchedForFailableInits : 1;
-
     /// Whether there is are lazily-loaded conformances for this nominal type.
     unsigned HasLazyConformances : 1;
   };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 5 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 3 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -609,6 +596,15 @@ class alignas(1 << DeclAlignInBits) Decl {
   enum { NumIfConfigDeclBits = NumDeclBits + 1 };
   static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
 
+  class MissingMemberDeclBitfields {
+    friend class MissingMemberDecl;
+    unsigned : NumDeclBits;
+
+    unsigned NumberOfVTableEntries : 2;
+  };
+  enum { NumMissingMemberDeclBits = NumDeclBits + 2 };
+  static_assert(NumMissingMemberDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
@@ -633,6 +629,7 @@ protected:
     ImportDeclBitfields ImportDeclBits;
     ExtensionDeclBitfields ExtensionDeclBits;
     IfConfigDeclBitfields IfConfigDeclBits;
+    MissingMemberDeclBitfields MissingMemberDeclBits;
     uint32_t OpaqueBits;
   };
 
@@ -1469,6 +1466,10 @@ public:
   void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
                                  GenericSignature *genericSig,
                                  uint64_t genericEnvData);
+
+  /// Whether this generic context has a lazily-created generic environment
+  /// that has not yet been constructed.
+  bool hasLazyGenericEnvironment() const;
 
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
@@ -2441,6 +2442,14 @@ public:
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
+  bool isCompatibilityAlias() const {
+    return TypeAliasDeclBits.IsCompatibilityAlias;
+  }
+
+  void markAsCompatibilityAlias(bool newValue = true) {
+    TypeAliasDeclBits.IsCompatibilityAlias = newValue;
+  }
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;
   }
@@ -2743,8 +2752,6 @@ protected:
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
-    NominalTypeDeclBits.SearchedForFailableInits = false;
-    NominalTypeDeclBits.HasFailableInits = false;
     NominalTypeDeclBits.HasLazyConformances = false;
   }
 
@@ -2794,19 +2801,6 @@ public:
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
               
-  bool getHasFailableInits() const {
-    return NominalTypeDeclBits.HasFailableInits;
-  }
-  void setHasFailableInits(bool failable = true) {
-    NominalTypeDeclBits.HasFailableInits = failable;
-  }
-  void setSearchedForFailableInits(bool searched = true) {
-    NominalTypeDeclBits.SearchedForFailableInits = searched;
-  }
-  bool getSearchedForFailableInits() const {
-    return NominalTypeDeclBits.SearchedForFailableInits;
-  }
-
   /// Compute the type of this nominal type.
   void computeType();
 
@@ -2901,6 +2895,9 @@ public:
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
+    ToStoredProperty(bool skipInaccessible = false) :
+        skipUserInaccessible(skipInaccessible) {}
+    bool skipUserInaccessible;
     Optional<VarDecl *> operator()(Decl *decl) const;
   };
   
@@ -2910,8 +2907,9 @@ public:
                                                      ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties() const {
-    return StoredPropertyRange(getMembers(), ToStoredProperty());
+  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const {
+    return StoredPropertyRange(getMembers(),
+                               ToStoredProperty(skipInaccessible));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -3199,6 +3197,7 @@ class ClassDecl : public NominalTypeDecl {
   unsigned ObjCKind : 3;
 
   unsigned HasMissingDesignatedInitializers : 1;
+  unsigned HasMissingVTableEntries : 1;
 
   friend class IterativeTypeChecker;
 
@@ -3293,6 +3292,16 @@ public:
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
     HasMissingDesignatedInitializers = newValue;
+  }
+
+  /// Returns true if the class has missing members that require vtable entries.
+  ///
+  /// In this case, the class cannot be subclassed, because we cannot construct
+  /// the vtable for the subclass.
+  bool hasMissingVTableEntries() const;
+
+  void setHasMissingVTableEntries(bool newValue = true) {
+    HasMissingVTableEntries = newValue;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -3409,46 +3418,54 @@ public:
 struct SelfReferenceKind {
   bool result;
   bool parameter;
+  bool requirement;
   bool other;
 
   /// The type does not refer to 'Self' at all.
   static SelfReferenceKind None() {
-    return SelfReferenceKind(false, false, false);
+    return SelfReferenceKind(false, false, false, false);
   }
 
   /// The type refers to 'Self', but only as the result type of a method.
   static SelfReferenceKind Result() {
-    return SelfReferenceKind(true, false, false);
+    return SelfReferenceKind(true, false, false, false);
   }
 
   /// The type refers to 'Self', but only as the parameter type of a method.
   static SelfReferenceKind Parameter() {
-    return SelfReferenceKind(false, true, false);
+    return SelfReferenceKind(false, true, false, false);
+  }
+
+  /// The type refers to 'Self' within a same-type requiement.
+  static SelfReferenceKind Requirement() {
+    return SelfReferenceKind(false, false, true, false);
   }
 
   /// The type refers to 'Self' in a position that is invariant.
   static SelfReferenceKind Other() {
-    return SelfReferenceKind(false, false, true);
+    return SelfReferenceKind(false, false, false, true);
   }
 
   SelfReferenceKind flip() const {
-    return SelfReferenceKind(parameter, result, other);
+    return SelfReferenceKind(parameter, result, requirement, other);
   }
 
   SelfReferenceKind operator|=(SelfReferenceKind kind) {
     result |= kind.result;
+    requirement |= kind.requirement;
     parameter |= kind.parameter;
     other |= kind.other;
     return *this;
   }
 
   operator bool() const {
-    return result || parameter || other;
+    return result || parameter || requirement || other;
   }
 
 private:
-  SelfReferenceKind(bool result, bool parameter, bool other)
-    : result(result), parameter(parameter), other(other) { }
+  SelfReferenceKind(bool result, bool parameter, bool requirement, bool other)
+    : result(result), parameter(parameter), requirement(requirement),
+      other(other) { }
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -4775,6 +4792,8 @@ protected:
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
     AbstractFunctionDeclBits.Overridden = false;
     AbstractFunctionDeclBits.Throws = Throws;
+    AbstractFunctionDeclBits.NeedsNewVTableEntry = false;
+    AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry = false;
 
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParameterLists == NumParameterLists);
@@ -4888,6 +4907,21 @@ public:
     return getBodyKind() == BodyKind::MemberwiseInitializer;
   }
 
+  void setNeedsNewVTableEntry(bool value) {
+    AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry = true;
+    AbstractFunctionDeclBits.NeedsNewVTableEntry = value;
+  }
+
+  bool needsNewVTableEntry() const {
+    if (!AbstractFunctionDeclBits.HasComputedNeedsNewVTableEntry)
+      const_cast<AbstractFunctionDecl *>(this)->computeNeedsNewVTableEntry();
+    return AbstractFunctionDeclBits.NeedsNewVTableEntry;
+  }
+
+private:
+  void computeNeedsNewVTableEntry();
+
+public:
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
@@ -5035,14 +5069,14 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// If this declaration is part of an overload set, determine if we've
-  /// searched for a common overload amongst all overloads, or if we've found
-  /// one.
-  unsigned HaveSearchedForCommonOverloadReturnType : 1;
-  unsigned HaveFoundCommonOverloadReturnType : 1;
-
   /// Whether we are statically dispatched even if overridable
   unsigned ForcedStaticDispatch : 1;
+
+  /// Whether this function has a dynamic Self return type.
+  unsigned HasDynamicSelf : 1;
+
+  /// Whether this function is a 'mutating' method.
+  unsigned Mutating : 1;
 
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
@@ -5071,12 +5105,10 @@ class FuncDecl final : public AbstractFunctionDecl,
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
-    FuncDeclBits.Mutating = false;
-    FuncDeclBits.HasDynamicSelf = false;
 
+    Mutating = false;
+    HasDynamicSelf = false;
     ForcedStaticDispatch = false;
-    HaveSearchedForCommonOverloadReturnType = false;
-    HaveFoundCommonOverloadReturnType = false;
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -5126,10 +5158,10 @@ public:
     FuncDeclBits.IsStatic = IsStatic;
   }
   bool isMutating() const {
-    return FuncDeclBits.Mutating;
+    return Mutating;
   }
-  void setMutating(bool Mutating = true) {
-    FuncDeclBits.Mutating = Mutating;
+  void setMutating(bool mutating = true) {
+    Mutating = mutating;
   }
   
   /// \brief Returns the parameter lists(s) for the function definition.
@@ -5149,20 +5181,6 @@ public:
     return getParameterLists()[i];
   }
   
-
-  bool getHaveSearchedForCommonOverloadReturnType() {
-    return HaveSearchedForCommonOverloadReturnType;
-  }
-  void setHaveSearchedForCommonOverloadReturnType(bool b = true) {
-    HaveSearchedForCommonOverloadReturnType = b;
-  }
-  bool getHaveFoundCommonOverloadReturnType() {
-    return HaveFoundCommonOverloadReturnType;
-  }
-  void setHaveFoundCommonOverloadReturnType(bool b = true) {
-    HaveFoundCommonOverloadReturnType = b;
-  }
-
   /// \returns true if this is non-mutating due to applying a 'mutating'
   /// attribute. For example a "mutating set" accessor.
   bool isExplicitNonMutating() const;
@@ -5251,11 +5269,11 @@ public:
 
   /// Determine whether this function has a dynamic \c Self return
   /// type.
-  bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
+  bool hasDynamicSelf() const { return HasDynamicSelf; }
 
   /// Set whether this function has a dynamic \c Self return or not.
   void setDynamicSelf(bool hasDynamicSelf) { 
-    FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
+    HasDynamicSelf = hasDynamicSelf;
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -5534,6 +5552,15 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// The failability of this initializer, which is an OptionalTypeKind.
   unsigned Failability : 2;
 
+  /// Whether this initializer is a stub placed into a subclass to
+  /// catch invalid delegations to a designated initializer not
+  /// overridden by the subclass. A stub will always trap at runtime.
+  ///
+  /// Initializer stubs can be invoked from Objective-C or through
+  /// the Objective-C runtime; there is no way to directly express
+  /// an object construction that will invoke a stub.
+  unsigned HasStubImplementation : 1;
+
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
@@ -5693,13 +5720,13 @@ public:
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {
-    return ConstructorDeclBits.HasStubImplementation;
+    return HasStubImplementation;
   }
 
   /// Set whether the implementation of this method is a stub that
   /// traps at runtime.
   void setStubImplementation(bool stub) {
-    ConstructorDeclBits.HasStubImplementation = stub;
+    HasStubImplementation = stub;
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
@@ -6095,6 +6122,55 @@ public:
   }
 };
 
+/// Represents a hole where a declaration should have been.
+///
+/// Among other things, these are used to keep vtable layout consistent.
+class MissingMemberDecl : public Decl {
+  DeclName Name;
+
+  MissingMemberDecl(DeclContext *DC, DeclName name, unsigned vtableEntries)
+      : Decl(DeclKind::MissingMember, DC), Name(name) {
+    MissingMemberDeclBits.NumberOfVTableEntries = vtableEntries;
+    assert(getNumberOfVTableEntries() == vtableEntries && "not enough bits");
+    setImplicit();
+  }
+public:
+  static MissingMemberDecl *
+  forMethod(ASTContext &ctx, DeclContext *DC, DeclName name,
+            bool hasNormalVTableEntry) {
+    assert(!name || name.isCompoundName());
+    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry);
+  }
+
+  static MissingMemberDecl *
+  forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
+                 bool hasNormalVTableEntry,
+                 bool hasAllocatingVTableEntry) {
+    unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
+    return new (ctx) MissingMemberDecl(DC, name, entries);
+  }
+
+  DeclName getFullName() const {
+    return Name;
+  }
+
+  unsigned getNumberOfVTableEntries() const {
+    return MissingMemberDeclBits.NumberOfVTableEntries;
+  }
+
+  SourceLoc getLoc() const {
+    return SourceLoc();
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::MissingMember;
+  }
+};
+
 inline bool ValueDecl::isSettable(const DeclContext *UseDC,
                                   const DeclRefExpr *base) const {
   if (auto vd = dyn_cast<VarDecl>(this)) {
@@ -6108,7 +6184,8 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
 inline Optional<VarDecl *>
 NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage())
+    if (!var->isStatic() && var->hasStorage() &&
+        (!skipUserInaccessible || var->isUserAccessible()))
       return var;
   }
 

@@ -179,10 +179,9 @@ class alignas(8) Expr {
     friend class UnresolvedDeclRefExpr;
     unsigned : NumExprBits;
     unsigned DeclRefKind : 2;
-    unsigned IsSpecialized : 1;
     unsigned FunctionRefKind : 2;
   };
-  enum { NumUnresolvedDeclRefExprBits = NumExprBits + 5 };
+  enum { NumUnresolvedDeclRefExprBits = NumExprBits + 4 };
   static_assert(NumUnresolvedDeclRefExprBits <= 32, "fits in an unsigned");
 
   class MemberRefExprBitfields {
@@ -271,14 +270,6 @@ class alignas(8) Expr {
   };
   enum { NumOverloadSetRefExprBits = NumExprBits + 2};
   static_assert(NumOverloadSetRefExprBits <= 32, "fits in an unsigned");
-
-  class OverloadedDeclRefExprBitfields {
-    friend class OverloadedDeclRefExpr;
-    unsigned : NumOverloadSetRefExprBits;
-    unsigned IsSpecialized : 1;
-  };
-  enum { NumOverloadedDeclRefExprBits = NumOverloadSetRefExprBits + 1 };
-  static_assert(NumOverloadedDeclRefExprBits <= 32, "fits in an unsigned");
 
   class BooleanLiteralExprBitfields {
     friend class BooleanLiteralExpr;
@@ -432,7 +423,6 @@ protected:
     DynamicSubscriptExprBitfields DynamicSubscriptExprBits;
     UnresolvedMemberExprBitfields UnresolvedMemberExprBits;
     OverloadSetRefExprBitfields OverloadSetRefExprBits;
-    OverloadedDeclRefExprBitfields OverloadedDeclRefExprBits;
     BooleanLiteralExprBitfields BooleanLiteralExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     ObjectLiteralExprBitfields ObjectLiteralExprBits;
@@ -1249,27 +1239,15 @@ public:
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
-  /// This is used when the reference is specialized, e.g "GenCls<Int>", to
-  /// hold information about the generic arguments.
-  struct SpecializeInfo {
-    ConcreteDeclRef D;
-    ArrayRef<TypeRepr*> GenericArgs;
-  };
-
-  /// \brief The declaration pointer or SpecializeInfo pointer if it was
-  /// explicitly specialized with <...>.
-  llvm::PointerUnion<ConcreteDeclRef, SpecializeInfo *> DOrSpecialized;
+  /// \brief The declaration pointer.
+  ConcreteDeclRef D;
   DeclNameLoc Loc;
-
-  SpecializeInfo *getSpecInfo() const {
-    return DOrSpecialized.dyn_cast<SpecializeInfo*>();
-  }
 
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
               AccessSemantics semantics = AccessSemantics::Ordinary,
               Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {
+    : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc) {
     DeclRefExprBits.Semantics = (unsigned) semantics;
     DeclRefExprBits.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
@@ -1289,29 +1267,9 @@ public:
 
   /// Retrieve the concrete declaration reference.
   ConcreteDeclRef getDeclRef() const {
-    if (auto Spec = getSpecInfo())
-      return Spec->D;
-    return DOrSpecialized.get<ConcreteDeclRef>();
+    return D;
   }
 
-  void setSpecialized();
-
-  /// \brief Determine whether this declaration reference was immediately
-  /// specialized by <...>.
-  bool isSpecialized() const { return getSpecInfo() != nullptr; }
-
-  /// Set the generic arguments.
-  ///
-  /// This copies the array using ASTContext's allocator.
-  void setGenericArgs(ArrayRef<TypeRepr*> GenericArgs);
-
-  /// Returns the generic arguments if it was specialized or an empty array
-  /// otherwise.
-  ArrayRef<TypeRepr *> getGenericArgs() const {
-    if (auto Spec = getSpecInfo())
-      return Spec->GenericArgs;
-    return ArrayRef<TypeRepr *>();
-  }
   SourceRange getSourceRange() const { return Loc.getSourceRange(); }
   SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
   DeclNameLoc getNameLoc() const { return Loc; }
@@ -1382,12 +1340,31 @@ public:
   static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
   
-  /// Return a TypeExpr for a TypeDecl and the specified location.
+  /// Create a TypeExpr for a TypeDecl at the specified location.
   static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D,
                                  bool isImplicit);
-  static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
-                                            ArrayRef<TypeRepr*> args,
-                                            SourceRange angleLocs);
+
+  /// Create a TypeExpr for a member TypeDecl of the given parent TypeDecl.
+  static TypeExpr *createForMemberDecl(SourceLoc ParentNameLoc,
+                                       TypeDecl *Parent,
+                                       SourceLoc NameLoc,
+                                       TypeDecl *Decl);
+
+  /// Create a TypeExpr for a member TypeDecl of the given parent IdentTypeRepr.
+  static TypeExpr *createForMemberDecl(IdentTypeRepr *ParentTR,
+                                       SourceLoc NameLoc,
+                                       TypeDecl *Decl);
+
+  /// Create a TypeExpr from an IdentTypeRepr with the given arguments applied
+  /// at the specified location.
+  ///
+  /// Returns nullptr if the reference cannot be formed, which is a hack due
+  /// to limitations in how we model generic typealiases.
+  static TypeExpr *createForSpecializedDecl(IdentTypeRepr *ParentTR,
+                                            ArrayRef<TypeRepr*> Args,
+                                            SourceRange AngleLocs,
+                                            ASTContext &C);
+
   TypeLoc &getTypeLoc() { return Info; }
   TypeLoc getTypeLoc() const { return Info; }
   TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
@@ -1488,24 +1465,16 @@ class OverloadedDeclRefExpr final : public OverloadSetRefExpr {
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, DeclNameLoc Loc,
-                        bool isSpecialized,
                         FunctionRefKind functionRefKind,
                         bool Implicit, Type Ty = Type())
       : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, functionRefKind,
                            Implicit, Ty),
         Loc(Loc) {
-    OverloadedDeclRefExprBits.IsSpecialized = isSpecialized;
   }
   
   DeclNameLoc getNameLoc() const { return Loc; }
   SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
   SourceRange getSourceRange() const { return Loc.getSourceRange(); }
-
-  /// \brief Determine whether this declaration reference was immediately
-  /// specialized by <...>.
-  bool isSpecialized() const {
-    return OverloadedDeclRefExprBits.IsSpecialized;
-  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
@@ -1526,7 +1495,6 @@ public:
       : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
         Name(name), Loc(loc) {
     UnresolvedDeclRefExprBits.DeclRefKind = static_cast<unsigned>(refKind);
-    UnresolvedDeclRefExprBits.IsSpecialized = false;
     UnresolvedDeclRefExprBits.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
@@ -1538,14 +1506,6 @@ public:
   DeclRefKind getRefKind() const {
     return static_cast<DeclRefKind>(UnresolvedDeclRefExprBits.DeclRefKind);
   }
-
-  void setSpecialized(bool specialized) {
-    UnresolvedDeclRefExprBits.IsSpecialized = specialized;
-  }
-
-  /// \brief Determine whether this declaration reference was immediately
-  /// specialized by <...>.
-  bool isSpecialized() const { return UnresolvedDeclRefExprBits.IsSpecialized; }
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
@@ -4558,11 +4518,20 @@ public:
 /// #keyPath(Person.friends.firstName)
 /// \endcode
 class KeyPathExpr : public Expr {
-  SourceLoc KeywordLoc;
+  SourceLoc StartLoc;
   SourceLoc LParenLoc;
-  SourceLoc RParenLoc;
-  TypeRepr *RootType;
+  SourceLoc EndLoc;
   Expr *ObjCStringLiteralExpr = nullptr;
+
+  // The parsed root of a Swift keypath (the section before an unusual dot, like
+  // Foo.Bar in \Foo.Bar.?.baz).
+  Expr *ParsedRoot = nullptr;
+  // The parsed path of a Swift keypath (the section after an unusual dot, like
+  // ?.baz in \Foo.Bar.?.baz).
+  Expr *ParsedPath = nullptr;
+
+  // The processed/resolved type, like Foo.Bar in \Foo.Bar.?.baz.
+  TypeRepr *RootType = nullptr;
 
 public:
   /// A single stored component, which will be one of:
@@ -4573,6 +4542,7 @@ public:
   class Component {
   public:
     enum class Kind: unsigned {
+      Invalid,
       UnresolvedProperty,
       UnresolvedSubscript,
       Property,
@@ -4607,7 +4577,7 @@ public:
     {}
     
   public:
-    Component() : Component({}, nullptr, (Kind)0, Type(), SourceLoc()) {}
+    Component() : Component({}, nullptr, Kind::Invalid, Type(), SourceLoc()) {}
     
     /// Create an unresolved component for a property.
     static Component forUnresolvedProperty(DeclName UnresolvedName,
@@ -4711,12 +4681,36 @@ public:
       return SubscriptIndexExprAndKind.getInt();
     }
     
+    bool isValid() const {
+      return getKind() != Kind::Invalid;
+    }
+    
+    bool isResolved() const {
+      if (!getComponentType())
+        return false;
+      
+      switch (getKind()) {
+      case Kind::Subscript:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::Property:
+        return true;
+      
+      case Kind::UnresolvedSubscript:
+      case Kind::UnresolvedProperty:
+      case Kind::Invalid:
+        return false;
+      }
+    }
+    
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
         return SubscriptIndexExprAndKind.getPointer();
         
+      case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
@@ -4731,6 +4725,7 @@ public:
       case Kind::UnresolvedProperty:
         return Decl.UnresolvedName;
 
+      case Kind::Invalid:
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
       case Kind::OptionalChain:
@@ -4747,6 +4742,7 @@ public:
       case Kind::Subscript:
         return Decl.ResolvedDecl;
 
+      case Kind::Invalid:
       case Kind::UnresolvedProperty:
       case Kind::UnresolvedSubscript:
       case Kind::OptionalChain:
@@ -4772,16 +4768,22 @@ public:
   /// Create a new #keyPath expression.
   KeyPathExpr(ASTContext &C,
               SourceLoc keywordLoc, SourceLoc lParenLoc,
-              TypeRepr *root,
               ArrayRef<Component> components,
               SourceLoc rParenLoc,
-              bool isObjC,
               bool isImplicit = false);
 
-  SourceLoc getLoc() const { return KeywordLoc; }
-  SourceRange getSourceRange() const {
-    return SourceRange(KeywordLoc, RParenLoc);
+  KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
+              bool isImplicit = false)
+      : Expr(ExprKind::KeyPath, isImplicit), StartLoc(backslashLoc),
+        EndLoc(parsedPath ? parsedPath->getEndLoc() : parsedRoot->getEndLoc()),
+        ParsedRoot(parsedRoot), ParsedPath(parsedPath) {
+    assert((parsedRoot || parsedPath) &&
+           "keypath must have either root or path");
+    KeyPathExprBits.IsObjC = false;
   }
+
+  SourceLoc getLoc() const { return StartLoc; }
+  SourceRange getSourceRange() const { return SourceRange(StartLoc, EndLoc); }
 
   /// Get the components array.
   ArrayRef<Component> getComponents() const {
@@ -4807,11 +4809,34 @@ public:
   void setObjCStringLiteralExpr(Expr *expr) {
     ObjCStringLiteralExpr = expr;
   }
-  
+
+  Expr *getParsedRoot() const {
+    assert(!isObjC() && "cannot get parsed root of ObjC keypath");
+    return ParsedRoot;
+  }
+  void setParsedRoot(Expr *root) {
+    assert(!isObjC() && "cannot get parsed root of ObjC keypath");
+    ParsedRoot = root;
+  }
+
+  Expr *getParsedPath() const {
+    assert(!isObjC() && "cannot get parsed path of ObjC keypath");
+    return ParsedPath;
+  }
+  void setParsedPath(Expr *path) {
+    assert(!isObjC() && "cannot set parsed path of ObjC keypath");
+    ParsedPath = path;
+  }
+
   TypeRepr *getRootType() const {
+    assert(!isObjC() && "cannot get root type of ObjC keypath");
     return RootType;
   }
-  
+  void setRootType(TypeRepr *rootType) {
+    assert(!isObjC() && "cannot set root type of ObjC keypath");
+    RootType = rootType;
+  }
+
   /// True if this is an ObjC key path expression.
   bool isObjC() const { return KeyPathExprBits.IsObjC; }
 
@@ -4820,6 +4845,22 @@ public:
   }
 };
 
+/// Represents the unusual behavior of a . in a \ keypath expression, such as
+/// \.[0] and \Foo.?.
+class KeyPathDotExpr : public Expr {
+  SourceLoc DotLoc;
+
+public:
+  KeyPathDotExpr(SourceLoc dotLoc)
+      : Expr(ExprKind::KeyPathDot, /*isImplicit=*/true), DotLoc(dotLoc) {}
+
+  SourceLoc getLoc() const { return DotLoc; }
+  SourceRange getSourceRange() const { return SourceRange(DotLoc, DotLoc); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::KeyPathDot;
+  }
+};
 
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -enforce-exclusivity=checked | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend %s -swift-version 4 -emit-ir -enforce-exclusivity=checked | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-SWIFT4 --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend %s -swift-version 3 -emit-ir -enforce-exclusivity=checked | %FileCheck --check-prefix=CHECK  --check-prefix=CHECK-SWIFT3 --check-prefix=CHECK-%target-cpu %s
 
 sil_stage canonical
 
@@ -24,8 +25,9 @@ bb0(%0 : $A):
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH0]] to i8*
   // CHECK: call void @llvm.lifetime.start(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
-  // CHECK: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 0)
-  %4 = begin_access [read] [dynamic] %3 : $*Int
+  // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 16, i8* null)
+  // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 0, i8* null)
+    %4 = begin_access [read] [dynamic] %3 : $*Int
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[INT]], [[INT]]* %1, i32 0, i32 0
   // CHECK: load {{.*}}* [[T0]]
@@ -44,7 +46,8 @@ bb0(%0 : $A):
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH1]] to i8*
   // CHECK: call void @llvm.lifetime.start(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
-  // CHECK: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T]] 1)
+  // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 17, i8* null)
+  // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 1, i8* null)
   %12 = begin_access [modify] [dynamic] %11 : $*Int
 
   // CHECK: call {{.*}} @changeInt([[INT]]*{{.*}} [[PROP]])

@@ -634,3 +634,11 @@ void CompilerInstance::performParseOnly() {
   assert(Context->LoadedModules.size() == 1 &&
          "Loaded a module during parse-only");
 }
+
+void CompilerInstance::freeContextAndSIL() {
+  Context.reset();
+  TheSILModule.reset();
+  MainModule = nullptr;
+  SML = nullptr;
+  PrimarySourceFile = nullptr;
+}

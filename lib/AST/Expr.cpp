@@ -175,10 +175,10 @@ SourceLoc Expr::getLoc() const {
 }
 
 Expr *Expr::getSemanticsProvidingExpr() {
-  if (IdentityExpr *IE = dyn_cast<IdentityExpr>(this))
+  if (auto *IE = dyn_cast<IdentityExpr>(this))
     return IE->getSubExpr()->getSemanticsProvidingExpr();
 
-  if (TryExpr *TE = dyn_cast<TryExpr>(this))
+  if (auto *TE = dyn_cast<TryExpr>(this))
     return TE->getSubExpr()->getSemanticsProvidingExpr();
 
   return this;
@@ -510,6 +510,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(EditorPlaceholder);
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
+  NO_REFERENCE(KeyPathDot);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -796,6 +797,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Assign:
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
+  case ExprKind::KeyPathDot:
     return false;
   }
 
@@ -1306,25 +1308,6 @@ StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
   llvm_unreachable("unspecified literal");
 }
 
-void DeclRefExpr::setSpecialized() {
-  if (isSpecialized())
-    return;
-
-  ConcreteDeclRef ref = getDeclRef();
-  void *Mem = ref.getDecl()->getASTContext().Allocate(sizeof(SpecializeInfo),
-                                                      alignof(SpecializeInfo));
-  auto Spec = new (Mem) SpecializeInfo;
-  Spec->D = ref;
-  DOrSpecialized = Spec;
-}
-
-void DeclRefExpr::setGenericArgs(ArrayRef<TypeRepr*> GenericArgs) {
-  ValueDecl *D = getDecl();
-  assert(D);
-  setSpecialized();
-  getSpecInfo()->GenericArgs = D->getASTContext().AllocateCopy(GenericArgs);
-}
-
 ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
   return cast_or_null<ConstructorDecl>(Ctor.getDecl());
 }
@@ -1489,7 +1472,7 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
 }
 
 static ValueDecl *getCalledValue(Expr *E) {
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
   Expr *E2 = E->getValueProvidingExpr();
@@ -1957,11 +1940,10 @@ Type TypeExpr::getInstanceType(
 }
 
 
-/// Return a TypeExpr for a simple identifier and the specified location.
 TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid());
+  assert(Loc.isValid() || isImplicit);
   auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
   Repr->setValue(Decl);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
@@ -1970,17 +1952,103 @@ TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
   return result;
 }
 
-TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
-                                             ArrayRef<TypeRepr*> args,
-                                             SourceRange AngleLocs) {
-  ASTContext &C = D->getASTContext();
-  assert(Loc.isValid());
-  auto *Repr = new (C) GenericIdentTypeRepr(Loc, D->getName(),
-                                            args, AngleLocs);
-  Repr->setValue(D);
-  return new (C) TypeExpr(TypeLoc(Repr, Type()));
+TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
+                                        TypeDecl *Parent,
+                                        SourceLoc NameLoc,
+                                        TypeDecl *Decl) {
+  ASTContext &C = Decl->getASTContext();
+  assert(ParentNameLoc.isValid());
+  assert(NameLoc.isValid());
+
+  // Create a new list of components.
+  SmallVector<ComponentIdentTypeRepr *, 2> Components;
+
+  // The first component is the parent type.
+  auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
+                                                 Parent->getName());
+  ParentComp->setValue(Parent);
+  Components.push_back(ParentComp);
+
+  // The second component is the member we just found.
+  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc,
+                                              Decl->getName());
+  NewComp->setValue(Decl);
+  Components.push_back(NewComp);
+
+  auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
+  return new (C) TypeExpr(TypeLoc(NewTypeRepr, Type()));
 }
 
+TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
+                                        SourceLoc NameLoc,
+                                        TypeDecl *Decl) {
+  ASTContext &C = Decl->getASTContext();
+
+  // Create a new list of components.
+  SmallVector<ComponentIdentTypeRepr *, 2> Components;
+  for (auto *Component : ParentTR->getComponentRange())
+    Components.push_back(Component);
+
+  // Add a new component for the member we just found.
+  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->getName());
+  NewComp->setValue(Decl);
+  Components.push_back(NewComp);
+
+  auto *NewTypeRepr = IdentTypeRepr::create(C, Components);
+  return new (C) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+}
+
+TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
+                                             ArrayRef<TypeRepr*> Args,
+                                             SourceRange AngleLocs,
+                                             ASTContext &C) {
+  // Create a new list of components.
+  SmallVector<ComponentIdentTypeRepr *, 2> components;
+  for (auto *component : ParentTR->getComponentRange()) {
+    components.push_back(component);
+  }
+
+  auto *last = components.back();
+  components.pop_back();
+
+  if (isa<SimpleIdentTypeRepr>(last) &&
+      last->getBoundDecl()) {
+    if (isa<TypeAliasDecl>(last->getBoundDecl())) {
+      // If any of our parent types are unbound, bail out and let
+      // the constraint solver can infer generic parameters for them.
+      //
+      // This is because a type like GenericClass.GenericAlias<Int>
+      // cannot be represented directly.
+      //
+      // This also means that [GenericClass.GenericAlias<Int>]()
+      // won't parse correctly, whereas if we fully specialize
+      // GenericClass, it does.
+      //
+      // FIXME: Once we can model generic typealiases properly, rip
+      // this out.
+      for (auto *component : components) {
+        auto *componentDecl = dyn_cast_or_null<GenericTypeDecl>(
+          component->getBoundDecl());
+
+        if (isa<SimpleIdentTypeRepr>(component) &&
+            componentDecl &&
+            componentDecl->isGeneric())
+          return nullptr;
+      }
+    }
+
+    auto *genericComp = new (C) GenericIdentTypeRepr(
+      last->getIdLoc(), last->getIdentifier(),
+      Args, AngleLocs);
+    genericComp->setValue(last->getBoundDecl());
+    components.push_back(genericComp);
+
+    auto *genericRepr = IdentTypeRepr::create(C, components);
+    return new (C) TypeExpr(TypeLoc(genericRepr, Type()));
+  }
+
+  return nullptr;
+}
 
 // Create an implicit TypeExpr, with location information even though it
 // shouldn't have one.  This is presently used to work around other location
@@ -2003,23 +2071,17 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<ArchetypeType>();
 }
 
-KeyPathExpr::KeyPathExpr(ASTContext &C,
-                         SourceLoc keywordLoc, SourceLoc lParenLoc,
-                         TypeRepr *root,
-                         ArrayRef<Component> components,
-                         SourceLoc rParenLoc,
-                         bool isObjC,
-                         bool isImplicit)
-  : Expr(ExprKind::KeyPath, isImplicit),
-    KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc),
-    RootType(root),
-    Components(C.AllocateUninitialized<Component>(components.size()))
-{
+KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,
+                         SourceLoc lParenLoc, ArrayRef<Component> components,
+                         SourceLoc rParenLoc, bool isImplicit)
+    : Expr(ExprKind::KeyPath, isImplicit), StartLoc(keywordLoc),
+      LParenLoc(lParenLoc), EndLoc(rParenLoc),
+      Components(C.AllocateUninitialized<Component>(components.size())) {
   // Copy components into the AST context.
   std::uninitialized_copy(components.begin(), components.end(),
                           Components.begin());
-  
-  KeyPathExprBits.IsObjC = isObjC;
+
+  KeyPathExprBits.IsObjC = true;
 }
 
 void

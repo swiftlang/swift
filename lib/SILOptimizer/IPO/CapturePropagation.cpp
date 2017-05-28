@@ -379,7 +379,7 @@ static SILFunction *getSpecializedWithDeadParams(
           return nullptr;
       }
 
-      if (TryApplyInst *TAI = dyn_cast<TryApplyInst>(&I)) {
+      if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
         // Check the normal and throw blocks of the try_apply.
         if (onlyContainsReturnOrThrowOfArg(TAI->getNormalBB()) &&
             onlyContainsReturnOrThrowOfArg(TAI->getErrorBB()))
@@ -488,7 +488,7 @@ void CapturePropagation::run() {
     while (I != BB.end()) {
       SILInstruction *Inst = &*I;
       ++I;
-      if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Inst))
+      if (auto *PAI = dyn_cast<PartialApplyInst>(Inst))
         HasChanged |= optimizePartialApply(PAI);
     }
   }

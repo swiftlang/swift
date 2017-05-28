@@ -1024,3 +1024,80 @@ bb3:
   unreachable
 }
 
+// Test that
+//  begin_access [read], copy_addr, end_access, destroy_addr
+// is folded into
+//  begin_access [deinit], copy_addr [take], end_access
+//
+// CHECK-LABEL: sil @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T, %2 : @trivial $*T):
+// CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
+// CHECK: copy_addr %2 to [initialization] [[STK]] : $*T
+// CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
+// CHECK: copy_addr [[READ]] to [initialization] %0 : $*T
+// CHECK: end_access [[READ]] : $*T
+// CHECK: [[READ:%.*]] = begin_access [deinit] [static] [[STK]] : $*T
+// CHECK: copy_addr [take] [[READ]] to [initialization] %1 : $*T
+// CHECK: end_access [[READ]] : $*T
+// CHECK-NOT: destroy_addr
+// CHECK: dealloc_stack [[STK]] : $*T
+// CHECK: destroy_addr %2 : $*T
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'deinit_access'
+sil @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
+  %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr %2 to [initialization] %5 : $*T
+  %7 = begin_access [read] [static] %5 : $*T
+  copy_addr %7 to [initialization] %0 : $*T
+  end_access %7 : $*T
+  %10 = begin_access [read] [static] %5 : $*T
+  copy_addr %10 to [initialization] %1 : $*T
+  end_access %10 : $*T
+  destroy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
+  destroy_addr %2 : $*T
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// Test that
+//  begin_access [read], <other access>, copy_addr, end_access, destroy_addr
+// is *not* folded into
+//  begin_access [deinit], copy_addr [take], end_access
+//
+// CHECK-LABEL: sil @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T, %2 : @trivial $*T):
+// CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
+// CHECK: copy_addr %2 to [initialization] [[STK]] : $*T
+// CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
+// CHECK: copy_addr [[READ]] to [initialization] %0 : $*T
+// CHECK: end_access [[READ]] : $*T
+// CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
+// CHECK: [[INNER:%.*]] = begin_access [read] [static] [[READ]] : $*T
+// CHECK: end_access [[INNER]] : $*T
+// CHECK: copy_addr [[READ]] to [initialization] %1 : $*T
+// CHECK: end_access [[READ]] : $*T
+// CHECK: destroy_addr [[STK]] : $*T
+// CHECK: dealloc_stack [[STK]] : $*T
+// CHECK: destroy_addr %2 : $*T
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'nodeinit_access'
+sil @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
+bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
+  %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr %2 to [initialization] %5 : $*T
+  %7 = begin_access [read] [static] %5 : $*T
+  copy_addr %7 to [initialization] %0 : $*T
+  end_access %7 : $*T
+  %10 = begin_access [read] [static] %5 : $*T
+  %innerAccess = begin_access [read] [static] %10 : $*T
+  end_access %innerAccess : $*T
+  copy_addr %10 to [initialization] %1 : $*T
+  end_access %10 : $*T
+  destroy_value %4 : $<τ_0_0> { var τ_0_0 } <T>
+  destroy_addr %2 : $*T
+  %15 = tuple ()
+  return %15 : $()
+}

@@ -73,6 +73,15 @@ struct QueryTypeSubstitutionMap {
 };
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c TypeSubstitutionMap, or returns the original type
+/// if no match was found.
+struct QueryTypeSubstitutionMapOrIdentity {
+  const TypeSubstitutionMap &substitutions;
+  
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c SubstitutionMap.
 struct QuerySubstitutionMap {
   const SubstitutionMap &subMap;
@@ -156,7 +165,24 @@ enum class SubstFlags {
 };
 
 /// Options for performing substitutions into a type.
-typedef OptionSet<SubstFlags> SubstOptions;
+struct SubstOptions : public OptionSet<SubstFlags> {
+  // Note: The unfortunate use of TypeBase * here, rather than Type,
+  // is due to a libc++ quirk that requires the result type to be
+  // complete.
+  typedef std::function<TypeBase *(const NormalProtocolConformance *,
+                                   AssociatedTypeDecl *)>
+    GetTentativeTypeWitness;
+
+  /// Function that retrieves a tentative type witness for a protocol
+  /// conformance with the state \c CheckingTypeWitnesses.
+  GetTentativeTypeWitness getTentativeTypeWitness;
+
+  SubstOptions(llvm::NoneType) : OptionSet(None) { }
+
+  SubstOptions(SubstFlags flags) : OptionSet(flags) { }
+
+  SubstOptions(OptionSet<SubstFlags> options) : OptionSet(options) { }
+};
 
 inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
   return SubstOptions(lhs) | rhs;

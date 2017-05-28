@@ -364,9 +364,8 @@ extension URLComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLComponents?) -> URLComponents {
-        var result: URLComponents?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return URLComponents() }
+        return URLComponents(reference: src)
     }
 }
 

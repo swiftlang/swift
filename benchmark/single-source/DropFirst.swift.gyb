@@ -51,8 +51,7 @@ public func run_DropFirst${Name}(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount,
-      "IncorrectResults in DropFirst${Name}: \(result) != \(sumCount)")
+    CheckResults(result == sumCount)
   }
 }
 % end

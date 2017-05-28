@@ -61,10 +61,6 @@ decomposeInheritedClauseDecl(
         }
       }
     }
-
-    if (!isa<EnumDecl>(typeDecl)) {
-      options |= TR_NonEnumInheritanceClauseOuterLayer;
-    }
   } else {
     auto ext = decl.get<ExtensionDecl *>();
     inheritanceClause = ext->getInherited();
@@ -258,8 +254,6 @@ void IterativeTypeChecker::processInheritedProtocols(
     // FIXME: We'd prefer to keep what the user wrote here.
     if (inherited.getType()->isExistentialType()) {
       auto layout = inherited.getType()->getExistentialLayout();
-      assert(!layout.superclass && "Need to redo inheritance clause "
-             "typechecking");
       for (auto inheritedProtocolTy: layout.getProtocols()) {
         auto *inheritedProtocol = inheritedProtocolTy->getDecl();
 

@@ -583,8 +583,9 @@ public:
     
     // Assigning an object doesn't require type metadata.
     if (auto assignment = dyn_cast<AssignExpr>(E))
-      return !assignment->getSrc()->getType()
-        ->hasRetainablePointerRepresentation();
+      return assignment->getSrc()->getType() &&
+        !assignment->getSrc()->getType()
+            ->hasRetainablePointerRepresentation();
 
     return true;
   }

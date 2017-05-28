@@ -278,6 +278,15 @@ LegacyASTTransformer::visitPostfixOperatorDecl(
   return getUnknownDecl(D);
 }
 
+
+RC<SyntaxData>
+LegacyASTTransformer::visitMissingMemberDecl(
+    MissingMemberDecl *D,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownDecl(D);
+}
+
 RC<SyntaxData>
 LegacyASTTransformer::visitGenericTypeParamDecl(
     GenericTypeParamDecl *D,
@@ -1260,6 +1269,13 @@ RC<SyntaxData>
 LegacyASTTransformer::visitKeyPathExpr(KeyPathExpr *E,
                                        const SyntaxData *Parent,
                                        const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitKeyPathDotExpr(KeyPathDotExpr *E,
+                                          const SyntaxData *Parent,
+                                          const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
 }
 

@@ -7,7 +7,7 @@ public struct S {
   var o: AnyObject?
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSAA1SVs9AnyObject_pSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
+// CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSAA1SVyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
 // CHECK: bb0(%0 : $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
@@ -26,7 +26,7 @@ public struct S {
 // CHECK: [[RET:%.*]] = load [copy] [[ACCESS3]] : $*S
 // CHECK: end_access [[ACCESS3]] : $*S
 // CHECK: return [[RET]] : $S
-// CHECK-LABEL: } // end sil function '_T017access_marker_gen5initSAA1SVs9AnyObject_pSgF'
+// CHECK-LABEL: } // end sil function '_T017access_marker_gen5initSAA1SVyXlSgF'
 @inline(never)
 func initS(_ o: AnyObject?) -> S {
   var s: S
@@ -65,7 +65,7 @@ func readGlobal() -> AnyObject? {
   return global.o
 }
 
-// CHECK-LABEL: sil hidden @_T017access_marker_gen10readGlobals9AnyObject_pSgyF
+// CHECK-LABEL: sil hidden @_T017access_marker_gen10readGlobalyXlSgyF
 // CHECK:         [[ADDRESSOR:%.*]] = function_ref @_T017access_marker_gen6globalAA1SVfau :
 // CHECK-NEXT:    [[T0:%.*]] = apply [[ADDRESSOR]]()
 // CHECK-NEXT:    [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*S
@@ -118,7 +118,7 @@ class D {
   var x: Int = 0
 }
 //   materializeForSet callback
-// CHECK-LABEL: sil hidden [transparent] @_T017access_marker_gen1DC1xSifmytfU_
+// CHECK-LABEL: sil private [transparent] @_T017access_marker_gen1DC1xSifmytfU_
 // CHECK:       end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
 
 //   materializeForSet

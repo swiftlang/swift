@@ -683,14 +683,19 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   if (GenericEnv && GenericEnv->getGenericSignature()->areAllParamsConcrete())
     genericEnv = nullptr;
 
-  auto callback =
-    SGM.M.createFunction(Linkage, CallbackName, callbackType,
-                         genericEnv, SILLocation(Witness),
-                         IsBare, F.isTransparent(), F.isSerialized(),
-                         IsNotThunk, SubclassScope::NotApplicable,
-                         /*inlineStrategy=*/InlineDefault,
-                         /*EK=*/EffectsKind::Unspecified,
-                         /*InsertBefore=*/&F);
+  // The callback's symbol is irrelevant (it is just returned as a value from
+  // the actual materializeForSet function), and so we only need to make sure we
+  // don't break things in cases when there may be multiple definitions.
+  auto callbackLinkage =
+      hasSharedVisibility(Linkage) ? SILLinkage::Shared : SILLinkage::Private;
+
+  auto callback = SGM.M.createFunction(
+      callbackLinkage, CallbackName, callbackType, genericEnv,
+      SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),
+      IsNotThunk, SubclassScope::NotApplicable,
+      /*inlineStrategy=*/InlineDefault,
+      /*EK=*/EffectsKind::Unspecified,
+      /*InsertBefore=*/&F);
 
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
 

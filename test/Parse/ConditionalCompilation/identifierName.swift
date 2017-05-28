@@ -74,3 +74,4 @@ let BAR = { () -> Void in
 #if BAR
 #endif
 }
+

@@ -108,7 +108,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation loc, SILValue fn,
                                       SubstitutionList subs,
                                       ArrayRef<SILValue> args) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
-  return SILBuilder::createApply(loc, fn, substFnTy, result, subs, args, false);
+  return SILBuilder::createApply(loc, fn, subs, args, false);
 }
 
 TryApplyInst *
@@ -116,8 +116,7 @@ SILGenBuilder::createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
                               SubstitutionList subs, ArrayRef<SILValue> args,
                               SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
-  return SILBuilder::createTryApply(loc, fn, substFnTy, subs, args, normalBB,
-                                    errorBB);
+  return SILBuilder::createTryApply(loc, fn, subs, args, normalBB, errorBB);
 }
 
 PartialApplyInst *
@@ -125,8 +124,9 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                   SILType substFnTy, SubstitutionList subs,
                                   ArrayRef<SILValue> args, SILType closureTy) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
-  return SILBuilder::createPartialApply(loc, fn, substFnTy, subs, args,
-                                        closureTy);
+  return SILBuilder::createPartialApply(
+      loc, fn, subs, args,
+      closureTy.getAs<SILFunctionType>()->getCalleeConvention());
 }
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
@@ -708,7 +708,7 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(caseBlock);
 
     ManagedValue input;
-    if (decl->getArgumentInterfaceType()) {
+    if (decl->hasAssociatedValues()) {
       // Pull the payload out if we have one.
       SILType inputType =
           optional.getType().getEnumElementType(decl, builder.getModule());

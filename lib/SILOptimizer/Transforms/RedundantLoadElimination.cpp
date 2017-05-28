@@ -101,7 +101,7 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 /// Return the deallocate stack instructions corresponding to the given
 /// AllocStackInst.
 static SILInstruction *findAllocStackInst(SILInstruction *I) {
-  if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(I))
+  if (auto *DSI = dyn_cast<DeallocStackInst>(I))
     return dyn_cast<SILInstruction>(DSI->getOperand());
   return nullptr;
 }

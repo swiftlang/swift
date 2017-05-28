@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-subclass-existentials -disable-objc-attr-requires-foundation-module
+// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module
 
 @objc class ObjCClass {}
 @objc protocol ObjCProtocol {}

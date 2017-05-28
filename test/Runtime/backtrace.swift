@@ -8,11 +8,15 @@
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
 
+// REQUIRES: swift_stdlib_asserts
 // REQUIRES: executable_test
 
 // Backtraces are not emitted when optimizations are enabled. This test can not
 // run when optimizations are enabled.
 // REQUIRES: swift_test_mode_optimize_none
+
+// This file just causes a crash in the runtime to check whether or not a stack
+// trace is produced from the runtime.
 
 func main() {
   let x = UnsafePointer<Int>(bitPattern: 0)!

@@ -350,10 +350,6 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
   auto proto = type->getDecl();
 
-  // AnyObject -> id.
-  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-    return getClangIdType(getClangASTContext());
-
   // Single protocol -> id<Proto>
   if (proto->isObjC()) {
     auto &clangCtx = getClangASTContext();
@@ -561,6 +557,7 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     case ParameterConvention::Direct_Owned:
       llvm_unreachable("block takes owned parameter");
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -605,6 +602,10 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
   SmallVector<const clang::ObjCProtocolDecl *, 4> Protocols;
   auto layout = type.getExistentialLayout();
   assert(layout.isObjC() && "Cannot represent opaque existential in Clang");
+
+  // AnyObject -> id.
+  if (layout.isAnyObject())
+    return getClangIdType(getClangASTContext());
 
   auto superclassTy = clangCtx.ObjCBuiltinIdTy;
   if (layout.superclass) {

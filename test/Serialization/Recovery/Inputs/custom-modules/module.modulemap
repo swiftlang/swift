@@ -1,2 +1,4 @@
 module Overrides { header "Overrides.h" }
 module Typedefs { header "Typedefs.h" }
+module TypeRemovalObjC { header "TypeRemovalObjC.h" }
+module Types { header "Types.h" }

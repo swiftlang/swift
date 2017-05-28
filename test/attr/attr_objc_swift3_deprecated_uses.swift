@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 3
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 3 -warn-swift3-objc-inference-minimal
 // REQUIRES: objc_interop
 
 import Foundation
@@ -30,9 +30,9 @@ class ObjCSubclass : NSObject {
 }
 
 class DynamicMembers {
-  dynamic func foo() { }
+  dynamic func foo() { } // expected-warning{{inference of '@objc' for 'dynamic' members is deprecated}}{{3-3=@objc }}
   
-  dynamic var bar: NSObject? = nil
+  dynamic var bar: NSObject? = nil // expected-warning{{inference of '@objc' for 'dynamic' members is deprecated}}{{3-3=@objc }}
 
   func overridableFunc() { }
   var overridableVar: NSObject? = nil

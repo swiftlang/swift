@@ -6,6 +6,7 @@
 
 import Foundation
 
+@NSKeyedArchiverEncodeNonGenericSubclassesOnly
 final class Foo<T: NSCoding>: NSObject, NSCoding {
   var one, two: T
 
@@ -190,10 +191,10 @@ func unarchive() {
     fatalError("unable to unarchive Foo<NSNumber>")
   }
 
-  // CHECK-LABEL: <_T04main3FooCySo8NSStringCGD: {{0x[0-9a-f]+}}> #0
+  // CHECK-LABEL: <_TtGC4main3FooCSo8NSString_: {{0x[0-9a-f]+}}> #0
   // CHECK:         one: one
   // CHECK:         two: two
-  // CHECK-LABEL: <_T04main3FooCySo8NSNumberCGD: {{0x[0-9a-f]+}}> #0
+  // CHECK-LABEL: <_TtGC4main3FooCSo8NSNumber_: {{0x[0-9a-f]+}}> #0
   // CHECK:         one: 1
   // CHECK:         two: 2
   dump(strings)

@@ -190,9 +190,9 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   TermInst *TI = BB.getTerminator();
 
   // Process conditional branches with constant conditions.
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(TI)) {
+  if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
     SILValue V = CBI->getCondition();
-    SILInstruction *CondI = dyn_cast<SILInstruction>(V);
+    auto *CondI = dyn_cast<SILInstruction>(V);
     SILLocation Loc = CBI->getLoc();
 
     if (IntegerLiteralInst *ConstCond =
@@ -249,8 +249,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   //                            case #Bool.false!unionelt: bb2
   // =>
   //   br bb2
-  if (SwitchEnumInst *SUI = dyn_cast<SwitchEnumInst>(TI)) {
-    if (EnumInst *TheEnum = dyn_cast<EnumInst>(SUI->getOperand())) {
+  if (auto *SUI = dyn_cast<SwitchEnumInst>(TI)) {
+    if (auto *TheEnum = dyn_cast<EnumInst>(SUI->getOperand())) {
       const EnumElementDecl *TheEnumElem = TheEnum->getElement();
       SILBasicBlock *TheSuccessorBlock = nullptr;
       int ReachableBlockIdx = -1;
@@ -334,7 +334,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   //   switch_value %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
   // =>
   //   br bb2
-  if (SwitchValueInst *SUI = dyn_cast<SwitchValueInst>(TI)) {
+  if (auto *SUI = dyn_cast<SwitchValueInst>(TI)) {
     if (IntegerLiteralInst *SwitchVal =
           dyn_cast<IntegerLiteralInst>(SUI->getOperand())) {
       SILBasicBlock *TheSuccessorBlock = nullptr;

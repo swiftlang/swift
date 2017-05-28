@@ -1,4 +1,4 @@
-//===--- SortLettersInPlace.swift -----------------------------------------===//
+//===--- SortLargeExistentials.swift --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,14 +19,16 @@ protocol LetterKind {
   func lessthan(_ rhs: LetterKind) -> Bool
 }
 
-// A struct which exeeds the size of the existential inline buffer.
+// A struct which exceeds the size of the existential inline buffer.
 struct Letter : LetterKind {
   let value: String
 
-  var a: Int = 27
-  var b: Int = 27
-  var c: Int = 27
-  var d: Int = 27
+  // Make this struct a large struct which does not fit into the 3-word
+  // existential inline buffer. Also provide an answer to ...
+  var a: Int = 42
+  var b: Int = 42
+  var c: Int = 42
+  var d: Int = 42
 
   init(_ value: String) {
     self.value = value
@@ -75,7 +77,6 @@ public func run_SortLargeExistentials(_ N: Int) {
     }
 
     // Check whether letters are sorted.
-    CheckResults(letters[0].value <= letters[letters.count/2].value,
-                 "Incorrect results in SortLargeExistentials.")
+    CheckResults(letters[0].value <= letters[letters.count/2].value)
   }
 }

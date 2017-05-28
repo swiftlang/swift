@@ -10,18 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A single extended grapheme cluster, which approximates a user-perceived
+/// A single extended grapheme cluster that approximates a user-perceived
 /// character.
 ///
 /// The `Character` type represents a character made up of one or more Unicode
 /// scalar values, grouped by a Unicode boundary algorithm. Generally, a
 /// `Character` instance matches what the reader of a string will perceive as
-/// a single character. The number of visible characters is generally the most
-/// natural way to count the length of a string.
+/// a single character. Strings are collections of `Character` instances, so
+/// the number of visible characters is generally the most natural way to
+/// count the length of a string.
 ///
 ///     let greeting = "Hello! 🐥"
-///     print("Character count: \(greeting.characters.count)")
-///     // Prints "Character count: 8"
+///     print("Length: \(greeting.count)")
+///     // Prints "Length: 8"
 ///
 /// Because each character in a string can be made up of one or more Unicode
 /// code points, the number of characters in a string may not match the length
@@ -60,6 +61,7 @@
 /// [glossary]: http://www.unicode.org/glossary/
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
+@_fixed_layout
 public struct Character :
   _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
   ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
@@ -74,8 +76,6 @@ public struct Character :
   // should be represented as such.
   @_versioned
   internal enum Representation {
-    // A _StringBuffer whose first grapheme cluster is self.
-    // NOTE: may be more than 1 Character long.
     case large(_StringBuffer._Storage)
     case small(Builtin.Int63)
   }
@@ -83,7 +83,7 @@ public struct Character :
   /// Creates a character containing the given Unicode scalar value.
   ///
   /// - Parameter scalar: The Unicode scalar value to convert into a character.
-  public init(_ scalar: UnicodeScalar) {
+  public init(_ scalar: Unicode.Scalar) {
     var asInt: UInt64 = 0
     var shift: UInt64 = 0
 
@@ -104,6 +104,9 @@ public struct Character :
         UTF32.self, input: CollectionOfOne(UInt32(value))))
   }
 
+  // Inlining ensures that the whole constructor can be folded away to a single
+  // integer constant in case of small character literals.
+  @inline(__always)
   @effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
@@ -132,21 +135,22 @@ public struct Character :
     }
     // For anything that doesn't fit in 63 bits, build the large
     // representation.
-    self = Character(_largeRepresentationString: String(
-      _builtinExtendedGraphemeClusterLiteral: start,
-      utf8CodeUnitCount: utf8CodeUnitCount,
-      isASCII: isASCII))
+    self = Character(_largeRepresentationString:
+      String(
+        _builtinExtendedGraphemeClusterLiteral: start,
+        utf8CodeUnitCount: utf8CodeUnitCount,
+        isASCII: isASCII))
   }
 
   /// Creates a character with the specified value.
   ///
-  /// Do not call this initializer directly. It is used by the compiler when
+  /// Do not call this initalizer directly. It is used by the compiler when
   /// you use a string literal to initialize a `Character` instance. For
   /// example:
   ///
   ///     let oBreve: Character = "o\u{306}"
   ///     print(oBreve)
-  ///     // Prints "ŏ"
+  ///     // Prints "ŏ"
   ///
   /// The assignment to the `oBreve` constant calls this initializer behind the
   /// scenes.
@@ -195,9 +199,15 @@ public struct Character :
 
   /// Creates a Character from a String that is already known to require the
   /// large representation.
+  ///
+  /// - Note: `s` should contain only a single grapheme, but we can't require
+  ///   that formally because of grapheme cluster literals and the shifting
+  ///   sands of Unicode.  https://bugs.swift.org/browse/SR-4955
+  @_versioned
   internal init(_largeRepresentationString s: String) {
     if let native = s._core.nativeBuffer,
-       native.start == s._core._baseAddress! {
+      native.start == s._core._baseAddress!,
+      native.usedCount == s._core.count {
       _representation = .large(native._storage)
       return
     }
@@ -233,8 +243,8 @@ public struct Character :
     init(_ u8: UInt64) {
       let utf8Count = Character._smallSize(u8)
       _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
-      self.count = UInt16(utf8Count)
-      self.data = u8
+      self._count = UInt16(utf8Count)
+      self._data = u8
     }
 
     /// The position of the first element in a non-empty collection.
@@ -250,7 +260,7 @@ public struct Character :
     /// reachable from `startIndex` by zero or more applications of
     /// `index(after:)`.
     var endIndex: Int {
-      return Int(count)
+      return Int(_count)
     }
 
     /// Access the code unit at `position`.
@@ -258,12 +268,12 @@ public struct Character :
     /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF8.CodeUnit {
-      _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
+      _sanityCheck(position >= startIndex)
+      _sanityCheck(position < endIndex)
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF8.CodeUnit(
-        extendingOrTruncating: data &>> (UInt64(position) &* 8))
+        extendingOrTruncating: _data &>> (UInt64(position) &* 8))
     }
 
     internal struct Iterator : IteratorProtocol {
@@ -284,11 +294,11 @@ public struct Character :
     }
 
     internal func makeIterator() -> Iterator {
-      return Iterator(data)
+      return Iterator(_data)
     }
 
-    var count: UInt16
-    var data: UInt64
+    var _count: UInt16
+    var _data: UInt64
   }
 
   struct _SmallUTF16 : RandomAccessCollection {
@@ -300,7 +310,7 @@ public struct Character :
         decodedAs: UTF8.self,
         repairingIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
-      self.count = UInt16(count)
+      self._count = UInt16(count)
       var u16: UInt64 = 0
       let output: (UTF16.CodeUnit) -> Void = {
         u16 = u16 &<< 16
@@ -311,7 +321,7 @@ public struct Character :
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,
         into: output)
-      self.data = u16
+      self._data = u16
     }
 
     /// The position of the first element in a non-empty collection.
@@ -327,7 +337,7 @@ public struct Character :
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
     var endIndex: Int {
-      return Int(count)
+      return Int(_count)
     }
 
     /// Access the code unit at `position`.
@@ -335,16 +345,16 @@ public struct Character :
     /// - Precondition: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     subscript(position: Int) -> UTF16.CodeUnit {
-      _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
+      _sanityCheck(position >= startIndex)
+      _sanityCheck(position < endIndex)
       // Note: using unchecked arithmetic because overflow cannot happen if the
       // above sanity checks hold.
       return UTF16.CodeUnit(extendingOrTruncating:
-        data &>> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
+        _data &>> ((UInt64(_count) &- UInt64(position) &- 1) &* 16))
     }
 
-    var count: UInt16
-    var data: UInt64
+    var _count: UInt16
+    var _data: UInt64
   }
 
   /// The character's hash value.
@@ -393,8 +403,7 @@ extension String {
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
     case let .large(value):
-      let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
+      self = String(_StringCore(_StringBuffer(value)))
     }
   }
 }
@@ -443,4 +452,3 @@ extension Character : Comparable {
     }
   }
 }
-

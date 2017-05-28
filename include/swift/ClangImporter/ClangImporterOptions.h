@@ -44,6 +44,9 @@ public:
   /// header, place it in this directory.
   std::string PrecompiledHeaderOutputDir;
 
+  /// Disable validating the persistent PCH.
+  bool PCHDisableValidation = false;
+
   /// \see Mode
   enum class Modes : uint8_t {
     /// Set up Clang for importing modules into Swift and generating IR from

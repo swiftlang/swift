@@ -22,5 +22,7 @@ protocol Storied {
 }
 
 func testProtocol<T: Storied>(x: inout T) {
+  // expected-warning@+2 {{simultaneous accesses to parameter 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@+1 {{conflicting access is here}}
   swap(&x.protocolRequirement[0], &x.protocolRequirement[1])
 }

@@ -376,7 +376,7 @@ private:
       }
     }
 
-    BraceStmt *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
+    auto *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
     assert(ParentBrace && "Expected parent of GuardStmt to be BraceStmt");
     if (!FallthroughRange.hasValue())
       return;
@@ -2002,6 +2002,59 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
   });
 }
 
+/// Check if this is a subscript declaration inside String or
+/// Substring that returns String, and if so return true.
+bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
+  // Is this a subscript?
+  if (!isa<SubscriptDecl>(D))
+    return false;
+
+  // Is the subscript declared in String or Substring?
+  auto *declContext = D->getDeclContext();
+  assert(declContext && "Expected decl context!");
+
+  auto *stringDecl = Context.getStringDecl();
+  auto *substringDecl = Context.getSubstringDecl();
+
+  auto *typeDecl = declContext->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!typeDecl)
+    return false;
+
+  if (typeDecl != stringDecl && typeDecl != substringDecl)
+    return false;
+
+  // Is the subscript index one we want to emit a special diagnostic
+  // for, and the return type String?
+  auto fnTy = D->getInterfaceType()->getAs<AnyFunctionType>();
+  assert(fnTy && "Expected function type for subscript decl!");
+
+  // We're only going to warn for BoundGenericStructType with a single
+  // type argument that is not Int!
+  auto inputTy = fnTy->getInput()->getAs<BoundGenericStructType>();
+  if (!inputTy)
+    return false;
+
+  auto genericArgs = inputTy->getGenericArgs();
+  if (genericArgs.size() != 1)
+    return false;
+
+  // The subscripts taking T<Int> do not return Substring, and our
+  // special fixit does not help here.
+  auto intDecl = Context.getIntDecl();
+  auto nominalTypeParam = genericArgs[0]->getAs<NominalType>();
+  if (!nominalTypeParam)
+    return false;
+
+  if (nominalTypeParam->getDecl() == intDecl)
+    return false;
+
+  auto resultTy = fnTy->getResult()->getAs<NominalType>();
+  if (!resultTy)
+    return false;
+
+  return resultTy->getDecl() == stringDecl;
+}
+
 bool TypeChecker::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
@@ -2055,6 +2108,14 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName, EncodedMessage.Message);
         attachRenameFixIts(diag);
       }
+    } else if (isSubscriptReturningString(D, Context)) {
+      diagnose(Loc, diag::availabilty_string_subscript_migration)
+        .highlight(R)
+        .fixItInsert(R.Start, "String(")
+        .fixItInsertAfter(R.End, ")");
+
+      // Skip the note emitted below.
+      return true;
     } else if (Attr->Message.empty()) {
       diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift
                             : diag::availability_decl_unavailable,

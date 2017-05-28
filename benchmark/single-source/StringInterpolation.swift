@@ -36,7 +36,7 @@ public func run_StringInterpolation(_ N: Int) {
       // with an operation on the native storage type.
       result = result &+ Int(utf16[utf16.index(before: utf16.endIndex)])
     }
-    CheckResults(result == refResult, "IncorrectResults in StringInterpolation: \(result) != \(refResult)")
+    CheckResults(result == refResult)
   }
 }
 

@@ -73,7 +73,7 @@ class ModuleFile : public LazyMemberLoader {
   StringRef TargetTriple;
 
   /// The Swift compatibility version in use when this module was built.
-  StringRef CompatibilityVersion;
+  version::Version CompatibilityVersion;
 
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
@@ -83,17 +83,6 @@ class ModuleFile : public LazyMemberLoader {
 
   /// The number of entities that are currently being deserialized.
   unsigned NumCurrentDeserializingEntities = 0;
-
-  /// Declaration contexts with delayed generic environments, which will be
-  /// completed as a pending action.
-  ///
-  /// This should only be used on the module returned by
-  /// getModuleFileForDelayedActions().
-  ///
-  /// FIXME: This is needed because completing a generic environment can
-  /// require the type checker, which might be gone if we delay generic
-  /// environments too far. It is a hack.
-  std::vector<DeclContext *> DelayedGenericEnvironments;
 
   /// RAII class to be used when deserializing an entity.
   class DeserializingEntityRAII {

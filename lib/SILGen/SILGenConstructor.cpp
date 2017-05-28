@@ -53,7 +53,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
   auto type = DC->mapTypeIntoContext(interfaceType)->getCanonicalType();
 
   // Restructure tuple arguments.
-  if (CanTupleType tupleTy = dyn_cast<TupleType>(interfaceType)) {
+  if (auto tupleTy = dyn_cast<TupleType>(interfaceType)) {
     RValue tuple(type);
     for (auto fieldType : tupleTy.getElementTypes())
       tuple.addElement(emitImplicitValueConstructorArg(gen, loc, fieldType, DC));
@@ -385,7 +385,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the exploded constructor argument.
   ArgumentSource payload;
-  if (element->getArgumentInterfaceType()) {
+  if (element->hasAssociatedValues()) {
     RValue arg = emitImplicitValueConstructorArg
       (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
        element->getDeclContext());
@@ -486,12 +486,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer. Always use the Swift entry point, which will be a
   // bridging thunk if we're calling ObjC.
-  SILDeclRef initConstant =
-    SILDeclRef(ctor,
-               SILDeclRef::Kind::Initializer,
-               SILDeclRef::ConstructAtBestResilienceExpansion,
-               SILDeclRef::ConstructAtNaturalUncurryLevel,
-               /*isObjC=*/false);
+  auto initConstant = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
 
   ManagedValue initVal;
   SILType initTy;
@@ -913,21 +908,19 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Cleanup after this initialization.
         FullExpr scope(Cleanups, entry.getPattern());
 
-        // Get the substitutions for the constructor context.
+        // We want a substitution list written in terms of the generic
+        // signature of the type, with replacement archetypes from the
+        // constructor's context (which might be in an extension of
+        // the type, which adds additional generic requirements).
         SubstitutionList subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
-
-        DeclContext *typeDC = dc;
-        while (!typeDC->isTypeContext())
-          typeDC = typeDC->getParent();
-        auto typeGenericSig = typeDC->getGenericSignatureOfContext();
+        auto typeGenericSig = nominal->getGenericSignatureOfContext();
 
         if (genericEnv && typeGenericSig) {
           // Generate a set of substitutions for the initialization function,
           // whose generic signature is that of the type context, and whose
           // replacement types are the archetypes of the initializer itself.
-          SmallVector<Substitution, 4> subsVec;
-          typeGenericSig->getSubstitutions(
+          auto subMap = typeGenericSig->getSubstitutionMap(
                        [&](SubstitutableType *type) {
                          if (auto gp = type->getAs<GenericTypeParamType>()) {
                            return genericEnv->mapTypeIntoContext(gp);
@@ -940,8 +933,9 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                            ProtocolType *conformedProtocol) {
                          return ProtocolConformanceRef(
                                   conformedProtocol->getDecl());
-                       },
-                       subsVec);
+                       });
+          SmallVector<Substitution, 4> subsVec;
+          typeGenericSig->getSubstitutions(subMap, subsVec);
           subs = SGM.getASTContext().AllocateCopy(subsVec);
         }
 

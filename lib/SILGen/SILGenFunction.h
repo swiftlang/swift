@@ -619,8 +619,7 @@ public:
                                   CleanupLocation cleanupLoc);
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
-  void emitCurryThunk(ValueDecl *fd,
-                      SILDeclRef fromLevel, SILDeclRef toLevel);
+  void emitCurryThunk(SILDeclRef thunk);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
@@ -870,6 +869,23 @@ public:
   ManagedValue getOptionalSomeValue(SILLocation loc, ManagedValue value,
                                     const TypeLowering &optTL);
 
+  struct SourceLocArgs {
+    ManagedValue filenameStartPointer,
+                 filenameLength,
+                 filenameIsAscii,
+                 line,
+                 column;
+  };
+
+  /// Emit raw lowered arguments for a runtime diagnostic to report the given
+  /// source location:
+  /// - The first three arguments are the components necessary to construct
+  ///   a StaticString for the filename: start pointer, length, and
+  ///   "is ascii" bit.
+  /// - The fourth argument is the line number.
+  SourceLocArgs
+  emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
+
   /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
   /// The result is a Builtin.Int1.
@@ -958,7 +974,7 @@ public:
   /// \param openedArchetype The opened existential archetype.
   /// \param loweredOpenedType The lowered type of the projection, which in
   /// practice will be the openedArchetype, possibly wrapped in a metatype.
-  SILGenFunction::OpaqueValueState
+  OpaqueValueState
   emitOpenExistential(SILLocation loc,
                       ManagedValue existentialValue,
                       ArchetypeType *openedArchetype,
@@ -1285,6 +1301,11 @@ public:
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    AccessKind accessKind,
                                    TSanKind tsanKind = TSanKind::None);
+  LValue emitOpenExistentialLValue(SILLocation loc,
+                                   LValue &&existentialLV,
+                                   CanArchetypeType openedArchetype,
+                                   CanType formalRValueType,
+                                   AccessKind accessKind);
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);
@@ -1417,7 +1438,13 @@ public:
 
   /// Mapping from active opaque value expressions to their values,
   /// along with a bit for each indicating whether it has been consumed yet.
-  llvm::DenseMap<OpaqueValueExpr *, OpaqueValueState> OpaqueValues;
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpaqueValueState>
+    OpaqueValues;
+
+  /// A mapping from opaque value expressions to the open-existential
+  /// expression that determines them, used while lowering lvalues.
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
+    OpaqueValueExprs;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///

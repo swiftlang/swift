@@ -714,12 +714,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
                                /*allow uninitialized*/ true);
     StackAllocSize = -1;
-    auto &ti = IGF.getTypeInfo(selfType);
-    assert(ti.getSchema().size() == 1);
-    assert(!ti.getSchema().containsAggregate());
-    auto destType = ti.getSchema()[0].getScalarType();
-    auto *val = emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
-    return IGF.Builder.CreateBitCast(val, destType);
+    return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   llvm::Value *metadata =
@@ -755,8 +750,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                TailArraysRef TailArrays) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
-    return emitObjCAllocObjectCall(IGF, metadata, 
-                                   selfType.getSwiftRValueType());
+    return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   // Otherwise, allocate using Swift's routines.
@@ -798,10 +792,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
   }
 
   // Check whether the SIL module defines it.  (We need a type for it.)
-  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func,
-                   ResilienceExpansion::Minimal,
-                   /*uncurryLevel*/ 1,
-                   /*foreign*/ false);
+  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func);
   SILFunction *silFn = IGF.getSILModule().lookUpFunction(fnRef);
   if (!silFn)
     return false;
@@ -960,6 +951,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   emitClassMetadata(*this, D,
                     classTI.getLayout(*this, selfType),
                     classTI.getClassLayout(*this, selfType));
+
+  IRGen.addClassForArchiveNameRegistration(D);
+
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
 }
@@ -1123,10 +1117,6 @@ namespace {
       for (ProtocolDecl *p : theProtocol->getInheritedProtocols()) {
         if (!p->isObjC())
           continue;
-        // Don't emit the magic AnyObject conformance.
-        if (auto known = p->getKnownProtocolKind())
-          if (*known == KnownProtocolKind::AnyObject)
-            continue;
         Protocols.push_back(p);
       }
 
@@ -1146,11 +1136,6 @@ namespace {
       }
 
       for (ProtocolDecl *proto : protocols) {
-        // Don't emit the magic AnyObject conformance.
-        if (auto known = proto->getKnownProtocolKind())
-          if (*known == KnownProtocolKind::AnyObject)
-            continue;
-
         Protocols.push_back(proto);
       }
     }
@@ -1481,10 +1466,8 @@ namespace {
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
-      SILDeclRef dtorRef(destructor, SILDeclRef::Kind::Deallocator,
-                         ResilienceExpansion::Minimal,
-                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         /*isForeign=*/true);
+      auto dtorRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator)
+        .asForeign();
       if (auto silFn = IGM.getSILModule().lookUpFunction(dtorRef))
         return silFn->isDefinition();
 
@@ -1500,6 +1483,10 @@ namespace {
           hasObjCDeallocDefinition(destructor)) {
         InstanceMethods.push_back(destructor);
       }
+    }
+
+    void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+      llvm_unreachable("should not IRGen classes with missing members");
     }
 
     void addIVarInitializer() {
@@ -2223,7 +2210,7 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
                                                        CanType conformingType) {
   NominalTypeDecl *nom = conformingType->getAnyNominal();
-  ClassDecl *clas = dyn_cast<ClassDecl>(nom);
+  auto *clas = dyn_cast<ClassDecl>(nom);
   if (nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel()))
     return true;
 

@@ -51,6 +51,10 @@
 
 using namespace swift;
 
+/// Define this to 1 to enable expensive assertions of the
+/// GenericSignatureBuilder.
+#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
+
 LazyResolver::~LazyResolver() = default;
 DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
@@ -82,6 +86,11 @@ namespace {
 using AssociativityCacheType =
   llvm::DenseMap<std::pair<PrecedenceGroupDecl *, PrecedenceGroupDecl *>,
                  Associativity>;
+
+#define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
+  MACRO(NSError) \
+  MACRO(NSNumber) \
+  MACRO(NSValue)
 
 struct ASTContext::Implementation {
   Implementation();
@@ -153,8 +162,11 @@ struct ASTContext::Implementation {
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
-  /// The declaration of Foundation.NSError.
-  ClassDecl *NSErrorDecl = nullptr;
+#define CACHE_FOUNDATION_DECL(NAME) \
+  /** The declaration of Foundation.NAME. */ \
+  ClassDecl *NAME##Decl = nullptr;
+FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
+#undef CACHE_FOUNDATION_DECL
 
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -168,6 +180,9 @@ struct ASTContext::Implementation {
 
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
+
+  /// func reserveCapacityForAppend(newElementsCount: Int)
+  FuncDecl *ArrayReserveCapacityDecl = nullptr;
 
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
@@ -638,7 +653,7 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   if (results.size() != 1) return nullptr;
 
   // The property must have type T.
-  VarDecl *property = dyn_cast<VarDecl>(results[0]);
+  auto *property = dyn_cast<VarDecl>(results[0]);
   if (!property) return nullptr;
   if (!property->getInterfaceType()->isEqual(sig->getGenericParams()[0]))
     return nullptr;
@@ -677,18 +692,6 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
 CanType ASTContext::getAnyObjectType() const {
   if (Impl.AnyObjectType) {
     return Impl.AnyObjectType;
-  }
-
-  // Go find 'AnyObject' in the Swift module.
-  //
-  // FIXME: This is going away.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("AnyObject", results);
-  for (auto result : results) {
-    if (auto proto = dyn_cast<ProtocolDecl>(result)) {
-      Impl.AnyObjectType = proto->getDeclaredType()->getCanonicalType();
-      return Impl.AnyObjectType;
-    }
   }
 
   Impl.AnyObjectType = CanType(
@@ -740,25 +743,30 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
   return Impl.ObjCBoolDecl;
 }
 
-ClassDecl *ASTContext::getNSErrorDecl() const {
-  if (!Impl.NSErrorDecl) {
-    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) {
-      // Note: use unqualified lookup so we find NSError regardless of
-      // whether it's defined in the Foundation module or the Clang
-      // Foundation module it imports.
-      UnqualifiedLookup lookup(getIdentifier("NSError"), M, nullptr);
-      if (auto type = lookup.getSingleTypeResult()) {
-        if (auto classDecl = dyn_cast<ClassDecl>(type)) {
-          if (classDecl->getGenericParams() == nullptr) {
-            Impl.NSErrorDecl = classDecl;
-          }
-        }
-      }
-    }
-  }
-
-  return Impl.NSErrorDecl;
+#define GET_FOUNDATION_DECL(NAME) \
+ClassDecl *ASTContext::get##NAME##Decl() const { \
+  if (!Impl.NAME##Decl) { \
+    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
+      /* Note: use unqualified lookup so we find NSError regardless of */ \
+      /* whether it's defined in the Foundation module or the Clang */ \
+      /* Foundation module it imports. */ \
+      UnqualifiedLookup lookup(getIdentifier(#NAME), M, nullptr); \
+      if (auto type = lookup.getSingleTypeResult()) { \
+        if (auto classDecl = dyn_cast<ClassDecl>(type)) { \
+          if (classDecl->getGenericParams() == nullptr) { \
+            Impl.NAME##Decl = classDecl; \
+          } \
+        } \
+      } \
+    } \
+  } \
+  \
+  return Impl.NAME##Decl; \
 }
+
+FOR_KNOWN_FOUNDATION_TYPES(GET_FOUNDATION_DECL)
+#undef GET_FOUNDATION_DECL
+#undef FOR_KNOWN_FOUNDATION_TYPES
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
@@ -770,22 +778,25 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Find all of the declarations with this name in the appropriate module.
   SmallVector<ValueDecl *, 1> results;
 
-  // _BridgedNSError, _BridgedStoredNSError, and _ErrorCodeProtocol
-  // are in the Foundation module.
-  if (kind == KnownProtocolKind::BridgedNSError ||
-      kind == KnownProtocolKind::BridgedStoredNSError ||
-      kind == KnownProtocolKind::ErrorCodeProtocol) {
-    ModuleDecl *foundation =
-        const_cast<ASTContext *>(this)->getLoadedModule(Id_Foundation);
-    if (!foundation)
-      return nullptr;
-
-    auto identifier = getIdentifier(getProtocolName(kind));
-    foundation->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
-                            results);
-  } else {
-    lookupInSwiftModule(getProtocolName(kind), results);
+  const ModuleDecl *M;
+  switch (kind) {
+  case KnownProtocolKind::BridgedNSError:
+  case KnownProtocolKind::BridgedStoredNSError:
+  case KnownProtocolKind::ErrorCodeProtocol:
+    M = getLoadedModule(Id_Foundation);
+    break;
+  case KnownProtocolKind::CFObject:
+    M = getLoadedModule(Id_CoreFoundation);
+    break;
+  default:
+    M = getStdlibModule();
+    break;
   }
+
+  if (!M)
+    return nullptr;
+  M->lookupValue({ }, getIdentifier(getProtocolName(kind)),
+                 NLKind::UnqualifiedLookup, results);
 
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
@@ -882,7 +893,7 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   // Find the overload for Int.
   for (ValueDecl *vd : equalFuncs) {
     // All "==" decls should be functions, but who knows...
-    FuncDecl *funcDecl = dyn_cast<FuncDecl>(vd);
+    auto *funcDecl = dyn_cast<FuncDecl>(vd);
     if (!funcDecl)
       continue;
 
@@ -961,6 +972,68 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
         return nullptr;
 
       Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
+  if (Impl.ArrayReserveCapacityDecl)
+    return Impl.ArrayReserveCapacityDecl;
+
+  auto ReserveFunctions = getArrayDecl()->lookupDirect(
+                                   getIdentifier("reserveCapacityForAppend"));
+
+  for (auto CandidateFn : ReserveFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.reserve_capacity_for_append")
+        continue;
+
+      auto ParamLists = FnDecl->getParameterLists();
+      if (ParamLists.size() != 2)
+        return nullptr;
+      if (ParamLists[0]->size() != 1)
+        return nullptr;
+
+      InOutType *SelfInOutTy =
+        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
+      if (!SelfInOutTy)
+        return nullptr;
+
+      BoundGenericStructType *SelfGenericStructTy =
+        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      if (!SelfGenericStructTy)
+        return nullptr;
+      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+        return nullptr;
+
+      if (ParamLists[1]->size() != 1)
+        return nullptr;
+      StructType *IntType =
+        ParamLists[1]->get(0)->getInterfaceType()->getAs<StructType>();
+      if (!IntType)
+        return nullptr;
+
+      StructDecl *IntDecl = IntType->getDecl();
+      auto StoredProperties = IntDecl->getStoredProperties();
+      auto FieldIter = StoredProperties.begin();
+      if (FieldIter == StoredProperties.end())
+        return nullptr;
+      VarDecl *field = *FieldIter;
+      if (field->hasClangNode())
+        return nullptr;
+      if (!field->getInterfaceType()->is<BuiltinIntegerType>())
+        return nullptr;
+      if (std::next(FieldIter) != StoredProperties.end())
+        return nullptr;
+
+      if (!FnDecl->getResultInterfaceType()->isVoid())
+        return nullptr;
+
+      Impl.ArrayReserveCapacityDecl = FnDecl;
       return FnDecl;
     }
   }
@@ -1293,19 +1366,25 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
-  builder->addGenericSignature(sig);
-  builder->finalize(SourceLoc(), sig->getGenericParams(),
-                    /*allowConcreteGenericParams=*/true);
+  auto builder =
+    new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
 
-#ifndef NDEBUG
-  if (builder->getGenericSignature()->getCanonicalSignature() != sig) {
+  // Store this generic signature builder (no generic environment yet).
+  Impl.GenericSignatureBuilders[{sig, mod}] =
+    std::unique_ptr<GenericSignatureBuilder>(builder);
+
+  builder->addGenericSignature(sig);
+
+#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
+  auto builderSig =
+    builder->computeGenericSignature(SourceLoc(),
+                                     /*allowConcreteGenericParams=*/true);
+  if (builderSig->getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig =
-    builder->getGenericSignature()->getCanonicalSignature();
+    auto reprocessedSig = builderSig->getCanonicalSignature();
 
     reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -1350,23 +1429,23 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
     llvm_unreachable("idempotency problem with a generic signature");
   }
+#else
+  // FIXME: This should be handled lazily in the future, and therefore not
+  // required.
+  builder->processDelayedRequirements();
 #endif
-
-  // Store this generic signature builder (no generic environment yet).
-  Impl.GenericSignatureBuilders[{sig, mod}] =
-    std::unique_ptr<GenericSignatureBuilder>(builder);
 
   return builder;
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    GenericSignatureBuilder *builder,
-                                                    ModuleDecl &module) {
+                                              GenericSignatureBuilder *builder,
+                                              GenericSignature *sig,
+                                              ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
-  auto sig = builder->getGenericSignature();
   auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
@@ -3985,6 +4064,21 @@ bool ASTContext::isTypeBridgedInExternalModule(
           // gets upset if you don't use the NSValue subclasses its factory
           // methods instantiate.
           nominal->getParentModule()->getName() == Id_CoreMedia);
+}
+
+bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
+  auto clas = t->getClassOrBoundGenericClass();
+  if (!clas)
+    return false;
+  
+  if (clas == getNSErrorDecl())
+    return true;
+  if (clas == getNSNumberDecl())
+    return true;
+  if (clas == getNSValueDecl())
+    return true;
+  
+  return false;
 }
 
 Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,

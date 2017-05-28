@@ -245,7 +245,7 @@ SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
 static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"), llvm::cl::cat(Category));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
 SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
              llvm::cl::cat(Category));
 
@@ -349,13 +349,6 @@ InferImportAsMember("enable-infer-import-as-member",
 static llvm::cl::opt<bool>
 EnableSwift3ObjCInference("enable-swift3-objc-inference",
     llvm::cl::desc("Enable Swift 3's @objc inference rules"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-EnableDeserializationRecovery(
-    "enable-experimental-deserialization-recovery",
-    llvm::cl::desc("Attempt to recover from missing xrefs (etc) in swiftmodules"),
     llvm::cl::cat(Category),
     llvm::cl::init(false));
 
@@ -1240,7 +1233,7 @@ private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Range.getByteLength() == 0)
       return true;
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D))
       annotateSourceEntity({ Range, VD, nullptr, /*IsRef=*/false});
     return true;
   }
@@ -1626,7 +1619,7 @@ public:
     if (isa<ProtocolDecl>(D)) {
       InProtocol = true;
       DefaultImplementationMap.clear();
-      ProtocolDecl *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
+      auto *PD = const_cast<ProtocolDecl*>(dyn_cast<ProtocolDecl>(D));
       collectDefaultImplementationForProtocolMembers(PD,
                                                      DefaultImplementationMap);
     }
@@ -2497,7 +2490,7 @@ public:
 
 private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D))
       printUSR(VD, Range.getStart());
     return true;
   }
@@ -2622,8 +2615,6 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  // This is temporary
-  Invocation.getLangOptions().EnableExperimentalSubclassExistentials = true;
 
   CompilerInstance CI;
 
@@ -2981,8 +2972,11 @@ int main(int argc, char *argv[]) {
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
+    // Honor the *last* -swift-version specified.
+    const auto &LastSwiftVersion =
+      options::SwiftVersion[options::SwiftVersion.size()-1];
     if (auto swiftVersion =
-          version::Version::parseVersionString(options::SwiftVersion,
+          version::Version::parseVersionString(LastSwiftVersion,
                                                SourceLoc(), nullptr)) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
@@ -3016,8 +3010,6 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference ||
     InitInvok.getLangOptions().isSwiftVersion3();
-  InitInvok.getLangOptions().EnableDeserializationRecovery |=
-    options::EnableDeserializationRecovery;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

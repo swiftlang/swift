@@ -43,7 +43,7 @@ extension FixedWidthInteger {
 
   /// a hex representation of every bit in the number
   func hexBits(_ bitWidth: Int) -> String {
-    let hexDigits: [UnicodeScalar] = [
+    let hexDigits: [Unicode.Scalar] = [
       "0", "1", "2", "3", "4", "5", "6", "7",
       "8", "9", "A", "B", "C", "D", "E", "F"]
 
@@ -581,6 +581,37 @@ tests.test("MultiplyMinByMinusOne") {
   }
   expectCrashLater()
   _ = f(Int.min)
+}
+
+tests.test("signum/generic") {
+  func check<T : BinaryInteger>(_ expected: T, _ x: T) {
+    expectEqual(expected, x.signum())
+  }
+% for suffix in ['8', '16', '32', '64', '']:
+  check(-1, Int${suffix}.min)
+  check(-1, (-42) as Int${suffix})
+  check(-1, (-1) as Int${suffix})
+%   for u in ['U', '']:
+  check(0, 0 as ${u}Int${suffix})
+  check(1, 1 as ${u}Int${suffix})
+  check(1, 42 as ${u}Int${suffix})
+  check(1, ${u}Int${suffix}.max)
+%   end
+% end
+}
+
+tests.test("signum/concrete") {
+% for suffix in ['8', '16', '32', '64', '']:
+  expectEqual(-1 as Int${suffix}, Int${suffix}.min.signum())
+  expectEqual(-1 as Int${suffix}, (-42 as Int${suffix}).signum())
+  expectEqual(-1 as Int${suffix}, (-1 as Int${suffix}).signum())
+%   for u in ['U', '']:
+  expectEqual(0 as ${u}Int${suffix}, (0 as ${u}Int${suffix}).signum())
+  expectEqual(1 as ${u}Int${suffix}, (1 as ${u}Int${suffix}).signum())
+  expectEqual(1 as ${u}Int${suffix}, (42 as ${u}Int${suffix}).signum())
+  expectEqual(1 as ${u}Int${suffix}, ${u}Int${suffix}.max.signum())
+%   end
+% end
 }
 
 

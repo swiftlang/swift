@@ -36,11 +36,31 @@ makeFileName(StringRef ProcessName) {
   return stream.str();
 }
 
+// LLVM's statistics-reporting machinery is sensitive to filenames containing
+// YAML-quote-requiring characters, which occur surprisingly often in the wild;
+// we only need a recognizable and likely-unique name for a target here, not an
+// exact filename, so we go with a crude approximation.
+static std::string
+cleanTargetName(StringRef TargetName) {
+  std::string tmp;
+  for (auto c : TargetName) {
+    if (('a' <= c && c <= 'z') ||
+        ('A' <= c && c <= 'Z') ||
+        ('0' <= c && c <= '9') ||
+        (c == '-') || (c == '.') || (c == '/'))
+      tmp += c;
+    else
+      tmp += '_';
+  }
+  return tmp;
+}
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef TargetName,
                                            StringRef Directory)
   : Filename(Directory),
-    Timer(make_unique<NamedRegionTimer>(TargetName, "Building Target",
+    Timer(make_unique<NamedRegionTimer>(cleanTargetName(TargetName),
+                                        "Building Target",
                                         ProgramName, "Running Program"))
 {
   path::append(Filename, makeFileName(ProgramName));
@@ -74,6 +94,39 @@ void
 UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
+
+    PUBLISH_STAT(C, "AST", NumSourceBuffers);
+    PUBLISH_STAT(C, "AST", NumLinkLibraries);
+    PUBLISH_STAT(C, "AST", NumLoadedModules);
+    PUBLISH_STAT(C, "AST", NumImportedExternalDefinitions);
+    PUBLISH_STAT(C, "AST", NumTotalClangImportedEntities);
+    PUBLISH_STAT(C, "AST", NumASTBytesAllocated);
+    PUBLISH_STAT(C, "AST", NumDependencies);
+    PUBLISH_STAT(C, "AST", NumReferencedTopLevelNames);
+    PUBLISH_STAT(C, "AST", NumReferencedDynamicNames);
+    PUBLISH_STAT(C, "AST", NumReferencedMemberNames);
+    PUBLISH_STAT(C, "AST", NumDecls);
+    PUBLISH_STAT(C, "AST", NumLocalTypeDecls);
+    PUBLISH_STAT(C, "AST", NumObjCMethods);
+    PUBLISH_STAT(C, "AST", NumInfixOperators);
+    PUBLISH_STAT(C, "AST", NumPostfixOperators);
+    PUBLISH_STAT(C, "AST", NumPrefixOperators);
+    PUBLISH_STAT(C, "AST", NumPrecedenceGroups);
+    PUBLISH_STAT(C, "AST", NumUsedConformances);
+
+    PUBLISH_STAT(C, "Sema", NumConformancesDeserialized);
+    PUBLISH_STAT(C, "Sema", NumConstraintScopes);
+    PUBLISH_STAT(C, "Sema", NumDeclsDeserialized);
+    PUBLISH_STAT(C, "Sema", NumDeclsValidated);
+    PUBLISH_STAT(C, "Sema", NumFunctionsTypechecked);
+    PUBLISH_STAT(C, "Sema", NumGenericSignatureBuilders);
+    PUBLISH_STAT(C, "Sema", NumLazyGenericEnvironments);
+    PUBLISH_STAT(C, "Sema", NumLazyGenericEnvironmentsLoaded);
+    PUBLISH_STAT(C, "Sema", NumLazyIterableDeclContexts);
+    PUBLISH_STAT(C, "Sema", NumTypesDeserialized);
+    PUBLISH_STAT(C, "Sema", NumTypesValidated);
+    PUBLISH_STAT(C, "Sema", NumUnloadedLazyIterableDeclContexts);
+
     PUBLISH_STAT(C, "SILModule", NumSILGenFunctions);
     PUBLISH_STAT(C, "SILModule", NumSILGenVtables);
     PUBLISH_STAT(C, "SILModule", NumSILGenWitnessTables);
@@ -85,6 +138,16 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     PUBLISH_STAT(C, "SILModule", NumSILOptWitnessTables);
     PUBLISH_STAT(C, "SILModule", NumSILOptDefaultWitnessTables);
     PUBLISH_STAT(C, "SILModule", NumSILOptGlobalVariables);
+
+    PUBLISH_STAT(C, "IRModule", NumIRGlobals);
+    PUBLISH_STAT(C, "IRModule", NumIRFunctions);
+    PUBLISH_STAT(C, "IRModule", NumIRAliases);
+    PUBLISH_STAT(C, "IRModule", NumIRIFuncs);
+    PUBLISH_STAT(C, "IRModule", NumIRNamedMetaData);
+    PUBLISH_STAT(C, "IRModule", NumIRValueSymbols);
+    PUBLISH_STAT(C, "IRModule", NumIRComdatSymbols);
+    PUBLISH_STAT(C, "IRModule", NumIRBasicBlocks);
+    PUBLISH_STAT(C, "IRModule", NumIRInsts);
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
@@ -118,6 +181,39 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   const char *delim = "";
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
+
+    PRINT_STAT(OS, delim, C, "AST", NumSourceBuffers);
+    PRINT_STAT(OS, delim, C, "AST", NumLinkLibraries);
+    PRINT_STAT(OS, delim, C, "AST", NumLoadedModules);
+    PRINT_STAT(OS, delim, C, "AST", NumImportedExternalDefinitions);
+    PRINT_STAT(OS, delim, C, "AST", NumTotalClangImportedEntities);
+    PRINT_STAT(OS, delim, C, "AST", NumASTBytesAllocated);
+    PRINT_STAT(OS, delim, C, "AST", NumDependencies);
+    PRINT_STAT(OS, delim, C, "AST", NumReferencedTopLevelNames);
+    PRINT_STAT(OS, delim, C, "AST", NumReferencedDynamicNames);
+    PRINT_STAT(OS, delim, C, "AST", NumReferencedMemberNames);
+    PRINT_STAT(OS, delim, C, "AST", NumDecls);
+    PRINT_STAT(OS, delim, C, "AST", NumLocalTypeDecls);
+    PRINT_STAT(OS, delim, C, "AST", NumObjCMethods);
+    PRINT_STAT(OS, delim, C, "AST", NumInfixOperators);
+    PRINT_STAT(OS, delim, C, "AST", NumPostfixOperators);
+    PRINT_STAT(OS, delim, C, "AST", NumPrefixOperators);
+    PRINT_STAT(OS, delim, C, "AST", NumPrecedenceGroups);
+    PRINT_STAT(OS, delim, C, "AST", NumUsedConformances);
+
+    PRINT_STAT(OS, delim, C, "Sema", NumConformancesDeserialized);
+    PRINT_STAT(OS, delim, C, "Sema", NumConstraintScopes);
+    PRINT_STAT(OS, delim, C, "Sema", NumDeclsDeserialized);
+    PRINT_STAT(OS, delim, C, "Sema", NumDeclsValidated);
+    PRINT_STAT(OS, delim, C, "Sema", NumFunctionsTypechecked);
+    PRINT_STAT(OS, delim, C, "Sema", NumGenericSignatureBuilders);
+    PRINT_STAT(OS, delim, C, "Sema", NumLazyGenericEnvironments);
+    PRINT_STAT(OS, delim, C, "Sema", NumLazyGenericEnvironmentsLoaded);
+    PRINT_STAT(OS, delim, C, "Sema", NumLazyIterableDeclContexts);
+    PRINT_STAT(OS, delim, C, "Sema", NumTypesDeserialized);
+    PRINT_STAT(OS, delim, C, "Sema", NumTypesValidated);
+    PRINT_STAT(OS, delim, C, "Sema", NumUnloadedLazyIterableDeclContexts);
+
     PRINT_STAT(OS, delim, C, "SILModule", NumSILGenFunctions);
     PRINT_STAT(OS, delim, C, "SILModule", NumSILGenVtables);
     PRINT_STAT(OS, delim, C, "SILModule", NumSILGenWitnessTables);
@@ -129,6 +225,16 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     PRINT_STAT(OS, delim, C, "SILModule", NumSILOptWitnessTables);
     PRINT_STAT(OS, delim, C, "SILModule", NumSILOptDefaultWitnessTables);
     PRINT_STAT(OS, delim, C, "SILModule", NumSILOptGlobalVariables);
+
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRGlobals);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRFunctions);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRAliases);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRIFuncs);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRNamedMetaData);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRValueSymbols);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRComdatSymbols);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRBasicBlocks);
+    PRINT_STAT(OS, delim, C, "IRModule", NumIRInsts);
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();

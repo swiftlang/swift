@@ -12,7 +12,9 @@
 ///
 /// This pass eliminates 'unknown' access enforcement by selecting either
 /// static or dynamic enforcement.
-/// 
+///
+/// FIXME: handle boxes used by copy_value when neither copy is captured.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-selection"
@@ -80,8 +82,12 @@ public:
   void run();
 
 private:
-  void analyzeUsesOfBox();
+  void analyzeUsesOfBox(SILInstruction *source);
   void analyzeProjection(ProjectBoxInst *projection);
+
+  /// Note that the given instruction is a use of the box (or a use of
+  /// a projection from it) in which the address escapes.
+  void noteEscapingUse(SILInstruction *inst);
 
   void propagateEscapes();
   void propagateEscapesFrom(SILBasicBlock *bb);
@@ -101,7 +107,7 @@ private:
 
 void SelectEnforcement::run() {
   // Set up the data-flow problem.
-  analyzeUsesOfBox();
+  analyzeUsesOfBox(Box);
 
   // Run the data-flow problem.
   propagateEscapes();
@@ -110,10 +116,17 @@ void SelectEnforcement::run() {
   updateAccesses();
 }
 
-void SelectEnforcement::analyzeUsesOfBox() {
+// FIXME: This should cover a superset of AllocBoxToStack's findUnexpectedBoxUse
+// to avoid perturbing codegen. They should be sharing the same analysis.
+void SelectEnforcement::analyzeUsesOfBox(SILInstruction *source) {
   // Collect accesses rooted off of projections.
-  for (auto use : Box->getUses()) {
+  for (auto use : source->getUses()) {
     auto user = use->getUser();
+
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(user)) {
+      analyzeUsesOfBox(MUI);
+      continue;
+    }
 
     if (auto projection = dyn_cast<ProjectBoxInst>(user)) {
       analyzeProjection(projection);
@@ -128,20 +141,7 @@ void SelectEnforcement::analyzeUsesOfBox() {
       continue;
 
     // Treat everything else as an escape:
-
-    // Add it to the escapes set.
-    Escapes.insert(user);
-
-    // 
-    auto userBB = user->getParent();
-    auto &state = StateMap[userBB];
-    if (!state.IsInWorklist) {
-      state.HasEscape = true;
-      state.IsInWorklist = true;
-      Worklist.push_back(userBB);
-    }
-    assert(state.HasEscape);
-    assert(state.IsInWorklist);
+    noteEscapingUse(user);
   }
 
   assert(!Accesses.empty() && "didn't find original access!");
@@ -157,6 +157,22 @@ void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
         Accesses.push_back(access);
     }
   }
+}
+
+void SelectEnforcement::noteEscapingUse(SILInstruction *inst) {
+  // Add it to the escapes set.
+  Escapes.insert(inst);
+
+  // Record this point as escaping.
+  auto userBB = inst->getParent();
+  auto &state = StateMap[userBB];
+  if (!state.IsInWorklist) {
+    state.HasEscape = true;
+    state.IsInWorklist = true;
+    Worklist.push_back(userBB);
+  }
+  assert(state.HasEscape);
+  assert(state.IsInWorklist);
 }
 
 void SelectEnforcement::propagateEscapes() {
@@ -353,19 +369,15 @@ struct AccessEnforcementSelection : SILFunctionTransform {
     if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
       switch (arg->getArgumentConvention()) {
       case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
         // `inout` arguments are checked on the caller side, either statically
         // or dynamically if necessary. The @inout does not alias and cannot
         // escape within the callee, so static enforcement is always sufficient.
-        setStaticEnforcement(access);
-        break;
-      case SILArgumentConvention::Indirect_InoutAliasable:
-        // `inout_aliasable` are not enforced on the caller side. Dynamic
-        // enforcement is required unless we have special knowledge of how this
-        // closure is used at its call-site.
         //
-        // TODO: optimize closures passed to call sites in which the captured
-        // variable is not modified by any closure passed to the same call.
-        setDynamicEnforcement(access);
+        // FIXME: `inout_aliasable` are not currently enforced on the caller
+        // side. Consequently, using static enforcement for noescape closures
+        // may fails to diagnose certain violations.
+        setStaticEnforcement(access);
         break;
       default:
         // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or
@@ -389,10 +401,14 @@ struct AccessEnforcementSelection : SILFunctionTransform {
   }
 
   void handleAccessToBox(BeginAccessInst *access, ProjectBoxInst *projection) {
+    SILValue source = projection->getOperand();
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(source))
+      source = MUI->getOperand();
+
     // If we didn't allocate the box, assume that we need to use
     // dynamic enforcement.
     // TODO: use static enforcement in certain provable cases.
-    auto box = dyn_cast<AllocBoxInst>(projection->getOperand());
+    auto box = dyn_cast<AllocBoxInst>(source);
     if (!box) {
       setDynamicEnforcement(access);
       return;

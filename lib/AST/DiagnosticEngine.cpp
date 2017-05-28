@@ -247,6 +247,14 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
+bool DiagnosticEngine::finishProcessing() {
+  bool hadError = false;
+  for (auto &Consumer : Consumers) {
+    hadError |= Consumer->finishProcessing();
+  }
+  return hadError;
+}
+
 /// \brief Skip forward to one of the given delimiters.
 ///
 /// \param Text The text to search through, which will be updated to point
@@ -322,6 +330,21 @@ static bool isInterestingTypealias(Type type) {
     return false;
   if (type->is<BuiltinType>())
     return false;
+
+  auto aliasDecl = aliasTy->getDecl();
+
+  // The 'Swift.AnyObject' typealias is not 'interesting'.
+  if (aliasDecl->getName() ==
+      aliasDecl->getASTContext().getIdentifier("AnyObject") &&
+      aliasDecl->getParentModule()->isStdlibModule()) {
+    return false;
+  }
+
+  auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
+
+  if (aliasDecl->isCompatibilityAlias())
+    return isInterestingTypealias(underlyingTy);
+
   return true;
 }
 

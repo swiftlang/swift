@@ -7,7 +7,7 @@ struct OuterGeneric<D> {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ t: D)
+    func flop(_ t: D) // expected-error{{use of undeclared type 'D'}}
   }
 }
 
@@ -15,7 +15,7 @@ class OuterGenericClass<T> {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ t: T)
+    func flop(_ t: T) // expected-error{{use of undeclared type 'T'}}
   }
 }
 
@@ -25,7 +25,7 @@ protocol OuterProtocol {
   // expected-note@-1 {{did you mean 'InnerProtocol'?}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ h: Hen)
+    func flop(_ h: Hen) // expected-error{{use of undeclared type 'Hen'}}
   }
 }
 
@@ -64,7 +64,13 @@ enum OuterEnum {
   case C(C) // expected-error{{invalid redeclaration of 'C'}}
 }
 
-class OuterClass<T> {
+class OuterClass {
   protocol InnerProtocol : OuterClass { }
+  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OuterClass'}}
+  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+}
+
+class OtherGenericClass<T> {
+  protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }

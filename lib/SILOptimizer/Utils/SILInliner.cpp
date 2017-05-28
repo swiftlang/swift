@@ -109,7 +109,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   // If we're inlining into a normal apply and the callee's entry
   // block ends in a return, then we can avoid a split.
   if (auto nonTryAI = dyn_cast<ApplyInst>(AI)) {
-    if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
+    if (auto *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
       // Replace all uses of the apply instruction with the operands of the
       // return instruction, appropriately mapped.
       nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()));
@@ -149,7 +149,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
     // Modify return terminators to branch to the return-to BB, rather than
     // trying to clone the ReturnInst.
-    if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
+    if (auto *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
       auto thrownValue = remapValue(RI->getOperand());
       getBuilder().createBranch(Loc.getValue(), ReturnToBB,
                                 thrownValue);
@@ -158,7 +158,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
     // Modify throw terminators to branch to the error-return BB, rather than
     // trying to clone the ThrowInst.
-    if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
+    if (auto *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
       if (auto *A = dyn_cast<ApplyInst>(AI)) {
         (void)A;
         assert(A->isNonThrowing() &&
@@ -359,6 +359,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
+    case ValueKind::RetainValueAddrInst:
     case ValueKind::UnmanagedRetainValueInst:
     case ValueKind::CopyValueInst:
     case ValueKind::CopyUnownedValueInst:
@@ -375,6 +376,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ProjectBoxInst:
     case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::ReleaseValueAddrInst:
     case ValueKind::UnmanagedReleaseValueInst:
     case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:

@@ -26,6 +26,11 @@
 #include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
+  /// Given a pointer to the starting byte of a UTF8 character, validate it and
+  /// advance the lexer past it.  This returns the encoded character or ~0U if
+  /// the encoding is invalid.
+  uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr, const char *End);
+
   class DiagnosticEngine;
   class InFlightDiagnostic;
   class LangOptions;
@@ -519,9 +524,6 @@ private:
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker();
-
-  /// Check multiline string literal is indented correctly.
-  void validateMultilineIndents(const Token &Str);
 };
   
 } // end namespace swift

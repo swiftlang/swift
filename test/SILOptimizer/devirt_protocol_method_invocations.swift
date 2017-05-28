@@ -1,5 +1,30 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
+protocol PPP {
+    func f()
+}
+
+protocol QQQ : PPP {
+}
+
+struct S : QQQ {}
+
+extension QQQ {
+    @_semantics("optimize.sil.never")
+    func f() {}
+}
+
+// Test that all witness_method instructions are devirtualized.
+// This test used to crash the compiler because it uses inherited conformances.
+// CHECK-LABEL: sil @_T034devirt_protocol_method_invocations24testInheritedConformanceyyF : $@convention(thin) () -> ()
+// CHECK-NOT: witness_method
+// CHECK-NOT: class_method
+// CHECK: apply
+// CHECK: // end sil function '_T034devirt_protocol_method_invocations24testInheritedConformanceyyF'
+public func testInheritedConformance() {
+    (S() as QQQ).f()
+}
+
 public protocol Foo { 
   func foo(_ x:Int) -> Int
 }
@@ -49,12 +74,10 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
   return callGetSelf(c)
 }
 
-// It's not obvious why this isn't completely devirtualized.
 // CHECK: sil @_T034devirt_protocol_method_invocations12test24114020SiyF
-// CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
-// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
-// CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
-// CHECK:   return [[T2]]
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int{{.*}}, 1
+// CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int{{.*}})
+// CHECK:   return [[T1]]
 
 // CHECK: sil @_T034devirt_protocol_method_invocations14testExMetatypeSiyF
 // CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
@@ -166,6 +189,12 @@ struct HasStatic<T> : StaticP {
 }
 public func testExMetatype() -> Int {
   let type: StaticP.Type = HasStatic<Int>.self
+  return type.size
+}
+
+// rdar://32288618
+public func testExMetatypeVar() -> Int {
+  var type: StaticP.Type = HasStatic<Int>.self
   return type.size
 }
 

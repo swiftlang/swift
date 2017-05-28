@@ -154,7 +154,7 @@ extension ${Self} : ${TraversalCollection} {
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   @_inlineable
-  public subscript(position: Base.Index) -> Base.Iterator.Element {
+  public subscript(position: Base.Index) -> Base.Element {
     return _base[position]
   }
 
@@ -203,7 +203,7 @@ extension ${Self} : ${TraversalCollection} {
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   @_inlineable
-  public var first: Base.Iterator.Element? {
+  public var first: Base.Element? {
     return _base.first
   }
 
@@ -235,7 +235,7 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   @_inlineable
-  public var last: Base.Iterator.Element? {
+  public var last: Base.Element? {
     return _base.last
   }
 %   end

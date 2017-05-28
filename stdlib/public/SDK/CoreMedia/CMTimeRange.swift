@@ -29,7 +29,9 @@ extension CMTimeRange {
 
   public var isValid: Bool {
     return self.start.isValid &&
-      self.duration.isValid && (self.duration.epoch == 0)
+      self.duration.isValid &&
+      (self.duration.epoch == 0) &&
+      (self.duration.value >= 0)
   }
 
   public var isIndefinite: Bool {

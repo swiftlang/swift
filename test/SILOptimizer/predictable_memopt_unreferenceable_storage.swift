@@ -14,7 +14,7 @@ struct T {
         self.s = s
     }
 }
-// CHECK-LABEL: sil hidden @_T042predictable_memopt_unreferenceable_storage1TVACSo19StructWithBitfieldsV1v_AA1SV1stcfC
+// CHECK-LABEL: sil hidden @_T042predictable_memopt_unreferenceable_storage1TVACSC19StructWithBitfieldsV1v_AA1SV1stcfC
 // CHECK:       bb0(%0 : $StructWithBitfields, %1 : $S, %2 : $@thin T.Type):
 // CHECK:         [[RESULT:%.*]] = struct $T (%0 : $StructWithBitfields, %1 : $S)
 // CHECK:         return [[RESULT]]

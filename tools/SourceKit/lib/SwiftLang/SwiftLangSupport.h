@@ -358,7 +358,8 @@ public:
                                  StringRef Name,
                                  StringRef HeaderName,
                                  ArrayRef<const char *> Args,
-                                 bool SynthesizedExtensions) override;
+                                 bool SynthesizedExtensions,
+                                 Optional<unsigned> swiftVersion) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,
@@ -388,6 +389,7 @@ public:
 
   void getCursorInfo(StringRef Filename, unsigned Offset,
                      unsigned Length, bool Actionables,
+                     bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
 
@@ -397,14 +399,16 @@ public:
                    std::function<void(const NameTranslatingInfo &)> Receiver) override;
 
   void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                    ArrayRef<const char *> Args,
+                    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
                     std::function<void(const RangeInfo&)> Receiver) override;
 
   void getCursorInfoFromUSR(
-      StringRef Filename, StringRef USR, ArrayRef<const char *> Args,
+      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args,
       std::function<void(const CursorInfo &)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
+                                    bool CancelOnSubsequentRequest,
                                     ArrayRef<const char *> Args,
               std::function<void(const RelatedIdentsInfo &)> Receiver) override;
 

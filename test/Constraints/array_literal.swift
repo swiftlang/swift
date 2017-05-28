@@ -112,7 +112,7 @@ func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
-     where T.Element : ExpressibleByIntegerLiteral {
+     where T.ArrayLiteralElement : ExpressibleByIntegerLiteral {
   let x: T = [1]
   return x
 }
@@ -129,7 +129,7 @@ func defaultToAny(i: Int, s: String) {
 
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  let _: Int = a2  // expected-error{{value of type '[Any]'}}
+  let _: Int = a2  // expected-error{{value of type 'Array<Any>'}}
   
   let a3 = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
@@ -137,7 +137,7 @@ func defaultToAny(i: Int, s: String) {
   
   let a4: Array = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
-  let _: Int = a4 // expected-error{{value of type '[Any?]'}}
+  let _: Int = a4 // expected-error{{value of type 'Array<Any?>'}}
 
   let a5 = []
   // expected-error@-1{{empty collection literal requires an explicit type}}

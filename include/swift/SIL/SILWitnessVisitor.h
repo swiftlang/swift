@@ -143,6 +143,10 @@ public:
     asDerived().addMethod(func);
   }
 
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+    asDerived().addPlaceholder(placeholder);
+  }
+
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // We already visited these in the first pass.
   }

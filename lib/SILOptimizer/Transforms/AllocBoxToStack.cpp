@@ -435,6 +435,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
   while (!Worklist.empty()) {
     auto *Op = Worklist.pop_back_val();
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
+      // This may result in an alloc_stack being used by begin_access [dynamic].
       PBI->replaceAllUsesWith(StackBox);
       continue;
     }
@@ -837,13 +838,10 @@ specializePartialApply(PartialApplyInst *PartialApply,
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    ClonedFn);
-  CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
-  auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
-  return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
-                                 SILType::getPrimitiveObjectType(SubstCalleeTy),
-                                    PartialApply->getSubstitutions(), Args,
-                                    PartialApply->getType());
+  return Builder.createPartialApply(
+      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
+      Args,
+      PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }
 
 static void

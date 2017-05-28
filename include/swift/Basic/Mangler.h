@@ -94,7 +94,10 @@ protected:
 
   Mangler() : Buffer(Storage) { }
 
-  /// Adds the mangling prefix.
+  /// Begins a new mangling but does not add the mangling prefix.
+  void beginManglingWithoutPrefix();
+
+  /// Begins a new mangling but and adds the mangling prefix.
   void beginMangling();
 
   /// Finish the mangling of the symbol and return the mangled name.

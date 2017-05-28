@@ -50,7 +50,6 @@
 
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
-PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)
@@ -58,12 +57,17 @@ PROTOCOL(Comparable)
 PROTOCOL(Error)
 PROTOCOL_(ErrorCodeProtocol)
 PROTOCOL(OptionSet)
+
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
+PROTOCOL_(CFObject)
+PROTOCOL_(SwiftNewtypeWrapper)
+PROTOCOL(CodingKey)
+PROTOCOL(Encodable)
+PROTOCOL(Decodable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
-PROTOCOL_(SwiftNewtypeWrapper)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral)

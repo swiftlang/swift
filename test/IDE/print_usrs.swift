@@ -265,3 +265,14 @@ func importedMacros() {
   _ = m1; _ = m2; _ = m3
 }
 
+class OverloadVarsByAvailability {
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public var memory: Int8 { get { } set { } }
+  // CHECK: [[@LINE-1]]:14 s:14swift_ide_test26OverloadVarsByAvailabilityC6memorys4Int8Vv
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public var memory: Int16 { get { } set { } }
+  // CHECK: [[@LINE-1]]:14 s:14swift_ide_test26OverloadVarsByAvailabilityC6memorys5Int16Vv
+}

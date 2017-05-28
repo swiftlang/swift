@@ -478,6 +478,190 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
   }
 }
 
+DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    // Merge some new values.
+    d1.merge([(40, 2040), (50, 2050)]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 5)
+    assert(d1[50]! == 2050)
+
+    // Merge and overwrite some existing values.
+    d1.merge([(10, 2010), (60, 2060)]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 6)
+    assert(d1[10]! == 2010)
+    assert(d1[60]! == 2060)
+
+    // Merge, keeping existing values.
+    d1.merge([(30, 2030), (70, 2070)]) { x, _ in x }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 7)
+    assert(d1[30]! == 1030)
+    assert(d1[70]! == 2070)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge some new values.
+    d2.merge([(40, 2040), (50, 2050)]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+    assert(d1[40] == nil)
+
+    assert(d2.count == 5)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+    assert(d2[40]! == 2040)
+    assert(d2[50]! == 2050)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge and overwrite some existing values.
+    d2.merge([(10, 2010)]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 2010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge, keeping existing values.
+    d2.merge([(10, 2010)]) { x, _ in x }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+}
+
+DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    // No mutation on access.
+    assert(d1[10, default: 0] + 1 == 1011)
+    assert(d1[40, default: 0] + 1 == 1)
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1[10]! == 1010)
+
+    // Increment existing in place.
+    d1[10, default: 0] += 1
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1[10]! == 1011)
+
+    // Add incremented default value.
+    d1[40, default: 0] += 1
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1[40]! == 1)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // No mutation on access.
+    assert(d2[10, default: 0] + 1 == 1011)
+    assert(d2[40, default: 0] + 1 == 1)
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Increment existing in place.
+    d2[10, default: 0] += 1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1[10]! == 1010)
+    assert(d2[10]! == 1011)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Add incremented default value.
+    d2[40, default: 0] += 1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1[40] == nil)
+    assert(d2[40]! == 1)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+}
 
 DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   var d = getCOWFastDictionary()
@@ -978,6 +1162,96 @@ DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
   assert(identity2 == d2._rawIdentifier())
 }
 
+//===---
+// Keys and Values collection tests.
+//===---
+
+DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
+  var d1 = getCOWFastDictionary()
+  var identity1 = d1._rawIdentifier()
+  
+  assert([1010, 1020, 1030] == d1.values.sorted())
+  assert(identity1 == d1._rawIdentifier())
+  
+  var d2 = d1
+  assert(identity1 == d2._rawIdentifier())
+  
+  let i = d2.index(forKey: 10)!
+  assert(d1.values[i] == 1010)
+  assert(d1[i] == (10, 1010))
+  
+#if swift(>=4.0)
+  d2.values[i] += 1
+  assert(d2.values[i] == 1011)
+  assert(d2[10]! == 1011)
+  assert(identity1 != d2._rawIdentifier())
+#endif
+  
+  assert(d1[10]! == 1010)
+  assert(identity1 == d1._rawIdentifier())
+  
+  checkCollection(
+    Array(d1.values),
+    d1.values,
+    stackTrace: SourceLocStack())
+  { $0 == $1 }
+}
+
+DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
+  var d1 = getCOWFastDictionary()
+  var identity1 = d1._rawIdentifier()
+  
+  assert([10, 20, 30] == d1.keys.sorted())
+
+  let i = d1.index(forKey: 10)!
+  assert(d1.keys[i] == 10)
+  assert(d1[i] == (10, 1010))
+  assert(identity1 == d1._rawIdentifier())
+
+  checkCollection(
+    Array(d1.keys),
+    d1.keys,
+    stackTrace: SourceLocStack())
+  { $0 == $1 }
+  
+  do {
+    var d2: [MinimalHashableValue : Int] = [
+      MinimalHashableValue(10): 1010,
+      MinimalHashableValue(20): 1020,
+      MinimalHashableValue(30): 1030,
+      MinimalHashableValue(40): 1040,
+      MinimalHashableValue(50): 1050,
+      MinimalHashableValue(60): 1060,
+      MinimalHashableValue(70): 1070,
+      MinimalHashableValue(80): 1080,
+      MinimalHashableValue(90): 1090,
+    ]
+    
+    // Find the last key in the dictionary
+    var lastKey: MinimalHashableValue = d2.first!.key
+    for i in d2.indices { lastKey = d2[i].key }
+
+    // index(where:) - linear search
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    let j = d2.index(where: { (k, _) in k == lastKey })!
+    expectGE(MinimalHashableValue.timesEqualEqualWasCalled, 8)
+
+    // index(forKey:) - O(1) bucket + linear search
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    let k = d2.index(forKey: lastKey)!
+    expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
+    
+    // keys.index(of:) - O(1) bucket + linear search
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    let l = d2.keys.index(of: lastKey)!
+#if swift(>=4.0)
+    expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
+#endif
+
+    expectEqual(j, k)
+    expectEqual(k, l)
+  }
+}
 
 //===---
 // Native dictionary tests.
@@ -1163,6 +1437,146 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[20]! == 1020)
     assert(d[30]! == 1030)
   }
+}
+
+DictionaryTestSuite.test("init(uniqueKeysWithValues:)") {
+  do {
+    var d = Dictionary(uniqueKeysWithValues: [(10, 1010), (20, 1020), (30, 1030)])
+    expectEqual(d.count, 3)
+    expectEqual(d[10]!, 1010)
+    expectEqual(d[20]!, 1020)
+    expectEqual(d[30]!, 1030)
+    expectNil(d[1111])
+  }
+  do {
+    var d = Dictionary<Int, Int>(uniqueKeysWithValues: EmptyCollection<(Int, Int)>())
+    expectEqual(d.count, 0)
+    expectNil(d[1111])
+  }
+  do {
+    expectCrashLater()
+    var d = Dictionary(uniqueKeysWithValues: [(10, 1010), (20, 1020), (10, 2010)])
+  }
+}
+
+DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
+  do {
+    var d = Dictionary(
+      [(10, 1010), (20, 1020), (30, 1030), (10, 2010)], uniquingKeysWith: min)
+    expectEqual(d.count, 3)
+    expectEqual(d[10]!, 1010)
+    expectEqual(d[20]!, 1020)
+    expectEqual(d[30]!, 1030)
+    expectNil(d[1111])
+  }
+  do {
+    var d = Dictionary(
+      [(10, 1010), (20, 1020), (30, 1030), (10, 2010)] as [(Int, Int)],
+      uniquingKeysWith: +)
+    expectEqual(d.count, 3)
+    expectEqual(d[10]!, 3020)
+    expectEqual(d[20]!, 1020)
+    expectEqual(d[30]!, 1030)
+    expectNil(d[1111])
+  }
+  do {
+    var d = Dictionary([(10, 1010), (20, 1020), (30, 1030), (10, 2010)]) {
+      (a, b) in Int("\(a)\(b)")!
+    }
+    expectEqual(d.count, 3)
+    expectEqual(d[10]!, 10102010)
+    expectEqual(d[20]!, 1020)
+    expectEqual(d[30]!, 1030)
+    expectNil(d[1111])
+  }
+  do {
+    var d = Dictionary([(10, 1010), (10, 2010), (10, 3010), (10, 4010)]) { $1 }
+    expectEqual(d.count, 1)
+    expectEqual(d[10]!, 4010)
+    expectNil(d[1111])
+  }
+  do {
+    var d = Dictionary(EmptyCollection<(Int, Int)>(), uniquingKeysWith: min)
+    expectEqual(d.count, 0)
+    expectNil(d[1111])
+  }
+
+  struct TE: Error {}
+  do {
+    // No duplicate keys, so no error thrown.
+    var d1 = try Dictionary([(10, 1), (20, 2), (30, 3)]) { _ in throw TE() }
+    expectEqual(d1.count, 3)
+    // Duplicate keys, should throw error.
+    var d2 = try Dictionary([(10, 1), (10, 2)]) { _ in throw TE() }
+    assertionFailure()
+  } catch {
+    assert(error is TE)
+  }
+}
+
+DictionaryTestSuite.test("init(grouping:by:)") {
+  let r = 0..<10
+
+  let d1 = Dictionary(grouping: r, by: { $0 % 3 })
+  expectEqual(3, d1.count)
+  expectEqual([0, 3, 6, 9], d1[0]!)
+  expectEqual([1, 4, 7], d1[1]!)
+  expectEqual([2, 5, 8], d1[2]!)
+
+  let d2 = Dictionary(grouping: r, by: { $0 })
+  expectEqual(10, d2.count)
+
+  let d3 = Dictionary(grouping: 0..<0, by: { $0 })
+  expectEqual(0, d3.count)
+}
+
+DictionaryTestSuite.test("mapValues(_:)") {
+  let d1 = [10: 1010, 20: 1020, 30: 1030]
+  let d2 = d1.mapValues(String.init)
+
+  expectEqual(d1.count, d2.count)
+  expectEqual(d1.keys.first, d2.keys.first)
+
+  for (key, value) in d1 {
+    expectEqual(String(d1[key]!), d2[key]!)
+  }
+
+  do {
+    var d3: [MinimalHashableValue : Int] = Dictionary(
+      uniqueKeysWithValues: d1.lazy.map { (MinimalHashableValue($0), $1) })
+    expectEqual(d3.count, 3)
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashValueWasCalled = 0
+
+    // Calling mapValues shouldn't ever recalculate any hashes.
+    let d4 = d3.mapValues(String.init)
+    expectEqual(d4.count, d3.count)
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+  }
+}
+
+DictionaryTestSuite.test("capacity/reserveCapacity(_:)") {
+  var d1 = [10: 1010, 20: 1020, 30: 1030]
+  expectEqual(3, d1.capacity)
+  d1[40] = 1040
+  expectEqual(6, d1.capacity)
+
+  // Reserving new capacity jumps up to next limit.
+  d1.reserveCapacity(7)
+  expectEqual(12, d1.capacity)
+
+  // Can reserve right up to a limit.
+  d1.reserveCapacity(24)
+  expectEqual(24, d1.capacity)
+
+  // Fill up to the limit, no reallocation.
+  d1.merge(stride(from: 50, through: 240, by: 10).lazy.map { ($0, 1000 + $0) },
+    uniquingKeysWith: { _ in fatalError() })
+  expectEqual(24, d1.count)
+  expectEqual(24, d1.capacity)
+  d1[250] = 1250
+  expectEqual(48, d1.capacity)
 }
 
 #if _runtime(_ObjC)

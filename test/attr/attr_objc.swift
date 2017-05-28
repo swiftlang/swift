@@ -860,8 +860,8 @@ class infer_instanceVar1 {
 // CHECK-LABEL: @objc var var_Float: Float
 // CHECK-LABEL: @objc var var_Double: Double
 
-  var var_Char: UnicodeScalar
-// CHECK-LABEL: @objc var var_Char: UnicodeScalar
+  var var_Char: Unicode.Scalar
+// CHECK-LABEL: @objc var var_Char: Unicode.Scalar
 
   //===--- Tuples.
 

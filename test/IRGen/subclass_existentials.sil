@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-subclass-existentials | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK
 
 sil_stage canonical
 

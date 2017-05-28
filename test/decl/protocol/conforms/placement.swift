@@ -106,21 +106,20 @@ extension ExplicitSub1 : P1 { } // expected-error{{redundant conformance of 'Exp
 // ---------------------------------------------------------------------------
 // Suppression of synthesized conformances
 // ---------------------------------------------------------------------------
-class SynthesizedClass1 : AnyObject { }
+class SynthesizedClass1 : AnyObject { } // expected-warning{{conformance of class 'SynthesizedClass1' to 'AnyObject' is redundant}}
 
 class SynthesizedClass2 { }
-extension SynthesizedClass2 : AnyObject { }
+extension SynthesizedClass2 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
 
 class SynthesizedClass3 : AnyObjectRefinement { }
 
 class SynthesizedClass4 { }
 extension SynthesizedClass4 : AnyObjectRefinement { }
 
-class SynthesizedSubClass1 : SynthesizedClass1, AnyObject { } // expected-error{{redundant conformance of 'SynthesizedSubClass1' to protocol 'AnyObject'}}
-// expected-note@-1{{'SynthesizedSubClass1' inherits conformance to protocol 'AnyObject' from superclass here}}
+class SynthesizedSubClass1 : SynthesizedClass1, AnyObject { } // expected-warning{{conformance of class 'SynthesizedSubClass1' to 'AnyObject' is redundant}}
 
-class SynthesizedSubClass2 : SynthesizedClass2 { } // expected-note{{'SynthesizedSubClass2' inherits conformance to protocol 'AnyObject' from superclass here}}
-extension SynthesizedSubClass2 : AnyObject { } // expected-error{{redundant conformance of 'SynthesizedSubClass2' to protocol 'AnyObject'}}
+class SynthesizedSubClass2 : SynthesizedClass2 { }
+extension SynthesizedSubClass2 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
 
 class SynthesizedSubClass3 : SynthesizedClass1, AnyObjectRefinement { }
 
@@ -171,12 +170,12 @@ extension MFExplicitSub1 : P1 { } // expected-error{{redundant conformance of 'M
 // ---------------------------------------------------------------------------
 class MFSynthesizedClass1 { }
 
-extension MFSynthesizedClass2 : AnyObject { }
+extension MFSynthesizedClass2 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
 
 class MFSynthesizedClass4 { }
 extension MFSynthesizedClass4 : AnyObjectRefinement { }
 
-extension MFSynthesizedSubClass2 : AnyObject { } // expected-error{{redundant conformance of 'MFSynthesizedSubClass2' to protocol 'AnyObject'}}
+extension MFSynthesizedSubClass2 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
 
 extension MFSynthesizedSubClass3 : AnyObjectRefinement { }
 
@@ -189,31 +188,31 @@ enum MFSynthesizedEnum2 : Int { case none = 0 }
 // ===========================================================================
 // Tests with conformances in imported modules
 // ===========================================================================
-extension MMExplicit1 : MMP1 { } // expected-error{{redundant conformance of 'MMExplicit1' to protocol 'MMP1'}}
+extension MMExplicit1 : MMP1 { } // expected-warning{{conformance of 'MMExplicit1' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
 
-extension MMExplicit1 : MMP2a { } // expected-error{{redundant conformance of 'MMExplicit1' to protocol 'MMP2a'}}
-extension MMExplicit1 : MMP3a { } // expected-error{{redundant conformance of 'MMExplicit1' to protocol 'MMP3a'}}
+extension MMExplicit1 : MMP2a { } // expected-warning{{MMExplicit1' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A}}
+extension MMExplicit1 : MMP3a { } // expected-warning{{conformance of 'MMExplicit1' to protocol 'MMP3a' was already stated in the type's module 'placement_module_A'}}
 
 extension MMExplicit1 : MMP3b { } // okay
 
-extension MMSuper1 : MMP1 { } // expected-error{{redundant conformance of 'MMSuper1' to protocol 'MMP1'}}
-extension MMSuper1 : MMP2a { } // expected-error{{redundant conformance of 'MMSuper1' to protocol 'MMP2a'}}
+extension MMSuper1 : MMP1 { } // expected-warning{{conformance of 'MMSuper1' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
+extension MMSuper1 : MMP2a { } // expected-warning{{conformance of 'MMSuper1' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A'}}
 extension MMSuper1 : MMP3b { } // okay
 
-extension MMSub1 : AnyObject { } // expected-error{{redundant conformance of 'MMSub1' to protocol 'AnyObject'}}
+extension MMSub1 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
 
-extension MMSub2 : MMP1 { } // expected-error{{redundant conformance of 'MMSub2' to protocol 'MMP1'}}
-extension MMSub2 : MMP2a { } // expected-error{{redundant conformance of 'MMSub2' to protocol 'MMP2a'}}
+extension MMSub2 : MMP1 { } // expected-warning{{conformance of 'MMSub2' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
+extension MMSub2 : MMP2a { } // expected-warning{{conformance of 'MMSub2' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A'}}
 extension MMSub2 : MMP3b { } // okay
 
 extension MMSub2 : MMAnyObjectRefinement { } // okay
 
-extension MMSub3 : MMP1 { } // expected-error{{redundant conformance of 'MMSub3' to protocol 'MMP1'}}
-extension MMSub3 : MMP2a { } // expected-error{{redundant conformance of 'MMSub3' to protocol 'MMP2a'}}
+extension MMSub3 : MMP1 { } // expected-warning{{conformance of 'MMSub3' to protocol 'MMP1' was already stated in the type's module 'placement_module_A'}}
+extension MMSub3 : MMP2a { } // expected-warning{{conformance of 'MMSub3' to protocol 'MMP2a' was already stated in the type's module 'placement_module_A'}}
 extension MMSub3 : MMP3b { } // okay
-extension MMSub3 : AnyObject { } // expected-error{{redundant conformance of 'MMSub3' to protocol 'AnyObject'}}
+extension MMSub3 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
 
-extension MMSub4 : MMP1 { } // expected-error{{redundant conformance of 'MMSub4' to protocol 'MMP1'}}
-extension MMSub4 : MMP2a { } // expected-error{{redundant conformance of 'MMSub4' to protocol 'MMP2a'}}
+extension MMSub4 : MMP1 { } // expected-warning{{conformance of 'MMSub4' to protocol 'MMP1' was already stated in the type's module 'placement_module_B'}}
+extension MMSub4 : MMP2a { } // expected-warning{{conformance of 'MMSub4' to protocol 'MMP2a' was already stated in the type's module 'placement_module_B'}}
 extension MMSub4 : MMP3b { } // okay
 extension MMSub4 : AnyObjectRefinement { } // okay

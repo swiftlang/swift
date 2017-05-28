@@ -152,11 +152,22 @@ void SILInstruction::dropAllReferences() {
 
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
-  auto *FRI = dyn_cast<FunctionRefInst>(this);
-  if (!FRI || !FRI->getReferencedFunction())
+  if (auto *FRI = dyn_cast<FunctionRefInst>(this)) {
+    if (!FRI->getReferencedFunction())
+      return;
+    FRI->dropReferencedFunction();
     return;
+  }
 
-  FRI->dropReferencedFunction();
+  // If we have a KeyPathInst, drop its pattern reference so that we can
+  // decrement refcounts on referenced functions.
+  if (auto *KPI = dyn_cast<KeyPathInst>(this)) {
+    if (!KPI->hasPattern())
+      return;
+    
+    KPI->dropReferencedPattern();
+    return;
+  }
 }
 
 void SILInstruction::replaceAllUsesWithUndef() {
@@ -207,7 +218,15 @@ namespace {
       return true;
     }
 
+    bool visitReleaseValueAddrInst(const ReleaseValueAddrInst *RHS) {
+      return true;
+    }
+
     bool visitRetainValueInst(const RetainValueInst *RHS) {
+      return true;
+    }
+
+    bool visitRetainValueAddrInst(const RetainValueAddrInst *RHS) {
       return true;
     }
 
@@ -886,6 +905,7 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::StrongReleaseInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::ReleaseValueAddrInst:
     return true;
 
   case ValueKind::DestroyValueInst:

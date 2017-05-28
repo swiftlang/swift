@@ -152,7 +152,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(UnownedReleaseInst, RefCountingInst, unowned_release, MayHaveSideEffects,
          MayRelease)
     INST(RetainValueInst, RefCountingInst, retain_value, MayHaveSideEffects, DoesNotRelease)
+    INST(RetainValueAddrInst, RefCountingInst, retain_value_addr, MayHaveSideEffects, DoesNotRelease)
     INST(ReleaseValueInst, RefCountingInst, release_value, MayHaveSideEffects, MayRelease)
+    INST(ReleaseValueAddrInst, RefCountingInst, release_value_addr, MayHaveSideEffects, MayRelease)
     INST(SetDeallocatingInst, RefCountingInst, set_deallocating, MayHaveSideEffects,
          DoesNotRelease)
     INST(AutoreleaseValueInst, RefCountingInst, autorelease_value, MayHaveSideEffects,
@@ -249,7 +251,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
 
   // Key paths
-  INST(KeyPathInst, SILInstruction, keypath, None, DoesNotRelease)
+  // TODO: The only "side effect" is potentially retaining the returned key path
+  // object; is there a more specific effect?
+  INST(KeyPathInst, SILInstruction, keypath, MayHaveSideEffects, DoesNotRelease)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)

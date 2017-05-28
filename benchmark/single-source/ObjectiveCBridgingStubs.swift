@@ -24,7 +24,7 @@ func testObjectiveCBridgeStubFromNSString() {
    for _ in 0 ..< 10_000 {
      str = b.testToString()
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
+   CheckResults(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 
@@ -71,7 +71,7 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
      arr = b.testToArrayOfStrings()
      str = arr[0]
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
+   CheckResults(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 

@@ -179,6 +179,16 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
     }
 
+      case OPT_swift_version: {
+        unsigned ver;
+        if (StringRef(InputArg->getValue()).getAsInteger(10, ver)) {
+          llvm::errs() << "error: expected integer for 'swift-version'\n";
+          return true;
+        }
+        SwiftVersion = ver;
+        break;
+      }
+
     case OPT_line:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Line)) {
         llvm::errs() << "error: expected integer for 'line'\n";
@@ -280,6 +290,15 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_objc_selector:
       ObjCSelector = InputArg->getValue();
+      break;
+
+    case OPT_cancel_on_subsequent_request:
+      unsigned Cancel;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Cancel)) {
+        llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";
+        return true;
+      }
+      CancelOnSubsequentRequest = Cancel;
       break;
 
     case OPT_UNKNOWN:

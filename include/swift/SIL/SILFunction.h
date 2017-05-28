@@ -239,9 +239,9 @@ public:
   /// or return instructions; you need to do that yourself
   /// if you care.
   ///
-  /// This is a hack and should be removed!
+  /// This routine does not update all the references in the module
+  /// You have to do that yourself
   void rewriteLoweredTypeUnsafe(CanSILFunctionType newType) {
-    assert(canBeDeleted());
     LoweredType = newType;
   }
 

@@ -524,7 +524,7 @@ func test_isa_class_1(x: B) {
 }
 // CHECK: } // end sil function '_T06switch16test_isa_class_1yAA1BC1x_tF'
 
-// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF : $@convention(thin)
+// CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2yXlAA1BC1x_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : $B):
   // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
@@ -639,7 +639,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   destroy_value [[X]]
   // CHECK:   return [[T0]]
 }
-// CHECK: } // end sil function '_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF'
+// CHECK: } // end sil function '_T06switch16test_isa_class_2yXlAA1BC1x_tF'
 
 enum MaybePair {
   case Neither
@@ -690,43 +690,6 @@ func test_union_1(u: MaybePair) {
   // CHECK-NOT: switch_enum [[SUBJECT]]
   // CHECK:   function_ref @_T06switch1eyyF
   e()
-}
-
-// CHECK-LABEL: sil hidden @_T06switch12test_union_2yAA9MaybePairO1u_tF
-func test_union_2(u: MaybePair) {
-  switch u {
-  // CHECK: switch_enum {{%.*}} : $MaybePair,
-  // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
-  // CHECK:   case #MaybePair.Right!enumelt.1: [[IS_RIGHT:bb[0-9]+]],
-  // CHECK:   default [[DEFAULT:bb[0-9]+]]
-
-  // CHECK: [[IS_NEITHER]]:
-  case .Neither:
-  // CHECK:   function_ref @_T06switch1ayyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
-    a()
-
-  // CHECK: [[IS_LEFT]]({{%.*}}):
-  case .Left:
-  // CHECK:   function_ref @_T06switch1byyF
-  // CHECK:   br [[CONT]]
-    b()
-
-  // CHECK: [[IS_RIGHT]]({{%.*}}):
-  case .Right:
-  // CHECK:   function_ref @_T06switch1cyyF
-  // CHECK:   br [[CONT]]
-    c()
-
-  // -- missing .Both case
-  // CHECK: [[DEFAULT]]:
-  // CHECK:   unreachable
-  }
-
-  // CHECK: [[CONT]]:
-  // CHECK:   function_ref @_T06switch1dyyF
-  d()
 }
 
 // CHECK-LABEL: sil hidden @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {

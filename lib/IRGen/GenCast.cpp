@@ -521,7 +521,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   SmallVector<llvm::Value*, 4> objcProtos;
   SmallVector<llvm::Value*, 4> witnessTableProtos;
 
-  bool hasClassConstraint = layout.requiresClass;
+  bool hasClassConstraint = layout.requiresClass();
   bool hasClassConstraintByProtocol = false;
 
   bool hasSuperclassConstraint = bool(layout.superclass);
@@ -533,15 +533,6 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     // to check for it independent of protocol witnesses.
     if (protoDecl->requiresClass()) {
       assert(hasClassConstraint);
-
-      if (protoDecl->getKnownProtocolKind()
-          && *protoDecl->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
-        // AnyObject only requires that the type be a class.
-        continue;
-      }
-      
-      // If this protocol is class-constrained but not AnyObject, checking its
-      // conformance will check the class constraint too.
       hasClassConstraintByProtocol = true;
     }
 

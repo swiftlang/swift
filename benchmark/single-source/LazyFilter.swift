@@ -22,7 +22,7 @@ public func run_LazilyFilteredRange(_ N: Int) {
     res += Array(c).count
     res -= Array(c).count
   }
-  CheckResults(res == 123, "Wrong result in LazilyFilteredRange 123 != \(res)")
+  CheckResults(res == 123)
 }
 
 @inline(never)
@@ -33,6 +33,6 @@ public func run_LazilyFilteredArrays(_ N: Int) {
     res += Array(c).count
     res -= Array(c).count
   }
-  CheckResults(res == 123, "Wrong result in LazilyFilteredArray 123 != \(res)")
+  CheckResults(res == 123)
 }
 

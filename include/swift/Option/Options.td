@@ -285,9 +285,19 @@ def continue_building_after_errors : Flag<["-"], "continue-building-after-errors
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Continue building, even after errors are encountered">;
 
-def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+def warn_swift3_objc_inference_complete :
+  Flag<["-"], "warn-swift3-objc-inference-complete">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Warn about deprecated @objc inference in Swift 3">;
+  HelpText<"Warn about deprecated @objc inference in Swift 3 for every declaration that will no longer be inferred as @objc in Swift 4">;
+
+def warn_swift3_objc_inference_minimal :
+  Flag<["-"], "warn-swift3-objc-inference-minimal">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+  Alias<warn_swift3_objc_inference_complete>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -415,9 +425,23 @@ def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
 // Migrator Options
+
+def update_code : Flag<["-"], "update-code">,
+  HelpText<"Update Swift code">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
+def migrate_keep_objc_visibility: Flag<["-"], "migrate-keep-objc-visibility">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When migrating, add '@objc' to declarations that would've been implicitly visible in Swift 3">;
+
 def disable_migrator_fixits: Flag<["-"], "disable-migrator-fixits">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Disable the Migrator phase which automatically applies fix-its">;
+
+def emit_remap_file_path: Separate<["-"], "emit-remap-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the replacement map describing Swift Migrator changes to <path>">,
+  MetaVarName<"<path>">;
 
 def emit_migrated_file_path: Separate<["-"], "emit-migrated-file-path">,
   Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -507,10 +531,6 @@ def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def S: Flag<["-"], "S">, Alias<emit_assembly>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
-
-def update_code : Flag<["-"], "update-code">,
-  HelpText<"Update Swift code">, ModeOpt,
-  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def fixit_all : Flag<["-"], "fixit-all">,
   HelpText<"Apply all fixits from diagnostics without any filtering">,

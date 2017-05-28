@@ -27,6 +27,7 @@
 
 #include "Explosion.h"
 #include "GenCall.h"
+#include "GenCast.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -333,7 +334,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       llvm::Instruction *I = static_cast<llvm::Instruction *>(v);
       if (I->getParent() == IGF.Builder.GetInsertBlock()) {
         llvm::LLVMContext &ctx = IGF.IGM.Module.getContext();
-        llvm::IntegerType *intType = dyn_cast<llvm::IntegerType>(v->getType());
+        auto *intType = dyn_cast<llvm::IntegerType>(v->getType());
         llvm::Metadata *rangeElems[] = {
           llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(intType, 0)),
           llvm::ConstantAsMetadata::get(
@@ -859,23 +860,55 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
-    llvm::Value *args[2];
+    llvm::Value *entrypointArgs[7];
     auto argIter = IGF.CurFn->arg_begin();
 
     // self
-    args[0] = &*argIter++;
-    if (args[0]->getType() != IGF.IGM.ObjCPtrTy)
-      args[0] = IGF.Builder.CreateBitCast(args[0], IGF.IGM.ObjCPtrTy);
+    entrypointArgs[0] = &*argIter++;
+    if (entrypointArgs[0]->getType() != IGF.IGM.ObjCPtrTy)
+      entrypointArgs[0] = IGF.Builder.CreateBitCast(entrypointArgs[0], IGF.IGM.ObjCPtrTy);
 
     // _cmd
-    args[1] = &*argIter;
-    if (args[1]->getType() != IGF.IGM.ObjCSELTy)
-      args[1] = IGF.Builder.CreateBitCast(args[1], IGF.IGM.ObjCSELTy);
+    entrypointArgs[1] = &*argIter;
+    if (entrypointArgs[1]->getType() != IGF.IGM.ObjCSELTy)
+      entrypointArgs[1] = IGF.Builder.CreateBitCast(entrypointArgs[1], IGF.IGM.ObjCSELTy);
+    
+    // Filename pointer
+    entrypointArgs[2] = args.claimNext();
+    // Filename length
+    entrypointArgs[3] = args.claimNext();
+    // Line
+    entrypointArgs[4] = args.claimNext();
+    // Column
+    entrypointArgs[5] = args.claimNext();
+    
+    // Create a flag variable so that this invocation logs only once.
+    auto flagStorageTy = llvm::ArrayType::get(IGF.IGM.Int8Ty,
+                                        IGF.IGM.getAtomicBoolSize().getValue());
+    auto flag = new llvm::GlobalVariable(IGF.IGM.Module, flagStorageTy,
+                               /*constant*/ false,
+                               llvm::GlobalValue::PrivateLinkage,
+                               llvm::ConstantAggregateZero::get(flagStorageTy));
+    flag->setAlignment(IGF.IGM.getAtomicBoolAlignment().getValue());
+    entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
 
-    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(), args);
+    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),
+                           entrypointArgs);
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsSameMetatype) {
+    auto metatypeLHS = args.claimNext();
+    auto metatypeRHS = args.claimNext();
+    (void)args.claimAll();
+    llvm::Value *metatypeLHSCasted =
+        IGF.Builder.CreateBitCast(metatypeLHS, IGF.IGM.Int8PtrTy);
+    llvm::Value *metatypeRHSCasted =
+        IGF.Builder.CreateBitCast(metatypeRHS, IGF.IGM.Int8PtrTy);
+
+    out.add(IGF.Builder.CreateICmpEQ(metatypeLHSCasted, metatypeRHSCasted));
+    return;
+  }
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

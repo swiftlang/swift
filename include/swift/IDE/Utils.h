@@ -13,6 +13,7 @@
 #ifndef SWIFT_IDE_UTILS_H
 #define SWIFT_IDE_UTILS_H
 
+#include "llvm/ADT/PointerIntPair.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Module.h"
@@ -199,6 +200,8 @@ private:
                           ReferenceMetaData Data) override;
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override;
+  bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
+                                    ValueDecl *D) override;
   bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
   bool rangeContainsLoc(SourceRange Range) const {
     return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
@@ -219,6 +222,7 @@ enum class RangeKind : int8_t{
   SingleDecl,
 
   MultiStatement,
+  PartOfExpression,
 };
 
 struct DeclaredDecl {
@@ -241,10 +245,26 @@ enum class OrphanKind : int8_t {
   Break,
   Continue,
 };
+
+enum class ExitState: int8_t {
+  Positive,
+  Negative,
+  Unsure,
+};
+
+struct ReturnInfo {
+  TypeBase* ReturnType;
+  ExitState Exit;
+  ReturnInfo(): ReturnInfo(nullptr, ExitState::Unsure) {}
+  ReturnInfo(TypeBase* ReturnType, ExitState Exit):
+    ReturnType(ReturnType), Exit(Exit) {}
+  ReturnInfo(ASTContext &Ctx, ArrayRef<ReturnInfo> Branches);
+};
+
 struct ResolvedRangeInfo {
   RangeKind Kind;
-  Type Ty;
-  StringRef Content;
+  ReturnInfo ExitInfo;
+  CharSourceRange Content;
   bool HasSingleEntry;
   bool ThrowingUnhandledError;
   OrphanKind Orphan;
@@ -254,23 +274,32 @@ struct ResolvedRangeInfo {
   ArrayRef<DeclaredDecl> DeclaredDecls;
   ArrayRef<ReferencedDecl> ReferencedDecls;
   DeclContext* RangeContext;
-  ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
-                    DeclContext* RangeContext,
-                    bool HasSingleEntry, bool ThrowingUnhandledError,
+  Expr* CommonExprParent;
+
+  ResolvedRangeInfo(RangeKind Kind, ReturnInfo ExitInfo,
+                    CharSourceRange Content, DeclContext* RangeContext,
+                    Expr *CommonExprParent, bool HasSingleEntry,
+                    bool ThrowingUnhandledError,
                     OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
-                      Ty(Ty), Content(Content), HasSingleEntry(HasSingleEntry),
+                      ExitInfo(ExitInfo), Content(Content),
+                      HasSingleEntry(HasSingleEntry),
                       ThrowingUnhandledError(ThrowingUnhandledError),
                       Orphan(Orphan), ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
-                      RangeContext(RangeContext) {}
-  ResolvedRangeInfo(StringRef Content) :
-  ResolvedRangeInfo(RangeKind::Invalid, Type(), Content, nullptr,
+                      RangeContext(RangeContext),
+                      CommonExprParent(CommonExprParent) {}
+  ResolvedRangeInfo(CharSourceRange Content) :
+  ResolvedRangeInfo(RangeKind::Invalid, {nullptr, ExitState::Unsure}, Content,
+                    nullptr, /*Commom Expr Parent*/nullptr,
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}
+  ResolvedRangeInfo(): ResolvedRangeInfo(CharSourceRange()) {}
   void print(llvm::raw_ostream &OS);
+  ExitState exit() const { return ExitInfo.Exit; }
+  Type getType() const { return ExitInfo.ReturnType; }
 };
 
 class RangeResolver : public SourceEntityWalker {
@@ -298,6 +327,7 @@ public:
 class DeclNameViewer {
   StringRef BaseName;
   SmallVector<StringRef, 4> Labels;
+  bool HasParen;
 public:
   DeclNameViewer(StringRef Text);
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
@@ -307,6 +337,7 @@ public:
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
+  bool isFunction() const { return HasParen; }
 };
 
 /// This provide a utility for writing to an underlying string buffer multiple
@@ -405,6 +436,15 @@ enum class LabelRangeEndAt: int8_t {
   BeforeElemStart,
   LabelNameOnly,
 };
+
+struct CallArgInfo {
+  Expr *ArgExp;
+  CharSourceRange LabelRange;
+  CharSourceRange getEntireCharRange(const SourceManager &SM) const;
+};
+
+std::vector<CallArgInfo>
+getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 
 // Get the ranges of argument labels from an Arg, either tuple or paren.
 std::vector<CharSourceRange>

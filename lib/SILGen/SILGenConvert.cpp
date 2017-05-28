@@ -135,18 +135,18 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   return emitManagedRValueWithCleanup(result, optTL);
 }
 
-static void emitSourceLocationArgs(SILGenFunction &gen,
-                                   SILLocation loc,
-                                   ManagedValue (&args)[4]) {
-  auto &ctx = gen.getASTContext();
-  auto sourceLoc = loc.getSourceLoc();
+auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
+                                            SILLocation emitLoc)
+-> SourceLocArgs {
+  auto &ctx = getASTContext();
   
   StringRef filename = "";
   unsigned line = 0;
+  unsigned column = 0;
   if (sourceLoc.isValid()) {
     unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(sourceLoc);
     filename = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
-    line = ctx.SourceMgr.getLineAndColumn(sourceLoc).first;
+    std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
   }
   
   bool isASCII = true;
@@ -160,19 +160,24 @@ static void emitSourceLocationArgs(SILGenFunction &gen,
   auto wordTy = SILType::getBuiltinWordType(ctx);
   auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
   
-  // File
-  SILValue literal = gen.B.createStringLiteral(loc, filename,
-                                             StringLiteralInst::Encoding::UTF8);
-  args[0] = ManagedValue::forUnmanaged(literal);
+  SourceLocArgs result;
+  SILValue literal = B.createStringLiteral(emitLoc, filename,
+                                           StringLiteralInst::Encoding::UTF8);
+  result.filenameStartPointer = ManagedValue::forUnmanaged(literal);
   // File length
-  literal = gen.B.createIntegerLiteral(loc, wordTy, filename.size());
-  args[1] = ManagedValue::forUnmanaged(literal);
+  literal = B.createIntegerLiteral(emitLoc, wordTy, filename.size());
+  result.filenameLength = ManagedValue::forUnmanaged(literal);
   // File is ascii
-  literal = gen.B.createIntegerLiteral(loc, i1Ty, isASCII);
-  args[2] = ManagedValue::forUnmanaged(literal);
+  literal = B.createIntegerLiteral(emitLoc, i1Ty, isASCII);
+  result.filenameIsAscii = ManagedValue::forUnmanaged(literal);
   // Line
-  literal = gen.B.createIntegerLiteral(loc, wordTy, line);
-  args[3] = ManagedValue::forUnmanaged(literal);
+  literal = B.createIntegerLiteral(emitLoc, wordTy, line);
+  result.line = ManagedValue::forUnmanaged(literal);
+  // Column
+  literal = B.createIntegerLiteral(emitLoc, wordTy, column);
+  result.column = ManagedValue::forUnmanaged(literal);
+  
+  return result;
 }
 
 ManagedValue
@@ -204,10 +209,15 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   // Call the standard library implementation of _diagnoseUnexpectedNilOptional.
   if (auto diagnoseFailure =
         getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
-    ManagedValue args[4];
-    emitSourceLocationArgs(*this, loc, args);
+    auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
     
-    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(), args,
+    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(),
+                                {
+                                  args.filenameStartPointer,
+                                  args.filenameLength,
+                                  args.filenameIsAscii,
+                                  args.line
+                                },
                                 SGFContext());
   }
 
@@ -642,21 +652,13 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   
     // If the concrete value is a pseudogeneric archetype, first erase it to
     // its upper bound.
-    auto anyObjectProto = getASTContext()
-      .getProtocol(KnownProtocolKind::AnyObject);
     auto anyObjectTy = getASTContext().getAnyObjectType();
     auto eraseToAnyObject =
     [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
-      auto anyObjectConformance = SGM.SwiftModule
-        ->lookupConformance(concreteFormalType, anyObjectProto, nullptr);
-      ProtocolConformanceRef buf[] = {
-        *anyObjectConformance,
-      };
-
       return B.createInitExistentialRef(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
-          concreteValue, getASTContext().AllocateCopy(buf));
+          concreteValue, {});
     };
     
     auto concreteTLPtr = &concreteTL;

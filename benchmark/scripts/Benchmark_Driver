@@ -121,8 +121,10 @@ def instrument_test(driver_path, test, num_samples):
 def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     tests = subprocess.check_output([driver_path, '--list']).split()[2:]
-    if args.filter:
-        return filter(lambda name: name.startswith(args.filter), tests)
+    if args.filters:
+        regexes = [re.compile(pattern) for pattern in args.filters]
+        return sorted(list(set([name for pattern in regexes
+                                for name in tests if pattern.match(name)])))
     if not args.benchmarks:
         return tests
     return sorted(list(set(tests).intersection(set(args.benchmarks))))
@@ -135,6 +137,14 @@ def get_current_git_branch(git_repo_path):
          '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
 
 
+def get_git_head_ID(git_repo_path):
+    """Return the short identifier for the HEAD commit of the repo
+        `git_repo_path`"""
+    return subprocess.check_output(
+        ['git', '-C', git_repo_path, 'rev-parse',
+         '--short', 'HEAD'], stderr=subprocess.STDOUT).strip()
+
+
 def log_results(log_directory, driver, formatted_output, swift_repo=None):
     """Log `formatted_output` to a branch specific directory in
     `log_directory`
@@ -143,6 +153,10 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
         branch = get_current_git_branch(swift_repo)
     except (OSError, subprocess.CalledProcessError):
         branch = None
+    try:
+        head_ID = '-' + get_git_head_ID(swift_repo)
+    except (OSError, subprocess.CalledProcessError):
+        head_ID = ''
     timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
     if branch:
         output_directory = os.path.join(log_directory, branch)
@@ -154,7 +168,7 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
     except OSError:
         pass
     log_file = os.path.join(output_directory,
-                            driver_name + '-' + timestamp + '.log')
+                            driver_name + '-' + timestamp + head_ID + '.log')
     print('Logging results to: %s' % log_file)
     with open(log_file, 'w') as f:
         f.write(formatted_output)
@@ -350,7 +364,7 @@ def positive_int(value):
 
 def main():
     parser = argparse.ArgumentParser(
-        epilog='Example: ./Benchmark_Driver run -i 5 -f Array'
+        epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f .*Suffix.*'
     )
     subparsers = parser.add_subparsers(
         title='Swift benchmark driver commands',
@@ -363,8 +377,9 @@ def main():
         default=[],
         help='benchmark to run (default: all)', nargs='*', metavar="BENCHMARK")
     benchmarks_group.add_argument(
-        '-f', '--filter',
-        help='run all tests whose name starts with PREFIX', metavar="PREFIX")
+        '-f', '--filter', dest='filters', action='append',
+        help='run all tests whose name match regular expression PATTERN, ' +
+        'multiple filters are supported', metavar="PATTERN")
     parent_parser.add_argument(
         '-t', '--tests',
         help='directory containing Benchmark_O{,none,unchecked} ' +

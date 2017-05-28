@@ -196,7 +196,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     case CaptureKind::Constant: {
       // let declarations.
-      auto Entry = VarLocs[vd];
+      auto found = VarLocs.find(vd);
+      assert(found != VarLocs.end());
+      auto Entry = found->second;
 
       auto *var = cast<VarDecl>(vd);
       auto &tl = getTypeLowering(var->getType()->getReferenceStorageReferent());
@@ -301,9 +303,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
   auto hasCaptures = SGM.Types.hasLoweredLocalCaptures(closure);
-  assert(((constant.uncurryLevel == 1 && hasCaptures) ||
-          (constant.uncurryLevel == 0 && !hasCaptures)) &&
-         "curried local functions not yet supported");
 
   auto constantInfo = getConstantInfo(constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
@@ -370,21 +369,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   //  - the original type
   auto origLoweredFormalType =
       AbstractionPattern(constantInfo.LoweredInterfaceType);
-  if (hasCaptures) {
-    // Get the unlowered formal type of the constant, stripping off
-    // the first level of function application, which applies captures.
-    origLoweredFormalType =
-      AbstractionPattern(constantInfo.FormalInterfaceType)
-          .getFunctionResultType();
-
-    // Lower it, being careful to use the right generic signature.
-    origLoweredFormalType =
-      AbstractionPattern(
-          origLoweredFormalType.getGenericSignature(),
-          SGM.Types.getLoweredASTFunctionType(
-              cast<FunctionType>(origLoweredFormalType.getType()),
-              0, constant));
-  }
 
   // - the substituted type
   auto substFormalType = cast<FunctionType>(expectedType);
@@ -465,9 +449,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
     assert(results.size() == 1 && "more than one UIApplicationMain?");
 
-    SILDeclRef mainRef{results.front(), ResilienceExpansion::Minimal,
-                       SILDeclRef::ConstructAtNaturalUncurryLevel,
-                       /*isForeign*/true};
+    auto mainRef = SILDeclRef(results.front()).asForeign();
     auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
                                                          NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
@@ -478,11 +460,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
         ->getCanonicalType();
     CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
                                                    MetatypeRepresentation::ObjC);
-    ProtocolDecl *anyObjectProtocol =
-      ctx.getProtocol(KnownProtocolKind::AnyObject);
-    auto mainClassAnyObjectConformance = ProtocolConformanceRef(
-      *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
-                                                nullptr));
     CanType anyObjectTy = ctx.getAnyObjectType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
@@ -507,9 +484,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
-                          SILType::getPrimitiveObjectType(anyObjectMetaTy),
-                          ctx.AllocateCopy(
-                            llvm::makeArrayRef(mainClassAnyObjectConformance)));
+                          SILType::getPrimitiveObjectType(anyObjectMetaTy), {});
     SILValue optName = B.createApply(mainClass,
                                NSStringFromClass,
                                NSStringFromClass->getType(),

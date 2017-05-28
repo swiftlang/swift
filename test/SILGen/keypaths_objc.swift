@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-keypaths -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-keypath-components -emit-silgen -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -16,6 +16,8 @@ class Foo: NSObject {
 
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
+
+  dynamic var dyn: String { fatalError() }
 }
 
 class Bar: NSObject {
@@ -25,21 +27,31 @@ class Bar: NSObject {
 // CHECK-LABEL: sil hidden @_T013keypaths_objc0B8KeypathsyyF
 func objcKeypaths() {
   // CHECK: keypath $WritableKeyPath<NonObjC, Int>, (root
-  _ = #keyPath2(NonObjC, .x)
+  _ = \NonObjC.x
   // CHECK: keypath $WritableKeyPath<NonObjC, NSObject>, (root
-  _ = #keyPath2(NonObjC, .y)
+  _ = \NonObjC.y
   // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"
-  _ = #keyPath2(Foo, .int)
+  _ = \Foo.int
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
-  _ = #keyPath2(Foo, .bar)
+  _ = \Foo.bar
   // CHECK: keypath $KeyPath<Foo, Foo>, (objc "bar.foo"
-  _ = #keyPath2(Foo, .bar.foo)
+  _ = \Foo.bar.foo
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar.foo.bar"
-  _ = #keyPath2(Foo, .bar.foo.bar)
+  _ = \Foo.bar.foo.bar
   // CHECK: keypath $KeyPath<Foo, NonObjC>, (root
-  _ = #keyPath2(Foo, .nonobjc)
+  _ = \Foo.nonobjc
   // CHECK: keypath $KeyPath<Foo, NSObject>, (root
-  _ = #keyPath2(Foo, .bar.foo.nonobjc.y)
+  _ = \Foo.bar.foo.nonobjc.y
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "thisIsADifferentName"
-  _ = #keyPath2(Foo, .differentName)
+  _ = \Foo.differentName
+}
+
+// CHECK-LABEL: sil hidden @_T013keypaths_objc0B18KeypathIdentifiersyyF
+func objcKeypathIdentifiers() {
+  // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
+  _ = \ObjCFoo.objcProp
+  // CHECK: keypath $KeyPath<Foo, String>, (objc "dyn"; {{.*}} id #Foo.dyn!getter.1.foreign
+  _ = \Foo.dyn
+  // CHECK: keypath $KeyPath<Foo, Int>, (objc "int"; {{.*}} id #Foo.int!getter.1 :
+  _ = \Foo.int
 }

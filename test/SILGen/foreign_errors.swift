@@ -190,7 +190,7 @@ class VeryErrorProne : ErrorProne {
 // on than is being tested here, we should consider adding FileCheck tests for
 // it.
 
-// CHECK-LABEL:    sil hidden @_T014foreign_errors14VeryErrorProneCACs9AnyObject_pSg7withTwo_tKcfc
+// CHECK-LABEL:    sil hidden @_T014foreign_errors14VeryErrorProneCACyXlSg7withTwo_tKcfc
 // CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var VeryErrorProne }
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]

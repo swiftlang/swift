@@ -19,7 +19,7 @@ public func run_StringHasPrefix(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasPrefix(prefix) {
-        CheckResults(false, "prefix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -34,7 +34,7 @@ public func run_StringHasSuffix(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasSuffix(suffix) {
-        CheckResults(false, "suffix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -49,7 +49,7 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasPrefix(prefix) {
-        CheckResults(false, "prefix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -64,7 +64,7 @@ public func run_StringHasSuffixUnicode(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasSuffix(suffix) {
-        CheckResults(false, "suffix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -82,7 +82,7 @@ public func run_StringEqualPointerComparison(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !compareEqual(str1, str2) {
-        CheckResults(false, "Strings should be equal")
+        CheckResults(false)
       }
     }
   }

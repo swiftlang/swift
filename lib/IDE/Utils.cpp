@@ -781,12 +781,14 @@ void ide::collectModuleNames(StringRef SDKPath,
   }
 }
 
-DeclNameViewer::DeclNameViewer(StringRef Text) {
+
+DeclNameViewer::DeclNameViewer(StringRef Text): HasParen(false) {
   auto ArgStart = Text.find_first_of('(');
   if (ArgStart == StringRef::npos) {
     BaseName = Text;
     return;
   }
+  HasParen = true;
   BaseName = Text.substr(0, ArgStart);
   auto ArgEnd = Text.find_last_of(')');
   assert(ArgEnd != StringRef::npos);

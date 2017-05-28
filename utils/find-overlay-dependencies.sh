@@ -56,6 +56,8 @@ SDKS[iphoneos]="arm64"
 SDKS[appletvos]="arm64"
 SDKS[watchos]="armv7k"
 
+SDKS_ORDERED=(macosx iphoneos appletvos watchos)
+
 typeset -A CMAKE_DEPENDS_NAME
 CMAKE_DEPENDS_NAME[macosx]="SWIFT_MODULE_DEPENDS_OSX"
 CMAKE_DEPENDS_NAME[iphoneos]="SWIFT_MODULE_DEPENDS_IOS"
@@ -63,9 +65,9 @@ CMAKE_DEPENDS_NAME[appletvos]="SWIFT_MODULE_DEPENDS_TVOS"
 CMAKE_DEPENDS_NAME[watchos]="SWIFT_MODULE_DEPENDS_WATCHOS"
 
 echo $1
-for sdk in ${(k)SDKS}; do
+for sdk in $SDKS_ORDERED; do
+  sdkfull="${sdk}${SUFFIX}"
   arch=$SDKS[$sdk]
-  sdkfull="$sdk$SUFFIX"
   printf "%s:\n\t" "$sdkfull"
   deps=$(echo "@import $1;" | xcrun -sdk "${sdkfull}" clang -arch $arch -x objective-c -F $(xcrun -show-sdk-path -sdk "${sdkfull}")/System/Library/PrivateFrameworks - -M -fmodules 2>/dev/null)
   if [[ $? != 0 ]]; then
@@ -86,6 +88,18 @@ for sdk in ${(k)SDKS}; do
         egrep -q "\b$overlay\b") &&
         DEPENDS_ON+=${CUSTOM_NAMED_MODULES[$overlay]-$overlay}
   done
+
+  if [[ $sdk != macosx* ]]; then
+    DEPENDS_ON=("${(@)DEPENDS_ON:#XPC}")
+  fi
+
+  # Foundation depends on CoreGraphics in the .swift code.
+  # Hardcode the dependency.
+  if [[ "$1" == "Foundation" ]]; then
+    DEPENDS_ON+="CoreGraphics"
+  fi
+
+
   echo "$DEPENDS_ON"
   if [[ $UPDATE_CMAKE == 1 ]]; then
     sed -i "" -E -e "s/^([ \t]*$CMAKE_DEPENDS_NAME[$sdk]).*$/\1 $DEPENDS_ON # auto-updated/" "$CMAKE_PATH"

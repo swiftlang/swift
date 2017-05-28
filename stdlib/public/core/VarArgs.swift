@@ -70,15 +70,16 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 /// Invokes the given closure with a C `va_list` argument derived from the
 /// given array of arguments.
 ///
-/// The pointer passed as an argument to `body` is valid only for the lifetime
-/// of the closure. Do not escape it from the closure for later use.
+/// The pointer passed as an argument to `body` is valid only during the
+/// execution of `withVaList(_:_:)`. Do not store or return the pointer for
+/// later use.
 ///
 /// - Parameters:
 ///   - args: An array of arguments to convert to a C `va_list` pointer.
 ///   - body: A closure with a `CVaListPointer` parameter that references the
 ///     arguments passed as `args`. If `body` has a return value, it is used
 ///     as the return value for the `withVaList(_:)` function. The pointer
-///     argument is valid only for the duration of the closure's execution.
+///     argument is valid only for the duration of the function's execution.
 /// - Returns: The return value of the `body` closure parameter, if any.
 ///
 /// - SeeAlso: `getVaList(_:)`

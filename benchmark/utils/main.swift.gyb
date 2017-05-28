@@ -1,0 +1,90 @@
+//===--- main.swift -------------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to main.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+%{
+from gyb_benchmark_support import (
+    tests,
+    multisource_benches,
+    all_run_funcs
+)
+
+import re
+
+imports = sorted(tests + [msb.name for msb in multisource_benches])
+
+# The list of all "run_" functions is split into 3 test suites.
+# By default all tests belong to the "precommit" test suite.
+# Functions that match the following regular expressions will be in the "other"
+# and "string" test suites.
+
+other_re = [
+    "Ackermann",
+    "ExistentialTest.+",
+    "Fibonacci",
+    "HashQuadratic"
+]
+
+string_re = [
+    "StringWalk.+",
+]
+
+def matches(included_regexes, run_func):
+  for regexp in included_regexes:
+    if re.match(regexp, run_func):
+      return True
+  return False
+
+other_tests = filter(lambda x: matches(other_re, x), all_run_funcs)
+string_tests = filter(lambda x: matches(string_re, x), all_run_funcs)
+ignored_run_funcs = other_tests + string_tests
+run_funcs = filter(lambda x: x not in ignored_run_funcs, all_run_funcs)
+}%
+
+// This is just a driver for performance overview tests.
+import TestsUtils
+import DriverUtils
+% for IMPORT in imports:
+import ${IMPORT}
+% end
+
+@inline(__always)
+private func addTo(
+  _ testSuite: inout [String : (Int) -> ()],
+  _ name: String,
+  _ function: @escaping (Int) -> ()
+) {
+  testSuite[name] = function
+}
+
+// The main test suite: precommit tests
+% for run_func in run_funcs:
+addTo(&precommitTests, "${run_func}", run_${run_func})
+% end
+
+// Other tests
+% for test_name in other_tests:
+addTo(&otherTests, "${test_name }", run_${test_name})
+% end
+
+// String tests, an extended benchmark suite exercising finer-granularity
+// behavior of our Strings.
+% for test_name in string_tests:
+addTo(&stringTests, "${test_name}", run_${test_name})
+% end
+
+main()

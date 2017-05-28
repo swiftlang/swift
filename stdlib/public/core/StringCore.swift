@@ -336,32 +336,60 @@ public struct _StringCore {
     }
   }
 
+  var _unmanagedASCII : UnsafeBufferPointer<Unicode.ASCII.CodeUnit>? {
+    @inline(__always)
+    get {
+      guard _fastPath(_baseAddress != nil && elementWidth == 1) else {
+        return nil
+      }
+      return UnsafeBufferPointer(
+        start: _baseAddress!.assumingMemoryBound(
+          to: Unicode.ASCII.CodeUnit.self),
+        count: count
+      )
+    }
+  }
+  
+  var _unmanagedUTF16 : UnsafeBufferPointer<UTF16.CodeUnit>? {
+    @inline(__always)
+    get {
+      guard _fastPath(_baseAddress != nil && elementWidth != 1) else {
+        return nil
+      }
+      return UnsafeBufferPointer(
+        start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
+        count: count
+      )
+    }
+  }
+  
   /// Write the string, in the given encoding, to output.
-  func encode<Encoding: UnicodeCodec>(
+  func encode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void)
   {
-    if _fastPath(_baseAddress != nil) {
-      if _fastPath(elementWidth == 1) {
-        for x in UnsafeBufferPointer(
-          start: _baseAddress!.assumingMemoryBound(to: UTF8.CodeUnit.self),
-          count: count
-        ) {
-          Encoding.encode(UnicodeScalar(x), into: processCodeUnit)
+    defer { _fixLifetime(self) }
+    if let bytes = _unmanagedASCII {
+      if encoding == Unicode.ASCII.self
+      || encoding == Unicode.UTF8.self
+      || encoding == Unicode.UTF16.self
+      || encoding == Unicode.UTF32.self {
+        bytes.forEach {
+          processCodeUnit(Encoding.CodeUnit(extendingOrTruncating: $0))
         }
       }
       else {
-        let hadError = transcode(
-          UnsafeBufferPointer(
-            start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
-            count: count
-          ).makeIterator(),
-          from: UTF16.self,
-          to: encoding,
-          stoppingOnError: true,
-          into: processCodeUnit
-        )
-        _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
+        // TODO: be sure tests exercise this code path.
+        for b in bytes {
+          Encoding._encode(
+            Unicode.Scalar(_unchecked: UInt32(b))).forEach(processCodeUnit)
+        }
+      }
+    }
+    else if let content = _unmanagedUTF16 {
+      var i = content.makeIterator()
+      Unicode.UTF16.ForwardParser._parse(&i) {
+        Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
       }
     }
     else if hasCocoaBuffer {
@@ -390,7 +418,10 @@ public struct _StringCore {
   ///   the existing buffer's storage.
   mutating func _claimCapacity(
     _ newSize: Int, minElementWidth: Int) -> (Int, UnsafeMutableRawPointer?) {
-    if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
+    if _fastPath(
+      (nativeBuffer != nil) && elementWidth >= minElementWidth
+      && isKnownUniquelyReferenced(&_owner)
+    ) {
       var buffer = nativeBuffer!
 
       // In order to grow the substring in place, this _StringCore should point
@@ -487,7 +518,7 @@ public struct _StringCore {
   ///
   /// - Complexity: O(1) when amortized over repeated appends of equal
   ///   character values.
-  mutating func append(_ c: UnicodeScalar) {
+  mutating func append(_ c: Unicode.Scalar) {
     let width = UTF16.width(c)
     append(
       width == 2 ? UTF16.leadSurrogate(c) : UTF16.CodeUnit(c.value),
@@ -599,7 +630,7 @@ extension _StringCore : RangeReplaceableCollection {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == UTF16.CodeUnit {
+  ) where C : Collection, C.Element == UTF16.CodeUnit {
     _precondition(
       bounds.lowerBound >= 0,
       "replaceSubrange: subrange start precedes String start")
@@ -692,7 +723,7 @@ extension _StringCore : RangeReplaceableCollection {
   }
 
   public mutating func append<S : Sequence>(contentsOf s: S)
-    where S.Iterator.Element == UTF16.CodeUnit {
+    where S.Element == UTF16.CodeUnit {
     var width = elementWidth
     if width == 1 {
       if let hasNonAscii = s._preprocessingPass({

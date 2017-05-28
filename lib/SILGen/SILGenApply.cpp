@@ -185,10 +185,8 @@ public:
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
 private:
-  union {
-    ManagedValue IndirectValue;
-    SILDeclRef Constant;
-  };
+  ManagedValue IndirectValue;
+  SILDeclRef Constant;
   SILValue SelfValue;
   CanAnyFunctionType OrigFormalInterfaceType;
   CanFunctionType SubstFormalInterfaceType;
@@ -354,7 +352,7 @@ public:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
-      return Constant.uncurryLevel;
+      return Constant.getUncurryLevel();
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
@@ -372,18 +370,27 @@ public:
     ApplyOptions options = ApplyOptions::None;
     Optional<SILDeclRef> constant = None;
 
+    if (!Constant) {
+      assert(level == 0 && "can't curry indirect function");
+    } else {
+      unsigned uncurryLevel = Constant.getUncurryLevel();
+      assert(level <= uncurryLevel
+             && "uncurrying past natural uncurry level of standalone function");
+      if (level < uncurryLevel) {
+        assert(level == 0);
+        constant = Constant.asCurried();
+      } else {
+        constant = Constant;
+      }
+    }
+
     switch (kind) {
     case Kind::IndirectValue:
-      assert(level == 0 && "can't curry indirect function");
       mv = IndirectValue;
       assert(Substitutions.empty());
       break;
 
     case Kind::StandaloneFunction: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of standalone function");
-      constant = Constant.atUncurryLevel(level);
-
       // If we're currying a direct reference to a class-dispatched method,
       // make sure we emit the right set of thunks.
       if (constant->isCurried && Constant.hasDecl())
@@ -397,9 +404,6 @@ public:
       break;
     }
     case Kind::EnumElement: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of enum constructor");
-      constant = Constant.atUncurryLevel(level);
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       // We should not end up here if the enum constructor call is fully
@@ -411,13 +415,10 @@ public:
       break;
     }
     case Kind::ClassMethod: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      constant = Constant.atUncurryLevel(level);
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
-      if (level < Constant.uncurryLevel) {
+      if (constant->isCurried) {
         SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
@@ -434,12 +435,7 @@ public:
       break;
     }
     case Kind::SuperMethod: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      assert(level == getNaturalUncurryLevel() &&
-             "Currying the self parameter of super method calls should've been emitted");
-
-      constant = Constant.atUncurryLevel(level);
+      assert(!constant->isCurried);
 
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
@@ -453,13 +449,10 @@ public:
       break;
     }
     case Kind::WitnessMethod: {
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      constant = Constant.atUncurryLevel(level);
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       // If the call is curried, emit a direct call to the curry thunk.
-      if (level < Constant.uncurryLevel) {
+      if (constant->isCurried) {
         SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
         break;
@@ -480,12 +473,8 @@ public:
       break;
     }
     case Kind::DynamicMethod: {
-      assert(level >= 1
-             && "currying 'self' of dynamic method dispatch not yet supported");
-      assert(level <= Constant.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
+      assert(!constant->isCurried);
 
-      constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
       auto substFormalType = getSubstFormalType();
@@ -986,10 +975,8 @@ public:
 
         setSelfParam(ArgumentSource(thisCallSite->getArg(), std::move(self)),
                      thisCallSite);
-        SILDeclRef constant(afd, kind.getValue(),
-                            SILDeclRef::ConstructAtBestResilienceExpansion,
-                            SILDeclRef::ConstructAtNaturalUncurryLevel,
-                            requiresForeignEntryPoint(afd));
+        auto constant = SILDeclRef(afd, kind.getValue())
+          .asForeign(requiresForeignEntryPoint(afd));
 
         auto subs = e->getDeclRef().getSubstitutions();
         setCallee(Callee::forClassMethod(SGF, selfValue, constant, subs, e));
@@ -1004,11 +991,9 @@ public:
       return;
     }
 
-    SILDeclRef constant(e->getDecl(),
-                        SILDeclRef::ConstructAtBestResilienceExpansion,
-                        SILDeclRef::ConstructAtNaturalUncurryLevel,
-                        !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
-                          && requiresForeignEntryPoint(e->getDecl()));
+    auto constant = SILDeclRef(e->getDecl())
+      .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
+                 && requiresForeignEntryPoint(e->getDecl()));
 
     auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
 
@@ -1109,10 +1094,8 @@ public:
     SubstitutionList substitutions;
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
-                         SILDeclRef::ConstructAtBestResilienceExpansion,
-                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         requiresForeignEntryPoint(ctorRef->getDecl()));
+      constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer)
+        .asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
@@ -1139,10 +1122,8 @@ public:
       }
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
-      constant = SILDeclRef(declRef->getDecl(),
-                         SILDeclRef::ConstructAtBestResilienceExpansion,
-                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         requiresForeignEntryPoint(declRef->getDecl()));
+      constant = SILDeclRef(declRef->getDecl())
+        .asForeign(requiresForeignEntryPoint(declRef->getDecl()));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
@@ -1321,10 +1302,8 @@ public:
       auto constant = SILDeclRef(ctorRef->getDecl(),
                              useAllocatingCtor
                                ? SILDeclRef::Kind::Allocator
-                               : SILDeclRef::Kind::Initializer,
-                             SILDeclRef::ConstructAtBestResilienceExpansion,
-                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             requiresForeignEntryPoint(ctorRef->getDecl()));
+                                 : SILDeclRef::Kind::Initializer)
+        .asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
       setCallee(Callee::forArchetype(SGF, SILValue(),
                                      self.getType().getSwiftRValueType(),
                                      constant, subs,
@@ -1338,10 +1317,8 @@ public:
                   SILDeclRef(ctorRef->getDecl(),
                              useAllocatingCtor
                                ? SILDeclRef::Kind::Allocator
-                               : SILDeclRef::Kind::Initializer,
-                             SILDeclRef::ConstructAtBestResilienceExpansion,
-                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             requiresForeignEntryPoint(ctorRef->getDecl())),
+                             : SILDeclRef::Kind::Initializer)
+                    .asForeign(requiresForeignEntryPoint(ctorRef->getDecl())),
                   subs,
                   fn));
     } else {
@@ -1352,10 +1329,8 @@ public:
           SILDeclRef(ctorRef->getDecl(),
                      useAllocatingCtor
                        ? SILDeclRef::Kind::Allocator
-                       : SILDeclRef::Kind::Initializer,
-                     SILDeclRef::ConstructAtBestResilienceExpansion,
-                     SILDeclRef::ConstructAtNaturalUncurryLevel,
-                     requiresForeignEntryPoint(ctorRef->getDecl())),
+                     : SILDeclRef::Kind::Initializer)
+            .asForeign(requiresForeignEntryPoint(ctorRef->getDecl())),
           subs,
           fn));
     }
@@ -1445,9 +1420,7 @@ public:
 
       // Determine the type of the method we referenced, by replacing the
       // class type of the 'Self' parameter with Builtin.UnknownObject.
-      SILDeclRef member(fd, SILDeclRef::ConstructAtBestResilienceExpansion,
-                        SILDeclRef::ConstructAtNaturalUncurryLevel,
-                        /*isObjC=*/true);
+      auto member = SILDeclRef(fd).asForeign();
 
       auto substFormalType = dynamicMemberRef->getType()
           ->getAnyOptionalObjectType();
@@ -1754,6 +1727,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       // We may need to support this at some point, but currently only imported
@@ -3226,21 +3200,9 @@ private:
           emittedArg = ManagedValue(opened, emittedArg.getCleanup());
         }
         
-        // Erase to AnyObject.
-        auto conformance = SGF.SGM.SwiftModule->lookupConformance(
-          emittedArgTy,
-          SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
-          nullptr);
-        assert(conformance &&
-               "no AnyObject conformance for class?!");
-        
-        ArrayRef<ProtocolConformanceRef> conformances(*conformance);
-        auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
-        
         auto erased = SGF.B.createInitExistentialRef(loc,
                          SILType::getPrimitiveObjectType(getAnyObjectType()),
-                         emittedArgTy, emittedArg.getValue(),
-                         ctxConformances);
+                         emittedArgTy, emittedArg.getValue(), {});
         emittedArg = ManagedValue(erased, emittedArg.getCleanup());
       }
       
@@ -4112,14 +4074,7 @@ namespace {
         : SGF(SGF), callee(std::move(callee)),
           initialWritebackScope(std::move(writebackScope)),
           uncurries(callee.getNaturalUncurryLevel() + 1), applied(false),
-          assumedPlusZeroSelf(assumedPlusZeroSelf) {
-      // Subtract an uncurry level for captures, if any.
-      // TODO: Encapsulate this better in Callee.
-      if (this->callee.hasCaptures()) {
-        assert(uncurries > 0 && "captures w/o uncurry level?");
-        --uncurries;
-      }
-    }
+          assumedPlusZeroSelf(assumedPlusZeroSelf) {}
 
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
@@ -4270,10 +4225,6 @@ namespace {
 
     AbstractionPattern
     getUncurriedOrigFormalType(AbstractionPattern origFormalType) {
-      if (callee.hasCaptures()) {
-        claimNextParamClause(origFormalType);
-      }
-
       for (unsigned i = 0, e = uncurriedSites.size(); i < e; ++i) {
         claimNextParamClause(origFormalType);
       }
@@ -4415,7 +4366,7 @@ RValue CallEmission::applyEnumElementConstructor(
 
   // Get the payload argument.
   ArgumentSource payload;
-  if (element->getArgumentInterfaceType()) {
+  if (element->hasAssociatedValues()) {
     assert(uncurriedSites.size() == 2);
     formalResultType = formalType.getResult();
     claimNextParamClause(origFormalType.getValue());
@@ -4625,12 +4576,7 @@ void CallEmission::emitArgumentsForNormalApply(
 
     // Collect the captures, if any.
     if (callee.hasCaptures()) {
-      // The captures are represented as a placeholder curry level in the
-      // formal type.
-      // TODO: Remove this hack.
       (void)paramLowering.claimCaptureParams(callee.getCaptures());
-      claimNextParamClause(origFormalType);
-      claimNextParamClause(formalType);
       args.push_back({});
       args.back().append(callee.getCaptures().begin(),
                          callee.getCaptures().end());
@@ -4838,11 +4784,8 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   ConstructorDecl *ctor = cast<ConstructorDecl>(init.getDecl());
 
   // Form the reference to the allocating initializer.
-  SILDeclRef initRef(ctor,
-                     SILDeclRef::Kind::Allocator,
-                     SILDeclRef::ConstructAtBestResilienceExpansion,
-                     SILDeclRef::ConstructAtNaturalUncurryLevel,
-                     requiresForeignEntryPoint(ctor));
+  auto initRef = SILDeclRef(ctor, SILDeclRef::Kind::Allocator)
+    .asForeign(requiresForeignEntryPoint(ctor));
   auto initConstant = SGF.getConstantInfo(initRef);
   auto subs = init.getSubstitutions();
 
@@ -5220,6 +5163,7 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // base isn't a temporary.  We aren't allowed to pass aliased
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
@@ -5378,10 +5322,8 @@ static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
 SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
                                             bool isDirectUse) {
   // Use the ObjC entry point
-  return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    shouldReferenceForeignAccessor(storage, isDirectUse));
+  return SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func)
+    .asForeign(shouldReferenceForeignAccessor(storage, isDirectUse));
 }
 
 /// Emit a call to a getter.
@@ -5397,7 +5339,6 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
-  bool hasCaptures = getter.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
@@ -5405,9 +5346,6 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5423,10 +5361,8 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
 
 SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
                                             bool isDirectUse) {
-  return SILDeclRef(storage->getSetter(), SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    shouldReferenceForeignAccessor(storage, isDirectUse));
+  return SILDeclRef(storage->getSetter(), SILDeclRef::Kind::Func)
+    .asForeign(shouldReferenceForeignAccessor(storage, isDirectUse));
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
@@ -5440,7 +5376,6 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
-  bool hasCaptures = setter.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
@@ -5448,9 +5383,6 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
@@ -5475,10 +5407,7 @@ SILDeclRef
 SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
                                             bool isDirectUse) {
   return SILDeclRef(storage->getMaterializeForSetFunc(),
-                    SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*foreign*/ false);
+                    SILDeclRef::Kind::Func);
 }
 
 MaterializedLValue SILGenFunction::
@@ -5495,7 +5424,6 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                                      materializeForSet,
                                                      substitutions, selfValue,
                                                      isSuper, isDirectUse);
-  bool hasCaptures = callee.hasCaptures();
   bool hasSelf = (bool)selfValue;
   auto accessType = callee.getSubstFormalType();
 
@@ -5503,9 +5431,6 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<FunctionType>(accessType.getResult());
   }
 
@@ -5562,10 +5487,7 @@ SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
                                                AccessKind accessKind,
                                                bool isDirectUse) {
   FuncDecl *addressorFunc = storage->getAddressorForAccess(accessKind);
-  return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*foreign*/ false);
+  return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
 }
 
 /// Emit a call to an addressor.
@@ -5586,7 +5508,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,
                                        substitutions, selfValue,
                                        isSuper, isDirectUse);
-  bool hasCaptures = callee.hasCaptures();
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
@@ -5594,9 +5515,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   // Self ->
   if (hasSelf) {
     emission.addCallSite(loc, std::move(selfValue), accessType);
-  }
-  // TODO: Have Callee encapsulate the captures better.
-  if (hasSelf || hasCaptures) {
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5753,10 +5671,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                        memberMethodTy);
   } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
-  SILDeclRef member(memberFunc, SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*isObjC=*/true);
+  auto member = SILDeclRef(memberFunc, SILDeclRef::Kind::Func)
+    .asForeign();
   B.createDynamicMethodBranch(e, operand, member, hasMemberBB, noMemberBB);
 
   // Create the has-member branch.
@@ -5852,11 +5768,9 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
   // Create the branch.
   auto subscriptDecl = cast<SubscriptDecl>(e->getMember().getDecl());
-  SILDeclRef member(subscriptDecl->getGetter(),
-                    SILDeclRef::Kind::Func,
-                    SILDeclRef::ConstructAtBestResilienceExpansion,
-                    SILDeclRef::ConstructAtNaturalUncurryLevel,
-                    /*isObjC=*/true);
+  auto member = SILDeclRef(subscriptDecl->getGetter(),
+                           SILDeclRef::Kind::Func)
+    .asForeign();
   B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);
 
   // Create the has-member branch.

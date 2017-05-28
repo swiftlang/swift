@@ -118,10 +118,21 @@ protected:
   }
   
   SILType getTypeInClonedContext(SILType Ty) {
+    auto objectTy = Ty.getSwiftRValueType();
+    // Do not substitute opened existential types, if we do not have any.
+    if (!objectTy->hasOpenedExistential())
+      return Ty;
+    // Do not substitute opened existential types, if it is not required.
+    // This is often the case when cloning basic blocks inside the same
+    // function.
+    if (OpenedExistentialSubs.empty())
+      return Ty;
+
     // Substitute opened existential types, if we have any.
-    return SILType::getPrimitiveObjectType(
-      getASTTypeInClonedContext(Ty.getSwiftRValueType()))
-      .copyCategory(Ty);
+    return Ty.subst(
+      Builder.getModule(),
+      QueryTypeSubstitutionMapOrIdentity{OpenedExistentialSubs},
+      MakeAbstractConformanceForGenericType());
   }
   SILType getOpType(SILType Ty) {
     Ty = getTypeInClonedContext(Ty);
@@ -138,24 +149,10 @@ protected:
     if (OpenedExistentialSubs.empty())
       return ty->getCanonicalType();
 
-    return ty.transform(
-      [&](Type t) -> Type {
-        if (t->isOpenedExistential()) {
-          auto found = OpenedExistentialSubs.find(
-            t->castTo<ArchetypeType>());
-          // If an opened existential is supposed to be
-          // remapped, it is guaranteed by construction
-          // to be in the OpenedExistentialSubs, because
-          // a cloner always processes definitions of
-          // opened existentials before their uses and
-          // adds found opened existentials definitions
-          // to the map.
-          if (found != OpenedExistentialSubs.end())
-            return found->second;
-          return t;
-        }
-        return t;
-      })->getCanonicalType();
+    return ty.subst(
+      QueryTypeSubstitutionMapOrIdentity{OpenedExistentialSubs},
+      MakeAbstractConformanceForGenericType()
+    )->getCanonicalType();
   }
 
   CanType getOpASTType(CanType ty) {
@@ -352,7 +349,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   if (VI != ValueMap.end())
     return VI->second;
 
-  if (SILInstruction* I = dyn_cast<SILInstruction>(Value)) {
+  if (auto *I = dyn_cast<SILInstruction>(Value)) {
     auto II = InstructionMap.find(I);
     if (II != InstructionMap.end())
       return SILValue(II->second);
@@ -360,7 +357,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   }
 
   // If we have undef, just remap the type.
-  if (SILUndef *U = dyn_cast<SILUndef>(Value)) {
+  if (auto *U = dyn_cast<SILUndef>(Value)) {
     auto type = getOpType(U->getType());
     ValueBase *undef =
       (type == U->getType() ? U : SILUndef::get(type, Builder.getModule()));
@@ -575,8 +572,6 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createApply(getOpLocation(Inst->getLoc()),
                              getOpValue(Inst->getCallee()),
-                             getOpType(Inst->getSubstCalleeSILType()),
-                             getOpType(Inst->getType()),
                              getOpSubstitutions(Inst->getSubstitutions()),
                              Args,
                              Inst->isNonThrowing()));
@@ -590,7 +585,6 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createTryApply(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getCallee()),
-                                getOpType(Inst->getSubstCalleeSILType()),
                                 getOpSubstitutions(Inst->getSubstitutions()),
                                 Args,
                                 getOpBasicBlock(Inst->getNormalBB()),
@@ -603,12 +597,14 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
-    getBuilder().createPartialApply(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getCallee()),
-                                    getOpType(Inst->getSubstCalleeSILType()),
-                                    getOpSubstitutions(Inst->getSubstitutions()),
-                                    Args,
-                                    getOpType(Inst->getType())));
+                getBuilder().createPartialApply(
+                    getOpLocation(Inst->getLoc()),
+                    getOpValue(Inst->getCallee()),
+                    getOpSubstitutions(Inst->getSubstitutions()), Args,
+                    Inst->getType()
+                        .getSwiftRValueType()
+                        ->getAs<SILFunctionType>()
+                        ->getCalleeConvention()));
 }
 
 template<typename ImplClass>
@@ -1233,6 +1229,15 @@ void SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitRetainValueAddrInst(RetainValueAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createRetainValueAddr(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand()),
+                                               Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1266,6 +1271,16 @@ void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
     getBuilder().createReleaseValue(getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
                                     Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReleaseValueAddrInst(
+    ReleaseValueAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createReleaseValueAddr(getOpLocation(Inst->getLoc()),
+                                                getOpValue(Inst->getOperand()),
+                                                Inst->getAtomicity()));
 }
 
 template <typename ImplClass>

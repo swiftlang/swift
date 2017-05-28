@@ -27,11 +27,13 @@ public:
 /// \brief Returns the offset (in bytes) to the start of \p LineIndex
 size_t getOffsetOfLine(unsigned LineIndex, StringRef Text);
 
-/// \brief Returns the offset to the first Non-WhiteSpace Character
-size_t getOffsetOfTrimmedLine(unsigned LineIndex, StringRef Text);
+/// \brief Returns the offset to the first Character. If \p Trim is true, the
+///    first character is Non-WhiteSpace.
+size_t getOffsetOfLine(unsigned LineIndex, StringRef Text, bool Trim);
 
-/// \brief Returns the Text on \p LineIndex, excluding Leading WS
-StringRef getTrimmedTextForLine(unsigned LineIndex, StringRef Text);
+/// \brief Returns the Text on \p LineIndex, excluding Leading WS if \p Trim is
+///   true.
+StringRef getTextForLine(unsigned LineIndex, StringRef Text, bool Trim);
 
 /// \brief Returns the number of spaces at the beginning of \p LineIndex
 /// or if indenting is done by Tabs, the number of Tabs * TabWidthp
@@ -78,6 +80,11 @@ public:
     }
     else if (Line >= StartLine + Length) {
       Length = Line - StartLine + 1;
+    }
+    else if (Line < StartLine) {
+      unsigned Delta = StartLine - Line;
+      StartLine -= Delta;
+      Length += Delta;
     }
   }
 

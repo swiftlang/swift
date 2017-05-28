@@ -427,6 +427,6 @@ class AllocStackHoisting : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILFunctionTransform *irgen::createAllocStackHoisting() {
+SILTransform *irgen::createAllocStackHoisting() {
   return new AllocStackHoisting();
 }

@@ -191,6 +191,12 @@ private:
   /// The callback used by the SILLoader.
   std::unique_ptr<SerializationCallback> Callback;
 
+  // Callbacks registered by the SIL optimizer to run on each deserialized
+  // function body. This is intentionally a stateless type because the
+  // ModuleDecl and SILFunction should be sufficient context.
+  typedef void (*SILFunctionBodyCallback)(ModuleDecl *, SILFunction *F);
+  SmallVector<SILFunctionBodyCallback, 0> DeserializationCallbacks;
+
   /// The SILLoader used when linking functions into this module.
   ///
   /// This is lazily initialized the first time we attempt to
@@ -230,6 +236,12 @@ private:
 
 public:
   ~SILModule();
+
+  /// Add a callback for each newly deserialized SIL function body.
+  void registerDeserializationCallback(SILFunctionBodyCallback callBack);
+
+  /// Return set of registered deserialization callbacks.
+  ArrayRef<SILFunctionBodyCallback> getDeserializationCallbacks();
 
   /// Add a delete notification handler \p Handler to the module context.
   void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);

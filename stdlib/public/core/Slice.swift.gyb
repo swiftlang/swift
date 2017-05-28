@@ -131,7 +131,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     return _endIndex
   }
 
-  public subscript(index: Index) -> Base._Element {
+  public subscript(index: Index) -> Base.Element {
     get {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       return _base[index]
@@ -223,7 +223,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     self._endIndex = _base.endIndex
   }
 
-  public init(repeating repeatedValue: Base._Element, count: Int) {
+  public init(repeating repeatedValue: Base.Element, count: Int) {
     self._base = Base(repeating: repeatedValue, count: count)
     self._startIndex = _base.startIndex
     self._endIndex = _base.endIndex
@@ -232,7 +232,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public init<S>(_ elements: S)
     where
     S : Sequence,
-    S.Iterator.Element == Base._Element {
+    S.Element == Base.Element {
 
     self._base = Base(elements)
     self._startIndex = _base.startIndex
@@ -243,7 +243,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     _ subRange: Range<Index>, with newElements: C
   ) where
     C : Collection,
-    C.Iterator.Element == Base._Element {
+    C.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -280,7 +280,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  public mutating func insert(_ newElement: Base._Element, at i: Index) {
+  public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
     let sliceOffset: IndexDistance =
@@ -311,7 +311,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
     where
     S : Collection,
-    S.Iterator.Element == Base._Element {
+    S.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
@@ -344,7 +344,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  public mutating func remove(at i: Index) -> Base._Element {
+  public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
 %     if Traversal == 'Forward':
     let sliceOffset: IndexDistance =

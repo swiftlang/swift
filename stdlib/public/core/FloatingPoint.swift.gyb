@@ -170,10 +170,11 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 
   // For the minimumMagnitude and maximumMagnitude methods
-  // FIXME(integers): document me properly
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
   associatedtype Magnitude = Self
 
-  /// A type that represents any written exponent.
+  /// A type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
 
   /// Creates a new value from the given sign, exponent, and significand.
@@ -493,61 +494,44 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   var significand: Self { get }
 
-  /// Returns the sum of this value and the given value, rounded to a
+  /// Adds two values and produces their sum, rounded to a
   /// representable value.
   ///
-  /// This method serves as the basis for the addition operator (`+`). For
+  /// The addition operator (`+`) calculates the sum of its two arguments. For
   /// example:
   ///
   ///     let x = 1.5
-  ///     print(x.adding(2.25))
-  ///     // Prints "3.75"
-  ///     print(x + 2.25)
-  ///     // Prints "3.75"
+  ///     let y = x + 2.25
+  ///     // y == 3.75
   ///
-  /// The `adding(_:)` method implements the addition operation defined by the
+  /// The `+` operator implements the addition operation defined by the
   /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to add.
-  /// - Returns: The sum of this value and `other`, rounded to a representable
-  ///   value.
-  ///
-  /// - SeeAlso: `add(_:)`
-  // FIXME(integers): revise the doc comment
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
   static func +(_ lhs: Self, _ rhs: Self) -> Self
 
-  /// Adds the given value to this value in place, rounded to a representable
-  /// value.
+  /// Adds two values and stores the result in the left-hand-side variable,
+  /// rounded to a representable value.
   ///
-  /// This method serves as the basis for the in-place addition operator
-  /// (`+=`). For example:
-  ///
-  ///     var (x, y) = (2.25, 2.25)
-  ///     x.add(7.0)
-  ///     // x == 9.25
-  ///     y += 7.0
-  ///     // y == 9.25
-  ///
-  /// - Parameter other: The value to add.
-  ///
-  /// - SeeAlso: `adding(_:)`
-  // FIXME(integers): revise the doc comment
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
   static func +=(_ lhs: inout Self, _ rhs: Self)
 
-  /// Returns the additive inverse of this value.
+  /// Calculates the additive inverse of a value.
   ///
-  /// The result is always exact. This method serves as the basis for the
-  /// negation operator (prefixed `-`). For example:
+  /// The unary minus operator (prefix `-`) calculates the negation of its
+  /// operand. The result is always exact.
   ///
   ///     let x = 21.5
   ///     let y = -x
   ///     // y == -21.5
   ///
-  /// - Returns: The additive inverse of this value.
-  ///
-  /// - SeeAlso: `negate()`
+  /// - Parameter operand: The value to negate.
   static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
@@ -558,137 +542,94 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///     var x = 21.5
   ///     x.negate()
   ///     // x == -21.5
-  ///
-  /// - SeeAlso: The unary minus operator (`-`).
   mutating func negate()
 
-  /// Returns the difference of this value and the given value, rounded to a
-  /// representable value.
+  /// Subtracts one value from another and produces their difference, rounded
+  /// to a representable value.
   ///
-  /// This method serves as the basis for the subtraction operator (`-`). For
-  /// example:
+  /// The subtraction operator (`-`) calculates the difference of its two
+  /// arguments. For example:
   ///
   ///     let x = 7.5
-  ///     print(x.subtracting(2.25))
-  ///     // Prints "5.25"
-  ///     print(x - 2.25)
-  ///     // Prints "5.25"
-  ///
-  /// The `subtracting(_:)` method implements the subtraction operation
-  /// defined by the [IEEE 754 specification][spec].
-  ///
-  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - Parameter other: The value to subtract from this value.
-  /// - Returns: The difference of this value and `other`, rounded to a
-  ///   representable value.
-  ///
-  /// - SeeAlso: `subtract(_:)`
-  // FIXME(integers): revise the doc comment (it also mentiones 'addition')
-  static func -(_ lhs: Self, _ rhs: Self) -> Self
-
-  /// Subtracts the given value from this value in place, rounding to a
-  /// representable value.
-  ///
-  /// This method serves as the basis for the in-place subtraction operator
-  /// (`-=`). For example:
-  ///
-  ///     var (x, y) = (7.5, 7.5)
-  ///     x.subtract(2.25)
-  ///     // x == 5.25
-  ///     y -= 2.25
+  ///     let y = x - 2.25
   ///     // y == 5.25
   ///
-  /// - Parameter other: The value to subtract.
+  /// The `-` operator implements the subtraction operation defined by the
+  /// [IEEE 754 specification][spec].
   ///
-  /// - SeeAlso: `subtracting(_:)`
-  // FIXME(integers): revise the doc comment
+  /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  static func -(_ lhs: Self, _ rhs: Self) -> Self
+
+  /// Subtracts the second value from the first and stores the difference in
+  /// the left-hand-side variable, rounding to a representable value.
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
   static func -=(_ lhs: inout Self, _ rhs: Self)
 
-  /// Returns the product of this value and the given value, rounded to a
+  /// Multiplies two values and produces their product, rounding to a
   /// representable value.
   ///
-  /// This method serves as the basis for the multiplication operator (`*`).
-  /// For example:
+  /// The multiplication operator (`*`) calculates the product of its two
+  /// arguments. For example:
   ///
   ///     let x = 7.5
-  ///     print(x.multiplied(by: 2.25))
-  ///     // Prints "16.875"
-  ///     print(x * 2.25)
-  ///     // Prints "16.875"
+  ///     let y = x * 2.25
+  ///     // y == 16.875
   ///
-  /// The `multiplied(by:)` method implements the multiplication operation
-  /// defined by the [IEEE 754 specification][spec].
+  /// The `*` operator implements the multiplication operation defined by the
+  /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to multiply by this value.
-  /// - Returns: The product of this value and `other`, rounded to a
-  ///   representable value.
-  ///
-  /// - SeeAlso: `multiply(by:)`
-  // FIXME(integers): revise the doc comment
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
   static func *(_ lhs: Self, _ rhs: Self) -> Self
 
-  /// Multiplies this value by the given value in place, rounding to a
-  /// representable value.
+  /// Multiplies two values and stores the result in the left-hand-side
+  /// variable, rounding to a representable value.
   ///
-  /// This method serves as the basis for the in-place multiplication operator
-  /// (`*=`). For example:
-  ///
-  ///     var (x, y) = (7.5, 7.5)
-  ///     x.multiply(by: 2.25)
-  ///     // x == 16.875
-  ///     y *= 2.25
-  ///     // y == 16.875
-  ///
-  /// - Parameter other: The value to multiply by this value.
-  ///
-  /// - SeeAlso: `multiplied(by:)`
-  // FIXME(integers): revise the doc comment
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
   static func *=(_ lhs: inout Self, _ rhs: Self)
 
-  /// Returns the quotient of this value and the given value, rounded to a
-  /// representable value.
+  /// Returns the quotient of dividing the first value by the second, rounded
+  /// to a representable value.
   ///
-  /// This method serves as the basis for the division operator (`/`). For
-  /// example:
+  /// The division operator (`/`) calculates the quotient of the division if
+  /// `rhs` is nonzero. If `rhs` is zero, the result of the division is
+  /// infinity, with the sign of the result matching the sign of `lhs`.
   ///
-  ///     let x = 7.5
-  ///     let y = x.divided(by: 2.25)
-  ///     // y == 16.875
-  ///     let z = x * 2.25
-  ///     // z == 16.875
+  ///     let x = 16.875
+  ///     let y = x / 2.25
+  ///     // y == 7.5
   ///
-  /// The `divided(by:)` method implements the division operation
-  /// defined by the [IEEE 754 specification][spec].
+  ///     let z = x / 0
+  ///     // z.isInfinite == true
+  ///
+  /// The `/` operator implements the division operation defined by the [IEEE
+  /// 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
-  /// - Parameter other: The value to use when dividing this value.
-  /// - Returns: The quotient of this value and `other`, rounded to a
-  ///   representable value.
-  ///
-  /// - SeeAlso: `divide(by:)`
-  // FIXME(integers): revise the doc comment
+  /// - Parameters:
+  ///   - lhs: The value to divide.
+  ///   - rhs: The value to divide `lhs` by.
   static func /(_ lhs: Self, _ rhs: Self) -> Self
 
-  /// Divides this value by the given value in place, rounding to a
-  /// representable value.
+  /// Divides the first value by the second and stores the quotient in the
+  /// left-hand-side variable, rounding to a representable value.
   ///
-  /// This method serves as the basis for the in-place division operator
-  /// (`/=`). For example:
-  ///
-  ///     var (x, y) = (16.875, 16.875)
-  ///     x.divide(by: 2.25)
-  ///     // x == 7.5
-  ///     y /= 2.25
-  ///     // y == 7.5
-  ///
-  /// - Parameter other: The value to use when dividing this value.
-  ///
-  /// - SeeAlso: `divided(by:)`
-  // FIXME(integers): revise the doc comment
+  /// - Parameters:
+  ///   - lhs: The value to divide.
+  ///   - rhs: The value to divide `lhs` by.
   static func /=(_ lhs: inout Self, _ rhs: Self)
 
   /// Returns the remainder of this value divided by the given value.
@@ -1483,12 +1424,12 @@ public enum FloatingPointRoundingRule {
   case awayFromZero
 }
 
-@_transparent
-public func == <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
-  return lhs.isEqual(to: rhs)
-}
-
 extension FloatingPoint {
+  @_transparent
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.isEqual(to: rhs)
+  }
+
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)

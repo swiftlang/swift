@@ -204,8 +204,13 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (Tok.is(tok::kw_where))
     WhereClauseText << ',';
 
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
-                       diag::where_inside_brackets);
+  // For Swift 3, keep this warning. 
+  const auto Message = Context.isSwiftVersion3() 
+                             ? diag::swift3_where_inside_brackets 
+                             : diag::where_inside_brackets;
+
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
+
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
 
@@ -385,12 +390,7 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
     trailingWhere =
         TrailingWhereClause::create(Context, whereLoc, requirements);
   } else if (whereStatus.hasCodeCompletion()) {
-    // FIXME: this is completely (hah) cargo culted.
-    if (CodeCompletion && firstTypeInComplete) {
-      CodeCompletion->completeGenericParams(nullptr);
-    } else {
-      return makeParserCodeCompletionStatus();
-    }
+    return whereStatus;
   }
 
   return ParserStatus();

@@ -49,34 +49,32 @@ func mismatchedAppends<T, U, V>(readOnlyLeft: KeyPath<T, U>,
                                 readOnlyRight: KeyPath<U, V>,
                                 writableRight: WritableKeyPath<U, V>,
                                 referenceRight: ReferenceWritableKeyPath<U, V>){
-  /* TODO: These crash the compiler
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: readOnlyLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: writableLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: referenceLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = writableRight.appending(path: readOnlyLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = writableRight.appending(path: writableLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = writableRight.appending(path: referenceLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = referenceRight.appending(path: readOnlyLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = referenceRight.appending(path: writableLeft)
 
-  // e/xpected-error@+1{{}}
+  // expected-error@+1{{}}
   _ = referenceRight.appending(path: referenceLeft)
-  */
 }
 
 func partialAppends<T, U, V>(partial: PartialKeyPath<T>,

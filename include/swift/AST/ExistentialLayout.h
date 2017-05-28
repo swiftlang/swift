@@ -28,8 +28,7 @@ namespace swift {
 
 struct ExistentialLayout {
   ExistentialLayout() {
-    requiresClass = false;
-    requiresClassImplied = false;
+    hasExplicitAnyObject = false;
     containsNonObjCProtocol = false;
     singleProtocol = nullptr;
   }
@@ -40,13 +39,8 @@ struct ExistentialLayout {
   /// The superclass constraint, if any.
   Type superclass;
 
-  /// Whether the existential requires a class, either via an explicit
-  /// '& AnyObject' member or because of a superclass or protocol constraint.
-  bool requiresClass : 1;
-
-  /// Whether the class constraint was implied by another constraint and therefore
-  /// does not need to be stated explicitly.
-  bool requiresClassImplied : 1;
+  /// Whether the existential contains an explicit '& AnyObject' constraint.
+  bool hasExplicitAnyObject : 1;
 
   /// Whether any protocol members are non-@objc.
   bool containsNonObjCProtocol : 1;
@@ -55,8 +49,15 @@ struct ExistentialLayout {
 
   bool isObjC() const {
     // FIXME: Does the superclass have to be @objc?
-    return requiresClass && !containsNonObjCProtocol;
+    return ((superclass ||
+             hasExplicitAnyObject ||
+             getProtocols().size() > 0)
+            && !containsNonObjCProtocol);
   }
+
+  /// Whether the existential requires a class, either via an explicit
+  /// '& AnyObject' member or because of a superclass or protocol constraint.
+  bool requiresClass() const;
 
   // Does this existential contain the Error protocol?
   bool isExistentialWithError(ASTContext &ctx) const;

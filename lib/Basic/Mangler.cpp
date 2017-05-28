@@ -110,12 +110,16 @@ void Mangle::printManglingStats() {
 #endif
 }
 
-void Mangler::beginMangling() {
+void Mangler::beginManglingWithoutPrefix() {
   Storage.clear();
   Substitutions.clear();
   StringSubstitutions.clear();
   Words.clear();
   SubstMerging.clear();
+}
+
+void Mangler::beginMangling() {
+  beginManglingWithoutPrefix();
   Buffer << MANGLING_PREFIX_STR;
 }
 

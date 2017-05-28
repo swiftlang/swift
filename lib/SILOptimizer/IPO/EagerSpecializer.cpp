@@ -163,13 +163,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   SILBasicBlock *ErrorBB = F.createBasicBlock();
   SILBasicBlock *NormalBB = F.createBasicBlock();
 
-  Builder.createTryApply(Loc,
-                         FuncRef,
-                         SILType::getPrimitiveObjectType(CanSILFuncTy),
-                         Subs,
-                         CallArgs,
-                         NormalBB,
-                         ErrorBB);
+  Builder.createTryApply(Loc, FuncRef, Subs, CallArgs, NormalBB, ErrorBB);
 
   {
     // Emit the rethrow logic.
@@ -261,7 +255,6 @@ emitInvocation(SILBuilder &Builder,
   if (!CanSILFuncTy->hasErrorResult() ||
       CalleeFunc->findThrowBB() == CalleeFunc->end()) {
     return Builder.createApply(CalleeFunc->getLocation(), FuncRefInst,
-                               CalleeSILSubstFnTy, fnConv.getSILResultType(),
                                Subs, CallArgs, isNonThrowing);
   }
 
@@ -570,14 +563,8 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
   Builder.emitBlock(IsClassCheckBB);
 
   auto *FRI = Builder.createFunctionRef(Loc, IsClassF);
-  auto CanFnTy = IsClassF->getLoweredFunctionType()->substGenericArgs(
-      Builder.getModule(), {Sub});
-  auto SILFnTy = SILType::getPrimitiveObjectType(CanFnTy);
-  SILFunctionConventions fnConv(CanFnTy, Builder.getModule());
-  auto SILResultTy = fnConv.getSILResultType();
-  auto IsClassRuntimeCheck =
-      Builder.createApply(Loc, FRI, SILFnTy, SILResultTy, {Sub}, {GenericMT},
-                          /* isNonThrowing */ false);
+  auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, {Sub}, {GenericMT},
+                                                 /* isNonThrowing */ false);
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Ctx.getBoolDecl());
   auto Members = BoolStruct->lookupDirect(Ctx.Id_value_);

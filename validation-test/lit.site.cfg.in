@@ -65,6 +65,9 @@ else:
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
+if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
+    config.available_features.add('sourcekit')
+
 if "@SWIFT_STDLIB_ENABLE_RESILIENCE@" == "TRUE":
     config.available_features.add("resilient_stdlib")
 

@@ -49,7 +49,6 @@ lookupTypeWitness(const std::string &MangledTypeName,
         continue;
 
       std::string ProtocolMangledName(AssocTyDescriptor.ProtocolTypeName);
-      Demangle::Demangler Dem;
       auto DemangledProto = Dem.demangleType(ProtocolMangledName);
       auto TR = swift::remote::decodeMangledType(*this, DemangledProto);
 
@@ -73,28 +72,17 @@ lookupTypeWitness(const std::string &MangledTypeName,
 }
 
 const TypeRef * TypeRefBuilder::
-lookupSuperclass(const std::string &MangledTypeName) {
-  // Superclasses are recorded as a special associated type named 'super'
-  // on the 'AnyObject' protocol.
-  return lookupTypeWitness(MangledTypeName, "super",
-                           ProtocolTypeRef::create(*this, "s9AnyObject_p"));
-}
-
-const TypeRef * TypeRefBuilder::
 lookupSuperclass(const TypeRef *TR) {
-  const TypeRef *Superclass = nullptr;
-
-  if (auto *Nominal = dyn_cast<NominalTypeRef>(TR)) {
-    Superclass = lookupSuperclass(Nominal->getMangledName());
-  } else {
-    auto BG = cast<BoundGenericTypeRef>(TR);
-    Superclass = lookupSuperclass(BG->getMangledName());
-  }
-
-  if (Superclass == nullptr)
+  auto *FD = getFieldTypeInfo(TR);
+  if (FD == nullptr)
     return nullptr;
 
-  return Superclass->subst(*this, TR->getSubstMap());
+  auto Demangled = Dem.demangleType(FD->getSuperclass());
+  auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
+  if (!Unsubstituted)
+    return nullptr;
+
+  return Unsubstituted->subst(*this, TR->getSubstMap());
 }
 
 const FieldDescriptor *
@@ -124,15 +112,15 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
-std::vector<FieldTypeInfo>
-TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
+
+bool TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR,
+                                      const FieldDescriptor *FD,
+                                      std::vector<FieldTypeInfo> &Fields) {
   if (FD == nullptr)
-    return {};
+    return false;
 
   auto Subs = TR->getSubstMap();
 
-  Demangle::Demangler Dem;
-  std::vector<FieldTypeInfo> Fields;
   for (auto &Field : *FD) {
     auto FieldName = Field.getFieldName();
 
@@ -145,7 +133,7 @@ TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
     auto Demangled = Dem.demangleType(Field.getMangledTypeName());
     auto Unsubstituted = swift::remote::decodeMangledType(*this, Demangled);
     if (!Unsubstituted)
-      return {};
+      return false;
 
     auto Substituted = Unsubstituted->subst(*this, Subs);
 
@@ -156,7 +144,7 @@ TypeRefBuilder::getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD) {
 
     Fields.push_back(FieldTypeInfo::forField(FieldName, Substituted));
   }
-  return Fields;
+  return true;
 }
 
 const BuiltinTypeDescriptor *
@@ -208,7 +196,6 @@ ClosureContextInfo
 TypeRefBuilder::getClosureContextInfo(const CaptureDescriptor &CD) {
   ClosureContextInfo Info;
 
-  Demangle::Demangler Dem;
   for (auto i = CD.capture_begin(), e = CD.capture_end(); i != e; ++i) {
     const TypeRef *TR = nullptr;
     if (i->hasMangledTypeName()) {
@@ -251,7 +238,6 @@ TypeRefBuilder::dumpTypeRef(const std::string &MangledName,
   auto TypeName = Demangle::demangleTypeAsString(MangledName);
   OS << TypeName << '\n';
 
-  Demangle::Demangler Dem;
   auto DemangleTree = Dem.demangleType(MangledName);
   auto TR = swift::remote::decodeMangledType(*this, DemangleTree);
   if (!TR) {

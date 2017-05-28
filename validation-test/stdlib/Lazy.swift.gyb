@@ -12,12 +12,10 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// Disabled for now
-// REQUIRES: rdar://problem/31780356
+// REQUIRES: radar_31897334
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-
 
 % from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 

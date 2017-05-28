@@ -77,13 +77,31 @@ struct FixitFilter {
       return false;
     }
 
+    // With SE-110, the migrator may get a recommendation to add a Void
+    // placeholder in the call to f in:
+    // func foo(f: (Void) -> ()) {
+    //   f()
+    // }
+    // Here, f was () -> () in Swift 3 but now (()) -> () in Swift 4. Adding a
+    // type placeholder in the f() call isn't helpful for migration, although
+    // this particular fix-it should be to fix the f parameter's type.
+    if (Info.ID == diag::missing_argument_named.ID ||
+        Info.ID == diag::missing_argument_positional.ID) {
+      return false;
+    }
+
+    // Trying to add '_ in' to a closure signature can be counterproductive when
+    // fixing function signatures like (Void) -> () to () -> ().
+    if (Info.ID == diag::closure_argument_list_missing.ID) {
+      return false;
+    }
+
     if (Kind == DiagnosticKind::Error)
       return true;
 
     // Fixits from warnings/notes that should be applied.
     if (Info.ID == diag::forced_downcast_coercion.ID ||
         Info.ID == diag::forced_downcast_noop.ID ||
-        Info.ID == diag::variable_never_mutated.ID ||
         Info.ID == diag::function_type_no_parens.ID ||
         Info.ID == diag::convert_let_to_var.ID ||
         Info.ID == diag::parameter_extraneous_double_up.ID ||
@@ -102,7 +120,15 @@ struct FixitFilter {
         Info.ID == diag::deprecated_any_composition.ID ||
         Info.ID == diag::deprecated_operator_body.ID ||
         Info.ID == diag::unbound_generic_parameter_explicit_fix.ID ||
-        Info.ID == diag::objc_inference_swift3_addobjc.ID)
+        Info.ID == diag::objc_inference_swift3_addobjc.ID ||
+        Info.ID == diag::objc_inference_swift3_dynamic.ID ||
+        Info.ID == diag::override_swift3_objc_inference.ID ||
+        Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
+        Info.ID == diag::missing_several_cases.ID ||
+        Info.ID == diag::missing_particular_case.ID ||
+        Info.ID == diag::paren_void_probably_void.ID ||
+        Info.ID == diag::make_decl_objc.ID ||
+        Info.ID == diag::optional_req_nonobjc_near_match_add_objc.ID)
       return true;
 
     return false;

@@ -242,3 +242,16 @@ typealias C1Alias = C1
 // CHECK: [[@LINE+2]]:15 | class/Swift | C1 | [[C1_USR]] | Ref,Impl,RelBase | rel: 1
 // CHECK-NEXT: RelBase | class/Swift | SubC1 | [[SubC1_USR]]
 class SubC1 : C1Alias {}
+
+struct ImplCtors {
+// CHECK: [[@LINE-1]]:8 | struct/Swift | ImplCtors | [[ImplCtors_USR:.*]] | Def | rel: 0
+  // CHECK: [[@LINE-2]]:8 | constructor/Swift | init(x:) | [[ImplCtors_init_with_param_USR:.*]] | Def,Impl,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | struct/Swift | ImplCtors | [[ImplCtors_USR]]
+  // CHECK: [[@LINE-4]]:8 | constructor/Swift | init() | [[ImplCtors_init_USR:.*]] | Def,Impl,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | struct/Swift | ImplCtors | [[ImplCtors_USR]]
+  var x = 0
+}
+_ = ImplCtors()
+// CHECK: [[@LINE-1]]:5 | constructor/Swift | init() | [[ImplCtors_init_USR]] | Ref,Call | rel: 0
+_ = ImplCtors(x:0)
+// CHECK: [[@LINE-1]]:5 | constructor/Swift | init(x:) | [[ImplCtors_init_with_param_USR]] | Ref,Call | rel: 0

@@ -794,6 +794,8 @@ Globals
 
   global ::= type 'Wy' // Outlined Copy Function Type
   global ::= type 'We' // Outlined Consume Function Type
+  global ::= type 'Wr' // Outlined Retain Function Type
+  global ::= type 'Ws' // Outlined Release Function Type
 
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect
@@ -824,7 +826,8 @@ types where the metadata itself has unknown layout.)
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
-  global ::= global 'T_' specialization  // reset substitutions before demangling specialization
+  global ::= global specialization       // function specialization
+  global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
 
@@ -1101,6 +1104,7 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
+  PARAM-CONVENTION ::= 'c'                   // indirect in constant
   PARAM-CONVENTION ::= 'l'                   // indirect inout
   PARAM-CONVENTION ::= 'b'                   // indirect inout aliasable
   PARAM-CONVENTION ::= 'n'                   // indirect in guaranteed

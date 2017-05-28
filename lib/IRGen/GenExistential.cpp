@@ -1418,7 +1418,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
 
   // If the existential is class, lower it to a class
   // existential representation.
-  if (layout.requiresClass) {
+  if (layout.requiresClass()) {
     // If we're not using the Objective-C runtime, we can use the
     // native reference counting entry points.
     ReferenceCounting refcounting = getReferenceCountingForType(IGM, T);

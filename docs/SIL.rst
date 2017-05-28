@@ -479,6 +479,9 @@ number of ways:
     initialized object; both the caller and callee promise not to mutate the
     pointee, allowing the callee to read it.
 
+  - An ``@in_constant`` parameter is indirect.  The address must be of an
+    initialized object; the function will treat the value held there as read-only.
+
   - Otherwise, the parameter is an unowned direct parameter.
 
 - A SIL function type declares the conventions for its results.
@@ -2453,7 +2456,7 @@ index_raw_pointer
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of a builtin integer type
-  // %2 will be of type $*T
+  // %2 will be of type $Builtin.RawPointer
 
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
@@ -3296,6 +3299,18 @@ For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
+retain_value_addr
+`````````````````
+
+::
+
+  sil-instruction ::= 'retain_value_addr' sil-operand
+
+  retain_value_addr %0 : $*A
+
+Retains a loadable value inside given address,
+which simply retains any references it holds.
+
 unmanaged_retain_value
 ``````````````````````
 
@@ -3361,6 +3376,18 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+release_value_addr
+``````````````````
+
+::
+
+  sil-instruction ::= 'release_value_addr' sil-operand
+
+  release_value_addr %0 : $*A
+
+Destroys a loadable value inside given address,
+by releasing any retainable pointers within it.
 
 unmanaged_release_value
 ```````````````````````

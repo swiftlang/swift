@@ -15,6 +15,7 @@
 // RUN: %line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
 // RUN: %target-run %t/a.out 2>&1 | %line-directive %t/NewArray.swift -- %FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
+// XFAIL: *
 
 import StdlibUnittest
 import StdlibCollectionUnittest

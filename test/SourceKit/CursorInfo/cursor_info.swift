@@ -214,6 +214,7 @@ struct HasLocalizationKey {}
 /// - LocalizationKey: ABC
 func hasLocalizationKey2() {}
 
+// REQUIRES: objc_interop
 // RUN: rm -rf %t.tmp
 // RUN: mkdir -p %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift

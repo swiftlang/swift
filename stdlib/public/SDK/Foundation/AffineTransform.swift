@@ -170,11 +170,8 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
         
         let sine = CGFloat(sin(α))
         let cosine = CGFloat(cos(α))
-
-        m11 = cosine
-        m12 = sine
-        m21 = -sine
-        m22 = cosine
+        
+        append(AffineTransform(m11: cosine, m12: sine, m21: -sine, m22: cosine, tX: 0, tY: 0))
     }
     
     /**
@@ -273,13 +270,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
     }
     
     public var hashValue : Int {
-        // FIXME(integers): the expression was broken into pieces to speed up
-        // compilation.
-        // Used to be just: return Int(m11 + m12 + m21 + m22 + tX + tY)
-        let a: CGFloat = m11 + m12
-        let b: CGFloat = m21 + m22
-        let c: CGFloat = tX + tY
-        return Int(a + b + c)
+        return Int(m11 + m12 + m21 + m22 + tX + tY)
     }
     
     public var description: String {
@@ -320,9 +311,8 @@ extension AffineTransform : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ x: NSAffineTransform?) -> AffineTransform {
-        var result: AffineTransform?
-        _forceBridgeFromObjectiveC(x!, result: &result)
-        return result!
+        guard let src = x else { return AffineTransform.identity }
+        return AffineTransform(reference: src)
     }
 }
 
@@ -331,6 +321,28 @@ extension NSAffineTransform : _HasCustomAnyHashableRepresentation {
     @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(self as AffineTransform)
+    }
+}
+
+extension AffineTransform : Codable {
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        m11 = try container.decode(CGFloat.self)
+        m12 = try container.decode(CGFloat.self)
+        m21 = try container.decode(CGFloat.self)
+        m22 = try container.decode(CGFloat.self)
+        tX  = try container.decode(CGFloat.self)
+        tY  = try container.decode(CGFloat.self)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        try container.encode(self.m11)
+        try container.encode(self.m12)
+        try container.encode(self.m21)
+        try container.encode(self.m22)
+        try container.encode(self.tX)
+        try container.encode(self.tY)
     }
 }
 

@@ -140,6 +140,8 @@ func testSwitch() {
   // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
   case (3, let y):
     x += 1
+  default:
+    ()
   }
 }
 

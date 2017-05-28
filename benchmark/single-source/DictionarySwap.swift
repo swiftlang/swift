@@ -23,8 +23,7 @@ public func run_DictionarySwap(_ N: Int) {
     for i in 1...size {
         dict[i] = i
     }
-    CheckResults(dict.count == size,
-                 "Incorrect dict count: \(dict.count) != \(size).")
+    CheckResults(dict.count == size)
 
     var swapped = false
     for _ in 1...10000*N {
@@ -35,8 +34,7 @@ public func run_DictionarySwap(_ N: Int) {
         }
     }
 
-    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!),
-                 "Dictionary value swap failed")
+    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
 }
 
 // Return true if correctly swapped, false otherwise
@@ -70,8 +68,7 @@ public func run_DictionarySwapOfObjects(_ N: Int) {
     for i in 1...size {
         dict[Box(i)] = Box(i)
     }
-    CheckResults(dict.count == size,
-                 "Incorrect dict count: \(dict.count) != \(size).")
+    CheckResults(dict.count == size)
 
     var swapped = false
     for _ in 1...10000*N {
@@ -82,6 +79,5 @@ public func run_DictionarySwapOfObjects(_ N: Int) {
         }
     }
 
-    CheckResults(swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value),
-                 "Dictionary value swap failed")
+    CheckResults(swappedCorrectly(swapped, dict[Box(25)]!.value, dict[Box(75)]!.value))
 }

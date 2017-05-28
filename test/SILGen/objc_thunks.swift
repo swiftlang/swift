@@ -445,9 +445,9 @@ extension Hoozit {
 // Calling objc methods of subclass should go through native entry points
 func useHoozit(_ h: Hoozit) {
 // sil @_T011objc_thunks9useHoozityAA0D0C1h_tF
-  // In the class decl, gets dynamically dispatched
+  // In the class decl, overrides importd method, 'dynamic' was inferred
   h.fork()
-  // CHECK: class_method {{%.*}} : {{.*}}, #Hoozit.fork!1 :
+  // CHECK: class_method [volatile] {{%.*}} : {{.*}}, #Hoozit.fork!1.foreign
 
   // In an extension, 'dynamic' was inferred.
   h.foof()

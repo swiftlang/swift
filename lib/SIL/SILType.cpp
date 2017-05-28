@@ -159,7 +159,7 @@ static bool canUnsafeCastTuple(SILType fromType, CanTupleType fromTupleTy,
     return true;
   }
   // Otherwise, flatten one level of tuple elements on each side.
-  CanTupleType toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
+  auto toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
   if (!toTupleTy)
     return false;
 
@@ -185,7 +185,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   if (EnumDecl *toEnum = toType.getEnumOrBoundGenericEnum()) {
     for (auto toElement : toEnum->getAllElements()) {
       ++numToElements;
-      if (!toElement->getArgumentInterfaceType())
+      if (!toElement->hasAssociatedValues())
         continue;
       // Bail on multiple payloads.
       if (!toElementTy.isNull())
@@ -209,7 +209,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   // If any of the fromElements can be cast by value to the singleton toElement,
   // then the overall enum can be cast by value.
   for (auto fromElement : fromElements) {
-    if (!fromElement->getArgumentInterfaceType())
+    if (!fromElement->hasAssociatedValues())
       continue;
 
     auto fromElementTy = fromType.getEnumElementType(fromElement, M);
@@ -317,7 +317,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
-  assert(elt->getArgumentInterfaceType());
+  assert(elt->hasAssociatedValues());
 
   if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
@@ -413,7 +413,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     // Then if we have an enum...
     if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
       for (auto Elt : E->getAllElements())
-        if (Elt->getArgumentInterfaceType())
+        if (Elt->hasAssociatedValues())
           Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
       continue;
     }
@@ -506,7 +506,7 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
 
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
-  if (layout.requiresClass)
+  if (layout.requiresClass())
     return ExistentialRepresentation::Class;
   
   // Otherwise, we need to use a fixed-sized buffer.
@@ -539,7 +539,7 @@ SILType::canUseExistentialRepresentation(SILModule &M,
     
     // A class-constrained composition uses ClassReference representation;
     // otherwise, we use a fixed-sized buffer.
-    if (layout.requiresClass)
+    if (layout.requiresClass())
       return repr == ExistentialRepresentation::Class;
 
     return repr == ExistentialRepresentation::Opaque;

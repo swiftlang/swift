@@ -190,8 +190,11 @@ public:
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
     if (isa<PartialApplyInst>(getClosure()))
-      return B.createPartialApply(getClosure()->getLoc(), V, V->getType(), {},
-                                  Args, getClosure()->getType());
+      return B.createPartialApply(getClosure()->getLoc(), V, {}, Args,
+                                  getClosure()
+                                      ->getType()
+                                      .getAs<SILFunctionType>()
+                                      ->getCalleeConvention());
 
     assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
@@ -348,15 +351,11 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     }
   }
 
-  SILType LoweredType = NewF->getLoweredType();
-  auto loweredConv = NewF->getConventions();
-  SILType ResultType = loweredConv.getSILResultType();
   Builder.setInsertionPoint(AI.getInstruction());
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
-    NewAI = Builder.createTryApply(AI.getLoc(), FRI, LoweredType,
-                                   SubstitutionList(),
-                                   NewArgs,
+    NewAI = Builder.createTryApply(AI.getLoc(), FRI,
+                                   SubstitutionList(), NewArgs,
                                    TAI->getNormalBB(), TAI->getErrorBB());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
@@ -369,8 +368,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
       Builder.setInsertionPoint(AI.getInstruction());
     }
   } else {
-    NewAI = Builder.createApply(AI.getLoc(), FRI, LoweredType,
-                                ResultType, SubstitutionList(),
+    NewAI = Builder.createApply(AI.getLoc(), FRI,
+                                SubstitutionList(),
                                 NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned

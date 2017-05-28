@@ -29,19 +29,10 @@
 using namespace swift;
 
 namespace {
-/// This visits each attribute on a decl early, before the majority of type
-/// checking has been performed for the decl.  The visitor should return true if
-/// the attribute is invalid and should be marked as such.
-class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
-  TypeChecker &TC;
-  Decl *D;
-
-public:
-  AttributeEarlyChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
-
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
-  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
+  void diagnoseAndRemoveAttr(TypeChecker &TC, Decl *D, DeclAttribute *attr,
+                             ArgTypes &&...Args) {
     assert(!D->hasClangNode() && "Clang imported propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
@@ -56,6 +47,22 @@ public:
     }
 
     attr->setInvalid();
+  }
+
+/// This visits each attribute on a decl early, before the majority of type
+/// checking has been performed for the decl.  The visitor should return true if
+/// the attribute is invalid and should be marked as such.
+class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
+  TypeChecker &TC;
+  Decl *D;
+
+public:
+  AttributeEarlyChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
+
+  /// This emits a diagnostic with a fixit to remove the attribute.
+  template<typename ...ArgTypes>
+  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
+    ::diagnoseAndRemoveAttr(TC, D, attr, std::forward<ArgTypes>(Args)...);
   }
 
   /// Deleting this ensures that all attributes are covered by the visitor
@@ -97,6 +104,9 @@ public:
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
   IGNORED_ATTR(Implements)
+  IGNORED_ATTR(NSKeyedArchiverClassName)
+  IGNORED_ATTR(StaticInitializeObjCMetadata)
+  IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -719,6 +729,12 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
   Decl *D;
 
+  /// This emits a diagnostic with a fixit to remove the attribute.
+  template<typename ...ArgTypes>
+  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
+    ::diagnoseAndRemoveAttr(TC, D, attr, std::forward<ArgTypes>(Args)...);
+  }
+
 public:
   AttributeChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
 
@@ -766,6 +782,8 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(ObjCMembers)
+    IGNORED_ATTR(StaticInitializeObjCMetadata)
+    IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -807,6 +825,7 @@ public:
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+  void visitNSKeyedArchiverClassNameAttr(NSKeyedArchiverClassNameAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1801,8 +1820,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
-  Builder.finalize(attr->getLocation(), genericSig->getGenericParams(),
-                   /*allowConcreteGenericParams=*/true);
+  (void)Builder.computeGenericSignature(attr->getLocation(),
+                                        /*allowConcreteGenericParams=*/true);
 }
 
 static Accessibility getAccessForDiagnostics(const ValueDecl *D) {
@@ -1937,6 +1956,18 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     TC.diagnose(attr->getLocation(),
                 diag::implements_attr_non_protocol_type)
       .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
+  }
+}
+
+void AttributeChecker::visitNSKeyedArchiverClassNameAttr(
+                                              NSKeyedArchiverClassNameAttr *attr) {
+  auto classDecl = dyn_cast<ClassDecl>(D);
+  if (!classDecl) return;
+
+  // Generic classes can't use @NSKeyedArchiverClassName.
+  if (classDecl->getGenericSignatureOfContext()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_NSKeyedArchiverClassName_generic,
+                          classDecl->getDeclaredInterfaceType());
   }
 }
 

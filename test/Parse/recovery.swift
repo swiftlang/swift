@@ -297,7 +297,7 @@ _ = foobar // OK.
 //===--- Recovery for parse errors in types.
 
 struct ErrorTypeInVarDecl1 {
-  var v1 : // expected-error {{expected type}}
+  var v1 : // expected-error {{expected type}} {{11-11= <#type#>}}
 }
 
 struct ErrorTypeInVarDecl2 {
@@ -311,7 +311,7 @@ struct ErrorTypeInVarDecl3 {
 }
 
 struct ErrorTypeInVarDecl4 {
-  var v1 : Int<, // expected-error {{expected type}}
+  var v1 : Int<, // expected-error {{expected type}} {{16-16= <#type#>}}
   var v2 : Int
 }
 

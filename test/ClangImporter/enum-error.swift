@@ -83,8 +83,8 @@ func testError() {
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
 
   switch (terr) { case .TENone, .TEOne: break }
-  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive, consider adding missing cases
-
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
   let _ = TestError.Code(rawValue: 2)!
 
   do {

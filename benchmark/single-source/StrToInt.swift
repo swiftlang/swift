@@ -43,5 +43,5 @@ public func run_StrToInt(_ N: Int) {
   for _ in 1...1000*N {
     res = res & DoOneIter(input)
   }
-  CheckResults(res == ref_result, "IncorrectResults in StrToInt: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }

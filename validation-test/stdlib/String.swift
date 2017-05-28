@@ -314,13 +314,6 @@ StringTests.test("ForeignIndexes/removeSubrange/OutOfBoundsTrap/2") {
   acceptor.removeSubrange(r)
 }
 
-StringTests.test("_splitFirst") {
-  var (before, after, found) = "foo.bar"._splitFirst(separator: ".")
-  expectTrue(found)
-  expectEqual("foo", before)
-  expectEqual("bar", after)
-}
-
 StringTests.test("hasPrefix")
   .skip(.nativeRuntime("String.hasPrefix undefined without _runtime(_ObjC)"))
   .code {

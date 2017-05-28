@@ -290,7 +290,7 @@ func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_BB]]:
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArguments9AnyObject_pSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgumentyXlSg_q_tSayxGs01_E0R_r0_lF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -329,7 +329,7 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   br [[SOME_NONE_BB2:bb[0-9]+]]
   // CHECK: [[SOME_SOME_BB]]:
   // CHECK:   [[SOME_SOME_VALUE:%.*]] = unchecked_enum_data [[SOME_VALUE]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArguments9AnyObject_pSg_q_tSayxGs01_E0R_r0_lF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s35_convertConstArrayToPointerArgumentyXlSg_q_tSayxGs01_E0R_r0_lF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -369,7 +369,7 @@ func optStringToOptPointer(string: String?) {
   // CHECK:   cond_br [[T0]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_BB]]:
   // CHECK:   [[SOME_VALUE:%.*]] = unchecked_enum_data [[COPY]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArguments9AnyObject_pSg_xtSSs01_F0RzlF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgumentyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
@@ -409,7 +409,7 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   br [[SOME_NONE_BB2:bb[0-9]+]]
   // CHECK: [[SOME_SOME_BB]]:
   // CHECK:   [[SOME_SOME_VALUE:%.*]] = unchecked_enum_data [[SOME_VALUE]]
-  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArguments9AnyObject_pSg_xtSSs01_F0RzlF
+  // CHECK:   [[CONVERT:%.*]] = function_ref @_T0s40_convertConstStringToUTF8PointerArgumentyXlSg_xtSSs01_F0RzlF
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
   // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]

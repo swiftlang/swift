@@ -101,7 +101,7 @@ public:
     assert(!module_name.empty());
     static ConstString g_ObjectiveCModule(MANGLING_MODULE_OBJC);
     static ConstString g_BuiltinModule("Builtin");
-    static ConstString g_CModule(MANGLING_MODULE_CLANG_IMPORTER);
+    static ConstString g_CModule(MANGLING_MODULE_C);
     if (allow_crawler) {
       if (module_name == g_ObjectiveCModule || module_name == g_CModule)
         return DeclsLookupSource(&ast, module_name);
@@ -669,7 +669,7 @@ static TypeBase *FixCallingConv(Decl *in_decl, TypeBase *in_type) {
   if (!in_decl)
     return in_type;
 
-  AnyFunctionType *func_type = dyn_cast<AnyFunctionType>(in_type);
+  auto *func_type = dyn_cast<AnyFunctionType>(in_type);
   if (func_type) {
     DeclContext *decl_context = in_decl->getDeclContext();
     if (decl_context && decl_context->isTypeContext()) {

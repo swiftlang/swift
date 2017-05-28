@@ -86,7 +86,7 @@ repositories and will update them instead.
 
 **Via SSH**  For those who plan on regularly making direct commits,
 cloning over SSH may provide a better experience (which requires
-uploading SSH keys to GitHub):
+[uploading SSH keys to GitHub](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/)):
 
     git clone git@github.com:apple/swift.git
     ./swift/utils/update-checkout --clone-with-ssh

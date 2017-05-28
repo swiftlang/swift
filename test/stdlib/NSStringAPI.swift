@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift -swift-version 3
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

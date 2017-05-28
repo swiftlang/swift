@@ -428,6 +428,20 @@ public:
     // count, then this is a call to the opaque value returned from
     // the function.
     if (args.size() != fnRef.getNumArgumentsForFullApply()) {
+      // Special case: a reference to an operator within a type might be
+      // missing 'self'.
+      // FIXME: The issue here is that this is an ill-formed expression, but
+      // we don't know it from the structure of the expression.
+      if (args.size() == 1 && fnRef.getKind() == AbstractFunction::Function &&
+          isa<FuncDecl>(fnRef.getFunction()) &&
+          cast<FuncDecl>(fnRef.getFunction())->isOperator() &&
+          fnRef.getNumArgumentsForFullApply() == 2 &&
+          fnRef.getFunction()->getDeclContext()->isTypeContext()) {
+        // Can only happen with invalid code.
+        assert(fnRef.getFunction()->getASTContext().Diags.hadAnyError());
+        return Classification::forInvalidCode();
+      }
+
       assert(args.size() > fnRef.getNumArgumentsForFullApply() &&
              "partial application was throwing?");
       return Classification::forThrow(PotentialReason::forThrowingApply());

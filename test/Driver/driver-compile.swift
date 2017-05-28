@@ -111,9 +111,8 @@
 // FILELIST: -output-filelist {{[^-]}}
 
 // UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift
-// UPDATE-CODE: -frontend
-// UPDATE-CODE: -update-code
-// UPDATE-CODE: -o {{.+}}.remap
+// UPDATE-CODE: -frontend -c
+// UPDATE-CODE: -emit-remap-file-path {{.+}}.remap
 
 // NO-REFERENCE-DEPENDENCIES: bin/swift
 // NO-REFERENCE-DEPENDENCIES-NOT: -emit-reference-dependencies

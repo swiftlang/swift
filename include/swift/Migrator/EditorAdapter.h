@@ -105,8 +105,10 @@ public:
                        bool AfterToken = false,
                        bool BeforePreviousInsertions = false);
   bool insertWrap(StringRef before, SourceRange TokenRange, StringRef after);
+  bool remove(SourceLoc TokenLoc);
   bool remove(SourceRange TokenRange);
   bool replace(SourceRange TokenRange, StringRef Text);
+  bool replaceToken(SourceLoc TokenLoc, StringRef Text);
   bool replaceWithInner(SourceRange TokenRange, SourceRange TokenInnerRange);
 
   /// Return the batched edits encountered so far.

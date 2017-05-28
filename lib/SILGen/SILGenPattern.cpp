@@ -1767,7 +1767,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 
     SILType eltTy;
     bool hasElt = false;
-    if (elt->getArgumentInterfaceType()) {
+    if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
       hasElt = !eltTy.getSwiftRValueType()->isVoid();
     }
@@ -2025,7 +2025,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
     SILType eltTy;
     bool hasElt = false;
-    if (elt->getArgumentInterfaceType()) {
+    if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
       hasElt = !eltTy.getSwiftRValueType()->isVoid();
     }

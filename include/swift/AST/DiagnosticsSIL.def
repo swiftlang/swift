@@ -84,17 +84,27 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
-// This is temporarily a warning during staging to make it easier to evaluate.
-// The intent is to change it to an error before turning it on by default.
-WARNING(exclusivity_access_required,none,
-        "simultaneous accesses to %0 %1; "
+WARNING(exclusivity_access_required_swift3,none,
+        "simultaneous accesses to %0 %1, but "
         "%select{initialization|read|modification|deinitialization}2 requires "
-        "exclusive access", (DescriptiveDeclKind, Identifier, unsigned))
+        "exclusive access; consider copying to a local variable",
+        (DescriptiveDeclKind, Identifier, unsigned))
 
-WARNING(exclusivity_access_required_unknown_decl,none,
-        "simultaneous accesses; "
+ERROR(exclusivity_access_required,none,
+      "simultaneous accesses to %0 %1, but "
+      "%select{initialization|read|modification|deinitialization}2 requires "
+      "exclusive access; consider copying to a local variable",
+      (DescriptiveDeclKind, Identifier, unsigned))
+
+ERROR(exclusivity_access_required_unknown_decl,none,
+        "simultaneous accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
-        "exclusive access", (unsigned))
+        "exclusive access; consider copying to a local variable", (unsigned))
+
+WARNING(exclusivity_access_required_unknown_decl_swift3,none,
+        "simultaneous accesses, but "
+        "%select{initialization|read|modification|deinitialization}0 requires "
+"exclusive access; consider copying to a local variable", (unsigned))
 
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())

@@ -729,18 +729,19 @@ class TestData : TestDataSuper {
         object.verifier.reset()
         var data = object as Data
         expectTrue(object.verifier.wasCopied)
-        expectFalse(object.verifier.wasMutableCopied)
+        expectFalse(object.verifier.wasMutableCopied, "Expected an invocation to mutableCopy")
 
         object.verifier.reset()
         expectTrue(data.count == object.length)
-        expectFalse(object.verifier.wasCopied)
+        expectFalse(object.verifier.wasCopied, "Expected an invocation to copy")
 
         object.verifier.reset()
         data.append("test", count: 4)
-        expectTrue(object.verifier.wasMutableCopied)
+        expectTrue(object.verifier.wasMutableCopied, "Expected an invocation to mutableCopy")
 
-        let preservedObjectness = (data as NSData) is MutableDataVerifier
-        expectTrue(preservedObjectness)
+        let d = data as NSData
+        let preservedObjectness = d is ImmutableDataVerifier
+        expectTrue(preservedObjectness, "Expected ImmutableDataVerifier but got \(object_getClass(d))")
     }
 
     func test_basicMutableDataMutation() {
@@ -749,18 +750,20 @@ class TestData : TestDataSuper {
         object.verifier.reset()
         var data = object as Data
         expectTrue(object.verifier.wasCopied)
-        expectFalse(object.verifier.wasMutableCopied)
+        expectFalse(object.verifier.wasMutableCopied, "Expected an invocation to mutableCopy")
         
         object.verifier.reset()
         expectTrue(data.count == object.length)
-        expectFalse(object.verifier.wasCopied)
+        expectFalse(object.verifier.wasCopied, "Expected an invocation to copy")
         
         object.verifier.reset()
         data.append("test", count: 4)
-        expectTrue(object.verifier.wasMutableCopied)
-        
-        let preservedObjectness = (data as NSData) is MutableDataVerifier
-        expectTrue(preservedObjectness)
+        expectTrue(object.verifier.wasMutableCopied, "Expected an invocation to mutableCopy")
+        object.verifier.dump()
+
+        let d = data as NSData
+        let preservedObjectness = d is ImmutableDataVerifier
+        expectTrue(preservedObjectness, "Expected ImmutableDataVerifier but got \(object_getClass(d))")
     }
 
     func test_roundTrip() {
@@ -1004,6 +1007,71 @@ class TestData : TestDataSuper {
         expectEqual(found[0], 2)
         expectEqual(found[1], 3)
     }
+  
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(Data(), Data._unconditionallyBridgeFromObjectiveC(nil))
+    }
+
+    func test_sliceIndexing() {
+        let d = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+        let slice = d[5..<10]
+        expectEqual(slice[5], d[5])
+    }
+    
+    func test_sliceEquality() {
+        let d = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+        let slice = d[5..<7]
+        let expected = Data(bytes: [5, 6])
+        expectEqual(expected, slice)
+    }
+    
+    func test_sliceEquality2() {
+        let d = Data(bytes: [5, 6, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+        let slice1 = d[0..<2]
+        let slice2 = d[5..<7]
+        expectEqual(slice1, slice2)
+    }
+    
+    func test_splittingHttp() {
+        func split(_ data: Data, on delimiter: String) -> [Data] {
+            let dataDelimeter = delimiter.data(using: .utf8)!
+            var found = [Data]()
+            let start = data.startIndex
+            let end = data.endIndex.advanced(by: -dataDelimeter.count)
+            guard end >= start else { return [data] }
+            var index = start
+            var previousIndex = index
+            while index < end {
+                let slice = data[index..<index.advanced(by: dataDelimeter.count)]
+                
+                if slice == dataDelimeter {
+                    found.append(data[previousIndex..<index])
+                    previousIndex = index + dataDelimeter.count
+                }
+                
+                index = index.advanced(by: 1)
+            }
+            if index < data.endIndex { found.append(data[index..<index]) }
+            return found
+        }
+        let data = "GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n".data(using: .ascii)!
+        let fields = split(data, on: "\r\n")
+        let splitFields = fields.map { String(data:$0, encoding: .utf8)! }
+        expectEqual([
+            "GET /index.html HTTP/1.1",
+            "Host: www.example.com",
+            ""
+        ], splitFields)
+    }
+
+    func test_map() {
+        let d1 = Data(bytes: [81, 0, 0, 0, 14])
+        let d2 = d1[1...4]
+        expectEqual(4, d2.count)
+        let expected: [UInt8] = [0, 0, 0, 14]
+        let actual = d2.map { $0 }
+        expectEqual(expected, actual)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1054,6 +1122,12 @@ DataTests.test("test_sliceAppending") { TestData().test_sliceAppending() }
 DataTests.test("test_replaceSubrange") { TestData().test_replaceSubrange() }
 DataTests.test("test_sliceWithUnsafeBytes") { TestData().test_sliceWithUnsafeBytes() }
 DataTests.test("test_sliceIteration") { TestData().test_sliceIteration() }
+DataTests.test("test_unconditionallyBridgeFromObjectiveC") { TestData().test_unconditionallyBridgeFromObjectiveC() }
+DataTests.test("test_sliceIndexing") { TestData().test_sliceIndexing() }
+DataTests.test("test_sliceEquality") { TestData().test_sliceEquality() }
+DataTests.test("test_sliceEquality2") { TestData().test_sliceEquality2() }
+DataTests.test("test_splittingHttp") { TestData().test_splittingHttp() }
+DataTests.test("test_map") { TestData().test_map() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

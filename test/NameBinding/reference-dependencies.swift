@@ -111,7 +111,7 @@ extension ExpressibleByArrayLiteral {
 }
 
 // CHECK-DAG: OtherFileElementType
-extension ExpressibleByArrayLiteral where Element == OtherFileElementType {
+extension ExpressibleByArrayLiteral where ArrayLiteralElement == OtherFileElementType {
   func useless2() {}
 }
 
@@ -215,6 +215,8 @@ func lookUpManyTopLevelNames() {
   switch getOtherFileEnum() {
   case .Value:
     break
+  default:
+    break
   }
 
   _ = .Value as OtherFileEnumWrapper.Enum
@@ -231,11 +233,15 @@ func lookUpManyTopLevelNames() {
   switch value {
   case is OtherFileEnumWrapper.Enum:
     break
+  default:
+    break
   }
 
   // CHECK-DAG: !private "~="
   switch 42 {
   case 50:
+    break
+  default:
     break
   }
   

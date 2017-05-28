@@ -278,8 +278,10 @@ private:
     case Node::Kind::ProtocolList:
       return Node->getChild(0)->getNumChildren() <= 1;
 
-    case Node::Kind::ProtocolListWithClass:
     case Node::Kind::ProtocolListWithAnyObject:
+      return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
+
+    case Node::Kind::ProtocolListWithClass:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedTypeMetadataAccessor:
@@ -345,6 +347,7 @@ private:
     case Node::Kind::LocalDeclName:
     case Node::Kind::PrivateDeclName:
     case Node::Kind::MaterializeForSet:
+    case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
@@ -406,6 +409,8 @@ private:
     case Node::Kind::VariadicMarker:
     case Node::Kind::OutlinedCopy:
     case Node::Kind::OutlinedConsume:
+    case Node::Kind::OutlinedRetain:
+    case Node::Kind::OutlinedRelease:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -626,7 +631,8 @@ private:
 static bool isExistentialType(NodePointer node) {
   return (node->getKind() == Node::Kind::ExistentialMetatype ||
           node->getKind() == Node::Kind::ProtocolList ||
-          node->getKind() == Node::Kind::ProtocolListWithClass);
+          node->getKind() == Node::Kind::ProtocolListWithClass ||
+          node->getKind() == Node::Kind::ProtocolListWithAnyObject);
 }
 
 /// Print the relevant parameters and return the new index.
@@ -777,6 +783,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::OutlinedConsume:
     Printer << "outlined consume of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedRetain:
+    Printer << "outlined retain of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedRelease:
+    Printer << "outlined release of ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::Directness:
@@ -1177,10 +1191,24 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::KeyPathGetterThunkHelper:
     Printer << "key path getter for ";
     print(Node->getChild(0));
+    Printer << " : ";
+    if (Node->getNumChildren() == 2) {
+      print(Node->getChild(1));
+    } else {
+      print(Node->getChild(1));
+      print(Node->getChild(2));
+    }
     return nullptr;
   case Node::Kind::KeyPathSetterThunkHelper:
     Printer << "key path setter for ";
     print(Node->getChild(0));
+    Printer << " : ";
+    if (Node->getNumChildren() == 2) {
+      print(Node->getChild(1));
+    } else {
+      print(Node->getChild(1));
+      print(Node->getChild(2));
+    }
     return nullptr;
   case Node::Kind::FieldOffset: {
     print(Node->getChild(0)); // directness
@@ -1211,6 +1239,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(Node->getNumChildren() - 1));
     return nullptr;
   }
+  case Node::Kind::MergedFunction:
+    if (!Options.ShortenThunk) {
+      Printer << "merged ";
+    }
+    return nullptr;
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";
     print(Node->getChild(0));
@@ -1352,7 +1385,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     NodePointer superclass = Node->getChild(1);
     print(superclass);
     Printer << " & ";
-    printChildren(protocols, " & ");
+    if (protocols->getNumChildren() < 1)
+      return nullptr;
+    NodePointer type_list = protocols->getChild(0);
+    printChildren(type_list, " & ");
     return nullptr;
   }
   case Node::Kind::ProtocolListWithAnyObject: {
@@ -1361,12 +1397,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     NodePointer protocols = Node->getChild(0);
     if (protocols->getNumChildren() < 1)
       return nullptr;
-    if (protocols->getChild(0)->getNumChildren() == 0) {
-      Printer << "AnyObject";
-    } else {
-      printChildren(protocols->getChild(0), " & ");
-      Printer << " & AnyObject";
+    NodePointer type_list = protocols->getChild(0);
+    if (type_list->getNumChildren() > 0) {
+      printChildren(type_list, " & ");
+      Printer << " & ";
     }
+    if (Options.QualifyEntities)
+      Printer << "Swift.";
+    Printer << "AnyObject";
     return nullptr;
   }
   case Node::Kind::AssociatedType:
@@ -1558,7 +1596,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     } else if (c == 'N') {
       name = "_NativeRefCountedObject";
     } else if (c == 'C') {
-      name = "_Class";
+      name = "AnyObject";
     } else if (c == 'D') {
       name = "_NativeClass";
     } else if (c == 'T') {

@@ -146,7 +146,7 @@ namespace {
         return false;
       if (!P.CurDeclContext)
         return false;
-      FuncDecl *func_decl = dyn_cast<FuncDecl>(P.CurDeclContext);
+      auto *func_decl = dyn_cast<FuncDecl>(P.CurDeclContext);
       if (!func_decl)
         return false;
         
@@ -251,7 +251,7 @@ bool Parser::parseTopLevel() {
 
   // Add newly parsed decls to the module.
   for (auto Item : Items)
-    if (Decl *D = Item.dyn_cast<Decl*>())
+    if (auto *D = Item.dyn_cast<Decl*>())
       SF.Decls.push_back(D);
 
   // Note that the source file is fully parsed and verify it.
@@ -743,7 +743,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_CDecl:
-  case DAK_SILGenName: {
+  case DAK_SILGenName:
+  case DAK_NSKeyedArchiverClassName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -785,6 +786,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
+                                               AttrRange, /*Implicit=*/false));
+      else if (DK == DAK_NSKeyedArchiverClassName)
+        Attributes.add(new (Context) NSKeyedArchiverClassNameAttr(
+                                               AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
@@ -3957,9 +3962,9 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   VarDecl *PrimaryVar = nullptr;
   {
     Pattern *PrimaryPattern = pattern;
-    if (TypedPattern *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
+    if (auto *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
       PrimaryPattern = Typed->getSubPattern();
-    if (NamedPattern *Named = dyn_cast<NamedPattern>(PrimaryPattern)) {
+    if (auto *Named = dyn_cast<NamedPattern>(PrimaryPattern)) {
       PrimaryVar = Named->getDecl();
     }
   }
@@ -3972,7 +3977,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   }
 
   TypeLoc TyLoc;
-  if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
+  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
     TyLoc = TP->getTypeLoc();
   } else if (!PrimaryVar) {
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
@@ -4525,7 +4530,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     addPatternVariablesToScope(pattern);
     
     // Propagate back types for simple patterns, like "var A, B : T".
-    if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
+    if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
       if (isa<NamedPattern>(TP->getSubPattern()) && PatternInit == nullptr) {
         for (unsigned i = PBDEntries.size() - 1; i != 0; --i) {
           Pattern *PrevPat = PBDEntries[i-1].getPattern();
@@ -5352,8 +5357,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
   }
 
-  // Parse a 'where' clause if present. These are not supported, but we will
-  // get better QoI this way.
   TrailingWhereClause *TrailingWhere = nullptr;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {

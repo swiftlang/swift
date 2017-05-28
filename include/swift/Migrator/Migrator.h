@@ -27,15 +27,17 @@ namespace migrator {
 
 /// Run the migrator on the compiler invocation's input file and emit a
 /// "replacement map" describing the requested changes to the source file.
-bool updateCodeAndEmitRemap(const CompilerInvocation &Invocation);
+bool updateCodeAndEmitRemap(CompilerInstance *Instance,
+                            const CompilerInvocation &Invocation);
 
-class Migrator {
+struct Migrator {
+  CompilerInstance *StartInstance;
   const CompilerInvocation &StartInvocation;
   SourceManager SrcMgr;
   std::vector<RC<MigrationState>> States;
 
-public:
-  Migrator(const CompilerInvocation &StartInvocation);
+  Migrator(CompilerInstance *StartInstance,
+           const CompilerInvocation &StartInvocation);
 
   /// The maximum number of times to run the compiler over the input to get
   /// fix-its. Nullability changes may expose other fix-its in subsequent
@@ -45,11 +47,21 @@ public:
   /// Repeatedly perform a number of compiler-fix-it migrations in a row, until
   /// there are no new suggestions from the compiler or some other error
   /// occurred.
-  void repeatFixitMigrations(const unsigned Iterations);
+  ///
+  /// Returns the last CompilerInstance used in the iterations, provided
+  /// that the CompilerInvocation used to set it up was successful. Otherwise,
+  /// returns nullptr.
+  std::unique_ptr<swift::CompilerInstance>
+  repeatFixitMigrations(const unsigned Iterations,
+                        swift::version::Version SwiftLanguageVersion);
 
   /// Perform a single compiler fix-it migration on the last state, and push
   /// the result onto the state history.
-  llvm::Optional<RC<MigrationState>> performAFixItMigration();
+  ///
+  /// Returns the CompilerInstance used for the fix-it run, provided its
+  /// setup from a CompilerInvocation was successful.
+  std::unique_ptr<swift::CompilerInstance>
+  performAFixItMigration(swift::version::Version SwiftLanguageVersion);
 
   /// Starting with the last state, perform the following migration passes.
   ///

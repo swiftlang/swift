@@ -84,12 +84,12 @@ for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to proto
 }
 
 // Generic as part of function/tuple types
-func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) {
+func f6<T:P2>(_ g: (Void) -> T) -> (c: Int, i: T) { // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{20-26=()}}
   return (c: 0, i: g())
 }
 
 func f7() -> (c: Int, v: A) {
-  let g: (Void) -> A = { return A() }
+  let g: (Void) -> A = { return A() } // expected-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} {{10-16=()}}
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
@@ -237,7 +237,7 @@ String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 // <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
 protocol r21553065Protocol {}
 class r21553065Class<T : AnyObject> {}
-_ = r21553065Class<r21553065Protocol>()  // expected-error {{type 'r21553065Protocol' does not conform to protocol 'AnyObject'}}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Protocol' is not convertible to 'AnyObject'}}
 
 // Type variables not getting erased with nested closures
 struct Toe {
@@ -428,7 +428,7 @@ let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argu
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
-let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+let _: Color = .Unknown(42) // expected-error {{missing argument label 'description:' in call}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
@@ -440,10 +440,11 @@ let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member
 // expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
 let _: Color = .overload(1)  // expected-error {{ambiguous reference to member 'overload'}}
 // expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
-let _: Color = .frob(1.0, &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
+let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
-let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
@@ -634,7 +635,7 @@ func r23272739(_ contentType: String) {
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
 func r23641896() {
   var g = "Hello World"
-  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot invoke 'replaceSubrange' with an argument list of type '(CountableClosedRange<Int>, with: String)'}} expected-note {{overloads for 'replaceSubrange' exist}}
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'CountableClosedRange<Int>' to expected argument type 'Range<String.Index>' (aka 'Range<String.CharacterView.Index>')}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
@@ -647,7 +648,7 @@ func test17875634() {
   var row = 1
   var col = 2
   
-  match.append(row, col)  // expected-error {{extra argument in call}}
+  match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 }
 
 // <https://github.com/apple/swift/pull/1205> Improved diagnostics for enums with associated values
@@ -930,3 +931,50 @@ let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{bin
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
 // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+
+// Ambiguous overload inside a trailing closure
+
+func ambiguousCall() -> Int {} // expected-note {{found this candidate}}
+func ambiguousCall() -> Float {} // expected-note {{found this candidate}}
+
+func takesClosure(fn: () -> ()) {}
+
+takesClosure() { ambiguousCall() } // expected-error {{ambiguous use of 'ambiguousCall()'}}
+
+// SR-4692: Useless diagnostics calling non-static method
+
+class SR_4692_a {
+  private static func foo(x: Int, y: Bool) {
+    self.bar(x: x)
+    // expected-error@-1 {{instance member 'bar' cannot be used on type 'SR_4692_a'}}
+  }
+
+  private func bar(x: Int) {
+  }
+}
+
+class SR_4692_b {
+  static func a() {
+    self.f(x: 3, y: true)
+    // expected-error@-1 {{instance member 'f' cannot be used on type 'SR_4692_b'}}
+  }
+
+  private func f(a: Int, b: Bool, c: String) {
+    self.f(x: a, y: b)
+  }
+
+  private func f(x: Int, y: Bool) {
+  }
+}
+
+// rdar://problem/32101765 - Keypath diagnostics are not actionable/helpful
+
+struct R32101765 { let prop32101765 = 0 }
+let _: KeyPath<R32101765, Float> = \.prop32101765
+// expected-error@-1 {{KeyPath value type 'Int' cannot be converted to contextual type 'Float'}}
+let _: KeyPath<R32101765, Float> = \R32101765.prop32101765
+// expected-error@-1 {{KeyPath value type 'Int' cannot be converted to contextual type 'Float'}}
+let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
+// expected-error@-1 {{type 'Int' has no member 'unknown'}}
+let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
+// expected-error@-1 {{type 'Int' has no member 'unknown'}}

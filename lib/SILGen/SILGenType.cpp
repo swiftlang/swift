@@ -203,6 +203,8 @@ public:
     assert(result.second);
     (void) result;
   }
+
+  void addPlaceholder(MissingMemberDecl *) {}
 };
 
 } // end anonymous namespace
@@ -255,12 +257,8 @@ public:
   }
 
   void addConstructor(ConstructorDecl *cd, Witness witness) {
-    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator,
-                              ResilienceExpansion::Minimal);
-
-    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator,
-                          SILDeclRef::ConstructAtBestResilienceExpansion,
-                          requirementRef.uncurryLevel);
+    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator);
+    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator);
 
     asDerived().addMethod(requirementRef, witnessRef, IsNotFreeFunctionWitness,
                           witness);
@@ -283,20 +281,11 @@ public:
 
 private:
   void addMethod(FuncDecl *fd, ValueDecl *witnessDecl, Witness witness) {
-
-    // TODO: multiple resilience expansions?
-    // TODO: multiple uncurry levels?
-    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func,
-                              ResilienceExpansion::Minimal);
+    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);
     // Free function witnesses have an implicit uncurry layer imposed on them by
     // the inserted metatype argument.
     auto isFree = isFreeFunctionWitness(fd, witnessDecl);
-    unsigned witnessUncurryLevel = isFree ? requirementRef.uncurryLevel - 1
-                                          : requirementRef.uncurryLevel;
-
-    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func,
-                          SILDeclRef::ConstructAtBestResilienceExpansion,
-                          witnessUncurryLevel);
+    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func);
 
     asDerived().addMethod(requirementRef, witnessRef, isFree, witness);
   }
@@ -402,6 +391,10 @@ public:
   void addConstructor(ConstructorDecl *cd) {
     Witness witness = Conformance->getWitness(cd, nullptr);
     super::addConstructor(cd, witness);
+  }
+
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
   }
 
   void addMethod(SILDeclRef requirementRef,
@@ -562,18 +555,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   IsFreeFunctionWitness_t isFree,
                                   Witness witness) {
   auto requirementInfo = Types.getConstantInfo(requirement);
-  unsigned witnessUncurryLevel = witnessRef.uncurryLevel;
-
-  // If the witness is a free function, consider the self argument
-  // uncurry level.
-  if (isFree)
-    ++witnessUncurryLevel;
-
-  // The SIL witness thunk has the type of the AST-level witness with
-  // witness substitutions applied, at the abstraction level of the
-  // original protocol requirement.
-  assert(requirement.uncurryLevel == witnessUncurryLevel &&
-         "uncurry level of requirement and witness do not match");
 
   GenericEnvironment *genericEnv = nullptr;
 
@@ -750,6 +731,10 @@ public:
     super::addConstructor(cd, witness);
   }
 
+  void addPlaceholder(MissingMemberDecl *placeholder) {
+    llvm_unreachable("generating a witness table with placeholders in it");
+  }
+
   void addMethod(SILDeclRef requirementRef,
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
@@ -848,6 +833,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -947,6 +933,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *tpd) {}
   void visitModuleDecl(ModuleDecl *md) {}
+  void visitMissingMemberDecl(MissingMemberDecl *) {}
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }

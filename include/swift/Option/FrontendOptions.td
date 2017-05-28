@@ -247,6 +247,9 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 
+def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
+  HelpText<"Disable validating the persistent PCH">;
+
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
@@ -261,22 +264,24 @@ def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-
 
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
+  
+def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
+  HelpText<"Enable Large Loadable types IRGen pass">;
 
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
   
-def enable_experimental_keypaths :
-  Flag<["-"], "enable-experimental-keypaths">,
-  HelpText<"Enable experimental keypaths">;
+def enable_experimental_keypath_components :
+  Flag<["-"], "enable-experimental-keypath-components">,
+  HelpText<"Enable unimplemented keypath component kinds">;
 
-def enable_experimental_deserialization_recovery :
-  Flag<["-"], "enable-experimental-deserialization-recovery">,
+def enable_deserialization_recovery :
+  Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
-
-def enable_experimental_subclass_existentials : Flag<["-"],
-  "enable-experimental-subclass-existentials">,
-  HelpText<"Enable classes to appear in protocol composition types">;
+def disable_deserialization_recovery :
+  Flag<["-"], "disable-deserialization-recovery">,
+  HelpText<"Don't attempt to recover from missing xrefs (etc) in swiftmodules">;
 
 def enable_cow_existentials : Flag<["-"], "enable-cow-existentials">,
   HelpText<"Enable the copy-on-write existential implementation">;
@@ -301,6 +306,13 @@ def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+
+def enable_nskeyedarchiver_diagnostics :
+  Flag<["-"], "enable-nskeyedarchiver-diagnostics">,
+  HelpText<"Diagnose classes with unstable mangled names adopting NSCoding">;
+def disable_nskeyedarchiver_diagnostics :
+  Flag<["-"], "disable-nskeyedarchiver-diagnostics">,
+  HelpText<"Allow classes with unstable mangled names to adopt NSCoding">;
 
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,
@@ -409,7 +421,13 @@ def group_info_path : Separate<["-"], "group-info-path">,
 def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
 HelpText<"Diagnostics will be used in editor">;
 
-def validate_tbd_against_ir: Flag<["-"], "validate-tbd-against-ir">,
-    HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">;
+def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
+    HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">,
+    MetaVarName<"<level>">;
+
+// FIXME: Remove this flag when void subscripts are implemented.
+// This is used to guard preemptive testing for the fix-it.
+def fix_string_substring_conversion: Flag<["-"], "fix-string-substring-conversion">,
+    HelpText<"Emit a fix-it to append '[]' to String expressions when converting to Substring.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

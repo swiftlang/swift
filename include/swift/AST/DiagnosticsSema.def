@@ -441,6 +441,21 @@ ERROR(expr_unsupported_objc_key_path_compound_name,none,
       "compound name", ())
 ERROR(expr_keypath_no_keypath_type,none,
       "broken standard library: no 'KeyPath' type found", ())
+ERROR(expr_swift_keypath_invalid_component,none,
+      "invalid component of Swift key path", ())
+ERROR(expr_swift_keypath_not_starting_with_type,none,
+      "a Swift key path must begin with a type", ())
+ERROR(expr_swift_keypath_unimplemented_component,none,
+      "key path support for %0 components is not implemented", (StringRef))
+ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
+      "KeyPath value type %0 cannot be converted to contextual type %1",
+      (Type, Type))
+ERROR(expr_swift_keypath_empty, none,
+      "key path must have at least one component", ())
+ERROR(expr_string_interpolation_outside_string,none,
+      "string interpolation can only appear inside a string literal", ())
+ERROR(unsupported_keypath_tuple_element_reference,none,
+      "key path cannot reference tuple elements", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -614,6 +629,10 @@ ERROR(unspaced_unary_operator,none,
 
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
+NOTE(confusable_character,none,
+      "%select{identifier|operator}0 '%1' contains possibly confused characters; "
+      "did you mean to use '%2'?",
+      (bool, StringRef, StringRef))
 ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_undeclared_type_did_you_mean,none,
@@ -907,6 +926,9 @@ ERROR(extra_trailing_closure_in_call,none,
       "extra trailing closure passed in call", ())
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
+      (Type))
+ERROR(non_nominal_no_initializers,none,
+      "non-nominal type %0 does not support explicit initialization",
       (Type))
 ERROR(unbound_generic_parameter,none,
       "generic parameter %0 could not be inferred", (Type))
@@ -1205,6 +1227,28 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
+ERROR(nscoding_unstable_mangled_name,none,
+      "%select{private|fileprivate|nested|local|generic}0 class %1 has an "
+      "unstable name when archiving via 'NSCoding'",
+      (unsigned, Type))
+WARNING(nscoding_unstable_mangled_name_warn,none,
+        "%select{private|fileprivate|nested|local|generic}0 class %1 has an "
+        "unstable name when archiving via 'NSCoding'",
+        (unsigned, Type))
+NOTE(unstable_mangled_name_add_objc,none,
+     "for new classes, add '@objc' to specify a unique, prefixed Objective-C "
+     "runtime name", ())
+NOTE(unstable_mangled_name_add_NSKeyedArchiverClassName,none,
+     "for compatibility with existing archives, use '@NSKeyedArchiverClassName' "
+     "to record the Swift 3 mangled name", ())
+NOTE(add_NSKeyedArchiverEncodeNonGenericSubclassesOnly_attr,none,
+     "generic class %0 should not be archived directly; "
+     "add @NSKeyedArchiverEncodeNonGenericSubclassesOnly "
+     "and only archive specific subclasses of this class", (Type))
+
+ERROR(attr_NSKeyedArchiverClassName_generic,none,
+      "'@NSKeyedArchiverClassName' cannot be applied to generic class %0",
+      (Type))
 
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,
@@ -1298,8 +1342,6 @@ ERROR(extension_protocol_inheritance,none,
 ERROR(extension_protocol_via_typealias,none,
       "protocol %0 in the module being compiled cannot be extended via a "
       "type alias", (Type))
-ERROR(extension_anyobject,none,
-      "'AnyObject' protocol cannot be extended", ())
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
@@ -1348,6 +1390,10 @@ ERROR(objc_runtime_visible_cannot_conform_to_objc_protocol,none,
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
+ERROR(protocol_has_missing_requirements_versioned,none,
+      "type %0 cannot conform to protocol %1 (compiled with Swift %2) because "
+      "it has requirements that could not be loaded in Swift %3",
+      (Type, Type, clang::VersionTuple, clang::VersionTuple))
 ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
@@ -1373,6 +1419,19 @@ ERROR(witness_self_non_subtype,none,
       "(%2) because it uses 'Self' in a non-parameter, non-result type "
       "position",
       (Type, DeclName, Type))
+ERROR(witness_self_same_type,none,
+      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
+      " (in protocol %5) due to same-type requirement involving 'Self'",
+      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
+       DeclName, Type))
+WARNING(witness_self_same_type_warn,none,
+      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
+      " (in protocol %5) due to same-type requirement involving 'Self'",
+      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
+       DeclName, Type))
+NOTE(witness_self_weaken_same_type,none,
+      "consider weakening the same-type requirement %0 == %1 to a superclass "
+      "requirement", (Type, Type))
 ERROR(witness_requires_dynamic_self,none,
       "method %0 in non-final class %1 must return `Self` to conform to "
       "protocol %2",
@@ -1533,8 +1592,19 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
+WARNING(witness_unavailable,none,
+        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
+        (DescriptiveDeclKind, DeclName, DeclName))
+
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+WARNING(redundant_conformance_adhoc,none,
+        "conformance of %0 to protocol %1 was already stated in "
+        "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+NOTE(redundant_conformance_witness_ignored,none,
+     "%0 %1 will not be used to satisfy the conformance to %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 
 // "Near matches"
 WARNING(optional_req_near_match,none,
@@ -1866,12 +1936,21 @@ ERROR(inheritance_from_final_class,none,
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
       "inheritance from a generic Objective-C class %0 must bind "
       "type parameters of %0 to specific concrete types", (Identifier))
+ERROR(inheritance_from_class_with_missing_vtable_entries,none,
+      "cannot inherit from class %0 because it has overridable members that "
+      "could not be loaded",
+      (Identifier))
+ERROR(inheritance_from_class_with_missing_vtable_entries_versioned,none,
+      "cannot inherit from class %0 (compiled with Swift %1) because it has "
+      "overridable members that could not be loaded in Swift %2",
+      (Identifier, clang::VersionTuple, clang::VersionTuple))
 ERROR(inheritance_from_cf_class,none,
       "cannot inherit from Core Foundation type %0", (Identifier))
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "cannot inherit from class %0 because it is only visible via the "
       "Objective-C runtime", (Identifier))
-
+WARNING(class_inherits_anyobject,none,
+        "conformance of class %0 to 'AnyObject' is redundant", (Type))
 
 // Enums
 ERROR(enum_case_access,none,
@@ -1948,6 +2027,9 @@ NOTE(enum_raw_value_incrementing_from_zero,none,
 
 // Derived conformances
 
+ERROR(cannot_synthesize_in_extension,none,
+      "implementation of %0 cannot be automatically synthesized in an extension yet", (Type))
+
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
@@ -1962,6 +2044,23 @@ ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
+ERROR(broken_coding_key_requirement,none,
+      "CodingKey protocol is broken: unexpected requirement", ())
+ERROR(broken_encodable_requirement,none,
+      "Encodable protocol is broken: unexpected requirement", ())
+ERROR(broken_decodable_requirement,none,
+      "Decodable protocol is broken: unexpected requirement", ())
+
+NOTE(codable_extraneous_codingkey_case_here,none,
+     "CodingKey case %0 does match any stored properties", (Identifier))
+NOTE(codable_non_conforming_property_here,none,
+     "cannot automatically synthesize %0 because %1 does not conform to %0", (Type, Type))
+NOTE(codable_non_decoded_property_here,none,
+     "cannot automatically synthesize %0 because %1 does not have a matching CodingKey and does not have a default value", (Type, Identifier))
+NOTE(codable_codingkeys_type_is_not_an_enum_here,none,
+     "cannot automatically synthesize %0 because 'CodingKeys' is not an enum", (Type))
+NOTE(codable_codingkeys_type_does_not_conform_here,none,
+     "cannot automatically synthesize %0 because 'CodingKeys' does not conform to CodingKey", (Type))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
@@ -2044,7 +2143,8 @@ ERROR(attr_only_on_parameters,none,
       "%0 may only be used on parameters", (StringRef))
 ERROR(attr_not_on_variadic_parameters,none,
       "%0 may not be used on variadic parameters", (StringRef))
-
+ERROR(attr_not_on_subscript_parameters,none,
+      "%0 may not be used on subscript parameters", (StringRef))
 
 ERROR(override_final,none,
       "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
@@ -2750,14 +2850,6 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
-ERROR(empty_switch_stmt,none,
-      "%select{'switch' statement body must have at least one 'case' or 'default' block; |}0"
-      "do you want to add "
-      "%select{missing cases?|a default case?}1",(bool, bool))
-ERROR(non_exhaustive_switch,none,
-      "%select{switch must be exhaustive, consider adding |do you want to add }0"
-      "%select{missing cases|a default clause}1"
-      "%select{|?}0", (bool, bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -2788,6 +2880,20 @@ ERROR(closure_argument_list_tuple,none,
 ERROR(closure_argument_list_missing,none,
       "contextual type for closure argument list expects %0 argument%s0, "
       "which cannot be implicitly ignored", (unsigned))
+ERROR(closure_tuple_parameter_destructuring,none,
+      "closure tuple parameter %0 does not support destructuring", (Type))
+ERROR(closure_tuple_parameter_destructuring_implicit,none,
+      "closure tuple parameter %0 does not support destructuring "
+      "with implicit parameters", (Type))
+ERROR(nested_tuple_parameter_destructuring,none,
+      "nested tuple parameter %0 of function %1 "
+      "does not support destructuring", (Type, Type))
+ERROR(single_tuple_parameter_mismatch,none,
+      "%0 %select{|%1 }3expects a single parameter of type %2",
+      (DescriptiveDeclKind, Identifier, Type, bool))
+ERROR(unknown_single_tuple_parameter_mismatch,none,
+      "single parameter of type %0 is expected in call", (Type))
+
 
 ERROR(tuple_pattern_length_mismatch,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
@@ -3124,6 +3230,8 @@ ERROR(objc_convention_invalid,none,
       " with '@convention(%1)'", (Type, StringRef))
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
+WARNING(paren_void_probably_void,none,
+      "when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?", ())
 NOTE(not_objc_empty_protocol_composition,none,
      "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
@@ -3436,6 +3544,12 @@ NOTE(availability_protocol_requirement_here, none,
 NOTE(availability_conformance_introduced_here, none,
      "conformance introduced here", ())
 
+// This doesn't display as an availability diagnostic, but it's
+// implemented there and fires when these subscripts are marked
+// unavailable, so it seems appropriate to put it here.
+ERROR(availabilty_string_subscript_migration, none,
+      "subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result", ())
+
 //------------------------------------------------------------------------------
 // @discardableResult
 //------------------------------------------------------------------------------
@@ -3590,6 +3704,25 @@ WARNING(debug_long_function_body, none,
 WARNING(debug_long_closure_body, none,
         "closure took %0ms to type-check (limit: %1ms)",
         (unsigned, unsigned))
+
+//------------------------------------------------------------------------------
+// Pattern match diagnostics
+//------------------------------------------------------------------------------
+
+
+ERROR(empty_switch_stmt,none,
+      "'switch' statement body must have at least one 'case' or 'default' "
+      "block; do you want to add a default case?",())
+ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
+NOTE(missing_several_cases,none,
+     "do you want to add "
+     "%select{missing cases|a default clause}0"
+     "?", (bool))
+
+NOTE(missing_particular_case,none,
+     "add missing case: '%0'", (StringRef))
+WARNING(redundant_particular_case,none,
+        "case is already handled by previous patterns; consider removing it",())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -330,6 +330,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "!propertyinit";
     break;
   }
+
+  auto uncurryLevel = getUncurryLevel();
   if (uncurryLevel != 0)
     OS << (isDot ? '.' : '!')  << uncurryLevel;
 
@@ -953,6 +955,7 @@ public:
     // Should not apply to callees.
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
@@ -1355,6 +1358,14 @@ public:
   void visitRetainValueInst(RetainValueInst *I) { visitRefCountingInst(I); }
 
   void visitReleaseValueInst(ReleaseValueInst *I) { visitRefCountingInst(I); }
+
+  void visitRetainValueAddrInst(RetainValueAddrInst *I) {
+    visitRefCountingInst(I);
+  }
+
+  void visitReleaseValueAddrInst(ReleaseValueAddrInst *I) {
+    visitRefCountingInst(I);
+  }
 
   void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
     visitRefCountingInst(I);

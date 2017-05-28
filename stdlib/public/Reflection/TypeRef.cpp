@@ -140,8 +140,10 @@ public:
 
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol_composition");
-    for (auto protocol : PC->getProtocols())
-      printRec(protocol);
+    if (PC->hasExplicitAnyObject())
+      OS << " any_object";
+    for (auto member : PC->getMembers())
+      printRec(member);
     OS << ')';
   }
 
@@ -253,7 +255,6 @@ struct TypeRefIsConcrete
   }
 
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
-    std::vector<TypeRef *> SubstitutedArguments;
     for (auto Argument : F->getArguments())
       if (!visit(Argument))
         return false;
@@ -266,8 +267,8 @@ struct TypeRefIsConcrete
 
   bool
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
-    for (auto Protocol : PC->getProtocols())
-      if (!visit(Protocol))
+    for (auto Member : PC->getMembers())
+      if (!visit(Member))
         return false;
     return true;
   }

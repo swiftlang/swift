@@ -1111,3 +1111,48 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
 // CHECK: } // end sil function '_T010properties30DerivedClassWithPublicPropertyC1xytfg'
+
+// Make sure that we can handle this AST:
+// (load_expr
+//   (open_existential_expr
+//     (opaque_expr A)
+//     ...
+//     (load_expr
+//        (opaque_expr  ))))
+
+class ReferenceType {
+  var p: NonmutatingProtocol
+  init(p: NonmutatingProtocol) { self.p = p }
+}
+
+protocol NonmutatingProtocol {
+  var x: Int { get nonmutating set }
+}
+
+// sil hidden @_T010properties19overlappingLoadExpryAA13ReferenceTypeCz1c_tF : $@convention(thin) (@inout ReferenceType) -> () {
+// CHECK:        [[RESULT:%.*]] = alloc_stack $Int
+// CHECK-NEXT:   [[UNINIT:%.*]] = mark_uninitialized [var] [[RESULT]] : $*Int
+// CHECK-NEXT:   [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
+// CHECK-NEXT:   [[C:%.*]] = load [copy] [[C_INOUT:%.*]] : $*ReferenceType
+// CHECK-NEXT:   end_access [[C_INOUT]] : $*ReferenceType
+// CHECK-NEXT:   [[C_FIELD_BOX:%.*]] = alloc_stack $NonmutatingProtocol
+// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C]]) : $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
+// CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
+// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, %11 : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_COPY]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
+// CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol
+// CHECK-NEXT:   dealloc_stack [[RESULT]] : $*Int
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+
+func overlappingLoadExpr(c: inout ReferenceType) {
+  _ = c.p.x
+}

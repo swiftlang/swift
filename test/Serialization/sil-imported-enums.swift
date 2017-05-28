@@ -14,7 +14,7 @@
 import Foundation
 import UsesImportedEnums
 
-// CHECK-LABEL: sil hidden @_T04main4testSbSo13NSRuncingModeO1e_tF
+// CHECK-LABEL: sil hidden @_T04main4testSbSC13NSRuncingModeO1e_tF
 func test(e: NSRuncingMode) -> Bool {
   // CHECK-NOT: return
   // CHECK: _T0s2eeoiSbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF
