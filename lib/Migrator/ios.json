@@ -387,6 +387,28 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)defaultCalendarForNewReminders",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)calendarItemWithIdentifier:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)MPSBinaryImageKernel(im)encodeToCommandBuffer:primaryTexture:inPlaceSecondaryTexture:fallbackCopyAllocator:",
@@ -427,6 +449,94 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "iAd"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerApplicationController(im)performQueueTransaction:completionHandler:",
+    "LeftComment": "performQueueTransaction(_:completionHandler:)",
+    "RightUsr": "",
+    "RightComment": "perform(queueTransaction:completionHandler:)",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerController(cm)applicationMusicPlayer",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerController(cm)applicationQueuePlayer",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerController(cm)systemMusicPlayer",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerController(cm)iPodMusicPlayer",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerController(im)setQueueWithStoreIDs:",
+    "LeftComment": "setQueueWithStoreIDs(_:)",
+    "RightUsr": "",
+    "RightComment": "setQueue(with:)",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerController(im)setQueueWithDescriptor:",
+    "LeftComment": "setQueueWith(_:)",
+    "RightUsr": "",
+    "RightComment": "setQueue(with:)",
+    "ModuleName": "MediaPlayer"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)MPMusicPlayerControllerMutableQueue(im)removeItem:",
+    "LeftComment": "removeItem(_:)",
+    "RightUsr": "",
+    "RightComment": "remove(_:)",
+    "ModuleName": "MediaPlayer"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -1428,17 +1538,6 @@
     "RightUsr": "",
     "RightComment": "",
     "ModuleName": "IntentsUI"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(cs)INImage(cm)imageWithURL:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Intents"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -5612,83 +5711,6 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLBuffer(im)newTextureWithDescriptor:offset:bytesPerRow:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)blitCommandEncoder",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)renderCommandEncoderWithDescriptor:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)computeCommandEncoder",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLCommandBuffer(im)parallelRenderCommandEncoderWithDescriptor:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLCommandQueue(im)commandBuffer",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLCommandQueue(im)commandBufferWithUnretainedReferences",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLComputeCommandEncoder(im)setBytes:length:atIndex:",
@@ -5788,105 +5810,6 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newCommandQueue",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newCommandQueueWithMaxCommandBufferCount:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newHeapWithDescriptor:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newBufferWithLength:options:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newBufferWithBytes:length:options:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newBufferWithBytesNoCopy:length:options:deallocator:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newDepthStencilStateWithDescriptor:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newTextureWithDescriptor:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newSamplerStateWithDescriptor:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)MTLDevice(im)newDefaultLibrary",
@@ -5898,34 +5821,12 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLDevice(im)newFence",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)MTLFunctionConstantValues(im)setConstantValue:type:atIndex:",
     "LeftComment": "setConstantValue(_:type:at:)",
     "RightUsr": "",
     "RightComment": "setConstantValue(_:type:index:)",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLParallelRenderCommandEncoder(im)renderCommandEncoder",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
     "ModuleName": "Metal"
   },
   {
@@ -6124,28 +6025,6 @@
     "LeftComment": "setColorStoreAction(_:at:)",
     "RightUsr": "",
     "RightComment": "setColorStoreAction(_:index:)",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLTexture(im)newTextureViewWithPixelFormat:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Metal"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(pl)MTLTexture(im)newTextureViewWithPixelFormat:textureType:levels:slices:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
     "ModuleName": "Metal"
   },
   {
@@ -12282,6 +12161,14 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MPMusicPlayerController(im)setQueueWithStoreIDs:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)MPMusicPlayerController(im)setQueueWithDescriptor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)MPSCNNBinaryKernel(im)encodeToCommandBuffer:primaryImage:secondaryImage:destinationImage:"
   },
   {
@@ -12534,26 +12421,6 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLDevice(im)newTextureWithDescriptor:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:options:reflection:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:completionHandler:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLDevice(im)newRenderPipelineStateWithTileDescriptor:options:completionHandler:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLFunction(im)newIndirectArgumentEncoderWithBufferIndex:"
   },
   {
@@ -12567,18 +12434,6 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setFragmentSamplerState:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setTileSamplerState:atIndex:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLRenderCommandEncoder(im)setTileSamplerStates:withRange:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(pl)MTLTexture(im)newTextureViewWithPixelFormat:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
@@ -13190,10 +13045,6 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)ARCamera(im)projectionMatrixWithViewportSize:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(pl)ARSCNViewDelegate(im)renderer:nodeForAnchor:"
   },
   {
@@ -13258,14 +13109,6 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CXCallController(im)requestTransactionWithActions:completion:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)CXCallController(im)requestTransactionWithAction:completion:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSCoreDataCoreSpotlightDelegate(im)searchableIndex:reindexAllSearchableItemsWithAcknowledgementHandler:"
   },
   {
@@ -13298,15 +13141,7 @@
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onCVPixelBuffer:orientation:error:"
-  },
-  {
-    "DiffItemKind": "OverloadedFuncInfo",
-    "Usr": "c:objc(cs)VNSequenceRequestHandler(im)performRequests:onBuffer:orientation:error:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
