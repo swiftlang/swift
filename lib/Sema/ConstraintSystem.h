@@ -2671,8 +2671,8 @@ public:
   bool isSymmetricOperator() const;
 
   /// \brief Apply given choice to the system and try to solve it.
-  bool solve(SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables);
+  Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
+                        FreeTypeVariableBinding allowFreeTypeVariables);
 
 private:
   static ValueDecl *getOperatorDecl(Constraint *constraint) {
