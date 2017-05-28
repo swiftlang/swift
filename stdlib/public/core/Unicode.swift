@@ -919,6 +919,22 @@ extension UTF16 {
     var utf16Count = 0
     var i = input
     var d = Encoding.ForwardParser()
+
+    // Fast path for ASCII in a UTF8 buffer
+    if sourceEncoding == Unicode.UTF8.self {
+      var peek: Encoding.CodeUnit = 0
+      while let u = i.next() {
+        peek = u
+        guard _fastPath(peek < 0x80) else { break }
+        utf16Count = utf16Count + 1
+      }
+      if _fastPath(peek < 0x80) { return (utf16Count, true) }
+      
+      var d1 = UTF8.ForwardParser()
+      d1._buffer.append(numericCast(peek))
+      d = _identityCast(d1, to: Encoding.ForwardParser.self)
+    }
+    
     var utf16BitUnion: CodeUnit = 0
     while true {
       let s = d.parseScalar(from: &i)
