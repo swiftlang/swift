@@ -2957,7 +2957,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         return result.markErrorAlreadyDiagnosed();
 
       // FIXME: Deal with broken recursion
-      if (!ctor->getInterfaceType())
+      if (!ctor->hasInterfaceType())
         continue;
 
       // If the argument labels for this result are incompatible with
@@ -3054,7 +3054,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
 
     // FIXME: Deal with broken recursion
-    if (!cand->getInterfaceType())
+    if (!cand->hasInterfaceType())
       return;
 
     // If the argument labels for this result are incompatible with
@@ -3241,7 +3241,11 @@ retry_after_fail:
         result.markErrorAlreadyDiagnosed();
         return result;
       }
-      
+
+      // FIXME: Deal with broken recursion
+      if (!cand->hasInterfaceType())
+        continue;
+
       result.addUnviable(cand, MemberLookupResult::UR_Inaccessible);
     }
   }
