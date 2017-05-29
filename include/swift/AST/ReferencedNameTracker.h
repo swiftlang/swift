@@ -32,10 +32,10 @@ public: \
     return NAME##s; \
   }
 
-  TRACKED_SET(Identifier, TopLevelName)
-  TRACKED_SET(Identifier, DynamicLookupName)
+  TRACKED_SET(DeclBaseName, TopLevelName)
+  TRACKED_SET(DeclBaseName, DynamicLookupName)
 
-  using MemberPair = std::pair<const NominalTypeDecl *, Identifier>;
+  using MemberPair = std::pair<const NominalTypeDecl *, DeclBaseName>;
   TRACKED_SET(MemberPair, UsedMember)
 
 #undef TRACKED_SET

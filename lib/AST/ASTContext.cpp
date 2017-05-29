@@ -2432,7 +2432,7 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
         Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
                        diagInfo.first, diagInfo.second, selector);
         Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
-                       originalDecl->getName());
+                       originalDecl->getBaseName());
       } else {
         Diags.diagnose(conflictingDecl, diag::objc_redecl,
                        diagInfo.first,
