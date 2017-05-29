@@ -215,8 +215,21 @@ extension String {
   }
 }
 #else
-// FIXME: Implement hasPrefix and hasSuffix without objc
+// Implement hasPrefix and hasSuffix without objc
 // rdar://problem/18878343
+extension String {
+  /// Returns `true` iff `self` begins with `prefix`.
+  public func hasPrefix(prefix: String) -> Bool {
+    return prefix.isEmpty ? false :
+      prefix == String(self.characters.prefix(prefix.characters.count))
+  }
+
+  /// Returns `true` iff `self` ends with `suffix`.
+  public func hasSuffix(suffix: String) -> Bool {
+    return suffix.isEmpty ? false :
+      suffix == String(self.characters.suffix(suffix.characters.count))
+  }
+}
 #endif
 
 // Conversions to string from other types.
