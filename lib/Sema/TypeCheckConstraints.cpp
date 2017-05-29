@@ -646,7 +646,7 @@ TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
     if (nestedArg->isSuperExpr())
       return ctorContext->getImplicitSelfDecl();
     if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
-      if (declRef->getDecl()->getName() == Context.Id_self)
+      if (declRef->getDecl()->getFullName() == Context.Id_self)
         return ctorContext->getImplicitSelfDecl();
   }
   return nullptr;
@@ -1372,13 +1372,13 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto fn = binaryExpr->getFn();
     if (auto Overload = dyn_cast<OverloadedDeclRefExpr>(fn)) {
       for (auto Decl : Overload->getDecls())
-        if (Decl->getName().str() == "&") {
+        if (Decl->getBaseName() == "&") {
           isComposition = true;
           break;
         }
     } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
       if (Decl->getName().isSimpleName() &&
-            Decl->getName().getBaseName() == "&")
+          Decl->getName().getBaseName() == "&")
         isComposition = true;
     }
 

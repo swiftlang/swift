@@ -469,7 +469,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
+                  DRE->getDecl()->getBaseName(),
+                  isa<ParamDecl>(DRE->getDecl()));
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
@@ -482,7 +483,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       } else if (isAutoClosure)
         // TODO: add in a fixit for autoclosure
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
-                    DRE->getDecl()->getName());
+                    DRE->getDecl()->getBaseName());
     }
 
     // Swift 3 mode produces a warning + Fix-It for the missing ".self"
@@ -613,7 +614,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                  VD->getName(), VD->getDescriptiveKind(),
+                  VD->getBaseName(), VD->getDescriptiveKind(),
                   declParent->getDescriptiveKind(), declParent->getFullName());
       TC.diagnose(VD, diag::decl_declared_here, VD->getFullName());
 
@@ -667,7 +668,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
-                    DRE->getDecl()->getName());
+                    DRE->getDecl()->getBaseName());
       }
     }
     
@@ -1214,8 +1215,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       
       auto lhs = args->getElement(0);
       auto rhs = args->getElement(1);
-      auto calleeName = DRE->getDecl()->getName().str();
-      
+      auto calleeName = DRE->getDecl()->getBaseName();
+
       Expr *subExpr = nullptr;
       if (calleeName == "??" &&
           (subExpr = isImplicitPromotionToOptional(lhs))) {
@@ -1442,7 +1443,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         if (isImplicitSelfUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
-                      MRE->getMember().getDecl()->getName())
+                      MRE->getMember().getDecl()->getBaseName())
             .fixItInsert(MRE->getLoc(), "self.");
           return { false, E };
         }
@@ -1454,7 +1455,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           TC.diagnose(DSCE->getLoc(),
                       diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getName())
+                      MethodExpr->getDecl()->getBaseName())
             .fixItInsert(DSCE->getLoc(), "self.");
           return { false, E };
         }
@@ -3680,7 +3681,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   };
 
   Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseName());
+                                                    name.getBaseIdentifier());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {

@@ -707,7 +707,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   // If we're trying to set an unapplied method, say that.
   if (auto *VD = dyn_cast_or_null<ValueDecl>(immInfo.second)) {
     std::string message = "'";
-    message += VD->getName().str().str();
+    message += VD->getBaseName().getIdentifier().str();
     message += "'";
     
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -744,9 +744,9 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     else if (isa<DotSyntaxCallExpr>(AE) || isa<DotSyntaxBaseIgnoredExpr>(AE))
       name = "method call";
 
-    if (auto *DRE =
-          dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
-      name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
+    if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
+      name = std::string("'") +
+             DRE->getDecl()->getBaseName().getIdentifier().str().str() + "'";
 
     TC.diagnose(loc, diagID, name + " returns immutable value")
       .highlight(AE->getSourceRange());
@@ -1945,7 +1945,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
                       CD->getResultInterfaceType(), decl->getFormalAccess());
      
     } else {
-      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
+      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getBaseName(),
                       decl->getFormalAccess());
     }
     for (auto cand : candidates) {
@@ -2451,7 +2451,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
         // Fetch any declaration to check if the name is '~='
         ValueDecl *decl0 = overloadedFn->getDecls()[0];
 
-        if (decl0->getName() == decl0->getASTContext().Id_MatchOperator) {
+        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
           assert(binaryExpr->getArg()->getElements().size() == 2);
 
           // If the rhs of '~=' is the enum type, a single dot suffixes
@@ -2681,7 +2681,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_Inaccessible: {
       auto decl = result.UnviableCandidates[0].first;
       // FIXME: What if the unviable candidates have different levels of access?
-      diagnose(nameLoc, diag::candidate_inaccessible, decl->getName(),
+      diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
                decl->getFormalAccess());
       for (auto cand : result.UnviableCandidates)
         diagnose(cand.first, diag::decl_declared_here, memberName);
@@ -4595,7 +4595,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto baseDecl = baseExpr->getDecl();
-  if (!baseExpr->isImplicit() || baseDecl->getName() != TC.Context.Id_self)
+  if (!baseExpr->isImplicit() || baseDecl->getFullName() != TC.Context.Id_self)
     return false;
 
   // Our base expression is an implicit 'self.' reference e.g.
@@ -8596,9 +8596,9 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   
   auto decl = resolved.getDecl();
   if (isa<FuncDecl>(decl)) {
-    auto name = decl->getName();
+    auto name = decl->getBaseName();
     auto diagID = name.isOperator() ? diag::note_call_to_operator
-    : diag::note_call_to_func;
+                                    : diag::note_call_to_func;
     tc.diagnose(decl, diagID, name);
     return;
   }
@@ -8610,7 +8610,7 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   }
   
   if (isa<ParamDecl>(decl)) {
-    tc.diagnose(decl, diag::note_init_parameter, decl->getName());
+    tc.diagnose(decl, diag::note_init_parameter, decl->getBaseName());
     return;
   }
   
