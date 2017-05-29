@@ -3888,10 +3888,10 @@ namespace {
       for (unsigned i : indices(ValueWitnesses)) {
         auto &valueWitness = ValueWitnesses[i];
         llvm::errs() << i << ":  " << (Decl*)valueWitness.first
-                     << ' ' << valueWitness.first->getName() << '\n';
+                     << ' ' << valueWitness.first->getBaseName() << '\n';
         valueWitness.first->getDeclContext()->dumpContext();
         llvm::errs() << "    for " << (Decl*)valueWitness.second
-                     << ' ' << valueWitness.second->getName() << '\n';
+                     << ' ' << valueWitness.second->getBaseName() << '\n';
         valueWitness.second->getDeclContext()->dumpContext();
       }
     }

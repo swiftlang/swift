@@ -1979,7 +1979,7 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       OS.indent(IndentLevel * 2);
       OS << Decl::getKindName(VD->getKind()) << "Decl '''"
-         << VD->getName().str() << "''' ";
+         << VD->getBaseName() << "''' ";
       VD->getInterfaceType().print(OS, Options);
       OS << "\n";
     }

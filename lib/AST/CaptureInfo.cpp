@@ -54,7 +54,7 @@ void CaptureInfo::print(raw_ostream &OS) const {
 
   interleave(getCaptures(),
              [&](const CapturedValue &capture) {
-               OS << capture.getDecl()->getName();
+               OS << capture.getDecl()->getBaseName();
 
                if (capture.isDirect())
                  OS << "<direct>";
