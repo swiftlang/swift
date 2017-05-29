@@ -607,7 +607,7 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
     // of the function.
     if (var->isSelfParameter())
       return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         decl->getName().str());
+                         var->getName().str());
   }
 
   if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
@@ -620,12 +620,15 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
                         isa<FuncDecl>(decl) ? "method" :
                         "member");
 
+      // TODO: Handle special names
       return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getName().str(), kind);
+                         decl->getBaseName().getIdentifier().str(), kind);
     }
   }
 
-  return tc.diagnose(decl, diag::note_typo_candidate, decl->getName().str());
+  // TODO: Handle special names
+  return tc.diagnose(decl, diag::note_typo_candidate,
+                     decl->getBaseName().getIdentifier().str());
 }
 
 void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,

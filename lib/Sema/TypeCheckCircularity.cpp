@@ -431,8 +431,8 @@ void LLVM_ATTRIBUTE_USED PathElement::dump() const {
 void PathElement::print(llvm::raw_ostream &out) const {
   out << " -> (";
   if (Member) {
-    auto name = Member->getName();
-    if (!name.empty()) {
+    auto name = Member->getFullName();
+    if (name) {
       out << name;
     } else {
       out << "<anonymous>";
