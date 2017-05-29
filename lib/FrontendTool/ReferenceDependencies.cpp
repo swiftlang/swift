@@ -149,8 +149,9 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     return true;
   }
 
-  auto escape = [](Identifier name) -> std::string {
-    return llvm::yaml::escape(name.str());
+  auto escape = [](DeclBaseName name) -> std::string {
+    // TODO: Handle special names
+    return llvm::yaml::escape(name.getIdentifier().str());
   };
 
   out << "### Swift dependencies file v0 ###\n";

@@ -1821,7 +1821,7 @@ public:
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloaded_decl_ref_expr")
-      << " name=" << E->getDecls()[0]->getName()
+      << " name=" << E->getDecls()[0]->getBaseName()
       << " #decls=" << E->getDecls().size()
       << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
 
