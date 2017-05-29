@@ -1740,7 +1740,7 @@ ClangImporter::Implementation::exportSelector(DeclName name,
   clang::ASTContext &ctx = getClangASTContext();
 
   SmallVector<clang::IdentifierInfo *, 8> pieces;
-  pieces.push_back(exportName(name.getBaseName()).getAsIdentifierInfo());
+  pieces.push_back(exportName(name.getBaseIdentifier()).getAsIdentifierInfo());
 
   auto argNames = name.getArgumentNames();
   if (argNames.empty())
@@ -2932,7 +2932,7 @@ void ClangImporter::Implementation::lookupValue(
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
-  for (auto entry : table.lookup(name.getBaseName().str(), clangTU)) {
+  for (auto entry : table.lookup(name.getBaseIdentifier().str(), clangTU)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
@@ -2942,11 +2942,13 @@ void ClangImporter::Implementation::lookupValue(
       decl = cast_or_null<ValueDecl>(
           importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion));
       if (!decl) continue;
-    } else {
+    } else if (!name.isSpecial()) {
       // Try to import a macro.
       auto clangMacro = entry.get<clang::MacroInfo *>();
-      decl = importMacro(name.getBaseName(), clangMacro);
+      decl = importMacro(name.getBaseIdentifier(), clangMacro);
       if (!decl) continue;
+    } else {
+      continue;
     }
 
     // If we found a declaration from the standard library, make sure
@@ -3035,7 +3037,7 @@ void ClangImporter::Implementation::lookupObjCMembers(
        DeclName name,
        VisibleDeclConsumer &consumer) {
   auto &clangCtx = getClangASTContext();
-  auto baseName = name.getBaseName().str();
+  auto baseName = name.getBaseIdentifier().str();
 
   for (auto clangDecl : table.lookupObjCMembers(baseName)) {
     // If the entry is not visible, skip it.

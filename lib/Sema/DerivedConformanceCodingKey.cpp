@@ -430,7 +430,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
 
   auto &C = tc.Context;
   auto rawType = enumDecl->getRawType();
-  auto name = requirement->getName();
+  auto name = requirement->getBaseName();
   if (name == C.Id_stringValue) {
     // Synthesize `var stringValue: String { get }`
     auto stringType = C.getStringDecl()->getDeclaredType();
