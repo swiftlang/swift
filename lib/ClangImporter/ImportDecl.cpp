@@ -2771,7 +2771,8 @@ namespace {
           // context.
           if (errorWrapper) {
             auto enumeratorValue = cast<ValueDecl>(enumeratorDecl);
-            auto alias = importEnumCaseAlias(enumeratorValue->getName(),
+            auto name = enumeratorValue->getBaseName().getIdentifier();
+            auto alias = importEnumCaseAlias(name,
                                              constant,
                                              enumeratorValue,
                                              decl,
