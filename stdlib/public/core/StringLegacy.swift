@@ -215,8 +215,53 @@ extension String {
   }
 }
 #else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
+extension String {
+  /// Returns `true` iff `self` begins with `prefix`.
+  func hasPrefix(other:String) -> Bool {
+    let otherCharacters = other.characters
+    if otherCharacters.isEmpty { return false }
+    let otherStart = otherCharacters.startIndex
+    let otherEnd = otherCharacters.endIndex
+
+    let selfCharacters = self.characters
+    let selfStart = selfCharacters.startIndex
+    let selfEnd = selfCharacters.endIndex
+
+    var s = selfStart
+    var o = otherStart
+
+    while ( s < selfEnd && o < otherEnd ) {
+      if selfCharacters[s] != otherCharacters[o] { return false }
+      s = s.successor()
+      o = o.successor()
+    }
+    return o == otherEnd
+  }
+
+  /// Returns `true` iff `self` ends with `suffix`.
+  func hasSuffix(other:String) -> Bool {
+    let otherCharacters = other.characters
+    if otherCharacters.isEmpty { return false }
+    let otherStart = otherCharacters.startIndex
+    let otherEnd = otherCharacters.endIndex
+
+    let selfCharacters = self.characters
+    if selfCharacters.isEmpty { return false }
+    let selfStart = selfCharacters.startIndex
+    let selfEnd = selfCharacters.endIndex
+
+    var s = selfEnd
+    var o = otherEnd
+
+    repeat {
+      s = s.predecessor()
+      o = o.predecessor()
+      if selfCharacters[s] != otherCharacters[o] { return false }
+    } while ( s > selfStart && o > otherStart )
+
+    return o == otherStart
+  }
+}
 #endif
 
 // Conversions to string from other types.
