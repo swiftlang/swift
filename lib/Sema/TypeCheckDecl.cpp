@@ -4754,7 +4754,7 @@ public:
   /// the corresponding operator declaration.
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
-    auto operatorName = FD->getFullName().getBaseName();
+    auto operatorName = FD->getFullName().getBaseIdentifier();
 
     // Check for static/final/class when we're in a type.
     auto dc = FD->getDeclContext();

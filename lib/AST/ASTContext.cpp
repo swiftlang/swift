@@ -1937,7 +1937,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 
   // Fix the name of the function itself.
   if (name.getBaseName() != targetName.getBaseName()) {
-    diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+    diag.fixItReplace(func->getLoc(), targetName.getBaseIdentifier().str());
   }
 
   // Fix the argument names that need fixing.

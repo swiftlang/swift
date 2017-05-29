@@ -72,7 +72,7 @@ class ValidateIfConfigCondition :
                        UDRE->getNameLoc().getRParenLoc() });
     }
 
-    return UDRE->getName().getBaseName().str();
+    return UDRE->getName().getBaseIdentifier().str();
   }
 
   Expr *diagnoseUnsupportedExpr(Expr *E) {
@@ -413,7 +413,7 @@ class EvaluateIfConfigCondition :
   /// Get the identifier string from an \c Expr assuming it's an
   /// \c UnresolvedDeclRefExpr.
   StringRef getDeclRefStr(Expr *E) {
-    return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseName().str();
+    return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseIdentifier().str();
   }
 
 public:
@@ -518,7 +518,7 @@ class IsVersionIfConfigCondition :
   /// Get the identifier string from an \c Expr assuming it's an
   /// \c UnresolvedDeclRefExpr.
   StringRef getDeclRefStr(Expr *E) {
-    return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseName().str();
+    return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseIdentifier().str();
   }
 
 public:
