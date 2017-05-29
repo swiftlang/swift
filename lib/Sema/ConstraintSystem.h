@@ -416,8 +416,10 @@ enum ScoreKind {
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
   SK_KeyPathSubscript,
-  
-  SK_LastScoreKind = SK_KeyPathSubscript,
+  // A conversion from a string to a pointer.
+  SK_StringToPointerConversion,
+
+  SK_LastScoreKind = SK_StringToPointerConversion,
 };
 
 /// The number of score kinds.
