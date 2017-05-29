@@ -4338,6 +4338,12 @@ resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
       anchor = dotSyntax->getRHS();
       continue;
     }
+
+    if (auto *OEE = dyn_cast<OpenExistentialExpr>(anchor)) {
+      anchor = OEE->getSubExpr();
+      continue;
+    }
+
     break;
   } while (true);
   
@@ -4474,6 +4480,7 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     } else {
       newPath.push_back(ConstraintLocator::ApplyFunction);
     }
+
     assert(newPath.back().getNewSummaryFlags() == 0 &&
            "added element that changes the flags?");
     locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
@@ -7005,12 +7012,22 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return apply;
   }
 
-  // If the metatype value isn't a type expression, the user should reference
-  // '.init' explicitly, for clarity.
   if (!cs.isTypeReference(fn)) {
-    cs.TC.diagnose(apply->getArg()->getStartLoc(),
-                   diag::missing_init_on_metatype_initialization)
-      .fixItInsert(apply->getArg()->getStartLoc(), ".init");
+    bool isExistentialType = false;
+    // If this is an attempt to initialize existential type.
+    if (auto metaType = fn->getType()->getAs<MetatypeType>()) {
+      auto instanceType = metaType->getInstanceType();
+      isExistentialType = instanceType->isExistentialType();
+    }
+
+    if (!isExistentialType) {
+      // If the metatype value isn't a type expression,
+      // the user should reference '.init' explicitly, for clarity.
+      cs.TC
+          .diagnose(apply->getArg()->getStartLoc(),
+                    diag::missing_init_on_metatype_initialization)
+          .fixItInsert(apply->getArg()->getStartLoc(), ".init");
+    }
   }
 
   // If we're "constructing" a tuple type, it's simply a conversion.
