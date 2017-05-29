@@ -272,7 +272,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 
   unsigned splitLoc = splitCandidate.first;
   bool isBinOpFirst = splitCandidate.second;
-  StringRef nameStr = UDRE->getName().getBaseName().str();
+  StringRef nameStr = UDRE->getName().getBaseIdentifier().str();
   auto startStr = nameStr.substr(0, splitLoc);
   auto endStr = nameStr.drop_front(splitLoc);
 
@@ -300,7 +300,7 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
                                     DeclContext *DC,
                                     TypeChecker &TC) {
-  Identifier name = UDRE->getName().getBaseName();
+  Identifier name = UDRE->getName().getBaseIdentifier();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
     return false;
@@ -455,7 +455,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
       .highlight(UDRE->getSourceRange());
 
-    const char *buffer = Name.getBaseName().get();
+    Identifier simpleName = Name.getBaseIdentifier();
+    const char *buffer = simpleName.get();
     llvm::SmallString<64> expectedIdentifier;
     bool isConfused = false;
     uint32_t codepoint;
@@ -464,7 +465,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                                         buffer +
                                                         strlen(buffer)))
            != ~0U) {
-      int length = (buffer - Name.getBaseName().get()) - offset;
+      int length = (buffer - simpleName.get()) - offset;
       char expectedCodepoint;
       if ((expectedCodepoint =
            confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
@@ -479,10 +480,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
     if (isConfused) {
       diagnose(Loc, diag::confusable_character,
-               UDRE->getName().isOperator(),
-               Name.getBaseName().str(), expectedIdentifier)
-        .fixItReplaceChars(Loc, Loc.getAdvancedLoc(Name.getBaseName().getLength()),
-                           expectedIdentifier);
+               UDRE->getName().isOperator(), simpleName.str(),
+               expectedIdentifier)
+        .fixItReplace(Loc, expectedIdentifier);
     } else {
       // Note all the correction candidates.
       for (auto &result : Lookup) {
@@ -1378,7 +1378,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         }
     } else if (auto *Decl = dyn_cast<UnresolvedDeclRefExpr>(fn)) {
       if (Decl->getName().isSimpleName() &&
-            Decl->getName().getBaseName().str() == "&")
+            Decl->getName().getBaseName() == "&")
         isComposition = true;
     }
 
