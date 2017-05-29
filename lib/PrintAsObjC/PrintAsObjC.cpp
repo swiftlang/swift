@@ -2604,8 +2604,9 @@ public:
       assert(*lhs != *rhs && "duplicate top-level decl");
 
       auto getSortName = [](const Decl *D) -> StringRef {
+        // TODO: Handle special names
         if (auto VD = dyn_cast<ValueDecl>(D))
-          return VD->getName().str();
+          return VD->getBaseName().getIdentifier().str();
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();

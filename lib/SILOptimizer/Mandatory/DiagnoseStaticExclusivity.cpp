@@ -501,7 +501,7 @@ static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
     auto D = diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
                        DiagnosticID,
                        VD->getDescriptiveKind(),
-                       VD->getName(),
+                       VD->getBaseName(),
                        AccessKindForMain);
     D.highlight(rangeForMain);
     tryFixItWithCallToCollectionSwapAt(PriorAccess, NewAccess,
