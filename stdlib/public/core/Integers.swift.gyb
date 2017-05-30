@@ -3506,23 +3506,23 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 
 // Swift 3 compatibility APIs
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, renamed: "BinaryInteger")
 public typealias Integer = BinaryInteger
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, renamed: "BinaryInteger")
 public typealias IntegerArithmetic = BinaryInteger
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
 public typealias SignedNumber = SignedNumeric & Comparable
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
 public typealias AbsoluteValuable = SignedNumeric & Comparable
 
-@available(swift, obsoleted: 4)
+@available(swift, obsoleted: 4, renamed: "SignedInteger")
 public typealias _SignedInteger = SignedInteger
 
 extension SignedNumeric where Self : Comparable {
-  @available(swift, obsoleted: 4)
+  @available(swift, obsoleted: 4, message: "Please use the 'abs(_:)' free function.")
   @_transparent
   public static func abs(_ x: Self) -> Self {
     return Swift.abs(x)
@@ -3576,14 +3576,18 @@ extension FixedWidthInteger {
 
 }
 
+%{
+overflowingOps = [
+  ('add', 'adding', ''),
+  ('subtract', 'subtracting', ''),
+  ('multiply', 'multiplied', 'by:'),
+  ('divide', 'divided', 'by:'),
+  ('remainder', 'remainder', 'dividingBy:'),
+]
+}%
+
 extension FixedWidthInteger {
-% for oldPrefix, newPrefix, argLabel in [
-%   ('add', 'adding', ''),
-%   ('subtract', 'subtracting', ''),
-%   ('multiply', 'multiplied', 'by:'),
-%   ('divide', 'divided', 'by:'),
-%   ('remainder', 'remainder', 'dividingBy:'),
-%   ]:
+% for oldPrefix, newPrefix, argLabel in overflowingOps:
   @available(swift, obsoleted: 4, message: "Use ${newPrefix}ReportingOverflow(${argLabel or '_:'}) instead.")
   @_transparent
   public static func ${oldPrefix}WithOverflow(
@@ -3594,6 +3598,18 @@ extension FixedWidthInteger {
     return (partialValue, overflow == .overflow)
   }
 
+% end
+}
+
+extension BinaryInteger {
+% for oldPrefix, newPrefix, argLabel in overflowingOps:
+  @available(swift, obsoleted: 3.2,
+    message: "Please use FixedWidthInteger protocol as a generic constraint and ${newPrefix}ReportingOverflow(${argLabel or '_:'}) method instead.")
+  public static func ${oldPrefix}WithOverflow(
+    _ lhs: Self, _ rhs: Self
+  ) -> (Self, overflow: Bool) {
+    fatalError("Unavailable")
+  }
 % end
 }
 
@@ -3615,7 +3631,8 @@ extension SignedInteger {
     fatalError("Should be overridden in a more specific type")
   }
 
-  @available(swift, obsoleted: 4.0)
+  @available(swift, obsoleted: 4.0,
+      message: "Please use 'FixedWidthInteger' instead of 'SignedInteger' to get '${op}' in generic code.")
   public static func ${op} (lhs: Self, rhs: Self) -> Self {
     return ${helper}(lhs, rhs)
   }
