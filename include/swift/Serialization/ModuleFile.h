@@ -740,7 +740,11 @@ public:
   /// Returns the type with the given ID, deserializing it if needed.
   llvm::Expected<Type> getTypeChecked(serialization::TypeID TID);
 
-  /// Returns the identifier with the given ID, deserializing it if needed.
+  /// Returns the base name with the given ID, deserializing it if needed.
+  DeclBaseName getDeclBaseName(serialization::IdentifierID IID);
+
+  /// Convenience method to retrieve the identifier backing the name with
+  /// given ID. Asserts that the name with this ID is not special.
   Identifier getIdentifier(serialization::IdentifierID IID);
 
   /// Returns the decl with the given ID, deserializing it if needed.

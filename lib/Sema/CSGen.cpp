@@ -1031,8 +1031,6 @@ namespace {
                                  ValueDecl *declOrNull,
                                  ConstraintLocator *memberLocator = nullptr,
                                  ConstraintLocator *indexLocator = nullptr) {
-      ASTContext &Context = CS.getASTContext();
-
       // Locators used in this expression.
       if (!indexLocator)
         indexLocator
@@ -1128,7 +1126,7 @@ namespace {
         CS.addBindOverloadConstraint(fnTy, choice, memberLocator,
                                      CurDC);
       } else {
-        CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
+        CS.addValueMemberConstraint(baseTy, DeclBaseName::createSubscript(),
                                     fnTy, CurDC, FunctionRefKind::DoubleApply,
                                     memberLocator);
       }
