@@ -1,5 +1,7 @@
 // RUN: not --crash %target-swift-frontend -emit-ir -primary-file %s
 
+// REQUIRES: asserts
+
 internal protocol _UTFEncoding {
     associatedtype EncodedScalar where EncodedScalar == Int
 }
