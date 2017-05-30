@@ -9,14 +9,14 @@ sil public [serialized] @inlineMe : $@convention(thin) () -> Bool {
 bb0:
   // function_ref Swift.!= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
   %0 = function_ref @_TFsoi2neUs9Equatable__FTQ_Q__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool // user: %7
-  %1 = alloc_stack $ComparisonResult            // users: %3, %7, %9
-  %2 = enum $ComparisonResult, #ComparisonResult.Same!enumelt // user: %3
-  store %2 to %1 : $*ComparisonResult         // id: %3
-  %4 = alloc_stack $ComparisonResult            // users: %6, %7, %8
-  %5 = enum $ComparisonResult, #ComparisonResult.Same!enumelt // user: %6
-  store %5 to %4 : $*ComparisonResult         // id: %6
-  %7 = apply %0<ComparisonResult>(%1, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool // user: %10
-  dealloc_stack %4 : $*ComparisonResult // id: %8
-  dealloc_stack %1 : $*ComparisonResult // id: %9
+  %1 = alloc_stack $MyComparisonResult            // users: %3, %7, %9
+  %2 = enum $MyComparisonResult, #MyComparisonResult.Same!enumelt // user: %3
+  store %2 to %1 : $*MyComparisonResult         // id: %3
+  %4 = alloc_stack $MyComparisonResult            // users: %6, %7, %8
+  %5 = enum $MyComparisonResult, #MyComparisonResult.Same!enumelt // user: %6
+  store %5 to %4 : $*MyComparisonResult         // id: %6
+  %7 = apply %0<MyComparisonResult>(%1, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool // user: %10
+  dealloc_stack %4 : $*MyComparisonResult // id: %8
+  dealloc_stack %1 : $*MyComparisonResult // id: %9
   return %7 : $Bool                               // id: %10
 }

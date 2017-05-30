@@ -23,6 +23,7 @@ import Foundation
 // CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)acceptTopLevelImportedWithA:(enum TopLevelRaw)a b:(TopLevelEnum)b c:(TopLevelOptions)c d:(TopLevelTypedef)d e:(TopLevelAnon)e;
 // CHECK-NEXT: - (void)acceptMemberImportedWithA:(enum MemberRaw)a b:(enum MemberEnum)b c:(MemberOptions)c d:(enum MemberTypedef)d e:(MemberAnon)e ee:(MemberAnon2)ee;
+// CHECK-NEXT: - (void)comparisonResultIsSpecial:(NSComparisonResult)_;
 // CHECK: @end
 @objc class AnEnumMethod {
   @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
@@ -35,6 +36,8 @@ import Foundation
 
   @objc func acceptTopLevelImported(a: TopLevelRaw, b: TopLevelEnum, c: TopLevelOptions, d: TopLevelTypedef, e: TopLevelAnon) {}
   @objc func acceptMemberImported(a: Wrapper.Raw, b: Wrapper.Enum, c: Wrapper.Options, d: Wrapper.Typedef, e: Wrapper.Anon, ee: Wrapper.Anon2) {}
+
+  @objc func comparisonResultIsSpecial(_: ComparisonResult) {}
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcEnumNamed, "EnumNamed") {

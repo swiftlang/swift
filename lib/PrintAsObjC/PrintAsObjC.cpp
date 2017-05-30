@@ -1281,6 +1281,7 @@ private:
       MAP(Int, "NSInteger", false);
       MAP(UInt, "NSUInteger", false);
       MAP(Bool, "BOOL", false);
+      MAP(ComparisonResult, "NSComparisonResult", false);
 
       MAP(OpaquePointer, "void *", true);
       MAP(UnsafeRawPointer, "void const *", true);
@@ -1566,6 +1567,10 @@ private:
 
   void visitEnumType(EnumType *ET, Optional<OptionalTypeKind> optionalKind) {
     const EnumDecl *ED = ET->getDecl();
+
+    // Handle known type names.
+    if (printIfKnownSimpleType(ED, optionalKind))
+      return;
 
     // Handle bridged types.
     if (printIfObjCBridgeable(ED, { }, optionalKind))

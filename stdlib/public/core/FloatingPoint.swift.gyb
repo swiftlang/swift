@@ -1854,6 +1854,52 @@ extension BinaryFloatingPoint {
   */
 }
 
+
+// Comparable comparison operators (provides a total ordering)
+extension FloatingPoint {
+  public func compare(_ other: Self) -> ComparisonResult {
+    // Can potentially be implemented more efficiently -- this is just the clearest version
+    if self.isLess(than: other) {
+      return .orderedAscending
+    } else if other.isLess(than: self) {
+      return .orderedDescending
+    } else {
+      // Special cases
+
+      // -0 < +0
+      if self.isZero && other.isZero {
+        // .plus == 0 and .minus == 1, so flip ordering to get - < +
+        return other.sign.rawValue.compare(self.sign.rawValue)
+      }
+
+      // NaN == NaN, NaN > +Inf
+      if self.isNaN {
+        if other.isNaN {
+          return .orderedSame
+        } else {
+          return .orderedDescending
+        }
+      } else if other.isNaN {
+        return .orderedAscending
+      }
+
+      // Otherwise equality agrees with normal IEEE
+      return .orderedSame
+    }
+  }
+
+  @_implements(Equatable, ==(_:_:))
+  public static func _comparableEqual(lhs: Self, rhs: Self) -> Bool {
+    fatalError("NaNaNaNaaaaaa....")
+    return lhs.compare(rhs) == .orderedSame
+  }
+
+  @_implements(Comparable, <(_:_:))
+  public static func _comparableLessThan(lhs: Self, rhs: Self) -> Bool {
+    return lhs.compare(rhs) == .orderedDescending
+  }
+}
+
 /// Returns the absolute value of `x`.
 @_transparent
 public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {

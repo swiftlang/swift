@@ -629,3 +629,12 @@ class NewtypeUser {
   @objc func intNewtype(a: MyInt) {}
   @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
+
+func testComparisonResult(str: NSString) {
+  let ordering = str.compare(str as String)
+  switch ordering {
+  case .orderedAscending: break
+  case ComparisonResult.orderedSame: break
+  case Swift.ComparisonResult.orderedDescending: break
+  }
+}

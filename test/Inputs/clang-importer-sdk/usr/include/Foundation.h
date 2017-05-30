@@ -297,6 +297,8 @@ typedef NSPoint *NSPointArray;
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
 
+typedef NS_ENUM(NSInteger, NSComparisonResult) {NSOrderedAscending = -1L, NSOrderedSame, NSOrderedDescending};
+
 /// Aaa.  NSRuncingMode.  Bbb.
 typedef NS_ENUM(NSUInteger, NSRuncingMode) {
   NSRuncingMince,
@@ -759,9 +761,7 @@ NSSet *setToSet(NSSet *dict);
 
 @interface NSString(FoundationExts)
 - (void)notBridgedMethod;
-@end
-
-@interface NSString(FoundationExts)
+- (NSComparisonResult)compare:(NSString *)other;
 @property (nonatomic, copy) NSString *uppercaseString;
 @end
 

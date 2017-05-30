@@ -61,6 +61,7 @@ KNOWN_STDLIB_TYPE_DECL(Optional, EnumDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(ImplicitlyUnwrappedOptional, EnumDecl, 1)
 
 KNOWN_STDLIB_TYPE_DECL(OptionSet, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(ComparisonResult, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(UnsafeMutableRawPointer, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(UnsafeRawPointer, NominalTypeDecl, 0)

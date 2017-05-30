@@ -183,7 +183,7 @@ extension Measurement {
 
     /// Compare two measurements of the same `Unit`.
     /// - returns: `true` if the measurements can be compared and the `lhs` is less than the `rhs` converted value.
-    public static func <<LeftHandSideType, RightHandSideType>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
+    public static func < <LeftHandSideType, RightHandSideType>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
         if lhs.unit == rhs.unit {
             return lhs.value < rhs.value
         } else {
@@ -197,6 +197,25 @@ extension Measurement {
             }
             fatalError("Attempt to compare measurements with non-equal dimensions")
         }
+    }
+
+    /// FIXME: temporary duplication for overload resolution
+    /// Compare two measurements of the same `Unit`.
+    /// - returns: `true` if the measurements can be compared and the `lhs` is less than the `rhs` converted value.
+    public static func < <T>(lhs: Measurement<T>, rhs: Measurement<T>) -> Bool {
+      if lhs.unit == rhs.unit {
+          return lhs.value < rhs.value
+      } else {
+          if let lhsDimensionalUnit = lhs.unit as? Dimension,
+             let rhsDimensionalUnit = rhs.unit as? Dimension {
+              if type(of: lhsDimensionalUnit).baseUnit() == type(of: rhsDimensionalUnit).baseUnit() {
+                  let lhsValueInTermsOfBase = lhsDimensionalUnit.converter.baseUnitValue(fromValue: lhs.value)
+                  let rhsValueInTermsOfBase = rhsDimensionalUnit.converter.baseUnitValue(fromValue: rhs.value)
+                  return lhsValueInTermsOfBase < rhsValueInTermsOfBase
+              }
+          }
+          fatalError("Attempt to compare measurements with non-equal dimensions")
+      }
     }
 }
 

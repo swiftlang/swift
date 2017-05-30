@@ -2441,6 +2441,14 @@ namespace {
         if (declaredNative && nativeDecl)
           return nativeDecl;
 
+        // Special case for NSComparisonResult, which is imported as Swift's
+        // ComparisonResult.
+        if (decl->getName() == "NSComparisonResult") {
+          if (clang::Module *M = decl->getImportedOwningModule())
+            if (M->getTopLevelModuleName() == C.Id_Foundation.str())
+              return C.getComparisonResultDecl();
+        }
+
         // Compute the underlying type.
         auto underlyingType = Impl.importType(
             decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
