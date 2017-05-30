@@ -1,0 +1,10 @@
+[
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@ANTGlobalValue",
+    "OldPrintedName": "oldMember",
+    "OldTypeName": "OldType",
+    "NewPrintedName": "newMember",
+    "NewTypeName": "NewType"
+  }
+]

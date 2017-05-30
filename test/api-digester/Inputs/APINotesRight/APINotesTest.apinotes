@@ -1,0 +1,4 @@
+Name: APINotesTest
+Globals:
+  - Name: ANTGlobalValue
+    SwiftName: NewType.newMember
