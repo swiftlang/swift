@@ -8390,9 +8390,9 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       // constraint system through declaration types.
       bool hasUnresolvedParams = false;
       resultExpr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
-        if (auto DRE = dyn_cast<DeclRefExpr>(resultExpr)) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(childExpr)) {
           if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
-            auto paramType = param->getType();
+            auto paramType = param->hasType() ? param->getType() : Type();
             if (!paramType || paramType->hasTypeVariable()) {
               hasUnresolvedParams = true;
               return nullptr;
