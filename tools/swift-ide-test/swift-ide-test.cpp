@@ -108,13 +108,13 @@ public:
     return false;
   }
   void didGlobalize(Decl *D) override {}
-  bool lookupOverrides(Identifier Name, DeclContext *DC,
+  bool lookupOverrides(DeclBaseName Name, DeclContext *DC,
                        SourceLoc Loc, bool IsTypeLookup,
                        ResultVector &RV) override {
     return false;
   }
 
-  bool lookupAdditions(Identifier Name, DeclContext *DC,
+  bool lookupAdditions(DeclBaseName Name, DeclContext *DC,
                        SourceLoc Loc, bool IsTypeLookup,
                        ResultVector &RV) override {
     return false;
