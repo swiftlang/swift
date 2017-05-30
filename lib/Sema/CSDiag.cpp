@@ -2040,12 +2040,6 @@ public:
     return e ? e->getType() : Type();
   }
 
-  /// This is the same as typeCheckChildIndependently, but works on an arbitrary
-  /// subexpression of the current node because it handles ClosureExpr parents
-  /// of the specified node.
-  Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
-                                             TCCOptions options = TCCOptions());
-
   /// Special magic to handle inout exprs and tuples in argument lists.
   Expr *typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                                         const CalleeCandidateInfo &candidates,
@@ -2830,7 +2824,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     if (CS->getContextualTypePurpose() != CTP_Unused)
       options |= TCC_ForceRecheck;
       
-    auto sub = typeCheckArbitrarySubExprIndependently(anchor, options);
+    auto sub = typeCheckChildIndependently(anchor, Type(), CTP_Unused, options);
     if (!sub) return true;
     fromType = sub->getType();
   }
@@ -3362,7 +3356,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // no OpenExistentialExpr, which breaks invariants enforced by the
   // ASTChecker.
   eraseOpenedExistentials(subExpr);
-  
+
   // If recursive type checking failed, then an error was emitted.  Return
   // null to indicate this to the caller.
   if (hadError)
@@ -3374,54 +3368,9 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
     subExpr = preCheckedExpr;
     SavedTypeData.restore();
   }
-  
+
   CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
   return subExpr;
-}
-
-/// This is the same as typeCheckChildIndependently, but works on an arbitrary
-/// subexpression of the current node because it handles ClosureExpr parents
-/// of the specified node.
-Expr *FailureDiagnosis::
-typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
-  if (subExpr == expr)
-    return typeCheckChildIndependently(subExpr, options);
-  
-  // Construct a parent map for the expr tree we're investigating.
-  auto parentMap = expr->getParentMap();
-  
-  ClosureExpr *NearestClosure = nullptr;
-  
-  // Walk the parents of the specified expression, handling any ClosureExprs.
-  for (Expr *node = parentMap[subExpr]; node; node = parentMap[node]) {
-    auto *CE = dyn_cast<ClosureExpr>(node);
-    if (!CE) continue;
-    
-    // Keep track of the innermost closure we see that we're jumping into.
-    if (!NearestClosure)
-      NearestClosure = CE;
-    
-    // If we have a ClosureExpr parent of the specified node, check to make sure
-    // none of its arguments are type variables.  If so, these type variables
-    // would be accessible to name lookup of the subexpression and may thus leak
-    // in.  Reset them to UnresolvedTypes for safe measures.
-    for (auto param : *CE->getParameters()) {
-      auto VD = param;
-      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
-        VD->setType(CS->getASTContext().TheUnresolvedType);
-        VD->setInterfaceType(VD->getType());
-      }
-    }
-  }
-
-  // When we're type checking a single-expression closure, we need to reset the
-  // DeclContext to this closure for the recursive type checking.  Otherwise,
-  // if there is a closure in the subexpression, we can violate invariants.
-  auto newDC = NearestClosure ? NearestClosure : CS->DC;
-  llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, newDC);
-  
-  // Otherwise, we're ok to type check the subexpr.
-  return typeCheckChildIndependently(subExpr, options);
 }
 
 /// For an expression being type checked with a CTP_CalleeResult contextual
@@ -7720,7 +7669,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
     BaseLoc = baseExpr->getLoc();
     // Retypecheck the anchor type, which is the base of the member expression.
     baseExpr =
-        typeCheckArbitrarySubExprIndependently(baseExpr, TCC_AllowLValue);
+      typeCheckChildIndependently(baseExpr, Type(), CTP_Unused, TCC_AllowLValue);
     if (!baseExpr)
       return true;
 
