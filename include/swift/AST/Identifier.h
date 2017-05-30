@@ -233,6 +233,14 @@ public:
     return !isSpecial() && getIdentifier().isEditorPlaceholder();
   }
 
+  /// A representation of the name to be displayed to users. May be ambiguous
+  /// between identifiers and special names.
+  StringRef userFacingName() const {
+    if (empty())
+      return "_";
+    return getIdentifier().str();
+  }
+
   int compare(DeclBaseName other) const {
     // TODO: Sort special names cleverly
     return getIdentifier().compare(other.getIdentifier());

@@ -1021,9 +1021,9 @@ public:
         return { true, E };
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
-      // TODO: Handle special names
-      if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getBaseIdentifier().getLength())))
+      if (!Fn(CharSourceRange(
+              DRE->getSourceRange().Start,
+              DRE->getName().getBaseName().userFacingName().size())))
         return { false, nullptr };
     }
     return { true, E };

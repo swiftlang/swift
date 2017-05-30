@@ -1399,7 +1399,8 @@ public:
     llvm::array_pod_sort(ClangMacros.begin(), ClangMacros.end(),
        [](ValueDecl * const *lhs,
           ValueDecl * const *rhs) -> int {
-         return (*lhs)->getNameStr().compare((*rhs)->getNameStr());
+         return (*lhs)->getBaseName().userFacingName().compare(
+                  (*rhs)->getBaseName().userFacingName());
        });
 
     for (auto *VD : ClangMacros)
