@@ -1414,6 +1414,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitize = Opts.Sanitize;
   }
 
+  if (Opts.Optimization > SILOptions::SILOptMode::None)
+    Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
