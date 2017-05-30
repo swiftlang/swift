@@ -8082,6 +8082,43 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
 bool FailureDiagnosis::diagnoseExprFailure() {
   assert(CS && expr);
 
+  class AssignExprFinder : public ASTWalker {
+  public:
+    Expr *foundAssign = nullptr;
+
+    // Walk through the expr looking for assignments nested in them.
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *AE = dyn_cast<AssignExpr>(E)) {
+        foundAssign = AE;
+        return { false, E };
+      }
+      if (auto *AE = dyn_cast<DiscardAssignmentExpr>(E)) {
+        foundAssign = AE;
+        return { false, E };
+      }
+      return { true, E };
+    }
+
+    // Don't walk into anything else.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToParameterListPre(ParameterList *PL) override { return false; }
+  };
+
+  // First, directly diagnose nested assignment expressions.
+  AssignExprFinder assignFinder;
+  if (expr->walk(assignFinder), assignFinder.foundAssign != nullptr) {
+    diagnoseAmbiguity(assignFinder.foundAssign);
+    return true;
+  }
+
   // Our general approach is to do a depth first traversal of the broken
   // expression tree, type checking as we go.  If we find a subtree that cannot
   // be type checked on its own (even to an incomplete type) then that is where
