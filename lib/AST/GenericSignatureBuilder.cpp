@@ -4759,6 +4759,27 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   }
 }
 
+/// Resolve any unresolved dependent member types using the given builder.
+static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
+                                        Type type) {
+  if (!type->hasTypeParameter()) return type;
+
+  return type.transformRec([&builder](TypeBase *type) -> Optional<Type> {
+    if (auto depTy = dyn_cast<DependentMemberType>(type)) {
+      if (depTy->getAssocType()) return None;
+
+      auto pa = builder.resolveArchetype(
+                             type, ArchetypeResolutionKind::CompleteWellFormed);
+      if (!pa)
+        return ErrorType::get(depTy);
+
+      return pa->getDependentType({ }, /*allowUnresolved=*/false);
+    }
+
+    return None;
+  });
+}
+
 void GenericSignatureBuilder::checkConcreteTypeConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
                                  PotentialArchetype *representative) {
@@ -4783,6 +4804,10 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     None,
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
+
+  // Resolve any this-far-unresolved dependent types.
+  equivClass->concreteType =
+    resolveDependentMemberTypes(*this, equivClass->concreteType);
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -4820,6 +4845,10 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       diag::requires_superclass_conflict,
       diag::redundant_superclass_constraint,
       diag::superclass_redundancy_here);
+
+  // Resolve any this-far-unresolved dependent types.
+  equivClass->superclass =
+    resolveDependentMemberTypes(*this, equivClass->superclass);
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.

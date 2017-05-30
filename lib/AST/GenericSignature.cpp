@@ -869,11 +869,10 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       Type storedType = eraseAssociatedTypes(source->getStoredType());
 
       // Dig out the potential archetype for this stored type.
-      // FIXME: CompleteWellFormed here?
       auto pa =
         reqSigBuilder.resolveArchetype(
                                  storedType,
-                                 ArchetypeResolutionKind::AlwaysPartial);
+                                 ArchetypeResolutionKind::CompleteWellFormed);
       auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in
