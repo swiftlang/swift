@@ -417,7 +417,7 @@ enum ScoreKind {
   /// A key path application subscript.
   SK_KeyPathSubscript,
   
-  SK_LastScoreKind = SK_EmptyExistentialConversion,
+  SK_LastScoreKind = SK_KeyPathSubscript,
 };
 
 /// The number of score kinds.
