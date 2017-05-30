@@ -2159,9 +2159,15 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     auto diffParent = diffNode->getParent();
     assert(nodeParent && diffParent && "trying to check Root?");
 
+    // Move from global variable to a member variable.
     if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
         diffParent->getKind() == SDKNodeKind::Root)
       TypeMemberDiffs.push_back({diffNode, node});
+    // Move from a member variable to another member variable
+    if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
+        diffParent->getKind() == SDKNodeKind::TypeDecl)
+      TypeMemberDiffs.push_back({diffNode, node});
+    // Move from a getter/setter function to a property
     else if (node->getKind() == SDKNodeKind::Getter &&
              diffNode->getKind() == SDKNodeKind::Function &&
              node->isNameValid()) {
@@ -2998,6 +3004,7 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   RenameDetectorForMemberDiff Detector;
   for (auto pair : diffFinder.getDiffs()) {
     auto left = pair.first;
+    auto leftParent = left->getParent();
     auto right = pair.second;
     auto rightParent = right->getParent();
 
@@ -3006,6 +3013,8 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(), constructFullTypeName(rightParent),
         right->getPrintedName(), findSelfIndex(right), None,
+        leftParent->getKind() == SDKNodeKind::Root ?
+          StringRef() : constructFullTypeName(leftParent),
         left->getPrintedName()};
     out.emplace_back(item);
     Detector.workOn(left, right);
