@@ -159,7 +159,8 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
   // First perform a quick check.
   for (auto &Op : OpenedArchetypeOperands) {
     auto Def = Op.get();
-    if (getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
+    if (isa<SILInstruction>(Def) &&
+        getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
       return Def;
   }
   // Then use a regular lookup.
