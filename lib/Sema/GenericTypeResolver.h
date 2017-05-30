@@ -100,14 +100,7 @@ public:
 /// This generic type resolver leaves generic type parameter types alone
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
-  GenericSignatureBuilder &Builder;
-  ArrayRef<GenericTypeParamType *> GenericParams;
-
 public:
-  DependentGenericTypeResolver(GenericSignatureBuilder &builder,
-                               ArrayRef<GenericTypeParamType *> genericParams)
-    : Builder(builder), GenericParams(genericParams) { }
-
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,

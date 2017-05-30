@@ -42,17 +42,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      DeclContext *DC,
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
-#if true
-  auto archetype =
-    Builder.resolveArchetype(baseTy, ArchetypeResolutionKind::AlwaysPartial);
-  assert(archetype && "Bad generic context nesting?");
-
-  return archetype
-           ->getNestedType(ref->getIdentifier(), Builder)
-           ->getDependentType(GenericParams, /*allowUnresolved=*/true);
-#else
   return DependentMemberType::get(baseTy, ref->getIdentifier());
-#endif
 }
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
@@ -794,7 +784,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder, allGenericParams);
+  DependentGenericTypeResolver dependentResolver;
   if (checkGenericFuncSignature(*this, &builder, func, dependentResolver))
     invalid = true;
 
@@ -1025,7 +1015,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder, allGenericParams);
+  DependentGenericTypeResolver dependentResolver;
   if (checkGenericSubscriptSignature(*this, &builder, subscript,
                                      dependentResolver))
     invalid = true;
@@ -1144,7 +1134,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
-  DependentGenericTypeResolver dependentResolver(builder, allGenericParams);
+  DependentGenericTypeResolver dependentResolver;
   if (recursivelyVisitGenericParams) {
     visitOuterToInner(genericParams,
                       [&](GenericParamList *gpList) {
