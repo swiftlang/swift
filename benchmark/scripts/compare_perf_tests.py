@@ -17,11 +17,12 @@ from __future__ import print_function
 
 import argparse
 import csv
+import re
 import sys
 from math import sqrt
 
 
-class PerformanceTestResult:
+class PerformanceTestResult(object):
     def __init__(self, csv_row):
         # csv_row[0] is just an ordinal number of the test - skip that
         self.name = csv_row[1]          # Name of the performance test
@@ -36,7 +37,6 @@ class PerformanceTestResult:
         self.median = int(csv_row[7])   # Median runtime (ms)
         self.max_rss = (                # Maximum Resident Set Size (B)
             int(csv_row[8]) if len(csv_row) > 8 else None)
-        # TODO if we really want to compute mean MAX_RSS: self.S_memory
 
     @property
     def sd(self):  # Standard Deviation (ms)
@@ -65,7 +65,6 @@ class PerformanceTestResult:
             (self.samples, self.mean, self.S_runtime) = state
 
         # Merging test results with up to 3 samples is exact
-        # TODO investigate how to best handle merge of higher sample counts
         values = [r.min, r.max, r.median, r.mean][:min(r.samples, 4)]
         map(push, values)
 
@@ -73,15 +72,19 @@ class PerformanceTestResult:
 
     # Tuple of values formatted for display in results table:
     # (name, min value, max value, mean value, max_rss)
-    def values(self):
-        return (self.name, str(self.min), str(self.max), str(int(self.mean)),
-                str(self.max_rss) if self.max_rss else '-')
+    def values(self, break_words=False):
+        return (
+            break_word_camel_case(self.name) if break_words else self.name,
+            str(self.min), str(self.max), str(int(self.mean)),
+            str(self.max_rss) if self.max_rss else '—'
+        )
 
 
-class ResultComparison:
+class ResultComparison(object):
     def __init__(self, old, new):
         self.old = old
         self.new = new
+        assert(old.name == new.name)
         self.name = old.name  # Test name, convenience accessor
 
         # Speedup ratio
@@ -100,18 +103,19 @@ class ResultComparison:
 
     # Tuple of values formatted for display in results table:
     # (name, old value, new value, delta [%], speedup ratio)
-    def values(self):
-        return (self.name, str(self.old.min), str(self.new.min),
+    def values(self, break_words=False):
+        return (break_word_camel_case(self.name) if break_words else self.name,
+                str(self.old.min), str(self.new.min),
                 '{0:+.1f}%'.format(self.delta),
                 '{0:.2f}x{1}'.format(self.ratio, self.is_dubious))
 
 
-class TestComparator:
-    def __init__(self, old_file, new_file, delta_threshold, changes_only):
+class TestComparator(object):
+    def __init__(self, old_file, new_file, delta_threshold):
 
         def load_from_CSV(filename):  # handles output from Benchmark_O and
             def skip_totals(row):     # Benchmark_Driver (added MAX_RSS column)
-                        return len(row) > 7 and row[0].isdigit()
+                return len(row) > 7 and row[0].isdigit()
             tests = map(PerformanceTestResult,
                         filter(skip_totals, csv.reader(open(filename))))
 
@@ -131,9 +135,9 @@ class TestComparator:
         added_tests = new_tests.difference(old_tests)
         removed_tests = old_tests.difference(new_tests)
 
-        self.added = sorted(map(lambda t: new_results[t], added_tests),
+        self.added = sorted([new_results[t] for t in added_tests],
                             key=lambda r: r.name)
-        self.removed = sorted(map(lambda t: old_results[t], removed_tests),
+        self.removed = sorted([old_results[t] for t in removed_tests],
                               key=lambda r: r.name)
 
         def compare(name):
@@ -144,58 +148,60 @@ class TestComparator:
         def partition(l, p):
             return reduce(lambda x, y: x[not p(y)].append(y) or x, l, ([], []))
 
-        # TODO take standard deviation (SD) into account
         decreased, not_decreased = partition(
             comparisons, lambda c: c.ratio < (1 - delta_threshold))
         increased, unchanged = partition(
             not_decreased, lambda c: c.ratio > (1 + delta_threshold))
 
         # sorted partitions
-        names = map(lambda c: c.name, comparisons)
+        names = [c.name for c in comparisons]
         comparisons = dict(zip(names, comparisons))
-        self.decreased = map(lambda c: comparisons[c.name],
-                             sorted(decreased, key=lambda c: -c.delta))
-        self.increased = map(lambda c: comparisons[c.name],
-                             sorted(increased, key=lambda c: c.delta))
-        self.unchanged = map(lambda c: comparisons[c.name],
-                             sorted(unchanged, key=lambda c: c.name))
+        self.decreased = [comparisons[c.name]
+                          for c in sorted(decreased, key=lambda c: -c.delta)]
+        self.increased = [comparisons[c.name]
+                          for c in sorted(increased, key=lambda c: c.delta)]
+        self.unchanged = [comparisons[c.name]
+                          for c in sorted(unchanged, key=lambda c: c.name)]
 
 
-class ReportFormatter:
+class ReportFormatter(object):
     def __init__(self, comparator, old_branch, new_branch, changes_only):
         self.comparator = comparator
         self.old_branch = old_branch
         self.new_branch = new_branch
         self.changes_only = changes_only
+        self.break_words = False
 
-    MARKDOWN_DETAIL = """
+    MARKDOWN_DETAIL = u"""
 <details {3}>
   <summary>{0} ({1})</summary>
   {2}
 </details>
 """
-    GIT_DETAIL = """
+    GIT_DETAIL = u"""
 {0} ({1}): {2}"""
 
     def markdown(self):
-        return self.__formatted_text(
-            ROW='{0} | {1} | {2} | {3} | {4} \n',
-            HEADER_SEPARATOR='---',
+        self.break_words = True
+        return self._formatted_text(
+            ROW=u'{0} | {1} | {2} | {3} | {4} \n',
+            HEADER_SEPARATOR=u'---',
             DETAIL=self.MARKDOWN_DETAIL)
 
     def git(self):
-        return self.__formatted_text(
-            ROW='{0}   {1}   {2}   {3}   {4} \n',
-            HEADER_SEPARATOR='   ',
+        return self._formatted_text(
+            ROW=u'{0}   {1}   {2}   {3}   {4} \n',
+            HEADER_SEPARATOR=u'   ',
             DETAIL=self.GIT_DETAIL)
 
-    def __column_widths(self):
+    def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
         comparisons = (changed if self.changes_only else
                        changed + self.comparator.unchanged)
         comparisons += self.comparator.added + self.comparator.removed
 
-        values = map(lambda c: c.values(), comparisons)
+        values = [c.values(break_words=self.break_words)
+                  for c in comparisons]
         widths = map(lambda columns: map(len, columns),
                      [PerformanceTestResult.header, ResultComparison.header] +
                      values)
@@ -205,8 +211,8 @@ class ReportFormatter:
 
         return reduce(max_widths, widths, tuple([0] * 5))
 
-    def __formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
-        widths = self.__column_widths()
+    def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
+        widths = self._column_widths()
 
         def justify_columns(contents):
             return tuple(map(lambda (w, c): c.ljust(w), zip(widths, contents)))
@@ -223,7 +229,9 @@ class ReportFormatter:
 
         def table(title, results, is_strong=False, is_open=False):
             rows = [
-                row(format_columns(result_comparison.values(), is_strong))
+                row(format_columns(
+                    result_comparison.values(break_words=self.break_words),
+                    is_strong))
                 for result_comparison in results
             ]
             return ('' if not rows else
@@ -241,9 +249,9 @@ class ReportFormatter:
              table('No Changes', self.comparator.unchanged)),
             table('Added', self.comparator.added, is_open=True),
             table('Removed', self.comparator.removed, is_open=True)
-        ])
+        ]).encode('utf-8')
 
-    HTML = """
+    HTML = u"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -268,7 +276,7 @@ class ReportFormatter:
 </body>
 </html>"""
 
-    HTML_HEADER_ROW = """
+    HTML_HEADER_ROW = u"""
         <tr>
                 <th align='left'>{0} ({1})</th>
                 <th align='left'>{2}</th>
@@ -278,7 +286,7 @@ class ReportFormatter:
         </tr>
 """
 
-    HTML_ROW = """
+    HTML_ROW = u"""
         <tr>
                 <td align='left'>{0}</td>
                 <td align='left'>{1}</td>
@@ -315,7 +323,7 @@ class ReportFormatter:
                  table('No Changes', self.comparator.unchanged, 'black')),
                 table('Added', self.comparator.added, ''),
                 table('Removed', self.comparator.removed, '')
-            ]))
+            ])).encode('utf-8')
 
 
 def main():
@@ -343,7 +351,7 @@ def main():
 
     args = parser.parse_args()
     comparator = TestComparator(args.old_file, args.new_file,
-                                float(args.delta_threshold), args.changes_only)
+                                float(args.delta_threshold))
     formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
                                 args.changes_only)
 
@@ -368,13 +376,27 @@ def main():
             sys.exit(1)
 
 
+FIRST_CAP_RE = re.compile('(.)([A-Z][a-z]+)')
+ALL_CAP_RE = re.compile('([a-z0-9])([A-Z])')
+
+
+def break_word_camel_case(name, separator='\xe2\x80\x8b'):
+    """Insert sperator between words in the camelCased name.
+    Default separator is zero-width space (U+200B).
+    """
+    replacement = r'\1' + separator + r'\2'
+    name = FIRST_CAP_RE.sub(replacement, name)
+    name = ALL_CAP_RE.sub(replacement, name)
+    return unicode(name, encoding='utf-8')
+
+
 def write_to_file(file_name, data):
     """
     Write data to given file
     """
-    file = open(file_name, 'w')
-    file.write(data)
-    file.close
+    output_file = open(file_name, 'w')
+    output_file.write(data)
+    output_file.close
 
 
 if __name__ == '__main__':
