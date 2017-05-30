@@ -103,7 +103,7 @@ extension Unicode.Scalar :
       self._value = v
       return
     }
-    // Return nil in case of invalid unicode scalar value.
+    // Return nil in case of an invalid unicode scalar value.
     return nil
   }
 
@@ -122,7 +122,7 @@ extension Unicode.Scalar :
   ///     print(bap!)
   ///     // Prints "밥"
   ///
-  /// In case an invalid input value, nil is returned.
+  /// In case of an invalid input value, nil is returned.
   ///
   ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
   ///     if let bap = Unicode.Scalar(codepoint) {
@@ -321,7 +321,7 @@ extension Unicode.Scalar {
   ///     print(emoji)
   ///     // Prints "🎉"
   ///
-  /// In case an invalid input value, nil is returned.
+  /// In case of an invalid input value, nil is returned.
   ///
   ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
   ///     if let emoji = Unicode.Scalar(codepoint) {
