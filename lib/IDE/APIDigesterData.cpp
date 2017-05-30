@@ -325,7 +325,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
       RemovedIndexShort = RemovedIndex.getValue();
     return new (Alloc.Allocate<TypeMemberDiffItem>())
       TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName, SelfIndexShort,
-                         RemovedIndexShort, OldPrintedName);
+                         RemovedIndexShort, OldTypeName, OldPrintedName);
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     return new (Alloc.Allocate<NoEscapeFuncParam>())
@@ -393,6 +393,8 @@ struct ObjectTraits<APIDiffItem*> {
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_Usr), Item->usr);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldPrintedName),
                       Item->oldPrintedName);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldTypeName),
+                      Item->oldTypeName);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewPrintedName),
                       Item->newPrintedName);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewTypeName),
