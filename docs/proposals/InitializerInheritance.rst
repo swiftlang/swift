@@ -135,7 +135,7 @@ doing so is safe.
 Complete object initializers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Introduce the notion of a complete object initializer, which is
-written as an initializer with ``Self`` as its return type [#], e.g.::
+written as an initializer with ``Self`` as its return type [#]_, e.g.::
 
   init() -> Self {
     // ...
