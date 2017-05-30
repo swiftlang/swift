@@ -14,7 +14,7 @@ protocol P2 {
 protocol P3 { }
 protocol P4 { }
 
-// expected-error@+1{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{30-35=Assoc}}
+// expected-error@+1{{'assoc' is not a member type of 'T'}}
 func typoAssoc1<T : P1>(x: T.assoc, _: T) { } 
 
 // expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{53-58=Assoc}}
