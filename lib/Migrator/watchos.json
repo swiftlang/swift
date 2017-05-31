@@ -320,6 +320,28 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FE8SceneKitVSC10SCNMatrix4cFV4simd8float4x4S0_",
+    "LeftComment": "float4x4",
+    "RightUsr": "",
+    "RightComment": "float4x4",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:FE8SceneKitVSC10SCNMatrix4cFV4simd9double4x4S0_",
+    "LeftComment": "double4x4",
+    "RightUsr": "",
+    "RightComment": "double4x4",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "3:0:0",
@@ -1453,8 +1475,17 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSSecureCoding(cpy)supportsSecureCoding",
+    "OldPrintedName": "supportsSecureCoding",
+    "OldTypeName": "HKWorkoutSession",
+    "NewPrintedName": "supportsSecureCoding",
+    "NewTypeName": "CKFetchRecordZoneChangesOptions"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTabColumnTerminatorsAttributeName",
     "OldPrintedName": "NSTabColumnTerminatorsAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "columnTerminators",
     "NewTypeName": "NSTextTab.OptionKey"
   },
@@ -1462,6 +1493,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightUltraLight",
     "OldPrintedName": "UIFontWeightUltraLight",
+    "OldTypeName": "",
     "NewPrintedName": "ultraLight",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1469,6 +1501,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightThin",
     "OldPrintedName": "UIFontWeightThin",
+    "OldTypeName": "",
     "NewPrintedName": "thin",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1476,6 +1509,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightLight",
     "OldPrintedName": "UIFontWeightLight",
+    "OldTypeName": "",
     "NewPrintedName": "light",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1483,6 +1517,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightRegular",
     "OldPrintedName": "UIFontWeightRegular",
+    "OldTypeName": "",
     "NewPrintedName": "regular",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1490,6 +1525,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightMedium",
     "OldPrintedName": "UIFontWeightMedium",
+    "OldTypeName": "",
     "NewPrintedName": "medium",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1497,6 +1533,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightSemibold",
     "OldPrintedName": "UIFontWeightSemibold",
+    "OldTypeName": "",
     "NewPrintedName": "semibold",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1504,6 +1541,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightBold",
     "OldPrintedName": "UIFontWeightBold",
+    "OldTypeName": "",
     "NewPrintedName": "bold",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1511,6 +1549,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightHeavy",
     "OldPrintedName": "UIFontWeightHeavy",
+    "OldTypeName": "",
     "NewPrintedName": "heavy",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1518,6 +1557,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightBlack",
     "OldPrintedName": "UIFontWeightBlack",
+    "OldTypeName": "",
     "NewPrintedName": "black",
     "NewTypeName": "UIFont.Weight"
   },
@@ -1525,6 +1565,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorFamilyAttribute",
     "OldPrintedName": "UIFontDescriptorFamilyAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "family",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1532,6 +1573,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorNameAttribute",
     "OldPrintedName": "UIFontDescriptorNameAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "name",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1539,6 +1581,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorFaceAttribute",
     "OldPrintedName": "UIFontDescriptorFaceAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "face",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1546,6 +1589,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorSizeAttribute",
     "OldPrintedName": "UIFontDescriptorSizeAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "size",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1553,6 +1597,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorVisibleNameAttribute",
     "OldPrintedName": "UIFontDescriptorVisibleNameAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "visibleName",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1560,6 +1605,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorMatrixAttribute",
     "OldPrintedName": "UIFontDescriptorMatrixAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "matrix",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1567,6 +1613,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorCharacterSetAttribute",
     "OldPrintedName": "UIFontDescriptorCharacterSetAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "characterSet",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1574,6 +1621,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorCascadeListAttribute",
     "OldPrintedName": "UIFontDescriptorCascadeListAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "cascadeList",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1581,6 +1629,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorTraitsAttribute",
     "OldPrintedName": "UIFontDescriptorTraitsAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "traits",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1588,6 +1637,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorFixedAdvanceAttribute",
     "OldPrintedName": "UIFontDescriptorFixedAdvanceAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "fixedAdvance",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1595,6 +1645,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorFeatureSettingsAttribute",
     "OldPrintedName": "UIFontDescriptorFeatureSettingsAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "featureSettings",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1602,6 +1653,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontDescriptorTextStyleAttribute",
     "OldPrintedName": "UIFontDescriptorTextStyleAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "textStyle",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1609,6 +1661,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontSymbolicTrait",
     "OldPrintedName": "UIFontSymbolicTrait",
+    "OldTypeName": "",
     "NewPrintedName": "symbolic",
     "NewTypeName": "UIFontDescriptor.AttributeName"
   },
@@ -1616,6 +1669,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWeightTrait",
     "OldPrintedName": "UIFontWeightTrait",
+    "OldTypeName": "",
     "NewPrintedName": "weight",
     "NewTypeName": "UIFontDescriptor.TraitKey"
   },
@@ -1623,6 +1677,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontWidthTrait",
     "OldPrintedName": "UIFontWidthTrait",
+    "OldTypeName": "",
     "NewPrintedName": "width",
     "NewTypeName": "UIFontDescriptor.TraitKey"
   },
@@ -1630,6 +1685,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontSlantTrait",
     "OldPrintedName": "UIFontSlantTrait",
+    "OldTypeName": "",
     "NewPrintedName": "slant",
     "NewTypeName": "UIFontDescriptor.TraitKey"
   },
@@ -1637,6 +1693,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontFeatureTypeIdentifierKey",
     "OldPrintedName": "UIFontFeatureTypeIdentifierKey",
+    "OldTypeName": "",
     "NewPrintedName": "featureIdentifier",
     "NewTypeName": "UIFontDescriptor.FeatureKey"
   },
@@ -1644,6 +1701,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@UIFontFeatureSelectorIdentifierKey",
     "OldPrintedName": "UIFontFeatureSelectorIdentifierKey",
+    "OldTypeName": "",
     "NewPrintedName": "typeIdentifier",
     "NewTypeName": "UIFontDescriptor.FeatureKey"
   },
@@ -1651,6 +1709,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@HMSignificantEventSunrise",
     "OldPrintedName": "HMSignificantEventSunrise",
+    "OldTypeName": "",
     "NewPrintedName": "sunrise",
     "NewTypeName": "HMSignificantEvent"
   },
@@ -1658,6 +1717,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@HMSignificantEventSunset",
     "OldPrintedName": "HMSignificantEventSunset",
+    "OldTypeName": "",
     "NewPrintedName": "sunset",
     "NewTypeName": "HMSignificantEvent"
   },
@@ -1665,6 +1725,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTextEffectLetterpressStyle",
     "OldPrintedName": "NSTextEffectLetterpressStyle",
+    "OldTypeName": "",
     "NewPrintedName": "letterpressStyle",
     "NewTypeName": "NSAttributedString.TextEffectStyle"
   },
@@ -1672,6 +1733,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSPlainTextDocumentType",
     "OldPrintedName": "NSPlainTextDocumentType",
+    "OldTypeName": "",
     "NewPrintedName": "plain",
     "NewTypeName": "NSAttributedString.DocumentType"
   },
@@ -1679,6 +1741,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSRTFTextDocumentType",
     "OldPrintedName": "NSRTFTextDocumentType",
+    "OldTypeName": "",
     "NewPrintedName": "rtf",
     "NewTypeName": "NSAttributedString.DocumentType"
   },
@@ -1686,6 +1749,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSRTFDTextDocumentType",
     "OldPrintedName": "NSRTFDTextDocumentType",
+    "OldTypeName": "",
     "NewPrintedName": "rtfd",
     "NewTypeName": "NSAttributedString.DocumentType"
   },
@@ -1693,6 +1757,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSHTMLTextDocumentType",
     "OldPrintedName": "NSHTMLTextDocumentType",
+    "OldTypeName": "",
     "NewPrintedName": "html",
     "NewTypeName": "NSAttributedString.DocumentType"
   },
@@ -1700,6 +1765,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTextLayoutSectionOrientation",
     "OldPrintedName": "NSTextLayoutSectionOrientation",
+    "OldTypeName": "",
     "NewPrintedName": "orientation",
     "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
   },
@@ -1707,6 +1773,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTextLayoutSectionRange",
     "OldPrintedName": "NSTextLayoutSectionRange",
+    "OldTypeName": "",
     "NewPrintedName": "range",
     "NewTypeName": "NSAttributedString.TextLayoutSectionKey"
   },
@@ -1714,6 +1781,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSDocumentTypeDocumentAttribute",
     "OldPrintedName": "NSDocumentTypeDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "documentType",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1721,6 +1789,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSCharacterEncodingDocumentAttribute",
     "OldPrintedName": "NSCharacterEncodingDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "characterEncoding",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1728,6 +1797,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSDefaultAttributesDocumentAttribute",
     "OldPrintedName": "NSDefaultAttributesDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "defaultAttributes",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1735,6 +1805,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSPaperSizeDocumentAttribute",
     "OldPrintedName": "NSPaperSizeDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "paperSize",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1742,6 +1813,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSPaperMarginDocumentAttribute",
     "OldPrintedName": "NSPaperMarginDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "paperMargin",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1749,6 +1821,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSViewSizeDocumentAttribute",
     "OldPrintedName": "NSViewSizeDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "viewSize",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1756,6 +1829,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSViewZoomDocumentAttribute",
     "OldPrintedName": "NSViewZoomDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "viewZoom",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1763,6 +1837,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSViewModeDocumentAttribute",
     "OldPrintedName": "NSViewModeDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "viewMode",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1770,6 +1845,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSReadOnlyDocumentAttribute",
     "OldPrintedName": "NSReadOnlyDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "readOnly",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1777,6 +1853,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSBackgroundColorDocumentAttribute",
     "OldPrintedName": "NSBackgroundColorDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "backgroundColor",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1784,6 +1861,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSHyphenationFactorDocumentAttribute",
     "OldPrintedName": "NSHyphenationFactorDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "hyphenationFactor",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1791,6 +1869,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSDefaultTabIntervalDocumentAttribute",
     "OldPrintedName": "NSDefaultTabIntervalDocumentAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "defaultTabInterval",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1798,6 +1877,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTextLayoutSectionsAttribute",
     "OldPrintedName": "NSTextLayoutSectionsAttribute",
+    "OldTypeName": "",
     "NewPrintedName": "textLayoutSections",
     "NewTypeName": "NSAttributedString.DocumentAttributeKey"
   },
@@ -1805,6 +1885,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSFontAttributeName",
     "OldPrintedName": "NSFontAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "font",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1812,6 +1893,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSParagraphStyleAttributeName",
     "OldPrintedName": "NSParagraphStyleAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "paragraphStyle",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1819,6 +1901,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSForegroundColorAttributeName",
     "OldPrintedName": "NSForegroundColorAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "foregroundColor",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1826,6 +1909,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSBackgroundColorAttributeName",
     "OldPrintedName": "NSBackgroundColorAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "backgroundColor",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1833,6 +1917,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLigatureAttributeName",
     "OldPrintedName": "NSLigatureAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "ligature",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1840,6 +1925,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSKernAttributeName",
     "OldPrintedName": "NSKernAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "kern",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1847,6 +1933,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSStrikethroughStyleAttributeName",
     "OldPrintedName": "NSStrikethroughStyleAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "strikethroughStyle",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1854,6 +1941,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSUnderlineStyleAttributeName",
     "OldPrintedName": "NSUnderlineStyleAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "underlineStyle",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1861,6 +1949,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSStrokeColorAttributeName",
     "OldPrintedName": "NSStrokeColorAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "strokeColor",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1868,6 +1957,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSStrokeWidthAttributeName",
     "OldPrintedName": "NSStrokeWidthAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "strokeWidth",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1875,6 +1965,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSShadowAttributeName",
     "OldPrintedName": "NSShadowAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "shadow",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1882,6 +1973,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSTextEffectAttributeName",
     "OldPrintedName": "NSTextEffectAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "textEffect",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1889,6 +1981,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSAttachmentAttributeName",
     "OldPrintedName": "NSAttachmentAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "attachment",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1896,6 +1989,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinkAttributeName",
     "OldPrintedName": "NSLinkAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "link",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1903,6 +1997,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSBaselineOffsetAttributeName",
     "OldPrintedName": "NSBaselineOffsetAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "baselineOffset",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1910,6 +2005,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSUnderlineColorAttributeName",
     "OldPrintedName": "NSUnderlineColorAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "underlineColor",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1917,6 +2013,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSStrikethroughColorAttributeName",
     "OldPrintedName": "NSStrikethroughColorAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "strikethroughColor",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1924,6 +2021,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSObliquenessAttributeName",
     "OldPrintedName": "NSObliquenessAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "obliqueness",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1931,6 +2029,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSExpansionAttributeName",
     "OldPrintedName": "NSExpansionAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "expansion",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1938,6 +2037,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSWritingDirectionAttributeName",
     "OldPrintedName": "NSWritingDirectionAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "writingDirection",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1945,6 +2045,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSVerticalGlyphFormAttributeName",
     "OldPrintedName": "NSVerticalGlyphFormAttributeName",
+    "OldTypeName": "",
     "NewPrintedName": "verticalGlyphForm",
     "NewTypeName": "NSAttributedStringKey"
   },
@@ -1952,6 +2053,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagWord",
     "OldPrintedName": "NSLinguisticTagWord",
+    "OldTypeName": "",
     "NewPrintedName": "word",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -1959,6 +2061,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagPunctuation",
     "OldPrintedName": "NSLinguisticTagPunctuation",
+    "OldTypeName": "",
     "NewPrintedName": "punctuation",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -1966,6 +2069,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagWhitespace",
     "OldPrintedName": "NSLinguisticTagWhitespace",
+    "OldTypeName": "",
     "NewPrintedName": "whitespace",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -1973,6 +2077,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOther",
     "OldPrintedName": "NSLinguisticTagOther",
+    "OldTypeName": "",
     "NewPrintedName": "other",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -1980,6 +2085,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagNoun",
     "OldPrintedName": "NSLinguisticTagNoun",
+    "OldTypeName": "",
     "NewPrintedName": "noun",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -1987,6 +2093,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagVerb",
     "OldPrintedName": "NSLinguisticTagVerb",
+    "OldTypeName": "",
     "NewPrintedName": "verb",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -1994,6 +2101,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagAdjective",
     "OldPrintedName": "NSLinguisticTagAdjective",
+    "OldTypeName": "",
     "NewPrintedName": "adjective",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2001,6 +2109,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagAdverb",
     "OldPrintedName": "NSLinguisticTagAdverb",
+    "OldTypeName": "",
     "NewPrintedName": "adverb",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2008,6 +2117,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagPronoun",
     "OldPrintedName": "NSLinguisticTagPronoun",
+    "OldTypeName": "",
     "NewPrintedName": "pronoun",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2015,6 +2125,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagDeterminer",
     "OldPrintedName": "NSLinguisticTagDeterminer",
+    "OldTypeName": "",
     "NewPrintedName": "determiner",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2022,6 +2133,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagParticle",
     "OldPrintedName": "NSLinguisticTagParticle",
+    "OldTypeName": "",
     "NewPrintedName": "particle",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2029,6 +2141,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagPreposition",
     "OldPrintedName": "NSLinguisticTagPreposition",
+    "OldTypeName": "",
     "NewPrintedName": "preposition",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2036,6 +2149,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagNumber",
     "OldPrintedName": "NSLinguisticTagNumber",
+    "OldTypeName": "",
     "NewPrintedName": "number",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2043,6 +2157,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagConjunction",
     "OldPrintedName": "NSLinguisticTagConjunction",
+    "OldTypeName": "",
     "NewPrintedName": "conjunction",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2050,6 +2165,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagInterjection",
     "OldPrintedName": "NSLinguisticTagInterjection",
+    "OldTypeName": "",
     "NewPrintedName": "interjection",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2057,6 +2173,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagClassifier",
     "OldPrintedName": "NSLinguisticTagClassifier",
+    "OldTypeName": "",
     "NewPrintedName": "classifier",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2064,6 +2181,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagIdiom",
     "OldPrintedName": "NSLinguisticTagIdiom",
+    "OldTypeName": "",
     "NewPrintedName": "idiom",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2071,6 +2189,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOtherWord",
     "OldPrintedName": "NSLinguisticTagOtherWord",
+    "OldTypeName": "",
     "NewPrintedName": "otherWord",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2078,6 +2197,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSentenceTerminator",
     "OldPrintedName": "NSLinguisticTagSentenceTerminator",
+    "OldTypeName": "",
     "NewPrintedName": "sentenceTerminator",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2085,6 +2205,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOpenQuote",
     "OldPrintedName": "NSLinguisticTagOpenQuote",
+    "OldTypeName": "",
     "NewPrintedName": "openQuote",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2092,6 +2213,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagCloseQuote",
     "OldPrintedName": "NSLinguisticTagCloseQuote",
+    "OldTypeName": "",
     "NewPrintedName": "closeQuote",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2099,6 +2221,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOpenParenthesis",
     "OldPrintedName": "NSLinguisticTagOpenParenthesis",
+    "OldTypeName": "",
     "NewPrintedName": "openParenthesis",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2106,6 +2229,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagCloseParenthesis",
     "OldPrintedName": "NSLinguisticTagCloseParenthesis",
+    "OldTypeName": "",
     "NewPrintedName": "closeParenthesis",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2113,6 +2237,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagWordJoiner",
     "OldPrintedName": "NSLinguisticTagWordJoiner",
+    "OldTypeName": "",
     "NewPrintedName": "wordJoiner",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2120,6 +2245,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagDash",
     "OldPrintedName": "NSLinguisticTagDash",
+    "OldTypeName": "",
     "NewPrintedName": "dash",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2127,6 +2253,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOtherPunctuation",
     "OldPrintedName": "NSLinguisticTagOtherPunctuation",
+    "OldTypeName": "",
     "NewPrintedName": "otherPunctuation",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2134,6 +2261,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagParagraphBreak",
     "OldPrintedName": "NSLinguisticTagParagraphBreak",
+    "OldTypeName": "",
     "NewPrintedName": "paragraphBreak",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2141,6 +2269,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOtherWhitespace",
     "OldPrintedName": "NSLinguisticTagOtherWhitespace",
+    "OldTypeName": "",
     "NewPrintedName": "otherWhitespace",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2148,6 +2277,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagPersonalName",
     "OldPrintedName": "NSLinguisticTagPersonalName",
+    "OldTypeName": "",
     "NewPrintedName": "personalName",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2155,6 +2285,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagPlaceName",
     "OldPrintedName": "NSLinguisticTagPlaceName",
+    "OldTypeName": "",
     "NewPrintedName": "placeName",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2162,6 +2293,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagOrganizationName",
     "OldPrintedName": "NSLinguisticTagOrganizationName",
+    "OldTypeName": "",
     "NewPrintedName": "organizationName",
     "NewTypeName": "NSLinguisticTag"
   },
@@ -2169,6 +2301,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeTokenType",
     "OldPrintedName": "NSLinguisticTagSchemeTokenType",
+    "OldTypeName": "",
     "NewPrintedName": "tokenType",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2176,6 +2309,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeLexicalClass",
     "OldPrintedName": "NSLinguisticTagSchemeLexicalClass",
+    "OldTypeName": "",
     "NewPrintedName": "lexicalClass",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2183,6 +2317,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeNameType",
     "OldPrintedName": "NSLinguisticTagSchemeNameType",
+    "OldTypeName": "",
     "NewPrintedName": "nameType",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2190,6 +2325,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeNameTypeOrLexicalClass",
     "OldPrintedName": "NSLinguisticTagSchemeNameTypeOrLexicalClass",
+    "OldTypeName": "",
     "NewPrintedName": "nameTypeOrLexicalClass",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2197,6 +2333,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeLemma",
     "OldPrintedName": "NSLinguisticTagSchemeLemma",
+    "OldTypeName": "",
     "NewPrintedName": "lemma",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2204,6 +2341,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeLanguage",
     "OldPrintedName": "NSLinguisticTagSchemeLanguage",
+    "OldTypeName": "",
     "NewPrintedName": "language",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2211,6 +2349,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@NSLinguisticTagSchemeScript",
     "OldPrintedName": "NSLinguisticTagSchemeScript",
+    "OldTypeName": "",
     "NewPrintedName": "script",
     "NewTypeName": "NSLinguisticTagScheme"
   },
@@ -2218,6 +2357,7 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@GKPlayerDidChangeNotificationName",
     "OldPrintedName": "GKPlayerDidChangeNotificationName",
+    "OldTypeName": "",
     "NewPrintedName": "GKPlayerDidChangeNotificationName",
     "NewTypeName": "NSNotification.Name"
   },
@@ -2225,8 +2365,81 @@
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@GKPlayerAuthenticationDidChangeNotificationName",
     "OldPrintedName": "GKPlayerAuthenticationDidChangeNotificationName",
+    "OldTypeName": "",
     "NewPrintedName": "GKPlayerAuthenticationDidChangeNotificationName",
     "NewTypeName": "NSNotification.Name"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)isEqual:",
+    "OldPrintedName": "isEqual(_:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "isEqual(_:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)performSelector:",
+    "OldPrintedName": "perform(_:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "perform(_:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)performSelector:withObject:",
+    "OldPrintedName": "perform(_:with:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "perform(_:with:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)performSelector:withObject:withObject:",
+    "OldPrintedName": "perform(_:with:with:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "perform(_:with:with:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)isProxy",
+    "OldPrintedName": "isProxy()",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "isProxy()",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)isKindOfClass:",
+    "OldPrintedName": "isKind(of:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "isKind(of:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)isMemberOfClass:",
+    "OldPrintedName": "isMember(of:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "isMember(of:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)conformsToProtocol:",
+    "OldPrintedName": "conforms(to:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "conforms(to:)",
+    "NewTypeName": "NSProxy"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)NSObject(im)respondsToSelector:",
+    "OldPrintedName": "responds(to:)",
+    "OldTypeName": "NSObjectProtocol",
+    "NewPrintedName": "responds(to:)",
+    "NewTypeName": "NSObject"
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
