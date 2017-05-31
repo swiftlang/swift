@@ -1768,10 +1768,10 @@ shouldSuppressGenericParamsImport(const LangOptions &langOpts,
   // the SwiftImportAsNonGeneric API note. Once we can guarantee that that
   // attribute is present in all contexts, we can remove this check.
   auto isFromFoundationModule = [](const clang::Decl *decl) -> bool {
-    Optional<clang::Module *> module = getClangSubmoduleForDecl(decl);
+    clang::Module *module = getClangSubmoduleForDecl(decl).getValue();
     if (!module)
       return false;
-    return module.getValue()->getTopLevelModuleName() == "Foundation";
+    return module->getTopLevelModuleName() == "Foundation";
   };
 
   if (langOpts.isSwiftVersion3() || isFromFoundationModule(decl)) {
