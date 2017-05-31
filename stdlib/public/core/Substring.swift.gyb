@@ -318,42 +318,25 @@ extension Substring : LosslessStringConvertible {
   }
 }
 
-extension Substring : Equatable {
-  public static func ==(lhs: Substring, rhs: Substring) -> Bool {
-    return String(lhs) == String(rhs)
+extension StringProtocol {
+  public static func ==<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+    return lhs._ephemeralString == rhs._ephemeralString
   }
 
-  // These are not Equatable requirements, but sufficiently similar to be in
-  // this extension.
-  // FIXME(strings): should be gone if/when an implicit conversion from/to
-  // String is available.
-  // FIXME(ABI):
-  public static func ==(lhs: String, rhs: Substring) -> Bool {
-    return lhs == String(rhs)
-  }
-
-  public static func ==(lhs: Substring, rhs: String) -> Bool {
-    return String(lhs) == rhs
-  }
-
-  public static func !=(lhs: String, rhs: Substring) -> Bool {
-    return lhs != String(rhs)
-  }
-
-  public static func !=(lhs: Substring, rhs: String) -> Bool {
-    return String(lhs) != rhs
+  public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+    return lhs._ephemeralString != rhs._ephemeralString
   }
 }
 
-extension Substring : Comparable {
-  public static func <(lhs: Substring, rhs: Substring) -> Bool {
-    return String(lhs) < String(rhs)
+extension StringProtocol {
+  public static func < <S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+    return lhs._ephemeralString < rhs._ephemeralString
   }
 }
 
-extension Substring : Hashable {
+extension StringProtocol {
   public var hashValue : Int {
-    return String(self).hashValue
+    return self._ephemeralString.hashValue
   }
 }
 
