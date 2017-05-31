@@ -31,6 +31,10 @@ extension P {
   var z: String {
     return y
   }
+  var w: String {
+    get { return "" }
+    nonmutating set { }
+  }
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}storedProperties
@@ -170,4 +174,11 @@ class BB<U, V>: AA<V> {
 
 func keyPathForInheritedMember() {
   _ = \BB<Int, String>.a
+}
+
+func keyPathForExistentialMember() {
+  _ = \P.x
+  _ = \P.y
+  _ = \P.z
+  _ = \P.w
 }

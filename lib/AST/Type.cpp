@@ -4146,3 +4146,16 @@ getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
   }
   return props;
 }
+
+Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
+  assert(isAnyExistentialType());
+  if (auto metaty = getAs<ExistentialMetatypeType>()) {
+    opened = ArchetypeType::getOpened(metaty->getInstanceType());
+    if (metaty->hasRepresentation())
+      return MetatypeType::get(opened, metaty->getRepresentation());
+    else
+      return MetatypeType::get(opened);
+  }
+  opened = ArchetypeType::getOpened(this);
+  return opened;
+}

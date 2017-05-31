@@ -431,13 +431,7 @@ public:
     // Metatypes and bases of non-mutating setters on value types
     //  are always rvalues.
     if (!SubstSelfType->getRValueInstanceType()->mayHaveSuperclass()) {
-      if (self.getType().isObject())
-        return LValue::forValue(self, SubstSelfType);
-      else {
-        if (!self.isLValue())
-          self = ManagedValue::forLValue(self.getValue());
-        return LValue::forAddress(self, None, selfPattern, SubstSelfType);
-      }
+      return LValue::forValue(self, SubstSelfType);
     }
 
     CanType witnessSelfType =

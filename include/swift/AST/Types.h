@@ -589,6 +589,9 @@ public:
   /// bound.
   bool isClassExistentialType();
 
+  /// Opens an existential instance or meta-type and returns the opened type.
+  Type openAnyExistentialType(ArchetypeType *&opened);
+
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 

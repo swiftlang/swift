@@ -279,10 +279,16 @@ keyPath.test("computed properties") {
 
 class AB {
 }
-class ABC: AB {
+class ABC: AB, ABCProtocol {
   var a = LifetimeTracked(1)
   var b = LifetimeTracked(2)
   var c = LifetimeTracked(3)
+}
+
+protocol ABCProtocol {
+  var a: LifetimeTracked { get }
+  var b: LifetimeTracked { get set }
+  var c: LifetimeTracked { get nonmutating set }
 }
 
 keyPath.test("dynamically-typed application") {
@@ -311,6 +317,32 @@ keyPath.test("dynamically-typed application") {
     expectTrue(wrongFields[0] == nil)
     expectTrue(wrongFields[1] == nil)
     expectTrue(wrongFields[2] == nil)
+  }
+
+  var protoErasedSubject: ABCProtocol = subject
+  let protoErasedPathA = \ABCProtocol.a
+  let protoErasedPathB = \ABCProtocol.b
+  let protoErasedPathC = \ABCProtocol.c
+
+  do {
+    expectTrue(protoErasedSubject.a ===
+                  protoErasedSubject[keyPath: protoErasedPathA])
+
+    let newB = LifetimeTracked(4)
+    expectTrue(protoErasedSubject.b ===
+                  protoErasedSubject[keyPath: protoErasedPathB])
+    protoErasedSubject[keyPath: protoErasedPathB] = newB
+    expectTrue(protoErasedSubject.b ===
+                  protoErasedSubject[keyPath: protoErasedPathB])
+    expectTrue(protoErasedSubject.b === newB)
+
+    let newC = LifetimeTracked(5)
+    expectTrue(protoErasedSubject.c ===
+                  protoErasedSubject[keyPath: protoErasedPathC])
+    protoErasedSubject[keyPath: protoErasedPathC] = newC
+    expectTrue(protoErasedSubject.c ===
+                  protoErasedSubject[keyPath: protoErasedPathC])
+    expectTrue(protoErasedSubject.c === newC)
   }
 }
 
