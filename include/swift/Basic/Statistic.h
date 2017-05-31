@@ -67,6 +67,8 @@ public:
     size_t DriverDepNominal;
     size_t DriverDepMember;
     size_t DriverDepExternal;
+
+    size_t ChildrenMaxRSS;
   };
 
   struct AlwaysOnFrontendCounters

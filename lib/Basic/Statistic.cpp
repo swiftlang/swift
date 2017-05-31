@@ -13,15 +13,34 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
 
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
+
 namespace swift {
 using namespace llvm;
 using namespace llvm::sys;
+
+static size_t
+getChildrenMaxResidentSetSize() {
+#if defined(HAVE_GETRUSAGE)
+  struct rusage RU;
+  ::getrusage(RUSAGE_CHILDREN, &RU);
+  return RU.ru_maxrss;
+#else
+  return 0;
+#endif
+}
 
 static std::string
 makeFileName(StringRef ProcessName) {
@@ -165,6 +184,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     PUBLISH_STAT(C, "Driver", DriverDepNominal);
     PUBLISH_STAT(C, "Driver", DriverDepMember);
     PUBLISH_STAT(C, "Driver", DriverDepExternal);
+    PUBLISH_STAT(C, "Driver", ChildrenMaxRSS);
   }
 }
 
@@ -252,6 +272,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     PRINT_STAT(OS, delim, C, "Driver", DriverDepNominal);
     PRINT_STAT(OS, delim, C, "Driver", DriverDepMember);
     PRINT_STAT(OS, delim, C, "Driver", DriverDepExternal);
+    PRINT_STAT(OS, delim, C, "Driver", ChildrenMaxRSS);
   }
   // Print timers.
   TimerGroup::printAllJSONValues(OS, delim);
@@ -267,6 +288,11 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   // designed with more of a global-scope, run-at-process-exit in mind, which
   // we're repurposing a bit here.
   Timer.reset();
+
+  if (DriverCounters) {
+    auto &C = getDriverCounters();
+    C.ChildrenMaxRSS = getChildrenMaxResidentSetSize();
+  }
 
   std::error_code EC;
   raw_fd_ostream ostream(Filename, EC, fs::F_Append | fs::F_Text);
