@@ -85,6 +85,7 @@ func test2() {
   
   let b5: Any
   b5 = "x"   
+  { takes_inout_any(&b5) }()   // expected-error {{immutable value 'b5' may not be passed inout}}
   ({ takes_inout_any(&b5) })()   // expected-error {{immutable value 'b5' may not be passed inout}}
 
   // Structs

@@ -5591,6 +5591,18 @@ Expr *ExprRewriter::coerceCallArguments(
   return shuffle;
 }
 
+static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+
+  if (auto *captureList = dyn_cast<CaptureListExpr>(expr))
+    return captureList->getClosureBody();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(expr))
+    return closure;
+
+  return nullptr;
+}
+
 /// If the expression is an explicit closure expression (potentially wrapped in
 /// IdentityExprs), change the type of the closure and identities to the
 /// specified type and return true.  Otherwise, return false with no effect.
@@ -5603,11 +5615,19 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
     return true;
   }
 
+  // Look through capture lists.
+  if (auto CLE = dyn_cast<CaptureListExpr>(expr)) {
+    if (!applyTypeToClosureExpr(cs, CLE->getClosureBody(), toType)) return false;
+    cs.setType(CLE, toType);
+    return true;
+  }
+
   // If we found an explicit ClosureExpr, update its type.
   if (auto CE = dyn_cast<ClosureExpr>(expr)) {
     cs.setType(CE, toType);
     return true;
   }
+
   // Otherwise fail.
   return false;
 }
@@ -6912,7 +6932,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // Use the subexpression as the function.
     fn = covariant->getSubExpr();
   }
-  
+
+  // An immediate application of a closure literal is always noescape.
+  if (getClosureLiteralExpr(fn)) {
+    if (auto fnTy = cs.getType(fn)->getAs<FunctionType>()) {
+      fnTy = cast<FunctionType>(
+        fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape()));
+      fn = coerceToType(fn, fnTy, locator);
+    }
+  }
+
   apply->setFn(fn);
 
   // Check whether the argument is 'super'.
