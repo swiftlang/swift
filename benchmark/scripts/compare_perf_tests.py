@@ -23,7 +23,21 @@ from math import sqrt
 
 
 class PerformanceTestResult(object):
+    """PerformanceTestResult holds results from executing individual benchmark
+    from Swift Benchmark Suite as reported by test driver (Benchmark_O,
+    Benchmark_Onone, Benchmark_Ounchecked or Benchmark_Driver).
+
+    It depends on the log format emmited by the test driver in the form:
+    #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
+
+    The last column, MAX_RSS, is emmited only for runs instrumented by the
+    Benchmark_Driver to measure rough memory use during the execution of the
+    benchmark.
+    """
     def __init__(self, csv_row):
+        """PerformanceTestResult instance is created from an iterable with
+        length of 8 or 9. (Like a row provided by the CSV parser.)
+        """
         # csv_row[0] is just an ordinal number of the test - skip that
         self.name = csv_row[1]          # Name of the performance test
         self.samples = int(csv_row[2])  # Number of measurement samples taken
@@ -39,22 +53,33 @@ class PerformanceTestResult(object):
             int(csv_row[8]) if len(csv_row) > 8 else None)
 
     @property
-    def sd(self):  # Standard Deviation (ms)
+    def sd(self):
+        """Standard Deviation (ms)"""
         return (0 if self.samples < 2 else
                 sqrt(self.S_runtime / (self.samples - 1)))
 
-    # Compute running variance, B. P. Welford's method
-    # See Knuth TAOCP vol 2, 3rd edition, page 232, or
-    # https://www.johndcook.com/blog/standard_deviation/
-    # M is mean, Standard Deviation is defined as sqrt(S/k-1)
     @staticmethod
     def running_mean_variance((k, M_, S_), x):
+        """
+        Compute running variance, B. P. Welford's method
+        See Knuth TAOCP vol 2, 3rd edition, page 232, or
+        https://www.johndcook.com/blog/standard_deviation/
+        M is mean, Standard Deviation is defined as sqrt(S/k-1)
+        """
         k = float(k + 1)
         M = M_ + (x - M_) / k
         S = S_ + (x - M_) * (x - M)
         return (k, M, S)
 
     def merge(self, r):
+        """Merging test results recomputes min and max.
+        It attempts to recompute mean and standard deviation when all_samples
+        are available. There is no correct way to compute these values from
+        test results that are summaries from more than 3 samples.
+
+        The use case here is comparing tests results parsed from concatenated
+        log files from multiple runs of benchmark driver.
+        """
         self.min = min(self.min, r.min)
         self.max = max(self.max, r.max)
         # self.median = None # unclear what to do here
@@ -65,14 +90,20 @@ class PerformanceTestResult(object):
             (self.samples, self.mean, self.S_runtime) = state
 
         # Merging test results with up to 3 samples is exact
-        values = [r.min, r.max, r.median, r.mean][:min(r.samples, 4)]
+        values = [r.min, r.max, r.median][:min(r.samples, 3)]
         map(push, values)
 
+    # Column labels for header row in results table
     header = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
 
-    # Tuple of values formatted for display in results table:
-    # (name, min value, max value, mean value, max_rss)
     def values(self, break_words=False):
+        """Values property for display in results table comparisons
+        in format: ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS').
+        Test name can have invisible breaks inserted into camel case word
+        boundaries to prevent overly long tables when displayed on GitHub.
+        The `break_words` attribute controls this behavior, it is off by
+        default.
+        """
         return (
             break_word_camel_case(self.name) if break_words else self.name,
             str(self.min), str(self.max), str(int(self.mean)),
@@ -81,6 +112,9 @@ class PerformanceTestResult(object):
 
 
 class ResultComparison(object):
+    """ResultComparison compares MINs from new and old PerformanceTestResult.
+    It computes speedup ratio and improvement delta (%).
+    """
     def __init__(self, old, new):
         self.old = old
         self.new = new
@@ -94,16 +128,25 @@ class ResultComparison(object):
         ratio = (new.min + 0.001) / (old.min + 0.001)
         self.delta = ((ratio - 1) * 100)
 
-        self.is_dubious = (  # FIXME this is legacy
+        # Add ' (?)' to the speedup column as indication of dubious changes:
+        # result's MIN falls inside the (MIN, MAX) interval of result they are
+        # being compared with.
+        self.is_dubious = (
             ' (?)' if ((old.min < new.min and new.min < old.max) or
                        (new.min < old.min and old.min < new.max))
             else '')
 
+    # Column labels for header row in results table
     header = ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
 
-    # Tuple of values formatted for display in results table:
-    # (name, old value, new value, delta [%], speedup ratio)
     def values(self, break_words=False):
+        """Values property for display in results table comparisons
+        in format: ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP').
+        Test name can have invisible breaks inserted into camel case word
+        boundaries to prevent overly long tables when displayed on GitHub.
+        The `break_words` attribute controls this behavior, it is off by
+        default.
+        """
         return (break_word_camel_case(self.name) if break_words else self.name,
                 str(self.old.min), str(self.new.min),
                 '{0:+.1f}%'.format(self.delta),

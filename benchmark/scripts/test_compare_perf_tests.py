@@ -21,22 +21,8 @@ from compare_perf_tests import break_word_camel_case
 
 
 class TestPerformanceTestResult(unittest.TestCase):
-    """PerformanceTestResult holds results from executing individual benchmark
-    from Swift Benchmark Suite as reported by test driver (Benchmark_O,
-    Benchmark_Onone, Benchmark_Ounchecked or Benchmark_Driver).
-
-    It depends on the log format emmited by the test driver in the form:
-    #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
-
-    The last column, MAX_RSS, is emmited only for runs instrumented by the
-    Benchmark_Driver to measure rough memory use during the execution of the
-    benchmark.
-    """
 
     def test_init(self):
-        """PerformanceTestResult instance is created from an iterable with
-        length of 8 or 9. (Like a row provided by the CSV parser.)
-        """
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
         self.assertEquals(r.name, 'AngryPhonebook')
@@ -48,18 +34,10 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEquals(r.max_rss, 10510336)
 
     def test_header(self):
-        """Provides column labels for header row in results table"""
         self.assertEquals(PerformanceTestResult.header,
                           ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS'))
 
     def test_values(self):
-        """Values property for display in results table comparisons
-        in format: ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS').
-        Test name can have invisible breaks inserted into camel case word
-        boundaries to prevent overly long tables when displayed on GitHub.
-        The `break_words` attribute controls this behavior, it is off by
-        default.
-        """
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
         self.assertEquals(
@@ -77,14 +55,6 @@ class TestPerformanceTestResult(unittest.TestCase):
                            '12045', '12045', '12045', '10510336'))
 
     def test_merge(self):
-        """Merging test results recomputes min and max.
-        It attempts to recompute mean and standard deviation when all_samples
-        are available. There is no correct way to compute these values from
-        test results that are summaries from more than 3 samples.
-
-        The use case here is comparing tests results parsed from concatenated
-        log files from multiple runs of benchmark driver.
-        """
         tests = """1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336
 1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336
 1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144
@@ -112,9 +82,6 @@ class TestPerformanceTestResult(unittest.TestCase):
 
 class TestBreakWordsCamelCase(unittest.TestCase):
     def test_break_words_camel_case(self):
-        """Inset zero-width space (\xe2\x80\x8b) into word boundaries of
-        CamelCase names.
-        """
         b = break_word_camel_case
         self.assertEquals(b('Unchanged'), 'Unchanged')
         self.assertEquals(b('AngryPhonebook'), u'Angry\u200bPhonebook')
@@ -131,9 +98,6 @@ class TestBreakWordsCamelCase(unittest.TestCase):
 
 
 class TestResultComparison(unittest.TestCase):
-    """ResultComparison compares MINs from new and old PerformanceTestResult.
-    It computes speedup ratio and improvement delta (%).
-    """
     def setUp(self):
         self.r0 = PerformanceTestResult(
             '101,GlobalClass,20,0,0,0,0,0,10185728'.split(','))
@@ -169,18 +133,10 @@ class TestResultComparison(unittest.TestCase):
         )
 
     def test_header(self):
-        """Provides column labels for header row in results table"""
         self.assertEquals(ResultComparison.header,
                           ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP'))
 
     def test_values(self):
-        """Values property for display in results table comparisons
-        in format: ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP').
-        Test name can have invisible breaks inserted into camel case word
-        boundaries to prevent overly long tables when displayed on GitHub.
-        The `break_words` attribute controls this behavior, it is off by
-        default.
-        """
         rc = ResultComparison(self.r1, self.r2)
         self.assertEquals(
             rc.values(break_words=True),
@@ -198,10 +154,6 @@ class TestResultComparison(unittest.TestCase):
         )
 
     def test_values_is_dubious(self):
-        """Add ' (?)' to the speedup column as of indication dubious changes:
-        result's MIN falls inside the (MIN, MAX) interval of result they are
-        being compared with.
-        """
         self.r2.max = self.r1.min + 1
         # new.min < old.min < new.max
         rc = ResultComparison(self.r1, self.r2)
