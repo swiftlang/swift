@@ -3353,8 +3353,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
                                              convertTypePurpose, TCEOptions,
                                              listener, CS);
 
-  CS->cacheExprTypes(subExpr);
-
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
   // since the caller passed subExpr by value here, they would be left
@@ -3368,9 +3366,11 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   if (hadError)
     return nullptr;
 
+  CS->cacheExprTypes(subExpr);
+
   // If we type checked the result but failed to get a usable output from it,
   // just pretend as though nothing happened.
-  if (subExpr->getType()->is<ErrorType>()) {
+  if (CS->getType(subExpr)->is<ErrorType>()) {
     subExpr = preCheckedExpr;
     SavedTypeData.restore();
   }
