@@ -71,7 +71,7 @@ namespace {
     };
 
   #define PAIRCASE(XS, YS) case PairSwitch(XS, YS)
-
+    
     class Space final {
     private:
       SpaceKind Kind;
@@ -79,6 +79,60 @@ namespace {
       Identifier Head;
       std::forward_list<Space> Spaces;
 
+      // NB: This constant is arbitrary.  Anecdotally, the Space Engine is
+      // capable of efficiently handling Spaces of around size 200, but it would
+      // potentially push an enormous fixit on the user.
+      static const size_t MAX_SPACE_SIZE = 128;
+
+      size_t computeSize(TypeChecker &TC,
+                         SmallPtrSetImpl<TypeBase *> &cache) const {
+        switch (getKind()) {
+        case SpaceKind::Empty:
+          return 0;
+        case SpaceKind::BooleanConstant:
+          return 1;
+        case SpaceKind::Type: {
+          if (!canDecompose(getType())) {
+            return 1;
+          }
+          cache.insert(getType().getPointer());
+
+          SmallVector<Space, 4> spaces;
+          decompose(TC, getType(), spaces);
+          size_t acc = 0;
+          for (auto &sp : spaces) {
+            // Decomposed pattern spaces grow with the sum of the subspaces.
+            acc += sp.computeSize(TC, cache);
+          }
+          
+          cache.erase(getType().getPointer());
+          return acc;
+        }
+        case SpaceKind::Constructor: {
+          size_t acc = 1;
+          for (auto &sp : getSpaces()) {
+            // Break self-recursive references among enum arguments.
+            if (sp.getKind() == SpaceKind::Type
+                  && cache.count(sp.getType().getPointer())) {
+              continue;
+            }
+            
+            // Constructor spaces grow with the product of their arguments.
+            acc *= sp.computeSize(TC, cache);
+          }
+          return acc;
+        }
+        case SpaceKind::Disjunct: {
+          size_t acc = 0;
+          for (auto &sp : getSpaces()) {
+            // Disjoint grow with the sum of the subspaces.
+            acc += sp.computeSize(TC, cache);
+          }
+          return acc;
+        }
+        }
+      }
+      
     public:
       explicit Space(Type T)
         : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(Identifier()),
@@ -99,6 +153,15 @@ namespace {
       SpaceKind getKind() const { return Kind; }
 
       void dump() const LLVM_ATTRIBUTE_USED;
+
+      size_t getSize(TypeChecker &TC) const {
+        SmallPtrSet<TypeBase *, 4> cache;
+        return computeSize(TC, cache);
+      }
+
+      static size_t getMaximumSize() {
+        return MAX_SPACE_SIZE;
+      }
 
       bool isEmpty() const { return getKind() == SpaceKind::Empty; }
       
@@ -863,6 +926,7 @@ namespace {
       }
 
       bool sawDowngradablePattern = false;
+      bool sawRedundantPattern = false;
       SmallVector<Space, 4> spaces;
       for (unsigned i = 0, e = Switch->getCases().size(); i < e; ++i) {
         auto *caseBlock = Switch->getCases()[i];
@@ -880,6 +944,8 @@ namespace {
                                            sawDowngradablePattern);
           if (projection.isUseful()
                 && projection.isSubspace(Space(spaces), TC)) {
+            sawRedundantPattern |= true;
+
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
@@ -890,6 +956,23 @@ namespace {
       
       Space totalSpace(Switch->getSubjectExpr()->getType());
       Space coveredSpace(spaces);
+      size_t totalSpaceSize = totalSpace.getSize(TC);
+      if (totalSpaceSize > Space::getMaximumSize()) {
+        // Because the space is large, we have to extend the size
+        // heuristic to compensate for actually exhaustively pattern matching
+        // over enormous spaces.  In this case, if the covered space covers
+        // as much as the total space, and there were no duplicates, then we
+        // can assume the user did the right thing and that they don't need
+        // a 'default' to be inserted.
+        if (!sawRedundantPattern
+            && coveredSpace.getSize(TC) >= totalSpaceSize) {
+          return;
+        }
+
+        diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/true, Space());
+        return;
+      }
+      
       auto uncovered = totalSpace.minus(coveredSpace, TC).simplify(TC);
       if (uncovered.isEmpty()) {
         return;
