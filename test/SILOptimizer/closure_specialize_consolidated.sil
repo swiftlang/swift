@@ -45,9 +45,9 @@ public struct S {
 // @in_guaranteed.
 // (*NOTE* this includes address and non-address only types).
 // This is a temporary limitation.
-// CHECK-LABEL: sil @address_closure : $@convention(thin) (@in Int) -> () {
-sil @address_closure : $@convention(thin) (@in Int) -> () {
-bb0(%0 : $*Int):
+// CHECK-LABEL: sil @address_closure : $@convention(thin) (@in Int32) -> () {
+sil @address_closure : $@convention(thin) (@in Int32) -> () {
+bb0(%0 : $*Int32):
   %6 = tuple()
   return %6 : $()
 }
@@ -60,17 +60,17 @@ bb0(%0 : $*S):
 
 // Check that a specialization of address_closure_user was generated which does not
 // take a closure as a parameter anymore.
-// CHECK-LABEL: sil shared @{{.*}}address_closure_user{{.*}} : $@convention(thin) (Int64, @inout_aliasable Int64) -> ()
-// CHECK: function_ref @address_closure_trivial : $@convention(thin) (Int64, @inout_aliasable Int64) -> ()
-// CHECK: partial_apply %{{.*}} : $@convention(thin) (Int64, @inout_aliasable Int64) -> ()
+// CHECK-LABEL: sil shared @{{.*}}address_closure_user{{.*}} : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
+// CHECK: function_ref @address_closure_trivial : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
+// CHECK: partial_apply %{{.*}} : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
 // CHECK: apply
 // CHECK: return
 
 // Check that a specialization of address_closure_user was generated which does not
 // take a closure as a parameter anymore.
-// CHECK-LABEL: sil shared @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@inout_aliasable Int64) -> ()
-// CHECK: function_ref @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int64) -> ()
-// CHECK: partial_apply %{{.*}} : $@convention(thin) (@inout_aliasable Int64) -> ()
+// CHECK-LABEL: sil shared @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@inout_aliasable Int32) -> ()
+// CHECK: function_ref @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int32) -> ()
+// CHECK: partial_apply %{{.*}} : $@convention(thin) (@inout_aliasable Int32) -> ()
 // CHECK: apply
 // CHECK: return
 
@@ -114,12 +114,12 @@ bb0(%0 : $@callee_owned () -> ()):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @address_caller : $@convention(thin) (@in Int) -> () {
+// CHECK-LABEL: sil @address_caller : $@convention(thin) (@in Int32) -> () {
 // CHECK-NOT: _TTSf1cl15address_closureSi__address_closure_user
-sil @address_caller : $@convention(thin) (@in Int) -> () {
-bb0(%0 : $*Int):
-  %1 = function_ref @address_closure : $@convention(thin) (@in Int) -> ()
-  %2 = partial_apply %1(%0) : $@convention(thin) (@in Int) -> ()
+sil @address_caller : $@convention(thin) (@in Int32) -> () {
+bb0(%0 : $*Int32):
+  %1 = function_ref @address_closure : $@convention(thin) (@in Int32) -> ()
+  %2 = partial_apply %1(%0) : $@convention(thin) (@in Int32) -> ()
   %3 = function_ref @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   %4 = apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   %9999 = tuple()
@@ -131,21 +131,21 @@ bb0(%0 : $*Int):
 // (*NOTE* this includes address and non-address only types).
 // This is a temporary limitation.
 //
-// CHECK-LABEL: sil @address_caller_complex : $@convention(thin) (@in Int) -> ()
-// CHECK-NOT: function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@in Int) -> ()
+// CHECK-LABEL: sil @address_caller_complex : $@convention(thin) (@in Int32) -> ()
+// CHECK-NOT: function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@in Int32) -> ()
 // CHECK: partial_apply
-// CHECK-NOT: function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@in Int) -> ()
+// CHECK-NOT: function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@in Int32) -> ()
 // CHECK: return
-sil @address_caller_complex : $@convention(thin) (@in Int) -> () {
-bb0(%0 : $*Int):
-  %00 = alloc_stack $Int
-  %01 = load %0 : $*Int
-  store %01 to %00 : $*Int
-  %1 = function_ref @address_closure : $@convention(thin) (@in Int) -> ()
-  %2 = partial_apply %1(%00) : $@convention(thin) (@in Int) -> ()
+sil @address_caller_complex : $@convention(thin) (@in Int32) -> () {
+bb0(%0 : $*Int32):
+  %00 = alloc_stack $Int32
+  %01 = load %0 : $*Int32
+  store %01 to %00 : $*Int32
+  %1 = function_ref @address_closure : $@convention(thin) (@in Int32) -> ()
+  %2 = partial_apply %1(%00) : $@convention(thin) (@in Int32) -> ()
   %3 = function_ref @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   %4 = apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  dealloc_stack %00 : $*Int
+  dealloc_stack %00 : $*Int32
   br bb1
 
 bb1:
@@ -187,69 +187,69 @@ bb1:
 
 // More complex tests involving address arguments.
 
-sil @address_closure_trivial : $@convention(thin) (Int64, @inout_aliasable Int64) -> () {
-bb0(%0 : $Int64, %1 : $*Int64):
-  %9 = integer_literal $Builtin.Int64, 42
-  %10 = struct $Int64 (%9 : $Builtin.Int64)
-  store %10 to %1 : $*Int64
+sil @address_closure_trivial : $@convention(thin) (Int32, @inout_aliasable Int32) -> () {
+bb0(%0 : $Int32, %1 : $*Int32):
+  %9 = integer_literal $Builtin.Int32, 42
+  %10 = struct $Int32 (%9 : $Builtin.Int32)
+  store %10 to %1 : $*Int32
   %12 = tuple ()
   return %12 : $()
 }
 
 // CHECK-LABEL: sil @address_caller_trivial
 // CHECK-NOT: partial_apply
-// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (Int64, @inout_aliasable Int64) -> ()
+// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
-sil @address_caller_trivial: $@convention(thin) (Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %2 = alloc_stack $Int64, var, name "xx"
-  store %0 to %2 : $*Int64
+sil @address_caller_trivial: $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %2 = alloc_stack $Int32, var, name "xx"
+  store %0 to %2 : $*Int32
   // function_ref address_closure_user(f:)
   %4 = function_ref @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   // function_ref address_closure_trivial(x:)
-  %5 = function_ref @address_closure_trivial : $@convention(thin) (Int64, @inout_aliasable Int64) -> ()
-  %6 = partial_apply %5(%0, %2) : $@convention(thin) (Int64, @inout_aliasable Int64) -> ()
+  %5 = function_ref @address_closure_trivial : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
+  %6 = partial_apply %5(%0, %2) : $@convention(thin) (Int32, @inout_aliasable Int32) -> ()
   %7 = apply %4(%6) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  %8 = load %2 : $*Int64
-  dealloc_stack %2 : $*Int64
-  return %8 : $Int64
+  %8 = load %2 : $*Int32
+  dealloc_stack %2 : $*Int32
+  return %8 : $Int32
 }
 
-sil @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int64) -> () {
-bb0(%0 : $*Int64):
-  %2 = struct_element_addr %0 : $*Int64, #Int64._value
-  %3 = load %2 : $*Builtin.Int64
-  %4 = integer_literal $Builtin.Int64, 1
+sil @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int32) -> () {
+bb0(%0 : $*Int32):
+  %2 = struct_element_addr %0 : $*Int32, #Int32._value
+  %3 = load %2 : $*Builtin.Int32
+  %4 = integer_literal $Builtin.Int32, 1
   %5 = integer_literal $Builtin.Int1, -1
-  %6 = builtin "sadd_with_overflow_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
-  %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
-  %8 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 1
+  %6 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
+  %8 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %8 : $Builtin.Int1
-  %10 = struct $Int64 (%7 : $Builtin.Int64)
-  store %10 to %0 : $*Int64
+  %10 = struct $Int32 (%7 : $Builtin.Int32)
+  store %10 to %0 : $*Int32
   %12 = tuple ()
   return %12 : $()
 }
 
 // CHECK-LABEL: sil @address_caller_trivial_mutating
 // CHECK-NOT: partial_apply
-// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@inout_aliasable Int64) -> ()
+// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user{{.*}} : $@convention(thin) (@inout_aliasable Int32) -> ()
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
-sil @address_caller_trivial_mutating: $@convention(thin) (Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %2 = alloc_stack $Int64, var, name "xx"
-  store %0 to %2 : $*Int64
+sil @address_caller_trivial_mutating: $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %2 = alloc_stack $Int32, var, name "xx"
+  store %0 to %2 : $*Int32
   %4 = function_ref @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  %5 = function_ref @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int64) -> () // user: %6
-  %6 = partial_apply %5(%2) : $@convention(thin) (@inout_aliasable Int64) -> () // user: %7
+  %5 = function_ref @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int32) -> () // user: %6
+  %6 = partial_apply %5(%2) : $@convention(thin) (@inout_aliasable Int32) -> () // user: %7
   %7 = apply %4(%6) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  %8 = load %2 : $*Int64
-  dealloc_stack %2 : $*Int64
-  return %8 : $Int64
+  %8 = load %2 : $*Int32
+  dealloc_stack %2 : $*Int32
+  return %8 : $Int32
 }
 
 // CHECK-LABEL: sil @address_caller_existential
@@ -260,8 +260,8 @@ bb0(%0 : $Int64):
 // CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
 // CHECK-NOT: partial_apply
 // CHECK: return
-sil @address_caller_existential : $@convention(thin) (@in P, @in P, Int) -> @out P {
-bb0(%0 : $*P, %1 : $*P, %2 : $*P, %3 : $Int):
+sil @address_caller_existential : $@convention(thin) (@in P, @in P, Int32) -> @out P {
+bb0(%0 : $*P, %1 : $*P, %2 : $*P, %3 : $Int32):
   %7 = alloc_stack $P
   copy_addr %1 to [initialization] %7 : $*P
   %9 = function_ref @address_closure_existential : $@convention(thin) (@inout_aliasable P) -> ()
@@ -271,9 +271,9 @@ bb0(%0 : $*P, %1 : $*P, %2 : $*P, %3 : $Int):
   %14 = apply %12(%10) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   strong_retain %10 : $@callee_owned () -> ()
   %16 = apply %12(%10) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  %17 = integer_literal $Builtin.Int64, 10
-  %18 = struct_extract %3 : $Int, #Int._value
-  %19 = builtin "cmp_slt_Int64"(%17 : $Builtin.Int64, %18 : $Builtin.Int64) : $Builtin.Int1
+  %17 = integer_literal $Builtin.Int32, 10
+  %18 = struct_extract %3 : $Int32, #Int32._value
+  %19 = builtin "cmp_slt_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int1
   cond_br %19, bb1, bb2
 
 bb1:
