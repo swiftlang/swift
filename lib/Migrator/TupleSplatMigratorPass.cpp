@@ -254,7 +254,15 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
           }
         }
 
-        Editor.replaceToken(closureE->getInLoc(), "= $0;");
+        // If the original closure was a single expression without the need
+        // for a `return` statement, it needs one now, because we've added a new
+        // assignment statement just above.
+        if (closureE->hasSingleExpressionBody()) {
+          Editor.replaceToken(closureE->getInLoc(), "= $0; return");
+        } else {
+          Editor.replaceToken(closureE->getInLoc(), "= $0;");
+        }
+
         return true;
       }
 
@@ -293,7 +301,11 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
           auto param = paramList->get(i);
           OS << param->getNameStr();
         }
-        OS << ") = __val; ";
+        OS << ") = __val;";
+
+        if (closureE->hasSingleExpressionBody()) {
+          OS << " return";
+        }
       }
 
       Editor.replace(paramList->getSourceRange(), paramListText);
