@@ -548,7 +548,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         auto diag = TC.diagnose(E->getEndLoc(),
                                 diag::warn_value_of_metatype_missing_self,
                                 E->getType()->getRValueInstanceType());
-        if (E->canAppendCallParentheses()) {
+        if (E->canAppendPostfixExpression()) {
           diag.fixItInsertAfter(E->getEndLoc(), ".self");
         } else {
           diag.fixItInsert(E->getStartLoc(), "(");
@@ -578,7 +578,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Add fix-it to insert ".self".
       auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
-      if (E->canAppendCallParentheses()) {
+      if (E->canAppendPostfixExpression()) {
         diag.fixItInsertAfter(E->getEndLoc(), ".self");
       } else {
         diag.fixItInsert(E->getStartLoc(), "(");
@@ -2190,7 +2190,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
-                  unsigned noParens = initExpr->canAppendCallParentheses();
+                  unsigned noParens = initExpr->canAppendPostfixExpression();
                   
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.

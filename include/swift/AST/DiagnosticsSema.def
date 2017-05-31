@@ -2024,6 +2024,8 @@ NOTE(enum_raw_value_incrementing_from_here,none,
      "raw value auto-incremented from here",())
 NOTE(enum_raw_value_incrementing_from_zero,none,
      "raw value implicitly auto-incremented from zero",())
+NOTE(construct_raw_representable_from_unwrapped_value,none,
+     "construct %0 from unwrapped %1 value", (Type, Type))
 
 // Derived conformances
 
