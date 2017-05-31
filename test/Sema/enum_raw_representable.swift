@@ -83,3 +83,23 @@ class Outer {
     case a
   }
 }
+
+// rdar://problem/32431736 - Conversion fix-it from String to String raw value enum can't look through optionals
+
+func rdar32431736() {
+  enum E : String {
+    case A = "A"
+    case B = "B"
+  }
+
+  let items1: [String] = ["A", "a"]
+  let items2: [String]? = ["A"]
+
+  let myE1: E = items1.first
+  // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
+  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: }} {{24-24=!)}}
+
+  let myE2: E = items2?.first
+  // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
+  // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: (}} {{25-25=)!)}}
+}

@@ -655,7 +655,7 @@ bool Expr::isSuperExpr() const {
   } while (true);
 }
 
-bool Expr::canAppendCallParentheses() const {
+bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   switch (getKind()) {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
@@ -749,10 +749,12 @@ bool Expr::canAppendCallParentheses() const {
     return false;
 
   case ExprKind::Call:
-  case ExprKind::PostfixUnary:
   case ExprKind::DotSyntaxCall:
   case ExprKind::ConstructorRefCall:
     return true;
+
+  case ExprKind::PostfixUnary:
+    return !appendingPostfixOperator;
 
   case ExprKind::PrefixUnary:
   case ExprKind::Binary:
@@ -784,7 +786,7 @@ bool Expr::canAppendCallParentheses() const {
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
-      ->canAppendCallParentheses();
+      ->canAppendPostfixExpression(appendingPostfixOperator);
 
   case ExprKind::ForcedCheckedCast:
   case ExprKind::ConditionalCheckedCast:

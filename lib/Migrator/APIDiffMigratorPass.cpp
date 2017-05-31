@@ -464,7 +464,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto *SelfExpr = AllArgs[0].ArgExp;
     if (auto *IOE = dyn_cast<InOutExpr>(SelfExpr))
       SelfExpr = IOE->getSubExpr();
-    const bool NeedParen = !SelfExpr->canAppendCallParentheses();
+    const bool NeedParen = !SelfExpr->canAppendPostfixExpression();
 
     // Remove the global function name: "Foo(a, b..." to "a, b..."
     Editor.remove(CharSourceRange(SM, Call->getStartLoc(),

@@ -1623,7 +1623,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
     CharSourceRange selfExprRange =
         Lexer::getCharSourceRangeFromSourceRange(sourceMgr,
                                                  selfExpr->getSourceRange());
-    bool needsParens = !selfExpr->canAppendCallParentheses();
+    bool needsParens = !selfExpr->canAppendPostfixExpression();
 
     SmallString<64> selfReplace;
     if (needsParens)
