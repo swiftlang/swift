@@ -406,15 +406,8 @@ StringTests.test("appendToSubstring") {
         s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
         expectEqual(originalIdentity, s0.bufferID)
         s0 += "x"
-        // For a small string size, the allocator could round up the allocation
-        // and we could get some unused capacity in the buffer.  In that case,
-        // the identity would not change.
-        if sliceEnd != initialSize {
-          if sliceStart != sliceEnd {
-            expectNotEqual(originalIdentity, s0.bufferID)
-          } else {
-            expectEqual(0, s0.bufferID)
-          }
+        if sliceStart == sliceEnd {
+          expectEqual(0, s0.bufferID)
         }
         expectEqual(
           String(
