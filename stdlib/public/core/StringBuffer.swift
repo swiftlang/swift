@@ -88,7 +88,7 @@ public struct _StringBuffer {
 
     self.usedEnd = start + (initialSize &<< elementShift)
     _storage.value.capacityAndElementShift
-      = ((_storage._capacity() - capacityBump) &<< 1) + elementShift
+      = ((_storage.capacity - capacityBump) &<< 1) + elementShift
   }
 
   static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
@@ -195,7 +195,7 @@ public struct _StringBuffer {
   }
 
   var _anyObject: AnyObject? {
-    return _storage.storage != nil ? _storage.storage! : nil
+    return _storage.storage
   }
 
   var _storage: _Storage
