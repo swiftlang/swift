@@ -96,6 +96,12 @@ struct FixitFilter {
       return false;
     }
 
+    // The type-checker can erroneously report this diagnostic in the case of
+    // mismatching closure arguments to things that now take a tuple via SE-0110.
+    if (Info.ID == diag::extra_argument_labels.ID) {
+      return false;
+    }
+
     if (Kind == DiagnosticKind::Error)
       return true;
 
