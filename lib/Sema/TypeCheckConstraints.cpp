@@ -3438,7 +3438,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
             diag.fixItReplace(SourceRange(diagLoc, diagToRange.End), "!= nil");
 
             // Add parentheses if needed.
-            if (!fromExpr->canAppendCallParentheses()) {
+            if (!fromExpr->canAppendPostfixExpression()) {
               diag.fixItInsert(fromExpr->getStartLoc(), "(");
               diag.fixItInsertAfter(fromExpr->getEndLoc(), ")");
             }

@@ -7216,17 +7216,6 @@ static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
   return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
 
-static bool exprNeedsParensInsidePostfixOperator(TypeChecker &TC,
-                                                 DeclContext *DC,
-                                                 Expr *expr) {
-  // Prefix and infix operators will bind outside of a postfix operator.
-  // Postfix operators will get token-merged with a new postfix operator.
-  return (isa<PrefixUnaryExpr>(expr) ||
-          isa<PostfixUnaryExpr>(expr) ||
-          isa<OptionalEvaluationExpr>(expr) ||
-          expr->isInfixOperator());
-}
-
 namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
@@ -7424,14 +7413,11 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     } else {
       auto diag = TC.diagnose(affected->getLoc(),
                               diag::missing_unwrap_optional, type);
-      bool parensNeeded =
-        exprNeedsParensInsidePostfixOperator(TC, DC, affected);
-
-      if (parensNeeded) {
+      if (affected->canAppendPostfixExpression(true)) {
+        diag.fixItInsertAfter(affected->getEndLoc(), "!");
+      } else {
         diag.fixItInsert(affected->getStartLoc(), "(")
             .fixItInsertAfter(affected->getEndLoc(), ")!");
-      } else {
-        diag.fixItInsertAfter(affected->getEndLoc(), "!");
       }
     }
     return true;

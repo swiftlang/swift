@@ -2790,7 +2790,7 @@ bool FailureDiagnosis::diagnoseConversionToBool(Expr *expr, Type exprType) {
     // Technically we only need them if there's something in 'expr' with
     // lower precedence than '!=', but the code actually comes out nicer
     // in most cases with parens on anything non-trivial.
-    if (expr->canAppendCallParentheses()) {
+    if (expr->canAppendPostfixExpression()) {
       prefix = prefix.drop_back();
       suffix = suffix.drop_front();
     }
@@ -2972,7 +2972,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       DeclName(CS->TC.Context.getIdentifier("boolValue")));
     if (!LookupResult.empty()) {
       if (isa<VarDecl>(LookupResult.begin()->Decl)) {
-        if (anchor->canAppendCallParentheses())
+        if (anchor->canAppendPostfixExpression())
           diagnose(anchor->getLoc(), diag::types_not_convertible_use_bool_value,
                    fromType, toType).fixItInsertAfter(anchor->getEndLoc(),
                                                       ".boolValue");
@@ -3596,7 +3596,7 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     if (fromTypeIsOptional && toTypeIsOptional) {
       // Use optional's map function to convert conditionally, like so:
       //   expr.map{ T(rawValue: $0) }
-      bool needsParens = !expr->canAppendCallParentheses();
+      bool needsParens = !expr->canAppendPostfixExpression();
       std::string mapCodeFix;
       if (needsParens) {
         diag.fixItInsert(exprRange.Start, "(");
@@ -3611,6 +3611,24 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     } else if (!fromTypeIsOptional) {
       diag.fixItInsert(exprRange.Start, convWrapBefore);
       diag.fixItInsertAfter(exprRange.End, convWrapAfter);
+    } else {
+      SmallString<16> fixItBefore(convWrapBefore);
+      SmallString<16> fixItAfter;
+
+      if (!expr->canAppendPostfixExpression(true)) {
+        fixItBefore += "(";
+        fixItAfter = ")";
+      }
+
+      fixItAfter += "!" + convWrapAfter.str();
+
+      diag.flush();
+      CS->TC.diagnose(expr->getLoc(),
+                      diag::construct_raw_representable_from_unwrapped_value,
+                      toType, fromType)
+        .highlight(exprRange)
+        .fixItInsert(exprRange.Start, fixItBefore)
+        .fixItInsert(exprRange.End, fixItAfter);
     }
   };
 
