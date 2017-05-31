@@ -25,12 +25,14 @@ class FileUnit;
 class FrontendOptions;
 
 bool writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
-              llvm::StringRef OutputFilename);
+              bool silSerializeWitnessTables, llvm::StringRef OutputFilename);
 bool inputFileKindCanHaveTBDValidated(InputFileKind kind);
 bool validateTBD(ModuleDecl *M, llvm::Module &IRModule,
-                 bool hasMultipleIRGenThreads, bool diagnoseExtraSymbolsInTBD);
+                 bool hasMultipleIRGenThreads, bool silSerializeWitnessTables,
+                 bool diagnoseExtraSymbolsInTBD);
 bool validateTBD(FileUnit *M, llvm::Module &IRModule,
-                 bool hasMultipleIRGenThreads, bool diagnoseExtraSymbolsInTBD);
+                 bool hasMultipleIRGenThreads, bool silSerializeWitnessTables,
+                 bool diagnoseExtraSymbolsInTBD);
 }
 
 #endif

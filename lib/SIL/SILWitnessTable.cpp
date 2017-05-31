@@ -21,6 +21,7 @@
 
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
@@ -154,4 +155,19 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries,
 
 Identifier SILWitnessTable::getIdentifier() const {
   return Mod.getASTContext().getIdentifier(Name);
+}
+
+bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
+                                              ResilienceStrategy strategy,
+                                              bool silSerializeWitnessTables) {
+  auto *nominal = conformance->getType()->getAnyNominal();
+  // Only serialize if the witness table is sufficiently static, andresilience
+  // is explicitly enabled for this compilation or if we serialize all eligible
+  // witness tables.
+  return (strategy == ResilienceStrategy::Resilient ||
+          silSerializeWitnessTables) &&
+         nominal->hasFixedLayout() &&
+         conformance->getProtocol()->getEffectiveAccess() >=
+             Accessibility::Public &&
+         nominal->getEffectiveAccess() >= Accessibility::Public;
 }
