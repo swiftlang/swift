@@ -126,6 +126,8 @@ public:
     size_t NumIRComdatSymbols;
     size_t NumIRBasicBlocks;
     size_t NumIRInsts;
+
+    size_t NumLLVMBytesOutput;
   };
 
 private:

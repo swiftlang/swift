@@ -511,7 +511,7 @@ static bool performCompile(CompilerInstance &Instance,
     // TODO: remove once the frontend understands what action it should perform
     IRGenOpts.OutputKind = getOutputKind(Action);
 
-    return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get());
+    return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(), Stats);
   }
 
   ReferencedNameTracker nameTracker;
@@ -967,7 +967,7 @@ static bool performCompile(CompilerInstance &Instance,
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
                   IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
-                  opts.getSingleOutputFilename()) || HadError;
+                  opts.getSingleOutputFilename(), Stats) || HadError;
 }
 
 /// Returns true if an error occurred.

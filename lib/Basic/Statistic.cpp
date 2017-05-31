@@ -167,6 +167,8 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     PUBLISH_STAT(C, "IRModule", NumIRComdatSymbols);
     PUBLISH_STAT(C, "IRModule", NumIRBasicBlocks);
     PUBLISH_STAT(C, "IRModule", NumIRInsts);
+
+    PUBLISH_STAT(C, "LLVM", NumLLVMBytesOutput);
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
@@ -255,6 +257,8 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
     PRINT_STAT(OS, delim, C, "IRModule", NumIRComdatSymbols);
     PRINT_STAT(OS, delim, C, "IRModule", NumIRBasicBlocks);
     PRINT_STAT(OS, delim, C, "IRModule", NumIRInsts);
+
+    PRINT_STAT(OS, delim, C, "LLVM", NumLLVMBytesOutput);
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
