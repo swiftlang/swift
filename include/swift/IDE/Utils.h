@@ -184,6 +184,7 @@ class SemaLocResolver : public SourceEntityWalker {
   SourceLoc LocToResolve;
   SemaToken SemaTok;
   Type ContainerType;
+  llvm::SmallVector<Decl*, 4> ParentDecls;
 
 public:
   explicit SemaLocResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
