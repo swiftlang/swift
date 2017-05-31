@@ -91,5 +91,6 @@ def main(argc, argv):
         if op[0] is not 'equal':
             vim.current.buffer[op[1]:op[2]] = lines[op[3]:op[4]]
 
+
 if __name__ == '__main__':
     main(len(sys.argv), sys.argv)
