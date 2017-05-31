@@ -129,5 +129,15 @@
     "DiffItemKind": "SpecialCaseDiffItem",
     "Usr": "s:Sd3absS2dFZ",
     "SpecialCaseId": "StaticAbsToSwiftAbs"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:s15UnsignedIntegerPsE9toUIntMaxs6UInt64VyF",
+    "SpecialCaseId": "ToUIntMax"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:s13BinaryIntegerPsE8toIntMaxs5Int64VyF",
+    "SpecialCaseId": "ToIntMax"
   }
 ]
