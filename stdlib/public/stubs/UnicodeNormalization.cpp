@@ -61,6 +61,26 @@ static const UCollator *GetRootCollator() {
   return SWIFT_LAZY_CONSTANT(MakeRootCollator());
 }
 
+static const UCollator *MakeDefaultCollator() {
+  UErrorCode ErrorCode = U_ZERO_ERROR;
+  UCollator *root = ucol_open(NULL, &ErrorCode);
+  if (U_FAILURE(ErrorCode)) {
+    swift::crash("ucol_open: Failure setting up default collation.");
+  }
+  ucol_setAttribute(root, UCOL_NORMALIZATION_MODE, UCOL_ON, &ErrorCode);
+  ucol_setAttribute(root, UCOL_STRENGTH, UCOL_TERTIARY, &ErrorCode);
+  ucol_setAttribute(root, UCOL_NUMERIC_COLLATION, UCOL_OFF, &ErrorCode);
+  ucol_setAttribute(root, UCOL_CASE_LEVEL, UCOL_OFF, &ErrorCode);
+  if (U_FAILURE(ErrorCode)) {
+    swift::crash("ucol_setAttribute: Failure setting up default collation.");
+  }
+  return root;
+}
+
+static const UCollator *GetDefaultCollator() {
+  return SWIFT_LAZY_CONSTANT(MakeDefaultCollator());
+}
+
 /// This class caches the collation element results for the ASCII subset of
 /// unicode.
 class ASCIICollation {
@@ -132,11 +152,11 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
   // ICU UChar type is platform dependent. In Cygwin, it is defined
   // as wchar_t which size is 2. It seems that the underlying binary
   // representation is same with swift utf16 representation.
-  return ucol_strcoll(GetRootCollator(),
+  return ucol_strcoll(GetDefaultCollator(),
     reinterpret_cast<const UChar *>(LeftString), LeftLength,
     reinterpret_cast<const UChar *>(RightString), RightLength);
 #else
-  return ucol_strcoll(GetRootCollator(),
+  return ucol_strcoll(GetDefaultCollator(),
     LeftString, LeftLength,
     RightString, RightLength);
 #endif
@@ -164,7 +184,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
   uiter_setString(&RightIterator, RightString, RightLength);
 #endif
 
-  uint32_t Diff = ucol_strcollIter(GetRootCollator(),
+  uint32_t Diff = ucol_strcollIter(GetDefaultCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
     swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf16 string comparison.");
@@ -189,7 +209,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
   uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
   uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString), RightLength);
 
-  uint32_t Diff = ucol_strcollIter(GetRootCollator(),
+  uint32_t Diff = ucol_strcollIter(GetDefaultCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
   if (U_FAILURE(ErrorCode)) {
     swift::crash("ucol_strcollIter: Unexpected error doing utf8<->utf8 string comparison.");
@@ -202,11 +222,11 @@ void *swift::_swift_stdlib_unicodeCollationIterator_create(
   UErrorCode ErrorCode = U_ZERO_ERROR;
 #if defined(__CYGWIN__) || defined(_MSC_VER)
   UCollationElements *CollationIterator = ucol_openElements(
-    GetRootCollator(), reinterpret_cast<const UChar *>(Str), Length,
+    GetDefaultCollator(), reinterpret_cast<const UChar *>(Str), Length,
     &ErrorCode);
 #else
   UCollationElements *CollationIterator = ucol_openElements(
-    GetRootCollator(), Str, Length, &ErrorCode);
+    GetDefaultCollator(), Str, Length, &ErrorCode);
 #endif
   if (U_FAILURE(ErrorCode)) {
     swift::crash("_swift_stdlib_unicodeCollationIterator_create: ucol_openElements() failed.");
