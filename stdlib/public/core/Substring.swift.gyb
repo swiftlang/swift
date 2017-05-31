@@ -276,7 +276,8 @@ extension Substring : _SwiftStringView {
     _sanityCheck(r._core._owner !== _ephemeralContent._core._owner)
     return r
   }
-  
+
+  public // @testablw
   var _ephemeralContent : String {
     let wholeCore = _slice._base._core
     let subCore : _StringCore = wholeCore[
