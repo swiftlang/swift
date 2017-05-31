@@ -297,6 +297,10 @@ extension String.CharacterView : BidirectionalCollection {
   internal static func _internalExtraCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
+    _sanityCheck(
+      lhs != _CR || rhs != _LF,
+      "CR-LF special case handled by _quickCheckGraphemeBreakBetween")
+
     // Whether the given scalar, when it appears paired with another scalar
     // satisfying this property, has a grapheme break between it and the other
     // scalar.
@@ -316,10 +320,10 @@ extension String.CharacterView : BidirectionalCollection {
       // Repeat sub-300 check, this is beneficial for common cases of Latin
       // characters embedded within non-Latin script (e.g. newlines, spaces,
       // proper nouns and/or jargon, punctuation).
-      case 0x0000...0x02ff:
-        // Conservatively exclude CR, though this might not be necessary from
-        // previous checks.
-        return x != _CR
+      //
+      // NOTE: CR-LF special case has already been checked.
+      case 0x0000...0x02ff: return true
+
       // TODO: general punctuation
 
       // Non-combining kana:
