@@ -798,6 +798,10 @@ DeclNameViewer::DeclNameViewer(StringRef Text): HasParen(false) {
     return;
   assert(Labels.back().empty());
   Labels.pop_back();
+  std::transform(Labels.begin(), Labels.end(), Labels.begin(),
+      [](StringRef Label) {
+    return Label == "_" ? StringRef() : Label;
+  });
 }
 
 unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {

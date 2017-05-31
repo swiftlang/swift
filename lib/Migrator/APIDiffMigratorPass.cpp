@@ -334,7 +334,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (Idx < NewName.argSize()) {
         auto Label = NewName.args()[Idx++];
 
-        if (Label != "_") {
+        if (!Label.empty()) {
           if (LR.getByteLength())
             Editor.replace(LR, Label);
           else
