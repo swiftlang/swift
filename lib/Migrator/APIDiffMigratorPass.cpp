@@ -446,6 +446,20 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       // Swift.abs(1.0)
       Editor.replace(Call->getFn()->getSourceRange(), "Swift.abs");
       return true;
+    case SpecialCaseId::ToUIntMax:
+      if (const auto *DotCall = dyn_cast<DotSyntaxCallExpr>(Call->getFn())) {
+        Editor.insert(DotCall->getStartLoc(), "UInt64(");
+        Editor.replace({ DotCall->getDotLoc(), Call->getEndLoc() }, ")");
+        return true;
+      }
+      return false;
+    case SpecialCaseId::ToIntMax:
+      if (const auto *DotCall = dyn_cast<DotSyntaxCallExpr>(Call->getFn())) {
+        Editor.insert(DotCall->getStartLoc(), "Int64(");
+        Editor.replace({ DotCall->getDotLoc(), Call->getEndLoc() }, ")");
+        return true;
+      }
+      return false;
     case SpecialCaseId::NSOpenGLGetVersion: {
       if (const auto *Tuple = dyn_cast<TupleExpr>(Arg)) {
         if (Tuple->getNumElements() != 2) {
