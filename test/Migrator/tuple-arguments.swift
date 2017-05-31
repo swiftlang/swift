@@ -29,6 +29,15 @@ test6({ (_, _) in })
 test6({ (x:Int, y:Int) in })
 test6({ (_, _) ->() in })
 
+func test8(_: ((Int, Int)) -> Int) {}
+test8 { (_, _) -> Int in 2 }
+test8 { (x, y) in x }
+
+func isEven(_ x: Int) -> Bool { return x % 2 == 0 }
+let items = Array(zip(0..<10, 0..<10))
+_ = items.filter { (_, x) in isEven(x) }
+_ = items.filter { _ in true }
+
 func toString(indexes: Int?...) -> String {
   let _ = indexes.enumerated().flatMap({ (i: Int, index: Int?) -> String? in
     let _: Int = i

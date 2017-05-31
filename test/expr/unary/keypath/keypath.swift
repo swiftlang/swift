@@ -231,10 +231,10 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
 }
 
 struct ZwithSubscript {
-  subscript(keyPath: KeyPath<ZwithSubscript, Int>) -> Int { return 0 }
-  subscript(keyPath: WritableKeyPath<ZwithSubscript, Int>) -> Int { return 0 }
-  subscript(keyPath: ReferenceWritableKeyPath<ZwithSubscript, Int>) -> Int { return 0 }
-  subscript(keyPath: PartialKeyPath<ZwithSubscript>) -> Any { return 0 }
+  subscript(keyPath kp: KeyPath<ZwithSubscript, Int>) -> Int { return 0 }
+  subscript(keyPath kp: WritableKeyPath<ZwithSubscript, Int>) -> Int { return 0 }
+  subscript(keyPath kp: ReferenceWritableKeyPath<ZwithSubscript, Int>) -> Int { return 0 }
+  subscript(keyPath kp: PartialKeyPath<ZwithSubscript>) -> Any { return 0 }
 }
 
 func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscript,
@@ -249,12 +249,9 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   sink = readonly[keyPath: rkp]
   sink = writable[keyPath: rkp]
 
-  // FIXME: keypath application rather than subscripting if subscript parameter defined without a separate internal name
-  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable expression of type 'Int'}}
-  // FIXME: keypath application rather than subscripting if subscript parameter defined without a separate internal name
-  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable expression of type 'Int'}}
-  // FIXME: keypath application rather than subscripting if subscript parameter defined without a separate internal name
-  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable expression of type 'Int'}}
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign through subscript: subscript is get-only}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign through subscript: subscript is get-only}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign through subscript: subscript is get-only}}
   // FIXME: silently falls back to keypath application, which seems inconsistent
   writable[keyPath: wkp] = sink
   // FIXME: silently falls back to keypath application, which seems inconsistent
@@ -269,10 +266,8 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   var anySink2 = writable[keyPath: pkp]
   expect(&anySink2, toHaveType: Exactly<Any>.self)
 
-  // FIXME: keypath application rather than subscripting if subscript parameter defined without a separate internal name
-  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign to immutable expression of type 'Any'}}
-  // FIXME: keypath application rather than subscripting if subscript parameter defined without a separate internal name
-  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign to immutable expression of type 'Any'}}
+  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign through subscript: subscript is get-only}}
+  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign through subscript: subscript is get-only}}
 
   let akp: AnyKeyPath = pkp
 
