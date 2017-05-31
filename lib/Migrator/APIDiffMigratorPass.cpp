@@ -439,7 +439,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
     if (!Item)
       return false;
-    if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement)
+    if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement ||
+        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement)
       return false;
 
     if (Item->Subkind == TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty) {
@@ -490,6 +491,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     switch (Item->Subkind) {
     case TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty:
     case TypeMemberDiffItemSubKind::SimpleReplacement:
+    case TypeMemberDiffItemSubKind::QualifiedReplacement:
       llvm_unreachable("should be handled elsewhere");
     case TypeMemberDiffItemSubKind::HoistSelfOnly:
       // we are done here.

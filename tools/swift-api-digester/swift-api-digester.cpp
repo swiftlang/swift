@@ -1937,7 +1937,7 @@ public:
   virtual ~SDKTreeDiffPass() {}
 };
 
-using NodePairVector = std::vector<std::pair<NodePtr, NodePtr>>;
+using NodePairVector = llvm::MapVector<NodePtr, NodePtr>;
 
 // This map keeps track of updated nodes; thus we can conveniently find out what
 // is the counterpart of a node before or after being updated.
@@ -1947,7 +1947,7 @@ class UpdatedNodesMap : public MatchedNodeListener {
 public:
   void foundMatch(NodePtr Left, NodePtr Right) override {
     assert(Left && Right && "Not update operation.");
-    MapImpl.push_back(std::make_pair(Left, Right));
+    MapImpl.insert({Left, Right});
   }
 
   NodePtr findUpdateCounterpart(const SDKNode *Node) const {
@@ -2133,6 +2133,26 @@ private:
   MapUSRToNode &operator=(MapUSRToNode &) = delete;
 };
 
+static StringRef constructFullTypeName(NodePtr Node) {
+  assert(Node->getKind() == SDKNodeKind::TypeDecl);
+  std::vector<NodePtr> TypeChain;
+  for (auto C = Node; C->getKind() == SDKNodeKind::TypeDecl; C = C->getParent()) {
+    TypeChain.insert(TypeChain.begin(), C);
+  }
+  assert(TypeChain.front()->getParent()->getKind() == SDKNodeKind::Root);
+  llvm::SmallString<64> Buffer;
+  bool First = true;
+  for (auto N : TypeChain) {
+    if (First) {
+      First = false;
+    } else {
+      Buffer.append(".");
+    }
+    Buffer.append(N->getName());
+  }
+  return Node->getSDKContext().buffer(Buffer.str());
+}
+
 // Class to build up a diff of structurally different nodes, based on the given
 // USR map for the left (original) side of the diff, based on parent types.
 class TypeMemberDiffFinder : public SDKNodeVisitor {
@@ -2162,11 +2182,13 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     // Move from global variable to a member variable.
     if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
         diffParent->getKind() == SDKNodeKind::Root)
-      TypeMemberDiffs.push_back({diffNode, node});
+      TypeMemberDiffs.insert({diffNode, node});
     // Move from a member variable to another member variable
     if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
-        diffParent->getKind() == SDKNodeKind::TypeDecl)
-      TypeMemberDiffs.push_back({diffNode, node});
+        diffParent->getKind() == SDKNodeKind::TypeDecl &&
+        declNode->isStatic() &&
+        constructFullTypeName(nodeParent) != constructFullTypeName(diffParent))
+      TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
     else if (node->getKind() == SDKNodeKind::Getter &&
              diffNode->getKind() == SDKNodeKind::Function &&
@@ -2942,26 +2964,6 @@ public:
 
 namespace fs = llvm::sys::fs;
 namespace path = llvm::sys::path;
-
-static StringRef constructFullTypeName(NodePtr Node) {
-  assert(Node->getKind() == SDKNodeKind::TypeDecl);
-  std::vector<NodePtr> TypeChain;
-  for (auto C = Node; C->getKind() == SDKNodeKind::TypeDecl; C = C->getParent()) {
-    TypeChain.insert(TypeChain.begin(), C);
-  }
-  assert(TypeChain.front()->getParent()->getKind() == SDKNodeKind::Root);
-  llvm::SmallString<64> Buffer;
-  bool First = true;
-  for (auto N : TypeChain) {
-    if (First) {
-      First = false;
-    } else {
-      Buffer.append(".");
-    }
-    Buffer.append(N->getName());
-  }
-  return Node->getSDKContext().buffer(Buffer.str());
-}
 
 struct RenameDetectorForMemberDiff : public MatchedNodeListener {
   void foundMatch(NodePtr Left, NodePtr Right) override {
