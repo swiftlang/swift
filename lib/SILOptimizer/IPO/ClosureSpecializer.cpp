@@ -298,8 +298,9 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   // implicit release of all captured arguments that occurs when the partial
   // apply is destroyed.
   SILModule &M = NewF->getModule();
-  unsigned ClosureArgIdx = 0;
   auto ClosureCalleeConv = CSDesc.getClosureCallee()->getConventions();
+  unsigned ClosureArgIdx =
+      ClosureCalleeConv.getNumSILArguments() - CSDesc.getNumArguments();
   for (auto Arg : CSDesc.getArguments()) {
     SILType ArgTy = Arg->getType();
 
@@ -504,7 +505,8 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     auto ClosureCallee = FRI->getReferencedFunction();
     assert(ClosureCallee);
     auto ClosureCalleeConv = ClosureCallee->getConventions();
-    unsigned ClosureArgIdx = 0;
+    unsigned ClosureArgIdx =
+        ClosureCalleeConv.getNumSILArguments() - PAI->getNumArguments();
     for (auto Arg : PAI->getArguments()) {
       SILType ArgTy = Arg->getType();
       // If our argument is an object, continue...

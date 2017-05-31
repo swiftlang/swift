@@ -12,12 +12,15 @@ protocol P {
   func foo(f: (Int32)->Int32, _ j: Int32) -> Int32
 }
 
+protocol Q {
+}
+
 public class C {
   @sil_stored var c: C? { get set }
   init()
 }
 
-public struct S {
+public struct S: Q {
   @sil_stored var c: C? { get set }
   init(c: C?)
   init()
@@ -244,12 +247,88 @@ bb0(%0 : $Int32):
   %2 = alloc_stack $Int32, var, name "xx"
   store %0 to %2 : $*Int32
   %4 = function_ref @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  %5 = function_ref @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int32) -> () // user: %6
-  %6 = partial_apply %5(%2) : $@convention(thin) (@inout_aliasable Int32) -> () // user: %7
+  %5 = function_ref @address_closure_trivial_mutating : $@convention(thin) (@inout_aliasable Int32) -> ()
+  %6 = partial_apply %5(%2) : $@convention(thin) (@inout_aliasable Int32) -> ()
   %7 = apply %4(%6) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   %8 = load %2 : $*Int32
   dealloc_stack %2 : $*Int32
   return %8 : $Int32
+}
+
+sil @S_init : $@convention(method) (@thin S.Type) -> @owned S
+
+sil hidden @address_closure_body_out_result : $@convention(thin) (@in Q, @in Q) -> @out Q {
+bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q):
+  %5 = init_existential_addr %0 : $*Q, $S
+  // function_ref S.init()
+  %6 = function_ref @S_init : $@convention(method) (@thin S.Type) -> @owned S
+  %7 = metatype $@thin S.Type
+  %8 = apply %6(%7) : $@convention(method) (@thin S.Type) -> @owned S
+  store %8 to %5 : $*S
+  destroy_addr %2 : $*Q
+  destroy_addr %1 : $*Q
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @address_closure_out_result : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q {
+bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q, %3 : $*Q):
+  %7 = function_ref @address_closure_body_out_result : $@convention(thin) (@in Q, @in Q) -> @out Q
+  %8 = alloc_stack $Q
+  copy_addr %2 to [initialization] %8 : $*Q
+  %10 = alloc_stack $Q
+  copy_addr %3 to [initialization] %10 : $*Q
+  %12 = apply %7(%0, %8, %10) : $@convention(thin) (@in Q, @in Q) -> @out Q
+  dealloc_stack %10 : $*Q
+  dealloc_stack %8 : $*Q
+  destroy_addr %1 : $*Q
+  %16 = tuple ()
+  return %16 : $()
+}
+
+// Check that a specialization of address_closure_user_out_result was generated which does not
+// take a closure as a parameter anymore.
+// CHECK-LABEL: sil shared @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK: function_ref @address_closure_out_result : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK: [[PARTIAL_APPLY:%.*]] = partial_apply %{{.*}} : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK: apply [[PARTIAL_APPLY]]
+// CHECK: return
+
+sil @address_closure_user_out_result : $@convention(thin) (@owned @callee_owned (@in Q) -> @out Q) -> @out Q {
+bb0(%0 : $*Q, %1 : $@callee_owned (@in Q) -> @out Q):
+  %4 = alloc_stack $Q
+  %5 = init_existential_addr %4 : $*Q, $S
+  %6 = function_ref @S_init : $@convention(method) (@thin S.Type) -> @owned S
+  %7 = metatype $@thin S.Type
+  %8 = apply %6(%7) : $@convention(method) (@thin S.Type) -> @owned S
+  store %8 to %5 : $*S
+  %10 = apply %1(%0, %4) : $@callee_owned (@in Q) -> @out Q
+  dealloc_stack %4 : $*Q
+  strong_release %1 : $@callee_owned (@in Q) -> @out Q
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// Check that closure specialization can handle cases where the full closure type may have
+// unsupported address type arguments (e.g. @in or @out), but the partial_apply has only
+// supported address type arguments, i.e. @inout or @inout_aliasable.
+//
+// CHECK-LABEL: sil @address_caller_out_result : $@convention(thin) (@in Q, @in Q) -> @out Q
+// CHECK-NOT: partial_apply
+// CHECK:  [[SPECIALIZED_FN1:%.*]] = function_ref @{{.*}}address_closure_user_out_result{{.*}} : $@convention(thin) (@inout_aliasable Q, @inout_aliasable Q) -> @out Q
+// CHECK: apply [[SPECIALIZED_FN1]]{{.*}}
+// CHECK-NOT: partial_apply
+// CHECK: return
+sil @address_caller_out_result: $@convention(thin) (@in Q, @in Q) -> @out Q {
+bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q):
+  %5 = function_ref @address_closure_user_out_result : $@convention(thin) (@owned @callee_owned (@in Q) -> @out Q) -> @out Q
+  %6 = function_ref @address_closure_out_result : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q
+  %7 = partial_apply %6(%1, %2) : $@convention(thin) (@in Q, @inout_aliasable Q, @inout_aliasable Q) -> @out Q 
+  %8 = apply %5(%0, %7) : $@convention(thin) (@owned @callee_owned (@in Q) -> @out Q) -> @out Q
+  destroy_addr %2 : $*Q
+  destroy_addr %1 : $*Q
+  %11 = tuple ()
+  return %11 : $()
 }
 
 // CHECK-LABEL: sil @address_caller_existential
@@ -299,8 +378,8 @@ bb3:
 
 sil shared @address_closure_existential : $@convention(thin) (@inout_aliasable P) -> () {
 bb0(%0 : $*P):
-  %7 = tuple ()                                   // user: %8
-  return %7 : $()                                 // id: %8
+  %7 = tuple ()
+  return %7 : $()
 }
 
 sil @address_closure_struct1 : $@convention(thin) (@inout_aliasable S, @owned S) -> () {
