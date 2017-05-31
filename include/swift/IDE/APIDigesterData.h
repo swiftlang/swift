@@ -219,6 +219,7 @@ public:
 //
 enum class TypeMemberDiffItemSubKind {
   SimpleReplacement,
+  QualifiedReplacement,
   GlobalFuncToStaticProperty,
   HoistSelfOnly,
   HoistSelfAndRemoveParam,
