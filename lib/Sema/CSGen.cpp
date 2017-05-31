@@ -1710,7 +1710,7 @@ namespace {
         unsigned index = 0;
         for (auto element : expr->getElements()) {
           CS.addConstraint(ConstraintKind::Conversion,
-                           element->getType(),
+                           CS.getType(element),
                            contextualArrayElementType,
                            CS.getConstraintLocator(expr,
                                                    LocatorPathElt::
@@ -1738,7 +1738,7 @@ namespace {
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,
-                         element->getType(),
+                         CS.getType(element),
                          arrayElementTy,
                          CS.getConstraintLocator(
                            expr,
@@ -2002,7 +2002,7 @@ namespace {
         // This will avoid exponential typecheck behavior in the case of nested
         // array and dictionary literals.
         Type ty = haveBoundCollectionLiteral ?
-                    boundExpr->getType() :
+                    CS.getType(boundExpr) :
                     CS.createTypeVariable(CS.getConstraintLocator(locator),
                                           TVO_CanBindToInOut);
 
@@ -2060,7 +2060,7 @@ namespace {
 
     Type visitCaptureListExpr(CaptureListExpr *expr) {
       // The type of the capture list is just the type of its closure.
-      return expr->getClosureBody()->getType();
+      return CS.getType(expr->getClosureBody());
     }
 
     /// \brief Walk a closure body to determine if it's possible for
@@ -2773,7 +2773,7 @@ namespace {
 
     Type visitKeyPathExpr(KeyPathExpr *E) {
       if (E->isObjC())
-        return E->getObjCStringLiteralExpr()->getType();
+        return CS.getType(E->getObjCStringLiteralExpr());
       
       auto kpDecl = CS.getASTContext().getKeyPathDecl();
       

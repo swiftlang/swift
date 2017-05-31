@@ -1303,7 +1303,7 @@ namespace {
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
         // The index argument should be (keyPath: KeyPath<Root, Value>).
-        auto keyPathTTy = index->getType()->castTo<TupleType>()
+        auto keyPathTTy = cs.getType(index)->castTo<TupleType>()
           ->getElementType(0);
         
         Type valueTy;
@@ -1722,7 +1722,7 @@ namespace {
 
       // Form the arguments.
       Expr *args[2] = {
-        cs.cacheType(object),
+        object,
         cs.cacheType(
             new (tc.Context) DotSelfExpr(
                 TypeExpr::createImplicitHack(object->getLoc(),
@@ -2816,8 +2816,10 @@ namespace {
                             /*Implicit=*/true,
                             argType);
 
-      cs.cacheExprTypes(typeRef);
+      cs.cacheExprTypes(arg);
+
       cs.setExprTypes(typeRef);
+      cs.setExprTypes(arg);
 
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, *conformance,
                                     name, arg, diag::array_protocol_broken);
@@ -2896,8 +2898,10 @@ namespace {
                               /*Implicit=*/false,
                               argType);
 
-      cs.cacheExprTypes(typeRef);
+      cs.cacheExprTypes(arg);
+
       cs.setExprTypes(typeRef);
+      cs.setExprTypes(arg);
 
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
                                     *conformance, name, arg,
@@ -3611,7 +3615,7 @@ namespace {
       // already.
       Expr *simplified = simplifyExprType(expr);
       if (!SuppressDiagnostics
-          && !simplified->getType()->is<UnresolvedType>()) {
+          && !cs.getType(simplified)->is<UnresolvedType>()) {
         cs.TC.diagnose(simplified->getLoc(), diag::pattern_in_expr,
                        expr->getSubPattern()->getKind());
       }

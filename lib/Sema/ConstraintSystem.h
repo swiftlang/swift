@@ -1196,14 +1196,6 @@ private:
     SetExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
         : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto *closure = dyn_cast<ClosureExpr>(expr))
-        if (!closure->hasSingleExpressionBody())
-          return { false, closure };
-
-      return { true, expr };
-    }
-
     Expr *walkToExprPost(Expr *expr) override {
       if (ExcludeRoot && expr == RootExpr)
         return expr;
