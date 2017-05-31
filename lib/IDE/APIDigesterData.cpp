@@ -134,9 +134,12 @@ swift::ide::api::TypeMemberDiffItem::getSubKind() const {
     } else if (ToProperty) {
       assert(OldName.argSize() == 1);
       return TypeMemberDiffItemSubKind::HoistSelfAndUseProperty;
-    } else {
+    } else if (oldTypeName.empty()) {
       assert(NewName.argSize() + 1 == OldName.argSize());
       return TypeMemberDiffItemSubKind::HoistSelfOnly;
+    } else {
+      assert(NewName.argSize() == OldName.argSize());
+      return TypeMemberDiffItemSubKind::QualifiedReplacement;
     }
   } else if (ToProperty) {
     assert(OldName.argSize() == 0);

@@ -4,3 +4,8 @@ extern int ANTGlobalValue;
 @end
 @interface OldType
 @end
+
+@protocol TypeWithMethod
+  -(void) minusPrint;
+  +(void) plusPrint;
+@end
