@@ -469,7 +469,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  DRE->getDecl()->getBaseName(),
+                  cast<VarDecl>(DRE->getDecl())->getName(),
                   isa<ParamDecl>(DRE->getDecl()));
 
       // If we're a parameter, emit a helpful fixit to add @escaping
@@ -483,7 +483,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       } else if (isAutoClosure)
         // TODO: add in a fixit for autoclosure
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
-                    DRE->getDecl()->getBaseName());
+                    paramDecl->getName());
     }
 
     // Swift 3 mode produces a warning + Fix-It for the missing ".self"
@@ -668,7 +668,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
-                    DRE->getDecl()->getBaseName());
+                    DRE->getDecl()->getBaseName().getIdentifier());
       }
     }
     
@@ -1443,7 +1443,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         if (isImplicitSelfUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
-                      MRE->getMember().getDecl()->getBaseName())
+                      MRE->getMember().getDecl()->getBaseName().getIdentifier())
             .fixItInsert(MRE->getLoc(), "self.");
           return { false, E };
         }
@@ -1455,7 +1455,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           TC.diagnose(DSCE->getLoc(),
                       diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getBaseName())
+                      MethodExpr->getDecl()->getBaseName().getIdentifier())
             .fixItInsert(DSCE->getLoc(), "self.");
           return { false, E };
         }

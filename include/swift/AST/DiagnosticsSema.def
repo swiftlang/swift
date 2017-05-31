@@ -1776,18 +1776,18 @@ NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
 ERROR(override_unavailable,none,
-      "cannot override %0 which has been marked unavailable", (Identifier))
+      "cannot override %0 which has been marked unavailable", (DeclBaseName))
 ERROR(override_unavailable_msg, none,
       "cannot override %0 which has been marked unavailable: %1",
-      (Identifier, StringRef))
+      (DeclBaseName, StringRef))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
-      (Identifier))
+      (DeclBaseName))
 
 ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
-      (DescriptiveDeclKind, Identifier))
+      (DescriptiveDeclKind, DeclBaseName))
 
 ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
@@ -2089,7 +2089,7 @@ ERROR(property_behavior_protocol_no_initStorage,none,
       (Type, Type))
 ERROR(property_behavior_unknown_requirement,none,
       "property behavior protocol %0 has non-behavior requirement %1",
-      (Identifier, Identifier))
+      (Identifier, DeclBaseName))
 NOTE(property_behavior_unknown_requirement_here,none,
      "declared here", ())
 NOTE(self_conformance_required_by_property_behavior,none,
@@ -2607,7 +2607,7 @@ NOTE(add_self_to_type,none,
 
 WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %2 %3",
-        (Identifier, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+        (DeclBaseName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
 NOTE(fix_unqualified_access_member,none,
      "use 'self.' to silence this warning", ())
 NOTE(fix_unqualified_access_top_level,none,
@@ -3566,12 +3566,12 @@ ERROR(fixed_layout_attr_on_internal_type,
       none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
-      (Identifier, Accessibility))
+      (DeclBaseName, Accessibility))
 
 ERROR(versioned_attr_with_explicit_accessibility,
       none, "'@_versioned' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
-      (Identifier, Accessibility))
+      (DeclBaseName, Accessibility))
 
 ERROR(versioned_attr_in_protocol,none,
       "'@_versioned' attribute cannot be used in protocols", ())
@@ -3616,7 +3616,7 @@ ERROR(inlineable_stored_property,
 ERROR(inlineable_decl_not_public,
       none, "'@_inlineable' attribute can only be applied to public declarations, "
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
-      (Identifier, Accessibility))
+      (DeclBaseName, Accessibility))
 
 //------------------------------------------------------------------------------
 // @_specialize diagnostics

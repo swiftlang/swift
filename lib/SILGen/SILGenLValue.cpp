@@ -1352,7 +1352,8 @@ namespace {
       // If this is a simple property access, then we must have a conflict.
       if (!subscripts) {
         assert(isa<VarDecl>(decl));
-        SGF.SGM.diagnose(loc1, diag::writeback_overlap_property, decl->getBaseName())
+        SGF.SGM.diagnose(loc1, diag::writeback_overlap_property,
+                         decl->getBaseName().getIdentifier())
            .highlight(loc1.getSourceRange());
         SGF.SGM.diagnose(loc2, diag::writebackoverlap_note)
            .highlight(loc2.getSourceRange());
