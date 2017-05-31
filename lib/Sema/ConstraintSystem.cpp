@@ -1713,23 +1713,6 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       return DependentMemberType::get(ErrorType::get(newBase), assocType);
     }
 
-    // If this is a FunctionType and we inferred new function attributes, apply
-    // them.
-    if (auto ft = dyn_cast<FunctionType>(type.getPointer())) {
-      auto it = cs.extraFunctionAttrs.find(ft);
-      if (it != cs.extraFunctionAttrs.end()) {
-        auto extInfo = ft->getExtInfo();
-        if (it->second.isNoEscape())
-          extInfo = extInfo.withNoEscape();
-        if (it->second.throws())
-          extInfo = extInfo.withThrows();
-        return FunctionType::get(
-            simplifyTypeImpl(cs, ft->getInput(), getFixedTypeFn),
-            simplifyTypeImpl(cs, ft->getResult(), getFixedTypeFn),
-            extInfo);
-      }
-    }
-    
     return type;
   });
 }
