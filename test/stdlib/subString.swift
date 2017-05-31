@@ -26,6 +26,7 @@ SubstringTests.test("String") {
   expectEqual("ab" as String, s.prefix(2))
   expectEqual("fg" as String, s.suffix(2))
   
+#if _runtime(_ObjC)
   let emoji: String = s + "😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈" + "😡🇧🇪🇨🇦🇮🇳"
   expectTrue(s == s[...])
   expectTrue(s == s.dropFirst(0))
@@ -45,6 +46,7 @@ SubstringTests.test("String") {
   expectTrue(s as String != emoji[i...].dropLast(2).dropFirst(2))
   expectEqualSequence("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2))
   expectEqualSequence("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2).dropFirst(2))
+#endif
 }
 
 SubstringTests.test("CharacterView") {
