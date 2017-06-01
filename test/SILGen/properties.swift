@@ -533,7 +533,9 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @_T010properties4zero{{[_0-9a-zA-Z]*}}fau
       // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
       // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
-      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[ZEROADDR]]
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
       // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
@@ -692,6 +694,7 @@ class rdar16151899Derived : rdar16151899Base {
         
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
+        // CHECK-NEXT: end_access {{.*}} : $*Int
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : (rdar16151899Base)
         // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
     }
@@ -908,7 +911,8 @@ func genericProps(_ x: GenericClass<String>) {
   let _ = x.y
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.z
-  // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[Z]] : $*String
+  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[Z]] : $*String
+  // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[READ]] : $*String
   // CHECK:   destroy_value [[LOADED_Z]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   destroy_value [[ARG]]
@@ -920,7 +924,8 @@ func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<U>):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<U>, #GenericClass.z
-  // CHECK:   copy_addr [[Z]] {{.*}} : $*U
+  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[Z]] : $*U
+  // CHECK:   copy_addr [[READ]] {{.*}} : $*U
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.z
 }
@@ -937,7 +942,9 @@ class ClassWithLetProperty {
 // CHECK:       bb0([[ARG:%.*]] : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr [[ARG]] : $ClassWithLetProperty, #ClassWithLetProperty.p
-// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[PTR]] : $*Int
+// CHECK-NEXT:    [[READ:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*Int
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = load [trivial] [[READ]] : $*Int
+// CHECK-NEXT:    end_access [[READ]] : $*Int
 // CHECK-NEXT:   return [[VAL]] : $Int
 
 
@@ -965,7 +972,8 @@ class r19254812Derived: r19254812Base{
 // Initialization of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
+// CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[PIPTR]] : $*Double
+// CHECK-NEXT:  assign {{.*}} to [[WRITE]] : $*Double
 
 // CHECK-NOT: destroy_value
 // CHECK-NOT: copy_value
@@ -973,7 +981,9 @@ class r19254812Derived: r19254812Base{
 // Load of the pi field: no copy_values/releases.
 // CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
-// CHECK-NEXT:  {{.*}} = load [trivial] [[PIPTR]] : $*Double
+// CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [dynamic] [[PIPTR]] : $*Double
+// CHECK-NEXT:  {{.*}} = load [trivial] [[READ]] : $*Double
+// CHECK-NEXT:  end_access [[READ]] : $*Double
 // CHECK: return
 }
 
@@ -995,7 +1005,8 @@ class RedundantSelfRetains {
   // CHECK-NOT: copy_value
   
   // CHECK: [[FPTR:%[0-9]+]] = ref_element_addr %0 : $RedundantSelfRetains, #RedundantSelfRetains.f
-  // CHECK-NEXT: assign {{.*}} to [[FPTR]] : $*RedundantSelfRetains
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[FPTR]] : $*RedundantSelfRetains
+  // CHECK-NEXT: assign {{.*}} to [[WRITE]] : $*RedundantSelfRetains
 
   // CHECK: return
 }

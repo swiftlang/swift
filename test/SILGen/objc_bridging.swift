@@ -343,7 +343,8 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSfg
   // CHECK:   [[PROP_ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Bas.strRealProp
-  // CHECK:   [[PROP:%.*]] = load [copy] [[PROP_ADDR]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*String
+  // CHECK:   [[PROP:%.*]] = load [copy] [[READ]]
 
 
   // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSfsTo : $@convention(objc_method) (NSString, Bas) -> () {
@@ -365,7 +366,8 @@ class Bas : NSObject {
   // CHECK: bb0(%0 : $String, %1 : $Bas):
 
   // CHECK:   [[STR_ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Bas.strRealProp
-  // CHECK:   assign {{.*}} to [[STR_ADDR]]
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[STR_ADDR]] : $*String
+  // CHECK:   assign {{.*}} to [[WRITE]]
   // CHECK: }
 
   var strFakeProp: String {

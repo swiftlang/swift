@@ -496,7 +496,8 @@ class FailableDerivedClass : FailableBaseClass {
     // CHECK:   [[BORROWED_SELF:%.*]] = load_borrow [[PB_BOX]]
     // CHECK:   [[CANARY_VALUE:%.*]] = apply
     // CHECK:   [[CANARY_GEP:%.*]] = ref_element_addr [[BORROWED_SELF]]
-    // CHECK:   assign [[CANARY_VALUE]] to [[CANARY_GEP]]
+    // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[CANARY_GEP]] : $*Canary
+    // CHECK:   assign [[CANARY_VALUE]] to [[WRITE]]
     self.otherMember = Canary()
 
     // Finally, begin the super init sequence.

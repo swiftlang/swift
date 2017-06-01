@@ -144,7 +144,7 @@ public:
   bool EnforceExclusivityStatic = true;
 
   /// Emit checks to trap at run time when the law of exclusivity is violated.
-  bool EnforceExclusivityDynamic = false;
+  bool EnforceExclusivityDynamic = true;
 
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;

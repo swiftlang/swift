@@ -2133,26 +2133,6 @@ private:
   MapUSRToNode &operator=(MapUSRToNode &) = delete;
 };
 
-static StringRef constructFullTypeName(NodePtr Node) {
-  assert(Node->getKind() == SDKNodeKind::TypeDecl);
-  std::vector<NodePtr> TypeChain;
-  for (auto C = Node; C->getKind() == SDKNodeKind::TypeDecl; C = C->getParent()) {
-    TypeChain.insert(TypeChain.begin(), C);
-  }
-  assert(TypeChain.front()->getParent()->getKind() == SDKNodeKind::Root);
-  llvm::SmallString<64> Buffer;
-  bool First = true;
-  for (auto N : TypeChain) {
-    if (First) {
-      First = false;
-    } else {
-      Buffer.append(".");
-    }
-    Buffer.append(N->getName());
-  }
-  return Node->getSDKContext().buffer(Buffer.str());
-}
-
 // Class to build up a diff of structurally different nodes, based on the given
 // USR map for the left (original) side of the diff, based on parent types.
 class TypeMemberDiffFinder : public SDKNodeVisitor {
@@ -2187,7 +2167,8 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
         diffParent->getKind() == SDKNodeKind::TypeDecl &&
         declNode->isStatic() &&
-        constructFullTypeName(nodeParent) != constructFullTypeName(diffParent))
+        nodeParent->getAs<SDKNodeDecl>()->getFullyQualifiedName() !=
+          diffParent->getAs<SDKNodeDecl>()->getFullyQualifiedName())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
     else if (node->getKind() == SDKNodeKind::Getter &&
@@ -3013,11 +2994,13 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // SDK_CHANGE_TYPE_MEMBER(USR, new type context name, new printed name, self
     // index, old printed name)
     TypeMemberDiffItem item = {
-        right->getAs<SDKNodeDecl>()->getUsr(), constructFullTypeName(rightParent),
+        right->getAs<SDKNodeDecl>()->getUsr(),
+        rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
         right->getPrintedName(), findSelfIndex(right), None,
         leftParent->getKind() == SDKNodeKind::Root ?
-          StringRef() : constructFullTypeName(leftParent),
-        left->getPrintedName()};
+          StringRef() : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        left->getPrintedName()
+    };
     out.emplace_back(item);
     Detector.workOn(left, right);
   }
