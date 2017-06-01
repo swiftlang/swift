@@ -16,6 +16,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// SR5067: crashing sometimes on Linux.
+// REQUIRES: OS=macosx
+
 import Foundation
 import FoundationBridgeObjC
 
