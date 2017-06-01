@@ -2,7 +2,9 @@
 
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swiftc_driver -swift-version 3 -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
-// RUN: %target-swift-ide-test -swift-version 3 -print-local-types -I %t -module-to-print LocalTypes -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -swift-version 3 -print-local-types -I %t -module-to-print LocalTypes -source-filename %s > %t.dump
+// RUN: %FileCheck %s < %t.dump
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.dump
 
 public func singleFunc() {
   // CHECK-DAG: 10LocalTypes10singleFuncyyF06SingleD6StructL_V
@@ -20,6 +22,27 @@ public func singleFunc() {
   enum SingleFuncEnum {
     case SFEI(Int)
   }
+
+  // CHECK-DAG: 10LocalTypes10singleFuncyyF13GenericStructL_V
+  struct GenericStruct<T> {
+    let sfgsi: Int
+  }
+
+  // CHECK-DAG: 10LocalTypes10singleFuncyyF12GenericClassL_C
+  class GenericClass<T> {
+    let sfgci: Int = 0
+  }
+
+  // CHECK-DAG: 10LocalTypes10singleFuncyyF11GenericEnumL_O
+  enum GenericEnum<T> {
+    case sfgei(Int)
+  }
+
+  // We'll need to handle this if we start saving alias types.
+  // NEGATIVE-NOT: AliasAAA
+  typealias SingleFuncAliasAAA = Int
+  // NEGATIVE-NOT: AliasGGG
+  typealias GenericAliasGGG<T> = (T, T)
 }
 
 public func singleFuncWithDuplicates(_ fake: Bool) {
