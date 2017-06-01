@@ -2271,6 +2271,7 @@ ${operatorComment(x.nonMaskingOperator, True)}
 }
 
 extension FixedWidthInteger {
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   public init<Other: BinaryInteger>(clamping source: Other) {
     if _slowPath(source < Self.min) {
       self = Self.min
@@ -2416,6 +2417,7 @@ extension UnsignedInteger {
 }
 
 extension UnsignedInteger where Self : FixedWidthInteger {
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -2430,6 +2432,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     self.init(extendingOrTruncating: source)
   }
 
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
@@ -2494,6 +2497,7 @@ extension SignedInteger {
 }
 
 extension SignedInteger where Self : FixedWidthInteger {
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -2510,6 +2514,7 @@ extension SignedInteger where Self : FixedWidthInteger {
     self.init(extendingOrTruncating: source)
   }
 
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer

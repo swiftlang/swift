@@ -170,7 +170,8 @@ static bool isTypeTooComplex(Type t) {
 // ReabstractionInfo
 // =============================================================================
 
-static bool shouldNotSpecializeCallee(SILFunction *Callee) {
+static bool shouldNotSpecializeCallee(SILFunction *Callee,
+                                      SubstitutionList Subs = {}) {
   if (!Callee->shouldOptimize()) {
     DEBUG(llvm::dbgs() << "    Cannot specialize function " << Callee->getName()
           << " marked to be excluded from optimizations.\n");
@@ -178,6 +179,10 @@ static bool shouldNotSpecializeCallee(SILFunction *Callee) {
   }
 
   if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
+    return true;
+
+  if (!Subs.empty() &&
+      Callee->hasSemanticsAttr("optimize.sil.specialize.generic.partial.never"))
     return true;
 
   return false;
@@ -290,6 +295,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
     // We need a generic environment for the partial specialization.
     if (!CalleeGenericEnv)
+      return false;
+
+    // Bail if the callee should not be partially specialized.
+    if (shouldNotSpecializeCallee(Callee, ParamSubs))
       return false;
   }
 
