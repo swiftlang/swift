@@ -30,3 +30,21 @@ protocol P3 {
   func f<T: P3>(_: T) where T.A == Self.A, T.A: C // expected-error{{instance method requirement 'f' cannot add constraint 'Self.A: C' on 'Self'}}
   func g<T: P3>(_: T) where T.A: C, T.A == Self.A  // expected-error{{instance method requirement 'g' cannot add constraint 'Self.A: C' on 'Self'}}
 }
+
+protocol Base {
+  associatedtype Assoc
+}
+
+// FIXME: The first error is redundant, isn't correct in what it states, and
+// also should be emitted on the inheritance clause.
+// FIXME: This used to /not/ error in Swift 3. It didn't impose any statically-
+// enforced requirements, but the compiler crashed if you used anything but the
+// same type.
+protocol Sub1: Base { // expected-error {{first type 'Self.Assoc' in conformance requirement does not refer to a generic parameter or associated type}}
+  associatedtype SubAssoc: Assoc // expected-error {{inheritance from non-protocol, non-class type 'Self.Assoc'}}
+}
+// FIXME: This error is incorrect in what it states and should be emitted on
+// the where-clause.
+protocol Sub2: Base { // expected-error {{first type 'Self.Assoc' in conformance requirement does not refer to a generic parameter or associated type}}
+  associatedtype SubAssoc where SubAssoc: Assoc
+}
