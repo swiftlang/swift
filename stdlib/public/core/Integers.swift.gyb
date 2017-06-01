@@ -3374,7 +3374,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     let result = DoubleWidth(extendingOrTruncating: product)
     
     let isNegative = (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
-    let didCarry = isNegative ? carry != ~(0 as DoubleWidth) : carry != (0 as DoubleWidth)
+    let didCarry = isNegative
+      ? carry != ~(0 as DoubleWidth)
+      : carry != (0 as DoubleWidth)
     let hadPositiveOverflow = !isNegative &&
       DoubleWidth.isSigned && product.leadingZeroBitCount == 0
 
@@ -3518,7 +3520,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       return
     }
     
-    if rhs._storage.high != 0 || rhs._storage.low >= DoubleWidth.bitWidth {
+    if rhs._storage.high != (0 as High) ||
+      rhs._storage.low >= DoubleWidth.bitWidth
+    {
       lhs = 0
       return
     }
@@ -3548,8 +3552,10 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     
     // Shift is exactly the width of `Base`, so high -> low.
     if rhs._storage.low == Base.bitWidth {
-      lhs = DoubleWidth(
-        (lhs < (0 as DoubleWidth) ? ~0 : 0, Low(extendingOrTruncating: lhs._storage.high)))
+      lhs = DoubleWidth((
+        lhs < (0 as DoubleWidth) ? ~0 : 0,
+        Low(extendingOrTruncating: lhs._storage.high)
+      ))
       return
     }
 
