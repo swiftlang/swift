@@ -1175,7 +1175,7 @@ bool swift_unknownUnownedIsEqual(UnownedReference *ref, void *value);
 
 static inline bool swift_unknownUnownedIsEqual(UnownedReference *ref,
                                                void *value) {
-  return swift_unownedIsEqual(ref, value);
+  return swift_unownedIsEqual(ref, static_cast<HeapObject *>(value));
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
