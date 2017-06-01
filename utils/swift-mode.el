@@ -350,7 +350,7 @@ Use `M-x hs-show-all' to show them again."
                            1)
                           ((save-match-data
                              (looking-at
-                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
+                              "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\|repeat\\)\\>"))
                            1)
                           (t 0))))))
       (indent-line-to (max target-column 0)))
