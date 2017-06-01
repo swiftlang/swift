@@ -1261,12 +1261,6 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
 
-  /// \brief The set of additional attributes inferred for a FunctionType.  Note
-  /// that this is not state kept as part of SolverState, so it only supports
-  /// function attributes that need to be set invariant of the actual typing of
-  /// the solution.
-  llvm::SmallDenseMap<FunctionType*, FunctionType::ExtInfo> extraFunctionAttrs;
-
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;
   }
