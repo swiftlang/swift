@@ -21,8 +21,22 @@ import sys
 from math import sqrt
 
 
-class PerformanceTestResult:
+class PerformanceTestResult(object):
+    """PerformanceTestResult holds results from executing individual benchmark
+    from Swift Benchmark Suite as reported by test driver (Benchmark_O,
+    Benchmark_Onone, Benchmark_Ounchecked or Benchmark_Driver).
+
+    It depends on the log format emmited by the test driver in the form:
+    #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
+
+    The last column, MAX_RSS, is emmited only for runs instrumented by the
+    Benchmark_Driver to measure rough memory use during the execution of the
+    benchmark.
+    """
     def __init__(self, csv_row):
+        """PerformanceTestResult instance is created from an iterable with
+        length of 8 or 9. (Like a row provided by the CSV parser.)
+        """
         # csv_row[0] is just an ordinal number of the test - skip that
         self.name = csv_row[1]          # Name of the performance test
         self.samples = int(csv_row[2])  # Number of measurement samples taken
@@ -36,25 +50,41 @@ class PerformanceTestResult:
         self.median = int(csv_row[7])   # Median runtime (ms)
         self.max_rss = (                # Maximum Resident Set Size (B)
             int(csv_row[8]) if len(csv_row) > 8 else None)
-        # TODO if we really want to compute mean MAX_RSS: self.S_memory
+
+    def __repr__(self):
+        return (
+            '<PerformanceTestResult name:{0.name!r} '
+            'samples:{0.samples!r} min:{0.min!r} max:{0.max!r} '
+            'mean:{0.mean!r} sd:{0.sd!r} median:{0.median!r}>'.format(self))
 
     @property
-    def sd(self):  # Standard Deviation (ms)
+    def sd(self):
+        """Standard Deviation (ms)"""
         return (0 if self.samples < 2 else
                 sqrt(self.S_runtime / (self.samples - 1)))
 
-    # Compute running variance, B. P. Welford's method
-    # See Knuth TAOCP vol 2, 3rd edition, page 232, or
-    # https://www.johndcook.com/blog/standard_deviation/
-    # M is mean, Standard Deviation is defined as sqrt(S/k-1)
     @staticmethod
     def running_mean_variance((k, M_, S_), x):
+        """
+        Compute running variance, B. P. Welford's method
+        See Knuth TAOCP vol 2, 3rd edition, page 232, or
+        https://www.johndcook.com/blog/standard_deviation/
+        M is mean, Standard Deviation is defined as sqrt(S/k-1)
+        """
         k = float(k + 1)
         M = M_ + (x - M_) / k
         S = S_ + (x - M_) * (x - M)
         return (k, M, S)
 
     def merge(self, r):
+        """Merging test results recomputes min and max.
+        It attempts to recompute mean and standard deviation when all_samples
+        are available. There is no correct way to compute these values from
+        test results that are summaries from more than 3 samples.
+
+        The use case here is comparing tests results parsed from concatenated
+        log files from multiple runs of benchmark driver.
+        """
         self.min = min(self.min, r.min)
         self.max = max(self.max, r.max)
         # self.median = None # unclear what to do here
@@ -65,23 +95,31 @@ class PerformanceTestResult:
             (self.samples, self.mean, self.S_runtime) = state
 
         # Merging test results with up to 3 samples is exact
-        # TODO investigate how to best handle merge of higher sample counts
-        values = [r.min, r.max, r.median, r.mean][:min(r.samples, 4)]
+        values = [r.min, r.max, r.median][:min(r.samples, 3)]
         map(push, values)
 
+    # Column labels for header row in results table
     header = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
 
-    # Tuple of values formatted for display in results table:
-    # (name, min value, max value, mean value, max_rss)
     def values(self):
-        return (self.name, str(self.min), str(self.max), str(int(self.mean)),
-                str(self.max_rss) if self.max_rss else '-')
+        """Values property for display in results table comparisons
+        in format: ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS').
+        """
+        return (
+            self.name,
+            str(self.min), str(self.max), str(int(self.mean)),
+            str(self.max_rss) if self.max_rss else '—'
+        )
 
 
-class ResultComparison:
+class ResultComparison(object):
+    """ResultComparison compares MINs from new and old PerformanceTestResult.
+    It computes speedup ratio and improvement delta (%).
+    """
     def __init__(self, old, new):
         self.old = old
         self.new = new
+        assert(old.name == new.name)
         self.name = old.name  # Test name, convenience accessor
 
         # Speedup ratio
@@ -91,27 +129,43 @@ class ResultComparison:
         ratio = (new.min + 0.001) / (old.min + 0.001)
         self.delta = ((ratio - 1) * 100)
 
-        self.is_dubious = (  # FIXME this is legacy
+        # Add ' (?)' to the speedup column as indication of dubious changes:
+        # result's MIN falls inside the (MIN, MAX) interval of result they are
+        # being compared with.
+        self.is_dubious = (
             ' (?)' if ((old.min < new.min and new.min < old.max) or
                        (new.min < old.min and old.min < new.max))
             else '')
 
+    # Column labels for header row in results table
     header = ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
 
-    # Tuple of values formatted for display in results table:
-    # (name, old value, new value, delta [%], speedup ratio)
     def values(self):
-        return (self.name, str(self.old.min), str(self.new.min),
+        """Values property for display in results table comparisons
+        in format: ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP').
+        """
+        return (self.name,
+                str(self.old.min), str(self.new.min),
                 '{0:+.1f}%'.format(self.delta),
                 '{0:.2f}x{1}'.format(self.ratio, self.is_dubious))
 
 
-class TestComparator:
-    def __init__(self, old_file, new_file, delta_threshold, changes_only):
+class TestComparator(object):
+    """TestComparator parses `PerformanceTestResult`s from CSV log files.
+    Then it determines which tests were `added`, `removed` and which can be
+    compared. It then splits the `ResultComparison`s into 3 groups according to
+    the `delta_threshold` by the change in performance: `increased`,
+    `descreased` and `unchanged`.
+
+    The lists of `added`, `removed` and `unchanged` tests are sorted
+    alphabetically. The `increased` and `decreased` lists are sorted in
+    descending order by the amount of change.
+    """
+    def __init__(self, old_file, new_file, delta_threshold):
 
         def load_from_CSV(filename):  # handles output from Benchmark_O and
             def skip_totals(row):     # Benchmark_Driver (added MAX_RSS column)
-                        return len(row) > 7 and row[0].isdigit()
+                return len(row) > 7 and row[0].isdigit()
             tests = map(PerformanceTestResult,
                         filter(skip_totals, csv.reader(open(filename))))
 
@@ -131,9 +185,9 @@ class TestComparator:
         added_tests = new_tests.difference(old_tests)
         removed_tests = old_tests.difference(new_tests)
 
-        self.added = sorted(map(lambda t: new_results[t], added_tests),
+        self.added = sorted([new_results[t] for t in added_tests],
                             key=lambda r: r.name)
-        self.removed = sorted(map(lambda t: old_results[t], removed_tests),
+        self.removed = sorted([old_results[t] for t in removed_tests],
                               key=lambda r: r.name)
 
         def compare(name):
@@ -144,24 +198,28 @@ class TestComparator:
         def partition(l, p):
             return reduce(lambda x, y: x[not p(y)].append(y) or x, l, ([], []))
 
-        # TODO take standard deviation (SD) into account
         decreased, not_decreased = partition(
             comparisons, lambda c: c.ratio < (1 - delta_threshold))
         increased, unchanged = partition(
             not_decreased, lambda c: c.ratio > (1 + delta_threshold))
 
         # sorted partitions
-        names = map(lambda c: c.name, comparisons)
+        names = [c.name for c in comparisons]
         comparisons = dict(zip(names, comparisons))
-        self.decreased = map(lambda c: comparisons[c.name],
-                             sorted(decreased, key=lambda c: -c.delta))
-        self.increased = map(lambda c: comparisons[c.name],
-                             sorted(increased, key=lambda c: c.delta))
-        self.unchanged = map(lambda c: comparisons[c.name],
-                             sorted(unchanged, key=lambda c: c.name))
+        self.decreased = [comparisons[c.name]
+                          for c in sorted(decreased, key=lambda c: -c.delta)]
+        self.increased = [comparisons[c.name]
+                          for c in sorted(increased, key=lambda c: c.delta)]
+        self.unchanged = [comparisons[c.name]
+                          for c in sorted(unchanged, key=lambda c: c.name)]
 
 
-class ReportFormatter:
+class ReportFormatter(object):
+    """ReportFormatter formats the `PerformanceTestResult`s and
+    `ResultComparison`s provided by `TestComparator` using their `header` and
+    `values()` into report table. Supported formats are: `markdown` (used for
+    displaying benchmark results on GitHub), `git` (default) and `html`.
+    """
     def __init__(self, comparator, old_branch, new_branch, changes_only):
         self.comparator = comparator
         self.old_branch = old_branch
@@ -178,35 +236,34 @@ class ReportFormatter:
 {0} ({1}): {2}"""
 
     def markdown(self):
-        return self.__formatted_text(
+        return self._formatted_text(
             ROW='{0} | {1} | {2} | {3} | {4} \n',
             HEADER_SEPARATOR='---',
             DETAIL=self.MARKDOWN_DETAIL)
 
     def git(self):
-        return self.__formatted_text(
+        return self._formatted_text(
             ROW='{0}   {1}   {2}   {3}   {4} \n',
             HEADER_SEPARATOR='   ',
             DETAIL=self.GIT_DETAIL)
 
-    def __column_widths(self):
+    def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
         comparisons = (changed if self.changes_only else
                        changed + self.comparator.unchanged)
         comparisons += self.comparator.added + self.comparator.removed
 
-        values = map(lambda c: c.values(), comparisons)
         widths = map(lambda columns: map(len, columns),
                      [PerformanceTestResult.header, ResultComparison.header] +
-                     values)
+                     [c.values() for c in comparisons])
 
         def max_widths(maximum, widths):
             return tuple(map(max, zip(maximum, widths)))
 
         return reduce(max_widths, widths, tuple([0] * 5))
 
-    def __formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
-        widths = self.__column_widths()
+    def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
+        widths = self._column_widths()
 
         def justify_columns(contents):
             return tuple(map(lambda (w, c): c.ljust(w), zip(widths, contents)))
@@ -343,7 +400,7 @@ def main():
 
     args = parser.parse_args()
     comparator = TestComparator(args.old_file, args.new_file,
-                                float(args.delta_threshold), args.changes_only)
+                                float(args.delta_threshold))
     formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
                                 args.changes_only)
 
@@ -372,9 +429,8 @@ def write_to_file(file_name, data):
     """
     Write data to given file
     """
-    file = open(file_name, 'w')
-    file.write(data)
-    file.close
+    with open(file_name, 'w') as f:
+        f.write(data)
 
 
 if __name__ == '__main__':
