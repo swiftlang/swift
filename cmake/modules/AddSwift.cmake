@@ -1505,6 +1505,12 @@ function(add_swift_library name)
           if("${lib}" STREQUAL "ICU_UC")
             list(APPEND swiftlib_private_link_libraries_targets
                  "${SWIFT_${sdk}_ICU_UC}")
+            // temporary fix for atomic needing to be
+            // after object files for libswiftCore.so
+            if("${sdk}" STREQUAL "ANDROID")
+              list(APPEND swiftlib_private_link_libraries_targets
+                   "-latomic")
+            endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets
                  "${SWIFT_${sdk}_ICU_I18N}")
