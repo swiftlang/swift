@@ -2058,7 +2058,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (CS.solve(viable, FreeTypeVariableBinding::GenericParameters))
+  if (CS.solve(viable, FreeTypeVariableBinding::UnresolvedType))
     return true;
 
   auto &solution = viable[0];
@@ -2069,7 +2069,14 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   }
 
   expr->setType(solution.simplifyType(expr->getType()));
-  CCE->setType(solution.simplifyType(CCE->getType()));
+  auto completionType = solution.simplifyType(CCE->getType());
+
+  // If completion expression is unresolved it doesn't provide
+  // any meaningful information so shouldn't be in the results.
+  if (completionType->is<UnresolvedType>())
+    return true;
+
+  CCE->setType(completionType);
   return false;
 }
 
