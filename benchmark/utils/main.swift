@@ -391,7 +391,6 @@ addTo(&precommitTests, "SubstringFromLongStringGeneric", run_SubstringFromLongSt
 addTo(&precommitTests, "SubstringEquatable", run_SubstringEquatable)
 addTo(&precommitTests, "SubstringEqualString", run_SubstringEqualString)
 addTo(&precommitTests, "SubstringComparable", run_SubstringComparable)
-// addTo(&precommitTests, "SubstringGreaterThanString", run_SubstringGreaterThanString)
 addTo(&precommitTests, "SuffixAnyCollection", run_SuffixAnyCollection)
 addTo(&precommitTests, "SuffixAnyCollectionLazy", run_SuffixAnyCollectionLazy)
 addTo(&precommitTests, "SuffixAnySeqCRangeIter", run_SuffixAnySeqCRangeIter)
