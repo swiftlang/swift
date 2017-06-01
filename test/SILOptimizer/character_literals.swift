@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -O -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,CPU=x86_64
+
+// see https://bugs.swift.org/browse/SR-5064, rdar://32511377
 // XFAIL: *
 
 // This is an end-to-end test to ensure that the optimizer generates
