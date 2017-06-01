@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu %s
 
 // XFAIL: linux
-// REQUIRES: rdar_32513284
 
 var global: Int = 0
 
