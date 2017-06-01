@@ -431,11 +431,8 @@ public struct _StringCore {
       let usedEnd = _pointer(toElementAt:count)
 
       // Attempt to claim unused capacity in the buffer
-      if _fastPath(
-        buffer.grow(
-          oldBounds: UnsafeRawPointer(usedStart)..<UnsafeRawPointer(usedEnd),
-          newUsedCount: newSize)
-      ) {
+      if _fastPath(buffer.start == _baseAddress && newSize <= buffer.capacity) {
+        buffer.usedEnd = buffer.start + (newSize &<< elementShift)
         count = newSize
         return (0, usedEnd)
       }

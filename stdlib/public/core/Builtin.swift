@@ -262,11 +262,13 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
   return Builtin.castReference(x)
 }
 
+import SwiftShims
+
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutableRawPointer {
   let storedPropertyOffset = _roundUp(
-    MemoryLayout<_HeapObject>.size,
+    MemoryLayout<SwiftShims.HeapObject>.size,
     toAlignment: MemoryLayout<Optional<AnyObject>>.alignment)
   return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
