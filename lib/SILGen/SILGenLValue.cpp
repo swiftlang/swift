@@ -1751,13 +1751,20 @@ namespace {
 
 LValue LValue::forValue(ManagedValue value,
                         CanType substFormalType) {
-  assert(value.getType().isObject());
-  LValueTypeData typeData = getValueTypeData(substFormalType,
-                                             value.getValue());
+  if (value.getType().isObject()) {
+    LValueTypeData typeData = getValueTypeData(substFormalType,
+                                               value.getValue());
 
-  LValue lv;
-  lv.add<ValueComponent>(value, None, typeData, /*isRValue=*/true);
-  return lv;
+    LValue lv;
+    lv.add<ValueComponent>(value, None, typeData, /*isRValue=*/true);
+    return lv;
+  } else {
+    // Treat an address-only value as an lvalue we only read from.
+    if (!value.isLValue())
+      value = ManagedValue::forLValue(value.getValue());
+    return forAddress(value, None, AbstractionPattern(substFormalType),
+                      substFormalType);
+  }
 }
 
 LValue LValue::forAddress(ManagedValue address,

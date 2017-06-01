@@ -2415,6 +2415,44 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
   return RValue(SGF, e, ManagedValue::forUnmanaged(selectorValue));
 }
 
+static ManagedValue
+emitKeyPathRValueBase(SILGenFunction &subSGF,
+                     VarDecl *property,
+                     SILLocation loc,
+                     SILValue paramArg,
+                     CanType &baseType) {
+  auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
+                                             AbstractionPattern::getOpaque(),
+                                             baseType);
+  
+  // Upcast a class instance to the property's declared type if necessary.
+  if (auto propertyClass = dyn_cast<ClassDecl>(property->getDeclContext())) {
+    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+      baseType = baseType->getSuperclassForDecl(propertyClass)
+        ->getCanonicalType();
+      paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
+                                     SILType::getPrimitiveObjectType(baseType));
+    }
+  }
+  // …or pop open an existential container.
+  else if (baseType->isAnyExistentialType()) {
+    ArchetypeType *opened;
+    baseType = baseType->openAnyExistentialType(opened)->getCanonicalType();
+    auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
+                                   opened, subSGF.SGM.getLoweredType(baseType),
+                                   AccessKind::Read);
+    // Maybe we could peephole this if we know the property load can borrow the
+    // base value…
+    if (!openedOpaqueValue.IsConsumable) {
+      paramSubstValue = openedOpaqueValue.Value.copyUnmanaged(subSGF, loc);
+    } else {
+      paramSubstValue = openedOpaqueValue.Value;
+    }
+  }
+  return paramSubstValue;
+}
+
 static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
                                              SILLocation loc,
                                              VarDecl *property,
@@ -2482,22 +2520,10 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   
   Scope scope(subSGF, loc);
   
-  auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
-  auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
-                                             AbstractionPattern::getOpaque(),
-                                             baseType);
-  
-  // Upcast a class instance to the property's declared type if necessary.
-  if (auto propertyClass = dyn_cast<ClassDecl>(property->getDeclContext())) {
-    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
-      do {
-        baseType = baseType->getSuperclass()->getCanonicalType();
-      } while (baseType->getClassOrBoundGenericClass() != propertyClass);
-      paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
-                                     SILType::getPrimitiveObjectType(baseType));
-    }
-  }
-  
+  auto paramSubstValue = emitKeyPathRValueBase(subSGF, property,
+                                               loc, paramArg,
+                                               baseType);
+
   auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
                property->getInnermostDeclContext()->getInnermostTypeContext());
   SmallVector<Substitution, 4> subsList;
@@ -2602,20 +2628,9 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   
   LValue lv;
   if (property->isSetterNonMutating()) {
-    auto baseOrig = subSGF.emitManagedRValueWithCleanup(baseArg);
-    auto baseSubst = subSGF.emitOrigToSubstValue(loc, baseOrig,
-                                                 AbstractionPattern::getOpaque(),
-                                                 baseType);
-    // Upcast a class instance to the property's declared type if necessary.
-    if (auto propertyClass = dyn_cast<ClassDecl>(property->getDeclContext())) {
-      if (baseType->getClassOrBoundGenericClass() != propertyClass) {
-        do {
-          baseType = baseType->getSuperclass()->getCanonicalType();
-        } while (baseType->getClassOrBoundGenericClass() != propertyClass);
-        baseSubst = subSGF.B.createUpcast(loc, baseSubst,
-                                     SILType::getPrimitiveObjectType(baseType));
-      }
-    }
+    auto baseSubst = emitKeyPathRValueBase(subSGF, property,
+                                           loc, baseArg,
+                                           baseType);
 
     lv = LValue::forValue(baseSubst, baseType);
   } else {
@@ -2623,6 +2638,16 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
     lv = LValue::forAddress(baseOrig, None,
                             AbstractionPattern::getOpaque(),
                             baseType);
+    
+    // Open an existential lvalue, if necessary.
+    if (baseType->isAnyExistentialType()) {
+      ArchetypeType *opened;
+      baseType = baseType->openAnyExistentialType(opened)->getCanonicalType();
+      lv = subSGF.emitOpenExistentialLValue(loc, std::move(lv),
+                                            CanArchetypeType(opened),
+                                            baseType,
+                                            AccessKind::ReadWrite);
+    }
   }
 
   auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
