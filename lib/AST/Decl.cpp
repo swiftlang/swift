@@ -2096,8 +2096,16 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
       return result;
   }
 
-  return type1->getBaseName().getIdentifier().str().compare(
-                                  type2->getBaseName().getIdentifier().str());
+  if (int result = type1->getBaseName().getIdentifier().str().compare(
+                                  type2->getBaseName().getIdentifier().str()))
+    return result;
+
+  // Error case: two type declarations that cannot be distinguished.
+  if (type1 < type2)
+    return -1;
+  if (type1 > type2)
+    return +1;
+  return 0;
 }
 
 bool NominalTypeDecl::hasFixedLayout() const {

@@ -209,12 +209,13 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     return DependentMemberType::get(baseTy, assocType);
   }
 
-  // If the nested type comes from a type alias, use either the alias's
-  // concrete type, or resolve its components down to another dependent member.
-  if (auto alias = nestedPA->getTypeAliasDecl()) {
-    assert(!alias->getGenericParams() && "Generic typealias in protocol");
-    ref->setValue(alias);
-    return TC.substMemberTypeWithBase(DC->getParentModule(), alias, baseTy);
+  // If the nested type comes from a concrete type, substitute the base type
+  // into it.
+  if (auto concrete = nestedPA->getConcreteTypeDecl()) {
+    ref->setValue(concrete);
+    if (baseTy->isTypeParameter())
+      return DependentMemberType::get(baseTy, concrete->getName());
+    return TC.substMemberTypeWithBase(DC->getParentModule(), concrete, baseTy);
   }
   
   Identifier name = ref->getIdentifier();

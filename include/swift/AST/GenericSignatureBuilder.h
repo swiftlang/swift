@@ -1248,7 +1248,7 @@ class GenericSignatureBuilder::PotentialArchetype {
     Identifier name;
 
     /// The associated type or typealias for a resolved nested type.
-    TypeDecl *assocTypeOrAlias;
+    TypeDecl *assocTypeOrConcrete;
 
     /// The generic parameter key for a root.
     GenericParamKey genericParam;
@@ -1256,10 +1256,10 @@ class GenericSignatureBuilder::PotentialArchetype {
     PAIdentifier(Identifier name) : name(name) { }
 
     PAIdentifier(AssociatedTypeDecl *assocType)
-      : assocTypeOrAlias(assocType) { }
+      : assocTypeOrConcrete(assocType) { }
 
-    PAIdentifier(TypeAliasDecl *typeAlias)
-      : assocTypeOrAlias(typeAlias) { }
+    PAIdentifier(TypeDecl *concreteDecl)
+      : assocTypeOrConcrete(concreteDecl) { }
 
     PAIdentifier(GenericParamKey genericParam) : genericParam(genericParam) { }
   } identifier;
@@ -1342,9 +1342,9 @@ class GenericSignatureBuilder::PotentialArchetype {
     assert(parent != nullptr && "Not an associated type?");
   }
 
-  /// \brief Construct a new potential archetype for a type alias.
-  PotentialArchetype(PotentialArchetype *parent, TypeAliasDecl *typeAlias)
-    : parentOrBuilder(parent), identifier(typeAlias),
+  /// \brief Construct a new potential archetype for a concrete declaration.
+  PotentialArchetype(PotentialArchetype *parent, TypeDecl *concreteDecl)
+    : parentOrBuilder(parent), identifier(concreteDecl),
       isUnresolvedNestedType(false),
       IsRecursive(false), Invalid(false),
       DiagnosedRename(false)
@@ -1396,7 +1396,7 @@ public:
     if (isUnresolvedNestedType)
       return nullptr;
 
-    return dyn_cast<AssociatedTypeDecl>(identifier.assocTypeOrAlias);
+    return dyn_cast<AssociatedTypeDecl>(identifier.assocTypeOrConcrete);
   }
 
   /// Resolve the potential archetype to the given associated type.
@@ -1404,8 +1404,8 @@ public:
                              GenericSignatureBuilder &builder);
 
   /// Resolve the potential archetype to the given typealias.
-  void resolveTypeAlias(TypeAliasDecl *typealias,
-                        GenericSignatureBuilder &builder);
+  void resolveConcreteType(TypeDecl *concreteDecl,
+                           GenericSignatureBuilder &builder);
 
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
@@ -1436,16 +1436,19 @@ public:
     if (isUnresolvedNestedType)
       return identifier.name;
 
-    return identifier.assocTypeOrAlias->getName();
+    return identifier.assocTypeOrConcrete->getName();
   }
 
-  /// Retrieve the type alias.
-  TypeAliasDecl *getTypeAliasDecl() const {
+  /// Retrieve the concrete type declaration.
+  TypeDecl *getConcreteTypeDecl() const {
     assert(getParent() && "not a nested type");
     if (isUnresolvedNestedType)
       return nullptr;
 
-    return dyn_cast<TypeAliasDecl>(identifier.assocTypeOrAlias);
+    if (isa<AssociatedTypeDecl>(identifier.assocTypeOrConcrete))
+      return nullptr;
+
+    return identifier.assocTypeOrConcrete;
   }
 
   /// Retrieve the set of protocols to which this potential archetype
@@ -1548,8 +1551,9 @@ public:
   PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
                                     GenericSignatureBuilder &builder);
 
-  /// \brief Retrieve (or create) a nested type with a known typealias.
-  PotentialArchetype *getNestedType(TypeAliasDecl *typealias,
+  /// \brief Retrieve (or create) a nested type with a known concrete type
+  /// declaration.
+  PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
                                     GenericSignatureBuilder &builder);
 
   /// Describes the kind of update that is performed.
@@ -1581,7 +1585,7 @@ public:
   /// type or typealias of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
-                      PointerUnion<AssociatedTypeDecl *, TypeAliasDecl *> type,
+                      PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
                       NestedTypeUpdate kind);
 
   /// Update the named nested type when we know this type conforms to the given
