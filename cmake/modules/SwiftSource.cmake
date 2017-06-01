@@ -394,6 +394,11 @@ function(_compile_swift_files
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
   endif()
 
+  if (SWIFT_REPORT_STATISTICS)
+    list(GET obj_dirs 0 first_obj_dir)
+    list(APPEND swift_flags "-stats-output-dir" ${first_obj_dir})
+  endif()
+
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
   set(module_outputs "${module_file}" "${module_doc_file}")
