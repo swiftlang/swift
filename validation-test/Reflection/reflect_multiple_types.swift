@@ -6,6 +6,8 @@
 
 // FIXME: https://bugs.swift.org/browse/SR-2808
 // XFAIL: resilient_stdlib
+
+// See https://bugs.swift.org/browse/SR-5066, rdar://32511557
 // XFAIL: *
 
 import SwiftReflectionTest
