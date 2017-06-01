@@ -845,8 +845,6 @@ public struct ${Self}<Pointee>
   /// - Returns: The distance from this pointer to `end`, in strides of the
   ///   pointer's `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_inlineable
   public func distance(to end: ${Self}) -> Int {
     return end - self
@@ -867,8 +865,6 @@ public struct ${Self}<Pointee>
   ///   zero.
   /// - Returns: A pointer offset from this pointer by `n` instances of the
   ///   `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_inlineable
   public func advanced(by n: Int) -> ${Self} {
     return self + n
@@ -950,8 +946,6 @@ extension ${Self} {
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
   /// - Returns: A pointer offset from `lhs` by `rhs` instances of the
   ///   `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return ${Self}(Builtin.gep_Word(
@@ -971,8 +965,6 @@ extension ${Self} {
   ///   - rhs: A pointer.
   /// - Returns: A pointer offset from `rhs` by `lhs` instances of the
   ///   `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
     return rhs + lhs
@@ -991,8 +983,6 @@ extension ${Self} {
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
   /// - Returns: A pointer offset backward from `lhs` by `rhs` instances of
   ///   the `Pointee` type.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
     return lhs + -rhs
@@ -1014,8 +1004,6 @@ extension ${Self} {
   /// - Returns: The distance from `lhs` to `rhs`, in strides of the pointer's
   ///   `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
     return
@@ -1035,8 +1023,6 @@ extension ${Self} {
   ///   - lhs: A pointer to advance in place.
   ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs + rhs
@@ -1053,8 +1039,6 @@ extension ${Self} {
   ///   - lhs: A pointer to advance in place.
   ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
   ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
-  ///
-  /// - SeeAlso: `MemoryLayout`
   @_transparent
   public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
     lhs = lhs - rhs

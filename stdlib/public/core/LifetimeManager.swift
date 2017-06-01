@@ -91,8 +91,6 @@ public func _fixLifetime<T>(_ x: T) {
 ///     value of the `withUnsafeMutablePointer(to:_:)` function. The pointer
 ///     argument is valid only for the duration of the function's execution.
 /// - Returns: The return value of the `body` closure, if any.
-///
-/// - SeeAlso: `withUnsafePointer(to:_:)`
 @_inlineable
 public func withUnsafeMutablePointer<T, Result>(
   to arg: inout T,
@@ -119,8 +117,6 @@ public func withUnsafeMutablePointer<T, Result>(
 ///     `withUnsafePointer(to:_:)` function. The pointer argument is valid
 ///     only for the duration of the function's execution.
 /// - Returns: The return value of the `body` closure, if any.
-///
-/// - SeeAlso: `withUnsafeMutablePointer(to:_:)`
 @_inlineable
 public func withUnsafePointer<T, Result>(
   to arg: inout T,

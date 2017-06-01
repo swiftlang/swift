@@ -610,9 +610,6 @@ extension String {
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
-///
-/// - SeeAlso: `String.CharacterView`, `String.UnicodeScalarView`,
-///   `String.UTF16View`, `String.UTF8View`
 @_fixed_layout
 public struct String {
   /// Creates an empty string.

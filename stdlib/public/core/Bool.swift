@@ -145,7 +145,6 @@ extension Bool : Equatable, Hashable {
   /// - Note: The hash value is not guaranteed to be stable across different
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
-  /// - SeeAlso: `Hashable`
   @_transparent
   public var hashValue: Int {
     return self ? 1 : 0

@@ -107,8 +107,6 @@ public struct Zip2Iterator<
 ///     // Prints "two: 2
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
-///
-/// - SeeAlso: `zip(_:_:)`
 public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   : Sequence {
 

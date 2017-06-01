@@ -104,8 +104,6 @@ public enum _DisabledRangeIndex_ {}
 ///     }
 ///     print(brackets(-99..<100, 0))
 ///     // Prints "0"
-///
-/// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
 @_fixed_layout
 public struct CountableRange<Bound> : RandomAccessCollection
   where
@@ -342,8 +340,6 @@ extension CountableRange
 ///     let empty = 0.0..<0.0
 ///     print(empty.contains(0.0))          // Prints "false"
 ///     print(empty.isEmpty)                // Prints "true"
-///
-/// - SeeAlso: `CountableRange`, `ClosedRange`, `CountableClosedRange`
 @_fixed_layout
 public struct Range<
   Bound : Comparable

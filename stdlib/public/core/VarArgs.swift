@@ -81,8 +81,6 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 ///     as the return value for the `withVaList(_:)` function. The pointer
 ///     argument is valid only for the duration of the function's execution.
 /// - Returns: The return value of the `body` closure parameter, if any.
-///
-/// - SeeAlso: `getVaList(_:)`
 public func withVaList<R>(_ args: [CVarArg],
   _ body: (CVaListPointer) -> R) -> R {
   let builder = _VaListBuilder()
@@ -117,8 +115,6 @@ internal func _withVaList<R>(
 /// - Parameters args: An array of arguments to convert to a C `va_list`
 ///   pointer.
 /// - Returns: The return value of the `body` closure parameter, if any.
-///
-/// - SeeAlso: `withVaList(_:_:)`
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
   let builder = _VaListBuilder()
   for a in args {

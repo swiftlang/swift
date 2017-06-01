@@ -248,12 +248,8 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 ///         print("'obj' does not have a 'getIntegerValue()' method")
 ///     }
 ///     // Prints "The value of 'obj' is 100"
-///
-/// - SeeAlso: `AnyClass`
 #else
 /// The protocol to which all classes implicitly conform.
-///
-/// - SeeAlso: `AnyClass`
 #endif
 public typealias AnyObject = Builtin.AnyObject
 
@@ -284,8 +280,6 @@ public typealias AnyObject = Builtin.AnyObject
 ///
 ///     print(getDefaultValue(NSString.self))
 ///     // Prints "nil"
-///
-/// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
 /// A type that supports standard bitwise arithmetic operators.
@@ -377,8 +371,6 @@ public typealias AnyClass = AnyObject.Type
 /// - `x & Self.allZeros == .allZeros`
 /// - `x & ~Self.allZeros == x`
 /// - `~x == x ^ ~Self.allZeros`
-///
-/// - SeeAlso: `OptionSet`
 @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
 public typealias BitwiseOperations = _BitwiseOperations
 

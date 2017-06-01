@@ -233,8 +233,6 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-///
-/// - SeeAlso: `Equatable`, `==`, `!==`
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -259,8 +257,6 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-///
-/// - SeeAlso: `Equatable`, `===`, `!=`
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }

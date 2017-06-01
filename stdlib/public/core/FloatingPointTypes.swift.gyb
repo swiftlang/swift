@@ -160,8 +160,6 @@ extension ${Self}: BinaryFloatingPoint {
   /// [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  ///
-  /// - SeeAlso: `init(bitPattern:)`
   public var bitPattern: UInt${bits} {
     return UInt${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(_value))
   }
@@ -174,8 +172,6 @@ extension ${Self}: BinaryFloatingPoint {
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
   ///
   /// - Parameter bitPattern: The integer encoding of a `${Self}` instance.
-  ///
-  /// - SeeAlso: `bitPattern`
   public init(bitPattern: UInt${bits}) {
     self.init(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bitPattern._value))
   }
@@ -793,8 +789,6 @@ extension ${Self} {
   ///     // Use 'abs(_:)' instead of 'magnitude'
   ///     print("Missed the target by \(abs(margin)) meters.")
   ///     // Prints "Missed the target by 0.25 meters."
-  ///
-  /// - SeeAlso: `abs(_:)`
   @_transparent
   public var magnitude: ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))

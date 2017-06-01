@@ -440,8 +440,6 @@ internal struct _UnmanagedAnyObjectArray {
 /// unspecified. The instances of `NSSet` and `Set` share buffer using the
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
-///
-/// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Set<Element : Hashable> :
   SetAlgebra, Hashable, Collection, ExpressibleByArrayLiteral {
@@ -1676,8 +1674,6 @@ public func _setBridgeFromObjectiveCConditional<
 /// `NSDictionary` and `Dictionary` share buffer using the same copy-on-write
 /// optimization that is used when two instances of `Dictionary` share
 /// buffer.
-///
-/// - SeeAlso: `Hashable`
 @_fixed_layout
 public struct Dictionary<Key : Hashable, Value> :
   Collection, ExpressibleByDictionaryLiteral {
@@ -2345,8 +2341,6 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
-  ///
-  /// - SeeAlso: `ExpressibleByDictionaryLiteral`
   @effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeBuffer: _NativeDictionaryBuffer.fromArray(elements))

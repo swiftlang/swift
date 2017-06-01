@@ -32,8 +32,6 @@ public protocol _IndexableBase {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
-  ///
-  /// - SeeAlso: endIndex
   associatedtype Index : Comparable
 
   /// The position of the first element in a nonempty collection.
@@ -153,8 +151,6 @@ public protocol _IndexableBase {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  ///
-  /// - SeeAlso: `index(after:)`
   func formIndex(after i: inout Index)
 }
 
@@ -195,7 +191,6 @@ public protocol _Indexable : _IndexableBase {
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:limitedBy:)`, `formIndex(_:offsetBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -238,7 +233,6 @@ public protocol _Indexable : _IndexableBase {
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -256,7 +250,6 @@ public protocol _Indexable : _IndexableBase {
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -280,7 +273,6 @@ public protocol _Indexable : _IndexableBase {
   ///   going beyond `limit`; otherwise, `false`. When the return value is
   ///   `false`, the value of `i` is equal to `limit`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -793,7 +785,6 @@ public protocol Collection : _Indexable, Sequence
   /// - Returns: A subsequence up to, but not including, the `end` position.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `prefix(through:)`
   func prefix(upTo end: Index) -> SubSequence
 
   /// Returns a subsequence from the specified position to the end of the
@@ -860,7 +851,6 @@ public protocol Collection : _Indexable, Sequence
   /// - Returns: A subsequence up to, and including, the `end` position.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `prefix(upTo:)`
   func prefix(through position: Index) -> SubSequence
 
   /// A Boolean value indicating whether the collection is empty.
@@ -936,7 +926,6 @@ public protocol Collection : _Indexable, Sequence
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:limitedBy:)`, `formIndex(_:offsetBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -979,7 +968,6 @@ public protocol Collection : _Indexable, Sequence
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -1078,7 +1066,6 @@ extension _Indexable {
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:limitedBy:)`, `formIndex(_:offsetBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -1124,7 +1111,6 @@ extension _Indexable {
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -1145,7 +1131,6 @@ extension _Indexable {
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -1172,7 +1157,6 @@ extension _Indexable {
   ///   going beyond `limit`; otherwise, `false`. When the return value is
   ///   `false`, the value of `i` is equal to `limit`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
@@ -1644,7 +1628,6 @@ extension Collection {
   /// - Returns: A subsequence up to, but not including, the `end` position.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `prefix(through:)`
   @_inlineable
   public func prefix(upTo end: Index) -> SubSequence {
     return self[startIndex..<end]
@@ -1717,7 +1700,6 @@ extension Collection {
   /// - Returns: A subsequence up to, and including, the `end` position.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `prefix(upTo:)`
   @_inlineable
   public func prefix(through position: Index) -> SubSequence {
     return prefix(upTo: index(after: position))
@@ -1884,7 +1866,6 @@ extension Collection where SubSequence == Self {
   /// - Returns: The first element of the collection.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `popFirst()`
   @_inlineable
   @discardableResult
   public mutating func removeFirst() -> Element {

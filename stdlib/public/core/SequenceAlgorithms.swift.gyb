@@ -127,8 +127,6 @@ ${orderingExplanation}
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-  ///
-  /// - SeeAlso: `min()`
 %   else:
   /// Returns the minimum element in the sequence.
   ///
@@ -141,8 +139,6 @@ ${orderingExplanation}
   ///
   /// - Returns: The sequence's minimum element. If the sequence has no
   ///   elements, returns `nil`.
-  ///
-  /// - SeeAlso: `min(by:)`
 %   end
   @_inlineable
   @warn_unqualified_access
@@ -181,8 +177,6 @@ ${orderingExplanation}
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-  ///
-  /// - SeeAlso: `max()`
 %   else:
   /// Returns the maximum element in the sequence.
   ///
@@ -195,8 +189,6 @@ ${orderingExplanation}
   ///
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
-  ///
-  /// - SeeAlso: `max(by:)`
 %   end
   @_inlineable
   @warn_unqualified_access
@@ -244,8 +236,6 @@ ${equivalenceExplanation}
   /// - Returns: `true` if the initial elements of the sequence are equivalent
   ///   to the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  ///
-  /// - SeeAlso: `starts(with:)`
 %   else:
   /// Returns a Boolean value indicating whether the initial elements of the
   /// sequence are the same as the elements in another sequence.
@@ -269,8 +259,6 @@ ${equivalenceExplanation}
   /// - Returns: `true` if the initial elements of the sequence are the same as
   ///   the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  ///
-  /// - SeeAlso: `starts(with:by:)`
 %   end
   @_inlineable
   public func starts<PossiblePrefix>(
@@ -325,8 +313,6 @@ ${equivalenceExplanation}
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
   ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  ///
-  /// - SeeAlso: `elementsEqual(_:)`
 %   else:
   /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
@@ -347,8 +333,6 @@ ${equivalenceExplanation}
   /// - Parameter other: A sequence to compare to this sequence.
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
-  ///
-  /// - SeeAlso: `elementsEqual(_:by:)`
 %   end
   @_inlineable
   public func elementsEqual<OtherSequence>(
@@ -410,7 +394,6 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that perform
   ///   localized comparison instead.
-  /// - SeeAlso: `lexicographicallyPrecedes(_:)`
 %   else:
   /// Returns a Boolean value indicating whether the sequence precedes another
   /// sequence in a lexicographical (dictionary) ordering, using the
@@ -435,7 +418,6 @@ ${orderingExplanation}
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
-  /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
   @_inlineable
   public func lexicographicallyPrecedes<OtherSequence>(
@@ -675,7 +657,6 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  /// - SeeAlso: `joined()`, `map(_:)`
   @_inlineable
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Element) throws -> SegmentOfResult
