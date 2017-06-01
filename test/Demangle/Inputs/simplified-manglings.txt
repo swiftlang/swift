@@ -204,4 +204,4 @@ _TTRXFo_oCSo13SKPhysicsBodydVSC7CGPointdVSC8CGVectordGSpV10ObjectiveC8ObjCBool__
 _T0So13SKPhysicsBodyCSC7CGPointVSC8CGVectorVSpy10ObjectiveC8ObjCBoolVGIxxyyy_AbdFSpyAIGIyByyyy_TR ---> thunk for @callee_owned (@owned SKPhysicsBody, @unowned CGPoint, @unowned CGVector, @unowned UnsafeMutablePointer<ObjCBool>) -> ()
 _T04main1_yyF ---> _()
 _T03abc6testitySiFTm ---> testit(_:)
-
+_T04main4TestCACSi1x_tc6_PRIV_Llfc ---> Test.init(x:)

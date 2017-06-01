@@ -273,6 +273,7 @@ class Remangler {
   void mangleAnyNominalType(Node *node);
   void mangleAnyGenericType(Node *node, char TypeOp);
   void mangleGenericArgs(Node *node, char &Separator);
+  void mangleAnyConstructor(Node *node, char kindOp);
 
 #define NODE(ID)                                                        \
   void mangle##ID(Node *node);
@@ -478,8 +479,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
 }
 
 void Remangler::mangleAllocator(Node *node) {
-  mangleChildNodes(node);
-  Buffer << "fC";
+  mangleAnyConstructor(node, 'C');
 }
 
 void Remangler::mangleArgumentTuple(Node *node) {
@@ -600,9 +600,18 @@ void Remangler::mangleClass(Node *node) {
   mangleAnyNominalType(node);
 }
 
+void Remangler::mangleAnyConstructor(Node *node, char kindOp) {
+  mangleChildNode(node, 0);
+  if (node->getNumChildren() > 2) {
+    assert(node->getNumChildren() == 3);
+    mangleChildNode(node, 2);
+  }
+  mangleChildNode(node, 1);
+  Buffer << "f" << kindOp;
+}
+
 void Remangler::mangleConstructor(Node *node) {
-  mangleChildNodes(node);
-  Buffer << "fc";
+  mangleAnyConstructor(node, 'c');
 }
 
 void Remangler::mangleDeallocator(Node *node) {
@@ -1385,7 +1394,7 @@ void Remangler::manglePrefixOperator(Node *node) {
 
 void Remangler::manglePrivateDeclName(Node *node) {
   mangleChildNodesReversed(node);
-  Buffer << "LL";
+  Buffer << (node->getNumChildren() == 1 ? "Ll" : "LL");
 }
 
 void Remangler::mangleProtocol(Node *node) {
