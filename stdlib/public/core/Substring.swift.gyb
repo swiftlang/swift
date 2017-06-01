@@ -319,18 +319,30 @@ extension Substring : LosslessStringConvertible {
 }
 
 extension StringProtocol {
-  public static func ==<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+  public static func ==<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
     return lhs._ephemeralString == rhs._ephemeralString
   }
 
-  public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+  public static func !=<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
     return lhs._ephemeralString != rhs._ephemeralString
   }
 }
 
 extension StringProtocol {
-  public static func < <S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+  public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
     return lhs._ephemeralString < rhs._ephemeralString
+  }
+
+  public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return rhs < lhs
+  }
+
+  public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return !(lhs < rhs)
   }
 }
 
