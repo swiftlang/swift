@@ -18,11 +18,11 @@ import Foundation
 extension INCallRecord {
   @nonobjc
   public convenience init(
-      identifier: String? = nil,
+      identifier: String,
       dateCreated: Date? = nil,
       caller: INPerson? = nil,
-      callRecordType: INCallRecordType? = nil,
-      callCapability: INCallCapability? = nil,
+      callRecordType: INCallRecordType,
+      callCapability: INCallCapability,
       callDuration: Double? = nil,
       unseen: Bool? = nil
   ) {
