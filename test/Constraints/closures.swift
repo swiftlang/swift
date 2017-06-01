@@ -517,3 +517,15 @@ returnsArray().flatMap { $0 }.flatMap { }
 
 // rdar://problem/30271695
 _ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }
+
+// rdar://problem/32432145 - compiler should emit fixit to remove "_ in" in closures if 0 parameters is expected
+
+func r32432145(_ a: () -> ()) {}
+r32432145 { _ in let _ = 42 } // Ok in Swift 3
+r32432145 { _ in // Ok in Swift 3
+  print("answer is 42")
+}
+r32432145 { _,_ in
+  // expected-error@-1 {{contextual closure type '() -> ()' expects 0 arguments, but 2 were used in closure body}} {{13-19=}}
+  print("answer is 42")
+}
