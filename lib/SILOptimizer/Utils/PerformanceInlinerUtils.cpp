@@ -607,7 +607,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
       ArraySemanticsCall ASC(AI.getInstruction());
-      if (!ASC.canInlineEarly())
+      if (ASC && !ASC.canInlineEarly())
         return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
