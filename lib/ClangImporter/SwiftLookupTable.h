@@ -273,20 +273,6 @@ public:
     return bits | 0x01;
   }
 
-  /// Encode a declaration ID as an entry in the table.
-  static uintptr_t encodeDeclID(clang::serialization::DeclID id) {
-    auto upper = static_cast<uintptr_t>(id) << 2;
-    assert(upper >> 2 == id);
-    return upper | 0x02;
-  }
-
-  /// Encode a macro ID as an entry in the table.
-  static uintptr_t encodeMacroID(clang::serialization::MacroID id) {
-    auto upper = static_cast<uintptr_t>(id) << 2;
-    assert(upper >> 2 == id);
-    return upper | 0x02 | 0x01;
-  }
-
 private:
   /// A table mapping from the base name of Swift entities to all of
   /// the C entities that have that name, in all contexts.
