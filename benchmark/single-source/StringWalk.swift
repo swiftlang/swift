@@ -69,6 +69,7 @@ let utf16 = emoji + "the quick brown fox" + String(emoji.reversed() as Array<Cha
 let japanese = "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。"
 let chinese = "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。"
 let korean = "이번 업데이트에서는 강력하면서도 직관적인 Apple 플랫폼용 프로그래밍 언어인 Swift를 완벽히 개선하였습니다."
+let russian = "в чащах юга жил-был цитрус? да, но фальшивый экземпляр"
 
 // A workload that's mostly Latin characters, with occasional emoji
 // interspersed. Common for tweets.
@@ -266,6 +267,36 @@ public func run_StringWalk_korean_characters(_ N: Int) {
 public func run_StringWalk_korean_characters_Backwards(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
     count_characters_rev(korean.characters.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_russian_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    count_unicodeScalars(russian.unicodeScalars)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_russian_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    count_unicodeScalars_rev(russian.unicodeScalars.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_russian_characters(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    count_characters(russian.characters)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_russian_characters_Backwards(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    count_characters_rev(russian.characters.reversed())
   }
 }
 
