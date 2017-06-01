@@ -4,3 +4,11 @@ SwiftVersions:
     Classes:
       - Name: InnerClass
         SwiftName: InnerClass
+    Tags:
+      - Name: InnerStruct
+        SwiftName: InnerStruct
+    Typedefs:
+      - Name: InnerAlias
+        SwiftName: InnerAlias
+      - Name: InnerAnonStruct
+        SwiftName: InnerAnonStruct
