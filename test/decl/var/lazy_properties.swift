@@ -143,12 +143,19 @@ class ReferenceSelfInLazyProperty : BaseClass {
   lazy var cqtrefs: (Int, Int) = { (self.i, self.f()) }()
 
   lazy var mrefs = { () -> (Int, Int) in return (i, f()) }()
-  // expected-error@-1 {{call to method 'f' in closure requires explicit 'self.' to make capture semantics explicit}}
-  // expected-error@-2 {{reference to property 'i' in closure requires explicit 'self.' to make capture semantics explicit}}
   lazy var mtrefs: (Int, Int) = { return (i, f()) }()
 
   lazy var mqrefs = { () -> (Int, Int) in (self.i, self.f()) }()
   lazy var mqtrefs: (Int, Int) = { return (self.i, self.f()) }()
+
+  lazy var lcqrefs = { [unowned self] in (self.i, self.f()) }()
+  lazy var lcqtrefs: (Int, Int) = { [unowned self] in (self.i, self.f()) }()
+
+  lazy var lmrefs = { [unowned self] () -> (Int, Int) in return (i, f()) }()
+  lazy var lmtrefs: (Int, Int) = { [unowned self] in return (i, f()) }()
+
+  lazy var lmqrefs = { [unowned self] () -> (Int, Int) in (self.i, self.f()) }()
+  lazy var lmqtrefs: (Int, Int) = { [unowned self] in return (self.i, self.f()) }()
 
   var i = 42
   func f() -> Int { return 0 }
