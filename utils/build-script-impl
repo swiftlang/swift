@@ -169,6 +169,7 @@ KNOWN_SETTINGS=(
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
+    report-statistics           "0"              "set to 1 to generate compilation statistics files for swift libraries"
     llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
     swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
@@ -2129,6 +2130,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
+                    -DSWIFT_REPORT_STATISTICS:BOOL=$(true_false "${REPORT_STATISTICS}")
                     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_STDLIB}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
                     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_SDK_OVERLAY}")

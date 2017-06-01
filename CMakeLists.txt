@@ -252,6 +252,10 @@ option(SWIFT_CHECK_INCREMENTAL_COMPILATION
     "Check if incremental compilation works when compiling the Swift libraries"
     FALSE)
 
+option(SWIFT_REPORT_STATISTICS
+    "Create json files which contain internal compilation statistics"
+    FALSE)
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
