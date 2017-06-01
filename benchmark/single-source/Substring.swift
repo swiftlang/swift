@@ -225,21 +225,6 @@ public func run_SubstringComparable(_ N: Int) {
   CheckResults(count == N*500)
 }
 
-/* to add when Substring > String is working
-@inline(never)
-public func run_SubstringGreaterThanString(_ N: Int) {
-	var string = "pen,pineapple,apple,pen"
-	string += ",✒️,🍍,🍏,✒️"
-	let substrings = string.split(separator: ",")
-	let ppap = "ppap"
-	var count = 0
-	for _ in 1...N*500 {
-		count = count &+ substrings.index(where: { $0 > ppap })!
-	}
-  CheckResults(count == 4 &* N)
-}
-*/
-
 /*
 func checkLess<T, U>(_ x: T, _ y: U)
 where T : StringProtocol, U : StringProtocol {
