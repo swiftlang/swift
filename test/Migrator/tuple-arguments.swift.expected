@@ -26,11 +26,20 @@ func test7(_: ((Int, Int, Int)) -> ()) {}
 test7({ let (x,y,z) = $0; })
 test6({ let (x, y) = $0; })
 test6({ let (_, _) = $0; })
-test6({ (__val:(Int, Int)) in let (x,y) = __val;  })
-test6({ (__val:(Int, Int)) ->() in let (_,_) = __val;  })
+test6({ (__val:(Int, Int)) in let (x,y) = __val; })
+test6({ (__val:(Int, Int)) ->() in let (_,_) = __val; })
+
+func test8(_: ((Int, Int)) -> Int) {}
+test8 { (__val:(Int, Int)) -> Int in let (_,_) = __val; return 2 }
+test8 { let (x, y) = $0; return x }
+
+func isEven(_ x: Int) -> Bool { return x % 2 == 0 }
+let items = Array(zip(0..<10, 0..<10))
+_ = items.filter { let (_, x) = $0; return isEven(x) }
+_ = items.filter { _ in true }
 
 func toString(indexes: Int?...) -> String {
-  let _ = indexes.enumerated().flatMap({ (__val:(Int, Int?)) -> String? in let (i,index) = __val; 
+  let _ = indexes.enumerated().flatMap({ (__val:(Int, Int?)) -> String? in let (i,index) = __val;
     let _: Int = i
     if index != nil {}
     return ""
