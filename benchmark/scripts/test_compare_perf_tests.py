@@ -21,6 +21,7 @@ import unittest
 from compare_perf_tests import PerformanceTestResult
 from compare_perf_tests import ResultComparison
 from compare_perf_tests import TestComparator
+from compare_perf_tests import parse_args
 
 
 class TestPerformanceTestResult(unittest.TestCase):
@@ -223,6 +224,58 @@ class TestTestComparator(OldAndNewLog):
         )
         self.assertEquals(names(tc.increased), ['ByteSwap'])
         self.assertEquals(tc.decreased, [])
+
+
+class Test_parse_args(unittest.TestCase):
+    required = ['--old-file', 'old.log', '--new-file', 'new.log']
+
+    def test_required_input_arguments(self):
+        args = parse_args(self.required)
+        self.assertEquals(args.old_file, 'old.log')
+        self.assertEquals(args.new_file, 'new.log')
+        self.assertRaises(SystemExit, parse_args, [])
+
+    def test_format_argument(self):
+        self.assertEquals(
+            parse_args(self.required + ['--format', 'markdown']).format,
+            'markdown')
+        self.assertEquals(
+            parse_args(self.required + ['--format', 'git']).format, 'git')
+        self.assertEquals(
+            parse_args(self.required + ['--format', 'html']).format, 'html')
+        self.assertRaises(SystemExit, parse_args,
+                          self.required + ['--format', 'bogus'])
+
+    def test_delta_threshold_argument(self):
+        # default value
+        args = parse_args(self.required)
+        self.assertEquals(args.delta_threshold, 0.05)
+        # float parsing
+        args = parse_args(self.required + ['--delta-threshold', '0.1'])
+        self.assertEquals(args.delta_threshold, 0.1)
+        args = parse_args(self.required + ['--delta-threshold', '1'])
+        self.assertEquals(args.delta_threshold, 1.0)
+        args = parse_args(self.required + ['--delta-threshold', '.2'])
+        self.assertEquals(args.delta_threshold, 0.2)
+        self.assertRaises(SystemExit, parse_args,
+                          self.required + ['--delta-threshold', '2,2'])
+
+    def test_changes_only_argument(self):
+        self.assertFalse(parse_args(self.required).changes_only)
+        self.assertTrue(parse_args(self.required +
+                                   ['--changes-only']).changes_only)
+
+    def test_branch_arguments(self):
+        # default value
+        args = parse_args(self.required)
+        self.assertEquals(args.new_branch, 'NEW_MIN')
+        self.assertEquals(args.old_branch, 'OLD_MIN')
+        # user specified
+        args = parse_args(
+            self.required + ['--old-branch', 'master',
+                             '--new-branch', 'amazing-optimization'])
+        self.assertEquals(args.old_branch, 'master')
+        self.assertEquals(args.new_branch, 'amazing-optimization')
 
 
 if __name__ == '__main__':

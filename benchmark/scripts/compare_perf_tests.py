@@ -253,9 +253,11 @@ class ReportFormatter(object):
                        changed + self.comparator.unchanged)
         comparisons += self.comparator.added + self.comparator.removed
 
-        widths = map(lambda columns: map(len, columns),
-                     [PerformanceTestResult.header, ResultComparison.header] +
-                     [c.values() for c in comparisons])
+        widths = [
+            map(len, columns) for columns in
+            [PerformanceTestResult.header, ResultComparison.header] +
+            [c.values() for c in comparisons]
+        ]
 
         def max_widths(maximum, widths):
             return tuple(map(max, zip(maximum, widths)))
@@ -375,8 +377,8 @@ class ReportFormatter(object):
             ]))
 
 
-def main():
-
+def parse_args(args):
+    """Parse command line arguments and set default values."""
     parser = argparse.ArgumentParser(description='Compare Performance tests.')
     parser.add_argument('--old-file',
                         help='Baseline performance test suite (csv file)',
@@ -396,11 +398,15 @@ def main():
     parser.add_argument('--old-branch',
                         help='Name of the old branch', default='OLD_MIN')
     parser.add_argument('--delta-threshold',
-                        help='Delta threshold. Default 0.05.', default='0.05')
+                        help='Delta threshold. Default 0.05.',
+                        type=float, default=0.05)
+    return parser.parse_args(args)
 
-    args = parser.parse_args()
+
+def main():
+    args = parse_args(sys.argv[1:])
     comparator = TestComparator(args.old_file, args.new_file,
-                                float(args.delta_threshold))
+                                args.delta_threshold)
     formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
                                 args.changes_only)
 
