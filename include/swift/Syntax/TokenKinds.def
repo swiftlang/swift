@@ -10,13 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file defines macros used for macro-metaprogramming lexer tokens.
-///
-/// To use, simply define one or more of the macro functions listed below and
-/// then import this file. The macro functions follow a hierarchical pattern,
-/// and defining a higher-level macro will expend (by default) all the patterns
-/// beneath it. All of the macro functions will be undefined automatically at
-/// the end, there is no need to do this manually.
+/// This file defines x-macros used for metaprogramming with lexer tokens.
 ///
 /// KEYWORD(kw)
 ///   SWIFT_KEYWORD(kw)
@@ -80,25 +74,26 @@
 #endif
 
 /// POUND_KEYWORD(kw)
-///   Every keyword in the # namespace.
+///   Every keyword prefixed with a '#'.
 #ifndef POUND_KEYWORD
 #define POUND_KEYWORD(kw)
 #endif
 
 /// POUND_OBJECT_LITERAL(kw, desc, proto)
-///   Every keyword in the # namespace representing a new-form object literal.
+///   Every keyword prefixed with a '#' representing an object literal.
 #ifndef POUND_OBJECT_LITERAL
 #define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
 #endif
 
 /// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
-///   Every keyword in the # namespace representing an old-form object literal.
+///   Every keyword prefixed with a '#' representing the obsoleted form of an
+///   object literal.
 #ifndef POUND_OLD_OBJECT_LITERAL
 #define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
 #endif
 
 /// POUND_CONFIG(kw)
-///   Every keyword in the # namespace representing a configuration.
+///   Every keyword prefixed with a '#' representing a configuration.
 #ifndef POUND_CONFIG
 #define POUND_CONFIG(kw) POUND_KEYWORD(kw)
 #endif
@@ -230,7 +225,7 @@ PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 PUNCTUATOR(l_square_lit,  "[#")
 PUNCTUATOR(r_square_lit,  "#]")
 
-// Keywords in the # namespace.  "if" becomes "tok::pound_if".
+// Keywords prefixed with a '#'.  "if" becomes "tok::pound_if".
 POUND_KEYWORD(if)
 POUND_KEYWORD(else)
 POUND_KEYWORD(elseif)
@@ -240,12 +235,11 @@ POUND_KEYWORD(line)
 POUND_KEYWORD(sourceLocation)
 POUND_KEYWORD(selector)
 
-// Keywords in the # namespace that are build configurations.
+// Keywords prefixed with a '#' that are build configurations.
 POUND_CONFIG(available)
 
 
-// Declaratively define object literals, including their
-// corresponding protocols.
+// Object literals and their corresponding protocols.
 POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
 POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
 POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
