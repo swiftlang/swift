@@ -8,3 +8,14 @@
 __attribute__((swift_name("Outer.Inner")))
 @interface InnerClass : NSObject
 @end
+
+struct __attribute__((swift_name("Outer.InnerV"))) InnerStruct {
+  int value;
+};
+
+typedef struct {
+  int value;
+} InnerAnonStruct __attribute__((swift_name("Outer.InnerAS")));
+
+typedef int InnerAlias __attribute__((swift_name("Outer.InnerA")));
+
