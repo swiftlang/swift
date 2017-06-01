@@ -180,6 +180,51 @@ public func run_LessSubstringSubstringGenericComparable(_ N: Int) {
   }
 }
 
+@inline(never)
+public func run_SubstringEquatable(_ N: Int) {
+	var string = "pen,pineapple,apple,pen"
+	string += ",✒️,🍍,🍏,✒️"
+	let substrings = string.split(separator: ",")
+	var count = 0
+	for _ in 1...N*500 {
+		for s in substrings {
+			if substrings.contains(s) { count = count &+ 1 }
+		}
+	}
+  CheckResults(count == 8*N*500)
+}
+
+@inline(never)
+public func run_SubstringEqualString(_ N: Int) {
+	var string = "pen,pineapple,apple,pen"
+	string += ",✒️,🍍,🍏,✒️"
+	let substrings = string.split(separator: ",")
+	let pineapple = "pineapple"
+	let apple = "🍏"
+	var count = 0
+	for _ in 1...N*500 {
+		for s in substrings {
+			if s == pineapple || s == apple { count = count &+ 1 }
+		}
+	}
+  CheckResults(count == 2*N*500)
+}
+
+@inline(never)
+public func run_SubstringComparable(_ N: Int) {
+	var string = "pen,pineapple,apple,pen"
+	string += ",✒️,🍍,🍏,✒️"
+	let substrings = string.split(separator: ",")
+	let comparison = substrings + ["PPAP"]
+	var count = 0
+	for _ in 1...N*500 {
+		if substrings.lexicographicallyPrecedes(comparison) {
+			count = count &+ 1
+		}
+	}
+  CheckResults(count == N*500)
+}
+
 /*
 func checkLess<T, U>(_ x: T, _ y: U)
 where T : StringProtocol, U : StringProtocol {
