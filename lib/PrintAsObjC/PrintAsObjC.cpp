@@ -1370,7 +1370,8 @@ private:
     if (alias->hasClangNode()) {
       if (auto *clangTypeDecl =
             dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-        os << clangTypeDecl->getName();
+        maybePrintTagKeyword(alias);
+        os << getNameForObjC(alias);
 
         if (isClangPointerType(clangTypeDecl))
           printNullability(optionalKind);
@@ -1396,7 +1397,7 @@ private:
     visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }
 
-  void maybePrintTagKeyword(const NominalTypeDecl *NTD) {
+  void maybePrintTagKeyword(const TypeDecl *NTD) {
     if (isa<EnumDecl>(NTD) && !NTD->hasClangNode()) {
       os << "enum ";
       return;
