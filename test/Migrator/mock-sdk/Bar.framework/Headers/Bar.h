@@ -24,6 +24,8 @@ enum BarForwardDeclaredEnum {
 @interface PropertyUserInterface
 - (int) field;
 - (void) setField:(int)info;
++ (int) fieldPlus;
++ (void) methodPlus:(int)info;
 @end
 
 #define BAR_MACRO_1 0
@@ -34,3 +36,12 @@ typedef struct {
 } SomeItemSet;
 
 typedef SomeItemSet SomeEnvironment;
+
+#define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
+
+typedef NS_ENUM(long, FooComparisonResult) {
+  FooOrderedAscending = -1L,
+  FooOrderedSame,
+  FooOrderedDescending
+};

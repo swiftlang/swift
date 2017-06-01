@@ -18,6 +18,7 @@ public class FixedLayoutObjCSubclass : NSObject {
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k23FixedLayoutObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Ts5Int32V*
+// CHECK:      call void @swift_beginAccess
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
@@ -36,6 +37,7 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k26NonFixedLayoutObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Ts5Int32V*
+// CHECK:      call void @swift_beginAccess
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
@@ -67,6 +69,7 @@ public class GenericObjCSubclass<T> : NSCoder {
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k19GenericObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Ts5Int32V*
+// CHECK:      call void @swift_beginAccess
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
