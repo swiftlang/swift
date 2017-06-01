@@ -948,17 +948,7 @@ static void addMinimumProtocols(Type T,
 /// \brief Compare two protocols to establish an ordering between them.
 int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
                                    ProtocolDecl * const* PP2) {
-  auto *P1 = *PP1;
-  auto *P2 = *PP2;
-  ModuleDecl *M1 = P1->getParentModule();
-  ModuleDecl *M2 = P2->getParentModule();
-
-  // Try ordering based on module name, first.
-  if (int result = M1->getName().str().compare(M2->getName().str()))
-    return result;
-
-  // Order based on protocol name.
-  return P1->getName().str().compare(P2->getName().str());
+  return TypeDecl::compare(*PP1, *PP2);
 }
 
 bool ProtocolType::visitAllProtocols(
