@@ -67,6 +67,8 @@ public:
     size_t DriverDepNominal;
     size_t DriverDepMember;
     size_t DriverDepExternal;
+
+    size_t ChildrenMaxRSS;
   };
 
   struct AlwaysOnFrontendCounters
@@ -124,6 +126,8 @@ public:
     size_t NumIRComdatSymbols;
     size_t NumIRBasicBlocks;
     size_t NumIRInsts;
+
+    size_t NumLLVMBytesOutput;
   };
 
 private:

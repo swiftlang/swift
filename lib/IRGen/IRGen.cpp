@@ -23,6 +23,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -362,7 +363,8 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
                         const version::Version &effectiveLanguageVersion,
-                        StringRef OutputFilename) {
+                        StringRef OutputFilename,
+                        UnifiedStatsReporter *Stats) {
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
@@ -467,6 +469,13 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
   {
     SharedTimer timer("LLVM output");
     EmitPasses.run(*Module);
+  }
+  if (Stats && RawOS.hasValue()) {
+    if (DiagMutex)
+      DiagMutex->lock();
+    Stats->getFrontendCounters().NumLLVMBytesOutput += RawOS->tell();
+    if (DiagMutex)
+      DiagMutex->unlock();
   }
   return false;
 }
@@ -1096,7 +1105,8 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                        llvm::Module *Module) {
+                        llvm::Module *Module,
+                        UnifiedStatsReporter *Stats) {
   // Build TargetMachine.
   auto TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
@@ -1106,7 +1116,7 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(),
                     Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.getSingleOutputFilename()))
+                    Opts.getSingleOutputFilename(), Stats))
     return true;
   return false;
 }

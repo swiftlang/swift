@@ -17,11 +17,16 @@
 
 import argparse
 import csv
+import datetime
 import json
 import os
+import platform
 import random
 import re
 import sys
+import time
+import urllib
+import urllib2
 
 
 class JobStats:
@@ -89,6 +94,55 @@ class JobStats:
                 "ts": self.start_usec,
                 "dur": self.dur_usec,
                 "args": self.jobargs}
+
+    def start_timestr(self):
+        t = datetime.datetime.fromtimestamp(self.start_usec / 1000000.0)
+        return t.strftime("%Y-%m-%d %H:%M:%S")
+
+    def end_timestr(self):
+        t = datetime.datetime.fromtimestamp((self.start_usec +
+                                             self.dur_usec) / 1000000.0)
+        return t.strftime("%Y-%m-%d %H:%M:%S")
+
+    def pick_lnt_metric_suffix(self, metric_name):
+        if "BytesOutput" in metric_name:
+            return "code_size"
+        if "RSS" in metric_name or "BytesAllocated" in metric_name:
+            return "mem"
+        return "compile"
+
+    # Return a JSON-formattable object of the form preferred by LNT's
+    # 'submit' format.
+    def to_lnt_test_obj(self, args):
+        run_info = {
+            "run_order": str(args.lnt_order),
+            "tag": str(args.lnt_tag),
+        }
+        run_info.update(dict(args.lnt_run_info))
+        stats = self.stats
+        return {
+            "Machine":
+            {
+                "Name": args.lnt_machine,
+                "Info": dict(args.lnt_machine_info)
+            },
+            "Run":
+            {
+                "Start Time": self.start_timestr(),
+                "End Time": self.end_timestr(),
+                "Info": run_info
+            },
+            "Tests":
+            [
+                {
+                    "Data": [v],
+                    "Info": {},
+                    "Name": "%s.%s.%s.%s" % (args.lnt_tag, self.module,
+                                             k, self.pick_lnt_metric_suffix(k))
+                }
+                for (k, v) in stats.items()
+            ]
+        }
 
 
 # Return an array of JobStats objects
@@ -163,6 +217,30 @@ def write_catapult_trace(args):
     for path in args.remainder:
         allstats += load_stats_dir(path)
     json.dump([s.to_catapult_trace_obj() for s in allstats], args.output)
+
+
+def write_lnt_values(args):
+    for d in args.remainder:
+        stats = load_stats_dir(d)
+        merged = merge_all_jobstats(stats)
+        j = merged.to_lnt_test_obj(args)
+        if args.lnt_submit is None:
+            json.dump(j, args.output, indent=4)
+        else:
+            url = args.lnt_submit
+            print "\nSubmitting to LNT server: " + url
+            json_report = {'input_data': json.dumps(j), 'commit': '1'}
+            data = urllib.urlencode(json_report)
+            response_str = urllib2.urlopen(urllib2.Request(url, data))
+            response = json.loads(response_str.read())
+            print "### response:"
+            print response
+            if 'success' in response:
+                print "Server response:\tSuccess"
+            else:
+                print "Server response:\tError"
+                print "Error:\t", response['error']
+                sys.exit(1)
 
 
 def merge_all_jobstats(jobstats):
@@ -266,6 +344,21 @@ def main():
                         help="Percentage change required to report")
     parser.add_argument("--delta-usec-thresh", type=int, default=100000,
                         help="Absolute delta on times required to report")
+    parser.add_argument("--lnt-machine", type=str, default=platform.node(),
+                        help="Machine name for LNT submission")
+    parser.add_argument("--lnt-run-info", action='append', default=[],
+                        type=lambda kv: kv.split("="),
+                        help="Extra key=value pairs for LNT run-info")
+    parser.add_argument("--lnt-machine-info", action='append', default=[],
+                        type=lambda kv: kv.split("="),
+                        help="Extra key=value pairs for LNT machine-info")
+    parser.add_argument("--lnt-order", type=str,
+                        default=str(int(time.time())),
+                        help="Order for LNT submission")
+    parser.add_argument("--lnt-tag", type=str, default="swift-compile",
+                        help="Tag for LNT submission")
+    parser.add_argument("--lnt-submit", type=str, default=None,
+                        help="URL to submit LNT data to (rather than print)")
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--catapult", action="store_true",
                        help="emit a 'catapult'-compatible trace of events")
@@ -273,6 +366,8 @@ def main():
                        help="summarize the 'incrementality' of a build")
     modes.add_argument("--compare-frontend-stats", action="store_true",
                        help="Compare frontend stats from two stats-dirs")
+    modes.add_argument("--lnt", action="store_true",
+                       help="Emit an LNT-compatible test summary")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -289,6 +384,8 @@ def main():
             show_paired_incrementality(args)
         else:
             show_incrementality(args)
+    elif args.lnt:
+        write_lnt_values(args)
     return None
 
 
