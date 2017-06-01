@@ -28,7 +28,8 @@ using namespace swift;
 StringRef swift::objc_translation::
 getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
-         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
+         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD) ||
+         isa<TypeAliasDecl>(VD));
   if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName()) {
       assert(name->getNumSelectorPieces() == 1);
