@@ -2074,6 +2074,9 @@ IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(const IRGenOptions &Opts,
   return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF);
 }
 
+
+IRGenDebugInfo::~IRGenDebugInfo() {}
+
 // Forwarding to the private implementation.
 void IRGenDebugInfo::finalize() {
   static_cast<IRGenDebugInfoImpl *>(this)->finalize();
