@@ -2167,7 +2167,7 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
         diffParent->getKind() == SDKNodeKind::TypeDecl &&
         declNode->isStatic() &&
-        nodeParent->getAs<SDKNodeDecl>()->getFullyQualifiedName() ==
+        nodeParent->getAs<SDKNodeDecl>()->getFullyQualifiedName() !=
           diffParent->getAs<SDKNodeDecl>()->getFullyQualifiedName())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
