@@ -1399,6 +1399,9 @@ public:
     return dyn_cast<AssociatedTypeDecl>(identifier.assocTypeOrConcrete);
   }
 
+  /// Determine whether this PA is still unresolved.
+  bool isUnresolved() const { return isUnresolvedNestedType; }
+
   /// Resolve the potential archetype to the given associated type.
   void resolveAssociatedType(AssociatedTypeDecl *assocType,
                              GenericSignatureBuilder &builder);

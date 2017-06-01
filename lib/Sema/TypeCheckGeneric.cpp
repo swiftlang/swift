@@ -213,32 +213,33 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // into it.
   if (auto concrete = nestedPA->getConcreteTypeDecl()) {
     ref->setValue(concrete);
-    if (baseTy->isTypeParameter())
-      return DependentMemberType::get(baseTy, concrete->getName());
-    return TC.substMemberTypeWithBase(DC->getParentModule(), concrete, baseTy);
-  }
-  
-  Identifier name = ref->getIdentifier();
-  SourceLoc nameLoc = ref->getIdLoc();
 
-  // Check whether the name can be found in the superclass.
-  // FIXME: The generic signature builder should be doing this and mapping down to a
-  // concrete type.
-  if (auto superclassTy = basePA->getSuperclass()) {
-    if (auto lookup = TC.lookupMemberType(DC, superclassTy, name)) {
-      if (lookup.isAmbiguous()) {
-        TC.diagnoseAmbiguousMemberType(baseTy, baseRange, name, nameLoc,
-                                       lookup);
-        return ErrorType::get(TC.Context);
+    if (baseTy->isTypeParameter()) {
+      if (auto proto =
+            concrete->getDeclContext()
+              ->getAsProtocolOrProtocolExtensionContext()) {
+        auto subMap = SubstitutionMap::getProtocolSubstitutions(
+                        proto, baseTy, ProtocolConformanceRef(proto));
+        return concrete->getDeclaredInterfaceType().subst(subMap);
       }
 
-      ref->setValue(lookup.front().first);
-      // FIXME: Record (via type sugar) that this was referenced via baseTy.
-      return lookup.front().second;
+      if (auto superclass = basePA->getSuperclass()) {
+        return superclass->getTypeOfMember(
+                                         DC->getParentModule(), concrete,
+                                         concrete->getDeclaredInterfaceType());
+      }
+
+      llvm_unreachable("shouldn't have a concrete decl here");
     }
+
+    return TC.substMemberTypeWithBase(DC->getParentModule(), concrete, baseTy);
   }
 
+  assert(nestedPA->isUnresolved() && "meaningless unresolved type");
+
   // Complain that there is no suitable type.
+  Identifier name = ref->getIdentifier();
+  SourceLoc nameLoc = ref->getIdLoc();
   TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
     .highlight(baseRange);
   return ErrorType::get(TC.Context);

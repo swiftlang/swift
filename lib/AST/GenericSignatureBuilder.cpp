@@ -1286,7 +1286,7 @@ static void maybeAddSameTypeRequirementForNestedType(
   if (!superSource) return;
 
   auto assocType = nestedPA->getResolvedAssociatedType();
-  assert(assocType && "Not resolved to an associated type?");
+  if (!assocType) return;
 
   // Dig out the type witness.
   auto superConformance = superSource->getProtocolConformance();
@@ -1701,6 +1701,28 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
     }),
     concreteDecls.end());
 
+  // If we haven't found anything yet but have a superclass, look for a type
+  // in the superclass.
+  if (!resultPA && concreteDecls.empty()) {
+    if (auto superclass = getSuperclass()) {
+      if (auto classDecl = superclass->getClassOrBoundGenericClass()) {
+        SmallVector<ValueDecl *, 2> superclassMembers;
+        classDecl->getParentModule()->lookupQualified(superclass, name, NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers, nullptr,
+            superclassMembers);
+        for (auto member : superclassMembers) {
+          if (auto concreteDecl = dyn_cast<TypeDecl>(member)) {
+            // Track the best concrete type.
+            if (!bestConcreteDecl ||
+                TypeDecl::compare(concreteDecl, bestConcreteDecl) < 0)
+              bestConcreteDecl = concreteDecl;
+
+            concreteDecls.push_back(concreteDecl);
+          }
+        }
+      }
+    }
+  }
+
   // Update for all of the concrete decls with this name, which will introduce
   // various same-type constraints.
   for (auto concreteDecl : concreteDecls) {
@@ -1899,13 +1921,22 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
         // of the protocol's 'Self' type.
         auto type = concreteDecl->getDeclaredInterfaceType();
 
-        // Substitute in the type of the current PotentialArchetype in
-        // place of 'Self' here.
-        auto subMap = SubstitutionMap::getProtocolSubstitutions(
-          proto, getDependentType(/*genericParams=*/{},
-                                  /*allowUnresolved=*/true),
-          ProtocolConformanceRef(proto));
-        type = type.subst(subMap, SubstFlags::UseErrorType);
+        if (proto) {
+          // Substitute in the type of the current PotentialArchetype in
+          // place of 'Self' here.
+          auto subMap = SubstitutionMap::getProtocolSubstitutions(
+            proto, getDependentType(/*genericParams=*/{},
+                                    /*allowUnresolved=*/true),
+            ProtocolConformanceRef(proto));
+          type = type.subst(subMap, SubstFlags::UseErrorType);
+        } else {
+          // Substitute in the superclass type.
+          auto superclass = getSuperclass();
+          auto superclassDecl = superclass->getClassOrBoundGenericClass();
+          type = superclass->getTypeOfMember(
+                   superclassDecl->getParentModule(), concreteDecl,
+                   concreteDecl->getDeclaredInterfaceType());
+        }
 
         builder.addSameTypeRequirement(
                          UnresolvedType(resultPA),
@@ -1917,8 +1948,12 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
     // If there's a superclass constraint that conforms to the protocol,
     // add the appropriate same-type relationship.
-    if (auto superSource = builder.resolveSuperConformance(this, proto))
-      maybeAddSameTypeRequirementForNestedType(resultPA, superSource, builder);
+    if (proto) {
+      if (auto superSource = builder.resolveSuperConformance(this, proto)) {
+        maybeAddSameTypeRequirementForNestedType(resultPA, superSource,
+                                                 builder);
+      }
+    }
 
     // We know something concrete about the parent PA, so we need to propagate
     // that information to this new archetype.
@@ -2379,18 +2414,6 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     if (!pa) return None;
   }
 
-  auto rep = pa->getRepresentative();
-  if (!rep->getParent() || !rep->getConcreteTypeDecl())
-    return ResolvedType::forPotentialArchetype(pa);
-
-  // We're assuming that an equivalence class with a type alias representative
-  // doesn't have a "true" (i.e. associated type) potential archetype.
-  assert(llvm::all_of(rep->getEquivalenceClassMembers(),
-                      [&](PotentialArchetype *pa) {
-                        return pa->getParent() && pa->getConcreteTypeDecl();
-                      }) &&
-      "unexpected concrete type representative with non-concrete equivalent");
-
   return ResolvedType::forPotentialArchetype(pa);
 }
 
@@ -2597,7 +2620,6 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       return typealias->getUnderlyingTypeLoc().getType();
     }
 
-    // FIXME: Substitutions required!
     return typeDecl->getDeclaredInterfaceType();
   };
 
@@ -2827,11 +2849,24 @@ void GenericSignatureBuilder::updateSuperclass(
     }
   };
 
+  // Local function to resolve nested types found in the superclass.
+  auto updateSuperclassNestedTypes = [&] {
+    for (auto &nested : T->getNestedTypes()) {
+      if (nested.second.empty()) continue;
+      if (nested.second.front()->isUnresolved()) {
+        (void)T->getNestedArchetypeAnchor(nested.first, *this,
+          PotentialArchetype::NestedTypeUpdate::ResolveExisting);
+      }
+    }
+  };
+
   // If we haven't yet recorded a superclass constraint for this equivalence
   // class, do so now.
   if (!equivClass->superclass) {
     equivClass->superclass = superclass;
     updateSuperclassConformances();
+    updateSuperclassNestedTypes();
+
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
     auto layoutReqSource = source->viaSuperclass(*this, nullptr);
@@ -2862,6 +2897,7 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // We've strengthened the bound, so update superclass conformances.
     updateSuperclassConformances();
+    updateSuperclassNestedTypes();
     return;
   }
 
@@ -4005,10 +4041,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   if (Impl->NumUnresolvedNestedTypes > 0) {
     visitPotentialArchetypes([&](PotentialArchetype *pa) {
       // We only care about nested types that haven't been resolved.
-      if (pa->getParent() == nullptr || pa->getResolvedAssociatedType() ||
-          pa->getConcreteTypeDecl() ||
-          /* FIXME: Should be able to handle this earlier */pa->getSuperclass())
-        return;
+      if (!pa->isUnresolved()) return;
 
       // Try to typo correct to a nested type name.
       Identifier correction = typoCorrectNestedType(pa);
