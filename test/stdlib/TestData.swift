@@ -15,6 +15,7 @@
 // RUN: %target-run %t/TestData
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: resilient_stdlib
 
 import Foundation
 import Dispatch
