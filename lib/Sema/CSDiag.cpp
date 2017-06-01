@@ -6674,6 +6674,11 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
         }
       }
 
+      bool onlyAnonymousParams =
+      std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
+        return !param->hasName();
+      });
+
       // Okay, the wrong number of arguments was used, complain about that.
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
@@ -6682,15 +6687,22 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
           params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
           inferredArgCount, actualArgCount, (actualArgCount == 1));
 
+      // If closure expects no parameters but N was given,
+      // and all of them are anonymous let's suggest removing them.
+      if (inferredArgCount == 0 && onlyAnonymousParams) {
+        auto inLoc = CE->getInLoc();
+        auto &sourceMgr = CS->getASTContext().SourceMgr;
+
+        if (inLoc.isValid())
+          diag.fixItRemoveChars(params->getStartLoc(),
+                                Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+        return true;
+      }
+
       // If the number of parameters is less than number of inferred
       // and all of the parameters are anonymous, let's suggest a fix-it
       // with the rest of the missing parameters.
       if (actualArgCount < inferredArgCount) {
-        bool onlyAnonymousParams =
-        std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
-          return !param->hasName();
-        });
-
         SmallString<32> fixIt;
         llvm::raw_svector_ostream OS(fixIt);
 
