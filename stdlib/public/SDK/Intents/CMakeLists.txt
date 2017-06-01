@@ -10,6 +10,7 @@ add_swift_library(swiftIntents ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_O
   INIntegerResolutionResult.swift
   INParameter.swift
   INRequestRideIntent.swift
+  INRideOption.swift
   INSaveProfileInCarIntent.swift
   INSearchCallHistoryIntent.swift
   INSearchForPhotosIntentResponse.swift
