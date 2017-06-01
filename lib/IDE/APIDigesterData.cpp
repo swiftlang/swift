@@ -251,7 +251,9 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   case APIDiffItemKind::ADK_CommonDiffItem: {
     auto *Left = static_cast<const CommonDiffItem*>(this);
     auto *Right = static_cast<const CommonDiffItem*>(&Other);
-    return Left->ChildIndex == Right->ChildIndex;
+    return
+      Left->DiffKind == Right->DiffKind &&
+      Left->ChildIndex == Right->ChildIndex;
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
     auto *Left = static_cast<const NoEscapeFuncParam*>(this);
