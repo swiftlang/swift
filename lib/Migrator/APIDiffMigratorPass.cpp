@@ -366,6 +366,25 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  bool handleQualifiedReplacement(Expr* Call) {
+    if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(Call)) {
+      if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
+        for (auto *I :getRelatedDiffItems(FD)) {
+          if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
+            if (Item->Subkind == TypeMemberDiffItemSubKind::
+                QualifiedReplacement) {
+              Editor.replace(Call->getSourceRange(),
+                (llvm::Twine(Item->newTypeName) + "." +
+                  Item->getNewName().base()).str());
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   bool handleSpecialCases(ValueDecl *FD, CallExpr* Call, Expr *Arg) {
     SpecialCaseDiffItem *Item = nullptr;
     for (auto *I: getRelatedDiffItems(FD)) {
@@ -548,8 +567,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   bool walkToExprPre(Expr *E) override {
+    if (handleQualifiedReplacement(E))
+      return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
-
       auto Fn = CE->getFn();
       auto Args = CE->getArg();
       switch (Fn->getKind()) {

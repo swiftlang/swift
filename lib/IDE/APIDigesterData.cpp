@@ -119,7 +119,10 @@ swift::ide::api::TypeMemberDiffItem::getSubKind() const {
   DeclNameViewer NewName = getNewName();
   if (!OldName.isFunction()) {
     assert(!NewName.isFunction());
-    return TypeMemberDiffItemSubKind::SimpleReplacement;
+    if (oldTypeName.empty())
+      return TypeMemberDiffItemSubKind::SimpleReplacement;
+    else
+      return TypeMemberDiffItemSubKind::QualifiedReplacement;
   }
   assert(OldName.isFunction());
   bool ToProperty = !NewName.isFunction();
@@ -145,9 +148,12 @@ swift::ide::api::TypeMemberDiffItem::getSubKind() const {
     assert(OldName.argSize() == 0);
     assert(!removedIndex);
     return TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty;
-  } else {
+  } else if (oldTypeName.empty()){
     assert(NewName.argSize() == OldName.argSize());
     return TypeMemberDiffItemSubKind::SimpleReplacement;
+  } else {
+    assert(NewName.argSize() == OldName.argSize());
+    return TypeMemberDiffItemSubKind::QualifiedReplacement;
   }
 }
 
