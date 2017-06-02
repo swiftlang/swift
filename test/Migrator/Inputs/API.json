@@ -108,6 +108,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@M@null@objc(cs)C(im)field2",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "SetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)PropertyUserInterface(im)setField:",
