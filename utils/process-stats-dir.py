@@ -228,7 +228,7 @@ def write_lnt_values(args):
             json.dump(j, args.output, indent=4)
         else:
             url = args.lnt_submit
-            print "\nSubmitting to LNT server: " + url
+            print "\nsubmitting to LNT server: " + url
             json_report = {'input_data': json.dumps(j), 'commit': '1'}
             data = urllib.urlencode(json_report)
             response_str = urllib2.urlopen(urllib2.Request(url, data))
@@ -236,10 +236,10 @@ def write_lnt_values(args):
             print "### response:"
             print response
             if 'success' in response:
-                print "Server response:\tSuccess"
+                print "server response:\tSuccess"
             else:
-                print "Server response:\tError"
-                print "Error:\t", response['error']
+                print "server response:\tError"
+                print "error:\t", response['error']
                 sys.exit(1)
 
 
