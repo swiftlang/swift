@@ -63,7 +63,7 @@
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 @_fixed_layout
 public struct Character :
-  _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
+  _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral,
   ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
 
   // Fundamentally, it is just a String, but it is optimized for the common case
@@ -147,6 +147,48 @@ public struct Character :
         isASCII: isASCII))
   }
 
+  // Inlining ensures that the whole constructor can be folded away to a single
+  // integer constant in case of small character literals.
+  @inline(__always)
+  @effects(readonly)
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    utf16CodeUnitCount: Builtin.Word
+  ) {
+    let utf16 = UnsafeBufferPointer(
+      start: UnsafePointer<Unicode.UTF16.CodeUnit>(start),
+      count: Int(utf16CodeUnitCount))
+
+    switch utf16.count {
+    case 1:
+      _representation = .smallUTF16(Builtin.zext_Int16_Int63(utf16[0]._value))
+    case 2:
+      let bits = UInt32(utf16[0]) | UInt32(utf16[1]) &<< 16
+      _representation = .smallUTF16(Builtin.zext_Int32_Int63(bits._value))
+    case 3:
+      let bits = UInt64(utf16[0])
+        | UInt64(utf16[1]) &<< 16
+        | UInt64(utf16[2]) &<< 32
+      _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
+    case 4 where utf16[3] < 0x8000:
+      let bits = UInt64(utf16[0])
+        | UInt64(utf16[1]) &<< 16
+        | UInt64(utf16[2]) &<< 32
+        | UInt64(utf16[3]) &<< 48
+      _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
+    default:
+      _representation = Character(
+        _largeRepresentationString: String(
+          _StringCore(
+            baseAddress: UnsafeMutableRawPointer(start), 
+            count: utf16.count,
+            elementShift: 1,
+            hasCocoaBuffer: false,
+            owner: nil)
+        ))._representation
+    }
+  }
+  
   /// Creates a character with the specified value.
   ///
   /// Do not call this initalizer directly. It is used by the compiler when
