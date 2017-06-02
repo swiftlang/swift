@@ -3,7 +3,7 @@
 // a second compilation should move 'foo.swiftdeps' to 'foo.swiftdeps~', then
 // overwrite 'foo.swiftdeps' with new dependency information.
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // First, produce the dependency files and verify their contents.
 // RUN: %target-swift-frontend -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file %S/../Inputs/empty\ file.swift
