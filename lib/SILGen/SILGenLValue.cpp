@@ -627,14 +627,11 @@ namespace {
   /// A physical path component which projects out an opened archetype
   /// from an existential.
   class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
-    CanArchetypeType getOpenedArchetype() const {
-      return cast<ArchetypeType>(getSubstFormalType());
-    }
   public:
     OpenOpaqueExistentialComponent(CanArchetypeType openedArchetype,
                                    LValueTypeData typeData)
       : PhysicalPathComponent(typeData, OpenOpaqueExistentialKind) {
-      assert(getOpenedArchetype() == openedArchetype);
+      assert(getSubstFormalType() == openedArchetype);
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -664,7 +661,6 @@ namespace {
         llvm_unreachable("Bad existential representation for address-only type");
       }
 
-      SGF.setArchetypeOpeningSite(getOpenedArchetype(), addr);
       return ManagedValue::forLValue(addr);
     }
 
@@ -721,8 +717,6 @@ namespace {
                  == ExistentialRepresentation::Class);
         ref = SGF.B.createOpenExistentialRef(loc, result, getTypeOfRValue());
       }
-
-      SGF.setArchetypeOpeningSite(OpenedArchetype, ref.getValue());
 
       return RValue(SGF, loc, getSubstFormalType(), ref);
     }

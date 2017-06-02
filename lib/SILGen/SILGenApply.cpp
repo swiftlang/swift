@@ -587,15 +587,6 @@ public:
         constant(inputConstant.asForeign(protocol->isObjC())) {}
 
   Callee build() {
-    // Link back to something to create a data dependency if we have
-    // an opened type.
-    SILValue openingSite;
-    auto archetype =
-        getSelfType()->getRValueInstanceType()->castTo<ArchetypeType>();
-    if (archetype->getOpenedExistentialType()) {
-      openingSite = SGF.getArchetypeOpeningSite(archetype);
-    }
-
     // Then if we need to materialize self into memory, do so.
     if (shouldMaterializeSelf()) {
       SILLocation selfLoc = selfValue.getLocation();
@@ -603,7 +594,7 @@ public:
       setSelfValueToAddress(selfLoc, address);
     }
 
-    return Callee::forArchetype(SGF, openingSite, getSelfType(), constant,
+    return Callee::forArchetype(SGF, SILValue(), getSelfType(), constant,
                                 subs, loc);
   }
 

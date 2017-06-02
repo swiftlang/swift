@@ -859,7 +859,6 @@ SILGenFunction::emitOpenExistential(
   case ExistentialRepresentation::None:
     llvm_unreachable("not existential");
   }
-  setArchetypeOpeningSite(openedArchetype, archetypeMV.getValue());
 
   assert(!canConsume || isUnique); (void) isUnique;
 

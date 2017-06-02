@@ -336,7 +336,6 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
       = ArchetypeType::getOpened(substitutions[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     arg = gen.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
-    gen.setArchetypeOpeningSite(openedTy, arg.getValue());
   }
 
   // Return the cast result.
@@ -711,7 +710,6 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
       = ArchetypeType::getOpened(subs[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     ref = gen.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
-    gen.setArchetypeOpeningSite(openedTy, ref);
   }
   
   SILValue result = gen.B.createRefToBridgeObject(loc, ref, bits);

@@ -943,21 +943,6 @@ public:
                                             CanType inputTy,
                                             SILType resultTy);
 
-  /// OpenedArchetypes - Mappings of opened archetypes back to the
-  /// instruction which opened them.
-  llvm::DenseMap<ArchetypeType *, SILValue> ArchetypeOpenings;
-
-  SILValue getArchetypeOpeningSite(ArchetypeType *archetype) const {
-    auto it = ArchetypeOpenings.find(archetype);
-    assert(it != ArchetypeOpenings.end() &&
-           "opened archetype was not registered with SILGenFunction");
-    return it->second;
-  }
-
-  void setArchetypeOpeningSite(ArchetypeType *archetype, SILValue site) {
-    ArchetypeOpenings.insert({archetype, site});
-  }
-
   struct OpaqueValueState {
     ManagedValue Value;
     bool IsConsumable;
