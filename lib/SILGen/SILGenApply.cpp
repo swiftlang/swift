@@ -547,21 +547,6 @@ public:
   }
 };
 
-/// Given that we've applied some sort of trivial transform to the
-/// value of the given ManagedValue, enter a cleanup for the result if
-/// the original had a cleanup.
-static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &SGF,
-                                                    ManagedValue orig,
-                                                    SILValue result,
-                                                    SILLocation loc) {
-  if (orig.hasCleanup()) {
-    orig.forwardCleanup(SGF);
-    return SGF.emitFormalAccessManagedBufferWithCleanup(loc, result);
-  } else {
-    return ManagedValue::forUnmanaged(result);
-  }
-}
-
 namespace {
 
 class ArchetypeCalleeBuilder {
@@ -587,86 +572,9 @@ public:
         constant(inputConstant.asForeign(protocol->isObjC())) {}
 
   Callee build() {
-    // Then if we need to materialize self into memory, do so.
-    if (shouldMaterializeSelf()) {
-      SILLocation selfLoc = selfValue.getLocation();
-      ManagedValue address = evaluateAddressIntoMemory(selfLoc);
-      setSelfValueToAddress(selfLoc, address);
-    }
-
-    return Callee::forArchetype(SGF, SILValue(), getSelfType(), constant,
+    return Callee::forArchetype(SGF, SILValue(),
+                                selfValue.getSubstRValueType(), constant,
                                 subs, loc);
-  }
-
-private:
-  CanType getSelfType() const { return selfValue.getSubstRValueType(); }
-
-  SILParameterInfo getSelfParameterInfo() const {
-    if (selfParam == SILParameterInfo()) {
-      auto &Self = const_cast<ArchetypeCalleeBuilder &>(*this);
-      auto constantFnType = SGF.SGM.Types.getConstantFunctionType(constant);
-      Self.selfParam = constantFnType->getSelfParameter();
-    }
-
-    return selfParam;
-  }
-
-  SGFContext getSGFContextForSelf() {
-    if (getSelfParameterInfo().isConsumed())
-      return SGFContext();
-    return SGFContext::AllowGuaranteedPlusZero;
-  }
-
-  void setSelfValueToAddress(SILLocation loc, ManagedValue address) {
-    assert(address.getType().isAddress());
-    assert(address.getType().is<ArchetypeType>());
-    auto formalTy = address.getType().getSwiftRValueType();
-
-    if (getSelfParameterInfo().isIndirectMutating()) {
-      // Be sure not to consume the cleanup for an inout argument.
-      auto selfLV = ManagedValue::forLValue(address.getValue());
-      selfValue = ArgumentSource(loc,
-                    LValue::forAddress(selfLV, None,
-                                       AbstractionPattern(formalTy), formalTy));
-    } else {
-      selfValue = ArgumentSource(loc, RValue(SGF, loc, formalTy, address));
-    }
-  }
-
-  bool shouldMaterializeSelf() const {
-    // Only an instance method of a non-class protocol is ever passed
-    // indirectly.
-    if (!fd->isInstanceMember() ||
-        protocol->requiresClass() ||
-        selfValue.hasLValueType() ||
-        !cast<ArchetypeType>(getSelfType())->requiresClass())
-      return false;
-
-    assert(SGF.silConv.useLoweredAddresses() ==
-           SGF.silConv.isSILIndirect(getSelfParameterInfo()));
-    return SGF.silConv.useLoweredAddresses();
-  }
-
-  // If we're calling a member of a non-class-constrained protocol,
-  // but our archetype refines it to be class-bound, then
-  // we have to materialize the value in order to pass it indirectly.
-  ManagedValue evaluateAddressIntoMemory(SILLocation selfLoc) {
-    // Do so at +0 if we can.
-    ManagedValue ref =
-        std::move(selfValue).getAsSingleValue(SGF, getSGFContextForSelf());
-
-    // If we're already in memory for some reason, great.
-    if (ref.getType().isAddress())
-      return ref;
-
-    // Store the reference into a temporary.
-    SILValue temp =
-        SGF.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
-    SGF.B.emitStoreValueOperation(selfLoc, ref.getValue(), temp,
-                                  StoreOwnershipQualifier::Init);
-
-    // If we had a cleanup, create a cleanup at the new address.
-    return maybeEnterCleanupForTransformed(SGF, ref, temp, selfLoc);
   }
 };
 
