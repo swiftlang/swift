@@ -26,6 +26,7 @@ enum BarForwardDeclaredEnum {
 - (void) setField:(int)info;
 + (int) fieldPlus;
 + (void) methodPlus:(int)info;
++ (void) methodPlus;
 @end
 
 #define BAR_MACRO_1 0
