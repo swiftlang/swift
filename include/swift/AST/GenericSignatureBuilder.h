@@ -74,6 +74,11 @@ enum class ArchetypeResolutionKind {
   /// Only create a new potential archetype to describe this dependent type
   /// if it is already known.
   AlreadyKnown,
+
+  /// Only create a potential archetype when it is well-formed (i.e., we know
+  /// that there is a nested type with that name), but (unlike \c AlreadyKnown)
+  /// allow the creation of a new potential archetype.
+  WellFormed,
 };
 
 /// \brief Collects a set of requirements of generic parameters, both explicitly
@@ -1577,18 +1582,6 @@ public:
   PotentialArchetype *getNestedType(TypeDecl *concreteDecl,
                                     GenericSignatureBuilder &builder);
 
-  /// Describes the kind of update that is performed.
-  enum class NestedTypeUpdate {
-    /// Resolve an existing potential archetype, but don't create a new
-    /// one if not present.
-    ResolveExisting,
-    /// If this potential archetype is missing, create it.
-    AddIfMissing,
-    /// If this potential archetype is missing and would be a better anchor,
-    /// create it.
-    AddIfBetterAnchor,
-  };
-
   /// \brief Retrieve (or create) a nested type that is the current best
   /// nested archetype anchor (locally) with the given name.
   ///
@@ -1597,7 +1590,7 @@ public:
   PotentialArchetype *getNestedArchetypeAnchor(
                        Identifier name,
                        GenericSignatureBuilder &builder,
-                       NestedTypeUpdate kind = NestedTypeUpdate::AddIfMissing);
+                       ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1607,7 +1600,7 @@ public:
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *updateNestedTypeForConformance(
                       PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      NestedTypeUpdate kind);
+                      ArchetypeResolutionKind kind);
 
   /// Update the named nested type when we know this type conforms to the given
   /// protocol.
@@ -1618,7 +1611,7 @@ public:
   PotentialArchetype *updateNestedTypeForConformance(
                         Identifier name,
                         ProtocolDecl *protocol,
-                        NestedTypeUpdate kind);
+                        ArchetypeResolutionKind kind);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
