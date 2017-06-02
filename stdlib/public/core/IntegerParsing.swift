@@ -83,17 +83,19 @@ where CodeUnits.Element : UnsignedInteger {
   }
 }
 
-@inline(never)
-internal func _parseASCIIOutlined<
-  CodeUnits : IteratorProtocol, Result: FixedWidthInteger
->(
-  codeUnits: inout CodeUnits, radix: Result
-) -> Result?
-where CodeUnits.Element : UnsignedInteger {
-  return _parseASCII(codeUnits: &codeUnits, radix: radix)
-}
-
 extension FixedWidthInteger {
+  /// _parseASCII function thunk that prevents inlining used as an
+  /// implementation detail for FixedWidthInteger.init(_: radix:).
+  @inline(never)
+  internal static func _parseASCIIOutlined<
+    CodeUnits : IteratorProtocol, Result: FixedWidthInteger
+  >(
+    codeUnits: inout CodeUnits, radix: Result
+  ) -> Result?
+  where CodeUnits.Element : UnsignedInteger {
+    return _parseASCII(codeUnits: &codeUnits, radix: radix)
+  }
+
   /// Creates a new integer value from the given string and radix.
   ///
   /// The string passed as `text` may begin with a plus or minus sign character
@@ -136,7 +138,7 @@ extension FixedWidthInteger {
     let result: Self?
     if _slowPath(c._baseAddress == nil) {
       var i = s.utf16.makeIterator()
-      result = _parseASCIIOutlined(codeUnits: &i, radix: r)
+      result = Self._parseASCIIOutlined(codeUnits: &i, radix: r)
     }
     else if _fastPath(c.elementWidth == 1), let a = c.asciiBuffer {
       var i = a.makeIterator()
@@ -145,7 +147,7 @@ extension FixedWidthInteger {
     else {
       let b = UnsafeBufferPointer(start: c.startUTF16, count: c.count)
       var i = b.makeIterator()
-      result = _parseASCIIOutlined(codeUnits: &i, radix: r)
+      result = Self._parseASCIIOutlined(codeUnits: &i, radix: r)
     }
     guard _fastPath(result != nil) else { return nil }
     self = result!
