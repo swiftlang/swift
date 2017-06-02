@@ -22,14 +22,14 @@ from math import sqrt
 
 
 class PerformanceTestResult(object):
-    """PerformanceTestResult holds results from executing individual benchmark
-    from Swift Benchmark Suite as reported by test driver (Benchmark_O,
-    Benchmark_Onone, Benchmark_Ounchecked or Benchmark_Driver).
+    """PerformanceTestResult holds results from executing an individual
+    benchmark from the Swift Benchmark Suite as reported by the test driver
+    (Benchmark_O, Benchmark_Onone, Benchmark_Ounchecked or Benchmark_Driver).
 
-    It depends on the log format emmited by the test driver in the form:
+    It depends on the log format emitted by the test driver in the form:
     #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
 
-    The last column, MAX_RSS, is emmited only for runs instrumented by the
+    The last column, MAX_RSS, is emitted only for runs instrumented by the
     Benchmark_Driver to measure rough memory use during the execution of the
     benchmark.
     """

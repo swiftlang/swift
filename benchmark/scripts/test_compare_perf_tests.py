@@ -19,6 +19,7 @@ import tempfile
 import unittest
 
 from compare_perf_tests import PerformanceTestResult
+from compare_perf_tests import ReportFormatter
 from compare_perf_tests import ResultComparison
 from compare_perf_tests import TestComparator
 from compare_perf_tests import parse_args
@@ -226,6 +227,149 @@ class TestTestComparator(OldAndNewLog):
         self.assertEquals(tc.decreased, [])
 
 
+class TestReportFormatter(OldAndNewLog):
+    def setUp(self):
+        super(TestReportFormatter, self).setUp()
+        self.tc = TestComparator(self.old_log, self.new_log, 0.05)
+        self.rf = ReportFormatter(self.tc, '', '', changes_only=False)
+        self.markdown = self.rf.markdown()
+        self.git = self.rf.git()
+        self.html = self.rf.html()
+
+    def assert_report_contains(self, texts, report):
+        # assert not isinstance(texts, str)
+        if isinstance(texts, str):
+            self.assertIn(texts, report)
+        else:
+            for text in texts:
+                self.assertIn(text, report)
+
+    def assert_markdown_contains(self, texts):
+        self.assert_report_contains(texts, self.markdown)
+
+    def assert_git_contains(self, texts):
+        self.assert_report_contains(texts, self.git)
+
+    def assert_html_contains(self, texts):
+        self.assert_report_contains(texts, self.html)
+
+    def test_justified_columns(self):
+        """Table columns are all formated with same width, defined by the
+        longest value.
+        """
+        print self.markdown
+        self.assert_markdown_contains([
+            'AnyHashableWithAClass | 247027 | 319065 | 259056  | 10250445',
+            'Array2D               | 335831 | 335831 | +0.0%   | 1.00x'])
+        self.assert_git_contains([
+            'AnyHashableWithAClass   247027   319065   259056    10250445',
+            'Array2D                 335831   335831   +0.0%     1.00x'])
+
+    def test_column_headers(self):
+        """Report contains table headers for ResultComparisons and changed
+        PerformanceTestResults.
+        """
+        print self.git
+        self.assert_markdown_contains([
+            'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
+            '---                   | ---    | ---    | ---     | ---    ',
+            'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
+        self.assert_git_contains([
+            'TEST                    OLD      NEW      DELTA     SPEEDUP',
+            'TEST                    MIN      MAX      MEAN      MAX_RSS'])
+        self.assert_html_contains([
+            """
+                <th align='left'>OLD</th>
+                <th align='left'>NEW</th>
+                <th align='left'>DELTA</th>
+                <th align='left'>SPEEDUP</th>""",
+            """
+                <th align='left'>MIN</th>
+                <th align='left'>MAX</th>
+                <th align='left'>MEAN</th>
+                <th align='left'>MAX_RSS</th>"""])
+
+    def test_emphasize_speedup(self):
+        """Emphasize speedup values for regressions and improvements"""
+        # tests in No Changes don't have emphasized speedup
+        self.assert_markdown_contains([
+            'BitCount              | 3      | 9      | +199.9% | **0.33x**',
+            'ByteSwap              | 4      | 0      | -100.0% | **4001.00x**',
+            'AngryPhonebook        | 10458  | 10458  | +0.0%   | 1.00x ',
+            'ArrayAppend           | 23641  | 20000  | -15.4%  | **1.18x (?)**'
+        ])
+        self.assert_git_contains([
+            'BitCount                3        9        +199.9%   **0.33x**',
+            'ByteSwap                4        0        -100.0%   **4001.00x**',
+            'AngryPhonebook          10458    10458    +0.0%     1.00x',
+            'ArrayAppend             23641    20000    -15.4%    **1.18x (?)**'
+        ])
+        print self.html
+        self.assert_html_contains([
+            """
+        <tr>
+                <td align='left'>BitCount</td>
+                <td align='left'>3</td>
+                <td align='left'>9</td>
+                <td align='left'>+199.9%</td>
+                <td align='left'><font color='red'>0.33x</font></td>
+        </tr>""",
+            """
+        <tr>
+                <td align='left'>ByteSwap</td>
+                <td align='left'>4</td>
+                <td align='left'>0</td>
+                <td align='left'>-100.0%</td>
+                <td align='left'><font color='green'>4001.00x</font></td>
+        </tr>""",
+            """
+        <tr>
+                <td align='left'>AngryPhonebook</td>
+                <td align='left'>10458</td>
+                <td align='left'>10458</td>
+                <td align='left'>+0.0%</td>
+                <td align='left'><font color='black'>1.00x</font></td>
+        </tr>"""
+        ])
+
+    def test_sections(self):
+        """Report is divided into sections with summaries."""
+        self.assert_markdown_contains([
+            """<details open>
+  <summary>Regression (1)</summary>""",
+            """<details >
+  <summary>Improvement (2)</summary>""",
+            """<details >
+  <summary>No Changes (2)</summary>""",
+            """<details open>
+  <summary>Added (1)</summary>""",
+            """<details open>
+  <summary>Removed (1)</summary>"""])
+        self.assert_git_contains([
+            'Regression (1): \n',
+            'Improvement (2): \n',
+            'No Changes (2): \n',
+            'Added (1): \n',
+            'Removed (1): \n'])
+        self.assert_html_contains([
+            "<th align='left'>Regression (1)</th>",
+            "<th align='left'>Improvement (2)</th>",
+            "<th align='left'>No Changes (2)</th>",
+            "<th align='left'>Added (1)</th>",
+            "<th align='left'>Removed (1)</th>"])
+
+    def test_report_only_changes(self):
+        """Leave out tests without significant change."""
+        rf = ReportFormatter(self.tc, '', '', changes_only=True)
+        markdown, git, html = rf.markdown(), rf.git(), rf.html()
+        self.assertNotIn('No Changes', markdown)
+        self.assertNotIn('AngryPhonebook', markdown)
+        self.assertNotIn('No Changes', git)
+        self.assertNotIn('AngryPhonebook', git)
+        self.assertNotIn('No Changes', html)
+        self.assertNotIn('AngryPhonebook', html)
+
+
 class Test_parse_args(unittest.TestCase):
     required = ['--old-file', 'old.log', '--new-file', 'new.log']
 
@@ -259,6 +403,12 @@ class Test_parse_args(unittest.TestCase):
         self.assertEquals(args.delta_threshold, 0.2)
         self.assertRaises(SystemExit, parse_args,
                           self.required + ['--delta-threshold', '2,2'])
+
+    def test_output_argument(self):
+        self.assertEquals(parse_args(self.required).output, None)
+        self.assertEquals(parse_args(self.required +
+                                     ['--output', 'report.log']).output,
+                          'report.log')
 
     def test_changes_only_argument(self):
         self.assertFalse(parse_args(self.required).changes_only)
