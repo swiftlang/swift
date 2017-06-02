@@ -2480,8 +2480,9 @@ bool ConstraintSystem::solveSimplified(
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
+  Score initialScore = CurrentScore;
   Optional<DisjunctionChoice> lastSolvedChoice;
-  Optional<DisjunctionChoice> firstNonGenericOperatorSolution;
+  Optional<Score> bestNonGenericScore;
 
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
@@ -2507,9 +2508,13 @@ bool ConstraintSystem::solveSimplified(
     //        already have a solution involving non-generic operators,
     //        but continue looking for a better non-generic operator
     //        solution.
-    if (firstNonGenericOperatorSolution &&
-        currentChoice.isGenericOperatorOrUnavailable())
-      continue;
+    if (bestNonGenericScore && currentChoice.isGenericOperatorOrUnavailable()) {
+      // If non-generic solution increased the score by applying any
+      // fixes or restrictions to the solution, let's not skip generic
+      // overloads because they could produce a better solution.
+      if (bestNonGenericScore <= initialScore)
+        continue;
+    }
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
@@ -2542,11 +2547,12 @@ bool ConstraintSystem::solveSimplified(
       DisjunctionChoices.push_back({locator, index});
     }
 
-    if (currentChoice.solve(solutions, allowFreeTypeVariables)) {
-      if (!firstNonGenericOperatorSolution &&
-          !currentChoice.isGenericOperatorOrUnavailable() &&
-          currentChoice.isSymmetricOperator())
-        firstNonGenericOperatorSolution = currentChoice;
+    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
+      if (!currentChoice.isGenericOperatorOrUnavailable() &&
+          currentChoice.isSymmetricOperator()) {
+        if (!bestNonGenericScore || score < bestNonGenericScore)
+          bestNonGenericScore = score;
+      }
 
       lastSolvedChoice = currentChoice;
 
@@ -2578,10 +2584,12 @@ bool ConstraintSystem::solveSimplified(
   return tooComplex || !lastSolvedChoice;
 }
 
-bool DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
-                              FreeTypeVariableBinding allowFreeTypeVariables) {
+Optional<Score>
+DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
+                         FreeTypeVariableBinding allowFreeTypeVariables) {
   CS->simplifyDisjunctionChoice(Choice);
-  return !CS->solveRec(solutions, allowFreeTypeVariables);
+  bool failed = CS->solveRec(solutions, allowFreeTypeVariables);
+  return failed ? None : Optional<Score>(CS->CurrentScore);
 }
 
 bool DisjunctionChoice::isGenericOperatorOrUnavailable() const {

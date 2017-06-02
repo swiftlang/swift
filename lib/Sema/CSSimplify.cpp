@@ -4397,6 +4397,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
       if (flags.contains(TMF_GenerateConstraints)) {
+        increaseScore(SK_StringToPointerConversion);
+
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                        baseType2, TC.getInt8Type(DC),
                                        getConstraintLocator(locator));
@@ -4418,6 +4420,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!isStringCompatiblePointerBaseType(TC, DC, baseType2)) {
       return SolutionKind::Error;
     }
+
+    increaseScore(SK_StringToPointerConversion);
     return SolutionKind::Solved;
   }
       

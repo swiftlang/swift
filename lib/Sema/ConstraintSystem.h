@@ -416,8 +416,10 @@ enum ScoreKind {
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
   SK_KeyPathSubscript,
-  
-  SK_LastScoreKind = SK_KeyPathSubscript,
+  // A conversion from a string to a pointer.
+  SK_StringToPointerConversion,
+
+  SK_LastScoreKind = SK_StringToPointerConversion,
 };
 
 /// The number of score kinds.
@@ -2671,8 +2673,8 @@ public:
   bool isSymmetricOperator() const;
 
   /// \brief Apply given choice to the system and try to solve it.
-  bool solve(SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables);
+  Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
+                        FreeTypeVariableBinding allowFreeTypeVariables);
 
 private:
   static ValueDecl *getOperatorDecl(Constraint *constraint) {
