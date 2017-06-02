@@ -1848,18 +1848,23 @@ public:
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
-  bool isTypeReference(Expr *E);
+  bool isTypeReference(const Expr *E);
 
   /// Call Expr::isIsStaticallyDerivedMetatype on the given
   /// expression, using a custom accessor for the type on the
   /// expression that reads the type from the ConstraintSystem
   /// expression type map.
-  bool isStaticallyDerivedMetatype(Expr *E);
+  bool isStaticallyDerivedMetatype(const Expr *E);
 
-  /// Call Expr::getInstanceType on the given expression, using a
+  /// Call TypeExpr::getInstanceType on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
-  Type getInstanceType(TypeExpr *E);
+  Type getInstanceType(const TypeExpr *E);
+
+  /// Call AbstractClosureExpr::getResultType on the given expression,
+  /// using a custom accessor for the type on the expression that
+  /// reads the type from the ConstraintSystem expression type map.
+  Type getResultType(const AbstractClosureExpr *E);
 
 private:
   /// Introduce the constraints associated with the given type variable

@@ -1951,7 +1951,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Get the expression's simplified type.
   auto &solution = viable[0];
-  Type exprType = solution.simplifyType(expr->getType());
+  auto &solutionCS = solution.getConstraintSystem();
+  Type exprType = solution.simplifyType(solutionCS.getType(expr));
 
   assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
@@ -2068,8 +2069,9 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
     solution.dump(log);
   }
 
-  expr->setType(solution.simplifyType(expr->getType()));
-  auto completionType = solution.simplifyType(CCE->getType());
+  auto &solutionCS = solution.getConstraintSystem();
+  expr->setType(solution.simplifyType(solutionCS.getType(expr)));
+  auto completionType = solution.simplifyType(solutionCS.getType(CCE));
 
   // If completion expression is unresolved it doesn't provide
   // any meaningful information so shouldn't be in the results.
