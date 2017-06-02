@@ -11,7 +11,7 @@ int barGlobalVariableOldEnumElement = 1;
 int barGlobalFuncOldName(int a);
 
 @interface BarForwardDeclaredClass
-- (id)initWithOldLabel0:(int)frame;
+- (id _Nonnull)initWithOldLabel0:(int)frame;
 - (void) barInstanceFunc0;
 - (void) barInstanceFunc1:(int)info anotherValue:(int)info1 anotherValue1:(int)info2 anotherValue2:(int)info3;
 - (void) barInstanceFunc2:(int)info toRemove:(int)info1 toRemove1:(int)info2 toRemove2:(int)info3;
@@ -23,6 +23,7 @@ enum BarForwardDeclaredEnum {
 
 @interface PropertyUserInterface
 - (int) field;
+- (int * _Nullable) field2;
 - (void) setField:(int)info;
 + (int) fieldPlus;
 + (void) methodPlus:(int)info;
