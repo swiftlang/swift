@@ -52,10 +52,13 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
   auto declContext = theEnum->getDeclContext();
 
   for (auto elt : theEnum->getAllElements()) {
-    auto argumentTypeLoc = elt->getArgumentTypeLoc();
-    if (argumentTypeLoc.isNull())
+    if (!elt->getArgumentTypeLoc().getType())
+      tc.validateDecl(elt);
+
+    auto argumentType = elt->getArgumentTypeLoc().getType();
+    if (!argumentType)
       continue;
-    auto argumentType = argumentTypeLoc.getType();
+
     if (auto tupleType = argumentType->getAs<TupleType>()) {
       // One associated value with a label or multiple associated values
       // (labeled or unlabeled) are tuple types.

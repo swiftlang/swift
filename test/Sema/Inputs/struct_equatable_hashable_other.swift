@@ -9,3 +9,10 @@ struct AlsoFromOtherFile: Hashable {
 struct YetAnotherFromOtherFile: Hashable {
   let v: Float
 }
+
+struct OtherFileNonconforming {
+  let v: String
+}
+struct YetOtherFileNonconforming {
+  let v: String
+}

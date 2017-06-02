@@ -135,6 +135,17 @@ extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 
 // A struct with no stored properties trivially derives conformance.
 struct NoStoredProperties: Hashable {}
 
+// Verify that conformance (albeit manually implemented) can still be added to
+// a type in a different file.
+extension OtherFileNonconforming: Hashable {
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note {{non-matching type}}
+    return true
+  }
+  var hashValue: Int { return 0 }
+}
+// ...but synthesis in a type defined in another file doesn't work yet.
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension yet}}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
