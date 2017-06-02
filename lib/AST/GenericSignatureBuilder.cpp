@@ -1862,9 +1862,7 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   // If we found an associated type, use it.
   PotentialArchetype *resultPA = nullptr;
   if (bestAssocType) {
-    resultPA = updateNestedTypeForConformance(
-                                        bestAssocType,
-                                        ArchetypeResolutionKind::WellFormed);
+    resultPA = updateNestedTypeForConformance(bestAssocType, kind);
   }
 
   // If we have an associated type, drop any concrete decls that aren't in
@@ -1917,17 +1915,11 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   // Check whether we can add a missing nested type for this case.
   switch (kind) {
   case ArchetypeResolutionKind::AlwaysPartial:
-  case ArchetypeResolutionKind::CompleteWellFormed:
-    // FIXME: CompleteWellFormed should operate the same as WellFormed here.
     break;
 
   case ArchetypeResolutionKind::WellFormed:
-    if (!bestAssocType && !bestConcreteDecl)
-      return nullptr;
-    break;
-
+  case ArchetypeResolutionKind::CompleteWellFormed:
   case ArchetypeResolutionKind::AlreadyKnown:
-    // Don't add a new type;
     return nullptr;
   }
 
@@ -5224,8 +5216,11 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     auto equivClass = rep->getOrCreateEquivalenceClass();
 
     // If we didn't compute the derived same-type components yet, do so now.
-    if (equivClass->derivedSameTypeComponents.empty())
+    if (equivClass->derivedSameTypeComponents.empty()) {
       checkSameTypeConstraints(Impl->GenericParams, rep);
+      rep = archetype->getRepresentative();
+      equivClass = rep->getOrCreateEquivalenceClass();
+    }
 
     assert(!equivClass->derivedSameTypeComponents.empty() &&
            "Didn't compute derived same-type components?");
