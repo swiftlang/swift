@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -typecheck %s -swift-version 3
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/no_var_to_let.swift.result -swift-version 3 -o /dev/null
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/no_var_to_let.swift.result -swift-version 3 -o /dev/null
 // RUN: diff -u %s %t/no_var_to_let.swift.result
 // RUN: %target-swift-frontend -typecheck %s -swift-version 4
 
