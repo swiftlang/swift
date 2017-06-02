@@ -3272,6 +3272,11 @@ NOTE(objc_overriding_objc_decl,none,
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %0 %1 in protocol %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(witness_swift3_objc_inference,none,
+        "use of %0 %1 to satisfy a requirement of protocol %2 depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Type))
+
 
 ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
