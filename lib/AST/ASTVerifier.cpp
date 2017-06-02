@@ -697,6 +697,11 @@ public:
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
+      // In rare instances we clear the opaque value because we no
+      // longer have a subexpression that references it.
+      if (!expr->getOpaqueValue())
+        return true;
+
       assert(!OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues[expr->getOpaqueValue()] = 0;
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
@@ -705,6 +710,11 @@ public:
     }
 
     void cleanup(OpenExistentialExpr *expr) {
+      // In rare instances we clear the opaque value because we no
+      // longer have a subexpression that references it.
+      if (!expr->getOpaqueValue())
+        return;
+
       assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
