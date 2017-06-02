@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -module-name=test -DENCODE -o %t/encode
 // RUN: %target-build-swift %s -module-name=test -o %t/decode
 // RUN: %target-run %t/encode %t/test.arc
-// RUN: %FileCheck -check-prefix=CHECK-ARCHIVE %s < %t/test.arc
+// RUN: plutil -p %t/test.arc | %FileCheck -check-prefix=CHECK-ARCHIVE %s
 // RUN: %target-run %t/decode %t/test.arc | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -14,8 +14,8 @@
 import Foundation
 
 struct ABC {
-  // CHECK-ARCHIVE-DAG: nested_class_coding
-  @NSKeyedArchiverClassName("nested_class_coding")
+  // CHECK-ARCHIVE-DAG: "$classname" => "nested_class_coding"
+  @objc(nested_class_coding)
   class NestedClass : NSObject, NSCoding {
     var i : Int
 
@@ -33,8 +33,8 @@ struct ABC {
   }
 }
 
-// CHECK-ARCHIVE-DAG: private_class_coding
-@NSKeyedArchiverClassName("private_class_coding")
+// CHECK-ARCHIVE-DAG: "$classname" => "private_class_coding"
+@objc(private_class_coding)
 private class PrivateClass : NSObject, NSCoding {
   var pi : Int
 
@@ -65,7 +65,7 @@ class GenericClass<T> : NSObject, NSCoding {
   }
 }
 
-// CHECK-ARCHIVE-DAG: test.IntClass
+// CHECK-ARCHIVE-DAG: "$classname" => "test.IntClass"
 class IntClass : GenericClass<Int> {
 
   init(ii: Int) {
@@ -83,8 +83,8 @@ class IntClass : GenericClass<Int> {
   }
 }
 
-// CHECK-ARCHIVE-DAG: double_class_coding
-@NSKeyedArchiverClassName("double_class_coding")
+// CHECK-ARCHIVE-DAG: "$classname" => "double_class_coding"
+@objc(double_class_coding)
 class DoubleClass : GenericClass<Double> {
 
   init(dd: Double) {
@@ -102,8 +102,8 @@ class DoubleClass : GenericClass<Double> {
   }
 }
 
-// CHECK-ARCHIVE-DAG: top_level_coding
-@NSKeyedArchiverClassName("top_level_coding")
+// CHECK-ARCHIVE-DAG: "$classname" => "top_level_coding"
+@objc(top_level_coding)
 class TopLevel : NSObject, NSCoding {
   var tli : Int
 

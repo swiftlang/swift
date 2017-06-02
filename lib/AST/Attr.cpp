@@ -493,10 +493,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_NSKeyedArchiverClassName: {
-    Printer.printAttrName("@NSKeyedArchiverClassName");
+  case DAK_ObjCRuntimeName: {
+    Printer.printAttrName("@objc");
     Printer << "(";
-    auto *attr = cast<NSKeyedArchiverClassNameAttr>(this);
+    auto *attr = cast<ObjCRuntimeNameAttr>(this);
     Printer << "\"" << attr->Name << "\"";
     Printer << ")";
     break;
@@ -571,6 +571,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_AutoClosure:
     return "autoclosure";
   case DAK_ObjC:
+  case DAK_ObjCRuntimeName:
     return "objc";
   case DAK_Inline: {
     switch (cast<InlineAttr>(this)->getKind()) {
@@ -626,8 +627,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "_specialize";
   case DAK_Implements:
     return "_implements";
-  case DAK_NSKeyedArchiverClassName:
-    return "NSKeyedArchiverClassName";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
