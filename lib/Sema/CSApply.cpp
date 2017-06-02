@@ -760,6 +760,12 @@ namespace {
         if (result == nullptr) {
           result = new (tc.Context) ErrorExpr(range);
           cs.setType(result, erasedTy);
+          // The opaque value is no longer reachable in an AST walk as
+          // a result of the result above being replaced with an
+          // ErrorExpr, but there is code expecting to have a type set
+          // on it. Since we no longer have a reachable reference,
+          // we'll null this out.
+          record.OpaqueValue = nullptr;
         }
       }
 
@@ -768,7 +774,7 @@ namespace {
       // means this is our only chance to propagate the l-value access kind
       // down to the original existential value.  Otherwise, propagateLVAK
       // will handle this.
-      if (record.OpaqueValue->hasLValueAccessKind())
+      if (record.OpaqueValue && record.OpaqueValue->hasLValueAccessKind())
         cs.propagateLValueAccessKind(record.ExistentialValue,
                                   record.OpaqueValue->getLValueAccessKind());
 
