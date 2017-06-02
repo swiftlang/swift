@@ -166,27 +166,24 @@ namespace {
         fn(Named->getDecl());
       return P;
     }
-    
-    bool walkToDeclPre(Decl *D) override {
-      // Skip walking into decls -- they open a new scope.
-      return false;
+
+    // Only walk into an expression insofar as it doesn't open a new scope -
+    // that is, don't walk into a closure body.
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<ClosureExpr>(E)) {
+        return { false, E };
+      }
+      return { true, E };
     }
-    
+
+    // Don't walk into anything else.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
     }
-    
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
-    }
-    
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    
-    bool walkToParameterListPre(ParameterList *PL) override {
-      return false;
-    }
+    bool walkToParameterListPre(ParameterList *PL) override { return false; }
+    bool walkToDeclPre(Decl *D) override { return false; }
   };
 } // end anonymous namespace
 
