@@ -702,13 +702,11 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// - Parameter c: The character to append to the character view.
   public mutating func append(_ c: Character) {
-    switch c._representation {
-    case .small(let _63bits):
-      let bytes = Character._smallValue(_63bits)
-      _core.append(contentsOf: Character._SmallUTF16(bytes))
-    case .large(_):
-      _core.append(String(c)._core)
+    if let c0 = c._smallUTF16 {
+      _core.append(contentsOf: c0)
+      return
     }
+    _core.append(c._largeUTF16!)
   }
 
   /// Appends the characters in the given sequence to the character view.
