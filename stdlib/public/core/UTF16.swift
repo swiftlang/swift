@@ -56,19 +56,19 @@ extension Unicode.UTF16 : Unicode.Encoding {
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF8.self) {
-      let c = unsafeBitCast(content, to: UTF8.EncodedScalar.self)
-      var b = c._bitCount
-      b = b &- 8
+      let c = _identityCast(content, to: UTF8.EncodedScalar.self)
+      var b = c.count
+      b = b &- 1
       if _fastPath(b == 0) {
         return EncodedScalar(
-          _storage: c._storage & 0b0__111_1111, _bitCount: 16)
+          _storage: (c._biasedBits &- 0x1) & 0b0__111_1111, _bitCount: 16)
       }
-      var s = c._storage
+      var s = c._biasedBits &- 0x01010101
       var r = s
       r &<<= 6
       s &>>= 8
       r |= s & 0b0__11_1111
-      b = b &- 8
+      b = b &- 1
       
       if _fastPath(b == 0) {
         return EncodedScalar(_storage: r & 0b0__111_1111_1111, _bitCount: 16)
@@ -76,7 +76,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
       r &<<= 6
       s &>>= 8
       r |= s & 0b0__11_1111
-      b = b &- 8
+      b = b &- 1
       
       if _fastPath(b == 0) {
         return EncodedScalar(_storage: r & 0xFFFF, _bitCount: 16)
