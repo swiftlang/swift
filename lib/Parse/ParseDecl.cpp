@@ -569,6 +569,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   case DAK_RawDocComment:
   case DAK_ObjCBridged:
+  case DAK_ObjCRuntimeName:
   case DAK_SynthesizedProtocol:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
@@ -743,8 +744,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_CDecl:
-  case DAK_SILGenName:
-  case DAK_NSKeyedArchiverClassName: {
+  case DAK_SILGenName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -786,10 +786,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
-                                               AttrRange, /*Implicit=*/false));
-      else if (DK == DAK_NSKeyedArchiverClassName)
-        Attributes.add(new (Context) NSKeyedArchiverClassNameAttr(
-                                               AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
@@ -1483,6 +1479,12 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       .fixItRemove(SourceRange(AtLoc, rParenLoc));
 
     return false;
+  }
+
+  if (DK == DAK_Count && Tok.getText() == "NSKeyedArchiverClassName") {
+    DK = DAK_ObjC;
+    diagnose(Tok, diag::attr_nskeyedarchiverclassname_removed)
+      .fixItReplace(Tok.getLoc(), "objc");
   }
 
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))

@@ -6002,6 +6002,9 @@ static bool isNSCoding(ProtocolDecl *protocol) {
 
 /// Whether the given class has an explicit '@objc' name.
 static bool hasExplicitObjCName(ClassDecl *classDecl) {
+  if (classDecl->getAttrs().hasAttribute<ObjCRuntimeNameAttr>())
+    return true;
+
   auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
   if (!objcAttr) return false;
 
@@ -6029,13 +6032,8 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl,
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
-  // A class with the @NSKeyedArchiverClassNameAttr will end up getting registered
-  // with the Objective-C runtime anyway.
-  if (classDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>())
-    return;
-
-  // A class with @NSKeyedArchiverEncodeNonGenericSubclassesOnly promises not to be archived,
-  // so don't static-initialize its Objective-C metadata.
+  // A class with @NSKeyedArchiverEncodeNonGenericSubclassesOnly promises not to
+  // be archived, so don't static-initialize its Objective-C metadata.
   if (classDecl->getAttrs().hasAttribute<NSKeyedArchiverEncodeNonGenericSubclassesOnlyAttr>())
     return;
 
@@ -6133,7 +6131,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
         if (kind && getLangOpts().EnableNSKeyedArchiverDiagnostics &&
             !hasExplicitObjCName(classDecl) &&
-            !classDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>() &&
             !classDecl->getAttrs()
               .hasAttribute<NSKeyedArchiverEncodeNonGenericSubclassesOnlyAttr>()) {
           SourceLoc loc;
