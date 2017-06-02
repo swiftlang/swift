@@ -86,3 +86,19 @@ func testDynamicCalls(ao: AnyObject) {
   ao.foo?() // expected-warning{{reference to instance method 'foo()' of 'ObjCSubclass' depends on '@objc' attribute inference deprecated in Swift 4}}
   _ = ao.bar! // expected-warning{{reference to var 'bar' of 'ObjCSubclass' depends on '@objc' attribute inference deprecated in Swift 4}}
 }
+
+// Subclass uses superclass members to satisfy an @objc protocol requirement.
+// rdar://problem/32431838
+@objc public protocol P {
+  func method()
+  @objc optional func optionalMethod()
+}
+
+class C : NSObject {
+  func method() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}{{3-3=@objc }}
+  func optionalMethod() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}{{3-3=@objc }}
+}
+
+class S : C, P {}
+// expected-warning@-1{{use of instance method 'method()' to satisfy a requirement of protocol 'P' depends on '@objc' attribute inference deprecated in Swift 4}}
+// expected-warning@-2{{use of instance method 'optionalMethod()' to satisfy a requirement of protocol 'P' depends on '@objc' attribute inference deprecated in Swift 4}}
