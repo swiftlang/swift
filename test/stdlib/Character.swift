@@ -229,7 +229,7 @@ func checkRoundTripThroughCharacter(_ s: String) {
 
 func isSmallRepresentation(_ s: String) -> Bool {
   switch Character(s)._representation {
-    case .small:
+    case .smallUTF16:
       return true
     default:
       return false
@@ -253,7 +253,8 @@ func checkUnicodeScalars(_ s: String) {
 }
 
 func checkRepresentation(_ s: String) {
-  let expectSmall = s.utf8.count <= 8
+  let expectSmall
+    = s.utf16.count < 4 || s.utf16.count == 4 && s._core[3] < 0x8000
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"
@@ -280,10 +281,10 @@ CharacterTests.test("RoundTripping") {
 
 CharacterTests.test("RoundTripping/Random") {
   // Random tests
-  for x in 0..<500 {
+  for _ in 0..<500 {
     // Character's small representation variant has 63 bits. Making
     // the maximum length 9 scalars tests both sides of the limit.
-    var s = randomGraphemeCluster(1, 9)
+    let s = randomGraphemeCluster(1, 9)
     checkUnicodeScalars(s)
     checkRepresentation(s)
     checkRoundTripThroughCharacter(s)
@@ -362,7 +363,7 @@ UnicodeScalarTests.test("isASCII()") {
 UnicodeScalarTests.test("Comparable") {
   // FIXME: these tests are insufficient.
 
-  var CharA: UnicodeScalar = "A"
+  let CharA: UnicodeScalar = "A"
 
   expectTrue(CharA == "A")
   expectTrue("A" == CharA)
