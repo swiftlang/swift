@@ -557,6 +557,7 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
+  llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
   do {
     NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
     if (!CurNominal)
@@ -571,8 +572,13 @@ static void lookupVisibleMemberDeclsImpl(
     auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
-      assert(BaseTy.getPointer() != CurClass->getSuperclass().getPointer() &&
-             "type is its own superclass");
+      // FIXME: This path is no substitute for an actual circularity check.
+      // The real fix is to check that the superclass doesn't introduce a
+      // circular reference before it's written into the AST.
+      if (Ancestors.count(CurClass)) {
+        break;
+      }
+
       BaseTy = CurClass->getSuperclass();
       Reason = getReasonForSuper(Reason);
 
@@ -588,6 +594,7 @@ static void lookupVisibleMemberDeclsImpl(
     } else {
       break;
     }
+    Ancestors.insert(CurClass);
   } while (1);
 }
 
