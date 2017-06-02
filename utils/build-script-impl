@@ -2408,7 +2408,17 @@ for host in "${ALL_HOSTS[@]}"; do
                 # However, we only have the triple and sysroot for the host.
                 # Also, we will need to tell it which linker to use.
                 FOUNDATION_BUILD_ARGS=()
-                if [[ $(is_cross_tools_host ${host}) ]]; then
+                FOUNDATION_CFLAGS="CFLAGS=${CFLAGS}"
+                FOUNDATION_SFLAGS="SWIFTCFLAGS=${SWIFTCFLAGS}"
+                FOUNDATION_LDFLAGS="LDFLAGS=${LDFLAGS}"
+                if [[ "${ANDROID_NDK}" != "" ]]; then
+                    FOUNDATION_CFLAGS="CFLAGS=-DDEPLOYMENT_ENABLE_LIBDISPATCH --sysroot=${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm -I${ANDROID_ICU_UC}/include -I\${SDKROOT}/lib/swift"
+                    FOUNDATION_SFLAGS="SWIFTCFLAGS=-DDEPLOYMENT_ENABLE_LIBDISPATCH -I${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm/usr/include"
+                    FOUNDATION_LDFLAGS="LDFLAGS=-fuse-ld=gold --sysroot=${ANDROID_NDK}/platforms/android-21/arch-arm -L${ANDROID_NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x -L${ANDROID_ICU_UC} -L\${SDKROOT}/lib/swift/android -ldispatch"
+                    FOUNDATION_BUILD_ARGS+=(
+                        "--target=armv7-none-linux-androideabi"
+                    )
+                elif [[ $(is_cross_tools_host ${host}) ]]; then
                     FOUNDATION_BUILD_ARGS+=(
                         "--target=${SWIFT_HOST_TRIPLE}"
                     )
@@ -2422,7 +2432,7 @@ for host in "${ALL_HOSTS[@]}"; do
     
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
-                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
+                      SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" "$FOUNDATION_CFLAGS" "$FOUNDATION_SFLAGS" "$FOUNDATION_LDFLAGS" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call ${NINJA_BIN}
 
