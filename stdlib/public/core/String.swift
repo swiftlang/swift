@@ -211,6 +211,7 @@ extension _StringCore {
     }
   }
 
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   internal func _withCSubstringAndLength<
     Result, TargetEncoding: Unicode.Encoding
   >(
