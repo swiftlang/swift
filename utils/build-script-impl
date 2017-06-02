@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     skip-build-libdispatch      ""               "set to skip building libdispatch"
     skip-build-libicu           ""               "set to skip building libicu"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
+    skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-build-playgroundlogger ""               "set to skip building PlaygroundLogger"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
     skip-test-cmark             ""               "set to skip testing CommonMark"
@@ -2136,6 +2137,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_STATIC_SDK_OVERLAY}")
                     -DSWIFT_BUILD_PERF_TESTSUITE:BOOL=$(true_false "${build_perf_testsuite_this_time}")
+                    -DSWIFT_BUILD_SOURCEKIT:BOOL=$(true_false "$(false_true SKIP_BUILD_SOURCEKIT)")
                     -DSWIFT_BUILD_EXAMPLES:BOOL=$(true_false "${BUILD_SWIFT_EXAMPLES}")
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"

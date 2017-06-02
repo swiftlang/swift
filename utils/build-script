@@ -351,6 +351,7 @@ class BuildScriptInvocation(object):
             args.skip_build_watchos = True
             args.skip_build_android = True
             args.skip_build_benchmarks = True
+            args.skip_build_sourcekit = True
             args.build_lldb = False
             args.build_llbuild = False
             args.build_swiftpm = False
@@ -695,6 +696,8 @@ class BuildScriptInvocation(object):
                           "--skip-build-swift"]
         if args.skip_build_benchmarks:
             impl_args += ["--skip-build-benchmarks"]
+        if args.skip_build_sourcekit:
+            impl_args += ["--skip-build-sourcekit"]
         if not args.build_foundation:
             impl_args += ["--skip-build-foundation"]
         if not args.build_xctest:
@@ -1764,6 +1767,13 @@ iterations with -O",
         help="skip building Swift stdlibs for Android",
         action=arguments.action.optional_bool)
 
+    run_build_group.add_argument(
+        "--skip-build-sourcekit",
+        help="skip building SourceKit. %(default)s by default",
+        action=arguments.action.optional_bool,
+        # FIXME: Currently SourceKit only builds on Darwin hosts. See SR-1676
+        #        for details.
+        default=platform.system() != "Darwin")
     run_build_group.add_argument(
         "--skip-build-benchmarks",
         help="skip building Swift Benchmark Suite",
