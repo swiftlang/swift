@@ -296,13 +296,15 @@ public:
                   formalType, formalType, subs, l);
   }
   static Callee forArchetype(SILGenFunction &SGF,
-                             SILValue optOpeningInstruction,
                              CanType protocolSelfType,
                              SILDeclRef c,
                              SubstitutionList subs,
                              SILLocation l) {
+    auto *protocol = cast<ProtocolDecl>(c.getDecl()->getDeclContext());
+    c = c.asForeign(protocol->isObjC());
+
     auto formalType = getConstantFormalInterfaceType(SGF, c);
-    return Callee(Kind::WitnessMethod, SGF, optOpeningInstruction, c,
+    return Callee(Kind::WitnessMethod, SGF, SILValue(), c,
                   formalType, formalType, subs, l);
   }
   static Callee forDynamic(SILGenFunction &SGF, SILValue proto,
@@ -547,49 +549,6 @@ public:
   }
 };
 
-namespace {
-
-class ArchetypeCalleeBuilder {
-  SILGenFunction &SGF;
-  ArgumentSource &selfValue;
-  SubstitutionList subs;
-  SILLocation loc;
-  SILParameterInfo selfParam;
-  AbstractFunctionDecl *fd;
-  ProtocolDecl *protocol;
-  SILDeclRef constant;
-
-public:
-  ArchetypeCalleeBuilder(SILGenFunction &SGF,
-                         SILDeclRef inputConstant,
-                         SubstitutionList subs,
-                         SILLocation loc,
-                         ArgumentSource &selfValue)
-      : SGF(SGF), selfValue(selfValue),
-        subs(subs), loc(loc),
-        selfParam(), fd(cast<AbstractFunctionDecl>(inputConstant.getDecl())),
-        protocol(cast<ProtocolDecl>(fd->getDeclContext())),
-        constant(inputConstant.asForeign(protocol->isObjC())) {}
-
-  Callee build() {
-    return Callee::forArchetype(SGF, SILValue(),
-                                selfValue.getSubstRValueType(), constant,
-                                subs, loc);
-  }
-};
-
-} // end anonymous namespace
-
-static Callee prepareArchetypeCallee(SILGenFunction &SGF,
-                                     SILDeclRef constant,
-                                     SubstitutionList subs,
-                                     SILLocation loc,
-                                     ArgumentSource &selfValue) {
-  // Construct an archetype call.
-  ArchetypeCalleeBuilder Builder{SGF, constant, subs, loc, selfValue};
-  return Builder.build();
-}
-
 /// For ObjC init methods, we generate a shared-linkage Swift allocating entry
 /// point that does the [[T alloc] init] dance. We want to use this native
 /// thunk where we expect to be calling an allocating entry point for an ObjC
@@ -795,7 +754,9 @@ public:
         SILDeclRef constant = SILDeclRef(afd, kind);
 
         // Prepare the callee.  This can modify both selfValue and subs.
-        Callee theCallee = prepareArchetypeCallee(SGF, constant, subs, e, selfValue);
+        Callee theCallee = Callee::forArchetype(SGF,
+                                                selfValue.getSubstRValueType(),
+                                                constant, subs, e);
         AssumedPlusZeroSelf = selfValue.isRValue()
           && selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
@@ -1201,12 +1162,10 @@ public:
       auto constant = SILDeclRef(ctorRef->getDecl(),
                              useAllocatingCtor
                                ? SILDeclRef::Kind::Allocator
-                                 : SILDeclRef::Kind::Initializer)
-        .asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
-      setCallee(Callee::forArchetype(SGF, SILValue(),
+                               : SILDeclRef::Kind::Initializer);
+      setCallee(Callee::forArchetype(SGF,
                                      self.getType().getSwiftRValueType(),
-                                     constant, subs,
-                                     expr));
+                                     constant, subs, expr));
     } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
@@ -4710,11 +4669,9 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   // Form the callee.
   Optional<Callee> callee;
   if (isa<ProtocolDecl>(ctor->getDeclContext())) {
-    ArgumentSource selfSource(loc, 
-                              RValue(SGF, loc,
-                                     selfMetaVal.getType().getSwiftRValueType(),
-                                     selfMetaVal));
-    callee.emplace(prepareArchetypeCallee(SGF, initRef, subs, loc, selfSource));
+    callee.emplace(Callee::forArchetype(SGF,
+                                        selfMetaVal.getType().getSwiftRValueType(),
+                                        initRef, subs, loc));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, subs, loc));
   }
@@ -4937,7 +4894,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
     assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
 
-    return prepareArchetypeCallee(SGF, constant, subs, loc, selfValue);
+    return Callee::forArchetype(SGF,
+                                selfValue.getSubstRValueType(),
+                                constant, subs, loc);
   }
 
   bool isClassDispatch = false;
