@@ -316,19 +316,25 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
 
     void visitOpenExistentialExpr(OpenExistentialExpr *E,
                                   AccessKind accessKind) {
-      bool opaqueValueHadAK = E->getOpaqueValue()->hasLValueAccessKind();
-      AccessKind oldOpaqueValueAK =
-        (opaqueValueHadAK ? E->getOpaqueValue()->getLValueAccessKind()
-                          : AccessKind::Read);
+      AccessKind oldOpaqueValueAK;
+      bool opaqueValueHadAK;
+      if (E->getOpaqueValue()) {
+        opaqueValueHadAK = E->getOpaqueValue()->hasLValueAccessKind();
+        oldOpaqueValueAK =
+            (opaqueValueHadAK ? E->getOpaqueValue()->getLValueAccessKind()
+                              : AccessKind::Read);
+      }
 
       visit(E->getSubExpr(), accessKind);
 
-      // Propagate the new access kind from the OVE to the original existential
-      // if we just set or changed it on the OVE.
-      if (E->getOpaqueValue()->hasLValueAccessKind()) {
-        auto newOpaqueValueAK = E->getOpaqueValue()->getLValueAccessKind();
-        if (!opaqueValueHadAK || newOpaqueValueAK != oldOpaqueValueAK)
-          visit(E->getExistentialValue(), newOpaqueValueAK);
+      if (E->getOpaqueValue()) {
+        // Propagate the new access kind from the OVE to the original
+        // existential if we just set or changed it on the OVE.
+        if (E->getOpaqueValue()->hasLValueAccessKind()) {
+          auto newOpaqueValueAK = E->getOpaqueValue()->getLValueAccessKind();
+          if (!opaqueValueHadAK || newOpaqueValueAK != oldOpaqueValueAK)
+            visit(E->getExistentialValue(), newOpaqueValueAK);
+        }
       }
     }
 
