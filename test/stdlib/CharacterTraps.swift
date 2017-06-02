@@ -25,8 +25,8 @@ CharacterTraps.test("CharacterFromEmptyString")
 
 CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
   .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    { !_isDebugAssertConfiguration() },
+    reason: "this trap is only guaranteed to happen in Debug builds"))
   .code {
   var s = "ab"
   expectCrashLater()

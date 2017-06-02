@@ -137,16 +137,16 @@ func methodCalls(
 
   // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Base<Int> & P
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROW]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
-  // CHECK: store [[PAYLOAD]] to [init] [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn!1 : <Self where Self : P> (Self) -> () -> @dynamic_self Self, %16 : $@opened("{{.*}}") Base<Int> & P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
+  // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BOX]], [[SELF_BOX]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  // CHECK: [[RESULT_REF:%.*]] = load [take] %20 : $*@opened("{{.*}}") Base<Int> & P
+  // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
   // CHECK: dealloc_stack [[RESULT_BOX]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: end_borrow [[BORROW]] from %0 : $Base<Int> & P
   let _: Base<Int> & P = baseAndP.protocolSelfReturn()
 
