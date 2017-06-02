@@ -5174,6 +5174,23 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
           Conformance->setInvalid();
           return;
         }
+
+        // If the @objc on the witness was inferred using the deprecated
+        // Swift 3 rules, warn if asked.
+        if (auto attr = witness->getAttrs().getAttribute<ObjCAttr>()) {
+          if (attr->isSwift3Inferred() &&
+              TC.Context.LangOpts.WarnSwift3ObjCInference
+                == Swift3ObjCInferenceWarnings::Minimal) {
+            TC.diagnose(Conformance->getLoc(),
+                        diag::witness_swift3_objc_inference,
+                        witness->getDescriptiveKind(), witness->getFullName(),
+                        Conformance->getProtocol()->getDeclaredInterfaceType());
+            TC.diagnose(witness, diag::make_decl_objc,
+                        witness->getDescriptiveKind())
+              .fixItInsert(witness->getAttributeInsertionLoc(false),
+                           "@objc ");
+          }
+        }
       }
     };
 
