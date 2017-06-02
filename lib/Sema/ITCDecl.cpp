@@ -108,14 +108,24 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  GenericTypeToArchetypeResolver resolver(dc);
-  if (TC.validateType(*inherited, dc, options, &resolver,
+  Optional<ProtocolRequirementTypeResolver> protoResolver;
+  Optional<GenericTypeToArchetypeResolver> archetypeResolver;
+  GenericTypeResolver *resolver;
+  if (auto *proto = dyn_cast<ProtocolDecl>(dc)) {
+    protoResolver.emplace(proto);
+    resolver = protoResolver.getPointer();
+  } else {
+    archetypeResolver.emplace(dc);
+    resolver = archetypeResolver.getPointer();
+  }
+
+  if (TC.validateType(*inherited, dc, options, resolver,
                       &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
 
   auto type = inherited->getType();
-  if (!type.isNull())
+  if (!type.isNull() && !isa<ProtocolDecl>(dc))
     inherited->setType(dc->mapTypeOutOfContext(type));
 }
 
