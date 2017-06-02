@@ -259,18 +259,22 @@ void ConstraintSystem::propagateLValueAccessKind(Expr *E,
                                allowOverwrite);
 }
 
-bool ConstraintSystem::isTypeReference(Expr *E) {
+bool ConstraintSystem::isTypeReference(const Expr *E) {
   return E->isTypeReference([&](const Expr *E) -> Type { return getType(E); });
 }
 
-bool ConstraintSystem::isStaticallyDerivedMetatype(Expr *E) {
+bool ConstraintSystem::isStaticallyDerivedMetatype(const Expr *E) {
   return E->isStaticallyDerivedMetatype(
       [&](const Expr *E) -> Type { return getType(E); });
 }
 
-Type ConstraintSystem::getInstanceType(TypeExpr *E) {
+Type ConstraintSystem::getInstanceType(const TypeExpr *E) {
   return E->getInstanceType([&](const Expr *E) -> bool { return hasType(E); },
                             [&](const Expr *E) -> Type { return getType(E); });
+}
+
+Type ConstraintSystem::getResultType(const AbstractClosureExpr *E) {
+  return E->getResultType([&](const Expr *E) -> Type { return getType(E); });
 }
 
 static bool buildObjCKeyPathString(KeyPathExpr *E,
@@ -7070,7 +7074,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (!cs.isTypeReference(fn)) {
     bool isExistentialType = false;
     // If this is an attempt to initialize existential type.
-    if (auto metaType = fn->getType()->getAs<MetatypeType>()) {
+    if (auto metaType = cs.getType(fn)->getAs<MetatypeType>()) {
       auto instanceType = metaType->getInstanceType();
       isExistentialType = instanceType->isExistentialType();
     }
