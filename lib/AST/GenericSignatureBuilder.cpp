@@ -1341,7 +1341,7 @@ bool PotentialArchetype::addConformance(ProtocolDecl *proto,
   // Resolve any existing nested types that need it.
   for (auto &nested : NestedTypes) {
     (void)updateNestedTypeForConformance(nested.first, proto,
-                                         NestedTypeUpdate::ResolveExisting);
+                                         ArchetypeResolutionKind::AlreadyKnown);
   }
 
   return true;
@@ -1500,7 +1500,7 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
     auto parentAnchor = parent->getArchetypeAnchor(builder);
     anchor = parentAnchor->getNestedArchetypeAnchor(
                                           getNestedName(), builder,
-                                          NestedTypeUpdate::ResolveExisting);
+                                          ArchetypeResolutionKind::AlreadyKnown);
 
     // FIXME: Hack for cases where we couldn't resolve the nested type.
     if (!anchor)
@@ -1625,27 +1625,28 @@ PotentialArchetype *PotentialArchetype::getNestedType(
 
   // Retrieve the nested archetype anchor, which is the best choice (so far)
   // for this nested type.
-  return getNestedArchetypeAnchor(nestedName, builder);
+  return getNestedArchetypeAnchor(nestedName, builder,
+                                  ArchetypeResolutionKind::AlwaysPartial);
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
                                             AssociatedTypeDecl *assocType,
                                             GenericSignatureBuilder &builder) {
   return updateNestedTypeForConformance(assocType,
-                                        NestedTypeUpdate::AddIfMissing);
+                                        ArchetypeResolutionKind::WellFormed);
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
                                             TypeDecl *getConcreteTypeDecl,
                                             GenericSignatureBuilder &builder) {
   return updateNestedTypeForConformance(getConcreteTypeDecl,
-                                        NestedTypeUpdate::AddIfMissing);
+                                        ArchetypeResolutionKind::WellFormed);
 }
 
 PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                            Identifier name,
                                            GenericSignatureBuilder &builder,
-                                           NestedTypeUpdate kind) {
+                                           ArchetypeResolutionKind kind) {
   // Look for the best associated type or concrete type within the protocols
   // we know about.
   AssociatedTypeDecl *bestAssocType = nullptr;
@@ -1685,8 +1686,9 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   // If we found an associated type, use it.
   PotentialArchetype *resultPA = nullptr;
   if (bestAssocType) {
-    resultPA = updateNestedTypeForConformance(bestAssocType,
-                                              NestedTypeUpdate::AddIfMissing);
+    resultPA = updateNestedTypeForConformance(
+                                        bestAssocType,
+                                        ArchetypeResolutionKind::WellFormed);
   }
 
   // If we have an associated type, drop any concrete decls that aren't in
@@ -1726,8 +1728,9 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   // Update for all of the concrete decls with this name, which will introduce
   // various same-type constraints.
   for (auto concreteDecl : concreteDecls) {
-    auto concreteDeclPA = updateNestedTypeForConformance(concreteDecl,
-                                          NestedTypeUpdate::AddIfMissing);
+    auto concreteDeclPA = updateNestedTypeForConformance(
+                                      concreteDecl,
+                                      ArchetypeResolutionKind::WellFormed);
     if (!resultPA && concreteDecl == bestConcreteDecl)
       resultPA = concreteDeclPA;
   }
@@ -1737,11 +1740,17 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
 
   // Check whether we can add a missing nested type for this case.
   switch (kind) {
-  case NestedTypeUpdate::AddIfBetterAnchor:
-  case NestedTypeUpdate::AddIfMissing:
+  case ArchetypeResolutionKind::AlwaysPartial:
+  case ArchetypeResolutionKind::CompleteWellFormed:
+    // FIXME: CompleteWellFormed should operate the same as WellFormed here.
     break;
 
-  case NestedTypeUpdate::ResolveExisting:
+  case ArchetypeResolutionKind::WellFormed:
+    if (!bestAssocType && !bestConcreteDecl)
+      return nullptr;
+    break;
+
+  case ArchetypeResolutionKind::AlreadyKnown:
     // Don't add a new type;
     return nullptr;
   }
@@ -1769,9 +1778,9 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
 
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
-                                                       Identifier name,
-                                                       ProtocolDecl *proto,
-                                                       NestedTypeUpdate kind) {
+                                                 Identifier name,
+                                                 ProtocolDecl *proto,
+                                                 ArchetypeResolutionKind kind) {
   /// Determine whether there is an associated type or concrete type with this
   /// name in this protocol. If not, there's nothing to do.
   AssociatedTypeDecl *assocType = nullptr;
@@ -1800,7 +1809,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
 PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
                       PointerUnion<AssociatedTypeDecl *, TypeDecl *> type,
-                      NestedTypeUpdate kind) {
+                      ArchetypeResolutionKind kind) {
   auto *assocType = type.dyn_cast<AssociatedTypeDecl *>();
   auto *concreteDecl = type.dyn_cast<TypeDecl *>();
   if (!assocType && !concreteDecl)
@@ -1852,13 +1861,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   // If we don't have a result potential archetype yet, we may need to add one.
   if (!resultPA) {
     switch (kind) {
-    case NestedTypeUpdate::AddIfBetterAnchor:
-      // FIXME: The loop above should have kept track of whether this type
-      // would make a better anchor, so we can bail out here if the answer is
-      // "no".
-      LLVM_FALLTHROUGH;
-
-    case NestedTypeUpdate::AddIfMissing: {
+    case ArchetypeResolutionKind::AlwaysPartial:
+    case ArchetypeResolutionKind::CompleteWellFormed:
+    case ArchetypeResolutionKind::WellFormed: {
       if (assocType)
         resultPA = new PotentialArchetype(this, assocType);
       else
@@ -1894,7 +1899,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       break;
     }
 
-    case NestedTypeUpdate::ResolveExisting:
+    case ArchetypeResolutionKind::AlreadyKnown:
       break;
     }
   }
@@ -2355,25 +2360,12 @@ PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
     if (!base)
       return nullptr;
 
-    // Figure out what kind of nested type update we want.
-    typedef PotentialArchetype::NestedTypeUpdate NestedTypeUpdate;
-    NestedTypeUpdate updateKind;
-    switch (resolutionKind) {
-    case ArchetypeResolutionKind::AlreadyKnown:
-      updateKind = NestedTypeUpdate::ResolveExisting;
-      break;
-
-    case ArchetypeResolutionKind::AlwaysPartial:
-    case ArchetypeResolutionKind::CompleteWellFormed:
-      updateKind = NestedTypeUpdate::AddIfMissing;
-      break;
-    }
-
     // If we know the associated type already, get that specific type.
     if (auto assocType = dependentMember->getAssocType())
-      return base->updateNestedTypeForConformance(assocType, updateKind);
+      return base->updateNestedTypeForConformance(assocType, resolutionKind);
 
     // Resolve based on name alone.
+    // FIXME: Pass through the resolution kind?
     auto name = dependentMember->getName();
     switch (resolutionKind) {
     case ArchetypeResolutionKind::AlreadyKnown: {
@@ -2386,7 +2378,8 @@ PotentialArchetype *GenericSignatureBuilder::resolveArchetype(
 
     case ArchetypeResolutionKind::AlwaysPartial:
     case ArchetypeResolutionKind::CompleteWellFormed:
-      return base->getNestedArchetypeAnchor(name, *this, updateKind);
+    case ArchetypeResolutionKind::WellFormed:
+      return base->getNestedArchetypeAnchor(name, *this, resolutionKind);
     }
   }
 
@@ -2854,8 +2847,9 @@ void GenericSignatureBuilder::updateSuperclass(
     for (auto &nested : T->getNestedTypes()) {
       if (nested.second.empty()) continue;
       if (nested.second.front()->isUnresolved()) {
-        (void)T->getNestedArchetypeAnchor(nested.first, *this,
-          PotentialArchetype::NestedTypeUpdate::ResolveExisting);
+        (void)T->getNestedArchetypeAnchor(
+                                        nested.first, *this,
+                                        ArchetypeResolutionKind::AlreadyKnown);
       }
     }
   };
@@ -4439,7 +4433,9 @@ static PotentialArchetype *getLocalAnchor(PotentialArchetype *pa,
   if (!parent) return pa;
 
   auto parentAnchor = getLocalAnchor(parent, builder);
-  return parentAnchor->getNestedArchetypeAnchor(pa->getNestedName(), builder);
+  return parentAnchor->getNestedArchetypeAnchor(
+                                        pa->getNestedName(), builder,
+                                        ArchetypeResolutionKind::AlwaysPartial);
 }
 
 /// Computes the ordered set of archetype anchors required to form a minimum
