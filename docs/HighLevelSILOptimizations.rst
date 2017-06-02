@@ -55,8 +55,7 @@ Annotation of code in the standard library
 
 We use the ``@_semantics`` attribute to annotate code in the standard library.
 These annotations can be used by the high-level SIL optimizer to perform
-domain-specific optimizations. The same function may have multiple ``@_semantics``
-attributes.
+domain-specific optimizations.
 
 This is an example of the ``@_semantics`` attribute::
 
@@ -366,9 +365,6 @@ sil.specialize.generic.never
 
    The sil optimizer should never create generic specializations of this function. 
 
-optimize.sil.specialize.generic.partial.never
-
-   The sil optimizer should never create generic partial specializations of this function. 
 
 Availability checks
 ~~~~~~~~~~~~~~~~~~~
