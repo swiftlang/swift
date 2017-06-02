@@ -1246,10 +1246,6 @@ NOTE(add_NSKeyedArchiverEncodeNonGenericSubclassesOnly_attr,none,
      "add @NSKeyedArchiverEncodeNonGenericSubclassesOnly "
      "and only archive specific subclasses of this class", (Type))
 
-ERROR(attr_NSKeyedArchiverClassName_generic,none,
-      "'@NSKeyedArchiverClassName' cannot be applied to generic class %0",
-      (Type))
-
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,
       "type %0 cannot be nested in generic function %1",

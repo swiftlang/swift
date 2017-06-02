@@ -582,6 +582,12 @@ public:
     return Storage.getArgumentNames();
   }
 
+  /// Asserts that this is a nullary selector and returns the single identifier.
+  Identifier getSimpleName() const {
+    assert(Storage.isSimpleName() && "not a nullary selector");
+    return Storage.getBaseIdentifier();
+  }
+
   /// Get a string representation of the selector.
   ///
   /// \param scratch Scratch space to use.
