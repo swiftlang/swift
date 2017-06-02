@@ -123,7 +123,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
 
   @_fixed_layout
   public struct ForwardParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt8>
     @inline(__always)
     @_inlineable
     public init() { _buffer = _Buffer() }
@@ -132,7 +132,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   
   @_fixed_layout
   public struct ReverseParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt8>
     @inline(__always)
     @_inlineable
     public init() { _buffer = _Buffer() }
@@ -210,8 +210,9 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   @inline(__always)
   @_inlineable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    let s = UInt32(extendingOrTruncating: _buffer._storage)
     return Encoding.EncodedScalar(
-      _storage: _buffer._storage.byteSwapped &>> (32 - bitCount),
+      _storage: s.byteSwapped &>> (32 - bitCount),
       _bitCount: bitCount
     )
   }
@@ -280,8 +281,9 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   }
   
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
-    var r = _buffer
-    r._bitCount = bitCount
+    let r = Encoding.EncodedScalar(
+      _storage: UInt32(extendingOrTruncating: _buffer._storage),
+      _bitCount: bitCount)
     return r
   }
 }

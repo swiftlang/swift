@@ -95,13 +95,13 @@ extension Unicode.UTF16 : Unicode.Encoding {
   }
   
   public struct ForwardParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt16>
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
   
   public struct ReverseParser {
-    public typealias _Buffer = _UIntBuffer<UInt32, UInt16>
+    public typealias _Buffer = _UIntBuffer<UInt64, UInt16>
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -120,11 +120,9 @@ extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
   }
   
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
+    let s = UInt32(extendingOrTruncating: _buffer._storage)
     return Encoding.EncodedScalar(
-      _storage:
-        (_buffer._storage &<< 16 | _buffer._storage &>> 16) &>> (32 - bitCount),
-      _bitCount: bitCount
-    )
+      _storage: (s &<< 16 | s &>> 16) &>> (32 - bitCount), _bitCount: bitCount)
   }
 }
 
@@ -141,8 +139,7 @@ extension Unicode.UTF16.ForwardParser : Unicode.Parser, _UTFParser {
   }
   
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
-    var r = _buffer
-    r._bitCount = bitCount
-    return r
+    let s = UInt32(extendingOrTruncating: _buffer._storage)
+    return Encoding.EncodedScalar(_storage: s, _bitCount: bitCount)
   }
 }

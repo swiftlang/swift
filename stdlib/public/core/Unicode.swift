@@ -228,7 +228,7 @@ extension Unicode.UTF8 : UnicodeCodec {
       return (value, 1)
     }
     var p = ForwardParser()
-    p._buffer._storage = buffer
+    p._buffer._storage = ForwardParser._Buffer.Storage(buffer)
     p._buffer._bitCount = 32
     var i = EmptyCollection<UInt8>().makeIterator()
     switch p.parseScalar(from: &i) {
