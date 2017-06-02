@@ -399,7 +399,7 @@ Other substitutions:
 
 * ``%empty-directory(`` *directory-name* ``)``: ensures that the given
   directory exists and is empty.  Equivalent to
-  ``rm -rf directory-name && rm -rf directory-name``.
+  ``rm -rf directory-name && mkdir -p directory-name``.
 
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::

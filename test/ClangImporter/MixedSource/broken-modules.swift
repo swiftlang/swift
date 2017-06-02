@@ -1,10 +1,5 @@
-<<<<<<< HEAD:test/ClangImporter/MixedSource/broken-modules.swift
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
-=======
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-frontend -parse %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
->>>>>>> tests: replace 'rm -rf %t && mkdir -p %t' with '%empty-directory(%t)':test/ClangModules/MixedSource/broken-modules.swift
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal 2> %t/err.txt
 // RUN: %FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s < %t/err.txt
 
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -enable-source-import 2> %t/err.bridging-header.txt 

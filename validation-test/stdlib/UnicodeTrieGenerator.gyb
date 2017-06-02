@@ -1,6 +1,6 @@
 %{
 
-# RUN: %gyb %s | %FileCheck %s
+# RUN: %empty-directory(%t) && %gyb %s | %FileCheck %s
 
 from __future__ import print_function
 
