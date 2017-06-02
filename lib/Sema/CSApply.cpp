@@ -5816,6 +5816,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
 
 Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
                                         ConstraintLocatorBuilder locator) {
+  auto &tc = cs.getTypeChecker();
+
   Type fromType = cs.getType(expr);
 
   // Bridged collection casts always succeed, so we treat them as
@@ -5837,6 +5839,20 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
     Expr *objcExpr = bridgeToObjectiveC(expr);
     if (!objcExpr)
       return nullptr;
+
+    // We might have a coercion of a Swift type to a CF type toll-free
+    // bridged to Objective-C.
+    //
+    // FIXME: Ideally we would instead have already recorded a restriction
+    // when solving the constraint, and we wouldn't need to duplicate this
+    // part of coerceToType() here.
+    if (auto foreignClass = toType->getClassOrBoundGenericClass()) {
+      if (foreignClass->getForeignClassKind() ==
+            ClassDecl::ForeignKind::CFType) {
+        return cs.cacheType(
+          new (tc.Context) ForeignObjectConversionExpr(objcExpr, toType));
+      }
+    }
 
     return coerceToType(objcExpr, toType, locator);
   }
