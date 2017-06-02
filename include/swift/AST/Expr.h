@@ -3313,7 +3313,10 @@ public:
   }
 
   /// \brief Retrieve the result type of this closure.
-  Type getResultType() const;
+  Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
+                         [](const Expr *E) -> Type {
+    return E->getType();
+  }) const;
 
   /// \brief Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;

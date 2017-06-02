@@ -271,12 +271,12 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E,
                                      AccessKind accessKind) {
       if (!GetType(E->getBase())->isLValueType()) return;
-      auto kpDecl = E->getKeyPath()->getType()->castTo<BoundGenericType>()
+      auto kpDecl = GetType(E->getKeyPath())->castTo<BoundGenericType>()
         ->getDecl();
       AccessKind baseAccess;
       // A ReferenceWritableKeyPath only reads its base.
       if (kpDecl ==
-            E->getType()->getASTContext().getReferenceWritableKeyPathDecl())
+          GetType(E)->getASTContext().getReferenceWritableKeyPathDecl())
         baseAccess = AccessKind::Read;
       else
         // Assuming a writable keypath projects a part of the base.
@@ -1850,12 +1850,12 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
     P->setDeclContextOfParamDecls(this);
 }
 
+Type AbstractClosureExpr::getResultType(
+    llvm::function_ref<Type(const Expr *)> getType) const {
+  if (getType(this)->hasError())
+    return getType(this);
 
-Type AbstractClosureExpr::getResultType() const {
-  if (getType()->hasError())
-    return getType();
-
-  return getType()->castTo<FunctionType>()->getResult();
+  return getType(this)->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
