@@ -84,10 +84,11 @@ where CodeUnits.Element : UnsignedInteger {
 }
 
 extension FixedWidthInteger {
-  /// _parseASCII function thunk that prevents inlining used as an
-  /// implementation detail for FixedWidthInteger.init(_: radix:).
+  // _parseASCII function thunk that prevents inlining used as an implementation
+  // detail for FixedWidthInteger.init(_: radix:) on the slow path to save code
+  // size.
   @inline(never)
-  internal static func _parseASCIIOutlined<
+  internal static func _parseASCIISlowPath<
     CodeUnits : IteratorProtocol, Result: FixedWidthInteger
   >(
     codeUnits: inout CodeUnits, radix: Result
@@ -138,7 +139,7 @@ extension FixedWidthInteger {
     let result: Self?
     if _slowPath(c._baseAddress == nil) {
       var i = s.utf16.makeIterator()
-      result = Self._parseASCIIOutlined(codeUnits: &i, radix: r)
+      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
     }
     else if _fastPath(c.elementWidth == 1), let a = c.asciiBuffer {
       var i = a.makeIterator()
@@ -147,7 +148,7 @@ extension FixedWidthInteger {
     else {
       let b = UnsafeBufferPointer(start: c.startUTF16, count: c.count)
       var i = b.makeIterator()
-      result = Self._parseASCIIOutlined(codeUnits: &i, radix: r)
+      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
     }
     guard _fastPath(result != nil) else { return nil }
     self = result!
