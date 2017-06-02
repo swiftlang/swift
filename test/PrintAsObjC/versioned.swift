@@ -22,6 +22,12 @@ import NestedClass
 @objc class UsesNestedClass : NSObject {
   // CHECK-NEXT: - (InnerClass * _Nullable)foo SWIFT_WARN_UNUSED_RESULT;
   @objc func foo() -> InnerClass? { return nil }
+  // CHECK-NEXT: - (void)fooStruct:(struct InnerStruct)_;
+  @objc func fooStruct(_: InnerStruct) {}
+  // CHECK-NEXT: - (void)fooAnonStruct:(InnerAnonStruct)_;
+  @objc func fooAnonStruct(_: InnerAnonStruct) {}
+  // CHECK-NEXT: - (void)fooAlias:(InnerAlias)_;
+  @objc func fooAlias(_: InnerAlias) {}
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 }
