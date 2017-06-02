@@ -28,6 +28,11 @@ using namespace swift::migrator;
 
 bool migrator::updateCodeAndEmitRemap(CompilerInstance *Instance,
                                       const CompilerInvocation &Invocation) {
+  // Delete the remap file, in case someone is re-running the Migrator. If the
+  // file fails to compile and we don't get a chance to overwrite it, the old
+  // changes may get picked up.
+  llvm::sys::fs::remove(Invocation.getMigratorOptions().EmitRemapFilePath);
+
   Migrator M { Instance, Invocation }; // Provide inputs and configuration
 
   // Phase 1: Pre Fix-it passes
