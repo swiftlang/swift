@@ -872,7 +872,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto pa =
         reqSigBuilder.resolveArchetype(
                                  storedType,
-                                 ArchetypeResolutionKind::CompleteWellFormed);
+                                 ArchetypeResolutionKind::AlwaysPartial);
       auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in
