@@ -704,9 +704,13 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
         dbgs() << "  Specialize Attr:";
         SA.print(dbgs()); dbgs() << "\n");
 
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (GenericFunc->isSerialized())
+    Serialized = IsSerializable;
+
   GenericFuncSpecializer
         FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutions(),
-                        GenericFunc->isSerialized(), ReInfo);
+                        Serialized, ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)
