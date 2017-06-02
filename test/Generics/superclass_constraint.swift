@@ -152,3 +152,18 @@ class Classical : Elementary {
 }
 
 func genericFunc<T : Elementary, U : Classical>(_: T, _: U) where T.Element == U.Element {}
+
+// Lookup within superclass constraints.
+protocol P8 {
+  associatedtype B
+}
+
+class C8 {
+  struct A { }
+}
+
+func superclassLookup1<T: C8 & P8>(_: T) where T.A == T.B { }
+
+func superclassLookup2<T: P8>(_: T) where T.A == T.B, T: C8 { }
+
+func superclassLookup3<T>(_: T) where T.A == T.B, T: C8, T: P8 { }
