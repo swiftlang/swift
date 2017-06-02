@@ -2158,6 +2158,27 @@ namespace {
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
+
+        auto *builtinUTF16ExtendedGraphemeClusterProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral);
+        if (tc.conformsToProtocol(type,
+                                  builtinUTF16ExtendedGraphemeClusterProtocol,
+                                  cs.DC, ConformanceCheckFlags::InExpression)) {
+          builtinLiteralFuncName
+            = DeclName(tc.Context, tc.Context.Id_init,
+                       { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
+                         tc.Context.getIdentifier("utf16CodeUnitCount"),
+                         tc.Context.getIdentifier("isASCII") });
+
+          builtinProtocol = builtinUTF16ExtendedGraphemeClusterProtocol;
+          brokenBuiltinProtocolDiag =
+            diag::builtin_utf16_extended_grapheme_cluster_literal_broken_proto;
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF16);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        }
       } else {
         // Otherwise, we should have just one Unicode scalar.
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
