@@ -234,11 +234,19 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     {}
 
     void visit(Expr *E, AccessKind kind) {
-      assert((AllowOverwrite || !E->hasLValueAccessKind()) &&
-             "l-value access kind has already been set");
-
       assert(GetType(E)->isAssignableType() &&
              "setting access kind on non-l-value");
+
+      // This is required because CodeCompletionCallback code is going to
+      // attempt to re-typecheck the whole module when there are delayed
+      // functions present, so instead of failing if the access kind is set
+      // let's fail only if it's set to a different value.
+      if (E->hasLValueAccessKind()) {
+        auto currentKind = E->getLValueAccessKind();
+        assert((AllowOverwrite || currentKind == kind) &&
+               "l-value access kind has already been set");
+      }
+
       E->setLValueAccessKind(kind);
 
       // Propagate this to sub-expressions.
