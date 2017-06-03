@@ -88,7 +88,8 @@ extension _UnicodeEncoding_ {
   internal static func _transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar {
-    return _encode(FromEncoding.decode(content))
+    return transcode(content, from: FromEncoding.self)
+      ?? encodedReplacementCharacter
   }
 }
 
