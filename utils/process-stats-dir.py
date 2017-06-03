@@ -148,7 +148,11 @@ class JobStats:
 # Return an array of JobStats objects
 def load_stats_dir(path):
     jobstats = []
-    fpat = r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-(?P<pid>\d+).json$"
+    auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
+              r"-(?P<out>[^-]+)-(?P<opt>[^-]+)")
+    fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
+            auxpat +
+            r"-(?P<pid>\d+)(-.*)?.json$")
     for root, dirs, files in os.walk(path):
         for f in files:
             m = re.match(fpat, f)
@@ -158,13 +162,13 @@ def load_stats_dir(path):
                 jobkind = mg['kind']
                 jobid = int(mg['pid'])
                 start_usec = int(mg['start'])
+                module = mg["module"]
+                jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
 
                 j = json.load(open(os.path.join(root, f)))
                 dur_usec = 1
-                jobargs = None
-                module = "module"
-                patstr = (r"time\.swift-" + jobkind +
-                          r"\.(?P<module>[^\.]+)(?P<filename>.*)\.wall$")
+                patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
+                          r"\.wall$")
                 pat = re.compile(patstr)
                 stats = dict()
                 for (k, v) in j.items():
@@ -173,14 +177,7 @@ def load_stats_dir(path):
                     stats[k] = v
                     tm = re.match(pat, k)
                     if tm:
-                        tmg = tm.groupdict()
                         dur_usec = v
-                        module = tmg['module']
-                        if 'filename' in tmg:
-                            ff = tmg['filename']
-                            if ff.startswith('.'):
-                                ff = ff[1:]
-                            jobargs = [ff]
 
                 e = JobStats(jobkind=jobkind, jobid=jobid,
                              module=module, start_usec=start_usec,
