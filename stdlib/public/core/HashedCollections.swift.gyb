@@ -1730,13 +1730,13 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     print(wordToValue)
   ///     // Prints "["three": 3, "four": 4, "five": 5, "one": 1, "two": 2]"
   ///
-  /// - Parameter keysAndValues: A sequence of `(Key, Value)` tuples to use for
+  /// - Parameter keysAndValues: A sequence of key-value pairs to use for
   ///   the new dictionary. Every key in `keysAndValues` must be unique.
   /// - Returns: A new dictionary initialized with the elements of
   ///   `keysAndValues`.
   public init<S: Sequence>(
     uniqueKeysWithValues keysAndValues: S
-  ) where S.Iterator.Element == (Key, Value) {
+  ) where S.Element == (Key, Value) {
     if let d = keysAndValues as? Dictionary<Key, Value> {
       self = d
     } else {
@@ -1773,7 +1773,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // ["b": 4, "a": 3]
   ///
   /// - Parameters:
-  ///   - keysAndValues: A sequence of `(Key, Value)` tuples to use for the new
+  ///   - keysAndValues: A sequence of key-value pairs to use for the new
   ///     dictionary.
   ///   - combine: A closure that is called with the values for any duplicate
   ///     keys that are encountered. The closure returns the desired value for
@@ -1781,7 +1781,7 @@ public struct Dictionary<Key : Hashable, Value> :
   public init<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     self = Dictionary(minimumCapacity: keysAndValues.underestimatedCount)
     try _variantBuffer.merge(keysAndValues, uniquingKeysWith: combine)
   }
@@ -1810,8 +1810,8 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     `values`.
   public init<S: Sequence>(
     grouping values: S,
-    by keyForValue: (S.Iterator.Element) throws -> Key
-  ) rethrows where Value == [S.Iterator.Element] {
+    by keyForValue: (S.Element) throws -> Key
+  ) rethrows where Value == [S.Element] {
     self = [:]
     for value in values {
       self[try keyForValue(value), default: []].append(value)
@@ -2093,25 +2093,58 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     var dictionary = ["a": 1, "b": 2]
   ///
   ///     // Keeping existing value for key "a":
-  ///     dictionary.merge(["a": 3, "c": 4])
-  ///           { (current, _) in current }
+  ///     dictionary.merge(zip(["a", "c"], [3, 4])) { (current, _) in current }
   ///     // ["b": 2, "a": 1, "c": 4]
   ///
   ///     // Taking the new value for key "a":
-  ///     dictionary.merge(["a": 5, "d": 6])
-  ///           { (_, new) in new }
+  ///     dictionary.merge(zip(["a", "d"], [5, 6])) { (_, new) in new }
   ///     // ["b": 2, "a": 5, "c": 4, "d": 6]
   ///
   /// - Parameters:
-  ///   - other:  A sequence of `(Key, Value)` tuples.
+  ///   - other:  A sequence of key-value pairs.
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
   public mutating func merge<S: Sequence>(
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     try _variantBuffer.merge(other, uniquingKeysWith: combine)
+  }
+
+  /// Merges the given dictionary into this dictionary, using a combining
+  /// closure to determine the value for any duplicate keys.
+  ///
+  /// Use the `combine` closure to select which value to use in the updated
+  /// dictionary, or to combine existing and new values. As the key-values
+  /// pairs in `other` are merged with this dictionary, the `combine` closure
+  /// is called with the current and new values for any duplicate keys that
+  /// are encountered.
+  ///
+  /// This example shows how to choose the current or new values for any
+  /// duplicate keys:
+  ///
+  ///     var dictionary = ["a": 1, "b": 2]
+  ///
+  ///     // Keeping existing value for key "a":
+  ///     dictionary.merge(["a": 3, "c": 4]) { (current, _) in current }
+  ///     // ["b": 2, "a": 1, "c": 4]
+  ///
+  ///     // Taking the new value for key "a":
+  ///     dictionary.merge(["a": 5, "d": 6]) { (_, new) in new }
+  ///     // ["b": 2, "a": 5, "c": 4, "d": 6]
+  ///
+  /// - Parameters:
+  ///   - other:  A dictionary to merge.
+  ///   - combine: A closure that takes the current and new values for any
+  ///     duplicate keys. The closure returns the desired value for the final
+  ///     dictionary.
+  public mutating func merge(
+    _ other: [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows
+  {
+    try _variantBuffer.merge(
+      other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
   }
 
   /// Returns a new dictionary created by merging the key-value pairs in the
@@ -2128,16 +2161,15 @@ public struct Dictionary<Key : Hashable, Value> :
   /// duplicate keys:
   ///
   ///     let dictionary = ["a": 1, "b": 2]
-  ///     let otherDictionary = ["a": 3, "b": 4]
-  ///     let keepingCurrent = dictionary.merging(otherDictionary)
-  ///           { (current, _) in current }
+  ///     let newKeyValues = zip(["a", "b"], [3, 4])
+  ///
+  ///     let keepingCurrent = dictionary.merging(newKeyValues) { (current, _) in current }
   ///     // ["b": 2, "a": 1]
-  ///     let replacingCurrent = dictionary.merging(otherDictionary)
-  ///           { (_, new) in new }
+  ///     let replacingCurrent = dictionary.merging(newKeyValues) { (_, new) in new }
   ///     // ["b": 4, "a": 3]
   ///
   /// - Parameters:
-  ///   - other:  A sequence of `(Key, Value)` tuples.
+  ///   - other:  A sequence of key-value pairs.
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
@@ -2146,7 +2178,46 @@ public struct Dictionary<Key : Hashable, Value> :
   public func merging<S: Sequence>(
     _ other: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> [Key: Value] where S.Iterator.Element == (Key, Value) {
+  ) rethrows -> [Key: Value] where S.Element == (Key, Value) {
+    var result = self
+    try result._variantBuffer.merge(other, uniquingKeysWith: combine)
+    return result
+  }
+
+  /// Returns a new dictionary created by merging the given dictionary into
+  /// this dictionary, using a combining closure to determine the value for
+  /// any duplicate keys.
+  ///
+  /// Use the `combine` closure to select which value to use in the returned
+  /// dictionary, or to combine existing and new values. As the key-value
+  /// pairs in `other` are merged with this dictionary, the `combine` closure
+  /// is called with the current and new values for any duplicate keys that
+  /// are encountered.
+  ///
+  /// This example shows how to choose the current or new values for any
+  /// duplicate keys:
+  ///
+  ///     let dictionary = ["a": 1, "b": 2]
+  ///     let otherDictionary = ["a": 3, "b": 4]
+  ///
+  ///     let keepingCurrent = dictionary.merging(otherDictionary)
+  ///           { (current, _) in current }
+  ///     // ["b": 2, "a": 1]
+  ///     let replacingCurrent = dictionary.merging(otherDictionary)
+  ///           { (_, new) in new }
+  ///     // ["b": 4, "a": 3]
+  ///
+  /// - Parameters:
+  ///   - other:  A dictionary to merge.
+  ///   - combine: A closure that takes the current and new values for any
+  ///     duplicate keys. The closure returns the desired value for the final
+  ///     dictionary.
+  /// - Returns: A new dictionary with the combined keys and values of this
+  ///   dictionary and `other`.
+  public func merging(
+    _ other: [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) rethrows -> [Key: Value] {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
@@ -4938,7 +5009,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func nativeMerge<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     for (key, value) in keysAndValues {
       var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
@@ -4969,7 +5040,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func merge<S: Sequence>(
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Iterator.Element == (Key, Value) {
+  ) rethrows where S.Element == (Key, Value) {
     if _fastPath(guaranteedNative) {
       try nativeMerge(keysAndValues, uniquingKeysWith: combine)
       return
