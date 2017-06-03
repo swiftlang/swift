@@ -575,8 +575,21 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<UnifiedStatsReporter> StatsReporter;
   if (const Arg *A =
       ArgList->getLastArgNoClaim(options::OPT_stats_output_dir)) {
+    StringRef OptType = "Onone";
+    if (const Arg *OptA = ArgList->getLastArgNoClaim(options::OPT_O_Group)) {
+      OptType = OptA->getSpelling();
+    }
+    StringRef InputName = "all";
+    if (Inputs.size() == 1) {
+      InputName = Inputs[0].second->getSpelling();
+    }
+    StringRef OutputType = types::getTypeTempSuffix(OI.CompilerOutputType);
     StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-driver",
                                                             OI.ModuleName,
+                                                            InputName,
+                                                            DefaultTargetTriple,
+                                                            OutputType,
+                                                            OptType,
                                                             A->getValue());
   }
 

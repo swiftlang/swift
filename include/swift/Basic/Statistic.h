@@ -140,9 +140,16 @@ private:
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(llvm::raw_ostream &OS);
 
+  UnifiedStatsReporter(StringRef ProgramName,
+                       StringRef AuxName,
+                       StringRef Directory);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
-                       StringRef TargetName,
+                       StringRef ModuleName,
+                       StringRef InputName,
+                       StringRef TripleName,
+                       StringRef OutputType,
+                       StringRef OptType,
                        StringRef Directory);
   ~UnifiedStatsReporter();
 
