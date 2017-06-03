@@ -558,11 +558,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<UnifiedStatsReporter> StatsReporter;
   if (const Arg *A =
       ArgList->getLastArgNoClaim(options::OPT_stats_output_dir)) {
-    StringRef OptType = "Onone";
+    StringRef OptType;
     if (const Arg *OptA = ArgList->getLastArgNoClaim(options::OPT_O_Group)) {
       OptType = OptA->getSpelling();
     }
-    StringRef InputName = "all";
+    StringRef InputName;
     if (Inputs.size() == 1) {
       InputName = Inputs[0].second->getSpelling();
     }
