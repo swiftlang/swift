@@ -84,6 +84,18 @@ auxName(StringRef ModuleName,
         StringRef TripleName,
         StringRef OutputType,
         StringRef OptType) {
+  if (InputName.empty()) {
+    InputName = "all";
+  }
+  if (OptType.empty()) {
+    InputName = "Onone";
+  }
+  if (!OutputType.empty() && OutputType.front() == '.') {
+    OutputType = OutputType.substr(1);
+  }
+  if (!OptType.empty() && OptType.front() == '-') {
+    OptType = OptType.substr(1);
+  }
   return (cleanName(ModuleName)
           + "-" + cleanName(InputName)
           + "-" + cleanName(TripleName)
