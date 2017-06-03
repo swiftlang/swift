@@ -2701,9 +2701,6 @@ NOTE(silence_optional_in_interpolation_segment_call,none,
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
       (Identifier, bool))
-NOTE(noescape_autoclosure,none,
-    "parameter %0 is implicitly non-escaping because it was declared @autoclosure",
-     (Identifier))
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))

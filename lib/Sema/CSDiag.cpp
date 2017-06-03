@@ -3852,8 +3852,7 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
 
   // Give a note and fixit
   InFlightDiagnostic note = CS->TC.diagnose(
-      paramDecl->getLoc(), srcFT->isAutoClosure() ? diag::noescape_autoclosure
-                                                  : diag::noescape_parameter,
+      paramDecl->getLoc(), diag::noescape_parameter,
       paramDecl->getName());
 
   if (!srcFT->isAutoClosure()) {
