@@ -1,5 +1,8 @@
 // RUN: not --crash %target-swift-frontend %s -typecheck
 
+// See <rdar://32555384> 
+// XFAIL: *
+
 protocol P {}
 
 func bar(p: P?) {
