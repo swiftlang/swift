@@ -103,3 +103,46 @@ func rdar32431736() {
   // expected-error@-1 {{cannot convert value of type 'String?' to specified type 'E'}}
   // expected-note@-2 {{construct 'E' from unwrapped 'String' value}} {{17-17=E(rawValue: (}} {{25-25=)!)}}
 }
+
+// rdar://problem/32431165 - improve diagnostic for raw representable argument mismatch
+
+enum E_32431165 : String {
+  case foo = "foo"
+  case bar = "bar" // expected-note {{did you mean 'bar'?}}
+}
+
+func rdar32431165_1(_: E_32431165) {}
+func rdar32431165_1(_: Int) {}
+func rdar32431165_1(_: Int, _: E_32431165) {}
+
+rdar32431165_1(E_32431165.baz)
+// expected-error@-1 {{type 'E_32431165' has no member 'baz'}}
+
+rdar32431165_1(.baz) // FIXME: the error should be {{reference to member 'baz' cannot be resolved without a contextual type}}
+// expected-error@-1 {{expression type '()' is ambiguous without more context}}
+
+rdar32431165_1("")
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{15-15=E_32431165(rawValue: }} {{19-19=)}}
+rdar32431165_1(42, "")
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{20-20=E_32431165(rawValue: }} {{22-22=)}}
+
+func rdar32431165_2(_: String) {}
+func rdar32431165_2(_: Int) {}
+func rdar32431165_2(_: Int, _: String) {}
+
+rdar32431165_2(E_32431165.bar)
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{15-15=}} {{31-31=.rawValue}}
+rdar32431165_2(42, E_32431165.bar)
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{20-20=}} {{34-34=.rawValue}}
+
+E_32431165.bar == "bar"
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String}} {{1-1=}} {{15-15=.rawValue}}
+
+"bar" == E_32431165.bar
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String}} {{10-10=}} {{24-24=.rawValue}}
+
+func rdar32432253(_ condition: Bool = false) {
+  let choice: E_32431165 = condition ? .foo : .bar
+  let _ = choice == "bar"
+  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{11-11=}} {{17-17=.rawValue}}
+}
