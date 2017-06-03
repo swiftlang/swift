@@ -974,12 +974,6 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // An @autoclosure function type can be a subtype of a
-  // non-@autoclosure function type.
-  if (func1->isAutoClosure() != func2->isAutoClosure() &&
-      kind < ConstraintKind::Subtype)
-    return SolutionKind::Error;
-  
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.

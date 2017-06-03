@@ -55,7 +55,7 @@ func overloadedEach<P: P2>(_ source: P, _ closure: @escaping () -> ()) {
 struct S : P2 {
   typealias Element = Int
   func each(_ closure: @autoclosure () -> ()) {
-    // expected-note@-1{{parameter 'closure' is implicitly non-escaping because it was declared @autoclosure}}
+    // expected-note@-1{{parameter 'closure' is implicitly non-escaping}}
 
     overloadedEach(self, closure) // expected-error {{passing non-escaping parameter 'closure' to function expecting an @escaping closure}}
   }
@@ -93,7 +93,7 @@ class Sub : Super {
 func func12_sink(_ x: @escaping () -> Int) { }
 
 func func12a(_ x: @autoclosure () -> Int) {
-    // expected-note@-1{{parameter 'x' is implicitly non-escaping because it was declared @autoclosure}}
+    // expected-note@-1{{parameter 'x' is implicitly non-escaping}}
 
   func12_sink(x) // expected-error {{passing non-escaping parameter 'x' to function expecting an @escaping closure}}
 }
@@ -156,4 +156,32 @@ func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
 // expected-error @+1 {{@autoclosure may not be used on variadic parameters}}
 func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
   for _ in fn {}
+}
+
+// rdar://problem/20591571 - Various type inference problems with @autoclosure
+func id<T>(_: T) -> T {}
+
+func same<T>(_: T, _: T) {}
+
+func takesAnAutoclosure(_ fn: @autoclosure () -> Int, _ efn: @escaping @autoclosure () -> Int) {
+  // expected-note@-1 2{{parameter 'fn' is implicitly non-escaping}}
+
+  var fn2 = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+  // expected-warning@-1 {{initialization of variable 'fn2' was never used; consider replacing with assignment to '_' or removing it}}
+  let fn3 = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+  // expected-warning@-1 {{initialization of immutable value 'fn3' was never used; consider replacing with assignment to '_' or removing it}}
+
+  var efn2 = efn
+  // expected-warning@-1 {{initialization of variable 'efn2' was never used; consider replacing with assignment to '_' or removing it}}
+  let efn3 = efn
+  // expected-warning@-1 {{initialization of immutable value 'efn3' was never used; consider replacing with assignment to '_' or removing it}}
+
+  // FIXME: these should be rejected, because we shouldn't be able to
+  // bind a noescape function type to a generic parameter.
+  _ = id(fn)
+  _ = same(fn, { 3 })
+  _ = same({ 3 }, fn)
+
+  withoutActuallyEscaping(fn) { _ in }
+  withoutActuallyEscaping(fn) { (_: () -> Int) in }
 }

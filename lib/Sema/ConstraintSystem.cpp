@@ -645,6 +645,8 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                              DeclContext *UseDC,
                                              const DeclRefExpr *base,
                                              bool wantInterfaceType) {
+  assert(!baseType || wantInterfaceType);
+
   validateDecl(value);
   if (value->isInvalid())
     return ErrorType::get(Context);
@@ -653,18 +655,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                         ? value->getInterfaceType()
                         : value->getType());
 
-  requestedType = requestedType->getLValueOrInOutObjectType()
-    ->getReferenceStorageReferent();
-
-  // If we're dealing with contextual types, and we referenced this type from
-  // a different context, map the type.
-  if (!wantInterfaceType && requestedType->hasArchetype()) {
-    auto valueDC = value->getDeclContext();
-    if (valueDC != UseDC) {
-      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
-      requestedType = UseDC->mapTypeIntoContext(mapped);
-    }
-  }
+  requestedType = requestedType->getReferenceStorageReferent();
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
@@ -773,7 +764,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      const DeclRefExpr *base) {
-  if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
+  auto valueDC = value->getDeclContext();
+
+  if (valueDC->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
@@ -785,7 +778,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
             /*numArgumentLabelsToRemove=*/0,
             locator, replacements,
             func->getInnermostDeclContext(),
-            func->getDeclContext(),
+            valueDC,
             /*skipProtocolSelfConstraint=*/false);
     auto openedFnType = openedType->castTo<FunctionType>();
 
@@ -794,7 +787,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (!valueDC->getAsProtocolOrProtocolExtensionContext()) {
       if (func->hasDynamicSelf()) {
         Type selfTy = openedFnType->getInput()->getRValueInstanceType();
         openedType = openedType->replaceCovariantResultType(
@@ -824,7 +817,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                     functionRefKind),
         locator, replacements,
         funcDecl->getInnermostDeclContext(),
-        funcDecl->getDeclContext(),
+        valueDC,
         /*skipProtocolSelfConstraint=*/false);
 
     // If we opened up any type variables, record the replacements.
@@ -852,22 +845,33 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     return { type, type };
   }
 
-  // Only remaining case: unqualified reference to a property.
-  auto *varDecl = cast<VarDecl>(value);
+  // Only remaining case: unqualified reference to a property, variable
+  // or function parameter.
+  bool wantInterfaceType = !valueDC->isLocalContext();
 
-  // Determine the type of the value, opening up that type if necessary.
-  bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
-  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), DC, base,
-                                                 wantInterfaceType);
+  Type valueType;
+  if (auto *param = dyn_cast<ParamDecl>(value)) {
+    // Parameters are always in local context.
+    assert(!wantInterfaceType);
+    valueType = param->getType();
 
-  assert(!valueType->hasUnboundGenericType() &&
-         !valueType->hasTypeParameter());
+    // Do not propagate @autoclosure to uses of the parameter. From inside
+    // the function, it is just an ordinary function type.
+    if (auto *funcTy = valueType->getAs<FunctionType>()) {
+      if (funcTy->getExtInfo().isAutoClosure())
+        valueType = funcTy->withExtInfo(funcTy->getExtInfo()
+                                        .withIsAutoClosure(false));
+    }
 
-  // If this is a let-param whose type is a type variable, this is an untyped
-  // closure param that may be bound to an inout type later. References to the
-  // param should have lvalue type instead. Express the relationship with a new
-  // constraint.
-  if (auto *param = dyn_cast<ParamDecl>(varDecl)) {
+    // If this parameter has type 'inout T', the reference inside the function
+    // has type '@lvalue T'.
+    if (!param->isLet())
+      valueType = LValueType::get(valueType->getInOutObjectType());
+
+    // If this is a let-param whose type is a type variable, this is an untyped
+    // closure param that may be bound to an inout type later. References to the
+    // param should have lvalue type instead. Express the relationship with a new
+    // constraint.
     if (param->isLet() && valueType->is<TypeVariableType>()) {
       Type paramType = valueType;
       valueType = createTypeVariable(getConstraintLocator(locator),
@@ -876,7 +880,23 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       addConstraint(ConstraintKind::BindParam, paramType, valueType,
                     getConstraintLocator(locator));
     }
+  } else {
+    auto *varDecl = cast<VarDecl>(value);
+    valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), DC, base,
+                                              wantInterfaceType);
   }
+
+  // If we're dealing with contextual types, and we referenced this type from
+  // a different context, map the type.
+  if (!wantInterfaceType && valueType->hasArchetype()) {
+    if (valueDC != DC) {
+      Type mapped = valueDC->mapTypeOutOfContext(valueType);
+      valueType = DC->mapTypeIntoContext(mapped);
+    }
+  }
+
+  assert(!valueType->hasUnboundGenericType() &&
+         !valueType->hasTypeParameter());
 
   return { valueType, valueType };
 }
