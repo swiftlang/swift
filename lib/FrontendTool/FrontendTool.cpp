@@ -1032,6 +1032,18 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   return false;
 }
 
+static StringRef
+silOptModeArgStr(SILOptions::SILOptMode mode) {
+  switch (mode) {
+ case SILOptions::SILOptMode::Optimize:
+   return "O";
+ case SILOptions::SILOptMode::OptimizeUnchecked:
+   return "Ounchecked";
+ default:
+   return "Onone";
+  }
+}
+
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
@@ -1183,16 +1195,29 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       Invocation.getFrontendOptions().StatsOutputDir;
   std::unique_ptr<UnifiedStatsReporter> StatsReporter;
   if (!StatsOutputDir.empty()) {
-    auto &opts = Invocation.getFrontendOptions();
-    std::string TargetName = opts.ModuleName;
-    if (opts.PrimaryInput.hasValue() &&
-        opts.PrimaryInput.getValue().isFilename()) {
-      auto Index = opts.PrimaryInput.getValue().Index;
-      TargetName += ".";
-      TargetName += llvm::sys::path::filename(opts.InputFilenames[Index]);
+    auto &FEOpts = Invocation.getFrontendOptions();
+    auto &LangOpts = Invocation.getLangOptions();
+    auto &SILOpts = Invocation.getSILOptions();
+    StringRef InputName;
+    std::string TargetName = FEOpts.ModuleName;
+    if (FEOpts.PrimaryInput.hasValue() &&
+        FEOpts.PrimaryInput.getValue().isFilename()) {
+      auto Index = FEOpts.PrimaryInput.getValue().Index;
+      InputName = FEOpts.InputFilenames[Index];
     }
+    StringRef OptType = silOptModeArgStr(SILOpts.Optimization);
+    StringRef OutFile = FEOpts.getSingleOutputFilename();
+    StringRef OutputType = llvm::sys::path::extension(OutFile);
+    if (OutputType.size() > 0 && OutputType.front() == '.') {
+      OutputType = OutputType.substr(1);
+    }
+    std::string TripleName = LangOpts.Target.normalize();
     StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
-                                                            TargetName,
+                                                            FEOpts.ModuleName,
+                                                            InputName,
+                                                            TripleName,
+                                                            OutputType,
+                                                            OptType,
                                                             StatsOutputDir);
   }
 
