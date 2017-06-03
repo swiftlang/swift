@@ -19,7 +19,7 @@ public protocol StringProtocol
   CustomReflectable, CustomPlaygroundQuickLookable,
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringLiteral,
-  Hashable
+  Hashable, Comparable
   where Iterator.Element == Character {
 
   associatedtype UTF8Index

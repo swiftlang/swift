@@ -12,7 +12,7 @@ func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
   expectEqual(x[i], y[i])
 }
 
-SubstringTests.test("String") {
+SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
     s.index(s.startIndex, offsetBy: 4)]
@@ -22,6 +22,74 @@ SubstringTests.test("String") {
   expectEqual(s1, "cd")
   expectEqual(s2, "cd")
   expectEqual(s3, "cd")
+	expectTrue("" == s.dropFirst(s.count))
+	expectTrue(s.dropFirst().dropFirst(s.count) == s.dropFirst(s.count))
+  
+  expectEqual("ab" as String, s.prefix(2))
+  expectEqual("fg" as String, s.suffix(2))
+  
+#if _runtime(_ObjC)
+  let emoji: String = s + "😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈" + "😡🇧🇪🇨🇦🇮🇳"
+  expectTrue(s == s[...])
+  expectTrue(s[...] == s)
+  expectTrue(s.dropFirst(2) != s)
+  expectTrue(s == s.dropFirst(0))
+  expectTrue(s != s.dropFirst(1))
+  expectTrue(s != s.dropLast(1))
+  expectEqual(s[...], s[...])
+  expectEqual(s.dropFirst(0), s.dropFirst(0))
+  expectTrue(s == s.dropFirst(0))
+  expectTrue(s.dropFirst(2) != s.dropFirst(1))
+  expectNotEqual(s.dropLast(2), s.dropLast(1))
+  expectEqual(s.dropFirst(1), s.dropFirst(1))
+  expectTrue(s != s[...].dropFirst(1))
+  let i = emoji.index(of: "😄")!
+  expectEqual("😄👍🏽" as String, emoji[i...].prefix(2))
+  expectTrue("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2))
+  expectTrue("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2).dropFirst(2))
+  expectTrue(s as String != emoji[i...].dropLast(2).dropFirst(2))
+  expectEqualSequence("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2))
+  expectEqualSequence("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2).dropFirst(2))
+#endif
+	// equatable conformance
+	expectTrue("one,two,three".split(separator: ",").contains("two"))
+	expectTrue("one,two,three".split(separator: ",") == ["one","two","three"])
+}
+
+SubstringTests.test("Comparison") {
+  var s = "abc"
+	s += "defg"
+	expectFalse(s < s[...])
+	expectTrue(s <= s[...])
+	expectTrue(s >= s[...])
+	expectFalse(s > s[...])
+	expectFalse(s[...] < s)
+	expectTrue(s[...] <= s)
+	expectTrue(s[...] >= s)
+	expectFalse(s[...] > s)
+	expectFalse(s[...] < s[...])
+	expectTrue(s[...] <= s[...])
+	expectTrue(s[...] >= s[...])
+	expectFalse(s[...] > s[...])
+
+	expectTrue(s < s.dropFirst())
+	expectFalse(s > s.dropFirst())
+	expectFalse(s < s.dropLast())
+	expectTrue(s > s.dropLast())
+	expectTrue(s.dropFirst() < s.dropFirst(2))
+	expectFalse(s.dropFirst() > s.dropFirst(2))
+	expectFalse(s.dropLast() < s.dropLast(2))
+	expectTrue(s.dropLast() > s.dropLast(2))
+	expectFalse(s.dropFirst() < s.dropFirst().dropLast())
+	expectTrue(s.dropFirst() > s.dropFirst().dropLast())
+	expectTrue(s.dropFirst() > s)
+	expectTrue(s.dropFirst() > s[...])
+	expectTrue(s >= s[...])
+	expectTrue(s.dropFirst() >= s.dropFirst())
+
+	// comparable conformance
+	expectEqualSequence("pen,pineapple,apple,pen".split(separator: ",").sorted(),
+		["apple", "pen", "pen", "pineapple"])
 }
 
 SubstringTests.test("CharacterView") {
