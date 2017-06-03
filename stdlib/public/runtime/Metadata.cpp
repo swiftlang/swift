@@ -552,7 +552,6 @@ static OpaqueValue *tuple_projectBuffer(ValueBuffer *buffer,
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
 
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto wtable = tuple_getValueWitnesses(metatype);
   unsigned alignMask = wtable->getAlignmentMask();
   // Compute the byte offset of the object in the box.
@@ -560,9 +559,6 @@ static OpaqueValue *tuple_projectBuffer(ValueBuffer *buffer,
   auto *bytePtr =
       reinterpret_cast<char *>(*reinterpret_cast<HeapObject **>(buffer));
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-#else
-  return *reinterpret_cast<OpaqueValue**>(buffer);
-#endif
 }
 
 /// Generic tuple value witness for 'allocateBuffer'
@@ -574,33 +570,9 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
 
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   BoxPair refAndValueAddr(swift_allocBox(metatype));
   *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.first;
   return refAndValueAddr.second;
-#else
-  auto wtable = tuple_getValueWitnesses(metatype);
-  auto value = (OpaqueValue*) swift_slowAlloc(wtable->size,
-                                              wtable->getAlignmentMask());
-
-  *reinterpret_cast<OpaqueValue**>(buffer) = value;
-  return value;
-#endif
-}
-
-/// Generic tuple value witness for 'deallocateBuffer'.
-template <bool IsPOD, bool IsInline>
-static void tuple_deallocateBuffer(ValueBuffer *buffer,
-                                   const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  if (IsInline)
-    return;
-
-  auto wtable = tuple_getValueWitnesses(metatype);
-  auto value = *reinterpret_cast<OpaqueValue**>(buffer);
-  swift_slowDealloc(value, wtable->size, wtable->getAlignmentMask());
 }
 
 /// Generic tuple value witness for 'destroy'.
@@ -637,17 +609,6 @@ static void tuple_destroyArray(OpaqueValue *array, size_t n,
     tuple_destroy<IsPOD, IsInline>((OpaqueValue*)bytes, _metadata);
     bytes += stride;
   }
-}
-
-/// Generic tuple value witness for 'destroyBuffer'.
-template <bool IsPOD, bool IsInline>
-static void tuple_destroyBuffer(ValueBuffer *buffer, const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  auto tuple = tuple_projectBuffer<IsPOD, IsInline>(buffer, metatype);
-  tuple_destroy<IsPOD, IsInline>(tuple, metatype);
-  tuple_deallocateBuffer<IsPOD, IsInline>(buffer, metatype);
 }
 
 // The operation doesn't have to be initializeWithCopy, but they all
@@ -826,34 +787,6 @@ static OpaqueValue *tuple_assignWithTake(OpaqueValue *dest,
                             &ValueWitnessTable::assignWithTake);
 }
 
-/// Generic tuple value witness for 'initializeBufferWithCopy'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeBufferWithCopy(ValueBuffer *dest,
-                                                   OpaqueValue *src,
-                                                   const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  return tuple_initializeWithCopy<IsPOD, IsInline>(
-                        tuple_allocateBuffer<IsPOD, IsInline>(dest, metatype),
-                        src,
-                        metatype);
-}
-
-/// Generic tuple value witness for 'initializeBufferWithTake'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeBufferWithTake(ValueBuffer *dest,
-                                                   OpaqueValue *src,
-                                                   const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  return tuple_initializeWithTake<IsPOD, IsInline>(
-                        tuple_allocateBuffer<IsPOD, IsInline>(dest, metatype),
-                        src,
-                        metatype);
-}
-
 /// Generic tuple value witness for 'initializeBufferWithCopyOfBuffer'.
 template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
@@ -861,7 +794,6 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                      const Metadata *metatype) {
   assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
   assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   if (IsInline) {
     return tuple_initializeWithCopy<IsPOD, IsInline>(
         tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
@@ -872,12 +804,6 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
   swift_retain(srcReference);
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
-#else
-  return tuple_initializeBufferWithCopy<IsPOD, IsInline>(
-                            dest,
-                            tuple_projectBuffer<IsPOD, IsInline>(src, metatype),
-                            metatype);
-#endif
 }
 
 /// Generic tuple value witness for 'initializeBufferWithTakeOfBuffer'.
@@ -887,7 +813,6 @@ static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                      const Metadata *metatype) {
   assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
   assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   if (IsInline) {
     return tuple_initializeWithTake<IsPOD, IsInline>(
         tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
@@ -896,17 +821,6 @@ static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
-#else
-  if (IsInline) {
-    return tuple_initializeWithTake<IsPOD, IsInline>(
-                      tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
-                      tuple_projectBuffer<IsPOD, IsInline>(src, metatype),
-                      metatype);
-  } else {
-    dest->PrivateData[0] = src->PrivateData[0];
-    return (OpaqueValue*) dest->PrivateData[0];
-  }
-#endif
 }
 
 static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
@@ -1174,18 +1088,8 @@ static constexpr Out *pointer_function_cast(In *function) {
   return pointer_function_cast_impl<Out>::perform(function);
 }
 
-static void pod_indirect_deallocateBuffer(ValueBuffer *buffer,
-                                          const Metadata *self) {
-  auto value = *reinterpret_cast<OpaqueValue**>(buffer);
-  auto wtable = self->getValueWitnesses();
-  swift_slowDealloc(value, wtable->size, wtable->getAlignmentMask());
-}
-#define pod_indirect_destroyBuffer \
-  pointer_function_cast<value_witness_types::destroyBuffer>(pod_indirect_deallocateBuffer)
-
 static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
                     ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto wtable = self->getValueWitnesses();
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
@@ -1197,20 +1101,10 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
   auto *bytePtr = reinterpret_cast<char *>(srcReference);
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-#else
-  auto wtable = self->getValueWitnesses();
-  auto destBuf = (OpaqueValue*)swift_slowAlloc(wtable->size,
-                                               wtable->getAlignmentMask());
-  *reinterpret_cast<OpaqueValue**>(dest) = destBuf;
-  OpaqueValue *srcBuf = *reinterpret_cast<OpaqueValue**>(src);
-  memcpy(destBuf, srcBuf, wtable->size);
-  return destBuf;
-#endif
 }
 
 static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
                     ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   auto wtable = self->getValueWitnesses();
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
@@ -1221,33 +1115,6 @@ static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
   unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
   auto *bytePtr = reinterpret_cast<char *>(srcReference);
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-#else
-  memcpy(dest, src, sizeof(ValueBuffer));
-  return *reinterpret_cast<OpaqueValue**>(dest);
-#endif
-}
-
-static OpaqueValue *pod_indirect_projectBuffer(ValueBuffer *buffer,
-                                               const Metadata *self) {
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-  unsigned alignMask = self->getValueWitnesses()->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr =
-      reinterpret_cast<char *>(*reinterpret_cast<HeapObject **>(buffer));
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-#else
-  return *reinterpret_cast<OpaqueValue**>(buffer);
-#endif
-}
-
-static OpaqueValue *pod_indirect_allocateBuffer(ValueBuffer *buffer,
-                                                const Metadata *self) {
-  auto wtable = self->getValueWitnesses();
-  auto destBuf = (OpaqueValue*)swift_slowAlloc(wtable->size,
-                                               wtable->getAlignmentMask());
-  *reinterpret_cast<OpaqueValue**>(buffer) = destBuf;
-  return destBuf;
 }
 
 static void pod_noop(void *object, const Metadata *self) {
@@ -1255,30 +1122,6 @@ static void pod_noop(void *object, const Metadata *self) {
 #define pod_direct_destroy \
   pointer_function_cast<value_witness_types::destroy>(pod_noop)
 #define pod_indirect_destroy pod_direct_destroy
-#define pod_direct_destroyBuffer \
-  pointer_function_cast<value_witness_types::destroyBuffer>(pod_noop)
-#define pod_direct_deallocateBuffer \
-  pointer_function_cast<value_witness_types::deallocateBuffer>(pod_noop)
-
-static void *pod_noop_return(void *object, const Metadata *self) {
-  return object;
-}
-#define pod_direct_projectBuffer \
-  pointer_function_cast<value_witness_types::projectBuffer>(pod_noop_return)
-#define pod_direct_allocateBuffer \
-  pointer_function_cast<value_witness_types::allocateBuffer>(pod_noop_return)
-
-static OpaqueValue *pod_indirect_initializeBufferWithCopy(ValueBuffer *dest,
-                                                          OpaqueValue *src,
-                                                          const Metadata *self){
-  auto wtable = self->getValueWitnesses();
-  auto destBuf = (OpaqueValue*)swift_slowAlloc(wtable->size,
-                                               wtable->getAlignmentMask());
-  *reinterpret_cast<OpaqueValue**>(dest) = destBuf;
-  memcpy(destBuf, src, wtable->size);
-  return destBuf;
-}
-#define pod_indirect_initializeBufferWithTake pod_indirect_initializeBufferWithCopy
 
 static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
                                                   OpaqueValue *src,
@@ -1292,12 +1135,6 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
     (pod_direct_initializeWithCopy)
 #define pod_direct_initializeBufferWithTakeOfBuffer \
   pointer_function_cast<value_witness_types::initializeBufferWithTakeOfBuffer> \
-    (pod_direct_initializeWithCopy)
-#define pod_direct_initializeBufferWithCopy \
-  pointer_function_cast<value_witness_types::initializeBufferWithCopy> \
-    (pod_direct_initializeWithCopy)
-#define pod_direct_initializeBufferWithTake \
-  pointer_function_cast<value_witness_types::initializeBufferWithTake> \
     (pod_direct_initializeWithCopy)
 #define pod_direct_assignWithCopy pod_direct_initializeWithCopy
 #define pod_indirect_assignWithCopy pod_direct_initializeWithCopy
@@ -2323,7 +2160,6 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return true;
   // Opaque existential containers uniquely own their contained value.
   case ExistentialTypeRepresentation::Opaque:
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
   {
     // We can't take from a shared existential box without checking uniqueness.
     auto *opaque =
@@ -2331,9 +2167,6 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     auto *vwt = opaque->Type->getValueWitnesses();
     return vwt->isValueInline();
   }
-#else
-    return true;
-#endif
     
   // References to boxed existential containers may be shared.
   case ExistentialTypeRepresentation::Error: {
@@ -2360,7 +2193,6 @@ const {
     break;
   
   case ExistentialTypeRepresentation::Opaque: {
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     auto *opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
     auto *vwt = opaque->Type->getValueWitnesses();
     if (!vwt->isValueInline()) {
@@ -2369,12 +2201,6 @@ const {
       swift_deallocObject(*reinterpret_cast<HeapObject **>(&opaque->Buffer),
                           size, alignMask);
     }
-#else
-    // Containing the value may require a side allocation, which we need
-    // to clean up.
-    auto opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
-    opaque->Type->vw_deallocateBuffer(&opaque->Buffer);
-#endif
     break;
   }
   
@@ -2396,7 +2222,6 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   case ExistentialTypeRepresentation::Opaque: {
     auto *opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
-#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     auto *type = opaqueContainer->Type;
     auto *vwt = type->getValueWitnesses();
 
@@ -2409,10 +2234,6 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     auto *bytePtr = reinterpret_cast<const char *>(
         *reinterpret_cast<HeapObject *const *const>(&opaqueContainer->Buffer));
     return reinterpret_cast<const OpaqueValue *>(bytePtr + byteOffset);
-#else
-    return opaqueContainer->Type->vw_projectBuffer(
-      const_cast<ValueBuffer *>(&opaqueContainer->Buffer));
-#endif
   }
   case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox

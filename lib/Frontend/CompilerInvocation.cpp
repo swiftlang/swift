@@ -1411,10 +1411,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
 
-  /// Should we use the copy-on-write implementation of opaque existentials.
-  /// FIXME: Use during bootstraping this feature. Remove later.
-  Opts.UseCOWExistentials |= Args.hasArg(OPT_enable_cow_existentials);
-
   return false;
 }
 

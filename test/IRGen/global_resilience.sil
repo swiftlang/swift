@@ -124,7 +124,7 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 18
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 12
 // CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
@@ -135,7 +135,7 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
 // CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
 // CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
@@ -154,7 +154,7 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 18
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 12
 // CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072

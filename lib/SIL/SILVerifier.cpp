@@ -122,10 +122,6 @@ public:
     return F.getModule().getOptions().EnableSILOwnership;
   }
 
-  bool areCOWExistentialsEnabled() const {
-    return F.getModule().getOptions().UseCOWExistentials;
-  }
-
   void _require(bool condition, const Twine &complaint,
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
@@ -2322,9 +2318,6 @@ public:
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
-
-    if (!areCOWExistentialsEnabled())
-      return;
 
     // Check all the uses. Consuming or mutating uses must have mutable access
     // to the opened value.
