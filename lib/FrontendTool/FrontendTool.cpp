@@ -1292,9 +1292,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     StringRef OptType = silOptModeArgStr(SILOpts.Optimization);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
-    if (OutputType.size() > 0 && OutputType.front() == '.') {
-      OutputType = OutputType.substr(1);
-    }
     std::string TripleName = LangOpts.Target.normalize();
     StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
                                                             FEOpts.ModuleName,
