@@ -6387,6 +6387,14 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
                                               TCC_AllowLValue);
   if (!destExpr) return true;
 
+  if (auto *KPE = dyn_cast<KeyPathExpr>(assignExpr->getSrc())) {
+    // Presence of error type means that key path has already
+    // been diagnosed as invalid by constraint generator, most
+    // likely the key path has unsupported operations.
+    if (KPE->getType()->hasError())
+      return true;
+  }
+
   auto destType = destExpr->getType();
   if (destType->is<UnresolvedType>() || destType->hasTypeVariable()) {
     // Look closer into why destination has unresolved types since such

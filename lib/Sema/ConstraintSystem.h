@@ -1377,8 +1377,8 @@ private:
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
-  /// \returns the solution.
-  Solution finalize(FreeTypeVariableBinding allowFreeTypeVariables);
+  /// \returns the solution if no problems were discovered.
+  Optional<Solution> finalize(FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Apply the given solution to the current constraint system.
   ///
