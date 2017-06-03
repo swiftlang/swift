@@ -451,7 +451,7 @@ def main():
     modes.add_argument("--set-csv-baseline", type=str, default=None,
                        help="Merge stats from a stats-dir into a CSV baseline")
     modes.add_argument("--compare-to-csv-baseline",
-                       type=argparse.FileType('rb', 0),
+                       type=argparse.FileType('rb', 0), default=None,
                        metavar="BASELINE.csv",
                        help="Compare stats dir to named CSV baseline")
     modes.add_argument("--lnt", action="store_true",
@@ -467,7 +467,7 @@ def main():
         write_catapult_trace(args)
     elif args.set_csv_baseline is not None:
         return set_csv_baseline(args)
-    elif args.compare_to_csv_baseline:
+    elif args.compare_to_csv_baseline is not None:
         return compare_to_csv_baseline(args)
     elif args.incrementality:
         if args.paired:
