@@ -140,22 +140,20 @@ extension NSRange {
 //===----------------------------------------------------------------------===//
 
 extension NSRange {
-  public init<R: RangeExpression>(_ rangeExpression: R)
+  public init<R: RangeExpression>(_ region: R)
   where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
-    let range = rangeExpression.relative(to: 0..<R.Bound.max)
-    let start: Int = numericCast(range.lowerBound)
-    let end: Int = numericCast(range.upperBound)
-    self = NSRange(location: start, length: end - start)
+    let r = region.relative(to: 0..<R.Bound.max)
+    location = numericCast(r.lowerBound)
+    length = numericCast(r.count)
   }
   
-  public init<R: RangeExpression, S: StringProtocol>(_ rangeExpression: R, in string: S)
-  where R.Bound == String.Index, S.Index == String.Index {
-    let range = rangeExpression.relative(to: string)
-    let start = range.lowerBound.samePosition(in: string.utf16)
-    let end = range.upperBound.samePosition(in: string.utf16)
-    let location = string.utf16.distance(from: string.utf16.startIndex, to: start)
-    let length = string.utf16.distance(from: start, to: end)
-    self = NSRange(location: location, length: length)
+  public init<R: RangeExpression, S: StringProtocol>(_ region: R, in target: S)
+  where R.Bound == S.Index, S.Index == String.Index {
+    let r = region.relative(to: target)
+    self = NSRange(
+      location: r.lowerBound._utf16Index - target.startIndex._utf16Index,
+      length: r.upperBound._utf16Index - r.lowerBound._utf16Index
+    )
   }
 
   @available(swift, deprecated: 4, renamed: "Range.init(_:)")
