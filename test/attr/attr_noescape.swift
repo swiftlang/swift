@@ -170,7 +170,7 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-warning{{@noesc
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping because it was declared @autoclosure}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping}}
   doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
 }
 

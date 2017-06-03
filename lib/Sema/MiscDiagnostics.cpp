@@ -474,16 +474,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
-      auto isAutoClosure = AFT->isAutoClosure();
-      if (paramDecl && !isAutoClosure) {
+      if (paramDecl) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
             .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                          "@escaping ");
-      } else if (isAutoClosure)
-        // TODO: add in a fixit for autoclosure
-        TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
-                    DRE->getDecl()->getBaseName());
+      }
     }
 
     // Swift 3 mode produces a warning + Fix-It for the missing ".self"
