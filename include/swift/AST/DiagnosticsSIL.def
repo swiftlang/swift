@@ -79,6 +79,11 @@ ERROR(writeback_overlap_subscript,none,
 NOTE(writebackoverlap_note,none,
       "concurrent writeback occurred here", ())
 
+ERROR(addressonly_type_used_in_multipattern_case,none,
+      "matching %select{type '%1'|a protocol value|a generic value}0 in multiple patterns "
+      "is not yet supported; use separate cases instead",
+      (unsigned, Type))
+
 ERROR(inout_argument_alias,none,
       "inout arguments are not allowed to alias each other", ())
 NOTE(previous_inout_alias,none,
