@@ -268,7 +268,7 @@ class ReportFormatter(object):
         widths = self._column_widths()
 
         def justify_columns(contents):
-            return tuple(map(lambda (w, c): c.ljust(w), zip(widths, contents)))
+            return tuple([c.ljust(w) for w, c in zip(widths, contents)])
 
         def row(contents):
             return ROW.format(*justify_columns(contents))
@@ -409,34 +409,18 @@ def main():
                                 args.delta_threshold)
     formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
                                 args.changes_only)
+    formats = {
+        'markdown': formatter.markdown,
+        'git': formatter.git,
+        'html': formatter.html
+    }
 
-    if args.format:
-        if args.format.lower() != 'markdown':
-            print(formatter.git())
-        else:
-            print(formatter.markdown())
+    report = formats[args.format]()
+    print(report)
 
-    if args.format:
-        if args.format.lower() == 'html':
-            if args.output:
-                write_to_file(args.output, formatter.html())
-            else:
-                print('Error: missing --output flag.')
-                sys.exit(1)
-        elif args.format.lower() == 'markdown':
-            if args.output:
-                write_to_file(args.output, formatter.markdown())
-        elif args.format.lower() != 'git':
-            print('{0} is unknown format.'.format(args.format))
-            sys.exit(1)
-
-
-def write_to_file(file_name, data):
-    """
-    Write data to given file
-    """
-    with open(file_name, 'w') as f:
-        f.write(data)
+    if args.output:
+        with open(args.output, 'w') as f:
+            f.write(report)
 
 
 if __name__ == '__main__':

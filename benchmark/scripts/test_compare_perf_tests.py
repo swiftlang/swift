@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# ===--- benchmark_utils.py ----------------------------------------------===//
+# ===--- test_compare_perf_tests.py --------------------------------------===//
 #
 #  This source file is part of the Swift.org open source project
 #
@@ -15,14 +15,30 @@
 
 import os
 import shutil
+import sys
 import tempfile
 import unittest
+
+from StringIO import StringIO
+from contextlib import contextmanager
 
 from compare_perf_tests import PerformanceTestResult
 from compare_perf_tests import ReportFormatter
 from compare_perf_tests import ResultComparison
 from compare_perf_tests import TestComparator
+from compare_perf_tests import main
 from compare_perf_tests import parse_args
+
+
+@contextmanager
+def captured_output():
+    new_out, new_err = StringIO(), StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = new_out, new_err
+        yield sys.stdout, sys.stderr
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
 
 
 class TestPerformanceTestResult(unittest.TestCase):
@@ -195,6 +211,11 @@ Totals,1,20000,20000,20000,0,0,0
             f.write(data)
         return temp_file_name
 
+    def assert_report_contains(self, texts, report):
+        assert not isinstance(texts, str)
+        for text in texts:
+            self.assertIn(text, report)
+
 
 class TestTestComparator(OldAndNewLog):
     def test_init(self):
@@ -236,14 +257,6 @@ class TestReportFormatter(OldAndNewLog):
         self.git = self.rf.git()
         self.html = self.rf.html()
 
-    def assert_report_contains(self, texts, report):
-        # assert not isinstance(texts, str)
-        if isinstance(texts, str):
-            self.assertIn(texts, report)
-        else:
-            for text in texts:
-                self.assertIn(text, report)
-
     def assert_markdown_contains(self, texts):
         self.assert_report_contains(texts, self.markdown)
 
@@ -257,7 +270,6 @@ class TestReportFormatter(OldAndNewLog):
         """Table columns are all formated with same width, defined by the
         longest value.
         """
-        print self.markdown
         self.assert_markdown_contains([
             'AnyHashableWithAClass | 247027 | 319065 | 259056  | 10250445',
             'Array2D               | 335831 | 335831 | +0.0%   | 1.00x'])
@@ -269,7 +281,6 @@ class TestReportFormatter(OldAndNewLog):
         """Report contains table headers for ResultComparisons and changed
         PerformanceTestResults.
         """
-        print self.git
         self.assert_markdown_contains([
             'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
             '---                   | ---    | ---    | ---     | ---    ',
@@ -304,7 +315,6 @@ class TestReportFormatter(OldAndNewLog):
             'AngryPhonebook          10458    10458    +0.0%     1.00x',
             'ArrayAppend             23641    20000    -15.4%    **1.18x (?)**'
         ])
-        print self.html
         self.assert_html_contains([
             """
         <tr>
@@ -374,12 +384,16 @@ class Test_parse_args(unittest.TestCase):
     required = ['--old-file', 'old.log', '--new-file', 'new.log']
 
     def test_required_input_arguments(self):
+        with captured_output() as (_, err):
+            self.assertRaises(SystemExit, parse_args, [])
+        self.assertIn('usage: compare_perf_tests.py', err.getvalue())
+
         args = parse_args(self.required)
         self.assertEquals(args.old_file, 'old.log')
         self.assertEquals(args.new_file, 'new.log')
-        self.assertRaises(SystemExit, parse_args, [])
 
     def test_format_argument(self):
+        self.assertEquals(parse_args(self.required).format, 'markdown')
         self.assertEquals(
             parse_args(self.required + ['--format', 'markdown']).format,
             'markdown')
@@ -387,8 +401,13 @@ class Test_parse_args(unittest.TestCase):
             parse_args(self.required + ['--format', 'git']).format, 'git')
         self.assertEquals(
             parse_args(self.required + ['--format', 'html']).format, 'html')
-        self.assertRaises(SystemExit, parse_args,
-                          self.required + ['--format', 'bogus'])
+
+        with captured_output() as (_, err):
+            self.assertRaises(SystemExit, parse_args,
+                              self.required + ['--format', 'bogus'])
+        self.assertIn("error: argument --format: invalid choice: 'bogus' "
+                      "(choose from 'markdown', 'git', 'html')",
+                      err.getvalue())
 
     def test_delta_threshold_argument(self):
         # default value
@@ -401,8 +420,13 @@ class Test_parse_args(unittest.TestCase):
         self.assertEquals(args.delta_threshold, 1.0)
         args = parse_args(self.required + ['--delta-threshold', '.2'])
         self.assertEquals(args.delta_threshold, 0.2)
-        self.assertRaises(SystemExit, parse_args,
-                          self.required + ['--delta-threshold', '2,2'])
+
+        with captured_output() as (_, err):
+            self.assertRaises(SystemExit, parse_args,
+                              self.required + ['--delta-threshold', '2,2'])
+        self.assertIn(" error: argument --delta-threshold: invalid float "
+                      "value: '2,2'",
+                      err.getvalue())
 
     def test_output_argument(self):
         self.assertEquals(parse_args(self.required).output, None)
@@ -426,6 +450,81 @@ class Test_parse_args(unittest.TestCase):
                              '--new-branch', 'amazing-optimization'])
         self.assertEquals(args.old_branch, 'master')
         self.assertEquals(args.new_branch, 'amazing-optimization')
+
+
+class Test_compare_perf_tests_main(OldAndNewLog):
+    """Integration test that invokes the whole comparison script."""
+    markdown = [
+        '<summary>Regression (1)</summary>',
+        'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
+        'BitCount              | 3      | 9      | +199.9% | **0.33x**',
+    ]
+    git = [
+        'Regression (1):',
+        'TEST                    OLD      NEW      DELTA     SPEEDUP',
+        'BitCount                3        9        +199.9%   **0.33x**',
+    ]
+    html = ['<html>', "<td align='left'>BitCount</td>"]
+
+    def execute_main_with_format(self, report_format, test_output=False):
+        report_file = self.test_dir + 'report.log'
+        args = ['compare_perf_tests.py',
+                '--old-file', self.old_log,
+                '--new-file', self.new_log,
+                '--format', report_format]
+
+        sys.argv = (args if not test_output else
+                    args + ['--output', report_file])
+
+        with captured_output() as (out, _):
+            main()
+        report_out = out.getvalue()
+
+        if test_output:
+            with open(report_file, 'r') as f:
+                report = f.read()
+            # because print adds newline, add one here, too:
+            report_file = str(report + '\n')
+        else:
+            report_file = None
+
+        return report_out, report_file
+
+    def test_markdown(self):
+        """Writes Markdown formatted report to stdout"""
+        report_out, _ = self.execute_main_with_format('markdown')
+        self.assert_report_contains(self.markdown, report_out)
+
+    def test_markdown_output(self):
+        """Writes Markdown formatted report to stdout and `--output` file."""
+        report_out, report_file = (
+            self.execute_main_with_format('markdown', test_output=True))
+        self.assertEquals(report_out, report_file)
+        self.assert_report_contains(self.markdown, report_file)
+
+    def test_git(self):
+        """Writes Git formatted report to stdout."""
+        report_out, _ = self.execute_main_with_format('git')
+        self.assert_report_contains(self.git, report_out)
+
+    def test_git_output(self):
+        """Writes Git formatted report to stdout and `--output` file."""
+        report_out, report_file = (
+            self.execute_main_with_format('git', test_output=True))
+        self.assertEquals(report_out, report_file)
+        self.assert_report_contains(self.git, report_file)
+
+    def test_html(self):
+        """Writes HTML formatted report to stdout."""
+        report_out, _ = self.execute_main_with_format('html')
+        self.assert_report_contains(self.html, report_out)
+
+    def test_html_output(self):
+        """Writes HTML formatted report to stdout and `--output` file."""
+        report_out, report_file = (
+            self.execute_main_with_format('html', test_output=True))
+        self.assertEquals(report_out, report_file)
+        self.assert_report_contains(self.html, report_file)
 
 
 if __name__ == '__main__':
