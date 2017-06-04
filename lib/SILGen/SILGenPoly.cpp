@@ -316,7 +316,7 @@ RValue Transform::transform(RValue &&input,
   // If we emitted into context, be sure to finish the overall initialization.
   if (tupleInit) {
     tupleInit->finishInitialization(SGF);
-    return RValue();
+    return RValue::forInContext();
   }
 
   return RValue::withPreExplodedElements(outputExpansion, outputTupleType);

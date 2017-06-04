@@ -425,7 +425,7 @@ RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   if (values.size() == 1 && values[0].isInContext()) {
     values = ArrayRef<ManagedValue>();
     type = CanType();
-    elementsToBeAdded = Used;
+    elementsToBeAdded = InContext;
     return;
   }
 
@@ -444,7 +444,7 @@ RValue::RValue(SILGenFunction &SGF, SILLocation l, CanType formalType,
 
   if (v.isInContext()) {
     type = CanType();
-    elementsToBeAdded = Used;
+    elementsToBeAdded = InContext;
     return;
   }
 
@@ -457,7 +457,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
 
   if (v.isInContext()) {
     type = CanType();
-    elementsToBeAdded = Used;
+    elementsToBeAdded = InContext;
     return;
   }
 
@@ -476,8 +476,9 @@ RValue::RValue(AbstractionPattern pattern, CanType type)
 
 void RValue::addElement(RValue &&element) & {
   assert(!element.isUsed() && "adding consumed value to r-value");
+  assert(!element.isInSpecialState() && "adding special value to r-value");
   assert(!isComplete() && "rvalue already complete");
-  assert(!isUsed() && "rvalue already used");
+  assert(!isInSpecialState() && "cannot add elements to a special r-value");
   --elementsToBeAdded;
   values.insert(values.end(),
                 element.values.begin(), element.values.end());
@@ -489,8 +490,9 @@ void RValue::addElement(RValue &&element) & {
 void RValue::addElement(SILGenFunction &SGF, ManagedValue element,
                         CanType formalType, SILLocation l) & {
   assert(element && "adding consumed value to r-value");
+  assert(!element.isInContext() && "adding in-context value to r-value");
   assert(!isComplete() && "rvalue already complete");
-  assert(!isUsed() && "rvalue already used");
+  assert(!isInSpecialState() && "cannot add elements to an in-context r-value");
   --elementsToBeAdded;
 
   ExplodeTupleValue(values, SGF, l).visit(formalType, element);
@@ -560,6 +562,13 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation l) && {
+  assert(!isUsed() && "r-value already used");
+
+  if (isInContext()) {
+    makeUsed();
+    return ManagedValue::forInContext();
+  }
+
   // Avoid killing and re-emitting the cleanup if the enclosed value isn't a
   // tuple.
   if (!isa<TupleType>(type)) {
@@ -667,7 +676,7 @@ RValue::RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l)
   : type(copied.type),
     elementsToBeAdded(copied.elementsToBeAdded)
 {
-  assert((copied.isComplete() || copied.isUsed())
+  assert((copied.isComplete() || copied.isInSpecialState())
          && "can't copy incomplete rvalue");
   values.reserve(copied.values.size());
   for (ManagedValue value : copied.values) {

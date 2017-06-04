@@ -5198,7 +5198,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (!subscripts)
+  if (subscripts.isNull())
     subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
@@ -5236,7 +5236,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   }
 
   // (value)  or (value, indices)
-  if (subscripts) {
+  if (!subscripts.isNull()) {
     // If we have a value and index list, create a new rvalue to represent the
     // both of them together.  The value goes first.
     SmallVector<ManagedValue, 4> Elts;
@@ -5295,7 +5295,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
     elts.push_back(ManagedValue::forLValue(callbackStorage));
 
-    if (subscripts) {
+    if (!subscripts.isNull()) {
       std::move(subscripts).getAll(elts);
     }
     return RValue::withPreExplodedElements(elts, accessType.getInput());
@@ -5367,7 +5367,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (!subscripts)
+  if (subscripts.isNull())
     subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),

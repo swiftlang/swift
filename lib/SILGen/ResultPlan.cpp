@@ -37,7 +37,7 @@ public:
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
     init->finishInitialization(SGF);
-    return RValue();
+    return RValue::forInContext();
   }
   void
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
@@ -106,7 +106,7 @@ public:
 
         // If that successfully emitted into the initialization, we're done.
         if (value.isInContext())
-          return RValue();
+          return RValue::forInContext();
       }
     }
 
@@ -114,7 +114,7 @@ public:
     if (init) {
       init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
       init->finishInitialization(SGF);
-      return RValue();
+      return RValue::forInContext();
 
       // Otherwise, we've got the r-value we want.
     } else {
@@ -148,14 +148,14 @@ public:
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
     RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
-    assert(subResult.isUsed() && "sub-plan didn't emit into context?");
+    assert(subResult.isInContext() && "sub-plan didn't emit into context?");
     (void)subResult;
 
     ManagedValue value = temporary->getManagedAddress();
     init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
     init->finishInitialization(SGF);
 
-    return RValue();
+    return RValue::forInContext();
   }
 
   void
@@ -183,7 +183,7 @@ public:
     init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
     init->finishInitialization(SGF);
 
-    return RValue();
+    return RValue::forInContext();
   }
 
   void
@@ -271,12 +271,12 @@ public:
     for (auto i : indices(substTupleType.getElementTypes())) {
       auto eltType = substTupleType.getElementType(i);
       RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults);
-      assert(eltRV.isUsed());
+      assert(eltRV.isInContext());
       (void)eltRV;
     }
     tupleInit->finishInitialization(SGF);
 
-    return RValue();
+    return RValue::forInContext();
   }
 
   void
