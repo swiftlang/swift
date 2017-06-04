@@ -507,7 +507,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       managedName = emitOptionalToOptional(
           mainClass, managedName,
           SILType::getPrimitiveObjectType(IUOptNSStringTy),
-          [](SILGenFunction &, SILLocation, ManagedValue input, SILType) {
+          [](SILGenFunction &, SILLocation, ManagedValue input, SILType,
+             SGFContext) {
         return input;
       });
     }

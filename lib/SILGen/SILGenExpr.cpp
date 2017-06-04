@@ -1643,7 +1643,8 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
 static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
                                          SILLocation loc,
                                          ManagedValue input,
-                                         SILType resultTy) {
+                                         SILType resultTy,
+                                         SGFContext context) {
   SILValue result = gen.B.createUncheckedRefCast(loc,
                                                  input.forward(gen),
                                                  resultTy);
@@ -1659,9 +1660,9 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   ManagedValue result;
   if (resultType.getSwiftRValueType().getAnyOptionalObjectType()) {
     result = SGF.emitOptionalToOptional(e, original, resultType,
-                                        createUnsafeDowncast);
+                                        createUnsafeDowncast, C);
   } else {
-    result = createUnsafeDowncast(SGF, e, original, resultType);
+    result = createUnsafeDowncast(SGF, e, original, resultType, C);
   }
 
   return RValue(SGF, e, result);

@@ -20,13 +20,16 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
-// CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
-// CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_STR]])
-// CHECK-RAW: end_borrow [[BORROWED_STR]] from [[STR]]
+// CHECK-RAW: [[COPIED_STR:%.*]] = copy_value [[BORROWED_STR]]
+// CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
+// CHECK-RAW: [[BORROWED_COPIED_STR:%.*]] = begin_borrow [[COPIED_STR]]
+// CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_COPIED_STR]])
 // CHECK-RAW: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
 // CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[WRITE]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
+// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]] from [[COPIED_STR]]
+// CHECK-RAW: end_borrow [[BORROWED_STR]] from [[STR]]
 
 func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
@@ -34,13 +37,12 @@ func getRawValue(ed: ErrorDomain) -> String {
 
 // CHECK-RAW-LABEL: sil shared [serializable] @_T0SC11ErrorDomainV8rawValueSSfg
 // CHECK-RAW: bb0([[SELF:%[0-9]+]] : $ErrorDomain):
-// CHECK-RAW: [[FORCE_BRIDGE:%[0-9]+]] = function_ref @_forceBridgeFromObjectiveC_bridgeable
-// CHECK-RAW: [[STRING_RESULT_ADDR:%[0-9]+]] = alloc_stack $String
 // CHECK-RAW: [[STORED_VALUE:%[0-9]+]] = struct_extract [[SELF]] : $ErrorDomain, #ErrorDomain._rawValue
 // CHECK-RAW: [[STORED_VALUE_COPY:%.*]] = copy_value [[STORED_VALUE]]
-// CHECK-RAW: [[STRING_META:%[0-9]+]] = metatype $@thick String.Type
-// CHECK-RAW: apply [[FORCE_BRIDGE]]<String>([[STRING_RESULT_ADDR]], [[STORED_VALUE_COPY]], [[STRING_META]])
-// CHECK-RAW: [[STRING_RESULT:%[0-9]+]] = load [take] [[STRING_RESULT_ADDR]]
+// CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
+// CHECK-RAW: [[OPT_STORED_VALUE_COPY:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[STORED_VALUE_COPY]]
+// CHECK-RAW: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
+// CHECK-RAW: [[STRING_RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OPT_STORED_VALUE_COPY]], [[STRING_META]])
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
