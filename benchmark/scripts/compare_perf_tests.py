@@ -218,7 +218,7 @@ class ReportFormatter(object):
     """ReportFormatter formats the `PerformanceTestResult`s and
     `ResultComparison`s provided by `TestComparator` using their `header` and
     `values()` into report table. Supported formats are: `markdown` (used for
-    displaying benchmark results on GitHub), `git` (default) and `html`.
+    displaying benchmark results on GitHub), `git` and `html`.
     """
     def __init__(self, comparator, old_branch, new_branch, changes_only):
         self.comparator = comparator
