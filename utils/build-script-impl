@@ -168,6 +168,7 @@ KNOWN_SETTINGS=(
     build-swift-remote-mirror   "1"              "set to 1 to build the Swift Remote Mirror library"
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    build-sourcekit             ""               "set to build the SourceKit library and tools (enabled by default on Darwin hosts)"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
     report-statistics           "0"              "set to 1 to generate compilation statistics files for swift libraries"
     llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
@@ -1857,6 +1858,13 @@ for host in "${ALL_HOSTS[@]}"; do
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
+        )
+    fi
+
+    if [[ "${BUILD_SOURCEKIT}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_BUILD_SOURCEKIT:BOOL=TRUE
         )
     fi
 
