@@ -3112,6 +3112,51 @@ public:
     return E->getKind() == ExprKind::AnyHashableErasure;
   }
 };
+
+/// ConditionalBridgeFromObjCExpr - Bridge a value from a non-native
+/// representation.
+class ConditionalBridgeFromObjCExpr : public ImplicitConversionExpr {
+  ConcreteDeclRef Conversion;
+
+public:
+  ConditionalBridgeFromObjCExpr(Expr *subExpr, Type type,
+                                ConcreteDeclRef conversion)
+    : ImplicitConversionExpr(ExprKind::ConditionalBridgeFromObjC, subExpr, type),
+      Conversion(conversion) {
+  }
+
+  /// \brief Retrieve the conversion function.
+  ConcreteDeclRef getConversion() const {
+    return Conversion;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ConditionalBridgeFromObjC;
+  }
+};
+
+/// BridgeFromObjCExpr - Bridge a value from a non-native representation.
+class BridgeFromObjCExpr : public ImplicitConversionExpr {
+public:
+  BridgeFromObjCExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::BridgeFromObjC, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::BridgeFromObjC;
+  }
+};
+
+/// BridgeToObjCExpr - Bridge a value to a non-native representation.
+class BridgeToObjCExpr : public ImplicitConversionExpr {
+public:
+  BridgeToObjCExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::BridgeToObjC, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::BridgeToObjC;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr : public Expr {

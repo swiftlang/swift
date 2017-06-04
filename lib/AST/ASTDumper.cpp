@@ -1664,6 +1664,10 @@ public:
     conf.dump(OS, Indent + 2);
   }
 
+  void printDeclRef(ConcreteDeclRef declRef) {
+    declRef.dump(PrintWithColorRAII(OS, DeclColor).getOS());
+  }
+
   raw_ostream &printCommon(Expr *E, const char *C) {
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -1789,11 +1793,11 @@ public:
     printCommon(E, "discard_assignment_expr");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  
+
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr");
     PrintWithColorRAII(OS, DeclColor) << " decl=";
-    E->getDeclRef().dump(PrintWithColorRAII(OS, DeclColor).getOS());
+    printDeclRef(E->getDeclRef());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessibilityColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
@@ -1820,7 +1824,7 @@ public:
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
     printCommon(E, "other_constructor_ref_expr")
       << " decl=";
-    E->getDeclRef().dump(OS);
+    printDeclRef(E->getDeclRef());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
@@ -1949,7 +1953,7 @@ public:
       OS << " super";
     if (E->hasDecl()) {
       OS << "  decl=";
-      E->getDecl().dump(OS);
+      printDeclRef(E->getDecl());
     }
     printArgumentLabels(E->getArgumentLabels());
     OS << '\n';
@@ -2053,6 +2057,23 @@ public:
     printCommon(E, "any_hashable_erasure_expr") << '\n';
     printRec(E->getConformance());
     OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E) {
+    printCommon(E, "conditional_bridge_from_objc_expr") << " conversion=";
+    printDeclRef(E->getConversion());
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitBridgeFromObjCExpr(BridgeFromObjCExpr *E) {
+    printCommon(E, "bridge_from_objc_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitBridgeToObjCExpr(BridgeToObjCExpr *E) {
+    printCommon(E, "bridge_to_objc_expr") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2445,13 +2466,13 @@ public:
         
       case KeyPathExpr::Component::Kind::Property:
         OS << "property ";
-        component.getDeclRef().dump(OS);
+        printDeclRef(component.getDeclRef());
         OS << " ";
         break;
       
       case KeyPathExpr::Component::Kind::Subscript:
         OS << "subscript ";
-        component.getDeclRef().dump(OS);
+        printDeclRef(component.getDeclRef());
         OS << '\n';
         component.getIndexExpr()->print(OS, Indent + 4);
         OS.indent(Indent + 4);
