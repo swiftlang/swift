@@ -3,10 +3,10 @@
 // check that the static inline functions in Gizmo.h are correctly emitted as
 // inlineable.
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -Xcc -O3 -emit-ir | %FileCheck %s
 
-// RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule
+// RUN: %empty-directory(%t/Empty.framework/Modules/Empty.swiftmodule)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -F %t -DIMPORT_EMPTY -Xcc -O3 -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
@@ -16,7 +16,7 @@
 // XFAIL: linux
 
 #if IMPORT_EMPTY
-import Empty
+  import Empty
 #endif
 
 import gizmo
@@ -81,5 +81,5 @@ func testStaticButNotInline() -> CInt {
 
 // CHECK: attributes [[INLINEHINT_SSP_UWTABLE]] = { inlinehint ssp {{.*}}}
 // CHECK: attributes [[SSP]] = { ssp {{.*}} }
-// CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp 
+// CHECK: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind ssp
 // CHECK: attributes [[GET_INT_ATTR]] = {

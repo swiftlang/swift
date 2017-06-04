@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -disable-access-control | %FileCheck %s
 

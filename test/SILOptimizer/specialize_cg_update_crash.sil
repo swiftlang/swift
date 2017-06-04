@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library  -module-name TestMod -sil-serialize-all %S/Inputs/TestMod.sil -emit-module-path %t/TestMod.swiftmodule
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -I %t %s | %FileCheck %s
 

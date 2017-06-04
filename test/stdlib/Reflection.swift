@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -o %t/a.out
 // RUN: %S/timeout.sh 360 %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test

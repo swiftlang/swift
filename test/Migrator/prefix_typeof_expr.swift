@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/prefix_typeof_expr.swift.result -emit-remap-file-path %t/prefix_typeof_expr.swift.remap -o /dev/null
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -emit-migrated-file-path %t/prefix_typeof_expr.swift.result -emit-remap-file-path %t/prefix_typeof_expr.swift.remap -o /dev/null
 // RUN: diff -u %S/prefix_typeof_expr.swift.expected %t/prefix_typeof_expr.swift.result
 
 class HasTypeVar {

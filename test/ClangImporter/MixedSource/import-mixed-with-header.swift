@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp -R %S/Inputs/mixed-target %t
 
 // FIXME: BEGIN -enable-source-import hackaround

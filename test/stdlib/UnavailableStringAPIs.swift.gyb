@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb -D_runtime=%target-runtime %s -o %t/main.swift
 // RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify %t/main.swift
 

@@ -9,8 +9,7 @@ struct S1 {}
 func foo(x: FooStruct1) -> S1 {}
 
 // REQUIRES: objc_interop
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %swiftc_driver -emit-module -o %t/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
 
 // Sanity check that we have identical responses when things work.

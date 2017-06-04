@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -primary-file %S/Inputs/MoreSwiftNewtypes_conformances.swift %S/Inputs/MoreSwiftNewtypes_tests.swift -module-name MoreSwiftNewtypes
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %S/Inputs/MoreSwiftNewtypes_conformances.swift -primary-file %S/Inputs/MoreSwiftNewtypes_tests.swift -module-name MoreSwiftNewtypes

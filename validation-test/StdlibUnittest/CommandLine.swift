@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/main.out
 // RUN: %target-run %t/main.out | %FileCheck -check-prefix=CHECK-EMPTY %s
 // RUN: %target-run %t/main.out --abc | %FileCheck -check-prefix=CHECK-1 %s

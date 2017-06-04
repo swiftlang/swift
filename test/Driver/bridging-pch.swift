@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %swiftc_driver -typecheck -driver-print-actions -import-objc-header %S/Inputs/bridging-header.h %s 2>&1 | %FileCheck %s -check-prefix=YESPCHACT
 // YESPCHACT: 0: input, "{{.*}}Inputs/bridging-header.h", objc-header

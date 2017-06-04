@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift %S/main.swift %S/library.swift
 // RUN: %target-build-swift -g %S/main.swift %S/library.swift
