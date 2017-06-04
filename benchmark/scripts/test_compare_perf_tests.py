@@ -186,7 +186,7 @@ Totals,269,67351871,70727022,68220188,0,0,0
 """)
         # Log lines are deliberately in descending sort order in order to test
         # the ordering of the comparison results.
-        # ArrayAppend is included twice to test tesults merging.
+        # ArrayAppend is included twice to test results merging.
         self.new_log = self.write_temp_file('new.log', """
 265,TwoSum,20,5006,5679,5111,0,5111
 35,ByteSwap,20,0,0,0,0,0
