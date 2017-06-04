@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk %s
 //
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -accessibility-filter-public > %t.printed.txt

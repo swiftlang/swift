@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/FixedPointArithmeticTraps.swift
 // RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug
 // RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O

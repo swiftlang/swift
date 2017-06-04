@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/AnyHashableCasts.swift
 // RUN: %target-build-swift -g -module-name a %t/AnyHashableCasts.swift -o %t.out

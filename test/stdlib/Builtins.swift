@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 //   note: building with -Onone to test debug-mode-only safety checks
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t/Builtins
 // RUN: %target-run %t/Builtins

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Other1.swiftmodule -module-name Other1 %S/Inputs/warn_unqualified_access_other.swift
 // RUN: %target-swift-frontend -emit-module-path %t/Other2.swiftmodule -module-name Other2 %S/Inputs/warn_unqualified_access_other.swift
 // RUN: %target-swift-frontend -I %t -typecheck %s -verify
