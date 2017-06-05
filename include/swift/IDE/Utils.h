@@ -327,6 +327,7 @@ public:
 class DeclNameViewer {
   StringRef BaseName;
   SmallVector<StringRef, 4> Labels;
+  bool IsValid;
   bool HasParen;
 public:
   DeclNameViewer(StringRef Text);
@@ -337,6 +338,7 @@ public:
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
+  bool isValid() const { return IsValid; }
   bool isFunction() const { return HasParen; }
 };
 
