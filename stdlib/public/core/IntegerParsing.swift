@@ -87,6 +87,7 @@ extension FixedWidthInteger {
   // _parseASCII function thunk that prevents inlining used as an implementation
   // detail for FixedWidthInteger.init(_: radix:) on the slow path to save code
   // size.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(never)
   internal static func _parseASCIISlowPath<
     CodeUnits : IteratorProtocol, Result: FixedWidthInteger
@@ -129,6 +130,7 @@ extension FixedWidthInteger {
   ///     `radix`.
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
+  @_semantics("optimize.sil.specialize.generic.partial.never")
   public init?/*<S : StringProtocol>*/(_ text: String, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     let r = Self(radix)
