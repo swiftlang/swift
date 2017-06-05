@@ -1728,6 +1728,7 @@ namespace {
     PotentialArchetype *pa;
 
     void operator()(Type type1, Type type2) const {
+      // FIXME: Shouldn't need this!
       if (pa->getParent() && pa->getConcreteTypeDecl() &&
           source->getLoc().isInvalid()) {
         diags.diagnose(pa->getConcreteTypeDecl()->getLoc(),
@@ -1735,14 +1736,6 @@ namespace {
                        pa->getConcreteTypeDecl()->getName(),
                        type1, type2);
         return;
-      }
-
-      if (source->getLoc().isValid()) {
-        diags.diagnose(source->getLoc(),
-                       diag::requires_same_type_conflict,
-                       pa->isGenericParam(),
-                       pa->getDependentType(/*FIXME: */{ }, true),
-                       type1, type2);
       }
     }
   };
@@ -5006,8 +4999,8 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
 
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints,
-    [](const ConcreteConstraint &constraint) {
-      return true;
+    [&](const ConcreteConstraint &constraint) {
+      return constraint.value->isEqual(equivClass->concreteType);
     },
     [&](Type concreteType) {
       // If the concrete type is equivalent, the constraint is redundant.
@@ -5016,10 +5009,14 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
       if (concreteType->isEqual(equivClass->concreteType))
         return ConstraintRelation::Redundant;
 
-      // Call this unrelated.
-      return ConstraintRelation::Unrelated;
+      // If either has a type parameter, call them unrelated.
+      if (concreteType->hasTypeParameter() ||
+          equivClass->concreteType->hasTypeParameter())
+        return ConstraintRelation::Unrelated;
+
+      return ConstraintRelation::Conflicting;
     },
-    None,
+    diag::same_type_conflict,
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
 
