@@ -3412,11 +3412,11 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
         // Initialize self here so we can print type(of: self).
         self.init()
 
-        guard Key.self is Encodable.Type else {
+        guard Key.self is Decodable.Type else {
             preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Key.self) does not conform to Decodable.")
         }
 
-        guard Value.self is Encodable.Type else {
+        guard Value.self is Decodable.Type else {
             preconditionFailure("\(type(of: self)) does not conform to Decodable because \(Value.self) does not conform to Decodable.")
         }
 
