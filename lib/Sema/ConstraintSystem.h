@@ -1287,6 +1287,30 @@ private:
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
+  class TransferExprTypes : public ASTWalker {
+    ConstraintSystem &toCS;
+    ConstraintSystem &fromCS;
+
+  public:
+    TransferExprTypes(ConstraintSystem &toCS, ConstraintSystem &fromCS)
+        : toCS(toCS), fromCS(fromCS) {}
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (fromCS.hasType(expr))
+        toCS.setType(expr, fromCS.getType(expr));
+
+      return expr;
+    }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+
 public:
 
   void setExprTypes(Expr *expr) {
@@ -1310,6 +1334,10 @@ public:
   void cacheSubExprTypes(Expr *expr) {
     bool excludeRoot = true;
     expr->walk(CacheExprTypes(expr, *this, excludeRoot));
+  }
+
+  void transferExprTypes(ConstraintSystem *oldCS, Expr *expr) {
+    expr->walk(TransferExprTypes(*this, *oldCS));
   }
 
   /// \brief The current solver state.
