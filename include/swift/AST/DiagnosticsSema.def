@@ -1690,6 +1690,9 @@ NOTE(redundant_conformance_here,none,
      "inferred from type here}0",
      (unsigned, Type, ProtocolDecl *))
 
+ERROR(same_type_conflict,none,
+      "%select{generic parameter |protocol |}0%1 cannot be equal to both "
+      "%2 and %3", (unsigned, Type, Type, Type))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,

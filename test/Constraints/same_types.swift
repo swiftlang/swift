@@ -58,14 +58,16 @@ func test3<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
 func fail1<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
-  where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{associated type 'T.Foo' cannot be equal to both 'X' and 'Y'}}
+  where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{'U.Foo' cannot be equal to both 'Y' and 'X'}}
+  // expected-note@-1{{same-type constraint 'T.Foo' == 'X' written here}}
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
 func fail2<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
-  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{associated type 'U.Foo' cannot be equal to both 'X' and 'Y'}}
+  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{'U.Foo' cannot be equal to both 'Y' and 'X'}}
+  // expected-note@-1{{same-type constraint 'T.Foo' == 'X' written here}}
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
@@ -94,20 +96,22 @@ func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
 
 func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
-  T.Bar == Y,
-  T.Bar.Foo == Z { // expected-error{{associated type 'T.Bar.Foo' cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
+  T.Bar == Y, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+  T.Bar.Foo == Z { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
-  T.Bar.Foo == Z, // expected-warning{{redundant same-type constraint 'T.Bar.Foo' == 'Z'}}
-  T.Bar == Y { // expected-error{{associated type 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
-	// expected-note@-1{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+  T.Bar.Foo == Z, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Z' written here}}
+  T.Bar == Y { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
-func test8<T: Fooable>(_ t: T) where T.Foo == X, T.Foo == Y {} // expected-error{{associated type 'T.Foo' cannot be equal to both 'X' and 'Y'}}
+func test8<T: Fooable>(_ t: T)
+  where T.Foo == X, // expected-note{{same-type constraint 'T.Foo' == 'X' written here}}
+  T.Foo == Y {} // expected-error{{'T.Foo' cannot be equal to both 'Y' and 'X'}}
+
 
 func testAssocTypeEquivalence<T: Fooable>(_ fooable: T) -> X.Type
   where T.Foo == X {
@@ -246,7 +250,6 @@ func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U)
   where T.Assoc1 == Tuple2<T.Assoc1, U> // expected-error{{same-type constraint 'T.Assoc1' == '(T.Assoc1, U)' is recursive}}
 { }
 
-
 protocol P3 {
 }
 
@@ -255,6 +258,26 @@ protocol P4 {
 }
 
 func test9<T>(_: T) where T.A == X, T: P4, T.A: P3 { } // expected-error{{same-type constraint type 'X' does not conform to required protocol 'P3'}}
+
+// Same-type constraint conflict through protocol where clauses.
+protocol P5 where Foo1 == Foo2 {
+  associatedtype Foo1
+  associatedtype Foo2
+}
+
+protocol P6 {
+  associatedtype Bar: P5
+}
+
+struct X5a {}
+
+struct X5b { }
+
+func test9<T: P6, U: P6>(_ t: T, u: U)
+  where T.Bar.Foo1 == X5a, // expected-note{{same-type constraint 'T.Bar.Foo1' == 'X5a' written here}}
+        U.Bar.Foo2 == X5b, // expected-error{{'U.Bar.Foo2' cannot be equal to both 'X5b' and 'X5a'}}
+        T.Bar == U.Bar {
+}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'
