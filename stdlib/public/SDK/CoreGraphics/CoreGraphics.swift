@@ -375,6 +375,12 @@ public extension CGRect {
            from: fromEdge)
     return (slice, remainder)
   }
+
+  @available(*, unavailable, renamed: "minX")
+  public var x: CGFloat { return minX }
+
+  @available(*, unavailable, renamed: "minY")
+  public var y: CGFloat { return minY }
 }
 
 extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
