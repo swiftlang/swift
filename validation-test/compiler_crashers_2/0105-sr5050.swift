@@ -1,4 +1,5 @@
 // RUN: not --crash %target-swift-frontend %s -typecheck
+// REQUIRES: asserts
 
 protocol P {}
 
