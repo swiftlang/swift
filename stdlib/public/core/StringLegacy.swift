@@ -251,6 +251,7 @@ extension String {
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
   // FIXME(integers): support a more general BinaryInteger protocol
+  // FIXME(integers): support larger bitwidths than 64
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
