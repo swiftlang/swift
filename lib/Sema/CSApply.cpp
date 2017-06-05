@@ -1351,7 +1351,7 @@ namespace {
               base = cs.coerceToRValue(base);
             } else if (keyPathBGT->getDecl() ==
                          cs.getASTContext().getWritableKeyPathDecl()) {
-              resultIsLValue = base->getType()->isLValueType();
+              resultIsLValue = cs.getType(base)->isLValueType();
             } else if (keyPathBGT->getDecl() ==
                        cs.getASTContext().getReferenceWritableKeyPathDecl()) {
               resultIsLValue = true;
@@ -4032,7 +4032,7 @@ namespace {
 
       simplifyExprType(E);
       
-      if (E->getType()->hasError())
+      if (cs.getType(E)->hasError())
         return E;
 
       // If a component is already resolved, then all of them should be
