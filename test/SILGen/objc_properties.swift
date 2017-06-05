@@ -242,7 +242,7 @@ class HasLazyProperty : NSObject, HasProperty {
     return nil
   }
 
-  lazy var window = instanceMethod()
+  lazy var window = self.instanceMethod()
 }
 
 // CHECK-LABEL: sil hidden @_T015objc_properties15HasLazyPropertyC6windowSo8NSObjectCSgfg : $@convention(method) (@guaranteed HasLazyProperty) -> @owned Optional<NSObject> {
