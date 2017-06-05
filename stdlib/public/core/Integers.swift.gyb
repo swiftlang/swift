@@ -2651,6 +2651,31 @@ public struct ${Self}
     return Bool(Builtin.cmp_${u}lt_Int${bits}(lhs._value, rhs._value))
   }
 
+  // FIXME(integers): these overloads are here in order for the compiler to
+  // prefer them to the generic ones on BinaryInteger, in cases like the
+  // following, where choosing Int as a literal type leads to overflow:
+  //   UInt64() > 0x8000_0000_0000_0000
+  //   UInt64() != 0xFFFF_FFFF_FFFF_FFFF
+  @_transparent
+  public static func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs == rhs)
+  }
+
+  @_transparent
+  public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  @_transparent
+  public static func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return !(lhs < rhs)
+  }
+
+  @_transparent
+  public static func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
+    return rhs < lhs
+  }
+
 // FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
