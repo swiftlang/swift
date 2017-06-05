@@ -1339,7 +1339,7 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable {
+  /* Hashable, Numeric, CustomStringConvertible, Strideable, */ _BinaryInteger {
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
@@ -1663,7 +1663,15 @@ extension Int {
 //===--- Heterogeneous comparison -----------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-extension BinaryInteger {
+/// This protocol is an implementation detail of `BinaryInteger`. Do not use it
+/// directly.
+public protocol _BinaryInteger :
+  Hashable, Numeric, CustomStringConvertible, Strideable {
+  // FIXME(integers): This protocol is necessary for breaking ambiguities in
+  // generic code.
+}
+
+extension _BinaryInteger where Self : BinaryInteger {
   /// Returns a Boolean value indicating whether the two given values are
   /// equal.
   ///
@@ -1683,9 +1691,7 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @inline(__always)
-  public static func == <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
+  public static func == <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     let lhsNegative = Self.isSigned && lhs < (0 as Self)
     let rhsNegative = Other.isSigned && rhs < (0 as Other)
 
@@ -1740,9 +1746,7 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @_transparent
-  public static func != <
-    Other : BinaryInteger
-  >(lhs: Self, rhs: Other) -> Bool {
+  public static func != <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(lhs == rhs)
   }
 
@@ -1837,20 +1841,16 @@ extension BinaryInteger {
   }
 }
 
-//===----------------------------------------------------------------------===//
-//===--- Ambiguity breakers -----------------------------------------------===//
 // These two versions of the operators are not ordered with respect to one
 // another, but the compiler choses the second one, and that results in infinite
 // recursion.
 //
 //     <T : Comparable>(T, T) -> Bool
-//     <T : BinaryInteger, U : BinaryInteger>(T, U) -> Bool
+//     <T : _BinaryInteger, U : _BinaryInteger>(T, U) -> Bool
 //
 // so we define:
 //
 //     <T : BinaryInteger>(T, T) -> Bool
-//
-//===----------------------------------------------------------------------===//
 
 extension BinaryInteger {
   @_transparent
