@@ -642,9 +642,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             DC = DC->getParent();
 
-            BaseDecl = selfParam;
             ExtendedType = DC->getSelfTypeInContext();
             MetaBaseDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+            if (Ctx.isSwiftVersion3())
+              BaseDecl = MetaBaseDecl;
+            else
+              BaseDecl = selfParam;
 
             isTypeLookup = PBD->isStatic();
           }
@@ -705,7 +708,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // might be type checking a default argument expression and
             // performing name lookup from there), the base declaration
             // is the nominal type, not 'self'.
-            if (!AFD->isImplicit() &&
+            if ((Ctx.isSwiftVersion3() || !AFD->isImplicit()) &&
                 Loc.isValid() &&
                 AFD->getBodySourceRange().isValid() &&
                 !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
