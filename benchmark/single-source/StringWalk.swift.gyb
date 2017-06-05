@@ -1,0 +1,112 @@
+//===--- StringWalk.swift -------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to StringWalk.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+
+// Test String subscript performance.
+//
+// Subscript has a slow path that initializes a global variable:
+// Swift._cocoaStringSubscript.addressor.  Global optimization would
+// normally hoist the initializer outside the inner loop (over
+// unicodeScalars), forcing the initializer to be called on each
+// lap. However, no that the cocoa code is properly marked "slowPath",
+// no hoisting should occur.
+import TestsUtils
+
+var count: Int = 0
+
+//
+// Helper functionality
+//
+
+@inline(never) func count_unicodeScalars(_ s: String.UnicodeScalarView) {
+  for _ in s {
+    count += 1
+  }
+}
+@inline(never) func count_characters(_ s: String.CharacterView) {
+  for _ in s {
+    count += 1
+  }
+}
+@inline(never) func count_unicodeScalars_rev(
+  _ s: ReversedCollection<String.UnicodeScalarView>
+) {
+  for _ in s {
+    count += 1
+  }
+}
+@inline(never) func count_characters_rev(
+  _ s: ReversedCollection<String.CharacterView>
+) {
+  for _ in s {
+    count += 1
+  }
+}
+
+//
+// Workloads
+//
+let ascii =
+  "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
+let emoji = "👍👩‍👩‍👧‍👧👨‍👨‍👦‍👦🇺🇸🇨🇦🇲🇽👍🏻👍🏼👍🏽👍🏾👍🏿"
+let utf16 = emoji + "the quick brown fox" + String(emoji.reversed() as Array<Character>)
+
+let japanese = "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。"
+let chinese = "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。"
+let korean = "이번 업데이트에서는 강력하면서도 직관적인 Apple 플랫폼용 프로그래밍 언어인 Swift를 완벽히 개선하였습니다."
+let russian = "в чащах юга жил-был цитрус? да, но фальшивый экземпляр"
+
+// A workload that's mostly Latin characters, with occasional emoji
+// interspersed. Common for tweets.
+let tweet = "Worst thing about working on String is that it breaks *everything*. Asserts, debuggers, and *especially* printf-style debugging 😭"
+
+//
+// Benchmarks
+//
+
+// Pre-commit benchmark: simple scalar walk
+@inline(never)
+public func run_StringWalk(_ N: Int) {
+  return run_StringWalk_ascii_unicodeScalars(N)
+}
+
+// Extended String benchmarks:
+let baseMultiplier = 10_000
+let unicodeScalarsMultiplier = baseMultiplier
+let charactersMultiplier = baseMultiplier / 5
+
+% for Name in ["ascii", "utf16", "tweet", "japanese", "chinese", "korean", "russian"]:
+%   for Kind in ["unicodeScalars", "characters"]:
+
+@inline(never)
+public func run_StringWalk_${Name}_${Kind}(_ N: Int) {
+  for _ in 1...${Kind}Multiplier*N {
+    count_${Kind}(${Name}.${Kind})
+  }
+}
+
+@inline(never)
+public func run_StringWalk_${Name}_${Kind}_Backwards(_ N: Int) {
+  for _ in 1...${Kind}Multiplier*N {
+    count_${Kind}_rev(${Name}.${Kind}.reversed())
+  }
+}
+
+%   end
+% end

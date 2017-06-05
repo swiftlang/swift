@@ -9,7 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 

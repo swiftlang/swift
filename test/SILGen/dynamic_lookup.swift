@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -61,7 +61,9 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load_borrow [[READ]] : $*AnyObject
+  // CHECK: end_access [[READ]]
   // CHECK-NEXT: [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK-NEXT: [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened([[UUID:".*"]]) AnyObject).Type
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = dynamic_method [volatile] [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
@@ -84,7 +86,8 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
   // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
-  // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
   // CHECK:   [[OPT_TMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
   // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
@@ -137,7 +140,8 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
-  // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK:   [[OBJCOPY:%[0-9]+]] = load_borrow [[READ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
@@ -158,7 +162,8 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   project_box [[INT_BOX]]
-  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
@@ -191,9 +196,11 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   alloc_box ${ var Int }
   // CHECK:   project_box
-  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[PBI]] : $*Int
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBI]]
+  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[READ]] : $*Int
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
@@ -223,9 +230,11 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
-  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
-  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[PBI]] : $*Int
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBI]]
+  // CHECK:   [[I:%[0-9]+]] = load [trivial] [[READ]] : $*Int
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
@@ -250,7 +259,8 @@ func downcast(_ obj: AnyObject) -> X {
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
-  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[PBOBJ]] : $*AnyObject
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
   // CHECK:   destroy_value [[OBJ_BOX]] : ${ var AnyObject }
   // CHECK:   destroy_value %0

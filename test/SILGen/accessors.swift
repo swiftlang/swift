@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}
@@ -30,12 +30,12 @@ func test0(_ ref: A) {
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index0() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
 // CHECK-NEXT: [[BORROWED_ARG_RHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index1() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
@@ -104,12 +104,12 @@ func test1(_ ref: B) {
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
 // CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index0() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
 // CHECK-NEXT: [[BORROWED_ARG_RHS:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.index1() -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.

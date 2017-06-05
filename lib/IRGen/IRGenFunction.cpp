@@ -17,6 +17,7 @@
 
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
@@ -25,7 +26,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "LoadableTypeInfo.h"
 
 using namespace swift;
@@ -162,6 +162,24 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
   box = Builder.CreateExtractValue(call, 0);
   valueAddress = Builder.CreateExtractValue(call, 1);
 }
+
+void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
+                                          llvm::Value *typeMetadata,
+                                          llvm::Value *alignMask,
+                                          llvm::Value *&outBox,
+                                          llvm::Value *&outValueAddress) {
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  llvm::CallInst *call = Builder.CreateCall(IGM.getMakeBoxUniqueFn(),
+                                            {box, typeMetadata, alignMask});
+  call->setAttributes(attrs);
+
+  outBox = Builder.CreateExtractValue(call, 0);
+  outValueAddress = Builder.CreateExtractValue(call, 1);
+}
+
 
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                         llvm::Value *typeMetadata) {

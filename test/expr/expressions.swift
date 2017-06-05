@@ -236,7 +236,7 @@ func test_as_1() {
 }
 func test_as_2() {
   let x: Int = 1
-  x as [] // expected-error {{expected element type}}
+  x as [] // expected-error {{expected element type}} {{9-9= <#type#>}}
 }
 
 func test_lambda() {
@@ -257,7 +257,7 @@ func test_lambda() {
 func test_lambda2() {
   { () -> protocol<Int> in
     // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
-    // expected-error @-2 {{non-protocol type 'Int' cannot be used within a protocol composition}}
+    // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
     // expected-warning @-3 {{result of call is unused}}
     return 1
   }()
@@ -820,7 +820,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -871,25 +871,6 @@ func r22913570() {
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
-
-// <rdar://problem/23708702> Emit deprecation warnings for ++/-- in Swift 2.2
-func swift22_deprecation_increment_decrement() {
-  var i = 0
-  var f = 1.0
-
-  i++     // expected-error {{'++' is unavailable}} {{4-6= += 1}}
-  --i     // expected-error {{'--' is unavailable}} {{3-5=}} {{6-6= -= 1}}
-  _ = i++ // expected-error {{'++' is unavailable}}
-
-  ++f     // expected-error {{'++' is unavailable}} {{3-5=}} {{6-6= += 1}}
-  f--     // expected-error {{'--' is unavailable}} {{4-6= -= 1}}
-  _ = f-- // expected-error {{'--' is unavailable}} {{none}}
-
-  // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
-  // This should not get a fixit hint.
-  var j = 2
-  i = ++j   // expected-error {{'++' is unavailable}} {{none}}
-}
 
 // SR-628 mixing lvalues and rvalues in tuple expression
 var x = 0

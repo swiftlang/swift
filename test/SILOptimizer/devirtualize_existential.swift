@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
 
 protocol Pingable {
  func ping(_ x : Int);

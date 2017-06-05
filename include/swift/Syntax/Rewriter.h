@@ -40,6 +40,7 @@ struct SyntaxRewriter {
   virtual Id##Syntax rewrite##Id(Id##Syntax Node) { \
     return Node; \
   }
+#define SYNTAX_COLLECTION(Id, Element) SYNTAX(Id, {})
 #include "swift/Syntax/SyntaxKinds.def"
   virtual ~SyntaxRewriter() = default;
 };

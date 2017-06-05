@@ -15,6 +15,15 @@
 @_versioned public func publicVersioned() {}
 // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned' is public}}
 
+internal class internalClass {
+  @_versioned public func publicVersioned() {}
+  // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'publicVersioned' is public}}
+}
+
+fileprivate class filePrivateClass {
+  @_versioned internal func internalVersioned() {}
+}
+
 @_versioned struct S {
   var x: Int
   @_versioned var y: Int

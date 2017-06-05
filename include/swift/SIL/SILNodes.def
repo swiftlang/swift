@@ -108,6 +108,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(BeginBorrowInst, SILInstruction, begin_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(EndBorrowArgumentInst, SILInstruction, end_borrow_argument, MayHaveSideEffects, DoesNotRelease)
+  INST(BeginAccessInst, SILInstruction, begin_access, MayHaveSideEffects, DoesNotRelease)
+  INST(EndAccessInst, SILInstruction, end_access, MayHaveSideEffects, DoesNotRelease)
+  INST(BeginUnpairedAccessInst, SILInstruction, begin_unpaired_access, MayHaveSideEffects, DoesNotRelease)
+  INST(EndUnpairedAccessInst, SILInstruction, end_unpaired_access, MayHaveSideEffects, DoesNotRelease)
   INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
@@ -148,7 +152,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(UnownedReleaseInst, RefCountingInst, unowned_release, MayHaveSideEffects,
          MayRelease)
     INST(RetainValueInst, RefCountingInst, retain_value, MayHaveSideEffects, DoesNotRelease)
+    INST(RetainValueAddrInst, RefCountingInst, retain_value_addr, MayHaveSideEffects, DoesNotRelease)
     INST(ReleaseValueInst, RefCountingInst, release_value, MayHaveSideEffects, MayRelease)
+    INST(ReleaseValueAddrInst, RefCountingInst, release_value_addr, MayHaveSideEffects, MayRelease)
     INST(SetDeallocatingInst, RefCountingInst, set_deallocating, MayHaveSideEffects,
          DoesNotRelease)
     INST(AutoreleaseValueInst, RefCountingInst, autorelease_value, MayHaveSideEffects,
@@ -183,7 +189,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(IntegerLiteralInst, LiteralInst, integer_literal, None, DoesNotRelease)
     INST(FloatLiteralInst, LiteralInst, float_literal, None, DoesNotRelease)
     INST(StringLiteralInst, LiteralInst, string_literal, None, DoesNotRelease)
-    VALUE_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
+    INST(ConstStringLiteralInst, LiteralInst, const_string_literal, None, DoesNotRelease)
+    VALUE_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_VALUE(MethodInst, SILInstruction)
@@ -200,7 +207,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Metatypes
   INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
-  INST(ValueMetatypeInst, SILInstruction, value_metatype, None, DoesNotRelease)
+  INST(ValueMetatypeInst, SILInstruction, value_metatype, MayRead, DoesNotRelease)
   INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, MayRead, DoesNotRelease)
   INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
 
@@ -242,6 +249,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Blocks
   INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)
   INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
+
+  // Key paths
+  // TODO: The only "side effect" is potentially retaining the returned key path
+  // object; is there a more specific effect?
+  INST(KeyPathInst, SILInstruction, keypath, MayHaveSideEffects, DoesNotRelease)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)

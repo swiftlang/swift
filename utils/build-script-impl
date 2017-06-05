@@ -99,6 +99,7 @@ KNOWN_SETTINGS=(
     installable-package         ""               "the path to the archive of the installation directory"
     test-installable-package    ""               "whether to run post-packaging tests on the produced package"
     reconfigure                 ""               "force a CMake configuration run even if CMakeCache.txt already exists"
+    skip-reconfigure            ""               "set to skip reconfigure"
     swift-primary-variant-sdk   ""               "default SDK for target binaries"
     swift-primary-variant-arch  ""               "default arch for target binaries"
     skip-build-cmark            ""               "set to skip building CommonMark"
@@ -152,6 +153,7 @@ KNOWN_SETTINGS=(
     long-test                   "0"              "set to run the long test suite"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
+    skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
@@ -167,16 +169,12 @@ KNOWN_SETTINGS=(
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
+    report-statistics           "0"              "set to 1 to generate compilation statistics files for swift libraries"
     llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
     swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
-    compiler-vendor             "none"           "compiler vendor name [none,apple]"
-    clang-user-visible-version  "4.0.0"          "user-visible version of the embedded Clang and LLVM compilers"
-    swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
-    swift-compiler-version      ""               "string that indicates a compiler version for Swift"
-    clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
     darwin-crash-reporter-client ""              "whether to enable CrashReporter integration"
     darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
@@ -253,6 +251,7 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
+    swift-runtime-enable-cow-existentials "1"    "Enable the copy-on-write existential implementation"
 )
 
 # Centralized access point for traced command invocation.
@@ -942,6 +941,10 @@ if [[ "${CROSS_COMPILE_HOSTS}" ]]; then
     SKIP_BUILD_COMPILER_RT=1
 fi
 
+if [[ "${SKIP_RECONFIGURE}" ]]; then
+    RECONFIGURE=""
+fi
+
 # WORKSPACE, BUILD_DIR and INSTALLABLE_PACKAGE must be absolute paths
 case "${WORKSPACE}" in
     /*) ;;
@@ -1021,13 +1024,6 @@ function cmake_needs_to_specify_standard_computed_defaults() {
         echo "TRUE"
     else
         echo "FALSE"
-    fi
-}
-
-function copy_swift_stdlib_tool_substitute() {
-    if [ ! -f "$1" ] ; then
-        echo "--- Copy swift-stdlib-tool ---"
-        call cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "$1"
     fi
 }
 
@@ -1897,6 +1893,13 @@ for host in "${ALL_HOSTS[@]}"; do
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 
+    if [[ "${SKIP_TEST_SOURCEKIT}" ]] ; then
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=FALSE
+        )
+    fi
+
     for product in "${PRODUCTS[@]}"; do
         # Check if we should perform this action.
         if ! [[ $(should_execute_action "${host}-${product}-build") ]]; then
@@ -2126,6 +2129,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_SERIALIZE_STDLIB_UNITTEST:BOOL=$(true_false "${BUILD_SERIALIZED_STDLIB_UNITTEST}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
+                    -DSWIFT_REPORT_STATISTICS:BOOL=$(true_false "${REPORT_STATISTICS}")
                     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_STDLIB}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
                     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_SDK_OVERLAY}")
@@ -2360,15 +2364,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                 fi
                 
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
-                    # xcodebuild requires swift-stdlib-tool to build a Swift
-                    # framework. This is normally present when building XCTest
-                    # via a packaged .xctoolchain, but here we are using the
-                    # swiftc that was just built--no toolchain exists yet. As a
-                    # result, we must copy swift-stdlib-tool ourselves.
-                    copy_swift_stdlib_tool_substitute "$(build_directory_bin ${host} swift)/swift-stdlib-tool"
-                fi
-
                 # Use XCTEST_BUILD_TYPE to build either --debug or --release.
                 if [[ "${XCTEST_BUILD_TYPE}" ==  "Debug" ]] ; then
                     XCTEST_BUILD_ARGS="--debug"
@@ -2772,7 +2767,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
-                call "${swiftpm_bootstrap_command[@]}" test
+                call "${swiftpm_bootstrap_command[@]}" test --test-parallel
                 # As swiftpm tests itself, we break early here.
                 continue
                 ;;
@@ -3213,7 +3208,6 @@ for host in "${ALL_HOSTS[@]}"; do
             # Exclude shell scripts.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${TOOLCHAIN_PREFIX}" -perm -0111 -type f -print | \
-               grep -v swift-stdlib-tool | \
                grep -v crashlog.py | \
                grep -v symbolication.py | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
@@ -3258,8 +3252,6 @@ function build_and_test_installable_package() {
 
         # Assume the lipo builds are (or include) an OS X host and build an xctoolchain
         if [[ "${host}" == "macosx-"* ]] || [[ "${host}" == "merged-hosts" ]]; then
-          copy_swift_stdlib_tool_substitute "${host_install_destdir}${host_install_prefix}/bin/swift-stdlib-tool"
-          
           # Create plist for xctoolchain.
           echo "-- Create Info.plist --"
           PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"

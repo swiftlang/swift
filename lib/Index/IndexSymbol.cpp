@@ -11,7 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Index/IndexSymbol.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Types.h"
 
 using namespace swift;
 using namespace swift::index;
@@ -133,8 +136,6 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
     }
     return SymbolKind::InstanceProperty;
   }
-
-  assert(!DC->isLocalContext() && "local variable seen while indexing");
   return SymbolKind::Variable;
 }
 
@@ -205,6 +206,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       break;
   }
 
+  if (isLocalSymbol(D)) {
+    info.Properties |= SymbolProperty::Local;
+  }
+
   return info;
 }
 
@@ -223,4 +228,10 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
+}
+
+bool index::isLocalSymbol(const swift::Decl *D) {
+  return D->getDeclContext()->getLocalContext() &&
+    (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid() ||
+     D->getDeclContext()->getContextKind() == DeclContextKind::AbstractClosureExpr);
 }

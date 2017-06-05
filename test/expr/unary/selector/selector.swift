@@ -115,7 +115,6 @@ func testParseErrors3(_ c1: C1) {
 }
 
 func testParseErrors4() {
-  // Subscripts
   _ = #selector(C1.subscript) // expected-error{{type 'C1.Type' has no subscript members}}
 }
 
@@ -126,10 +125,12 @@ let optionalSel: Selector? = nil
 switch optionalSel {
 case #selector(C1.method1)?:
   break
+default:
+  break
 }
 
 @objc class SR1827 {
-  func bar() {}
+  @objc func bar() {}
 }
 
 switch optionalSel {

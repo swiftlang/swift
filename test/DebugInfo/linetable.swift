@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -S -g -o - | %FileCheck %s --check-prefix ASM-CHECK
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s --check-prefix ASM-CHECK
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -34,9 +34,9 @@ func main(_ x: Int64) -> Void
             var result = my_class.do_something(x)
             markUsed(result)
 // CHECK: call {{.*}} @swift_rt_swift_release {{.*}}
+// CHECK: bitcast
+// CHECK: llvm.lifetime.end
 // CHECK: call {{.*}} @swift_rt_swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
-// CHECK-NEXT: bitcast
-// CHECK-NEXT: llvm.lifetime.end
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
 // CHECK: ![[CLOSURE_END]] = !DILocation(line: [[@LINE+1]],
         }

@@ -18,6 +18,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -68,7 +69,7 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
   for (auto formalType : formalTypes) {
     // Runtime type metadata always represents the maximal abstraction level of
     // the type.
-    auto anyTy = ProtocolCompositionType::get(IGF.IGM.Context, {});
+    auto anyTy = IGF.IGM.Context.TheAnyType;
     auto openedAnyTy = ArchetypeType::getOpened(anyTy);
     auto maxAbstraction = AbstractionPattern(openedAnyTy);
     auto &ti = IGF.getTypeInfoForUnlowered(maxAbstraction, formalType);

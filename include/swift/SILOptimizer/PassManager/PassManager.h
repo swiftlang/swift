@@ -99,7 +99,7 @@ class SILPassManager {
 
 
   /// The IRGen SIL passes. These have to be dynamically added by IRGen.
-  llvm::DenseMap<unsigned, SILFunctionTransform *> IRGenPasses;
+  llvm::DenseMap<unsigned, SILTransform *> IRGenPasses;
 
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
@@ -118,7 +118,7 @@ public:
   template<typename T>
   T *getAnalysis() {
     for (SILAnalysis *A : Analysis)
-      if (T *R = llvm::dyn_cast<T>(A))
+      if (auto *R = llvm::dyn_cast<T>(A))
         return R;
 
     llvm_unreachable("Unable to find analysis for requested type.");
@@ -140,14 +140,12 @@ public:
   void clearRestartPipeline() { RestartPipeline = false; }
   bool shouldRestartPipeline() { return RestartPipeline; }
 
-  ///  \brief Broadcast the invalidation of the module to all analysis.
-  void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
-    assert(K != SILAnalysis::InvalidationKind::Nothing &&
-           "Invalidation call must invalidate some trait");
-
+  /// \brief Iterate over all analysis and invalidate them.
+  void invalidateAllAnalysis() {
+    // Invalidate the analysis (unless they are locked)
     for (auto AP : Analysis)
       if (!AP->isLocked())
-        AP->invalidate(K);
+        AP->invalidate();
 
     CurrentPassHasInvalidated = true;
 
@@ -167,7 +165,7 @@ public:
   /// particular analysis has been done on the function.
   void notifyAnalysisOfFunction(SILFunction *F) {
     for (auto AP : Analysis)
-      AP->notifyAnalysisOfFunction(F);
+      AP->notifyAddFunction(F);
   }
 
   /// \brief Broadcast the invalidation of the function to all analysis.
@@ -183,15 +181,26 @@ public:
     CompletedPassesMap[F].reset();
   }
 
-  /// \brief Broadcast the invalidation of the function to all analysis.
-  /// And we also know this function is dead and will be removed from the
-  /// module.
-  void invalidateAnalysisForDeadFunction(SILFunction *F,
-                                         SILAnalysis::InvalidationKind K) {
+  /// \brief Iterate over all analysis and notify them of a change in witness-
+  /// or vtables.
+  void invalidateFunctionTables() {
     // Invalidate the analysis (unless they are locked)
     for (auto AP : Analysis)
       if (!AP->isLocked())
-        AP->invalidateForDeadFunction(F, K);
+        AP->invalidateFunctionTables();
+
+    CurrentPassHasInvalidated = true;
+
+    // Assume that all functions have changed. Clear all masks of all functions.
+    CompletedPassesMap.clear();
+  }
+
+  /// \brief Iterate over all analysis and notify them of a deleted function.
+  void notifyDeleteFunction(SILFunction *F) {
+    // Invalidate the analysis (unless they are locked)
+    for (auto AP : Analysis)
+      if (!AP->isLocked())
+        AP->notifyDeleteFunction(F);
     
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
@@ -238,7 +247,7 @@ public:
     }
   }
 
-  void registerIRGenPass(PassKind Kind, SILFunctionTransform *Transform) {
+  void registerIRGenPass(PassKind Kind, SILTransform *Transform) {
     assert(IRGenPasses.find(unsigned(Kind)) == IRGenPasses.end() &&
            "Pass already registered");
     assert(

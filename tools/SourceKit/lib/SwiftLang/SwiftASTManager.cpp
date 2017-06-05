@@ -46,7 +46,9 @@ public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
     // FIXME: Print location info if available.
     switch (Kind) {
@@ -54,7 +56,7 @@ public:
       case DiagnosticKind::Warning: OS << "warning: "; break;
       case DiagnosticKind::Note: OS << "note: "; break;
     }
-    OS << Text;
+    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
   }
 };
 } // end anonymous namespace
@@ -213,7 +215,7 @@ namespace SourceKit {
   void ASTUnit::performAsync(std::function<void()> Fn) {
     Impl.Queue.dispatch(std::move(Fn));
   }
-}
+} // namespace SourceKit
 
 namespace {
 
@@ -833,7 +835,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     // don't block any other AST processing for the same SwiftInvocation.
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
-      SILOptions SILOpts;
+      SILOptions SILOpts = Invocation.getSILOptions();
       std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }

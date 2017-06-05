@@ -26,38 +26,37 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 // GraphTraits for SILBasicBlock
 //===----------------------------------------------------------------------===//
-template <> struct GraphTraits<swift::SILBasicBlock*> {
-  typedef swift::SILBasicBlock::SuccessorListTy::iterator ChildIteratorType;
-  typedef swift::SILBasicBlock *NodeRef;
+
+template <> struct GraphTraits<swift::SILBasicBlock *> {
+  using ChildIteratorType = swift::SILBasicBlock::succblock_iterator;
+  using Node = swift::SILBasicBlock;
+  using NodeRef = Node *;
 
   static NodeRef getEntryNode(NodeRef BB) { return BB; }
 
   static ChildIteratorType child_begin(NodeRef N) {
-    return N->getSuccessors().begin();
+    return N->succblock_begin();
   }
-  static ChildIteratorType child_end(NodeRef N) {
-    return N->getSuccessors().end();
-  }
+  static ChildIteratorType child_end(NodeRef N) { return N->succblock_end(); }
 };
 
 template <> struct GraphTraits<const swift::SILBasicBlock*> {
-  typedef swift::SILBasicBlock::ConstSuccessorListTy::iterator ChildIteratorType;
-  typedef const swift::SILBasicBlock *NodeRef;
+  using ChildIteratorType = swift::SILBasicBlock::const_succblock_iterator;
+  using Node = const swift::SILBasicBlock;
+  using NodeRef = Node *;
 
   static NodeRef getEntryNode(NodeRef BB) { return BB; }
 
   static ChildIteratorType child_begin(NodeRef N) {
-    return N->getSuccessors().begin();
+    return N->succblock_begin();
   }
-  static ChildIteratorType child_end(NodeRef N) {
-    return N->getSuccessors().end();
-  }
+  static ChildIteratorType child_end(NodeRef N) { return N->succblock_end(); }
 };
 
 template <> struct GraphTraits<Inverse<swift::SILBasicBlock*> > {
-  typedef swift::SILBasicBlock::pred_iterator ChildIteratorType;
-  typedef swift::SILBasicBlock *NodeRef;
-
+  using ChildIteratorType = swift::SILBasicBlock::pred_iterator;
+  using Node = swift::SILBasicBlock;
+  using NodeRef = Node *;
   static NodeRef getEntryNode(Inverse<swift::SILBasicBlock *> G) {
     return G.Graph;
   }
@@ -70,8 +69,9 @@ template <> struct GraphTraits<Inverse<swift::SILBasicBlock*> > {
 };
 
 template <> struct GraphTraits<Inverse<const swift::SILBasicBlock*> > {
-  typedef swift::SILBasicBlock::pred_iterator ChildIteratorType;
-  typedef const swift::SILBasicBlock *NodeRef;
+  using ChildIteratorType = swift::SILBasicBlock::pred_iterator;
+  using Node = const swift::SILBasicBlock;
+  using NodeRef = Node *;
 
   static NodeRef getEntryNode(Inverse<const swift::SILBasicBlock *> G) {
     return G.Graph;
@@ -84,10 +84,11 @@ template <> struct GraphTraits<Inverse<const swift::SILBasicBlock*> > {
   }
 };
 
-template <> struct GraphTraits<swift::SILFunction*>
-    : public GraphTraits<swift::SILBasicBlock*> {
-  typedef swift::SILFunction *GraphType;
-  typedef swift::SILBasicBlock *NodeRef;
+template <>
+struct GraphTraits<swift::SILFunction *>
+    : public GraphTraits<swift::SILBasicBlock *> {
+  using GraphType = swift::SILFunction *;
+  using NodeRef = swift::SILBasicBlock *;
 
   static NodeRef getEntryNode(GraphType F) { return &F->front(); }
 

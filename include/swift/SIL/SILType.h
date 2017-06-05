@@ -294,6 +294,18 @@ public:
   bool isClassExistentialType() const {
     return getSwiftRValueType()->isClassExistentialType();
   }
+
+  /// Returns true if the referenced type is an opened existential type
+  /// (which is actually a kind of archetype).
+  bool isOpenedExistential() const {
+    return getSwiftRValueType()->isOpenedExistential();
+  }
+
+  /// Returns true if the referenced type is expressed in terms of one
+  /// or more opened existential types.
+  bool hasOpenedExistential() const {
+    return getSwiftRValueType()->hasOpenedExistential();
+  }
   
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that
@@ -395,16 +407,15 @@ public:
 
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
-  SILType getSuperclass(LazyResolver *resolver) const {
-    auto superclass = getSwiftRValueType()->getSuperclass(resolver);
+  SILType getSuperclass() const {
+    auto superclass = getSwiftRValueType()->getSuperclass();
     if (!superclass) return SILType();
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
   /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
   bool isExactSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType(),
-                                                     nullptr);
+    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType());
   }
 
   /// Return true if Ty is a subtype of this SILType, or if this SILType
@@ -412,8 +423,7 @@ public:
   /// otherwise.
   bool isBindableToSuperclassOf(SILType Ty) const {
     return getSwiftRValueType()->isBindableToSuperclassOf(
-                                                        Ty.getSwiftRValueType(),
-                                                        nullptr);
+                                                        Ty.getSwiftRValueType());
   }
 
   /// Transform the function type SILType by replacing all of its interface
@@ -481,6 +491,11 @@ public:
   /// Type.
   SILType getReferentType(SILModule &M) const;
 
+  /// Given two SIL types which are representations of the same type,
+  /// check whether they have an abstraction difference.
+  bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
+                                SILType type2);
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
@@ -505,6 +520,9 @@ public:
                                      const ASTContext &C);
   /// Get the builtin word type as a SILType;
   static SILType getBuiltinWordType(const ASTContext &C);
+
+  /// Given a value type, return an optional type wrapping it.
+  static SILType getOptionalType(SILType valueType);
 
   /// Get the standard exception type.
   static SILType getExceptionType(const ASTContext &C);

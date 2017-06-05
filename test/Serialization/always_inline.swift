@@ -1,8 +1,7 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module -sil-serialize-all -o %t %S/Inputs/def_always_inline.swift
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_always_inline.swift
 // RUN: llvm-bcanalyzer %t/def_always_inline.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
@@ -22,5 +21,5 @@ var a = AlwaysInlineInitStruct(x: false)
 
 // SIL-LABEL: [always_inline] @_T017def_always_inline16testAlwaysInlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [fragile] [always_inline] @_T017def_always_inline22AlwaysInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [always_inline] @_T017def_always_inline22AlwaysInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 

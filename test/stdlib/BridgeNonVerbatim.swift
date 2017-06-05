@@ -16,7 +16,7 @@
 //  outlive the array.  
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift %s | %FileCheck %s
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 //
 // REQUIRES: objc_interop
@@ -61,50 +61,48 @@ struct X : _ObjectiveCBridgeable {
   var value: Int
 }
 
-// CHECK: testing...
-print("testing...")
+let BridgeNonVerbatimTests = TestSuite("BrideNonVerbatim")
 
-func testScope() {
-  let a = [X(1), X(2), X(3)]
-  let nsx: NSArray = a._bridgeToObjectiveC()
+BridgeNonVerbatimTests.test("testing") {
+    func testScope() {
+      let a = [X(1), X(2), X(3)]
+      let nsx: NSArray = a._bridgeToObjectiveC()
 
-  // construction of these tracked objects is lazy
-  // CHECK-NEXT: trackedCount = 0 .
-  print("trackedCount = \(LifetimeTracked.instances) .")
+      // construction of these tracked objects is lazy
+      expectEqual(LifetimeTracked.instances, 0)
 
-  // We can get a single element out
-  // CHECK-NEXT: nsx[0]: 1 .
-  let one = nsx.object(at: 0) as! LifetimeTracked
-  print("nsx[0]: \(one.value) .")
+      // We can get a single element out
+      let one = nsx.object(at: 0) as! LifetimeTracked
+      expectEqual(one.value, 1)
 
-  // We can get the element again, but it may not have the same identity
-  // CHECK-NEXT: object identity matches?
-  let anotherOne = nsx.object(at: 0) as! LifetimeTracked
-  print("object identity matches? \(one === anotherOne)")
+      // We can get the element again, but it may not have the same identity
+      let anotherOne = nsx.object(at: 0) as! LifetimeTracked
+      expectEqualReference(one, anotherOne)
 
-  // Because the elements come back at +0, we really don't want to
-  // treat them as objects, or we'll get double deletion
-  var objects: [Int] = [0, 0]
+      // Because the elements come back at +0, we really don't want to
+      // treat them as objects, or we'll get double deletion
+      var objects: [Int] = [0, 0]
 
-  objects.withUnsafeMutableBufferPointer {
-    // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
-    (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
-    nsx.available_getObjects(
-      AutoreleasingUnsafeMutablePointer(buf.baseAddress!),
-      range: NSRange(location: 1, length: 2))
-    return
-  }
+      objects.withUnsafeMutableBufferPointer {
+        // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
+        (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
+        nsx.available_getObjects(
+          AutoreleasingUnsafeMutablePointer(buf.baseAddress!),
+          range: NSRange(location: 1, length: 2))
+        return
+      }
 
-  // CHECK-NEXT: getObjects yields them at +0: true
-  var x = objects[0]
-  print("getObjects yields them at +0: "
-    + "\(_isUnique_native(&x))")
+      var x = objects[0]
+      // getObjects yields them at +0:
+      expectTrue(_isUnique_native(&x))
+    }
+
+    autoreleasepool() {
+      testScope()
+    }
+
+    // leaks?
+    expectEqual(LifetimeTracked.instances, 0)
 }
 
-autoreleasepool() {
-  testScope()
-}
-
-// CHECK-NEXT: leaks = 0 .
-print("leaks = \(LifetimeTracked.instances) .")
-
+runAllTests()

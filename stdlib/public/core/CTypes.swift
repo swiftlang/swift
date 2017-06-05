@@ -67,7 +67,7 @@ public typealias CDouble = Double
 // FIXME: Is it actually UTF-32 on Darwin?
 //
 /// The C++ 'wchar_t' type.
-public typealias CWideChar = UnicodeScalar
+public typealias CWideChar = Unicode.Scalar
 
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
@@ -75,7 +75,7 @@ public typealias CWideChar = UnicodeScalar
 public typealias CChar16 = UInt16
 
 /// The C++11 'char32_t' type, which has UTF-32 encoding.
-public typealias CChar32 = UnicodeScalar
+public typealias CChar32 = Unicode.Scalar
 
 /// The C '_Bool' and C++ 'bool' type.
 public typealias CBool = Bool
@@ -157,12 +157,26 @@ extension OpaquePointer : CustomDebugStringConvertible {
 }
 
 extension Int {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
 }
 
 extension UInt {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -192,6 +206,8 @@ extension CVaListPointer : CustomDebugStringConvertible {
   }
 }
 
+@_versioned
+@_inlineable
 func _memcpy(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeMutableRawPointer,
@@ -210,6 +226,8 @@ func _memcpy(
 ///
 /// The memory regions `source..<source + count` and
 /// `dest..<dest + count` may overlap.
+@_versioned
+@_inlineable
 func _memmove(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeRawPointer,

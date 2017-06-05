@@ -575,6 +575,21 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
 
+  // Now that all types have been finalized, run any delayed
+  // circularity checks.
+  // This has been written carefully to fail safe + finitely if
+  // for some reason a type gets re-delayed in a non-assertions
+  // build in an otherwise successful build.
+  // Types can be redelayed in a failing build because we won't
+  // type-check required declarations from different files.
+  for (size_t i = 0, e = TC.DelayedCircularityChecks.size(); i != e; ++i) {
+    TC.checkDeclCircularity(TC.DelayedCircularityChecks[i]);
+    assert((e == TC.DelayedCircularityChecks.size() ||
+            TC.Context.hadError()) &&
+           "circularity checking for type was re-delayed!");
+  }
+  TC.DelayedCircularityChecks.clear();
+
   // Compute captures for functions and closures we visited.
   for (AnyFunctionRef closure : TC.ClosuresWithUncomputedCaptures) {
     TC.computeCaptures(closure);
@@ -693,7 +708,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         hasTopLevelCode = true;
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
@@ -714,12 +729,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     typeCheckFunctionsAndExternalDecls(TC);
   }
-  MyTC.reset();
 
   // Checking that benefits from having the whole module available.
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
     performWholeModuleTypeChecking(SF);
   }
+
+  MyTC.reset();
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
@@ -827,9 +843,9 @@ static Optional<Type> getTypeOfCompletionContextExpr(
     // Handle below.
     break;
 
-  case CompletionTypeCheckKind::ObjCKeyPath:
+  case CompletionTypeCheckKind::KeyPath:
     referencedDecl = nullptr;
-    if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
+    if (auto keyPath = dyn_cast<KeyPathExpr>(parsedExpr))
       return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResultType=*/true);
 
     return None;
@@ -837,7 +853,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   Type originalType = parsedExpr->getType();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                 referencedDecl, FreeTypeVariableBinding::GenericParameters))
+                 referencedDecl, FreeTypeVariableBinding::UnresolvedType))
     return T;
 
   // Try to recover if we've made any progress.
@@ -968,7 +984,8 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
 void TypeChecker::checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
-  checkForForbiddenPrefix(E->getName().getBaseName());
+  if (!E->getName().isSpecial())
+    checkForForbiddenPrefix(E->getName().getBaseIdentifier());
 }
 
 void TypeChecker::checkForForbiddenPrefix(Identifier Ident) {

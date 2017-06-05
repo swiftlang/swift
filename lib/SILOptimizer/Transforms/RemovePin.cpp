@@ -67,8 +67,6 @@ class RemovePinInsts : public SILFunctionTransform {
 public:
   RemovePinInsts() {}
 
-  StringRef getName() override { return "StrongPin/Unpin removal"; }
-
   void run() override {
     AA = PM->getAnalysis<AliasAnalysis>();
     RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());

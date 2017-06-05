@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Serialization/ModuleFile.h"
+#include "DeserializationErrors.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/Subsystems.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -31,6 +32,7 @@
 using namespace swift;
 using namespace swift::serialization;
 using namespace llvm::support;
+using llvm::Expected;
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
   for (unsigned char byte : MODULE_SIGNATURE)
@@ -193,9 +195,22 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
         }
       }
 
-      // This field was added later; be resilient against its absence.
-      if (scratch.size() > 2) {
+      // These fields were added later; be resilient against their absence.
+      switch (scratch.size()) {
+      default:
+        // Add new cases here, in descending order.
+      case 4:
+        result.compatibilityVersion =
+          version::Version(blobData.substr(scratch[2]+1, scratch[3]),
+                           SourceLoc(), nullptr);
+        LLVM_FALLTHROUGH;
+      case 3:
         result.shortVersion = blobData.slice(0, scratch[2]);
+        LLVM_FALLTHROUGH;
+      case 2:
+      case 1:
+      case 0:
+        break;
       }
 
       versionSeen = true;
@@ -299,13 +314,14 @@ namespace {
 class ModuleFile::DeclTableInfo {
 public:
   using internal_key_type = StringRef;
-  using external_key_type = Identifier;
+  using external_key_type = DeclBaseName;
   using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
   internal_key_type GetInternalKey(external_key_type ID) {
-    return ID.str();
+    // TODO: Handle special names
+    return ID.getIdentifier().str();
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
@@ -323,6 +339,7 @@ public:
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    // TODO: Handle special names
     return StringRef(reinterpret_cast<const char *>(data), length);
   }
 
@@ -532,7 +549,7 @@ class ModuleFile::ObjCMethodTableInfo {
 public:
   using internal_key_type = std::string;
   using external_key_type = ObjCSelector;
-  using data_type = SmallVector<std::tuple<TypeID, bool, DeclID>, 8>;
+  using data_type = SmallVector<std::tuple<std::string, bool, DeclID>, 8>;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -551,7 +568,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
     return { keyLength, dataLength };
   }
 
@@ -562,14 +579,16 @@ public:
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
     const constexpr auto recordSize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
-    assert(length % recordSize == 0 && "invalid length");
     data_type result;
     while (length > 0) {
-      TypeID typeID = endian::readNext<uint32_t, little, unaligned>(data);
+      unsigned ownerLen = endian::readNext<uint32_t, little, unaligned>(data);
       bool isInstanceMethod = *data++ != 0;
       DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
-      result.push_back(std::make_tuple(typeID, isInstanceMethod, methodID));
-      length -= recordSize;
+      std::string ownerName((const char *)data, ownerLen);
+      result.push_back(
+        std::make_tuple(std::move(ownerName), isInstanceMethod, methodID));
+      data += ownerLen;
+      length -= (recordSize + ownerLen);
     }
 
     return result;
@@ -932,6 +951,7 @@ ModuleFile::ModuleFile(
       }
       Name = info.name;
       TargetTriple = info.targetTriple;
+      CompatibilityVersion = info.compatibilityVersion;
 
       hasValidControlBlock = true;
       break;
@@ -1279,7 +1299,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
-ModuleFile::~ModuleFile() = default;
+ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,
                              SmallVectorImpl<ValueDecl*> &results) {
@@ -1292,17 +1312,17 @@ void ModuleFile::lookupValue(DeclName name,
     // serialized.
     auto iter = TopLevelDecls->find(name.getBaseName());
     if (iter != TopLevelDecls->end()) {
-      if (name.isSimpleName()) {
-        for (auto item : *iter) {
-          auto VD = cast<ValueDecl>(getDecl(item.second));
+      for (auto item : *iter) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        auto VD = cast<ValueDecl>(declOrError.get());
+        if (name.isSimpleName() || VD->getFullName().matchesRef(name))
           results.push_back(VD);
-        }
-      } else {
-        for (auto item : *iter) {
-          auto VD = cast<ValueDecl>(getDecl(item.second));
-          if (VD->getFullName().matchesRef(name))
-            results.push_back(VD);
-        }
       }
     }
   }
@@ -1312,7 +1332,14 @@ void ModuleFile::lookupValue(DeclName name,
     auto iter = OperatorMethodDecls->find(name.getBaseName());
     if (iter != OperatorMethodDecls->end()) {
       for (auto item : *iter) {
-        auto VD = cast<ValueDecl>(getDecl(item.second));
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        auto VD = cast<ValueDecl>(declOrError.get());
         results.push_back(VD);
       }
     }
@@ -1485,21 +1512,32 @@ void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
   if (!TopLevelDecls)
     return;
 
+  auto tryImport = [this, &consumer](DeclID ID) {
+    Expected<Decl *> declOrError = getDeclChecked(ID);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      llvm::consumeError(declOrError.takeError());
+      return;
+    }
+    consumer.foundDecl(cast<ValueDecl>(declOrError.get()),
+                       DeclVisibilityKind::VisibleAtTopLevel);
+  };
+
   if (!accessPath.empty()) {
     auto iter = TopLevelDecls->find(accessPath.front().first);
     if (iter == TopLevelDecls->end())
       return;
 
     for (auto item : *iter)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::VisibleAtTopLevel);
+      tryImport(item.second);
+
     return;
   }
 
   for (auto entry : TopLevelDecls->data()) {
     for (auto item : entry)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::VisibleAtTopLevel);
+      tryImport(item.second);
   }
 }
 
@@ -1526,7 +1564,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
     }
   } else {
     std::string mangledName =
-        NewMangling::ASTMangler().mangleNominalType(nominal);
+        Mangle::ASTMangler().mangleNominalType(nominal);
     for (auto item : *iter) {
       if (item.first == mangledName)
         (void)getDecl(item.second);
@@ -1549,6 +1587,7 @@ void ModuleFile::loadObjCMethods(
     return;
   }
 
+  std::string ownerName = Mangle::ASTMangler().mangleNominalType(classDecl);
   auto results = *known;
   for (const auto &result : results) {
     // If the method is the wrong kind (instance vs. class), skip it.
@@ -1556,8 +1595,7 @@ void ModuleFile::loadObjCMethods(
       continue;
 
     // If the method isn't defined in the requested class, skip it.
-    Type type = getType(std::get<0>(result));
-    if (type->getClassOrBoundGenericClass() != classDecl)
+    if (std::get<0>(result) != ownerName)
       continue;
 
     // Deserialize the method and add it to the list.
@@ -1693,8 +1731,16 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
 
   if (TopLevelDecls) {
     for (auto entry : TopLevelDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        Expected<Decl *> declOrError = getDeclChecked(item.second);
+        if (!declOrError) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(declOrError.takeError());
+          llvm::consumeError(declOrError.takeError());
+          continue;
+        }
+        results.push_back(declOrError.get());
+      }
     }
   }
 
@@ -1883,4 +1929,8 @@ bool SerializedASTFile::hasEntryPoint() const {
 ClassDecl *SerializedASTFile::getMainClass() const {
   assert(hasEntryPoint());
   return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
+}
+
+const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {
+  return File.CompatibilityVersion;
 }

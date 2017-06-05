@@ -1,8 +1,7 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module -parse-as-library -sil-serialize-all -o %t %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %s
 // RUN: llvm-bcanalyzer %t/serialize_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -new-mangling-for-tests -enable-sil-verify-all %t/serialize_attr.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -disable-sil-linking %t/serialize_attr.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
@@ -52,6 +51,6 @@ class CC<T : PP> {
   }
 }
 
-// CHECK-DAG: sil hidden [fragile] [_specialize exported: false, kind: full, where T == Int, U == Float] @_T014serialize_attr14specializeThisyx_q_1utr0_lF : $@convention(thin) <T, U> (@in T, @in U) -> () {
+// CHECK-DAG: sil hidden [serialized] [_specialize exported: false, kind: full, where T == Int, U == Float] @_T014serialize_attr14specializeThisyx_q_1utr0_lF : $@convention(thin) <T, U> (@in T, @in U) -> () {
 
-// CHECK-DAG: sil hidden [fragile] [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T014serialize_attr2CCC3fooqd___AA2GGVyxGtqd___AG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-DAG: sil hidden [serialized] [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T014serialize_attr2CCC3fooqd___AA2GGVyxGtqd___AG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {

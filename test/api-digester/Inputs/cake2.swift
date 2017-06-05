@@ -13,4 +13,11 @@ public class C1 {
   public var CIIns1 : C1?
   public weak var CIIns2 : C1?
   public func foo3(a : ()?) {}
+  public init(_ : C1) {}
+}
+
+public typealias C3 = C1
+
+public struct NSSomestruct2 {
+  public static func foo1(_ a : C3) {}
 }

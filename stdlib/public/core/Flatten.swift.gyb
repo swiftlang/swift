@@ -41,7 +41,7 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
-  public mutating func next() -> Base.Element.Iterator.Element? {
+  public mutating func next() -> Base.Element.Element? {
     repeat {
       if _fastPath(_inner != nil) {
         let ret = _inner!.next()
@@ -78,7 +78,7 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
 ///
 /// - See also: `FlattenCollection`
 public struct FlattenSequence<Base : Sequence> : Sequence
-  where Base.Iterator.Element : Sequence {
+  where Base.Element : Sequence {
 
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
@@ -97,7 +97,7 @@ public struct FlattenSequence<Base : Sequence> : Sequence
   internal var _base: Base
 }
 
-extension Sequence where Iterator.Element : Sequence {
+extension Sequence where Element : Sequence {
   /// Returns the elements of this sequence of sequences, concatenated.
   ///
   /// In this example, an array of three ranges is flattened so that the
@@ -133,10 +133,7 @@ extension Sequence where Iterator.Element : Sequence {
   }
 }
 
-extension LazySequenceProtocol
-  where
-  Elements.Iterator.Element == Iterator.Element,
-  Iterator.Element : Sequence {
+extension LazySequenceProtocol where Element : Sequence {
 
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
@@ -168,7 +165,7 @@ public struct ${Index}<BaseElements>
 
   internal init(
     _ _outer: BaseElements.Index,
-    _ inner: BaseElements.Iterator.Element.Index?) {
+    _ inner: BaseElements.Element.Index?) {
     self._outer = _outer
     self._inner = inner
   }
@@ -182,7 +179,7 @@ public struct ${Index}<BaseElements>
   /// When `_inner != nil`, `_inner!` is a valid subscript of `base[_outer]`;
   /// when `_inner == nil`, `_outer == base.endIndex` and this index is
   /// `endIndex` of the `${Collection}`.
-  internal let _inner: BaseElements.Iterator.Element.Index?
+  internal let _inner: BaseElements.Element.Index?
 }
 
 extension ${Index} : Comparable {
@@ -335,7 +332,7 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   ///   `position != endIndex`.
   public subscript(
     position: Index
-  ) -> Base.Iterator.Element.Iterator.Element {
+  ) -> Base.Element.Element {
     return _base[position._outer][position._inner!]
   }
 
@@ -350,7 +347,7 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   public var underestimatedCount: Int { return 0 }
 
   public func _copyToContiguousArray()
-    -> ContiguousArray<Base.Iterator.Element.Iterator.Element> {
+    -> ContiguousArray<Base.Element.Element> {
 
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
@@ -361,7 +358,7 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
 
   // TODO: swift-3-indexing-model - add docs
   public func forEach(
-    _ body: (Base.Iterator.Element.Iterator.Element) throws -> Void
+    _ body: (Base.Element.Element) throws -> Void
   ) rethrows {
     // FIXME: swift-3-indexing-model: tests.
     for innerCollection in _base {
@@ -414,11 +411,12 @@ extension ${collectionForTraversal(traversal)}
 
 extension LazyCollectionProtocol
   where
+%   if traversal != 'Forward':
   Self : ${collectionForTraversal(traversal)},
   Elements : ${collectionForTraversal(traversal)},
-  ${constraints % {'Base': ''}},
-  ${constraints % {'Base': 'Elements.'}},
-  Iterator.Element == Elements.Iterator.Element {
+%   end
+  ${constraints % {'Base': 'Elements.'}}
+{
   /// A concatenation of the elements of `self`.
   public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy

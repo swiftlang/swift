@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
 
 enum TrivialUnion {
   case Foo

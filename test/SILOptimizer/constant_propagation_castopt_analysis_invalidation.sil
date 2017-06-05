@@ -19,13 +19,13 @@ private class Foo2 : Foo {
 }
 
 // static Swift.Process._argc : Swift.Int32
-sil_global [fragile] @_TZvOs7Process5_argcVs5Int32 : $Int32
+sil_global [serialized] @_TZvOs7Process5_argcVs5Int32 : $Int32
 
 // globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5
-sil_global private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
 
 // static Swift.Process._unsafeArgv : Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>>
-sil_global [fragile] @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+sil_global [serialized] @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
@@ -45,7 +45,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 }
 
 // Swift._didEnterMain (Swift.Int32, argv : Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>>) -> ()
-sil [transparent] [fragile] @_TFs13_didEnterMainFTVs5Int324argvGVs20UnsafeMutablePointerGS0_Vs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
+sil [transparent] [serialized] @_TFs13_didEnterMainFTVs5Int324argvGVs20UnsafeMutablePointerGS0_Vs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
 
 // main.(Foo in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo in _9ACC0692747077F216D14C36CD927671))() -> ()
 sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713Foo5speakfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> () {
@@ -213,7 +213,7 @@ bb6:                                              // Preds: bb4 bb5
 }
 
 // globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5
-sil private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> () {
+sil private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>> // user: %4
   %1 = integer_literal $Builtin.Int8, 0           // user: %2

@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 // Check that compiler does not crash on the devirtualization of materializeForSet methods
 // and produces a correct code.
 
-// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_T024devirt_materializeForSet7BaseFooCAA0F0A2aDP3barSSfmTW
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T024devirt_materializeForSet7BaseFooCAA0F0A2aDP3barSSfmTW
 // CHECK: checked_cast_br [exact] %{{.*}} : $BaseFoo to $ChildFoo
 // CHECK: thin_function_to_pointer %{{.*}} : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ChildFoo, @thick ChildFoo.Type) -> () to $Builtin.RawPointer
 // CHECK: enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, %{{.*}} : $Builtin.RawPointer

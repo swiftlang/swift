@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/../IDE/Inputs/custom-modules) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
@@ -99,30 +99,10 @@ class X : NSDocument {
 func makeProgress<T: NSProgressReporting>(thing: T) {} // expected-error {{'NSProgressReporting' has been renamed to 'ProgressReporting'}} {{22-41=ProgressReporting}} 
 
 func useLowercasedEnumCase(x: NSRuncingMode) {
-  switch x {
+  switch x { // expected-error {{switch must be exhaustive}}
+    // expected-note@-1 {{add missing case: '.mince'}}
+    // expected-note@-2 {{add missing case: '.quince'}}
     case .Mince: return // expected-error {{'Mince' has been renamed to 'mince'}} {{11-16=mince}}
     case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}
   }
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: 'NSProgressReporting' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'NSPostingStyle' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'NSPostingStyle' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'NSOperation' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'indexOfObject' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'makingHoney' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: did you mean 'NSXMLInvalidKind'?
-// <unknown>:0: error: unexpected note produced: did you mean 'NSXMLInvalidKind'?
-// <unknown>:0: error: unexpected note produced: 'EnableQuince' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'EnableMince' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1GlobalVar' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1CreateSimple' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1Invert' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1InvertInPlace' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1Rotate' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1StaticMethod()' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1GetRadius' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'IAMStruct1SetRadius' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'Mince' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'Quince' was obsoleted in Swift 3

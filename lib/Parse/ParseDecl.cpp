@@ -146,7 +146,7 @@ namespace {
         return false;
       if (!P.CurDeclContext)
         return false;
-      FuncDecl *func_decl = dyn_cast<FuncDecl>(P.CurDeclContext);
+      auto *func_decl = dyn_cast<FuncDecl>(P.CurDeclContext);
       if (!func_decl)
         return false;
         
@@ -251,7 +251,7 @@ bool Parser::parseTopLevel() {
 
   // Add newly parsed decls to the module.
   for (auto Item : Items)
-    if (Decl *D = Item.dyn_cast<Decl*>())
+    if (auto *D = Item.dyn_cast<Decl*>())
       SF.Decls.push_back(D);
 
   // Note that the source file is fully parsed and verify it.
@@ -435,6 +435,62 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
                                 trailingWhereClause, exported.getValue(),
                                 kind.getValue());
   return true;
+}
+
+ParserResult<ImplementsAttr>
+Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+  StringRef AttrName = "_implements";
+  ParserStatus Status;
+
+  if (Tok.isNot(tok::l_paren)) {
+    diagnose(Loc, diag::attr_expected_lparen, AttrName,
+             /*DeclModifier=*/false);
+    Status.setIsParseError();
+    return Status;
+  }
+
+  SourceLoc lParenLoc = consumeToken();
+
+  ParserResult<TypeRepr> ProtocolType = parseType();
+  Status |= ProtocolType;
+
+  if (!(Status.shouldStopParsing() || consumeIf(tok::comma))) {
+    diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
+             /*DeclModifier=*/false);
+    Status.setIsParseError();
+  }
+
+  DeclNameLoc MemberNameLoc;
+  DeclName MemberName;
+  if (!Status.shouldStopParsing()) {
+    MemberName =
+      parseUnqualifiedDeclName(/*afterDot=*/false, MemberNameLoc,
+                               diag::attr_implements_expected_member_name,
+                               /*allowOperators=*/true,
+                               /*allowZeroArgCompoundNames=*/true);
+    if (!MemberName) {
+      Status.setIsParseError();
+    }
+  }
+
+  if (Status.isError()) {
+    skipUntil(tok::r_paren);
+  }
+
+  SourceLoc rParenLoc;
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
+             /*DeclModifier=*/false);
+    Status.setIsParseError();
+  }
+
+  if (Status.isError()) {
+    return Status;
+  }
+
+  return ParserResult<ImplementsAttr>(
+    ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
+                           ProtocolType.get(), MemberName, MemberNameLoc));
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -687,7 +743,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_CDecl:
-  case DAK_SILGenName: {
+  case DAK_SILGenName:
+  case DAK_NSKeyedArchiverClassName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -729,6 +786,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
+                                               AttrRange, /*Implicit=*/false));
+      else if (DK == DAK_NSKeyedArchiverClassName)
+        Attributes.add(new (Context) NSKeyedArchiverClassNameAttr(
+                                               AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
@@ -1258,6 +1319,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     Attributes.add(Attr);
     break;
     }
+
+  case DAK_Implements: {
+    ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
+    if (Attr.isNonNull()) {
+      Attributes.add(Attr.get());
+    }
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -1983,7 +2052,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
     if (!getScopeInfo().isInactiveConfigBlock())
       SF.LocalTypeDecls.insert(TD);
 
-  Identifier name = D->getName();
+  Identifier name = D->getBaseName().getIdentifier();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
 }
@@ -2320,6 +2389,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         case tok::kw_func:
         case tok::kw_subscript:
         case tok::kw_var:
+        case tok::kw_let:
         case tok::kw_typealias:
           Keywords.push_back(OrigTok.getText());
           break;
@@ -3154,28 +3224,10 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   TrailingWhereClause *TrailingWhere = nullptr;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    SourceLoc whereLoc;
-    SmallVector<RequirementRepr, 4> requirements;
-    bool firstTypeInComplete;
-    auto whereStatus =
-        parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
-    if (whereStatus.isSuccess()) {
-      TrailingWhere =
-          TrailingWhereClause::create(Context, whereLoc, requirements);
-    } else if (whereStatus.hasCodeCompletion()) {
-      // FIXME: this is completely (hah) cargo culted.
-      if (CodeCompletion && firstTypeInComplete) {
-        CodeCompletion->completeGenericParams(nullptr);
-      } else {
-        return makeParserCodeCompletionResult<AssociatedTypeDecl>();
-      }
-    }
-
-    if (Context.isSwiftVersion3()) {
-      diagnose(whereLoc, diag::associatedtype_where_swift_3);
-      // There's nothing to see here, move along.
-      TrailingWhere = nullptr;
-    }
+    auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
+        TrailingWhere, /*isProtocol=*/false);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
   }
 
   if (!Flags.contains(PD_InProtocol)) {
@@ -3910,9 +3962,9 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   VarDecl *PrimaryVar = nullptr;
   {
     Pattern *PrimaryPattern = pattern;
-    if (TypedPattern *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
+    if (auto *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
       PrimaryPattern = Typed->getSubPattern();
-    if (NamedPattern *Named = dyn_cast<NamedPattern>(PrimaryPattern)) {
+    if (auto *Named = dyn_cast<NamedPattern>(PrimaryPattern)) {
       PrimaryVar = Named->getDecl();
     }
   }
@@ -3925,7 +3977,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   }
 
   TypeLoc TyLoc;
-  if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
+  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
     TyLoc = TP->getTypeLoc();
   } else if (!PrimaryVar) {
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
@@ -3945,7 +3997,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Addressor ||
         accessors.MutableAddressor) {
-      diagnose(pattern->getLoc(), diag::computed_property_missing_type);
+      SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
+        pattern->getBoundName().getLength());
+      diagnose(pattern->getLoc(), diag::computed_property_missing_type)
+        .fixItInsert(locAfterPattern, ": <# Type #>");
       Invalid = true;
     }
   }
@@ -4475,7 +4530,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     addPatternVariablesToScope(pattern);
     
     // Propagate back types for simple patterns, like "var A, B : T".
-    if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
+    if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
       if (isa<NamedPattern>(TP->getSubPattern()) && PatternInit == nullptr) {
         for (unsigned i = PBDEntries.size() - 1; i != 0; --i) {
           Pattern *PrevPat = PBDEntries[i-1].getPattern();
@@ -5302,25 +5357,23 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
   }
 
-  // Parse a 'where' clause if present. These are not supported, but we will
-  // get better QoI this way.
+  TrailingWhereClause *TrailingWhere = nullptr;
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    GenericParamList *unused = nullptr;
-    auto whereStatus = parseFreestandingGenericWhereClause(
-        unused, WhereClauseKind::Protocol);
+    auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
+        TrailingWhere, /*isProtocol=*/true);
     if (whereStatus.shouldStopParsing())
       return whereStatus;
   }
 
-  ProtocolDecl *Proto
-    = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
-                                 ProtocolName,
-                                 Context.AllocateCopy(InheritedProtocols));
+  ProtocolDecl *Proto = new (Context)
+      ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
+                   Context.AllocateCopy(InheritedProtocols), TrailingWhere);
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   // If there was a 'class' requirement, mark this as a class-bounded protocol.
   if (classRequirementLoc.isValid())
-    Proto->setRequiresClass();
+    Proto->setClassBounded(classRequirementLoc);
 
   Proto->getAttrs() = Attributes;
 

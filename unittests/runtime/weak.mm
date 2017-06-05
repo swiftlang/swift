@@ -845,3 +845,63 @@ TEST(WeakTest, objc_unowned_takeAssign) {
   swift_unknownRelease(swift1);
   swift_unknownRelease(swift2);
 }
+
+TEST(WeakTest, objc_unowned_isEqual_DeathTest) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+
+  DestroyedObjCCount = 0;
+
+  UnownedReference ref1;
+  UnownedReference ref2;
+  void *objc1 = make_objc_object();
+  void *objc2 = make_objc_object();
+  HeapObject *swift1 = make_swift_object();
+  HeapObject *swift2 = make_swift_object();
+
+  // ref1 = swift1
+  swift_unownedInit(&ref1, swift1);
+  ASSERT_EQ(true,  swift_unownedIsEqual(&ref1, swift1));
+  ASSERT_EQ(false, swift_unownedIsEqual(&ref1, swift2));
+  ASSERT_EQ(true,  swift_unknownUnownedIsEqual(&ref1, swift1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, swift2));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, objc1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, objc2));
+
+  // ref2 = objc1
+  swift_unknownUnownedInit(&ref2, objc1);
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, swift1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, swift2));
+  ASSERT_EQ(true,  swift_unknownUnownedIsEqual(&ref2, objc1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, objc2));
+
+  // Deinit the assigned objects, invalidating ref1 and ref2
+  swift_release(swift1);
+  ASSERT_DEATH(swift_unownedCheck(swift1),
+               "attempted to read an unowned reference");
+  ASSERT_EQ(0U, DestroyedObjCCount);
+  swift_unknownRelease(objc1);
+  ASSERT_EQ(1U, DestroyedObjCCount);
+
+  // Unequal does not abort, even after invalidation
+  // Equal but invalidated does abort (Swift)
+  // Formerly equal but now invalidated returns unequal (ObjC)
+  ASSERT_DEATH(swift_unownedIsEqual(&ref1, swift1),
+               "attempted to read an unowned reference");
+  ASSERT_EQ(false, swift_unownedIsEqual(&ref1, swift2));
+  ASSERT_DEATH(swift_unknownUnownedIsEqual(&ref1, swift1),
+               "attempted to read an unowned reference");
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, swift2));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, objc1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref1, objc2));
+
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, swift1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, swift2));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, objc1));
+  ASSERT_EQ(false, swift_unknownUnownedIsEqual(&ref2, objc2));
+
+  swift_release(swift2);
+  swift_unknownRelease(objc2);
+
+  swift_unownedDestroy(&ref1);
+  swift_unknownUnownedDestroy(&ref2);
+}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 class S<T> {
   func f<U>(_ x: T, _ y: U) -> T { return x }

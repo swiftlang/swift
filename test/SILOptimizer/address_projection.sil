@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -optimize-opaque-address-lowering -emit-sorted-sil -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -optimize-opaque-address-lowering -emit-sorted-sil -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 import Builtin
 

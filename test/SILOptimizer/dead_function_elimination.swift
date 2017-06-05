@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
+// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
 
 // Check if cycles are removed.
 
@@ -214,7 +214,7 @@ internal func donotEliminate() {
 // CHECK: aliveWitness!1: {{.*}} : @{{.*}}aliveWitness
 // CHECK: DeadWitness!1: {{.*}} : nil
 
-// CHECK-TESTING-LABEL: sil_witness_table [fragile] Adopt: Prot
+// CHECK-TESTING-LABEL: sil_witness_table [serialized] Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
 
 // CHECK-LABEL: sil_default_witness_table hidden Prot

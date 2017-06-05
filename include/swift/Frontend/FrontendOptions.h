@@ -14,6 +14,7 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
+#include "llvm/ADT/Hashing.h"
 
 #include <string>
 #include <vector>
@@ -115,6 +116,9 @@ public:
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
 
+  /// The path to which we should output a loaded module trace file.
+  std::string LoadedModuleTracePath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
@@ -149,6 +153,8 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
+    EmitTBD, ///< Emit a TBD file for this module
+    EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH, ///< Emit PCH of imported bridging header
 
     EmitSILGen, ///< Emit raw SIL
@@ -189,6 +195,9 @@ public:
   ///
   /// \sa swift::SharedTimer
   bool DebugTimeCompilation = false;
+
+  /// The path to which we should output statistics files.
+  std::string StatsOutputDir;
 
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
@@ -262,6 +271,16 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// The different modes for validating TBD against the LLVM IR.
+  enum class TBDValidationMode {
+    None,           ///< Do no validation.
+    MissingFromTBD, ///< Only check for symbols that are in IR but not TBD.
+    All, ///< Check for symbols that are in IR but not TBD and TBD but not IR.
+  };
+
+  /// Compare the symbols in the IR against the TBD file we would generate.
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
     None, ///< Don't automatically crash.
@@ -296,6 +315,12 @@ public:
   void setSingleOutputFilename(const std::string &FileName) {
     OutputFilenames.clear();
     OutputFilenames.push_back(FileName);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
   }
 };
 

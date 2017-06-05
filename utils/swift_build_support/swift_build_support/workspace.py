@@ -85,4 +85,11 @@ def compute_build_subdir(args):
         build_subdir += "+swift-" + swift_build_dir_label
         build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
 
+    # If we have a sanitizer enabled, mangle it into the subdir.
+    if args.enable_asan:
+        build_subdir += "+asan"
+    if args.enable_ubsan:
+        build_subdir += "+ubsan"
+    if args.enable_tsan:
+        build_subdir += "+tsan"
     return build_subdir

@@ -21,7 +21,6 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
@@ -153,11 +152,22 @@ void SILInstruction::dropAllReferences() {
 
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
-  auto *FRI = dyn_cast<FunctionRefInst>(this);
-  if (!FRI || !FRI->getReferencedFunction())
+  if (auto *FRI = dyn_cast<FunctionRefInst>(this)) {
+    if (!FRI->getReferencedFunction())
+      return;
+    FRI->dropReferencedFunction();
     return;
+  }
 
-  FRI->dropReferencedFunction();
+  // If we have a KeyPathInst, drop its pattern reference so that we can
+  // decrement refcounts on referenced functions.
+  if (auto *KPI = dyn_cast<KeyPathInst>(this)) {
+    if (!KPI->hasPattern())
+      return;
+    
+    KPI->dropReferencedPattern();
+    return;
+  }
 }
 
 void SILInstruction::replaceAllUsesWithUndef() {
@@ -208,7 +218,15 @@ namespace {
       return true;
     }
 
+    bool visitReleaseValueAddrInst(const ReleaseValueAddrInst *RHS) {
+      return true;
+    }
+
     bool visitRetainValueInst(const RetainValueInst *RHS) {
+      return true;
+    }
+
+    bool visitRetainValueAddrInst(const RetainValueAddrInst *RHS) {
       return true;
     }
 
@@ -264,6 +282,29 @@ namespace {
 
     bool visitProjectExistentialBoxInst(const ProjectExistentialBoxInst *RHS) {
       return true;
+    }
+
+    bool visitBeginAccessInst(const BeginAccessInst *right) {
+      auto left = cast<BeginAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndAccessInst(const EndAccessInst *right) {
+      auto left = cast<EndAccessInst>(LHS);
+      return left->isAborting() == right->isAborting();
+    }
+
+    bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
+      auto left = cast<BeginUnpairedAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
+      auto left = cast<EndUnpairedAccessInst>(LHS);
+      return left->getEnforcement() == right->getEnforcement()
+          && left->isAborting() == right->isAborting();
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
@@ -340,6 +381,12 @@ namespace {
         && LHS_->getValue().equals(RHS->getValue());
     }
 
+    bool visitConstStringLiteralInst(const ConstStringLiteralInst *RHS) {
+      auto LHS_ = cast<ConstStringLiteralInst>(LHS);
+      return LHS_->getEncoding() == RHS->getEncoding() &&
+             LHS_->getValue().equals(RHS->getValue());
+    }
+
     bool visitStructInst(const StructInst *RHS) {
       // We have already checked the operands. Make sure that the StructDecls
       // match up.
@@ -370,9 +417,7 @@ namespace {
 
     bool visitRefTailAddrInst(RefTailAddrInst *RHS) {
       auto *X = cast<RefTailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
@@ -448,9 +493,7 @@ namespace {
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
       auto *X = cast<TailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitCondFailInst(CondFailInst *RHS) {
@@ -862,6 +905,7 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::StrongReleaseInst:
   case ValueKind::UnownedReleaseInst:
   case ValueKind::ReleaseValueInst:
+  case ValueKind::ReleaseValueAddrInst:
     return true;
 
   case ValueKind::DestroyValueInst:
@@ -993,6 +1037,9 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 /// additional handling. It is important to know this information when
 /// you perform such optimizations like e.g. jump-threading.
 bool SILInstruction::isTriviallyDuplicatable() const {
+  if (isa<ThrowInst>(this))
+    return false;
+
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
   }

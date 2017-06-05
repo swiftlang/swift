@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+// RUN: %target-swift-frontend -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -65,10 +65,10 @@ protocol Impedance {
 
 extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzfgTW
-// CHECK-LABEL: sil shared [transparent] [fragile] @_T0SC11CCImpedanceV4realSdfg
-// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzfgTW
-// CHECK-LABEL: sil shared [transparent] [fragile] @_T0SC11CCImpedanceV4imagSdfg
+// CHECK-LABEL: sil private [transparent] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzfgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @_T0SC11CCImpedanceV4realSdfg
+// CHECK-LABEL: sil private [transparent] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzfgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @_T0SC11CCImpedanceV4imagSdfg
 
 class MyMagnetism : CCMagnetismModel {
   // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC15getRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator

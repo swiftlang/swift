@@ -92,7 +92,6 @@ class MemBehaviorDumper : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Memory Behavior Dumper"; }
 };
 
 } // end anonymous namespace

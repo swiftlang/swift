@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // REQUIRES: objc_interop
 // FIXME: this is failing on simulators
@@ -12,7 +11,7 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ObjectiveC -function-definitions=false -prefer-type-repr=true  > %t.ObjectiveC.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-OBJECTIVEC -strict-whitespace < %t.ObjectiveC.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true  -skip-parameter-names > %t.Foundation.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true -skip-unavailable -skip-parameter-names > %t.Foundation.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-FOUNDATION -strict-whitespace < %t.Foundation.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangImporter/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true  -skip-parameter-names > %t.CoreCooling.txt
@@ -261,25 +260,37 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func addDoodle(_: ABCDoodle)
 
 // Protocols as contexts
-// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWLanding {
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWLanding {
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func flip()
 
 // Verify that we get the Swift name from the original declaration.
-// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWiggle
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWWiggle
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func wiggle1()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "wiggle1()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func conflicting1()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "wiggleProp1")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var conflictingProp1: Int { get }
 
-// CHECK-OMIT-NEEDLESS-WORDS: protocol OMWWaggle
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: protocol OMWWaggle
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func waggle1()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "waggle1()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func conflicting1()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var waggleProp1: Int { get }
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "waggleProp1")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: var conflictingProp1: Int { get }
 
-// CHECK-OMIT-NEEDLESS-WORDS: class OMWSuper
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: class OMWSuper
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jump()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "jump()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jumpSuper()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: var wiggleProp1: Int { get }
 
-// CHECK-OMIT-NEEDLESS-WORDS: class OMWSub
+// CHECK-OMIT-NEEDLESS-WORDS-LABEL: class OMWSub
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jump()
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "jump()")
+// CHECK-OMIT-NEEDLESS-WORDS-NEXT: func jumpSuper()
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func joinSub()
 
 // CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C method 'conflicting1' in 'OMWSub' ('waggle1()' in 'OMWWaggle' vs. 'wiggle1()' in 'OMWWiggle')

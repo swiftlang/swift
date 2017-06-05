@@ -53,7 +53,20 @@ public extension DispatchIO {
 		self.init(__type: type.rawValue, fd: fileDescriptor, queue: queue, handler: cleanupHandler)
 	}
 
+	@available(swift, obsoleted: 4)
 	public convenience init(
+		type: StreamType,
+		path: UnsafePointer<Int8>,
+		oflag: Int32,
+		mode: mode_t,
+		queue: DispatchQueue,
+		cleanupHandler: @escaping (_ error: Int32) -> Void)
+	{
+		self.init(__type: type.rawValue, path: path, oflag: oflag, mode: mode, queue: queue, handler: cleanupHandler)
+	}
+
+	@available(swift, introduced: 4)
+	public convenience init?(
 		type: StreamType,
 		path: UnsafePointer<Int8>,
 		oflag: Int32,

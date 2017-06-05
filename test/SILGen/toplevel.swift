@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -24,7 +24,8 @@ func print_x() {
 
 // -- assign x
 // CHECK: integer_literal $Builtin.Int2048, 0
-// CHECK: assign {{.*}} to [[X]]
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*Int
+// CHECK: assign {{.*}} to [[WRITE]]
 // CHECK: [[PRINT_X:%[0-9]+]] = function_ref @_T08toplevel7print_xyyF :
 // CHECK: apply [[PRINT_X]]
 
@@ -65,14 +66,15 @@ func print_y() {
 // CHECK: alloc_global @_T08toplevel1ySiv
 // CHECK: [[Y1:%[0-9]+]] = global_addr @_T08toplevel1ySiv : $*Int
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
-// CHECK: assign {{.*}} to [[Y]]
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[Y]]
+ // CHECK: assign {{.*}} to [[WRITE]]
 // CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_T08toplevel7print_yyyF
 y = 1
 print_y()
 
 // -- treat 'guard' vars as locals
 // CHECK-LABEL: function_ref toplevel.A.__allocating_init
-// CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], default
+// CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.some!enumelt.1: [[SOME_CASE:.+]], case #Optional.none!
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
 // CHECK: store [[VALUE]] to [init] [[BOX:%.+]] : $*A
 // CHECK-NOT: destroy_value

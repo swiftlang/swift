@@ -17,6 +17,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/AST/PrintOptions.h"
 
@@ -26,6 +27,7 @@ namespace swift {
   class DynamicSelfType;
   class ModuleEntity;
   class TypeDecl;
+  class EnumElementDecl;
   class Type;
   struct TypeLoc;
   class Pattern;
@@ -175,6 +177,13 @@ public:
   ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(DeclName name);
+
+  // Special case for 'char', but not arbitrary things that convert to 'char'.
+  template <typename T>
+  typename std::enable_if<std::is_same<T, char>::value, ASTPrinter &>::type
+  operator<<(T c) {
+    return *this << StringRef(&c, 1);
+  }
 
   void printKeyword(StringRef name) {
     callPrintNamePre(PrintNameContext::Keyword);

@@ -15,24 +15,24 @@ extension String.Index {
   /// specified `UnicodeScalarView` position.
   ///
   /// The following example converts the position of the Unicode scalar `"e"`
-  /// into its corresponding position in the string's character view. The
-  /// character at that position is the composed `"é"` character.
+  /// into its corresponding position in the string. The character at that
+  /// position is the composed `"é"` character.
   ///
   ///     let cafe = "Cafe\u{0301}"
   ///     print(cafe)
   ///     // Prints "Café"
   ///
   ///     let scalarsIndex = cafe.unicodeScalars.index(of: "e")!
-  ///     let charactersIndex = String.Index(scalarsIndex, within: cafe)!
+  ///     let stringIndex = String.Index(scalarsIndex, within: cafe)!
   ///
-  ///     print(String(cafe.characters.prefix(through: charactersIndex)))
+  ///     print(cafe[...stringIndex])
   ///     // Prints "Café"
   ///
   /// If the position passed in `unicodeScalarIndex` doesn't have an exact
-  /// corresponding position in `other.characters`, the result of the
-  /// initializer is `nil`. For example, an attempt to convert the position of
-  /// the combining acute accent (`"\u{0301}"`) fails. Combining Unicode
-  /// scalars do not have their own position in a character view.
+  /// corresponding position in `other`, the result of the initializer is
+  /// `nil`. For example, an attempt to convert the position of the combining
+  /// acute accent (`"\u{0301}"`) fails. Combining Unicode scalars do not have
+  /// their own position in a string.
   ///
   ///     let nextIndex = String.Index(cafe.unicodeScalars.index(after: scalarsIndex),
   ///                                  within: cafe)
@@ -58,27 +58,26 @@ extension String.Index {
   /// specified `UTF16View` position.
   ///
   /// The following example finds the position of a space in a string's `utf16`
-  /// view and then converts that position to an index in the string's
-  /// `characters` view. The value `32` is the UTF-16 encoded value of a space
-  /// character.
+  /// view and then converts that position to an index in the string. The
+  /// value `32` is the UTF-16 encoded value of a space character.
   ///
   ///     let cafe = "Café 🍵"
   ///
   ///     let utf16Index = cafe.utf16.index(of: 32)!
-  ///     let charactersIndex = String.Index(utf16Index, within: cafe)!
+  ///     let stringIndex = String.Index(utf16Index, within: cafe)!
   ///
-  ///     print(String(cafe.characters.prefix(upTo: charactersIndex)))
+  ///     print(cafe[..<stringIndex])
   ///     // Prints "Café"
   ///
   /// If the position passed in `utf16Index` doesn't have an exact
-  /// corresponding position in `other.characters`, the result of the
-  /// initializer is `nil`. For example, an attempt to convert the position of
-  /// the trailing surrogate of a UTF-16 surrogate pair fails.
+  /// corresponding position in `other`, the result of the initializer is
+  /// `nil`. For example, an attempt to convert the position of the trailing
+  /// surrogate of a UTF-16 surrogate pair fails.
   ///
   /// The next example attempts to convert the indices of the two UTF-16 code
   /// points that represent the teacup emoji (`"🍵"`). The index of the lead
-  /// surrogate is successfully converted to a position in `other.characters`,
-  /// but the index of the trailing surrogate is not.
+  /// surrogate is successfully converted to a position in `other`, but the
+  /// index of the trailing surrogate is not.
   ///
   ///     let emojiHigh = cafe.utf16.index(after: utf16Index)
   ///     print(String.Index(emojiHigh, within: cafe))
@@ -110,9 +109,9 @@ extension String.Index {
   /// specified `UTF8View` position.
   ///
   /// If the position passed in `utf8Index` doesn't have an exact corresponding
-  /// position in `other.characters`, the result of the initializer is `nil`.
-  /// For example, an attempt to convert the position of a UTF-8 continuation
-  /// byte returns `nil`.
+  /// position in `other`, the result of the initializer is `nil`. For
+  /// example, an attempt to convert the position of a UTF-8 continuation byte
+  /// returns `nil`.
   ///
   /// - Parameters:
   ///   - utf8Index: A position in the `utf8` view of the `other` parameter.
@@ -135,15 +134,15 @@ extension String.Index {
   /// Returns the position in the given UTF-8 view that corresponds exactly to
   /// this index.
   ///
-  /// The index must be a valid index of `String(utf8).characters`.
+  /// The index must be a valid index of `String(utf8)`.
   ///
   /// This example first finds the position of the character `"é"` and then uses
   /// this method find the same position in the string's `utf8` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.characters.index(of: "é") {
+  ///     if let i = cafe.index(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf8)
-  ///         print(Array(cafe.utf8.suffix(from: j)))
+  ///         print(Array(cafe.utf8[j...]))
   ///     }
   ///     // Prints "[195, 169]"
   ///
@@ -158,13 +157,13 @@ extension String.Index {
   /// Returns the position in the given UTF-16 view that corresponds exactly to
   /// this index.
   ///
-  /// The index must be a valid index of `String(utf16).characters`.
+  /// The index must be a valid index of `String(utf16)`.
   ///
   /// This example first finds the position of the character `"é"` and then uses
   /// this method find the same position in the string's `utf16` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.characters.index(of: "é") {
+  ///     if let i = cafe.index(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf16)
   ///         print(cafe.utf16[j])
   ///     }
@@ -181,14 +180,14 @@ extension String.Index {
   /// Returns the position in the given view of Unicode scalars that
   /// corresponds exactly to this index.
   ///
-  /// The index must be a valid index of `String(unicodeScalars).characters`.
+  /// The index must be a valid index of `String(unicodeScalars)`.
   ///
   /// This example first finds the position of the character `"é"` and then uses
   /// this method find the same position in the string's `unicodeScalars`
   /// view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.characters.index(of: "é") {
+  ///     if let i = cafe.index(of: "é") {
   ///         let j = i.samePosition(in: cafe.unicodeScalars)
   ///         print(cafe.unicodeScalars[j])
   ///     }

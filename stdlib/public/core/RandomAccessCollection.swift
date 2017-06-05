@@ -48,20 +48,22 @@ public protocol _RandomAccessIndexable : _BidirectionalIndexable {
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection :
   _RandomAccessIndexable, BidirectionalCollection
+// FIXME(ABI) (Revert Where Clauses): Restore this:
+// where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : _RandomAccessIndexable, BidirectionalCollection
-    = RandomAccessSlice<Self>
-  // FIXME(ABI)#102 (Recursive Protocol Constraints):
-  // associatedtype SubSequence : RandomAccessCollection
+  associatedtype SubSequence
+  // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
+   : _RandomAccessIndexable, BidirectionalCollection
+   = RandomAccessSlice<Self>
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : _RandomAccessIndexable, BidirectionalCollection
-    = DefaultRandomAccessIndices<Self>
-  // FIXME(ABI)#103 (Recursive Protocol Constraints):
-  // associatedtype Indices : RandomAccessCollection
+  associatedtype Indices 
+  // FIXME(ABI) (Revert Where Clauses): Remove these two constraints:
+  : _RandomAccessIndexable, BidirectionalCollection
+  = DefaultRandomAccessIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -131,6 +133,7 @@ extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  @_inlineable
   public subscript(bounds: Range<Index>) -> RandomAccessSlice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return RandomAccessSlice(base: self, bounds: bounds)
@@ -185,6 +188,7 @@ extension _RandomAccessIndexable {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -204,6 +208,7 @@ where Index : Strideable,
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
+  @_inlineable
   public var indices: CountableRange<Index> {
     return startIndex..<endIndex
   }
@@ -213,6 +218,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
+  @_inlineable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests for the trap.
     _failEarlyRangeCheck(
@@ -220,6 +226,7 @@ where Index : Strideable,
     return i.advanced(by: 1)
   }
 
+  @_inlineable
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be greater than
@@ -255,6 +262,7 @@ where Index : Strideable,
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
     let result = i.advanced(by: n)
     // This range check is not precise, tighter bounds exist based on `n`.
@@ -276,6 +284,7 @@ where Index : Strideable,
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func distance(from start: Index, to end: Index) -> Index.Stride {
     // FIXME: swift-3-indexing-model: tests for traps.
     _failEarlyRangeCheck(

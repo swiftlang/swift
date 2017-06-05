@@ -361,6 +361,11 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   )
 }
 
+StringTests.test("[String].joined() -> String") {
+  let s = ["hello", "world"].joined()
+  _ = s == "" // should compile without error
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {

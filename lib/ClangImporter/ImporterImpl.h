@@ -29,6 +29,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -40,6 +41,7 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Path.h"
 #include <set>
 
 namespace llvm {
@@ -272,6 +274,7 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
+  const bool DisableAdapterModules;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -295,7 +298,13 @@ private:
   /// (through the Swift name lookup module file extension).
   LookupTableMap LookupTables;
 
+  /// \brief The fake buffer used to import modules.
+  ///
+  /// FIXME: Horrible hack for loadModule().
+  clang::FileID DummyImportBuffer;
+
   /// \brief A count of the number of load module operations.
+  ///
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
 
@@ -378,6 +387,10 @@ public:
   /// been imported.
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
+
+  clang::CompilerInstance *getClangInstance() {
+    return Instance.get();
+  }
 
 private:
   /// \brief Generation number that is used for crude versioning.
@@ -524,6 +537,11 @@ private:
   /// For importing names. This is initialized by the ClangImporter::create()
   /// after having set up a suitable Clang instance.
   std::unique_ptr<importer::NameImporter> nameImporter = nullptr;
+
+  /// If there is a single .PCH file imported into the __ObjC module, this
+  /// is the filename of that PCH. When other files are imported, this should
+  /// be llvm::None.
+  Optional<std::string> SinglePCHImport = None;
 
 public:
   importer::NameImporter &getNameImporter() {
@@ -893,7 +911,8 @@ public:
                   ImportTypeKind kind,
                   bool allowNSUIntegerAsInt,
                   bool canFullyBridgeTypes,
-                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
+                  OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
+                  bool resugarNSErrorPointer = true);
 
   /// \brief Import the given function type.
   ///
@@ -1110,6 +1129,8 @@ public:
       ASD->setSetterAccessibility(access);
     // All imported decls are constructed fully validated.
     D->setValidationStarted();
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
+      AFD->setNeedsNewVTableEntry(false);
     return D;
   }
 
@@ -1149,14 +1170,75 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   EffectiveClangContext getEffectiveClangContext(NominalTypeDecl *nominal);
 
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context that
+  /// will eventually reference that declaration, the contexts will still be
+  /// considered distinct.
+  ///
+  /// The names are generated in the same order as
+  /// forEachImportNameVersionFromCurrent. The current name is always first.
+  void forEachDistinctName(
+      const clang::NamedDecl *decl,
+      llvm::function_ref<void(importer::ImportedName,
+                              importer::ImportNameVersion)> action);
+
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
+
+  void setSinglePCHImport(Optional<std::string> PCHFilename) {
+    if (PCHFilename.hasValue()) {
+      assert(llvm::sys::path::extension(PCHFilename.getValue())
+                 .endswith(PCH_EXTENSION) &&
+             "Single PCH imported filename doesn't have .pch extension!");
+    }
+    SinglePCHImport = PCHFilename;
+  }
+
+  /// If there was is a single .pch bridging header without other imported
+  /// files, we can provide the PCH filename for declaration caching,
+  /// especially in code completion.
+  StringRef getSinglePCHImport() const {
+    if (SinglePCHImport.hasValue())
+      return *SinglePCHImport;
+    return StringRef();
+  }
 };
 
 namespace importer {
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
+
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
+    if (!alias->isCompatibilityAlias())
+      return nullptr;
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  }
+  return dyn_cast_or_null<T>(D);
+}
+
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *castIgnoringCompatibilityAlias(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
+    assert(alias->isCompatibilityAlias() &&
+           "non-compatible typealias found where nominal was expected");
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  }
+  return cast_or_null<T>(D);
+}
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;

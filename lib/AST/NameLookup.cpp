@@ -16,10 +16,11 @@
 
 #include "NameLookupImpl.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -138,7 +139,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const ModuleDecl *curModule,
                                 LazyResolver *typeResolver) {
   // Category declarations by their signatures.
-  llvm::SmallDenseMap<std::pair<CanType, Identifier>,
+  llvm::SmallDenseMap<std::pair<CanType, DeclBaseName>,
                       llvm::TinyPtrVector<ValueDecl *>>
     CollidingDeclGroups;
 
@@ -173,7 +174,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
-        CollidingDeclGroups[std::make_pair(signature, decl->getName())];
+        CollidingDeclGroups[std::make_pair(signature, decl->getBaseName())];
     if (!knownDecls.empty())
       anyCollisions = true;
 
@@ -509,29 +510,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Pattern binding initializers are only interesting insofar as they
         // affect lookup in an enclosing nominal type or extension thereof.
         if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(dc)) {
-          if (auto binding = bindingInit->getBinding()) {
-            // Look for 'self' for a lazy variable initializer.
-            if (auto singleVar = binding->getSingleVar())
-              // We only care about lazy variables.
-              if (singleVar->getAttrs().hasAttribute<LazyAttr>()) {
+          // Lazy variable initializer contexts have a 'self' parameter for
+          // instance member lookup.
+          if (auto *selfParam = bindingInit->getImplicitSelfDecl())
+            selfDecl = selfParam;
 
-              // 'self' will be listed in the local bindings.
-              for (auto local : localBindings) {
-                auto param = dyn_cast<ParamDecl>(local);
-                if (!param) continue;
-
-
-                // If we have a variable that's the implicit self of its enclosing
-                // context, mark it as 'self'.
-                if (auto func = dyn_cast<FuncDecl>(param->getDeclContext())) {
-                  if (param == func->getImplicitSelfDecl()) {
-                    selfDecl = param;
-                    break;
-                  }
-                }
-              }
-            }
-          }
           continue;
         }
 
@@ -575,13 +558,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // FIXME: We shouldn't need to compute a type to perform this lookup.
         Type lookupType = dc->getSelfTypeInContext();
 
-        // FIXME: Hack to deal with missing 'Self' archetypes.
-        if (!lookupType) {
-          if (auto proto = dc->getAsProtocolOrProtocolExtensionContext())
-            lookupType = proto->getDeclaredType();
-        }
-
-        if (!lookupType || lookupType->hasError()) continue;
+        if (lookupType->hasError()) continue;
 
         // Perform lookup into the type.
         NLOptions options = NL_UnqualifiedDefault;
@@ -609,9 +586,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // Predicate that determines whether a lookup result should
           // be unavailable except as a last-ditch effort.
           auto unavailableLookupResult =
-            [&](const UnqualifiedLookupResult &result) {
+              [&](const UnqualifiedLookupResult &result) {
+            auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
             return result.getValueDecl()->getAttrs()
-                     .isUnavailableInSwiftVersion();
+                .isUnavailableInSwiftVersion(effectiveVersion);
           };
 
           // If all of the results we found are unavailable, keep looking.
@@ -650,17 +628,46 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         Type ExtendedType;
         bool isTypeLookup = false;
 
-        // If this declcontext is an initializer for a static property, then we're
-        // implicitly doing a static lookup into the parent declcontext.
-        if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
-          if (!DC->getParent()->isModuleScopeContext()) {
-            if (auto *PBD = PBI->getBinding()) {
-              isTypeLookup = PBD->isStatic();
-              DC = DC->getParent();
-            }
+        if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
+          auto *PBD = PBI->getBinding();
+          assert(PBD);
+
+          // Lazy variable initializer contexts have a 'self' parameter for
+          // instance member lookup.
+          if (auto *selfParam = PBI->getImplicitSelfDecl()) {
+            Consumer.foundDecl(selfParam,
+                               DeclVisibilityKind::FunctionParameter);
+            if (!Results.empty())
+              return;
+
+            DC = DC->getParent();
+
+            BaseDecl = selfParam;
+            ExtendedType = DC->getSelfTypeInContext();
+            MetaBaseDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+
+            isTypeLookup = PBD->isStatic();
           }
-        
-        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+          // Initializers for stored properties of types perform static
+          // lookup into the surrounding context.
+          else if (PBD->getDeclContext()->isTypeContext()) {
+            DC = DC->getParent();
+
+            ExtendedType = DC->getSelfTypeInContext();
+            MetaBaseDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+            BaseDecl = MetaBaseDecl;
+
+            isTypeLookup = PBD->isStatic(); // FIXME
+
+            isCascadingUse = DC->isCascadingContextForLookup(false);
+          }
+          // Otherwise, we have an initializer for a global or local property.
+          // There's not much to find here, we'll keep going up to a parent
+          // context.
+
+          if (!isCascadingUse.hasValue())
+            isCascadingUse = DC->isCascadingContextForLookup(false);
+        } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           // Look for local variables; normally, the parser resolves these
           // for us, but it can't do the right thing inside local types.
           // FIXME: when we can parse and typecheck the function body partially
@@ -685,12 +692,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           if (AFD->getDeclContext()->isTypeContext()) {
             ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
-            // FIXME: Hack to deal with missing 'Self' archetypes.
-            if (!ExtendedType)
-              if (auto *PD = AFD->getDeclContext()
-                      ->getAsProtocolOrProtocolExtensionContext())
-                ExtendedType = PD->getDeclaredType();
-
             BaseDecl = AFD->getImplicitSelfDecl();
             MetaBaseDecl = AFD->getDeclContext()
                 ->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -700,9 +701,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               if (FD->isStatic())
                 isTypeLookup = true;
 
-            // If we're not in the body of the function, the base declaration
+            // If we're not in the body of the function (for example, we
+            // might be type checking a default argument expression and
+            // performing name lookup from there), the base declaration
             // is the nominal type, not 'self'.
-            if (Loc.isValid() &&
+            if (!AFD->isImplicit() &&
+                Loc.isValid() &&
                 AFD->getBodySourceRange().isValid() &&
                 !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
               BaseDecl = MetaBaseDecl;
@@ -729,14 +733,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           }
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
-        } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
+        } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
           ExtendedType = ED->getSelfTypeInContext();
 
           BaseDecl = ED->getAsNominalTypeOrNominalTypeExtensionContext();
           MetaBaseDecl = BaseDecl;
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
-        } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
+        } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
           ExtendedType = ND->getDeclaredType();
           BaseDecl = ND;
           MetaBaseDecl = BaseDecl;
@@ -781,8 +785,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (IgnoreAccessControl)
             options |= NL_IgnoreAccessibility;
 
-          if (!ExtendedType)
-            ExtendedType = ErrorType::get(Ctx);
+          if (ExtendedType->hasError())
+            continue;
 
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -825,8 +829,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // be unavailable except as a last-ditch effort.
             auto unavailableLookupResult =
               [&](const UnqualifiedLookupResult &result) {
+              auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
               return result.getValueDecl()->getAttrs()
-                       .isUnavailableInSwiftVersion();
+                  .isUnavailableInSwiftVersion(effectiveVersion);
             };
 
             // If all of the results we found are unavailable, keep looking.
@@ -866,7 +871,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           }
         }
 
-        DC = DC->getParent();
+        DC = DC->getParentForLookup();
       }
 
       if (!isCascadingUse.hasValue())
@@ -938,7 +943,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     return;
   }
 
-  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseName());
+  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
   if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
@@ -1179,14 +1184,14 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
+  (void)getMembers();
+
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
   if (!ignoreNewExtensions) {
     for (auto E : getExtensions())
       (void)E->getMembers();
   }
-
-  (void)getMembers();
 
   prepareLookupTable(ignoreNewExtensions);
 
@@ -1271,7 +1276,8 @@ static bool checkAccessibility(const DeclContext *useDC,
   assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
   case Accessibility::Private:
-    return useDC == sourceDC || useDC->isChildContextOf(sourceDC);
+    return (useDC == sourceDC ||
+      AccessScope::allowsPrivateAccess(useDC, sourceDC));
   case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {
@@ -1314,9 +1320,6 @@ bool DeclContext::lookupQualified(Type type,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
-
-  if (type->hasError())
-    return false;
 
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
     switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
@@ -1396,23 +1399,11 @@ bool DeclContext::lookupQualified(Type type,
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
 
   // Handle nominal types.
-  bool wantProtocolMembers = false;
+  bool wantProtocolMembers = (options & NL_ProtocolMembers);
   bool wantLookupInAllClasses = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
-    
-    wantProtocolMembers = (options & NL_ProtocolMembers) &&
-                          !isa<ProtocolDecl>(nominal);
-
-    // If we want dynamic lookup and we're searching in the
-    // AnyObject protocol, note this for later.
-    if (options & NL_DynamicLookup) {
-      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-          wantLookupInAllClasses = true;
-      }
-    }
   }
   // Handle archetypes
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
@@ -1422,32 +1413,29 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(proto);
 
     // Look into the superclasses of this archetype.
-    if (auto superclassTy = archetypeTy->getSuperclass()) {
-      if (auto superclassDecl = superclassTy->getAnyNominal()) {
-        if (visited.insert(superclassDecl).second) {
+    if (auto superclassTy = archetypeTy->getSuperclass())
+      if (auto superclassDecl = superclassTy->getAnyNominal())
+        if (visited.insert(superclassDecl).second)
           stack.push_back(superclassDecl);
-
-          wantProtocolMembers = (options & NL_ProtocolMembers) &&
-                                !isa<ProtocolDecl>(superclassDecl);
-        }
-      }
-    }
   }
   // Handle protocol compositions.
   else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (compositionTy->isExistentialType(protocols)) {
-      for (auto proto : protocols) {
-        if (visited.insert(proto).second) {
-          stack.push_back(proto);
+    auto layout = compositionTy->getExistentialLayout();
 
-          // If we want dynamic lookup and this is the AnyObject
-          // protocol, note this for later.
-          if ((options & NL_DynamicLookup) &&
-              proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-            wantLookupInAllClasses = true;
-        }
-      }
+    if (layout.isAnyObject() &&
+        (options & NL_DynamicLookup))
+      wantLookupInAllClasses = true;
+
+    for (auto proto : layout.getProtocols()) {
+      auto *protoDecl = proto->getDecl();
+      if (visited.insert(protoDecl).second)
+        stack.push_back(protoDecl);
+    }
+
+    if (layout.superclass) {
+      auto *nominalDecl = layout.superclass->getAnyNominal();
+      if (visited.insert(nominalDecl).second)
+        stack.push_back(nominalDecl);
     }
   } else {
     llvm_unreachable("Bad type for qualified lookup");

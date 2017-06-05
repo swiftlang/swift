@@ -14,7 +14,7 @@ class AClass : AProtocol {
 // CHECK-SAME:                            flags: DIFlagArtificial
 // CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
 // CHECK-SAME:                                baseType: ![[VOIDPTR:[0-9]+]]
-// CHECK: ![[VOIDPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "_TtBp", baseType: null
+// CHECK: ![[VOIDPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "_T0BpD", baseType: null
 func aFunction<T : AProtocol>(_ x: T) {
     print("I am in aFunction: \(x.f())")
 }

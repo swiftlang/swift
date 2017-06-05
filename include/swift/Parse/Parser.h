@@ -17,9 +17,14 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
-#include "swift/AST/AST.h"
-#include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
@@ -34,6 +39,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class DefaultArgumentInitializer;
   class DiagnosticEngine;
   class Lexer;
   class ScopeInfo;
@@ -124,6 +130,9 @@ public:
 
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
+  bool InSwiftKeyPath = false;
+  Expr* SwiftKeyPathRoot = nullptr;
+  SourceLoc SwiftKeyPathSlashLoc = SourceLoc();
 
   LocalContext *CurLocalContext = nullptr;
 
@@ -511,16 +520,16 @@ public:
   /// Add a camel-cased option if it is different than the first option.
   void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
                               StringRef DeclKindName);
-     
-  /// \brief Check whether the current token starts with '<'.
-  bool startsWithLess(Token Tok) {
-    return Tok.isAnyOperator() && Tok.getText()[0] == '<';
+
+  bool startsWithSymbol(Token Tok, char symbol) {
+    return (Tok.isAnyOperator() || Tok.isPunctuation()) &&
+           Tok.getText()[0] == symbol;
   }
+  /// \brief Check whether the current token starts with '<'.
+  bool startsWithLess(Token Tok) { return startsWithSymbol(Tok, '<'); }
 
   /// \brief Check whether the current token starts with '>'.
-  bool startsWithGreater(Token Tok) {
-    return Tok.isAnyOperator() && Tok.getText()[0] == '>';
-  }
+  bool startsWithGreater(Token Tok) { return startsWithSymbol(Tok, '>'); }
 
   /// \brief Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
@@ -723,6 +732,11 @@ public:
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
                                 SourceLoc Loc, SpecializeAttr *&Attr);
+
+  /// Parse the @_implements attribute.
+  /// \p Attr is where to store the parsed attribute
+  ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1130,8 +1144,13 @@ public:
                                        bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
+  ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
+                                            bool isExprBasic,
+                                            bool periodHasKeyPathBehavior,
+                                            bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper(bool isExprBasic);
@@ -1139,9 +1158,12 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
 
-  /// If the token is an escaped identifier being used as an argument
-  /// label, but doesn't need to be, diagnose it.
-  void diagnoseEscapedArgumentLabel(const Token &tok);
+  /// Parse an argument label `identifier ':'`, if it exists.
+  ///
+  /// \param name The parsed name of the label (empty if it doesn't exist, or is
+  /// _)
+  /// \param loc The location of the label (empty if it doesn't exist)
+  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
   /// Parse an unqualified-decl-name.
   ///
@@ -1153,8 +1175,12 @@ public:
   /// enables '.init' and '.default' like expressions.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
+  /// \param allowOperators Whether to allow operator basenames too.
+  /// \param allowZeroArgCompoundNames Whether to allow empty argument lists.
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
-                                    const Diagnostic &diag);
+                                    const Diagnostic &diag,
+                                    bool allowOperators=false,
+                                    bool allowZeroArgCompoundNames=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -1265,15 +1291,6 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Classify the condition of an #if directive according to whether it can
-  /// be evaluated statically.  The first member of the pair indicates whether
-  /// parsing of the condition body should occur, the second contains the result
-  /// of evaluating the conditional expression.
-  static ConditionalCompilationExprState
-  classifyConditionalCompilationExpr(Expr *condition,
-                                     ASTContext &context,
-                                     DiagnosticEngine &diags);
-
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
@@ -1295,6 +1312,10 @@ public:
   ParserStatus parseGenericWhereClause(
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
       bool &FirstTypeInComplete, bool AllowLayoutConstraints = false);
+
+  ParserStatus
+  parseProtocolOrAssociatedTypeWhereClause(TrailingWhereClause *&trailingWhere,
+                                           bool isProtocol);
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing

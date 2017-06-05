@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck -verify -verify-ignore-unknown %s
-
-// XFAIL: linux
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck -verify %s
 
 import SwiftName
 
@@ -34,31 +32,6 @@ func test() {
   spuriousAPINotedSwiftName(0)
   nicelyRenamedFunction("go apinotes!")
 
-  // This particular instance method mapping previously caused a crash because
-  // of the trailing closure.
-  acceptsClosure(Foo(), test) // expected-error {{'acceptsClosure' has been replaced by instance method 'Foo.accepts(closure:)'}} {{3-17=(Foo()).accepts}} {{18-25=}} {{25-25=closure: }}
-  acceptsClosure(Foo()) {} // expected-error {{'acceptsClosure' has been replaced by instance method 'Foo.accepts(closure:)'}} {{3-17=(Foo()).accepts}} {{18-23=}}
-
-  Foo().accepts(closure: test)
-  Foo().accepts() {}
-  Foo().accepts {}
-
-  acceptsClosureStatic(test) // expected-error {{'acceptsClosureStatic' has been replaced by 'Foo.accepts(closure:)'}} {{3-23=Foo.accepts}}
-  acceptsClosureStatic() {} // expected-error {{'acceptsClosureStatic' has been replaced by 'Foo.accepts(closure:)'}} {{3-23=Foo.accepts}}
-  acceptsClosureStatic {} // expected-error {{'acceptsClosureStatic' has been replaced by 'Foo.accepts(closure:)'}} {{3-23=Foo.accepts}}
-
-  Foo.accepts(closure: test)
-  Foo.accepts() {}
-  Foo.accepts {}
+  _ = AnonymousEnumConstant // expected-error {{'AnonymousEnumConstant' has been renamed to 'BoxForConstants.anonymousEnumConstant'}}
+  _ = BoxForConstants.anonymousEnumConstant // okay
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: 'ColorType' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: did you mean 'Overslept'?
-// <unknown>:0: error: unexpected note produced: did you mean 'TooHard'?
-// <unknown>:0: error: unexpected note produced: 'my_int_t' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'acceptsClosure' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'acceptsClosure' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'acceptsClosureStatic' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'acceptsClosureStatic' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: 'acceptsClosureStatic' was obsoleted in Swift 3

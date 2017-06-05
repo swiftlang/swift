@@ -63,6 +63,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
+  class UnifiedStatsReporter;
 
   /// SILParserState - This is a context object used to optionally maintain SIL
   /// parsing context for the parser.
@@ -133,7 +134,7 @@ namespace swift {
 
   /// \brief Lex and return a vector of `RC<TokenSyntax>` tokens, which include
   /// leading and trailing trivia.
-  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::TokenSyntax>,
                                    syntax::AbsolutePosition>>
   tokenizeWithTrivia(const LangOptions &LangOpts,
                      const SourceManager &SM,
@@ -301,7 +302,8 @@ namespace swift {
 
   /// Turn the given LLVM module into native code and return true on error.
   bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                   llvm::Module *Module);
+                   llvm::Module *Module,
+                   UnifiedStatsReporter *Stats=nullptr);
 
   /// Run the LLVM passes. In multi-threaded compilation this will be done for
   /// multiple LLVM modules in parallel.
@@ -320,7 +322,8 @@ namespace swift {
                    llvm::Module *Module,
                    llvm::TargetMachine *TargetMachine,
                    const version::Version &effectiveLanguageVersion,
-                   StringRef OutputFilename);
+                   StringRef OutputFilename,
+                   UnifiedStatsReporter *Stats=nullptr);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>

@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Pattern.h"
 
 using namespace swift;
 
@@ -404,6 +405,7 @@ public:
     // But if the expression didn't type-check, suppress diagnostics.
     if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
+
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
     auto fnType = type->getAs<AnyFunctionType>();
@@ -426,6 +428,20 @@ public:
     // count, then this is a call to the opaque value returned from
     // the function.
     if (args.size() != fnRef.getNumArgumentsForFullApply()) {
+      // Special case: a reference to an operator within a type might be
+      // missing 'self'.
+      // FIXME: The issue here is that this is an ill-formed expression, but
+      // we don't know it from the structure of the expression.
+      if (args.size() == 1 && fnRef.getKind() == AbstractFunction::Function &&
+          isa<FuncDecl>(fnRef.getFunction()) &&
+          cast<FuncDecl>(fnRef.getFunction())->isOperator() &&
+          fnRef.getNumArgumentsForFullApply() == 2 &&
+          fnRef.getFunction()->getDeclContext()->isTypeContext()) {
+        // Can only happen with invalid code.
+        assert(fnRef.getFunction()->getASTContext().Diags.hadAnyError());
+        return Classification::forInvalidCode();
+      }
+
       assert(args.size() > fnRef.getNumArgumentsForFullApply() &&
              "partial application was throwing?");
       return Classification::forThrow(PotentialReason::forThrowingApply());
@@ -663,20 +679,26 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
-    // If the parameter was a tuple, try to look through the various
-    // tuple operations.
-    if (auto paramTupleType = paramType->getAs<TupleType>()) {
+    // If the parameter was structurally a tuple, try to look through the
+    // various tuple operations.
+    if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
         return classifyTupleRethrowsArgument(tuple, paramTupleType);
       } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
         return classifyShuffleRethrowsArgument(shuffle, paramTupleType);
       }
 
-      // Otherwise, we're passing an opaque tuple expression, and we
-      // should treat it as contributing to 'rethrows' if the original
-      // parameter type included a throwing function type.
-      return classifyArgumentByType(paramType,
+      int scalarElt = paramTupleType->getElementForScalarInit();
+      if (scalarElt < 0) {
+        // Otherwise, we're passing an opaque tuple expression, and we
+        // should treat it as contributing to 'rethrows' if the original
+        // parameter type included a throwing function type.
+        return classifyArgumentByType(
+                                    paramType,
                                     PotentialReason::forRethrowsArgument(arg));
+      }
+
+      paramType = paramTupleType->getElementType(scalarElt);
     }
 
     // Otherwise, if the original parameter type was not a throwing

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -new-mangling-for-tests -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
 
 import c_layout
 
@@ -20,7 +20,7 @@ public func testCaptureGlobal() {
   var f: Float = 0
   var i: CInt = 0
   var s: UnsafePointer<CChar>! = nil
-  // CHECK-LABEL: define linkonce_odr hidden swiftcc void @_T09c_globals17testCaptureGlobalyyFyycfU_{{.*}} {
+  // CHECK-LABEL: define internal swiftcc void @_T09c_globals17testCaptureGlobalyyFyycfU_{{.*}} {
   blackHole({ () -> Void in
     // CHECK: @staticFloat
     // CHECK: @staticInt

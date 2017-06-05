@@ -121,10 +121,6 @@ def all_integer_or_real_binary_operator_names():
     return ['*', '/', '+', '-', '..<', '...']
 
 
-def all_arithmetic_comparison_operator_names():
-    return ['<', '<=', '>', '>=', '==', '!=']
-
-
 def all_integer_assignment_operator_names():
     return ['%=', '<<=', '>>=', '&=', '^=', '|=']
 

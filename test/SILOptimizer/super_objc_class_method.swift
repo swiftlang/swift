@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -179,10 +179,6 @@ class ArrayCountPropagation : public SILFunctionTransform {
 public:
   ArrayCountPropagation() {}
 
-  StringRef getName() override {
-    return "Array Count Propagation";
-  }
-
   void run() override {
     auto &Fn = *getFunction();
     bool Changed = false;

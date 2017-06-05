@@ -158,10 +158,11 @@ struct CompactVariantFuncs {
     return SOURCEKITD_VARIANT_TYPE_DICTIONARY;
   }
 
-  static bool dictionary_apply(
-        sourcekitd_variant_t dict,
-        sourcekitd_variant_dictionary_applier_t applier) {
-    void *Buf = (void*)dict.data[1];
+  static bool
+  dictionary_apply(sourcekitd_variant_t dict,
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
+    void *Buf = (void *)dict.data[1];
     size_t Index = dict.data[2];
     return T::dictionary_apply(Buf, Index, applier);
   }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // CHECK:       sil private [[INIT_A_B:@globalinit_.*]] :
 // CHECK:         alloc_global @_T026lazy_globals_multiple_vars1aSiv

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [thunk] @pear : $@convention(c)
 // CHECK:         function_ref @_T05cdecl5apple{{[_0-9a-zA-Z]*}}F

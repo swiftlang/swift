@@ -172,6 +172,31 @@ BoxPair::Return swift::swift_allocBox(const Metadata *type) {
   return SWIFT_RT_ENTRY_REF(swift_allocBox)(type);
 }
 
+BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
+                                    size_t alignMask) {
+  auto *inlineBuffer = reinterpret_cast<ValueBuffer*>(buffer);
+  HeapObject *box = reinterpret_cast<HeapObject *>(inlineBuffer->PrivateData[0]);
+
+  if (!swift_isUniquelyReferenced_nonNull_native(box)) {
+    auto refAndObjectAddr = BoxPair(swift_allocBox(type));
+    // Compute the address of the old object.
+    auto headerOffset = sizeof(HeapObject) + alignMask & ~alignMask;
+    auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(box) + headerOffset);
+    // Copy the data.
+    type->vw_initializeWithCopy(refAndObjectAddr.second, oldObjectAddr);
+    inlineBuffer->PrivateData[0] = refAndObjectAddr.first;
+    // Release ownership of the old box.
+    swift_release(box);
+    return refAndObjectAddr;
+  } else {
+    auto headerOffset = sizeof(HeapObject) + alignMask & ~alignMask;
+    auto *objectAddr = reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(box) + headerOffset);
+    return BoxPair{box, objectAddr};
+  }
+}
+
 SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {

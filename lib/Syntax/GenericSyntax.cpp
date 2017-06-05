@@ -374,7 +374,7 @@ GenericArgumentClauseSyntaxData::makeBlank() {
   auto Raw = RawSyntax::make(SyntaxKind::GenericArgumentClause,
                              {
                                TokenSyntax::missingToken(tok::l_angle, "<"),
-                               RawSyntax::missing(SyntaxKind::TypeArgumentList),
+                               RawSyntax::missing(SyntaxKind::GenericArgumentList),
                                TokenSyntax::missingToken(tok::r_angle, ">"),
                              },
                              SourcePresence::Present);
@@ -439,7 +439,7 @@ useRightAngleBracket(RC<TokenSyntax> RightAngle) {
 
 
 GenericArgumentClauseSyntax GenericArgumentClauseBuilder::build() const {
-  auto ArgListRaw = RawSyntax::make(SyntaxKind::TypeArgumentList,
+  auto ArgListRaw = RawSyntax::make(SyntaxKind::GenericParameterList,
                                     ArgumentListLayout,
                                     SourcePresence::Present);
   auto Raw = RawSyntax::make(SyntaxKind::GenericArgumentClause,

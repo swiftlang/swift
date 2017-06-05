@@ -15,7 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Pattern.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeLoc.h"
@@ -165,6 +166,24 @@ namespace {
         fn(Named->getDecl());
       return P;
     }
+
+    // Only walk into an expression insofar as it doesn't open a new scope -
+    // that is, don't walk into a closure body.
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<ClosureExpr>(E)) {
+        return { false, E };
+      }
+      return { true, E };
+    }
+
+    // Don't walk into anything else.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToParameterListPre(ParameterList *PL) override { return false; }
+    bool walkToDeclPre(Decl *D) override { return false; }
   };
 } // end anonymous namespace
 
@@ -394,3 +413,22 @@ SourceRange TypedPattern::getSourceRange() const {
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
 }
 
+/// Construct an ExprPattern.
+ExprPattern::ExprPattern(Expr *e, bool isResolved, Expr *matchExpr,
+                         VarDecl *matchVar,
+                         Optional<bool> implicit)
+  : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
+    MatchExpr(matchExpr), MatchVar(matchVar) {
+  assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
+  if (implicit.hasValue() ? *implicit : e->isImplicit())
+    setImplicit();
+}
+
+SourceLoc ExprPattern::getLoc() const {
+  return getSubExpr()->getLoc();
+}
+
+SourceRange ExprPattern::getSourceRange() const {
+  return getSubExpr()->getSourceRange();
+}
+  

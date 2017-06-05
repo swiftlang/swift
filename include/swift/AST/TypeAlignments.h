@@ -25,6 +25,7 @@
 #include <cstddef>
 
 namespace swift {
+  class AbstractClosureExpr;
   class AbstractStorageDecl;
   class ArchetypeType;
   class AssociatedTypeDecl;
@@ -38,12 +39,15 @@ namespace swift {
   class GenericTypeParamDecl;
   class NormalProtocolConformance;
   class OperatorDecl;
+  class Pattern;
   class ProtocolDecl;
   class ProtocolConformance;
+  class SILFunction;
   class Stmt;
   class Substitution;
   class TypeVariableType;
   class TypeBase;
+  class TypeDecl;
   class ValueDecl;
 
   /// We frequently use three tag bits on all of these types.
@@ -52,6 +56,8 @@ namespace swift {
   constexpr size_t ExprAlignInBits = 3;
   constexpr size_t StmtAlignInBits = 3;
   constexpr size_t TypeAlignInBits = 3;
+  constexpr size_t PatternAlignInBits = 3;
+  constexpr size_t SILFunctionAlignInBits = 2;
 }
 
 namespace llvm {
@@ -82,6 +88,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::AssociatedTypeDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericTypeParamDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::OperatorDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolDecl, swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ValueDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ExtensionDecl, swift::DeclAlignInBits)
 
@@ -95,11 +102,16 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, 2);
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractClosureExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
                             swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericEnvironment,
                             swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::Pattern,
+                            swift::PatternAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunction,
+                            swift::SILFunctionAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 

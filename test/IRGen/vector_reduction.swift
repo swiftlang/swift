@@ -5,9 +5,6 @@
 // rdar://30579970
 // REQUIRES: optimized_stdlib
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
-
 // We were missing target transform info and not vectorizing the loop below.
 
 // CHECK: xor <2 x i64>

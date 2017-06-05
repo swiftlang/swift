@@ -46,6 +46,17 @@ function(handle_gyb_source_single dependency_out_var_name)
 
   get_filename_component(dir "${GYB_SINGLE_OUTPUT}" DIRECTORY)
   get_filename_component(basename "${GYB_SINGLE_OUTPUT}" NAME)
+
+  # Handle foo.gyb in pattern ``gyb.expand('foo.gyb'`` as a dependency
+  set(gyb_expand_deps "")
+  file(READ "${GYB_SINGLE_SOURCE}" gyb_file)
+  string(REGEX MATCHALL "\\\$\{[\r\n\t ]*gyb.expand\\\([\r\n\t ]*[\'\"]([^\'\"]*)[\'\"]" gyb_expand_matches "${gyb_file}")
+  foreach(match ${gyb_expand_matches})
+    string(REGEX MATCH "[\'\"]\([^\'\"]*\)[\'\"]" gyb_dep "${match}")
+    list(APPEND gyb_expand_deps "${CMAKE_MATCH_1}")
+  endforeach()
+  list(REMOVE_DUPLICATES gyb_expand_deps)
+
   add_custom_command_target(
       dependency_target
       COMMAND
@@ -59,7 +70,7 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E remove "${GYB_SINGLE_OUTPUT}.tmp"
       OUTPUT "${GYB_SINGLE_OUTPUT}"
-      DEPENDS "${gyb_tool_source}" "${GYB_SINGLE_DEPENDS}" "${GYB_SINGLE_SOURCE}"
+      DEPENDS "${gyb_tool_source}" "${GYB_SINGLE_DEPENDS}" "${GYB_SINGLE_SOURCE}" "${gyb_expand_deps}"
       COMMENT "Generating ${basename} from ${GYB_SINGLE_SOURCE} ${GYB_SINGLE_COMMENT}"
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
       SOURCES "${GYB_SINGLE_SOURCE}"

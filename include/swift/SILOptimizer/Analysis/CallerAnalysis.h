@@ -121,11 +121,17 @@ public:
     return S->getKind() == AnalysisKind::Caller;
   }
 
-  virtual void notifyAnalysisOfFunction(SILFunction *F) {
-    RecomputeFunctionList.insert(F);
+  /// Invalidate all information in this analysis.
+  virtual void invalidate() override {
+    FuncInfos.clear();
+    RecomputeFunctionList.clear();
+    for (auto &F : Mod) {
+      RecomputeFunctionList.insert(&F);
+    }
   }
 
-  virtual void invalidate(SILFunction *F, InvalidationKind K) {
+  /// Invalidate all of the information for a specific function.
+  virtual void invalidate(SILFunction *F, InvalidationKind K) override {
     // Should we invalidate based on the invalidation kind.
     bool shouldInvalidate = K & InvalidationKind::CallsAndInstructions;
     if (!shouldInvalidate)
@@ -138,23 +144,20 @@ public:
     RecomputeFunctionList.insert(F);
   }
 
-  virtual void invalidateForDeadFunction(SILFunction *F, InvalidationKind K) {
+  /// Notify the analysis about a newly created function.
+  virtual void notifyAddFunction(SILFunction *F) override {
+    RecomputeFunctionList.insert(F);
+  }
+
+  /// Notify the analysis about a function which will be deleted from the
+  /// module.
+  virtual void notifyDeleteFunction(SILFunction *F) override {
     invalidateExistingCalleeRelation(F);
     RecomputeFunctionList.remove(F);
   }
 
-  virtual void invalidate(InvalidationKind K) {
-    // Should we invalidate based on the invalidation kind.
-    bool shouldInvalidate = K & InvalidationKind::Calls;
-    if (!shouldInvalidate)
-      return;
-
-    FuncInfos.clear();
-    RecomputeFunctionList.clear();
-    for (auto &F : Mod) {
-      RecomputeFunctionList.insert(&F);
-    }
-  }
+  /// Notify the analysis about changed witness or vtables.
+  virtual void invalidateFunctionTables() override { }
 
   const FunctionInfo &getCallerInfo(SILFunction *F) {
     // Recompute every function in the invalidated function list and empty the

@@ -69,7 +69,7 @@ struct IndexSymbol : IndexRelation {
   IndexSymbol() = default;
 
   StringRef getReceiverUSR() const {
-    for(auto Relation: Relations) {
+    for (auto Relation: Relations) {
       if (Relation.roles & (SymbolRoleSet) SymbolRole::RelationReceivedBy)
         return Relation.USR;
     }
@@ -79,6 +79,7 @@ struct IndexSymbol : IndexRelation {
 
 SymbolInfo getSymbolInfoForDecl(const Decl *D);
 SymbolSubKind getSubKindForAccessor(AccessorKind AK);
+bool isLocalSymbol(const Decl *D);
 
 using clang::index::printSymbolProperties;
 

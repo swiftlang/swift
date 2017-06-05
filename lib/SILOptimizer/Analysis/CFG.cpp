@@ -42,9 +42,8 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
 }
 
 static bool isTrapNoReturnFunction(ApplyInst *AI) {
-  const char *fatalName = MANGLE_AS_STRING(SELECT_MANGLING(
-                            Fs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_,
-                            s18_fatalErrorMessageys12StaticStringV_AcCSutF));
+  const char *fatalName =
+    MANGLE_AS_STRING(MANGLE_SYM(s18_fatalErrorMessageys12StaticStringV_AcCSutF));
   auto *Fn = AI->getReferencedFunction();
 
   // We use endswith here since if we specialize fatal error we will always

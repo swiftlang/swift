@@ -311,17 +311,6 @@ public:
 
 namespace value_witness_types {
 
-/// Given an initialized buffer, destroy its value and deallocate
-/// the buffer.  This can be decomposed as:
-///
-///   self->destroy(self->projectBuffer(buffer), self);
-///   self->deallocateBuffer(buffer), self);
-///
-/// Preconditions:
-///   'buffer' is an initialized buffer
-/// Postconditions:
-///   'buffer' is an unallocated buffer
-typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 
 /// Given an unallocated buffer, initialize it as a copy of the
 /// object in the source buffer.  This can be decomposed as:
@@ -340,23 +329,6 @@ typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                       ValueBuffer *src,
                                                       const Metadata *self);
 
-/// Given an allocated or initialized buffer, derive a pointer to
-/// the object.
-/// 
-/// Invariants:
-///   'buffer' is an allocated or initialized buffer
-typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
-                                   const Metadata *self);
-
-/// Given an allocated buffer, deallocate the object.
-///
-/// Preconditions:
-///   'buffer' is an allocated buffer
-/// Postconditions:
-///   'buffer' is an unallocated buffer
-typedef void deallocateBuffer(ValueBuffer *buffer,
-                              const Metadata *self);
-
 /// Given an initialized object, destroy it.
 ///
 /// Preconditions:
@@ -365,21 +337,6 @@ typedef void deallocateBuffer(ValueBuffer *buffer,
 ///   'object' is an uninitialized object
 typedef void destroy(OpaqueValue *object,
                      const Metadata *self);
-
-/// Given an uninitialized buffer and an initialized object, allocate
-/// storage in the buffer and copy the value there.
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-/// Invariants:
-///   'src' is an initialized object
-typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
-                                              OpaqueValue *src,
-                                              const Metadata *self);
 
 /// Given an uninitialized object and an initialized object, copy
 /// the value.
@@ -411,24 +368,6 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
                                     OpaqueValue *src,
                                     const Metadata *self);
-
-/// Given an uninitialized buffer and an initialized object, move
-/// the value from the object to the buffer, leaving the source object
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized buffer
-///   'src' is an initialized object
-/// Postconditions:
-///   'dest' is an initialized buffer
-///   'src' is an uninitialized object
-typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
-                                              OpaqueValue *src,
-                                              const Metadata *self);
 
 /// Given an uninitialized object and an initialized object, move
 /// the value from one to the other, leaving the source object
@@ -474,18 +413,6 @@ typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
                                     OpaqueValue *src,
                                     const Metadata *self);
 
-/// Given an uninitialized buffer, allocate an object.
-///
-/// Returns the uninitialized object.
-///
-/// Preconditions:
-///   'buffer' is an uninitialized buffer
-/// Postconditions:
-///   'buffer' is an allocated buffer
-typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
-                                    const Metadata *self);
-
-  
 /// Given an unallocated buffer and an initialized buffer, move the
 /// value from one buffer to the other, leaving the source buffer
 /// unallocated.
@@ -646,18 +573,12 @@ OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            const Metadata *self);
 
 #define FOR_ALL_FUNCTION_VALUE_WITNESSES(MACRO) \
-  MACRO(destroyBuffer) \
   MACRO(initializeBufferWithCopyOfBuffer) \
-  MACRO(projectBuffer) \
-  MACRO(deallocateBuffer) \
   MACRO(destroy) \
-  MACRO(initializeBufferWithCopy) \
   MACRO(initializeWithCopy) \
   MACRO(assignWithCopy) \
-  MACRO(initializeBufferWithTake) \
   MACRO(initializeWithTake) \
   MACRO(assignWithTake) \
-  MACRO(allocateBuffer) \
   MACRO(initializeBufferWithTakeOfBuffer) \
   MACRO(destroyArray) \
   MACRO(initializeArrayWithCopy) \
@@ -907,6 +828,8 @@ SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable VALUE_WITNESS_SYM(Bi128_); // Builtin.Int128
 SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable VALUE_WITNESS_SYM(Bi256_); // Builtin.Int256
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
 
 // The object-pointer table can be used for arbitrary Swift refcounted
 // pointer types.
@@ -1241,7 +1164,21 @@ public:
   void vw_destructiveInjectEnumTag(OpaqueValue *value, unsigned tag) const {
     getValueWitnesses()->_asEVWT()->destructiveInjectEnumTag(value, tag, this);
   }
-  
+
+  /// Allocate an out-of-line buffer if values of this type don't fit in the
+  /// ValueBuffer.
+  /// NOTE: This is not a box for copy-on-write existentials.
+  OpaqueValue *allocateBufferIn(ValueBuffer *buffer) const;
+
+  /// Deallocate an out-of-line buffer stored in 'buffer' if values of this type
+  /// are not stored inline in the ValueBuffer.
+  void deallocateBufferIn(ValueBuffer *buffer) const;
+
+  // Allocate an out-of-line buffer box (reference counted) if values of this
+  // type don't fit in the ValueBuffer.
+  // NOTE: This *is* a box for copy-on-write existentials.
+  OpaqueValue *allocateBoxForExistentialIn(ValueBuffer *Buffer) const;
+
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   const ConstTargetFarRelativeDirectPointer<Runtime,
@@ -1322,6 +1259,8 @@ SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bi128_);    // Builtin.Int128
 SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bi256_);    // Builtin.Int256
+SWIFT_RUNTIME_EXPORT
+const FullOpaqueMetadata METADATA_SYM(Bi512_);    // Builtin.Int512
 SWIFT_RUNTIME_EXPORT
 const FullOpaqueMetadata METADATA_SYM(Bo);        // Builtin.NativeObject
 SWIFT_RUNTIME_EXPORT
@@ -2427,6 +2366,18 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
   }
 
+  const TargetMetadata<Runtime> *getSuperclassConstraint() const {
+    if (!Flags.hasSuperclassConstraint())
+      return nullptr;
+
+    // Get a pointer to tail-allocated storage for this metadata record.
+    auto Pointer = reinterpret_cast<
+      ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this + 1);
+
+    // The superclass immediately follows the list of protocol descriptors.
+    return Pointer[Protocols.NumProtocols];
+  }
+
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
   }
@@ -3162,200 +3113,11 @@ swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 /// referenced by \c protocols will be sorted in-place.
 SWIFT_RT_ENTRY_VISIBILITY
 const ExistentialTypeMetadata *
-swift_getExistentialTypeMetadata(size_t numProtocols,
+swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
+                                 const Metadata *superclassConstraint,
+                                 size_t numProtocols,
                                  const ProtocolDescriptor **protocols)
     SWIFT_CC(RegisterPreservingCC);
-
-/// \brief Perform a checked dynamic cast of a value to a target type.
-///
-/// \param dest A buffer into which to write the destination value.
-/// In all cases, this will be left uninitialized if the cast fails.
-///
-/// \param src Pointer to the source value to cast.  This may be left
-///   uninitialized after the operation, depending on the flags.
-///
-/// \param targetType The type to which we are casting.
-///
-/// \param srcType The static type of the source value.
-///
-/// \param flags Flags to control the operation.
-///
-/// \return true if the cast succeeded. Depending on the flags,
-///   swift_dynamicCast may fail rather than return false.
-SWIFT_RT_ENTRY_VISIBILITY
-bool
-swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
-                  const Metadata *srcType,
-                  const Metadata *targetType,
-                  DynamicCastFlags flags)
-    SWIFT_CC(RegisterPreservingCC);
-
-/// \brief Checked dynamic cast to a Swift class type.
-///
-/// \param object The object to cast.
-/// \param targetType The type to which we are casting, which is known to be
-/// a Swift class type.
-///
-/// \returns the object if the cast succeeds, or null otherwise.
-SWIFT_RT_ENTRY_VISIBILITY
-const void *
-swift_dynamicCastClass(const void *object, const ClassMetadata *targetType)
-    SWIFT_CC(RegisterPreservingCC);
-
-/// \brief Unconditional, checked dynamic cast to a Swift class type.
-///
-/// Aborts if the object isn't of the target type.
-///
-/// \param object The object to cast.
-/// \param targetType The type to which we are casting, which is known to be
-/// a Swift class type.
-///
-/// \returns the object.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastClassUnconditional(const void *object,
-                                    const ClassMetadata *targetType);
-
-#if SWIFT_OBJC_INTEROP
-/// \brief Checked Objective-C-style dynamic cast to a class type.
-///
-/// \param object The object to cast, or nil.
-/// \param targetType The type to which we are casting, which is known to be
-/// a class type, but not necessarily valid type metadata.
-///
-/// \returns the object if the cast succeeds, or null otherwise.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastObjCClass(const void *object, const ClassMetadata *targetType);
-
-/// \brief Checked dynamic cast to a foreign class type.
-///
-/// \param object The object to cast, or nil.
-/// \param targetType The type to which we are casting, which is known to be
-/// a foreign class type.
-///
-/// \returns the object if the cast succeeds, or null otherwise.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastForeignClass(const void *object,
-                              const ForeignClassMetadata *targetType);
-
-/// \brief Unconditional, checked, Objective-C-style dynamic cast to a class
-/// type.
-///
-/// Aborts if the object isn't of the target type.
-/// Note that unlike swift_dynamicCastClassUnconditional, this does not abort
-/// if the object is 'nil'.
-///
-/// \param object The object to cast, or nil.
-/// \param targetType The type to which we are casting, which is known to be
-/// a class type, but not necessarily valid type metadata.
-///
-/// \returns the object.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastObjCClassUnconditional(const void *object,
-                                        const ClassMetadata *targetType);
-
-/// \brief Unconditional, checked dynamic cast to a foreign class type.
-///
-/// \param object The object to cast, or nil.
-/// \param targetType The type to which we are casting, which is known to be
-/// a foreign class type.
-///
-/// \returns the object if the cast succeeds, or null otherwise.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastForeignClassUnconditional(
-  const void *object,
-  const ForeignClassMetadata *targetType);
-#endif
-
-/// \brief Checked dynamic cast of a class instance pointer to the given type.
-///
-/// \param object The class instance to cast.
-///
-/// \param targetType The type to which we are casting, which may be either a
-/// class type or a wrapped Objective-C class type.
-///
-/// \returns the object, or null if it doesn't have the given target type.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastUnknownClass(const void *object, const Metadata *targetType);
-
-/// \brief Unconditional checked dynamic cast of a class instance pointer to
-/// the given type.
-///
-/// Aborts if the object isn't of the target type.
-///
-/// \param object The class instance to cast.
-///
-/// \param targetType The type to which we are casting, which may be either a
-/// class type or a wrapped Objective-C class type.
-///
-/// \returns the object.
-SWIFT_RUNTIME_EXPORT
-const void *
-swift_dynamicCastUnknownClassUnconditional(const void *object,
-                                           const Metadata *targetType);
-
-SWIFT_RUNTIME_EXPORT
-const Metadata *
-swift_dynamicCastMetatype(const Metadata *sourceType,
-                          const Metadata *targetType);
-SWIFT_RUNTIME_EXPORT
-const Metadata *
-swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
-                                       const Metadata *targetType);
-#if SWIFT_OBJC_INTEROP
-SWIFT_RUNTIME_EXPORT
-const ClassMetadata *
-swift_dynamicCastObjCClassMetatype(const ClassMetadata *sourceType,
-                                   const ClassMetadata *targetType);
-SWIFT_RUNTIME_EXPORT
-const ClassMetadata *
-swift_dynamicCastObjCClassMetatypeUnconditional(const ClassMetadata *sourceType,
-                                                const ClassMetadata *targetType);
-#endif
-
-SWIFT_RUNTIME_EXPORT
-const ClassMetadata *
-swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
-                                   const ClassMetadata *targetType);
-SWIFT_RUNTIME_EXPORT
-const ClassMetadata *
-swift_dynamicCastForeignClassMetatypeUnconditional(
-  const ClassMetadata *sourceType,
-  const ClassMetadata *targetType);
-
-/// \brief Return the dynamic type of an opaque value.
-///
-/// \param value An opaque value.
-/// \param self  The static type metadata for the opaque value and the result
-///              type value.
-/// \param existentialMetatype Whether the result type value is an existential
-///                            metatype. If `self` is an existential type,
-///                            then a `false` value indicates that the result
-///                            is of concrete metatype type `self.Protocol`,
-///                            and existential containers will not be projected
-///                            through. A `true` value indicates that the result
-///                            is of existential metatype type `self.Type`,
-///                            so existential containers can be projected
-///                            through as long as a subtype relationship holds
-///                            from `self` to the contained dynamic type.
-SWIFT_RUNTIME_EXPORT
-const Metadata *
-swift_getDynamicType(OpaqueValue *value, const Metadata *self,
-                     bool existentialMetatype);
-
-/// \brief Fetch the type metadata associated with the formal dynamic
-/// type of the given (possibly Objective-C) object.  The formal
-/// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO.
-///
-/// The object pointer may be a tagged pointer, but cannot be null.
-SWIFT_RUNTIME_EXPORT
-const Metadata *swift_getObjectType(HeapObject *object);
 
 /// \brief Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the
@@ -3454,20 +3216,10 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
     ? (unsigned)INT_MAX
     : (unsigned)(LeastValidPointerValue);
 }
-  
-/// \brief Check whether a type conforms to a given native Swift protocol,
-/// visible from the named module.
-///
-/// If so, returns a pointer to the witness table for its conformance.
-/// Returns void if the type does not conform to the protocol.
-///
-/// \param type The metadata for the type for which to do the conformance
-///             check.
-/// \param protocol The protocol descriptor for the protocol to check
-///                 conformance for.
-SWIFT_RUNTIME_EXPORT
-const WitnessTable *swift_conformsToProtocol(const Metadata *type,
-                                            const ProtocolDescriptor *protocol);
+
+/// Return the type name for a given type metadata.
+std::string nameForMetadata(const Metadata *type,
+                            bool qualified = true);
 
 /// Register a block of protocol conformance records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT
@@ -3478,10 +3230,6 @@ void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
 SWIFT_RUNTIME_EXPORT
 void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                        const TypeMetadataRecord *end);
-
-/// Return the type name for a given type metadata.
-std::string nameForMetadata(const Metadata *type,
-                            bool qualified = true);
 
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.

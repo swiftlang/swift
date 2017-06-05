@@ -29,30 +29,30 @@ class SGFContext;
 /// The goal is to make this eventually composed with SILBuilder so that all
 /// APIs only vend ManagedValues.
 class SILGenBuilder : public SILBuilder {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
 
 public:
-  SILGenBuilder(SILGenFunction &gen);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+  SILGenBuilder(SILGenFunction &SGF);
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB);
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SmallVectorImpl<SILInstruction *> *insertedInsts);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SILBasicBlock::iterator insertInst);
 
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB)
-      : SILGenBuilder(gen, &*insertBB) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB)
+      : SILGenBuilder(SGF, &*insertBB) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SmallVectorImpl<SILInstruction *> *insertedInsts)
-      : SILGenBuilder(gen, &*insertBB, insertedInsts) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+      : SILGenBuilder(SGF, &*insertBB, insertedInsts) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SILInstruction *insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst->getIterator()) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+      : SILGenBuilder(SGF, &*insertBB, insertInst->getIterator()) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SILBasicBlock::iterator insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst) {}
+      : SILGenBuilder(SGF, &*insertBB, insertInst) {}
 
   SILGenModule &getSILGenModule() const;
-  SILGenFunction &getSILGenFunction() const { return gen; }
+  SILGenFunction &getSILGenFunction() const { return SGF; }
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
@@ -224,9 +224,10 @@ public:
       SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCastValue;
-  ManagedValue createUnconditionalCheckedCastValue(SILLocation loc,
-                                                   ManagedValue operand,
-                                                   SILType type);
+  ManagedValue
+  createUnconditionalCheckedCastValue(SILLocation loc,
+                                      CastConsumptionKind consumption,
+                                      ManagedValue operand, SILType type);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue operand,
@@ -275,6 +276,8 @@ public:
   using DefaultCaseHandler =
       std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
 
+  enum class DefaultDispatchTime { BeforeNormalCases, AfterNormalCases };
+
 private:
   struct NormalCaseData {
     EnumElementDecl *decl;
@@ -293,10 +296,13 @@ private:
     SILBasicBlock *block;
     NullablePtr<SILBasicBlock> contBlock;
     DefaultCaseHandler handler;
+    DefaultDispatchTime dispatchTime;
 
     DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
-                    DefaultCaseHandler handler)
-        : block(block), contBlock(contBlock), handler(handler) {}
+                    DefaultCaseHandler handler,
+                    DefaultDispatchTime dispatchTime)
+        : block(block), contBlock(contBlock), handler(handler),
+          dispatchTime(dispatchTime) {}
     ~DefaultCaseData() = default;
   };
 
@@ -313,8 +319,10 @@ public:
 
   void addDefaultCase(SILBasicBlock *defaultBlock,
                       NullablePtr<SILBasicBlock> contBlock,
-                      DefaultCaseHandler handle) {
-    defaultBlockData.emplace(defaultBlock, contBlock, handle);
+                      DefaultCaseHandler handle,
+                      DefaultDispatchTime dispatchTime =
+                          DefaultDispatchTime::AfterNormalCases) {
+    defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime);
   }
 
   void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
@@ -326,6 +334,23 @@ public:
 
 private:
   SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
+};
+
+class CleanupCloner {
+  SILGenFunction &SGF;
+  bool hasCleanup;
+  bool isLValue;
+  ValueOwnershipKind ownershipKind;
+
+public:
+  CleanupCloner(SILGenFunction &SGF, ManagedValue mv)
+      : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()),
+        ownershipKind(mv.getOwnershipKind()) {}
+
+  CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
+      : CleanupCloner(builder.getSILGenFunction(), mv) {}
+
+  ManagedValue clone(SILValue value) const;
 };
 
 } // namespace Lowering

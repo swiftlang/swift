@@ -91,6 +91,7 @@ macro(swift_configure_components)
   endforeach()
 endmacro()
 
+# Sets the is_installing variable.
 function(swift_is_installing_component component result_var_name)
   precondition(component MESSAGE "Component name is required")
 

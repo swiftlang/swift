@@ -51,6 +51,7 @@ enum class SourceKitRequest {
   ExtractComment,
   ModuleGroups,
   NameTranslation,
+  MarkupToXML,
 };
 
 struct TestOptions {
@@ -68,6 +69,7 @@ struct TestOptions {
   unsigned EndCol = 0;
   unsigned Offset = 0;
   unsigned Length = 0;
+  llvm::Optional<unsigned> SwiftVersion;
   llvm::Optional<std::string> ReplaceText;
   std::string ModuleName;
   std::string HeaderPath;
@@ -88,7 +90,9 @@ struct TestOptions {
   bool SynthesizedExtensions = false;
   bool CollectActionables = false;
   bool isAsyncRequest = false;
+  llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
+  void printHelp(bool ShowHidden) const;
 };
 
 }

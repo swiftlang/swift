@@ -31,7 +31,7 @@ import Swift
 // CHECK-armv7s:      trap
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
-// CHECK-s390x:       trap
+// CHECK-s390x:       j       .Ltmp{{[0-9]+}}+2
 // CHECK-NOT-x86_64:      .cfi_endproc
 // CHECK-NOT-i386:        .cfi_endproc
 // CHECK-NOT-arm64:       .cfi_endproc
@@ -55,7 +55,7 @@ import Swift
 // CHECK-armv7s:      trap
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
-// CHECK-s390x:       trap
+// CHECK-s390x:       j       .Ltmp{{[0-9]+}}+2
 // CHECK-x86_64:      .cfi_endproc
 // CHECK-i386:        .cfi_endproc
 // CHECK-arm64:       .cfi_endproc

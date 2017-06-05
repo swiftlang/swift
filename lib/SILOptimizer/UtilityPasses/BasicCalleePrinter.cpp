@@ -60,7 +60,6 @@ class BasicCalleePrinterPass : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Basic Callee Printer"; }
 };
 
 } // end anonymous namespace

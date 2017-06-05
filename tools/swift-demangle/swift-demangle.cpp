@@ -93,17 +93,18 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   }
   if (RemangleMode) {
     std::string remangled;
-    if (!pointer) {
-      // Just reprint the original mangled name if it didn't demangle.
+    if (!pointer || !(name.startswith(MANGLING_PREFIX_STR) ||
+                      name.startswith("_S"))) {
+      // Just reprint the original mangled name if it didn't demangle or is in
+      // the old mangling scheme.
       // This makes it easier to share the same database between the
       // mangling and demangling tests.
       remangled = name;
     } else {
+      remangled = swift::Demangle::mangleNode(pointer);
       // Also accept the future mangling prefix.
-      // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
-      remangled = swift::Demangle::mangleNode(pointer,
-                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR)
-                                          || name.startswith("_S"));
+      // TODO: remove the special "_S" handling as soon as MANGLING_PREFIX_STR
+      // gets "_S".
       if (name.startswith("_S")) {
         assert(remangled.find(MANGLING_PREFIX_STR) == 0);
         remangled = "_S" + remangled.substr(3);

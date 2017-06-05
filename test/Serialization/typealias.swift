@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift
 // RUN: llvm-bcanalyzer %t/alias.swiftmodule | %FileCheck %s
 // RUN: %target-build-swift -I %t %s -o %t/a.out
@@ -51,4 +50,6 @@ print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")
 // Used for tests that only need to be type-checked.
 func check(_: BaseAlias) {
 }
+
+let x: GG<Int> = 0
 

@@ -13,7 +13,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Strings.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -131,15 +131,33 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     moduleFramework += ".framework";
     isFramework = true;
 
-    for (const auto &framepath : ctx.SearchPathOpts.FrameworkSearchPaths) {
-      currPath = framepath.Path;
+    auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
+      currPath = frameworkPath;
       llvm::sys::path::append(currPath, moduleFramework.str(),
                               "Modules", moduleFilename.str());
       auto err = openModuleFiles(currPath,
                                  archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer,
                                  scratch);
-      if (!err)
+      return !err;
+    };
+
+    for (const auto &framepath : ctx.SearchPathOpts.FrameworkSearchPaths) {
+      if (tryFrameworkImport(framepath.Path))
+        return true;
+    }
+
+    if (ctx.LangOpts.Target.isOSDarwin()) {
+      // Apple platforms have extra implicit framework search paths:
+      // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/
+      scratch = ctx.SearchPathOpts.SDKPath;
+      llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
+      if (tryFrameworkImport(scratch))
+        return true;
+
+      scratch = ctx.SearchPathOpts.SDKPath;
+      llvm::sys::path::append(scratch, "Library", "Frameworks");
+      if (tryFrameworkImport(scratch))
         return true;
     }
   }
@@ -182,8 +200,6 @@ FileUnit *SerializedModuleLoader::loadAST(
                        isFramework, loadedModuleFile,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
-    Ctx.bumpGeneration();
-
     M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
@@ -197,6 +213,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     loadInfo.status =
         loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
     if (loadInfo.status == serialization::Status::Valid) {
+      Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
       return fileUnit;
@@ -215,7 +232,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
     SmallString<32> versionBuf;
     llvm::raw_svector_ostream versionString(versionBuf);
-    versionString << version::Version::getCurrentLanguageVersion();
+    versionString << Ctx.LangOpts.EffectiveLanguageVersion;
     if (versionString.str() == shortVersion)
       return false;
 

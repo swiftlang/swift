@@ -82,7 +82,7 @@ public struct LazyFilterSequence<Base : Sequence>
   public // @testable
   init(
     _base base: Base,
-    _ isIncluded: @escaping (Base.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Base.Element) -> Bool
   ) {
     self.base = base
     self._include = isIncluded
@@ -93,69 +93,12 @@ public struct LazyFilterSequence<Base : Sequence>
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (Base.Iterator.Element) -> Bool
+  internal let _include: (Base.Element) -> Bool
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
-///
-/// The positions of a `LazyFilterIndex` correspond to those positions
-/// `p` in its underlying collection `c` such that `c[p]`
-/// satisfies the predicate with which the `LazyFilterIndex` was
-/// initialized.
-///
-/// - Note: The performance of advancing a `LazyFilterIndex`
-///   depends on how sparsely the filtering predicate is satisfied,
-///   and may not offer the usual performance given by models of
-///   `Collection`.
-public struct LazyFilterIndex<Base : Collection> {
-
-  /// The position corresponding to `self` in the underlying collection.
-  public let base: Base.Index
-}
-
-extension LazyFilterIndex : Comparable {
-  public static func == (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-
-  public static func != (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base != rhs.base
-  }
-
-  public static func < (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base < rhs.base
-  }
-
-  public static func <= (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base <= rhs.base
-  }
-
-  public static func >= (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base >= rhs.base
-  }
-
-  public static func > (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base > rhs.base
-  }
-}
+@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use Base.Index")
+public typealias LazyFilterIndex<Base : Collection> = Base.Index
 
 // FIXME(ABI)#27 (Conditional Conformance): `LazyFilter*Collection` types should be
 // collapsed into one `LazyFilterCollection` using conditional conformances.
@@ -170,20 +113,21 @@ extension LazyFilterIndex : Comparable {
 /// underlying collection that satisfy a predicate.
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
-///   that depend on `startIndex`, or of advancing a `LazyFilterIndex` depends
+///   that depend on `startIndex`, or of advancing an index depends
 ///   on how sparsely the filtering predicate is satisfied, and may not offer
 ///   the usual performance given by `Collection`. Be aware, therefore, that
 ///   general operations on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 public struct ${Self}<
   Base : ${collectionForTraversal(Traversal)}
-> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
+> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)}
+{
 
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = LazyFilterIndex<Base>
+  public typealias Index = Base.Index
 
   public typealias IndexDistance = Base.IndexDistance
 
@@ -192,7 +136,7 @@ public struct ${Self}<
   public // @testable
   init(
     _base: Base,
-    _ isIncluded: @escaping (Base.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Base.Element) -> Bool
   ) {
     self._base = _base
     self._predicate = isIncluded
@@ -209,7 +153,7 @@ public struct ${Self}<
     while index != _base.endIndex && !_predicate(_base[index]) {
       _base.formIndex(after: &index)
     }
-    return LazyFilterIndex(base: index)
+    return index
   }
 
   /// The collection's "past the end" position---that is, the position one
@@ -218,7 +162,7 @@ public struct ${Self}<
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
   public var endIndex: Index {
-    return LazyFilterIndex(base: _base.endIndex)
+    return _base.endIndex
   }
 
   // TODO: swift-3-indexing-model - add docs
@@ -230,12 +174,12 @@ public struct ${Self}<
 
   public func formIndex(after i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-    var index = i.base
+    var index = i
     _precondition(index != _base.endIndex, "can't advance past endIndex")
     repeat {
       _base.formIndex(after: &index)
     } while index != _base.endIndex && !_predicate(_base[index])
-    i = LazyFilterIndex(base: index)
+    i = index
   }
 
 %   if Traversal == 'Bidirectional':
@@ -247,12 +191,12 @@ public struct ${Self}<
 
   public func formIndex(before i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-    var index = i.base
+    var index = i
     _precondition(index != _base.startIndex, "can't retreat before startIndex")
     repeat {
       _base.formIndex(before: &index)
     } while !_predicate(_base[index])
-    i = LazyFilterIndex(base: index)
+    i = index
   }
 %   end
 
@@ -260,12 +204,28 @@ public struct ${Self}<
   ///
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
-  public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[position.base]
+  public subscript(position: Index) -> Base.Element {
+    return _base[position]
   }
 
   public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
     return ${Slice}(base: self, bounds: bounds)
+  }
+
+  // Any estimate of the number of elements that pass `_predicate` requires
+  // iterating the collection and evaluating each element, which can be costly,
+  // is unexpected, and usually doesn't pay for itself in saving time through
+  // preventing intermediate reallocations. (SR-4164)
+  public var underestimatedCount: Int { return 0 }
+
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+
+    // The default implementation of `_copyToContiguousArray` queries the
+    // `count` property, which evaluates `_predicate` for every element --
+    // see the note above `underestimatedCount`. Here we treat `self` as a
+    // sequence and only rely on underestimated count.
+    return _copySequenceToContiguousArray(self)
   }
 
   // FIXME(ABI)#28 (Associated Types with where clauses): we actually want to add:
@@ -287,7 +247,7 @@ public struct ${Self}<
   }
 
   var _base: Base
-  let _predicate: (Base.Iterator.Element) -> Bool
+  let _predicate: (Base.Element) -> Bool
 }
 
 % end
@@ -300,7 +260,7 @@ extension LazySequenceProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ isIncluded: @escaping (Elements.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, isIncluded)
@@ -310,9 +270,11 @@ extension LazySequenceProtocol {
 % for Traversal in ['Forward', 'Bidirectional']:
 
 extension LazyCollectionProtocol
+%   if Traversal != 'Forward':
   where
   Self : ${collectionForTraversal(Traversal)},
   Elements : ${collectionForTraversal(Traversal)}
+%   end
 {
   /// Returns the elements of `self` that satisfy `predicate`.
   ///
@@ -321,7 +283,7 @@ extension LazyCollectionProtocol
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ isIncluded: @escaping (Elements.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
     return LazyFilter${collectionForTraversal(Traversal)}(
       _base: self.elements, isIncluded)
@@ -347,7 +309,7 @@ extension LazyFilterSequence {
   @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
     Builtin.unreachable()
   }
@@ -362,7 +324,7 @@ extension LazyFilterCollection {
   @available(*, unavailable, message: "use '.lazy.filter' on the collection")
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
     Builtin.unreachable()
   }

@@ -14,11 +14,11 @@
 import Foundation
 
 extension NSManagedObjectContext {
-  public func fetch<T: NSFetchRequestResult>(_ request: NSFetchRequest<T>) throws -> [T] {
+  public func fetch<T>(_ request: NSFetchRequest<T>) throws -> [T] {
     return try fetch(unsafeDowncast(request, to: NSFetchRequest<NSFetchRequestResult>.self)) as! [T]
   }
 
-  public func count<T: NSFetchRequestResult>(for request: NSFetchRequest<T>) throws -> Int {
+  public func count<T>(for request: NSFetchRequest<T>) throws -> Int {
     return try count(for: unsafeDowncast(request, to: NSFetchRequest<NSFetchRequestResult>.self))
   }
 }

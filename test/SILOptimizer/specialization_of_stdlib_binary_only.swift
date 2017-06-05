@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -parse-stdlib -parse-as-library -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-serialize-all -O -parse-stdlib -parse-as-library -emit-sil %s | %FileCheck %s
 
 // Make sure specialization of stdlib_binary_only functions are not marked
 // shared. Marking them shared would make their visibility hidden. Because

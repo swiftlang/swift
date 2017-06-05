@@ -21,6 +21,7 @@
 #include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -56,6 +57,13 @@ enum class OutputLevel {
   Parseable,
 };
 
+/// Indicates whether a temporary file should always be preserved if a part of
+/// the compilation crashes.
+enum class PreserveOnSignal : bool {
+  No,
+  Yes
+};
+
 class Compilation {
   friend class PerformJobsState;
 private:
@@ -86,8 +94,8 @@ private:
 
   /// Temporary files that should be cleaned up after the compilation finishes.
   ///
-  /// These apply whether the compilation succeeds or fails.
-  std::vector<std::string> TempFilePaths;
+  /// These apply whether the compilation succeeds or fails. If the
+  llvm::StringMap<PreserveOnSignal> TempFilePaths;
 
   /// Write information about this compilation to this file.
   ///
@@ -134,6 +142,9 @@ private:
   /// execute.
   bool ShowDriverTimeCompilation;
 
+  /// When non-null, record various high-level counters to this.
+  std::unique_ptr<UnifiedStatsReporter> Stats;
+
   /// When true, dumps information about why files are being scheduled to be
   /// rebuilt.
   bool ShowIncrementalBuildDecisions = false;
@@ -141,6 +152,10 @@ private:
   /// When true, traces the lifecycle of each driver job. Provides finer
   /// detail than ShowIncrementalBuildDecisions.
   bool ShowJobLifecycle = false;
+
+  /// When true, some frontend job has requested permission to pass
+  /// -emit-loaded-module-trace, so no other job needs to do it.
+  bool PassedEmitLoadedModuleTraceToFrontendJob = false;
 
   static const Job *unwrap(const std::unique_ptr<const Job> &p) {
     return p.get();
@@ -156,7 +171,8 @@ public:
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
-              bool ShowDriverTimeCompilation = false);
+              bool ShowDriverTimeCompilation = false,
+              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
   ~Compilation();
 
   ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
@@ -165,14 +181,13 @@ public:
   }
   Job *addJob(std::unique_ptr<Job> J);
 
-  void addTemporaryFile(StringRef file) {
-    TempFilePaths.push_back(file.str());
+  void addTemporaryFile(StringRef file,
+                        PreserveOnSignal preserve = PreserveOnSignal::No) {
+    TempFilePaths[file] = preserve;
   }
 
   bool isTemporaryFile(StringRef file) {
-    // TODO: Use a set instead of a linear search.
-    return std::find(TempFilePaths.begin(), TempFilePaths.end(), file) !=
-             TempFilePaths.end();
+    return TempFilePaths.count(file);
   }
 
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
@@ -227,12 +242,31 @@ public:
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
   int performJobs();
 
+  /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
+  /// to a frontend job.
+  ///
+  /// This only returns true once, because only one job should pass that
+  /// argument.
+  bool requestPermissionForFrontendToEmitLoadedModuleTrace() {
+    if (PassedEmitLoadedModuleTraceToFrontendJob)
+      // Someone else has already done it!
+      return false;
+    else {
+      // We're the first and only (to execute this path).
+      PassedEmitLoadedModuleTraceToFrontendJob = true;
+      return true;
+    }
+  }
+
 private:
   /// \brief Perform all jobs.
   ///
-  /// \returns exit code of the first failed Job, or 0 on success. A return
-  /// value of -2 indicates that a Job crashed during execution.
-  int performJobsImpl();
+  /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
+  /// crashes).
+  ///
+  /// \returns exit code of the first failed Job, or 0 on success. If a Job
+  /// crashes during execution, a negative value will be returned.
+  int performJobsImpl(bool &abnormalExit);
 
   /// \brief Performs a single Job by executing in place, if possible.
   ///

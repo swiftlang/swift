@@ -105,8 +105,11 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
     STRINGS FALSE "NOT-MERGED" "MERGED")
 
-set(SWIFT_VERSION "3.1" CACHE STRING
-    "The user-visible version of the Swift compiler")
+# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
+# can be reused when a new version of Swift comes out (assuming the user hasn't
+# manually set it as part of their own CMake configuration).
+set(SWIFT_VERSION "4.0")
+
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
@@ -249,6 +252,10 @@ option(SWIFT_CHECK_INCREMENTAL_COMPILATION
     "Check if incremental compilation works when compiling the Swift libraries"
     FALSE)
 
+option(SWIFT_REPORT_STATISTICS
+    "Create json files which contain internal compilation statistics"
+    FALSE)
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
@@ -268,10 +275,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
-    FALSE)
-
-option(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-    "Build the runtime with a copy-on-write implementation for opaque existentials"
     FALSE)
 
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
@@ -380,6 +383,9 @@ else()
 endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
+    ${SWIFT_BUILD_SOURCEKIT_default})
+option(SWIFT_ENABLE_SOURCEKIT_TESTS
+    "Enable running SourceKit tests"
     ${SWIFT_BUILD_SOURCEKIT_default})
 
 #
@@ -491,6 +497,7 @@ include_directories(BEFORE
 #     ...
 #  endif()
 set(SWIFT_DARWIN_VARIANTS "^(macosx|iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
+set(SWIFT_DARWIN_EMBEDDED_VARIANTS "^(iphoneos|iphonesimulator|appletvos|appletvsimulator|watchos|watchsimulator)")
 
 # A convenient list to match Darwin SDKs. Example:
 #  if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
@@ -584,18 +591,6 @@ endif()
 #
 # Configure SDKs.
 #
-
-function(is_sdk_requested name result_var_name)
-  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${name}")
-    set("${result_var_name}" "TRUE" PARENT_SCOPE)
-  else()
-    if("${name}" IN_LIST SWIFT_SDKS)
-      set("${result_var_name}" "TRUE" PARENT_SCOPE)
-    else()
-      set("${result_var_name}" "FALSE" PARENT_SCOPE)
-    endif()
-  endif()
-endfunction()
 
 if(XCODE)
   # FIXME: Cannot cross-compile the standard library using Xcode.  Xcode
@@ -697,84 +692,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   message(STATUS "${xcode_version}")
   message(STATUS "")
 
-  is_sdk_requested(OSX swift_build_osx)
-  if(swift_build_osx)
-    configure_sdk_darwin(
-        OSX "OS X" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
-        macosx macosx macosx "x86_64")
-    configure_target_variant(OSX-DA "OS X Debug+Asserts"   OSX DA "Debug+Asserts")
-    configure_target_variant(OSX-RA "OS X Release+Asserts" OSX RA "Release+Asserts")
-    configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
-  endif()
-
-  # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,
-  #   TVOS_SIMULATOR, WATCHOS, WATCHOS_SIMULATOR (archs hardcoded below).
-
-  is_sdk_requested(IOS swift_build_ios)
-  if(swift_build_ios)
-    configure_sdk_darwin(
-        IOS "iOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
-        iphoneos ios ios "armv7;armv7s;arm64")
-    configure_target_variant(IOS-DA "iOS Debug+Asserts"   IOS DA "Debug+Asserts")
-    configure_target_variant(IOS-RA "iOS Release+Asserts" IOS RA "Release+Asserts")
-    configure_target_variant(IOS-R  "iOS Release"         IOS R "Release")
-  endif()
-
-  is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
-  if(swift_build_ios_simulator)
-    configure_sdk_darwin(
-        IOS_SIMULATOR "iOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
-        iphonesimulator ios-simulator ios "i386;x86_64")
-    configure_target_variant(
-        IOS_SIMULATOR-DA "iOS Debug+Asserts"   IOS_SIMULATOR DA "Debug+Asserts")
-    configure_target_variant(
-        IOS_SIMULATOR-RA "iOS Release+Asserts" IOS_SIMULATOR RA "Release+Asserts")
-    configure_target_variant(
-        IOS_SIMULATOR-R  "iOS Release"         IOS_SIMULATOR R "Release")
-  endif()
-
-  is_sdk_requested(TVOS swift_build_tvos)
-  if(swift_build_tvos)
-    configure_sdk_darwin(
-        TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
-        appletvos tvos tvos "arm64")
-    configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
-    configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
-    configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
-  endif()
-
-  is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
-  if(swift_build_tvos_simulator)
-    configure_sdk_darwin(
-        TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
-        appletvsimulator tvos-simulator tvos "x86_64")
-    configure_target_variant(
-      TVOS_SIMULATOR-DA "tvOS Debug+Asserts"   TVOS_SIMULATOR DA "Debug+Asserts")
-    configure_target_variant(
-      TVOS_SIMULATOR-RA "tvOS Release+Asserts" TVOS_SIMULATOR RA "Release+Asserts")
-    configure_target_variant(
-      TVOS_SIMULATOR-R  "tvOS Release"         TVOS_SIMULATOR R "Release")
-  endif()
-
-  is_sdk_requested(WATCHOS swift_build_watchos)
-  if(swift_build_watchos)
-    configure_sdk_darwin(
-        WATCHOS "watchOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-        watchos watchos watchos "armv7k")
-    configure_target_variant(WATCHOS-DA "watchOS Debug+Asserts"   WATCHOS DA "Debug+Asserts")
-    configure_target_variant(WATCHOS-RA "watchOS Release+Asserts" WATCHOS RA "Release+Asserts")
-    configure_target_variant(WATCHOS-R  "watchOS Release"         WATCHOS R "Release")
-  endif()
-
-  is_sdk_requested(WATCHOS_SIMULATOR swift_build_watchos_simulator)
-  if(swift_build_watchos_simulator)
-    configure_sdk_darwin(
-        WATCHOS_SIMULATOR "watchOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-        watchsimulator watchos-simulator watchos "i386")
-    configure_target_variant(WATCHOS_SIMULATOR-DA "watchOS Debug+Asserts"   WATCHOS_SIMULATOR DA "Debug+Asserts")
-    configure_target_variant(WATCHOS_SIMULATOR-RA "watchOS Release+Asserts" WATCHOS_SIMULATOR RA "Release+Asserts")
-    configure_target_variant(WATCHOS_SIMULATOR-R  "watchOS Release"         WATCHOS_SIMULATOR R "Release")
-  endif()
+  include(DarwinSDKs)
 
   # FIXME: guess target variant based on the host.
   # if(SWIFT_HOST_VARIANT MATCHES "^macosx")

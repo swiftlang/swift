@@ -268,3 +268,9 @@ guard let foo = optionalAny else {}
 for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; consider replacing with '_' or removing it}} {{5-6=_}}
    print("")
 }
+
+// Tests fix to SR-2421
+func sr2421() {
+  let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
+  x = 42
+}

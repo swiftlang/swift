@@ -16,8 +16,8 @@
 #include "SourceKit/SwiftLang/Factory.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -567,6 +567,7 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
     case swift::ide::RangeKind::SingleStatement: return KindRangeSingleStatement;
     case swift::ide::RangeKind::SingleDecl: return KindRangeSingleDeclaration;
     case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
+    case swift::ide::RangeKind::PartOfExpression: return KindRangeInvalid;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
 
@@ -728,6 +729,7 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
+    case DAK_DowngradeExhaustivityCheck:
       continue;
     default:
       break;

@@ -132,6 +132,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
         .Case("translate", SourceKitRequest::NameTranslation)
+        .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
@@ -139,10 +140,16 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
-               "open/edit/print-annotations/print-diags/extract-comment/module-groups/range\n";
+               "open/edit/print-annotations/print-diags/extract-comment/module-groups/"
+               "range/translate/markup-xml\n";
         return true;
       }
       break;
+
+    case OPT_help: {
+      printHelp(false);
+      return true;
+    }
 
     case OPT_offset:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Offset)) {
@@ -171,6 +178,16 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       EndCol = linecol.second;
       break;
     }
+
+      case OPT_swift_version: {
+        unsigned ver;
+        if (StringRef(InputArg->getValue()).getAsInteger(10, ver)) {
+          llvm::errs() << "error: expected integer for 'swift-version'\n";
+          return true;
+        }
+        SwiftVersion = ver;
+        break;
+      }
 
     case OPT_line:
       if (StringRef(InputArg->getValue()).getAsInteger(10, Line)) {
@@ -275,9 +292,19 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ObjCSelector = InputArg->getValue();
       break;
 
+    case OPT_cancel_on_subsequent_request:
+      unsigned Cancel;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, Cancel)) {
+        llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";
+        return true;
+      }
+      CancelOnSubsequentRequest = Cancel;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
-                   << InputArg->getAsString(ParsedArgs) << '\n';
+                   << InputArg->getAsString(ParsedArgs) << '\n'
+                   << "Use -h or -help for assistance" << '\n';
       return true;
     }
   }
@@ -289,4 +316,17 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
   }
 
   return false;
+}
+
+void TestOptions::printHelp(bool ShowHidden) const {
+
+  // Based off of swift/lib/Driver/Driver.cpp, at Driver::printHelp
+  //FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
+  // Maybe not for modes such as Interactive, Batch, AutolinkExtract, etc,
+  // as in Driver.cpp. But could be useful for extra info, like HelpHidden.
+
+  TestOptTable Table;
+
+  Table.PrintHelp(llvm::outs(), "sourcekitd-test", "SourceKit Testing Tool",
+                      ShowHidden);
 }

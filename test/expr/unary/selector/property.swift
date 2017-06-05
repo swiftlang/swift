@@ -143,9 +143,9 @@ class ObjCClassWithGetterSetter: NSObject {
 // Looking up inherited members
 
 class BaseClass: NSObject {
-  var myVar = 1
+  @objc var myVar = 1
 
-  func myFunc() {
+  @objc func myFunc() {
   }
 }
 

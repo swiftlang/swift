@@ -385,6 +385,9 @@ Other substitutions:
 * ``%platform-sdk-overlay-dir``: absolute path of the directory where the SDK
   overlay module files for the target platform are stored.
 
+* ``%swift_src_root``: absolute path of the directory where the Swift source
+  code is stored.
+
 * ``%{python}``: run the same Python interpreter that's being used to run the
   current ``lit`` test.
 
@@ -393,6 +396,10 @@ Other substitutions:
   path-independent constants.
 
 * ``%raw-FileCheck``: the LLVM ``FileCheck`` utility.
+
+* ``%empty-directory(`` *directory-name* ``)``: ensures that the given
+  directory exists and is empty.  Equivalent to
+  ``rm -rf directory-name && mkdir -p directory-name``.
 
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::

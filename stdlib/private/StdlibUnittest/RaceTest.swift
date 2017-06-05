@@ -413,9 +413,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   }
 }
 
-func _masterThreadStopWorkers<RT : RaceTestWithPerTrialData>(
-    _ sharedState: _RaceTestSharedState<RT>
-) {
+func _masterThreadStopWorkers<RT>( _ sharedState: _RaceTestSharedState<RT>) {
   // Workers are proceeding to the first barrier in _workerThreadOneTrial.
   sharedState.stopNow.store(1)
   // Allow workers to proceed past that first barrier. They will then see
@@ -423,9 +421,7 @@ func _masterThreadStopWorkers<RT : RaceTestWithPerTrialData>(
   sharedState.trialBarrier.wait()
 }
 
-func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
-  _ sharedState: _RaceTestSharedState<RT>
-) {
+func _masterThreadOneTrial<RT>(_ sharedState: _RaceTestSharedState<RT>) {
   let racingThreadCount = sharedState.racingThreadCount
   let raceDataCount = racingThreadCount * racingThreadCount
   let rt = RT()
@@ -485,7 +481,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialData>(
   }
 }
 
-func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
+func _workerThreadOneTrial<RT>(
   _ tid: Int, _ sharedState: _RaceTestSharedState<RT>
 ) -> Bool {
   sharedState.trialBarrier.wait()

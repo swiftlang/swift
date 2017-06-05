@@ -4,8 +4,11 @@
     "AssertCommon.swift"
   ],
   "String": [
+    "ASCII.swift",
     "CString.swift",
     "Character.swift",
+    "CharacterUnicodeScalars.swift",
+    "ICU.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
@@ -21,10 +24,18 @@
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
+    "Substring.swift",
     "Unicode.swift",
+    "UnicodeEncoding.swift",
+    "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeTrie.swift",
-    "UnavailableStringAPIs.swift"
+    "UnavailableStringAPIs.swift",
+    "UTFEncoding.swift",
+    "UTF8.swift",
+    "UTF16.swift",
+    "UTF32.swift",
+    "ValidUTF8Buffer.swift"
   ],
   "Bool": [
     "Bool.swift"
@@ -40,6 +51,7 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
+    "SentinelCollection.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
@@ -51,6 +63,7 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "UIntBuffer.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
@@ -95,6 +108,9 @@
     "CTypes.swift",
     "MemoryLayout.swift"
   ],
+  "KeyPaths": [
+    "KeyPath.swift"
+  ],
   "Reflection": [
     "Dump.swift",
     "Mirror.swift",
@@ -109,8 +125,6 @@
     {
     "Integers": [
       "Integers.swift",
-      "IntegerArithmetic.swift",
-      "FixedPoint.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
@@ -149,6 +163,7 @@
     "REPL.swift",
     "Runtime.swift",
     "Shims.swift",
+    "ThreadLocalStorage.swift",
     "Unmanaged.swift",
     "Availability.swift",
     "CommandLine.swift",
@@ -158,6 +173,7 @@
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift"
+    "Hashable.swift",
+    "Codable.swift"
   ]
 }

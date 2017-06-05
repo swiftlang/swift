@@ -55,13 +55,25 @@ namespace swift {
   bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
-  struct ResolveMemberResult {
-    ValueDecl *Favored = nullptr;
-    std::vector<ValueDecl*> OtherViables;
-    operator bool() const { return Favored; }
+  enum InterestedMemberKind : uint8_t {
+    Viable,
+    Unviable,
+    All,
   };
 
-  ResolveMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
+  struct ResolvedMemberResult {
+    struct Implementation;
+    Implementation &Impl;
+
+    ResolvedMemberResult();
+    ~ResolvedMemberResult();
+    operator bool() const;
+    bool hasBestOverload() const;
+    ValueDecl* getBestOverload() const;
+    ArrayRef<ValueDecl*> getMemberDecls(InterestedMemberKind Kind);
+  };
+
+  ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
   /// \brief Given a type and an extension to the original type decl of that type,
@@ -76,7 +88,7 @@ namespace swift {
     Normal,
 
     /// Type check the argument to an Objective-C #keyPath.
-    ObjCKeyPath,
+    KeyPath,
   };
 
   /// \brief Return the type of an expression parsed during code completion, or

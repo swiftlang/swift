@@ -82,9 +82,6 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
-  /// \brief The first type must conform to the layout defined by the second
-  /// component representing a layout constraint.
-  Layout,
   /// \brief The first type describes a literal that conforms to the second
   /// type, which is one of the known expressible-by-literal protocols.
   LiteralConformsTo,
@@ -132,6 +129,16 @@ enum class ConstraintKind : char {
   /// \brief The first type is an opened type from the second type (which is
   /// an existential).
   OpenedExistentialOf,
+  /// \brief A relation between three types. The first is the key path type,
+  // the second is the root type, and the third is the projected value type.
+  // The second and third types can be lvalues depending on the kind of key
+  // path.
+  KeyPathApplication,
+  /// \brief A relation between three types. The first is the key path type,
+  // the second is its root type, and the third is the projected value type.
+  // The key path type is chosen based on the selection of overloads for the
+  // member references along the path.
+  KeyPath,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -187,6 +194,8 @@ enum class ConversionRestrictionKind {
   Existential,
   /// Metatype to existential metatype conversion.
   MetatypeToExistentialMetatype,
+  /// Existential metatype to metatype conversion.
+  ExistentialMetatypeToMetatype,
   /// T -> U? value to optional conversion (or to implicitly unwrapped optional).
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
@@ -307,6 +316,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
 
+  /// Was this constraint was determined to be inconsistent with the
+  /// constraint graph during constraint propagation?
+  unsigned IsDisabled : 1;
+
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
@@ -331,6 +344,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
       /// \brief The second type.
       Type Second;
+
+      /// \brief The third type, if any.
+      Type Third;
     } Types;
 
     struct {
@@ -379,6 +395,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
+  /// Construct a new constraint.
+  Constraint(ConstraintKind kind, Type first, Type second, Type third,
+             ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
              DeclContext *useDC, FunctionRefKind functionRefKind,
@@ -408,6 +429,11 @@ public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
                             Type First, Type Second,
+                            ConstraintLocator *locator);
+
+  /// Create a new constraint.
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
+                            Type First, Type Second, Type Third,
                             ConstraintLocator *locator);
 
   /// Create a new member constraint.
@@ -465,8 +491,20 @@ public:
   bool isActive() const { return IsActive; }
 
   /// Set whether this constraint is active or not.
-  void setActive(bool active) { IsActive = active; }
-  
+  void setActive(bool active) {
+    assert(!isDisabled() && "Cannot activate a constraint that is disabled!");
+    IsActive = active;
+  }
+
+  /// Whether this constraint is active, i.e., in the worklist.
+  bool isDisabled() const { return IsDisabled; }
+
+  /// Set whether this constraint is active or not.
+  void setDisabled() {
+    assert(!isActive() && "Cannot disable constraint marked as active!");
+    IsDisabled = true;
+  }
+
   /// Mark or retrieve whether this constraint should be favored in the system.
   void setFavored() { IsFavored = true; }
   bool isFavored() const { return IsFavored; }
@@ -496,7 +534,6 @@ public:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
-    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
@@ -512,6 +549,8 @@ public:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
+    case ConstraintKind::KeyPath:
+    case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
 
@@ -556,6 +595,17 @@ public:
     }
   }
 
+  /// \brief Retrieve the third type in the constraint.
+  Type getThirdType() const {
+    switch (getKind()) {
+    case ConstraintKind::KeyPath:
+    case ConstraintKind::KeyPathApplication:
+      return Types.Third;
+    default:
+      llvm_unreachable("no third type");
+    }
+  }
+
   /// \brief Retrieve the protocol in a conformance constraint.
   ProtocolDecl *getProtocol() const;
 
@@ -586,6 +636,15 @@ public:
   ArrayRef<Constraint *> getNestedConstraints() const {
     assert(Kind == ConstraintKind::Disjunction);
     return Nested;
+  }
+
+  unsigned countActiveNestedConstraints() const {
+    unsigned count = 0;
+    for (auto *constraint : Nested)
+      if (!constraint->isDisabled())
+        count++;
+
+    return count;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.

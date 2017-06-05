@@ -13,6 +13,9 @@
 #define DEBUG_TYPE "diagnose-unreachable"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
@@ -187,9 +190,9 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   TermInst *TI = BB.getTerminator();
 
   // Process conditional branches with constant conditions.
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(TI)) {
+  if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
     SILValue V = CBI->getCondition();
-    SILInstruction *CondI = dyn_cast<SILInstruction>(V);
+    auto *CondI = dyn_cast<SILInstruction>(V);
     SILLocation Loc = CBI->getLoc();
 
     if (IntegerLiteralInst *ConstCond =
@@ -246,8 +249,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   //                            case #Bool.false!unionelt: bb2
   // =>
   //   br bb2
-  if (SwitchEnumInst *SUI = dyn_cast<SwitchEnumInst>(TI)) {
-    if (EnumInst *TheEnum = dyn_cast<EnumInst>(SUI->getOperand())) {
+  if (auto *SUI = dyn_cast<SwitchEnumInst>(TI)) {
+    if (auto *TheEnum = dyn_cast<EnumInst>(SUI->getOperand())) {
       const EnumElementDecl *TheEnumElem = TheEnum->getElement();
       SILBasicBlock *TheSuccessorBlock = nullptr;
       int ReachableBlockIdx = -1;
@@ -331,7 +334,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   //   switch_value %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
   // =>
   //   br bb2
-  if (SwitchValueInst *SUI = dyn_cast<SwitchValueInst>(TI)) {
+  if (auto *SUI = dyn_cast<SwitchValueInst>(TI)) {
     if (IntegerLiteralInst *SwitchVal =
           dyn_cast<IntegerLiteralInst>(SUI->getOperand())) {
       SILBasicBlock *TheSuccessorBlock = nullptr;
@@ -538,13 +541,17 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     }
   }
 
+  auto *Scope = NoReturnCall->getDebugScope();
   recursivelyDeleteTriviallyDeadInstructions(ToBeDeleted, true);
   NumInstructionsRemoved += ToBeDeleted.size();
 
   // Add an unreachable terminator. The terminator has an invalid source
   // location to signal to the DataflowDiagnostic pass that this code does
   // not correspond to user code.
+  // Share the scope with the preceding BB. This causes the debug info to be
+  // much smaller and easier to read, but otherwise has no effect.
   SILBuilder B(&BB);
+  B.setCurrentDebugScope(Scope);
   B.createUnreachable(ArtificialUnreachableLocation());
 
   return true;
@@ -724,7 +731,8 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 /// diagnose any user code after it as being unreachable.  This pass happens
 /// before the definite initialization pass so that it doesn't see infeasible
 /// control flow edges.
-static void performNoReturnFunctionProcessing(SILModule *M) {
+static void performNoReturnFunctionProcessing(SILModule *M,
+                                              SILModuleTransform *T) {
   for (auto &Fn : *M) {
     DEBUG(llvm::errs() << "*** No return function processing: "
           << Fn.getName() << "\n");
@@ -734,10 +742,11 @@ static void performNoReturnFunctionProcessing(SILModule *M) {
       // function.
       simplifyBlocksWithCallsToNoReturn(BB, nullptr);
     }
+    T->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
 
-void swift::performSILDiagnoseUnreachable(SILModule *M) {
+void swift::performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T) {
   for (auto &Fn : *M) {
     DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: "
           << Fn.getName() << "\n");
@@ -775,17 +784,17 @@ void swift::performSILDiagnoseUnreachable(SILModule *M) {
 
     // Remove unreachable blocks.
     removeUnreachableBlocks(Fn, *M, &State);
+
+    if (T)
+      T->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
 
 namespace {
   class NoReturnFolding : public SILModuleTransform {
     void run() override {
-      performNoReturnFunctionProcessing(getModule());
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      performNoReturnFunctionProcessing(getModule(), this);
     }
-    
-    StringRef getName() override { return "NoReturnFolding"; }
   };
 } // end anonymous namespace
 
@@ -797,11 +806,8 @@ SILTransform *swift::createNoReturnFolding() {
 namespace {
   class DiagnoseUnreachable : public SILModuleTransform {
     void run() override {
-      performSILDiagnoseUnreachable(getModule());
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      performSILDiagnoseUnreachable(getModule(), this);
     }
-
-    StringRef getName() override { return "Diagnose Unreachable"; }
   };
 } // end anonymous namespace
 

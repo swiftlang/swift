@@ -3,11 +3,11 @@
 func markUsed<T>(_ t: T) {}
 
 class DWARF {
-// CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "_TtVs6UInt32"
-// CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARF9DIEOffset",{{.*}} line: [[@LINE+1]], baseType: ![[BASE]])
+// CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "_T0s6UInt32VD"
+// CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_T09typealias5DWARFC9DIEOffsetaD",{{.*}} line: [[@LINE+1]], baseType: ![[BASE]])
   typealias DIEOffset = UInt32
-  // CHECK-DAG: ![[VOID:.*]] = !DICompositeType({{.*}}identifier: "_TtT_"
-  // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARFP{{.+}}11PrivateType",{{.*}} line: [[@LINE+1]], baseType: ![[VOID]])
+  // CHECK-DAG: ![[VOID:.*]] = !DICompositeType({{.*}}identifier: "_T0ytD"
+  // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_T09typealias5DWARFC11PrivateType{{.+}}aD",{{.*}} line: [[@LINE+1]], baseType: ![[VOID]])
   fileprivate typealias PrivateType = ()
   fileprivate static func usePrivateType() -> PrivateType { return () }
 }

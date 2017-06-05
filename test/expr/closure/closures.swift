@@ -3,7 +3,7 @@
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
 var func6b : (Int, (Int, Int) -> Int) -> ()
-func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to parameters}}
+func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {}
 
 
 // Expressions can be auto-closurified, so that they can be evaluated separately
@@ -337,4 +337,19 @@ func r25993258a() {
 }
 func r25993258b() {
   r25993258_helper { _ in () }
+}
+
+// We have to map the captured var type into the right generic environment.
+class GenericClass<T> {}
+
+func lvalueCapture<T>(c: GenericClass<T>) {
+  var cc = c
+  weak var wc = c
+
+  func innerGeneric<U>(_: U) {
+    _ = cc
+    _ = wc
+
+    cc = wc!
+  }
 }

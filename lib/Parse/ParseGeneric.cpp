@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -203,8 +204,13 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (Tok.is(tok::kw_where))
     WhereClauseText << ',';
 
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
-                       diag::where_inside_brackets);
+  // For Swift 3, keep this warning. 
+  const auto Message = Context.isSwiftVersion3() 
+                             ? diag::swift3_where_inside_brackets 
+                             : diag::where_inside_brackets;
+
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
+
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
 
@@ -371,3 +377,21 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
   return ParserStatus();
 }
 
+/// Parse a where clause after a protocol or associated type declaration.
+ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
+    TrailingWhereClause *&trailingWhere, bool isProtocol) {
+  assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
+  SourceLoc whereLoc;
+  SmallVector<RequirementRepr, 4> requirements;
+  bool firstTypeInComplete;
+  auto whereStatus =
+      parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
+  if (whereStatus.isSuccess()) {
+    trailingWhere =
+        TrailingWhereClause::create(Context, whereLoc, requirements);
+  } else if (whereStatus.hasCodeCompletion()) {
+    return whereStatus;
+  }
+
+  return ParserStatus();
+}

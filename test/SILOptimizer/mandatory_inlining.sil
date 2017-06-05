@@ -901,8 +901,7 @@ bb0(%0 : $*L):
   %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
   %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
-  destroy_addr %5 : $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
-  deinit_existential_addr %3 : $*P2
+  destroy_addr %3 : $*P2
   dealloc_stack %3 : $*P2
   return %7 : $Int32
 }

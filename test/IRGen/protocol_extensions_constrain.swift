@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // rdar://20532214 -- Wrong code for witness method lookup lets executable crash
 
@@ -27,7 +27,7 @@ public struct C2 : P2 {
 }
 
 extension P2 where Self.Index : P3 {
-  final public var bar: Bool {
+  public var bar: Bool {
 	  let i = startIndex
     return i.foo(i)
   }

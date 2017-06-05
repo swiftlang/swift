@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 struct __CurrentErrno {}
 struct CErrorOr<T>
@@ -9,10 +9,8 @@ struct CErrorOr<T>
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
     // CHECK: call void @llvm.dbg.value({{.*}}, metadata ![[SELF:.*]], metadata !{{[0-9]+}})
-    // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope
-    // CHECK-SAME:                         type: ![[T1:.*]])
-    // CHECK: ![[T1]] = !DICompositeType(
-    // CHECK-SAME: identifier: "_T020generic_enum_closure8CErrorOrVyACQq_GD"
+    // CHECK: ![[T1:.*]] = !DICompositeType({{.*}}, identifier: "_T020generic_enum_closure8CErrorOrVyACQq_GD")
+    // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope: {{.*}}, type: ![[T1]])
     value = .none
   }
   func isError() -> Bool {

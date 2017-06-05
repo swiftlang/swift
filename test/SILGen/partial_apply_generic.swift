@@ -1,8 +1,14 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+protocol Panda {
+  associatedtype Cuddles : Foo
+}
 
 protocol Foo {
   static func staticFunc()
   func instanceFunc()
+
+  func makesSelfNonCanonical<T : Panda>(_: T) where T.Cuddles == Self
 }
 
 // CHECK-LABEL: sil hidden @_T021partial_apply_generic14getStaticFunc1{{[_0-9a-zA-Z]*}}F
@@ -61,3 +67,16 @@ func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () -> () {
 // CHECK-NEXT: return
 }
 
+// CHECK-LABEL: sil hidden @_T021partial_apply_generic23getNonCanonicalSelfFuncyq_cxcxm1t_t7CuddlesQy_RszAA5PandaR_r0_lF : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@thick T.Type) -> @owned @callee_owned (@in T) -> @owned @callee_owned (@in U) -> () {
+func getNonCanonicalSelfFunc<T : Foo, U : Panda>(t: T.Type) -> (T) -> (U) -> () where U.Cuddles == T {
+// CHECK: [[REF:%.*]] = function_ref @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_0_0) -> @owned @callee_owned (@in τ_1_0) -> ()
+// CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [[REF]]<T, U>()
+  return t.makesSelfNonCanonical
+// CHECK-NEXT: return [[CLOSURE]]
+}
+
+// curry thunk of Foo.makesSelfNonCanonical<A where ...> (A1) -> ()
+// CHECK-LABEL: sil shared [thunk] @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <Self><T where Self == T.Cuddles, T : Panda> (@in Self) -> @owned @callee_owned (@in T) -> () {
+// CHECK: [[REF:%.*]] = witness_method $Self, #Foo.makesSelfNonCanonical!1 : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [[REF]]<Self, T>(%0)
+// CHECK-NEXT: return [[CLOSURE]]

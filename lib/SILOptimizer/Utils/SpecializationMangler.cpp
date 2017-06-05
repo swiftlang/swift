@@ -16,38 +16,57 @@
 #include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace Mangle;
 
 void SpecializationMangler::beginMangling() {
-  ASTMangler::beginMangling();
-  if (Fragile)
+  ASTMangler::beginManglingWithoutPrefix();
+  if (Serialized)
     ArgOpBuffer << 'q';
   ArgOpBuffer << char(uint8_t(Pass) + '0');
 }
 
+namespace {
+
+/// Utility class for demangling specialization attributes.
+class AttributeDemangler : public Demangle::Demangler {
+public:
+  void demangleAndAddAsChildren(StringRef MangledSpecialization,
+                                NodePointer Parent) {
+    init(MangledSpecialization);
+    if (!parseAndPushNodes()) {
+      llvm::errs() << "Can't demangle: " << MangledSpecialization << '\n';
+      abort();
+    }
+    for (Node *Nd : NodeStack) {
+      addChild(Parent, Nd);
+    }
+  }
+};
+
+} // namespace
+
 std::string SpecializationMangler::finalize() {
-  std::string MangledSpecialization = ASTMangler::finalize();
-  Demangle::Demangler D;
-  NodePointer TopLevel = D.demangleSymbol(MangledSpecialization);
+  StringRef MangledSpecialization(Storage.data(), Storage.size());
+  AttributeDemangler D;
+  NodePointer TopLevel = D.createNode(Node::Kind::Global);
+  D.demangleAndAddAsChildren(MangledSpecialization, TopLevel);
 
   StringRef FuncName = Function->getName();
   NodePointer FuncTopLevel = nullptr;
   if (FuncName.startswith(MANGLING_PREFIX_STR)) {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
-  } else if (FuncName.startswith("_T")) {
-    FuncTopLevel = Demangle::demangleOldSymbolAsNode(FuncName, D);
   }
   if (!FuncTopLevel) {
     FuncTopLevel = D.createNode(Node::Kind::Global);
     FuncTopLevel->addChild(D.createNode(Node::Kind::Identifier, FuncName), D);
   }
   for (NodePointer FuncChild : *FuncTopLevel) {
-    assert(FuncChild->getKind() != Node::Kind::Suffix ||
-           FuncChild->getText() == "merged");
     TopLevel->addChild(FuncChild, D);
   }
-  return Demangle::mangleNode(TopLevel);
+  std::string mangledName = Demangle::mangleNode(TopLevel);
+  verify(mangledName);
+  return mangledName;
 }
 
 //===----------------------------------------------------------------------===//
@@ -89,8 +108,8 @@ std::string PartialSpecializationMangler::mangle() {
 
 FunctionSignatureSpecializationMangler::
 FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
-                                       IsFragile_t Fragile, SILFunction *F)
-  : SpecializationMangler(P, Fragile, F) {
+                                       IsSerialized_t Serialized, SILFunction *F)
+  : SpecializationMangler(P, Serialized, F) {
   for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
        ++i) {
     (void)i;

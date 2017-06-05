@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -22,9 +22,11 @@ func callFoo(_ x: Foo) {
 
   // Final @objc properties are still accessed directly.
   // CHECK: [[PROP:%.*]] = ref_element_addr {{%.*}} : $Foo, #Foo.prop
-  // CHECK: load [trivial] [[PROP]] : $*Int
+  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[PROP]] : $*Int
+  // CHECK: load [trivial] [[READ]] : $*Int
   let prop = x.prop
   // CHECK: [[PROP:%.*]] = ref_element_addr {{%.*}} : $Foo, #Foo.prop
-  // CHECK: assign {{%.*}} to [[PROP]] : $*Int
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[PROP]] : $*Int
+  // CHECK: assign {{%.*}} to [[WRITE]] : $*Int
   x.prop = prop
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -new-mangling-for-tests -O %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -parse-as-library -O %s -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=CHECK-REFLECTION %s < %t.ll
 

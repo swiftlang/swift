@@ -41,7 +41,7 @@ public func run_Dictionary3(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result, "Incorrect results in Dictionary3: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -54,13 +54,10 @@ class Box<T : Hashable> : Hashable {
   var hashValue: Int {
     return value.hashValue
   }
-}
-
-extension Box : Equatable {
-}
-
-func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
-  return lhs.value == rhs.value
+  
+  static func ==(lhs: Box, rhs: Box) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 @inline(never)
@@ -92,5 +89,5 @@ public func run_Dictionary3OfObjects(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result, "Incorrect results in Dictionary3OfObject: \(res) != \(ref_result)")
+  CheckResults(res == ref_result)
 }

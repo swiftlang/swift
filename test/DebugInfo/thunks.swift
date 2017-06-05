@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-ir -g %s -o - | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -emit-verbose-sil -g %s -o - | %FileCheck %s --check-prefix=SIL-CHECK
+// RUN: %target-swift-frontend -emit-ir -g %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -g %s -o - | %FileCheck %s --check-prefix=SIL-CHECK
 // REQUIRES: objc_interop
 import Foundation
 

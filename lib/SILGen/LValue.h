@@ -97,15 +97,17 @@ public:
     TupleElementKind,           // tuple_element_addr
     StructElementKind,          // struct_element_addr
     OptionalObjectKind,         // optional projection
-    OpenedExistentialKind,      // opened opaque existential
+    OpenOpaqueExistentialKind,  // opened opaque existential
     AddressorKind,              // var/subscript addressor
     ValueKind,                  // random base pointer as an lvalue
+    KeyPathApplicationKind,     // applying a key path
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
+    OpenNonOpaqueExistentialKind,  // opened class or metatype existential
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
@@ -156,7 +158,9 @@ public:
   /// base value.
   virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                        AccessKind accessKind) const = 0;
-  
+
+  virtual bool isRValue() const { return false; }
+
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.  This is always an object type, never an address.
   SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
@@ -189,12 +193,12 @@ public:
   /// Derive the address of this component given the address of the base.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue offset(SILGenFunction &gen,
+  virtual ManagedValue offset(SILGenFunction &SGF,
                               SILLocation loc,
                               ManagedValue base,
                               AccessKind accessKind) && = 0;
 
-  AccessKind getBaseAccessKind(SILGenFunction &gen,
+  AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                AccessKind accessKind) const override {
     return accessKind;
   }
@@ -224,18 +228,18 @@ protected:
 public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent>
-  clone(SILGenFunction &gen, SILLocation l) const = 0;
+  clone(SILGenFunction &SGF, SILLocation l) const = 0;
   
   /// Set the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual void set(SILGenFunction &gen, SILLocation loc,
+  virtual void set(SILGenFunction &SGF, SILLocation loc,
                    RValue &&value, ManagedValue base) && = 0;
 
   /// Get the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual RValue get(SILGenFunction &gen, SILLocation loc,
+  virtual RValue get(SILGenFunction &SGF, SILLocation loc,
                      ManagedValue base, SGFContext c) && = 0;
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
@@ -244,7 +248,7 @@ public:
   /// diagnostic.
   virtual void diagnoseWritebackConflict(LogicalPathComponent *rhs,
                                          SILLocation loc1, SILLocation loc2,
-                                         SILGenFunction &gen) = 0;
+                                         SILGenFunction &SGF) = 0;
 
 
   /// Materialize the storage into memory.  If the access is for
@@ -252,14 +256,14 @@ public:
   /// eventually be reflected in the original storage.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue getMaterialized(SILGenFunction &gen, SILLocation loc,
+  virtual ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
                                        ManagedValue base,
                                        AccessKind accessKind) &&;
 
   /// Perform a writeback on the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual void writeback(SILGenFunction &gen, SILLocation loc,
+  virtual void writeback(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base,
                          MaterializedLValue materialized,
                          bool isFinal);
@@ -284,7 +288,7 @@ protected:
   }
 
 public:
-  AccessKind getBaseAccessKind(SILGenFunction &gen,
+  AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                AccessKind kind) const override {
     // Always use the same access kind for the base.
     return kind;
@@ -292,23 +296,23 @@ public:
 
   void diagnoseWritebackConflict(LogicalPathComponent *RHS,
                                  SILLocation loc1, SILLocation loc2,
-                                 SILGenFunction &gen) override {
+                                 SILGenFunction &SGF) override {
     // no useful writeback diagnostics at this point
   }
 
-  RValue get(SILGenFunction &gen, SILLocation loc,
+  RValue get(SILGenFunction &SGF, SILLocation loc,
              ManagedValue base, SGFContext c) && override;
 
-  void set(SILGenFunction &gen, SILLocation loc,
+  void set(SILGenFunction &SGF, SILLocation loc,
            RValue &&value, ManagedValue base) && override;
 
   /// Transform from the original pattern.
-  virtual RValue translate(SILGenFunction &gen, SILLocation loc,
+  virtual RValue translate(SILGenFunction &SGF, SILLocation loc,
                            RValue &&value,
                            SGFContext ctx = SGFContext()) && = 0;
 
   /// Transform into the original pattern.
-  virtual RValue untranslate(SILGenFunction &gen, SILLocation loc,
+  virtual RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                              RValue &&value,
                              SGFContext ctx = SGFContext()) && = 0;
   
@@ -341,6 +345,7 @@ public:
                          CanType substFormalType);
 
   static LValue forAddress(ManagedValue address,
+                           Optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
 
@@ -388,7 +393,7 @@ public:
   }
 
   /// Add a member component to the access path of this lvalue.
-  void addMemberComponent(SILGenFunction &gen, SILLocation loc,
+  void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                           AbstractStorageDecl *storage,
                           SubstitutionList subs,
                           bool isSuper,
@@ -398,7 +403,7 @@ public:
                           CanType formalRValueType,
                           RValue &&indices);
 
-  void addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
+  void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                              VarDecl *var,
                              SubstitutionList subs,
                              bool isSuper,
@@ -407,7 +412,7 @@ public:
                              AccessStrategy accessStrategy,
                              CanType formalRValueType);
 
-  void addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
+  void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                    SubscriptDecl *subscript,
                                    SubstitutionList subs,
                                    bool isSuper,
@@ -453,6 +458,13 @@ public:
     return getTypeData().OrigFormalType;
   }
 
+  /// Returns true when the other access definitely does not begin a formal
+  /// access that would conflict with this the accesses begun by this
+  /// LValue. This is a best-effort attempt; it may return false in cases
+  /// where the two LValues do not conflict.
+  bool isObviouslyNonConflicting(const LValue &other, AccessKind selfAccess,
+                                 AccessKind otherAccess);
+
   void dump() const;
   void print(raw_ostream &OS) const;
 };
@@ -460,9 +472,9 @@ public:
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
 /// during the inout conversion scope will be no-ops.
 class InOutConversionScope {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
 public:
-  InOutConversionScope(SILGenFunction &gen);
+  InOutConversionScope(SILGenFunction &SGF);
   ~InOutConversionScope();
 };
 
@@ -486,30 +498,16 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
         component(std::move(comp)), base(base), materialized(materialized) {}
 
   void diagnoseConflict(const ExclusiveBorrowFormalAccess &rhs,
-                        SILGenFunction &SGF) const {
-    // If the two writebacks we're comparing are of different kinds (e.g.
-    // ownership conversion vs a computed property) then they aren't the
-    // same and thus cannot conflict.
-    if (component->getKind() != rhs.component->getKind())
-      return;
+                        SILGenFunction &SGF) const;
 
-    // If the lvalues don't have the same base value, then they aren't the same.
-    // Note that this is the primary source of false negative for this
-    // diagnostic.
-    if (base.getValue() != rhs.base.getValue())
-      return;
-
-    component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,
-                                         SGF);
+  void performWriteback(SILGenFunction &SGF, bool isFinal) {
+    Scope S(SGF.Cleanups, CleanupLocation::get(loc));
+    component->writeback(SGF, loc, base, materialized, isFinal);
   }
 
-  void performWriteback(SILGenFunction &gen, bool isFinal) {
-    Scope S(gen.Cleanups, CleanupLocation::get(loc));
-    component->writeback(gen, loc, base, materialized, isFinal);
-  }
-
-  void finishImpl(SILGenFunction &gen) override {
-    performWriteback(gen, /*isFinal*/ true);
+  void finishImpl(SILGenFunction &SGF) override {
+    performWriteback(SGF, /*isFinal*/ true);
+    component.reset();
   }
 };
 

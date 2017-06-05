@@ -263,15 +263,24 @@ public:
   /// Encodes the memory behavior query as a MemBehaviorKeyTy.
   MemBehaviorKeyTy toMemoryBehaviorKey(SILValue V1, SILValue V2, RetainObserveKind K);
 
-  virtual void invalidate(SILAnalysis::InvalidationKind K) override {
+  virtual void invalidate() override {
     AliasCache.clear();
     MemoryBehaviorCache.clear();
   }
 
   virtual void invalidate(SILFunction *,
                           SILAnalysis::InvalidationKind K) override {
-    invalidate(K);
+    invalidate();
   }
+
+  /// Notify the analysis about a newly created function.
+  virtual void notifyAddFunction(SILFunction *F) override { }
+
+  /// Notify the analysis about a function which will be deleted from the
+  /// module.
+  virtual void notifyDeleteFunction(SILFunction *F) override { }
+
+  virtual void invalidateFunctionTables() override { }
 };
 
 

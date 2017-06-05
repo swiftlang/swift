@@ -3,16 +3,41 @@ TypeAlias Dictionary.Index has been removed
 TypeAlias Set.Index has been removed
 Struct DictionaryIndex has been removed
 Struct SetIndex has been removed
+/* AbsoluteValuable is available in Swift 3 mode as a type alias */
+Protocol AbsoluteValuable has been removed
 
 /* Removed declarations */
 Protocol BidirectionalIndexable has been removed (deprecated)
 Protocol ExpressibleByStringInterpolation has been removed (deprecated)
 Protocol Indexable has been removed (deprecated)
 Protocol IndexableBase has been removed (deprecated)
+/* IntegerArithmetic is available in Swift 3 mode as a type alias */
+Protocol IntegerArithmetic has been removed
 Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
+/* IntegerArithmetic is available in Swift 3 mode as a type alias */
+Protocol IntegerArithmetic has been removed
+/* SignedNumber is available in Swift 3 mode as a type alias */
+Protocol SignedNumber has been removed
+/* Underscored protocols should not be used and are not guaranteed to exist */
+Protocol _DisallowMixedSignArithmetic has been removed
+Protocol _Integer has been removed
+Protocol _IntegerArithmetic has been removed
+Protocol _SignedInteger has been removed
+/* allZeros is available but deprecated in Swift 3 mode */
+Var Int.allZeros has been removed
+Var Int16.allZeros has been removed
+Var Int32.allZeros has been removed
+Var Int64.allZeros has been removed
+Var Int8.allZeros has been removed
+Var UInt.allZeros has been removed
+Var UInt16.allZeros has been removed
+Var UInt32.allZeros has been removed
+Var UInt64.allZeros has been removed
+Var UInt8.allZeros has been removed
 Constructor String.init(stringInterpolationSegment:) has been removed
+Constructor UnsafeBufferPointerIterator.init() has been removed
 Func Array.append(contentsOf:) has been removed
 Func ArraySlice.append(contentsOf:) has been removed
 Func ContiguousArray.append(contentsOf:) has been removed
@@ -21,10 +46,122 @@ Func ContiguousArray.append(contentsOf:) has been removed
 Func Dictionary.removeValue(forKey:) has been removed
 Func Dictionary.updateValue(_:forKey:) has been removed
 
+/* Source-compatible integer changes */
+Var Int.description has been moved to Var SignedInteger.description
+Var Int.max has been moved to Var SignedInteger.max
+Var Int.min has been moved to Var SignedInteger.min
+Var Int16.description has been moved to Var SignedInteger.description
+Var Int16.max has been moved to Var SignedInteger.max
+Var Int16.min has been moved to Var SignedInteger.min
+Var Int32.description has been moved to Var SignedInteger.description
+Var Int32.max has been moved to Var SignedInteger.max
+Var Int32.min has been moved to Var SignedInteger.min
+Var Int64.description has been moved to Var SignedInteger.description
+Var Int64.max has been moved to Var SignedInteger.max
+Var Int64.min has been moved to Var SignedInteger.min
+Var Int8.description has been moved to Var SignedInteger.description
+Var Int8.max has been moved to Var SignedInteger.max
+Var Int8.min has been moved to Var SignedInteger.min
+Var UInt.description has been moved to Var SignedInteger.description
+Var UInt.max has been moved to Var SignedInteger.max
+Var UInt.min has been moved to Var SignedInteger.min
+Var UInt16.description has been moved to Var SignedInteger.description
+Var UInt16.max has been moved to Var SignedInteger.max
+Var UInt16.min has been moved to Var SignedInteger.min
+Var UInt32.description has been moved to Var SignedInteger.description
+Var UInt32.max has been moved to Var SignedInteger.max
+Var UInt32.min has been moved to Var SignedInteger.min
+Var UInt64.description has been moved to Var SignedInteger.description
+Var UInt64.max has been moved to Var SignedInteger.max
+Var UInt64.min has been moved to Var SignedInteger.min
+Var UInt8.description has been moved to Var SignedInteger.description
+Var UInt8.max has been moved to Var SignedInteger.max
+Var UInt8.min has been moved to Var SignedInteger.min
+
+/* Some of these changes are valid, others are just bogus */
+Constructor Int.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor Int.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int16.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int16.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor Int16.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int16.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int32.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int32.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor Int32.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int32.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int64.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int64.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor Int64.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int64.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int8.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int8.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor Int8.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int8.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor UInt.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt16.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt16.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor UInt16.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt16.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt32.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt32.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor UInt32.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt32.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt64.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt64.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor UInt64.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt64.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt8.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt8.init(_:) has been moved to Constructor SetAlgebra.init(_:)
+Constructor UInt8.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt8.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UnsafeBufferPointerIterator.init() has been moved to Constructor BinaryInteger.init()
+Func Double.subtract(_:) has been moved to Func SetAlgebra.subtract(_:)
+Func Float.subtract(_:) has been moved to Func SetAlgebra.subtract(_:)
+Func Float80.subtract(_:) has been moved to Func SetAlgebra.subtract(_:)
+Func FloatingPoint.subtract(_:) has been moved to Func SetAlgebra.subtract(_:)
+Func FloatingPoint.subtracting(_:) has been moved to Func SetAlgebra.subtracting(_:)
+Func Int.toIntMax() has been moved to Func BinaryInteger.toIntMax()
+Func Int16.toIntMax() has been moved to Func BinaryInteger.toIntMax()
+Func Int32.toIntMax() has been moved to Func BinaryInteger.toIntMax()
+Func Int64.toIntMax() has been moved to Func BinaryInteger.toIntMax()
+Func Int8.toIntMax() has been moved to Func BinaryInteger.toIntMax()
+Func SignedInteger.advanced(by:) has been moved to Func BinaryInteger.advanced(by:)
+Func SignedInteger.distance(to:) has been moved to Func BinaryInteger.distance(to:)
+Func SignedInteger.toIntMax() has been moved to Func BinaryInteger.toIntMax()
+Func UInt.toUIntMax() has been moved to Func Int16.toUIntMax()
+Func UInt16.toUIntMax() has been moved to Func Int16.toUIntMax()
+Func UInt32.toUIntMax() has been moved to Func Int16.toUIntMax()
+Func UInt64.toUIntMax() has been moved to Func Int16.toUIntMax()
+Func UInt8.toUIntMax() has been moved to Func Int16.toUIntMax()
+
+/* Valid source comatible changes to integers */
+Func UnsignedInteger.advanced(by:) has been moved to Func BinaryInteger.advanced(by:)
+Func UnsignedInteger.distance(to:) has been moved to Func BinaryInteger.distance(to:)
+Protocol Integer has been renamed to Protocol BinaryInteger
+
 /* FIXME: Bogus */
+Func FloatingPoint.adding(_:) has been renamed to Func FloatingPoint.addingProduct(_:_:)
+Var BidirectionalCollection.indices has declared type change from DefaultBidirectionalIndices<Self> to Self.Indices
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+
+/* Added new type */
+Var Dictionary.keys has declared type change from LazyMapCollection<Dictionary<Key, Value>, Key> to Dictionary<Key, Value>.Keys
+
+/* FIXME: Bogus */
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Var RandomAccessCollection.indices has declared type change from DefaultRandomAccessIndices<Self> to Self.Indices
+
+/* Added new type */
+Var Dictionary.values has declared type change from LazyMapCollection<Dictionary<Key, Value>, Value> to Dictionary<Key, Value>.Values
+
+/* FIXME: Bogus */
 Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Var Set.first has declared type change from Element? to (Element)?
 Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
 Constructor AnyIterator.init(_:) has parameter 0 type change from () -> Element? to () -> AnyIterator.Element?
 Constructor BidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<BidirectionalSlice.Index>

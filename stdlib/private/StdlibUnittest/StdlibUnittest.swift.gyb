@@ -158,6 +158,26 @@ public func expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatab
   expectEqualTest(expected.3, actual.3, ${trace}, showFrame: false) {$0 == $1}
 }
 
+% for (Lhs, Rhs) in [
+%   ('String', 'Substring'),
+%   ('Substring', 'String'),
+%   ('String', 'String'), # this one is to break ambiguity
+% ]:
+public func expectEqual(_ expected: ${Lhs}, _ actual: ${Rhs}, ${TRACE}) {
+  if !(expected == actual) {
+    expectationFailure(
+      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      trace: ${trace}
+    )
+  }
+}
+% end
+
+public func expectEqualReference(_ expected: AnyObject?, _ actual: AnyObject?, ${TRACE}) {
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) {$0 === $1}
+}
+
 public func expectationFailure(
   _ reason: String,
   trace message: String,
@@ -290,7 +310,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
 extension Range
 %   if 'Countable' in OtherRange:
   where
-  Bound : Comparable & _Strideable, Bound.Stride : SignedInteger
+  Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
 {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
@@ -359,15 +379,11 @@ public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
 ) where
   // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
+%   if Mutable == '':
   X.SubSequence : Collection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
+%   end
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence,
-  X.Indices : Collection,
-  X.Indices.Iterator.Element == X.Index,
-  X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices {}
+  X.Indices : Collection {}
 % end
 
 /// A slice is a `Collection` that when sliced returns an instance of
@@ -408,16 +424,9 @@ public func expectCollectionAssociatedTypes<X : Collection>(
 ) where
   // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X._Element == X.Iterator.Element,
   X.SubSequence : Collection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence,
-  X.Indices : Collection,
-  X.Indices.Iterator.Element == X.Index,
-  X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices {}
+  X.Indices : Collection {}
 
 /// Check that all associated types of a `BidirectionalCollection` are what we
 /// expect them to be.
@@ -431,16 +440,9 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
 ) where
   // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X._Element == X.Iterator.Element,
   X.SubSequence : BidirectionalCollection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence,
-  X.Indices : BidirectionalCollection,
-  X.Indices.Iterator.Element == X.Index,
-  X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices {}
+  X.Indices : BidirectionalCollection {}
 
 /// Check that all associated types of a `RandomAccessCollection` are what we
 /// expect them to be.
@@ -454,16 +456,9 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
 ) where
   // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X._Element == X.Iterator.Element,
   X.SubSequence : RandomAccessCollection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
-  X.SubSequence.SubSequence == X.SubSequence,
-  X.Indices : RandomAccessCollection,
-  X.Indices.Iterator.Element == X.Index,
-  X.Indices.Index == X.Index,
-  X.Indices.SubSequence == X.Indices {}
+  X.Indices : RandomAccessCollection {}
 
 public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {
@@ -594,7 +589,7 @@ func _stdlib_getline() -> String? {
       }
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
-    if c == CInt(UnicodeScalar("\n").value) {
+    if c == CInt(Unicode.Scalar("\n").value) {
       return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
     }
     result.append(UInt8(c))
@@ -634,7 +629,7 @@ func _childProcess() {
 
 #if _runtime(_ObjC)
   objc_setUncaughtExceptionHandler {
-    let exception = $0! as AnyObject
+    let exception = ($0 as Optional)! as AnyObject
     var stderr = _Stderr()
     let maybeNSException =
         unsafeBitCast(exception, to: _StdlibUnittestNSException.self)
@@ -1994,10 +1989,7 @@ public func checkEquatable<Instances : Collection>(
   allowBrokenTransitivity: Bool = false,
   ${TRACE}
 ) where
-  Instances.Iterator.Element : Equatable,
-  // FIXME(ABI)#89 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index
+  Instances.Iterator.Element : Equatable
 {
   let indices = Array(instances.indices)
   _checkEquatableImpl(
@@ -2090,10 +2082,7 @@ public func checkHashable<Instances : Collection>(
   allowBrokenTransitivity: Bool = false,
   ${TRACE}
 ) where
-  Instances.Iterator.Element : Hashable,
-  // FIXME(ABI)#90 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Iterator.Element : Hashable {
 
   checkEquatable(
     instances,
@@ -2185,10 +2174,7 @@ public func checkComparable<Instances : Collection>(
   oracle: (Instances.Index, Instances.Index) -> ExpectedComparisonResult,
   ${TRACE}
 ) where
-  Instances.Iterator.Element : Comparable,
-  // FIXME(ABI)#91 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Iterator.Element : Comparable {
 
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
@@ -2295,11 +2281,7 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
   ${TRACE}
 ) where
   Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == Strides.Iterator.Element,
-  // FIXME(ABI)#92 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index,
-  Strides.Indices.Iterator.Element == Strides.Index {
+  Instances.Iterator.Element.Stride == Strides.Iterator.Element {
 
   checkComparable(
     instances,
@@ -2441,7 +2423,7 @@ public func expectEqualsUnordered<
 public func expectEqualsUnordered<T : Strideable>(
   _ expected: CountableRange<T>, _ actual: [T], ${TRACE}
 ) {
-  if numericCast(expected.count) != actual.count {
+  if expected.count != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})

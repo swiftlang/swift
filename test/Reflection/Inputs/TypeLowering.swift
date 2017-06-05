@@ -113,6 +113,8 @@ public struct ExistentialStruct {
   
   public weak var weakAnyObject: AnyObject?
   public weak var weakAnyClassBoundProto: CP1?
+
+  public let classConstrainedP1: C & P1
 }
 
 public struct MetadataHolder<T, U> {

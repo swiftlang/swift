@@ -286,7 +286,7 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
   while (ptr < end) {
     uint8_t first = *ptr++;
     if (first < 0x80) {
-      if (NewMangling::isValidSymbolChar(first) || !mapNonSymbolChars) {
+      if (Mangle::isValidSymbolChar(first) || !mapNonSymbolChars) {
         OutUTF32.push_back(first);
       } else {
         OutUTF32.push_back((uint32_t)first + 0xD800);

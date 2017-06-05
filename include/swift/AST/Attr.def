@@ -50,6 +50,7 @@ TYPE_ATTR(in)
 TYPE_ATTR(inout)
 TYPE_ATTR(inout_aliasable)
 TYPE_ATTR(in_guaranteed)
+TYPE_ATTR(in_constant)
 TYPE_ATTR(owned)
 TYPE_ATTR(unowned_inner_pointer)
 TYPE_ATTR(guaranteed)
@@ -92,7 +93,7 @@ SIMPLE_DECL_ATTR(final, Final,
                  OnClass | OnFunc | OnVar | OnSubscript|DeclModifier, 2)
 
 DECL_ATTR(objc, ObjC,
-          OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
+          OnFunc | OnClass | OnProtocol | OnExtension | OnVar | OnSubscript |
           OnConstructor | OnDestructor | OnEnum | OnEnumElement, 3)
 
 SIMPLE_DECL_ATTR(required, Required,
@@ -158,7 +159,7 @@ DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
 SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
-                 OnFunc | OnVar | OnSubscript | OnConstructor, 30)
+                 OnExtension | OnFunc | OnVar | OnSubscript | OnConstructor, 30)
 
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
                  OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
@@ -170,6 +171,8 @@ SIMPLE_DECL_ATTR(_inlineable, Inlineable,
 DECL_ATTR(_specialize, Specialize,
           OnConstructor | OnFunc | AllowMultipleAttributes | LongAttribute
           | UserInaccessible, 33)
+
+SIMPLE_DECL_ATTR(objcMembers, ObjCMembers, OnClass, 34)
 
 // Non-serialized attributes.
 
@@ -264,6 +267,29 @@ SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
                  OnFunc | OnConstructor | LongAttribute, 65)
 
 SIMPLE_DECL_ATTR(GKInspectable, GKInspectable, OnVar, 66)
+
+DECL_ATTR(_implements, Implements,
+          OnFunc | OnVar | OnSubscript | OnTypeAlias
+          | NotSerialized | UserInaccessible,
+          /* Not serialized */ 67)
+
+DECL_ATTR(NSKeyedArchiverClassName, NSKeyedArchiverClassName,
+          OnClass | NotSerialized | LongAttribute,
+          /*Not serialized */ 68)
+
+SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
+                 OnClass | NotSerialized | LongAttribute | RejectByParser,
+                 /*Not serialized */ 69)
+
+SIMPLE_DECL_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly,
+                 NSKeyedArchiverEncodeNonGenericSubclassesOnly,
+                 OnClass | NotSerialized | LongAttribute,
+                 /*Not serialized */ 70)
+
+// HACK: Attribute needed to preserve source compatibility by downgrading errors
+// due to an SDK change in Dispatch
+SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
+                 OnEnumElement | LongAttribute | UserInaccessible, 71)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

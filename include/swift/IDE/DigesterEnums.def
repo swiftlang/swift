@@ -1,0 +1,145 @@
+#ifndef NODE_KIND
+#define NODE_KIND(NAME)
+#endif
+
+#ifndef NODE_ANNOTATION
+#define NODE_ANNOTATION(NAME)
+#endif
+
+#ifndef DECL_ATTR
+#define DECL_ATTR(NAME)
+#endif
+
+#ifndef KEY
+#define KEY(NAME)
+#endif
+
+#ifndef KNOWN_TYPE
+#define KNOWN_TYPE(NAME)
+#endif
+
+#ifndef DIFF_ITEM_KIND
+#define DIFF_ITEM_KIND(NAME)
+#endif
+
+#ifndef DIFF_ITEM_KEY_KIND
+#define DIFF_ITEM_KEY_KIND(NAME)
+#endif
+
+#ifndef SPECIAL_CASE_ID
+#define SPECIAL_CASE_ID(NAME)
+#endif
+
+NODE_KIND(Root)
+NODE_KIND(TypeDecl)
+NODE_KIND(TypeNominal)
+NODE_KIND(TypeFunc)
+NODE_KIND(TypeNameAlias)
+NODE_KIND(Function)
+NODE_KIND(Constructor)
+NODE_KIND(Getter)
+NODE_KIND(Setter)
+NODE_KIND(Var)
+NODE_KIND(TypeAlias)
+
+NODE_ANNOTATION(Added)
+NODE_ANNOTATION(Removed)
+NODE_ANNOTATION(Updated)
+NODE_ANNOTATION(RemovingErrorParam)
+NODE_ANNOTATION(ImplicitOptionalToOptional)
+NODE_ANNOTATION(OptionalToImplicitOptional)
+NODE_ANNOTATION(WrapOptional)
+NODE_ANNOTATION(WrapImplicitOptional)
+NODE_ANNOTATION(UnwrapOptional)
+NODE_ANNOTATION(GenericParamUpCast)
+NODE_ANNOTATION(GenericParamDownCast)
+NODE_ANNOTATION(TypeAliasChangeFromInt)
+NODE_ANNOTATION(GetterToProperty)
+NODE_ANNOTATION(SetterToProperty)
+NODE_ANNOTATION(TypeRewritten)
+NODE_ANNOTATION(TypeRewrittenLeft)
+NODE_ANNOTATION(TypeRewrittenRight)
+NODE_ANNOTATION(ModernizeEnum)
+NODE_ANNOTATION(UnwrapUnmanaged)
+NODE_ANNOTATION(RemovedDecl)
+NODE_ANNOTATION(Rename)
+NODE_ANNOTATION(RenameOldName)
+NODE_ANNOTATION(RenameNewName)
+NODE_ANNOTATION(NowThrowing)
+NODE_ANNOTATION(NowMutating)
+NODE_ANNOTATION(StaticChange)
+NODE_ANNOTATION(OwnershipChange)
+
+DECL_ATTR(deprecated)
+
+KEY(kind)
+KEY(name)
+KEY(selfIndex)
+KEY(usr)
+KEY(location)
+KEY(children)
+KEY(printedName)
+KEY(moduleName)
+KEY(throwing)
+KEY(mutating)
+KEY(static)
+KEY(typeAttributes)
+KEY(declAttributes)
+KEY(declKind)
+KEY(ownership)
+
+KNOWN_TYPE(Optional)
+KNOWN_TYPE(ImplicitlyUnwrappedOptional)
+KNOWN_TYPE(Void)
+KNOWN_TYPE(Unmanaged)
+KNOWN_TYPE(Function)
+
+DIFF_ITEM_KIND(CommonDiffItem)
+DIFF_ITEM_KIND(TypeMemberDiffItem)
+DIFF_ITEM_KIND(SpecialCaseDiffItem)
+DIFF_ITEM_KIND(NoEscapeFuncParam)
+DIFF_ITEM_KIND(OverloadedFuncInfo)
+
+#ifndef DIFF_ITEM_KEY_KIND_STRING
+#define DIFF_ITEM_KEY_KIND_STRING(NAME) DIFF_ITEM_KEY_KIND(NAME)
+#endif
+
+#ifndef DIFF_ITEM_KEY_KIND_INT
+#define DIFF_ITEM_KEY_KIND_INT(NAME) DIFF_ITEM_KEY_KIND(NAME)
+#endif
+
+DIFF_ITEM_KEY_KIND_STRING(DiffItemKind)
+DIFF_ITEM_KEY_KIND_STRING(NodeKind)
+DIFF_ITEM_KEY_KIND_STRING(NodeAnnotation)
+DIFF_ITEM_KEY_KIND_STRING(Usr)
+DIFF_ITEM_KEY_KIND_STRING(ChildIndex)
+DIFF_ITEM_KEY_KIND_STRING(LeftUsr)
+DIFF_ITEM_KEY_KIND_STRING(LeftComment)
+DIFF_ITEM_KEY_KIND_STRING(RightUsr)
+DIFF_ITEM_KEY_KIND_STRING(RightComment)
+DIFF_ITEM_KEY_KIND_STRING(ModuleName)
+DIFF_ITEM_KEY_KIND_STRING(NewTypeName)
+DIFF_ITEM_KEY_KIND_STRING(NewPrintedName)
+DIFF_ITEM_KEY_KIND_STRING(OldTypeName)
+DIFF_ITEM_KEY_KIND_STRING(OldPrintedName)
+DIFF_ITEM_KEY_KIND_STRING(SpecialCaseId)
+
+DIFF_ITEM_KEY_KIND_INT(SelfIndex)
+DIFF_ITEM_KEY_KIND_INT(RemovedIndex)
+DIFF_ITEM_KEY_KIND_INT(Index)
+
+SPECIAL_CASE_ID(NSOpenGLSetOption)
+SPECIAL_CASE_ID(NSOpenGLGetOption)
+SPECIAL_CASE_ID(StaticAbsToSwiftAbs)
+
+#undef SPECIAL_CASE_ID
+#undef DIFF_ITEM_KEY_KIND_INT
+#undef DIFF_ITEM_KEY_KIND_STRING
+
+#undef DIFF_ITEM_KEY_KIND
+#undef DIFF_ITEM_KIND
+#undef KNOWN_TYPE
+#undef KEY
+#undef DECL_ATTR
+#undef NODE_ANNOTATION
+#undef NODE_KIND

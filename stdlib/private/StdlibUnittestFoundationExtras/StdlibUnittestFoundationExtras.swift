@@ -27,13 +27,17 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   _ temporaryLocale: NSLocale,
   _ body: () -> Result
 ) -> Result {
-  let oldMethod = class_getClassMethod(
-    NSLocale.self, #selector(getter: NSLocale.current))
-  precondition(oldMethod != nil, "could not find +[Locale currentLocale]")
+  guard let oldMethod = class_getClassMethod(
+    NSLocale.self, #selector(getter: NSLocale.current)) as Optional
+  else {
+    _preconditionFailure("could not find +[Locale currentLocale]")
+  }
 
-  let newMethod = class_getClassMethod(
-    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale))
-  precondition(newMethod != nil, "could not find +[Locale _swiftUnittest_currentLocale]")
+  guard let newMethod = class_getClassMethod(
+    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale)) as Optional
+  else {
+    _preconditionFailure("could not find +[Locale _swiftUnittest_currentLocale]")
+  }
 
   precondition(_temporaryLocaleCurrentLocale == nil,
     "nested calls to withOverriddenLocaleCurrentLocale are not supported")
@@ -75,6 +79,7 @@ public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
 #endif
 }
 
+@_versioned
 @_silgen_name("swift_stdlib_NSArray_getObjects")
 internal func _stdlib_NSArray_getObjects(
   nsArray: AnyObject,

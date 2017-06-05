@@ -165,19 +165,22 @@ public protocol Equatable {
   static func == (lhs: Self, rhs: Self) -> Bool
 }
 
-/// Returns a Boolean value indicating whether two values are not equal.
-///
-/// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
-/// implies that `a == b` is `false`.
-///
-/// This is the default implementation of the not-equal-to operator (`!=`)
-/// for any type that conforms to `Equatable`.
-///
-/// - Parameters:
-///   - lhs: A value to compare.
-///   - rhs: Another value to compare.
-public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
-  return !(lhs == rhs)
+extension Equatable {
+  /// Returns a Boolean value indicating whether two values are not equal.
+  ///
+  /// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
+  /// implies that `a == b` is `false`.
+  ///
+  /// This is the default implementation of the not-equal-to operator (`!=`)
+  /// for any type that conforms to `Equatable`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
+  @_transparent
+  public static func != (lhs: Self, rhs: Self) -> Bool {
+    return !(lhs == rhs)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -236,8 +239,8 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
     return Bool(Builtin.cmp_eq_RawPointer(
-        Builtin.bridgeToRawPointer(Builtin.castToNativeObject(l)),
-        Builtin.bridgeToRawPointer(Builtin.castToNativeObject(r))
+        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(l)),
+        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(r))
       ))
   case (nil, nil):
     return true

@@ -22,7 +22,7 @@ protocol P3 {}
 // CHECK-NEXT: Requirement signature: <Self where Self.X : P1>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.X : P1>
 protocol Q1 {
-    associatedtype X: P1
+    associatedtype X: P1 // expected-note 2{{declared here}}
 }
 
 // inheritance
@@ -36,7 +36,7 @@ protocol Q2: Q1 {}
 // CHECK-NEXT: Requirement signature: <Self where Self : Q1>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : Q1>
 protocol Q3: Q1 {
-    associatedtype X
+    associatedtype X // expected-warning{{redeclaration of associated type 'X'}}
 }
 
 // inheritance adding a new conformance
@@ -44,7 +44,8 @@ protocol Q3: Q1 {
 // CHECK-NEXT: Requirement signature: <Self where Self : Q1, Self.X : P2>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : Q1, τ_0_0.X : P2>
 protocol Q4: Q1 {
-    associatedtype X: P2
+    associatedtype X: P2 // expected-warning{{redeclaration of associated type 'X'}}
+                   // expected-note@-1 2{{'X' declared here}}
 }
 
 // multiple inheritance
@@ -57,8 +58,10 @@ protocol Q5: Q2, Q3, Q4 {}
 // CHECK-LABEL: .Q6@
 // CHECK-NEXT: Requirement signature: <Self where Self : Q2, Self : Q3, Self : Q4>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0 : Q3, τ_0_0 : Q4>
-protocol Q6: Q2, Q3, Q4 {
-    associatedtype X: P1
+protocol Q6: Q2, // expected-note{{conformance constraint 'Self.X': 'P1' implied here}}
+             Q3, Q4 {
+    associatedtype X: P1 // expected-warning{{redundant conformance constraint 'Self.X': 'P1'}}
+                   // expected-warning@-1{{redeclaration of associated type 'X' from protocol 'Q4' is}}
 }
 
 // multiple inheritance with a new conformance
@@ -66,5 +69,5 @@ protocol Q6: Q2, Q3, Q4 {
 // CHECK-NEXT: Requirement signature: <Self where Self : Q2, Self : Q3, Self : Q4, Self.X : P3>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0 : Q3, τ_0_0 : Q4, τ_0_0.X : P3>
 protocol Q7: Q2, Q3, Q4 {
-    associatedtype X: P3
+    associatedtype X: P3 // expected-warning{{redeclaration of associated type 'X'}}
 }

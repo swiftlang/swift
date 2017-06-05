@@ -5,7 +5,8 @@
   (eval let*
         ((x (dir-locals-find-file default-directory))
          (this-directory (if (listp x) (car x) (file-name-directory x))))
-        (unless (featurep 'swift-project-settings)
+        (unless (or (featurep 'swift-project-settings) 
+                    (tramp-tramp-file-p this-directory))
           (add-to-list 'load-path
                        (concat this-directory "utils")
                        :append)

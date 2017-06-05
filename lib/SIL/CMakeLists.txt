@@ -6,7 +6,6 @@ add_swift_library(swiftSIL STATIC
   InstructionUtils.cpp
   Linker.cpp
   LoopInfo.cpp
-  Mangle.cpp
   PrettyStackTrace.cpp
   Projection.cpp
   SIL.cpp
@@ -14,6 +13,7 @@ add_swift_library(swiftSIL STATIC
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILCoverageMap.cpp
+  SILDebugScope.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp
   SILFunction.cpp
@@ -33,6 +33,7 @@ add_swift_library(swiftSIL STATIC
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
+  ValueOwnershipKindClassifier.cpp
   LINK_LIBRARIES
     swiftSerialization
     swiftSema

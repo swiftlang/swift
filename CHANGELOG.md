@@ -21,12 +21,257 @@ CHANGELOG
 Swift 4.0
 ---------
 
+* [SE-0165][] and [SE-0154][]
+
+  The standard library's `Dictionary` and `Set` types have some new features. You can now create a new dictionary from a sequence of keys and values, and merge keys and values into an existing dictionary.
+
+  ```swift
+  let asciiTable = Dictionary(uniqueKeysWithValues: zip("abcdefghijklmnopqrstuvwxyz", 97...))
+  // ["w": 119, "n": 110, "u": 117, "v": 118, "x": 120, "q": 113, ...]
+
+  let vegetables = ["tomato", "carrot", "onion", "onion", "carrot", "onion"]
+  var vegetableCounts = Dictionary(zip(vegetables, repeatElement(1, count: Int.max)),
+                                   uniquingKeysWith: +)
+  vegetableCounts.merge([("tomato", 1)], uniquingKeysWith: +)
+  // ["tomato": 2, "carrot": 2, "onion": 3]
+  ```
+
+  Filtering a set or a dictionary now results in the same type. You can also now transform just the values of a dictionary, keeping the same keys, using the `mapValues(_:)` method.
+
+  ```swift
+  let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  let asciiVowels = asciiTable.filter({ vowels.contains($0.key) })
+  asciiVowels["a"]  // 97
+  asciiVowels["b"]  // nil
+
+  let asciiHexTable = asciiTable.mapValues({ "0x" + String($0, radix: 16) })
+  // ["w": "0x77", "n": "0x6e", "u": "0x75", "v": "0x76", "x": "0x78", ...]
+  ```
+
+  When using a key as a dictionary subscript, you can now supply a default value to be returned if the key is not present in the dictionary.
+
+  ```swift
+  for veg in ["tomato", "cauliflower"] {
+      vegetableCounts[veg, default: 0] += 1
+  }
+  // ["tomato": 3, "carrot": 2, "onion": 3, "cauliflower": 1]
+  ```
+
+  Use the new `init(grouping:by:)` initializer to convert an array or other sequence into a dictionary, grouped by a particular trait.
+
+  ```swift
+  let buttons = // an array of button instances
+  let buttonsByStatus = Dictionary(grouping: buttons, by: { $0.isEnabled })
+  // How many enabled buttons?
+  print("Enabled:", buttonsByStatus[true]?.count ?? 0)
+  ```
+
+  Additionally, dictionaries and sets now have a visible `capacity` property and a `reserveCapacity(_:)` method similar to arrays, and a dictionary's `keys` and `values` properties are represented by specialized collections.
+
+* [SE-0161][] is partially implemented. Swift now natively supports key path
+  objects for properties. Similar to KVC key path strings in Cocoa, key path
+  objects allow a property to be referenced independently of accessing it
+  from a value:
+
+    ```swift
+    struct Point {
+      var x, y: Double
+    }
+    let x = \Point.x
+    let y = \Point.y
+
+    let p = Point(x: 3, y: 4)
+    p[keyPath: x] // gives 3
+    p[keyPath: y] // gives 4
+    ```
+
+* Core Foundation types implicitly conform to Hashable (and Equatable), using
+  CFHash and CFEqual as the implementation. This change applies even to "Swift
+  3 mode", so if you were previously adding this conformance yourself, use
+  `#if swift(>=3.2)` to restrict the extension to Swift 3.1 and below.
+  ([SR-2388](https://bugs.swift.org/browse/SR-2388))
+
+* [SE-0156][]
+
+  Protocol composition types can now contain one or more class type terms,
+  forming a class-constrained protocol composition.
+
+  For example:
+
+  ```swift
+  protocol Paintable {
+    func paint()
+  }
+
+  class Canvas {
+    var origin: CGPoint
+  }
+
+  class Wall : Canvas, Paintable {
+    func paint() { ... }
+  }
+
+  func render(_: Canvas & Paintable) { ... }
+
+  render(Wall())
+  ```
+
+  Note that class-constrained protocol compositions can be written and
+  used in both Swift 3 and Swift 4 mode.
+
+  Generated headers for Swift APIs will map class-constrained protocol
+  compositions to Objective-C protocol-qualified class types in both
+  Swift 3 and Swift 4 mode (for instance, `NSSomeClass & SomeProto &
+  OtherProto` in Swift becomes `NSSomeClass <SomeProto, OtherProto>`
+  in Objective-C).
+
+  Objective-C APIs which use protocol-qualified class types differ in
+  behavior when imported by a module compiled in Swift 3 mode and
+  Swift 4 mode. In Swift 3 mode, these APIs will continue to import as
+  protocol compositions without a class constraint
+  (eg, `SomeProto & OtherProto`).
+
+  In Swift 4 mode, protocol-qualified class types import as
+  class-constrained protocol compositions, for a more faithful mapping
+  of APIs from Objective-C to Swift.
+
+  Note that the current implementation of class-constrained protocol
+  compositions lacks three features outlined in the Swift evolution proposal:
+
+  - In the evolution proposal, a class-constrained is permitted to contain
+    two different classes as long as one is a superclass of the other.
+    The current implementation only allows multiple classes to appear in
+    the composition if they are identical.
+
+  - In the evolution proposal, associated type and class inheritance clauses
+    are generalized to allow class-constrained protocol compositions. The
+    current implementation does not allow this.
+
+  - In the evolution proposal, protocol inheritance clauses are allowed to
+    contain a class, placing a requirement that all conforming types are
+    a subclass of the given class. The current implementation does not
+    allow this.
+
+  These missing aspects of the proposal can be introduced in a future
+  release without breaking source compatibility with existing code.
+
+* [SE-0142][]
+
+  Protocols and associated types can now contain `where` clauses that
+  provide additional restrictions on associated types. For example:
+
+    ```swift
+    protocol StringRepresentable: RawRepresentable
+    where RawValue == String { }
+
+    protocol RawStringWrapper {
+      associatedtype Wrapped: RawRepresentable
+        where Wrapper.RawValue == String
+    }
+    ```
+
+* [SE-0160][]
+
+  In Swift 4 mode, a declaration is inferred to be `@objc` where it is required for semantic consistency of the programming model. Specifically, it is inferred when:
+
+    * The declaration is an override of an `@objc` declaration
+    * The declaration satisfies a requirement in an `@objc` protocol
+    * The declaration has one of the following attributes: `@IBAction`, `@IBOutlet`, `@IBInspectable`, `@GKInspectable`, or `@NSManaged`
+
+  Additionally, in Swift 4 mode, `dynamic` declarations that don't
+  have `@objc` inferred based on the rules above will need to be
+  explicitly marked `@objc`.
+
+  Swift 3 compatibility mode retains the more-permissive Swift 3
+  rules for inference of `@objc` within subclasses of
+  `NSObject`. However, the compiler will emit warnings about places
+  where the Objective-C entry points for these inference cases are
+  used, e.g., in a `#selector` or `#keyPath` expression, via
+  messaging through `AnyObject`, or direct uses in Objective-C code
+  within a mixed project. The warnings can be silenced by adding an
+  explicit `@objc`. Uses of these entrypoints that are not
+  statically visible to the compiler can be diagnosed at runtime by
+  setting the environment variable
+  `SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT` to a value between 1 and 3
+  and testing the application. See the [migration discussion in
+  SE-0160](https://github.com/apple/swift-evolution/blob/master/proposals/0160-objc-inference.md#minimal-migration-workflow).
+
+* [SE-0138](https://github.com/apple/swift-evolution/blob/master/proposals/0138-unsaferawbufferpointer.md#amendment-to-normalize-the-slice-type):
+
+  Slicing a raw buffer no longer results in the same raw buffer
+  type. Specifically, `Unsafe[Mutable]BufferPointer.SubSequence` now has type
+  `[Mutable]RandomAccessSlice<Unsafe[Mutable]RawBufferPointer>`. Therefore,
+  indexing into a raw buffer slice is no longer zero-based. This is required for
+  raw buffers to fully conform to generic `Collection`. Changing the slice type
+  resulted in the following behavioral changes:
+
+  Passing a region within buffer to another function that takes a buffer can no
+  longer be done via subscript:
+
+  Incorrect: `takesRawBuffer(buffer[i..<j])`
+
+  This now requires explicit initialization, using a `rebasing:` initializer,
+  which converts from a slice to a zero-based `Unsafe[Mutable]RawBufferPointer`:
+
+  Correct: `takesRawBuffer(UnsafeRawBufferPointer(rebasing: buffer[i..<j]))`
+
+  Subscript assignment directly from a buffer no longer compiles:
+
+  Incorrect: `buffer[n..<m] = smaller_buffer`
+
+  This now requires creation of a slice from the complete source buffer:
+
+  Correct: `buffer[n..<m] = smaller_buffer.suffix(from: 0)`
+
+  `UnsafeRawBufferPointer`'s slice type no longer has a nonmutating subscript
+  setter. So assigning into a mutable `let` buffer no longer compiles:
+
+  ```swift
+  let slice = buffer[n..<m]
+  slice[i..<j] = buffer[k..<l]
+  ```
+
+  The assigned buffer slice now needs to be a `var`.
+
+  ```swift
+  var slice = buffer[n..<m]
+  slice[i..<j] = buffer[k..<l]
+  ```
+
+* [SR-1529](https://bugs.swift.org/browse/SR-1529):
+
+  Covariant method overrides are now fully supported, fixing many crashes
+  and compile-time assertions when defining or calling such methods.
+  Examples:
+
+  ```swift
+  class Bed {}
+  class Nook : Bed {}
+
+  class Cat<T> {
+    func eat(snack: T) {}
+    func play(game: String) {}
+    func sleep(where: Nook) {}
+  }
+
+  class Dog : Cat<(Int, Int)> {
+    // 'T' becomes concrete
+    override func eat(snack: (Int, Int)) {}
+
+    // 'game' becomes optional
+    override func play(game: String?) {}
+
+    // 'where' becomes a superclass
+    override func sleep(where: Bed) {}
+  }
+  ```
+
 * [SE-0148][]:
 
   Subscript declarations can now be defined to have generic parameter lists.
   Example:
 
-  ```
+  ```swift
   extension JSON {
     subscript<T>(key: String) -> T?
         where T : JSONConvertible {
@@ -64,6 +309,8 @@ Swift 4.0
 
 Swift 3.1
 ---------
+
+### 2017-03-27 (Xcode 8.3)
 
 * [SE-0080][]:
 
@@ -6439,3 +6686,27 @@ Swift 1.0
 [SE-0153]: <https://github.com/apple/swift-evolution/blob/master/proposals/0153-compensate-for-the-inconsistency-of-nscopyings-behaviour.md>
 [SE-0154]: <https://github.com/apple/swift-evolution/blob/master/proposals/0154-dictionary-key-and-value-collections.md>
 [SE-0155]: <https://github.com/apple/swift-evolution/blob/master/proposals/0155-normalize-enum-case-representation.md>
+[SE-0156]: <https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md>
+[SE-0157]: <https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md>
+[SE-0158]: <https://github.com/apple/swift-evolution/blob/master/proposals/0158-package-manager-manifest-api-redesign.md>
+[SE-0159]: <https://github.com/apple/swift-evolution/blob/master/proposals/0159-fix-private-access-levels.md>
+[SE-0160]: <https://github.com/apple/swift-evolution/blob/master/proposals/0160-objc-inference.md>
+[SE-0161]: <https://github.com/apple/swift-evolution/blob/master/proposals/0161-key-paths.md>
+[SE-0162]: <https://github.com/apple/swift-evolution/blob/master/proposals/0162-package-manager-custom-target-layouts.md>
+[SE-0163]: <https://github.com/apple/swift-evolution/blob/master/proposals/0163-string-revision-1.md>
+[SE-0164]: <https://github.com/apple/swift-evolution/blob/master/proposals/0164-remove-final-support-in-protocol-extensions.md>
+[SE-0165]: <https://github.com/apple/swift-evolution/blob/master/proposals/0165-dict.md>
+[SE-0166]: <https://github.com/apple/swift-evolution/blob/master/proposals/0166-swift-archival-serialization.md>
+[SE-0167]: <https://github.com/apple/swift-evolution/blob/master/proposals/0167-swift-encoders.md>
+[SE-0168]: <https://github.com/apple/swift-evolution/blob/master/proposals/0168-multi-line-string-literals.md>
+[SE-0169]: <https://github.com/apple/swift-evolution/blob/master/proposals/0169-improve-interaction-between-private-declarations-and-extensions.md>
+[SE-0170]: <https://github.com/apple/swift-evolution/blob/master/proposals/0170-nsnumber_bridge.md>
+[SE-0171]: <https://github.com/apple/swift-evolution/blob/master/proposals/0171-reduce-with-inout.md>
+[SE-0172]: <https://github.com/apple/swift-evolution/blob/master/proposals/0172-one-sided-ranges.md>
+[SE-0173]: <https://github.com/apple/swift-evolution/blob/master/proposals/0173-swap-indices.md>
+[SE-0174]: <https://github.com/apple/swift-evolution/blob/master/proposals/0174-filter-range-replaceable.md>
+[SE-0175]: <https://github.com/apple/swift-evolution/blob/master/proposals/0175-package-manager-revised-dependency-resolution.md>
+[SE-0176]: <https://github.com/apple/swift-evolution/blob/master/proposals/0176-enforce-exclusive-access-to-memory.md>
+[SE-0177]: <https://github.com/apple/swift-evolution/blob/master/proposals/0177-add-clamped-to-method.md>
+[SE-0178]: <https://github.com/apple/swift-evolution/blob/master/proposals/0178-character-unicode-view.md>
+[SE-0179]: <https://github.com/apple/swift-evolution/blob/master/proposals/0179-swift-run-command.md>

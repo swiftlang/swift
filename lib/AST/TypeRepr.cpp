@@ -77,7 +77,7 @@ Identifier ComponentIdentTypeRepr::getIdentifier() const {
   if (IdOrDecl.is<Identifier>())
     return IdOrDecl.get<Identifier>();
 
-  return IdOrDecl.get<ValueDecl *>()->getName();
+  return IdOrDecl.get<TypeDecl *>()->getName();
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
@@ -336,7 +336,7 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
 
 void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                        const PrintOptions &Opts) const {
-  if (TypeDecl *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
+  if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
       Printer.printModuleRef(MD, getIdentifier());
     else

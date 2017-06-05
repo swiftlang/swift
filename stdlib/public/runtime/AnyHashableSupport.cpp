@@ -14,7 +14,8 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Casting.h"
 #include "Private.h"
 #include "SwiftValue.h"
 #include "SwiftHashableSupport.h"
@@ -155,12 +156,18 @@ void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
       if (auto unboxedHashableWT =
               swift_conformsToProtocol(type, &HashableProtocolDescriptor)) {
         ValueBuffer unboxedCopyBuf;
-        auto unboxedValueCopy = unboxedType->vw_initializeBufferWithCopy(
-            &unboxedCopyBuf, const_cast<OpaqueValue *>(unboxedValue));
+        // Allocate buffer.
+        OpaqueValue *unboxedValueCopy =
+            unboxedType->allocateBufferIn(&unboxedCopyBuf);
+        // initWithCopy.
+        unboxedType->vw_initializeWithCopy(
+            unboxedValueCopy, const_cast<OpaqueValue *>(unboxedValue));
+
         _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
             unboxedValueCopy, anyHashableResultPointer, unboxedType,
             unboxedHashableWT);
-        unboxedType->vw_deallocateBuffer(&unboxedCopyBuf);
+        // Deallocate buffer.
+        unboxedType->deallocateBufferIn(&unboxedCopyBuf);
         type->vw_destroy(value);
         return;
       }

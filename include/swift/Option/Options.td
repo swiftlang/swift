@@ -166,6 +166,10 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
 
+def pch_output_dir: Separate<["-"], "pch-output-dir">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Directory to persist automatically created precompiled bridging headers">;
+
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
   Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -187,10 +191,23 @@ def save_temps : Flag<["-"], "save-temps">,
 def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
   Flags<[NoInteractiveOption,DoesNotAffectIncrementalBuild]>,
   HelpText<"Prints the total time it took to execute all compilation tasks">;
+def stats_output_dir: Separate<["-"], "stats-output-dir">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Directory to write unified compilation-statistics files to">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
+
+def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit a JSON file containing information about what modules were loaded">;
+def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-path">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit the loaded module trace JSON to <path>">,
+  MetaVarName<"<path>">;
+def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_loaded_module_trace_path>;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -239,6 +256,10 @@ def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
+def value_recursion_threshold : Separate<["-"], "value-recursion-threshold">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum depth for direct recursion in value types">;
+
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
@@ -263,6 +284,20 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Continue building, even after errors are encountered">;
+
+def warn_swift3_objc_inference_complete :
+  Flag<["-"], "warn-swift3-objc-inference-complete">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about deprecated @objc inference in Swift 3 for every declaration that will no longer be inferred as @objc in Swift 4">;
+
+def warn_swift3_objc_inference_minimal :
+  Flag<["-"], "warn-swift3-objc-inference-minimal">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+  Alias<warn_swift3_objc_inference_complete>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -348,6 +383,11 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 
+// Verify debug info
+def verify_debug_info : Flag<["-"], "verify-debug-info">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Verify the binary representation of debug output.">;
+
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
@@ -383,6 +423,55 @@ def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
   Flags<[NoInteractiveOption, NoBatchOption, SwiftFormatOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
+
+// Migrator Options
+
+def update_code : Flag<["-"], "update-code">,
+  HelpText<"Update Swift code">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
+def migrate_keep_objc_visibility: Flag<["-"], "migrate-keep-objc-visibility">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When migrating, add '@objc' to declarations that would've been implicitly visible in Swift 3">;
+
+def disable_migrator_fixits: Flag<["-"], "disable-migrator-fixits">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Disable the Migrator phase which automatically applies fix-its">;
+
+def emit_remap_file_path: Separate<["-"], "emit-remap-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the replacement map describing Swift Migrator changes to <path>">,
+  MetaVarName<"<path>">;
+
+def emit_migrated_file_path: Separate<["-"], "emit-migrated-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the migrated source file to <path>">,
+  MetaVarName<"<path>">;
+
+def dump_migration_states_dir: Separate<["-"], "dump-migration-states-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the input text, output text, and states for migration to <path>">,
+  MetaVarName<"<path>">;
+
+def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
+def dump_usr: Flag<["-"], "dump-usr">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Dump USR for each declaration reference">;
+
+// FIXME: Remove these once Xcode stops appending these flags.
+// rdar://problem/31844718
+
+def migrator_update_sdk: Flag<["-"], "migrator-update-sdk">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
+
+def migrator_update_swift: Flag<["-"], "migrator-update-swift">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
 
 // File types
 
@@ -431,19 +520,18 @@ def emit_sib : Flag<["-"], "emit-sib">,
 def emit_sibgen : Flag<["-"], "emit-sibgen">,
   HelpText<"Emit serialized AST + raw SIL file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
+  HelpText<"Emit a list of the imported modules">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_tbd : Flag<["-"], "emit-tbd">,
+  HelpText<"Emit a TBD file">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 def S: Flag<["-"], "S">, Alias<emit_assembly>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
 
-def update_code : Flag<["-"], "update-code">,
-  HelpText<"Update Swift code">, ModeOpt,
-  Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
-def fixit_code : Flag<["-"], "fixit-code">,
-  HelpText<"Get compiler fixits as code edits">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def fixit_all : Flag<["-"], "fixit-all">,
   HelpText<"Apply all fixits from diagnostics without any filtering">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -557,5 +645,9 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   MetaVarName<"<type>">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
+
+def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
+  Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
+  HelpText<"Enforce law of exclusivity">;
 
 include "FrontendOptions.td"

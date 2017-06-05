@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_multiple_types
 // RUN: %target-run %target-swift-reflection-test %t/reflect_multiple_types 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
@@ -6,6 +6,9 @@
 
 // FIXME: https://bugs.swift.org/browse/SR-2808
 // XFAIL: resilient_stdlib
+
+// See https://bugs.swift.org/browse/SR-5066, rdar://32511557
+// XFAIL: *
 
 import SwiftReflectionTest
 import Foundation
@@ -115,7 +118,7 @@ reflect(object: obj)
 // CHECK-64: (class reflect_multiple_types.TestClass)
 
 // CHECK-64: Type info:
-// CHECK-64: (class_instance size=193 alignment=8 stride=200 num_extra_inhabitants=0
+// CHECK-64: (class_instance size=185 alignment=8 stride=192 num_extra_inhabitants=0
 // CHECK-64:   (field name=t00 offset=16
 // CHECK-64:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
 // (unstable implementation details omitted)

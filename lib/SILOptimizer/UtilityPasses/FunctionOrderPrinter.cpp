@@ -57,7 +57,6 @@ class FunctionOrderPrinterPass : public SILModuleTransform {
     llvm::outs() << "\n";
   }
 
-  StringRef getName() override { return "Function Order Printer"; }
 };
 
 } // end anonymous namespace

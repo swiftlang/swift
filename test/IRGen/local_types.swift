@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir -parse-as-library %s -I %t > %t.ll
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -parse-as-library %s -I %t > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
@@ -9,14 +9,14 @@
 import local_types_helper
 
 public func singleFunc() {
-  // CHECK-DAG: @_T011local_types10singleFuncyyF06SingleD6StructL_VWV = hidden constant
+  // CHECK-DAG: @_T011local_types10singleFuncyyF06SingleD6StructL_VWV = internal constant
   struct SingleFuncStruct {
     let i: Int
   }
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: @_T011local_types13singleClosureyycvfiyycfU_06SingleD6StructL_VWV = hidden constant
+  // CHECK-DAG: @_T011local_types13singleClosureyycvfiyycfU_06SingleD6StructL_VWV = internal constant
   struct SingleClosureStruct {
     let i: Int
   }
@@ -24,7 +24,7 @@ public let singleClosure: () -> () = {
 
 public struct PatternStruct {
   public var singlePattern: Int = ({
-    // CHECK-DAG: @_T011local_types13PatternStructV06singleC0SivfiSiycfU_06SinglecD0L_VWV = hidden constant
+    // CHECK-DAG: @_T011local_types13PatternStructV06singleC0SivfiSiycfU_06SinglecD0L_VWV = internal constant
     struct SinglePatternStruct {
       let i: Int
     }
@@ -33,7 +33,7 @@ public struct PatternStruct {
 }
 
 public func singleDefaultArgument(i: Int = {
-  // CHECK-DAG: @_T011local_types21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingledE6StructL_VWV = hidden constant
+  // CHECK-DAG: @_T011local_types21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingledE6StructL_VWV = internal constant
   struct SingleDefaultArgumentStruct {
     let i: Int
   }

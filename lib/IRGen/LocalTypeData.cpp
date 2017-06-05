@@ -54,7 +54,7 @@ void IRGenFunction::destroyLocalTypeData() {
   delete LocalTypeData;
 }
 
-unsigned LocalTypeDataCache::CacheEntry::cost() const {
+OperationCost LocalTypeDataCache::CacheEntry::cost() const {
   switch (getKind()) {
   case Kind::Concrete:
     return static_cast<const ConcreteCacheEntry*>(this)->cost();
@@ -99,7 +99,7 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
   auto &chain = it->second;
 
   CacheEntry *best = nullptr;
-  Optional<unsigned> bestCost;
+  Optional<OperationCost> bestCost;
 
   CacheEntry *next = chain.Root;
   while (next) {
@@ -120,7 +120,7 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
       // If that's zero, go ahead and short-circuit out.
       if (!bestCost) {
         bestCost = best->cost();
-        if (*bestCost == 0) break;
+        if (*bestCost == OperationCost::Free) break;
       }
 
       auto curCost = cur->cost();
@@ -317,8 +317,8 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
     // Check whether there's already an entry that's at least as good as the
     // fulfillment.
-    Optional<unsigned> fulfillmentCost;
-    auto getFulfillmentCost = [&]() -> unsigned {
+    Optional<OperationCost> fulfillmentCost;
+    auto getFulfillmentCost = [&]() -> OperationCost {
       if (!fulfillmentCost)
         fulfillmentCost = fulfillment.second.Path.cost();
       return *fulfillmentCost;
@@ -335,7 +335,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
       // Ensure that the entry isn't better than the fulfillment.
       auto curCost = cur->cost();
-      if (curCost == 0 || curCost <= getFulfillmentCost()) {
+      if (curCost == OperationCost::Free || curCost <= getFulfillmentCost()) {
         foundBetter = true;
         break;
       }

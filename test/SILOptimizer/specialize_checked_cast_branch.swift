@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
 
 class C {}
 class D : C {}
@@ -325,17 +325,17 @@ func ExistentialToArchetypeCast<T>(o : AnyObject, t : T) -> T {
   _preconditionFailure("??? Profit?")
 }
 
-// CHECK-LABEL: sil shared @_T030specialize_checked_cast_branch26ExistentialToArchetypeCastxs9AnyObject_p1o_x1ttlFAA1CC_Tg5Tf4nd_n : $@convention(thin) (@owned AnyObject) -> @owned C
+// CHECK-LABEL: sil shared @_T030specialize_checked_cast_branch26ExistentialToArchetypeCastxyXl1o_x1ttlFAA1CC_Tg5Tf4nd_n : $@convention(thin) (@owned AnyObject) -> @owned C
 // CHECK: bb0
 // CHECK:  checked_cast_br %0 : $AnyObject to $C
 // CHECK: bb1
 
-// CHECK-LABEL: sil shared @_T030specialize_checked_cast_branch26ExistentialToArchetypeCastxs9AnyObject_p1o_x1ttlFAA8NotUInt8V_Tg5Tf4gd_n : $@convention(thin) (@guaranteed AnyObject) -> NotUInt8
+// CHECK-LABEL: sil shared @_T030specialize_checked_cast_branch26ExistentialToArchetypeCastxyXl1o_x1ttlFAA8NotUInt8V_Tg5Tf4gd_n : $@convention(thin) (@guaranteed AnyObject) -> NotUInt8
 // CHECK: bb0
 // CHECK:  checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to NotUInt8 in {{%.*}} : $*NotUInt8,
 // CHECK: bb1
 
-// CHECK-LABEL: sil shared @_T030specialize_checked_cast_branch26ExistentialToArchetypeCastxs9AnyObject_p1o_x1ttlFsAC_p_Tg5Tf4nd_n : $@convention(thin) (@owned AnyObject) -> @owned AnyObject
+// CHECK-LABEL: sil shared @_T030specialize_checked_cast_branch26ExistentialToArchetypeCastxyXl1o_x1ttlFyXl_Tg5Tf4nd_n : $@convention(thin) (@owned AnyObject) -> @owned AnyObject
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br %
 // CHECK: return %0 : $AnyObject

@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
@@ -327,7 +326,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-    if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
+    if (auto *ID = dyn_cast<ImportDecl>(D)) {
       Binder.addImport(ImportedModules, ID);
     } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(D)) {
       insertOperatorDecl(Binder, SF.PrefixOperators, OD);

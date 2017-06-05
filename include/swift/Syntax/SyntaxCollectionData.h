@@ -30,12 +30,6 @@ class SyntaxCollectionData : public SyntaxData {
   friend class SyntaxData;
   friend class FunctionCallExprSyntaxBuilder;
 
-  SyntaxCollectionData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                       CursorIndex IndexInParent = 0)
-      : SyntaxData(Raw, Parent, IndexInParent),
-        CachedElements(Raw->Layout.size(), nullptr) {
-    assert(Raw->Kind == CollectionKind);
-  }
 
   static RC<SyntaxCollectionData<CollectionKind, ElementType>>
   make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
@@ -53,11 +47,25 @@ class SyntaxCollectionData : public SyntaxData {
     return make(Raw);
   }
 
+protected:
+  SyntaxCollectionData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+                       CursorIndex IndexInParent = 0)
+  : SyntaxData(Raw, Parent, IndexInParent),
+  CachedElements(Raw->Layout.size(), nullptr) {
+      assert(Raw->Kind == CollectionKind);
+  }
+
 public:
   static bool classof(const SyntaxData *SD) {
     return SD->getKind() == CollectionKind;
   }
 };
+
+#define SYNTAX(Id, Parent)
+#define SYNTAX_COLLECTION(Id, Element) \
+  class Element;                       \
+  using Id##SyntaxData = SyntaxCollectionData<SyntaxKind::Id, Element>;
+#include "swift/Syntax/SyntaxKinds.def"
 
 } // end namespace syntax
 } // end namespace swift

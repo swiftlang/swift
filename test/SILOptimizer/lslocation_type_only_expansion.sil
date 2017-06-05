@@ -81,31 +81,24 @@ sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6
 
 // CHECK-LABEL: @test_struct_type_expansion
 // CHECK: #0  store
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
+// CHECK-NEXT: Projection Path [$*S1
+// CHECK-NEXT:   Field: var b: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
 // CHECK: #1  store
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Field Type: var b: S1
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Field Type: var b: S1
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
+// CHECK-NEXT: Projection Path [$*S2
+// CHECK-NEXT:   Field: var b: S1 of: $*S1
+// CHECK-NEXT:   Field: var b: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S2
+// CHECK-NEXT:   Field: var b: S1 of: $*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S2
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
 sil hidden @test_struct_type_expansion : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S1, var, name "a"                   // users: %5, %12
@@ -146,32 +139,24 @@ bb0:
 
 // CHECK-LABEL: test_struct_and_class_slot
 // CHECK:  #0 store
-// CHECK-NEXT: Address Projection Type: $*C1
-// CHECK-NEXT: Field Type: var b: C1
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Field Type: var b: S1
-// CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Field Type: var b: S1
-// CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
-// CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2
-// CHECK-NEXT: Address Projection Type: $*C1
-// CHECK-NEXT: Field Type: var c: C1
+// CHECK-NEXT: Projection Path [$*S3
+// CHECK-NEXT:   Field: var b: C1 of: $*C1]
+// CHECK-NEXT: Projection Path [$*S3
+// CHECK-NEXT:   Field: var a: S2 of: $*S2
+// CHECK-NEXT:   Field: var b: S1 of: $*S1
+// CHECK-NEXT:   Field: var b: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S3
+// CHECK-NEXT:   Field: var a: S2 of: $*S2
+// CHECK-NEXT:   Field: var b: S1 of: $*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S3
+// CHECK-NEXT:   Field: var a: S2 of: $*S2
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S3
+// CHECK-NEXT:   Field: var c: C1 of: $*C1]
 sil hidden @test_struct_and_class_slot : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S3, var, name "a"                  // users: %4, %7
@@ -190,34 +175,24 @@ bb0:
 //
 // CHECK-LABEL: test_tuple
 // CHECK:  #0 store
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S1)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S1)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S1)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S1)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Index: 1
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S1)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S1)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Index: 0
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S1)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S1)
+// CHECK-NEXT: Projection Path [$*S4
+// CHECK-NEXT:   Field: var c: (Int, Int, S1) of: $*(Int, Int, S1)
+// CHECK-NEXT:   Index: 2 into: $*S1
+// CHECK-NEXT:   Field: var b: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S4
+// CHECK-NEXT:   Field: var c: (Int, Int, S1) of: $*(Int, Int, S1)
+// CHECK-NEXT:   Index: 2 into: $*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S4
+// CHECK-NEXT:   Field: var c: (Int, Int, S1) of: $*(Int, Int, S1)
+// CHECK-NEXT:   Index: 1 into: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S4
+// CHECK-NEXT:   Field: var c: (Int, Int, S1) of: $*(Int, Int, S1)
+// CHECK-NEXT:   Index: 0 into: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
 sil hidden @test_tuple : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S4, var, name "x"                  // users: %4, %7
@@ -234,64 +209,42 @@ bb0:
 
 // CHECK-LABEL: tuple_test_with_reference
 // CHECK: #0 store
-// CHECK-NEXT: Address Projection Type: $*C1
-// CHECK-NEXT: Field Type: var b: C1
-// CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var b: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Field Type: var b: S1
-// CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2
-// CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
-// CHECK-NEXT: Address Projection Type: $*S1
-// CHECK-NEXT: Field Type: var b: S1
-// CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2
-// CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
-// CHECK-NEXT: Address Projection Type: $*S2
-// CHECK-NEXT: Field Type: var a: S2
-// CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
-// CHECK-NEXT: Address Projection Type: $*C1
-// CHECK-NEXT: Field Type: var c: C1
-// CHECK-NEXT: Address Projection Type: $*S3
-// CHECK-NEXT: Index: 2
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Index: 1
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
-// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-// CHECK-NEXT: Field Type: var value: Int64
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Index: 0
-// CHECK-NEXT: Address Projection Type: $*(Int, Int, S3)
-// CHECK-NEXT: Field Type: var c: (Int, Int, S3)
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 2 into: $*S3
+// CHECK-NEXT:   Field: var b: C1 of: $*C1]
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 2 into: $*S3
+// CHECK-NEXT:   Field: var a: S2 of: $*S2
+// CHECK-NEXT:   Field: var b: S1 of: $*S1
+// CHECK-NEXT:   Field: var b: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 2 into: $*S3
+// CHECK-NEXT:   Field: var a: S2 of: $*S2
+// CHECK-NEXT:   Field: var b: S1 of: $*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 2 into: $*S3
+// CHECK-NEXT:   Field: var a: S2 of: $*S2
+// CHECK-NEXT:   Field: var a: Int of: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 2 into: $*S3
+// CHECK-NEXT:   Field: var c: C1 of: $*C1]
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 1 into: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+// CHECK-NEXT: Projection Path [$*S5
+// CHECK-NEXT:   Field: var c: (Int, Int, S3) of: $*(Int, Int, S3)
+// CHECK-NEXT:   Index: 0 into: $*Int
+// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
 sil hidden @tuple_test_with_reference : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S5, var, name "x"                  // users: %4, %7
@@ -308,18 +261,14 @@ bb0:
 
 /// CHECK-LABEL: tuple_inside_struct
 /// CHECK: #0 store
-/// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-/// CHECK-NEXT: Field Type: var value: Int64
-/// CHECK-NEXT: Address Projection Type: $*Int
-/// CHECK-NEXT: Index: 1
-/// CHECK-NEXT: Address Projection Type: $*(Int, Int)
-/// CHECK-NEXT: Field Type: var tuple: (Int, Int)
-/// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-/// CHECK-NEXT: Field Type: var value: Int64
-/// CHECK-NEXT: Address Projection Type: $*Int
-/// CHECK-NEXT: Index: 0
-/// CHECK-NEXT: Address Projection Type: $*(Int, Int)
-/// CHECK-NEXT: Field Type: var tuple: (Int, Int)
+/// CHECK-NEXT: Projection Path [$*S6
+/// CHECK-NEXT:   Field: var tuple: (Int, Int) of: $*(Int, Int)
+/// CHECK-NEXT:   Index: 1 into: $*Int
+/// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
+/// CHECK-NEXT: Projection Path [$*S6
+/// CHECK-NEXT:   Field: var tuple: (Int, Int) of: $*(Int, Int)
+/// CHECK-NEXT:   Index: 0 into: $*Int
+/// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
 sil hidden @tuple_inside_struct : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S6, var, name "x"                  // users: %4, %7
@@ -342,8 +291,8 @@ bb0:
 /// CHECK-NOT: Int64
 /// CHECK-NOT: Int32
 /// CHECK: #1  store
-/// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
-/// CHECK-NEXT: Field Type: var value: Int64
+/// CHECK-NEXT: Projection Path [$*Int
+/// CHECK-NEXT:   Field: var value: Int64 of: $*Builtin.Int64]
 sil hidden @enum_test : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Example, var, name "ee"       // users: %5, %11

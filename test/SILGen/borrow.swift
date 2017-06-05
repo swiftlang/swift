@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 import Swift
 
@@ -17,10 +17,12 @@ func useD(_ d: D) {}
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var C }, var, name "c"
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
 // CHECK:   [[FUNC:%.*]] = function_ref @_T06borrow4useD{{.*}} : $@convention(thin) (@owned D) -> ()
-// CHECK:   [[CLASS:%.*]] = load [copy] [[PB_BOX]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB_BOX]] : $*C
+// CHECK:   [[CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
 // CHECK:   [[OFFSET:%.*]] = ref_element_addr [[BORROWED_CLASS]]
-// CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[OFFSET]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[OFFSET]] : $*D
+// CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   end_borrow [[BORROWED_CLASS]] from [[CLASS]]
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
 // CHECK:   destroy_value [[CLASS]]

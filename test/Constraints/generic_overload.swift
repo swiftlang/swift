@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
-protocol P1 { associatedtype Assoc }
-protocol P2 : P1 { associatedtype Assoc }
+protocol P1 { associatedtype Assoc } // expected-note{{declared here}}
+protocol P2 : P1 { associatedtype Assoc } // expected-warning{{redeclaration of associated type}}
 protocol P3 { }
 
 struct X1 : P1 { typealias Assoc = X3 }

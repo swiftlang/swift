@@ -19,42 +19,44 @@ import platform
 import sys
 import time
 
-import android.adb.commands # noqa (E402 module level import not at top of file)
+import android.adb.commands
 
-# FIXME: Instead of modifying the system path in order to enable imports from
-#        other directories, all Python modules related to the build script
-#        should be moved to the `swift_build_support` module. Remove "noqa"
-#        markers when this is fixed.
-#        For additional information, see: https://bugs.swift.org/browse/SR-237.
-sys.path.append(os.path.dirname(__file__))
-from SwiftBuildSupport import (
+from swift_build_support.swift_build_support import (
+    arguments,
+    debug,
+    diagnostics,
+    host,
+    migration,
+    products,
+    shell,
+    tar,
+    targets,
+    workspace
+)
+
+from swift_build_support.swift_build_support.SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
+    SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
     get_all_preset_names,
-    get_preset_options,
-)  # noqa (E402 module level import not at top of file)
+    get_preset_options,  
+)
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
-
-# E402 means module level import not at top of file
-from swift_build_support import arguments  # noqa (E402)
-from swift_build_support import diagnostics  # noqa (E402)
-from swift_build_support import host  # noqa (E402)
-from swift_build_support.toolchain import host_toolchain  # noqa (E402)
-import swift_build_support.debug      # noqa (E402)
-from swift_build_support import migration  # noqa (E402)
-from swift_build_support import products  # noqa (E402)
-from swift_build_support import shell  # noqa (E402)
-import swift_build_support.tar        # noqa (E402)
-import swift_build_support.targets    # noqa (E402)
-from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
-from swift_build_support.cmake import CMake  # noqa (E402)
-import swift_build_support.workspace    # noqa (E402)
-
+from swift_build_support.swift_build_support.cmake import CMake
+from swift_build_support.swift_build_support.targets import \
+    StdlibDeploymentTarget
+from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 build_script_impl = os.path.join(
-    SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
+    SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils", "build-script-impl")
+
+
+def exit_rejecting_arguments(message, parser=None):
+    print(message, file=sys.stderr)
+    if parser:
+        parser.print_usage(sys.stderr)
+    sys.exit(2)  # 2 is the same as `argparse` error exit code.
 
 
 def call_without_sleeping(command, env=None, dry_run=False, echo=False):
@@ -303,6 +305,22 @@ class BuildScriptInvocation(object):
         if args.cmake_generator is None:
             args.cmake_generator = "Ninja"
 
+        # --ios-all etc are not supported by open-source Swift.
+        if args.ios_all:
+            exit_rejecting_arguments("error: --ios-all is unavailable in " +
+                                     "open-source Swift.\nUse --ios to " +
+                                     "skip iOS device tests.")
+
+        if args.tvos_all:
+            exit_rejecting_arguments("error: --tvos-all is unavailable in " +
+                                     "open-source Swift.\nUse --tvos to " +
+                                     "skip tvOS device tests.")
+
+        if args.watchos_all:
+            exit_rejecting_arguments("error: --watchos-all is unavailable " +
+                                     "in open-source Swift.\nUse --watchos " +
+                                     "to skip watchOS device tests.")
+
         ninja_required = (
             args.cmake_generator == 'Ninja' or args.build_foundation)
         if ninja_required and toolchain.ninja is None:
@@ -420,7 +438,7 @@ class BuildScriptInvocation(object):
 
         if args.build_subdir is None:
             args.build_subdir = \
-                swift_build_support.workspace.compute_build_subdir(args)
+                workspace.compute_build_subdir(args)
 
         # Add optional stdlib-deployment-targets
         if args.android:
@@ -443,7 +461,7 @@ class BuildScriptInvocation(object):
         self.toolchain = toolchain
         self.args = args
 
-        self.workspace = swift_build_support.workspace.Workspace(
+        self.workspace = workspace.Workspace(
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
@@ -489,18 +507,27 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
         if args.skip_test_osx:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        # iOS device tests are not supported.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        if args.skip_test_ios_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        else:
+            exit_rejecting_arguments("error: iOS device tests are not " +
+                                     "supported in open-source Swift.")
         if args.skip_test_ios_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator)
-        # tvOS device tests are not supported.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        if args.skip_test_tvos_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        else:
+            exit_rejecting_arguments("error: tvOS device tests are not " +
+                                     "supported in open-source Swift.")
         if args.skip_test_tvos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleTVSimulator)
-        # watchOS device tests are not supported.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        if args.skip_test_watchos_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        else:
+            exit_rejecting_arguments("error: watchOS device tests are not " +
+                                     "supported in open-source Swift.")
         if args.skip_test_watchos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
@@ -650,10 +677,11 @@ class BuildScriptInvocation(object):
                 "--distcc",
                 "--distcc-pump=%s" % toolchain.distcc_pump
             ]
+
+        # *NOTE* We use normal cmake to pass through tsan/ubsan options. We do
+        # NOT pass them to build-script-impl.
         if args.enable_asan:
             impl_args += ["--enable-asan"]
-        if args.enable_ubsan:
-            impl_args += ["--enable-ubsan"]
         if args.verbose_build:
             impl_args += ["--verbose-build"]
         if args.install_symroot:
@@ -785,7 +813,7 @@ class BuildScriptInvocation(object):
         if platform.system() == 'Darwin':
             impl_args += [
                 "--toolchain-prefix",
-                swift_build_support.targets.darwin_toolchain_prefix(
+                targets.darwin_toolchain_prefix(
                     args.install_prefix),
                 "--host-lipo", toolchain.lipo,
             ]
@@ -1063,7 +1091,8 @@ def main_preset():
         args.preset_file_names = [
             os.path.join(HOME, ".swift-build-presets"),
             os.path.join(
-                SWIFT_SOURCE_ROOT, "swift", "utils", "build-presets.ini")
+                SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils",
+                "build-presets.ini")
         ]
 
     if args.show_presets:
@@ -1796,6 +1825,11 @@ iterations with -O",
              "device",
         action="store_true")
     parser.add_argument(
+        "-I", "--ios-all",
+        help="also build for iOS, and allow all iOS tests",
+        action="store_true",
+        dest="ios_all")
+    parser.add_argument(
         "--skip-ios",
         help="set to skip everything iOS-related",
         dest="ios",
@@ -1807,6 +1841,11 @@ iterations with -O",
              "device",
         action=arguments.action.optional_bool)
     parser.add_argument(
+        "--tvos-all",
+        help="also build for tvOS, and allow all tvOS tests",
+        action=arguments.action.optional_bool,
+        dest="tvos_all")
+    parser.add_argument(
         "--skip-tvos",
         help="set to skip everything tvOS-related",
         dest="tvos",
@@ -1817,6 +1856,11 @@ iterations with -O",
         help="also build for watchOS, but disallow tests that require an "
              "watchOS device",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--watchos-all",
+        help="also build for Apple watchOS, and allow all Apple watchOS tests",
+        action=arguments.action.optional_bool,
+        dest="watchos_all")
     parser.add_argument(
         "--skip-watchos",
         help="set to skip everything watchOS-related",
@@ -1846,7 +1890,7 @@ iterations with -O",
         help="The installation prefix. This is where built Swift products "
              "(like bin, lib, and include) will be installed.",
         metavar="PATH",
-        default=swift_build_support.targets.install_prefix())
+        default=targets.install_prefix())
     parser.add_argument(
         "--install-symroot",
         help="the path to install debug symbols into",
@@ -2000,7 +2044,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="3.1",
+        default="4.0",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
@@ -2116,9 +2160,7 @@ iterations with -O",
             migration.check_impl_args(build_script_impl,
                                       args.build_script_impl_args)
         except ValueError as e:
-            parser.print_usage(sys.stderr)
-            print(e, file=sys.stderr)
-            sys.exit(2)  # 2 is the same as `argparse` error exit code.
+            exit_rejecting_arguments(e, parser)
 
         if '--check-args-only' in args.build_script_impl_args:
             return 0
@@ -2127,6 +2169,7 @@ iterations with -O",
 
     # Prepare and validate toolchain
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
+    os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 
     if args.host_cc is not None:
         toolchain.cc = args.host_cc
@@ -2153,7 +2196,7 @@ iterations with -O",
 
     # Show SDKs, if requested.
     if args.show_sdks:
-        swift_build_support.debug.print_xcodebuild_versions()
+        debug.print_xcodebuild_versions()
 
     # Clean build directory if requested.
     if args.clean:
@@ -2175,8 +2218,7 @@ iterations with -O",
         print('-- Package file: {} --'.format(args.symbols_package))
 
         if platform.system() == 'Darwin':
-            prefix = swift_build_support.targets.darwin_toolchain_prefix(
-                args.install_prefix)
+            prefix = targets.darwin_toolchain_prefix(args.install_prefix)
         else:
             prefix = args.install_prefix
 
@@ -2185,8 +2227,8 @@ iterations with -O",
         # run `tar` without the leading '/' (we remove it ourselves to keep
         # `tar` from emitting a warning).
         with shell.pushd(args.install_symroot):
-            swift_build_support.tar.tar(source=prefix.lstrip('/'),
-                                        destination=args.symbols_package)
+            tar.tar(source=prefix.lstrip('/'),
+                    destination=args.symbols_package)
 
     return 0
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O %s -disable-llvm-optzns -emit-sil -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-sil -g -o - | %FileCheck %s
 
 // CHECK: sil shared [noinline] @_T014specialization3sumxx_xtAA5ProtoRzlFAA7AddableV_Tg5
 // CHECK-SAME: $@convention(thin) (Addable, Addable) -> Addable {

@@ -2,5 +2,6 @@
 
 // CHECK-NOT: Unknown
 
+// REQUIRES: rdar31683781
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test

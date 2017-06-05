@@ -90,10 +90,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
       switch (req.getKind()) {
       case RequirementKind::SameType:
       case RequirementKind::Conformance:
-      case RequirementKind::Layout:
       case RequirementKind::Superclass:
         if (doIt(req.getSecondType()))
           return true;
+        break;
+      case RequirementKind::Layout:
         break;
       }
     }
@@ -123,8 +124,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitProtocolCompositionType(ProtocolCompositionType *ty) {
-    for (auto proto : ty->getProtocols())
-      if (doIt(proto))
+    for (auto member : ty->getMembers())
+      if (doIt(member))
         return true;
     return false;
   }
@@ -158,9 +159,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
   
   bool visitSILBlockStorageType(SILBlockStorageType *ty) {
-    if (doIt(ty->getCaptureType()))
-      return true;
-    return false;
+    return doIt(ty->getCaptureType());
   }
 
   bool visitSILBoxType(SILBoxType *ty) {

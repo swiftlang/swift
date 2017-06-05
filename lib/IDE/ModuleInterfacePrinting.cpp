@@ -450,12 +450,12 @@ void swift::ide::printSubmoduleInterface(
 
   // Sort imported declarations in source order *within a submodule*.
   for (auto &P : ClangDecls) {
-    std::sort(P.second.begin(), P.second.end(),
-              [&](std::pair<Decl *, clang::SourceLocation> LHS,
-                  std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
-                return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
-                                                                    RHS.second);
-              });
+    std::stable_sort(P.second.begin(), P.second.end(),
+                     [&](std::pair<Decl *, clang::SourceLocation> LHS,
+                         std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
+      return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
+                                                          RHS.second);
+    });
   }
 
   // Sort Swift declarations so that we print them in a consistent order.
@@ -480,8 +480,8 @@ void swift::ide::printSubmoduleInterface(
         auto *RHSValue = dyn_cast<ValueDecl>(RHS);
 
         if (LHSValue && RHSValue) {
-          StringRef LHSName = LHSValue->getName().str();
-          StringRef RHSName = RHSValue->getName().str();
+          auto LHSName = LHSValue->getBaseName();
+          auto RHSName = RHSValue->getBaseName();
           if (int Ret = LHSName.compare(RHSName))
             return Ret < 0;
           // FIXME: this is not sufficient to establish a total order for overloaded

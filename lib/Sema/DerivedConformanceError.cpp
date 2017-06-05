@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -103,7 +104,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(TypeChecker &tc,
 
   auto enumType = cast<EnumDecl>(type);
 
-  if (requirement->getName() == tc.Context.Id_nsErrorDomain)
+  if (requirement->getBaseName() == tc.Context.Id_nsErrorDomain)
     return deriveBridgedNSError_enum_nsErrorDomain(tc, parentDecl, enumType);
 
   tc.diagnose(requirement->getLoc(),

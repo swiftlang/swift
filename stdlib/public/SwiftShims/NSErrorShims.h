@@ -1,4 +1,4 @@
-//===--- NSErrorShims.h - Foundation declarations for NSError overlay ------===//
+//===--- NSErrorShims.h - Foundation declarations for NSError overlay -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,9 @@
 NS_BEGIN_DECLS
 
 NS_INLINE void __NSErrorPerformRecoverySelector(_Nullable id delegate, SEL selector, BOOL success, void *_Nullable contextInfo) {
-    objc_msgSend(delegate, selector, success, contextInfo);
+    void (*msg)(_Nullable id, SEL, BOOL, void* _Nullable) =
+        (void(*)(_Nullable id, SEL, BOOL, void* _Nullable))objc_msgSend;
+    msg(delegate, selector, success, contextInfo);
 }
 
 NS_END_DECLS

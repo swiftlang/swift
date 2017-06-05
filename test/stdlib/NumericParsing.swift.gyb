@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %line-directive %t/NumericParsing.swift -- %target-run %t/a.out
@@ -80,7 +80,7 @@ tests.test("${Self}/success") {
   expectEqual(0, ${Self}("-00", radix: 16))
 
   // Maximum radix
-  expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix}))
+  expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix})!)
 
   // Out-of-range values
   expectEqual(nil, ${Self}("${maxValue + 1}"))
@@ -135,6 +135,14 @@ tests.test("${Self}/Basics") {
   expectEqual(-(.infinity), ${Self}("-Inf"))
   expectEqual(String(${Self}.nan), String(${Self}("nan")!))
   expectEqual(String(${Self}.nan), String(${Self}("NaN")!))
+
+// sNaN cannot be fully supported on i386.
+#if !arch(i386)
+  expectTrue(${Self}("sNaN")!.isSignalingNaN)
+  expectTrue(${Self}("SNAN")!.isSignalingNaN)
+  expectTrue(${Self}("+snan")!.isSignalingNaN)
+  expectTrue(${Self}("-SnAn")!.isSignalingNaN)
+#endif
 % end
 
   expectEqual(-0.0, ${Self}("-0"))

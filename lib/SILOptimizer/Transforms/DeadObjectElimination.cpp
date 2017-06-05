@@ -706,7 +706,6 @@ class DeadObjectElimination : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Dead Object Elimination"; }
 };
 } // end anonymous namespace
 

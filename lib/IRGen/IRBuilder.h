@@ -134,7 +134,7 @@ public:
     void insert(llvm::Instruction *I) {
       assert(isValid() && "inserting at invalid location!");
       assert(I->getParent() == nullptr);
-      if (llvm::BasicBlock *block = After.dyn_cast<llvm::BasicBlock*>()) {
+      if (auto *block = After.dyn_cast<llvm::BasicBlock*>()) {
         block->getInstList().push_front(I);
       } else {
         llvm::Instruction *afterInsn = After.get<llvm::Instruction*>();

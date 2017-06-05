@@ -15,7 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/SourceManager.h"
@@ -39,7 +44,7 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
   bool hasPrintedName = false;
   if (auto *named = dyn_cast<ValueDecl>(D)) {
     if (named->hasName()) {
-      out << '\'' << named->getName() << '\'';
+      out << '\'' << named->getFullName() << '\'';
       hasPrintedName = true;
     } else if (auto *fn = dyn_cast<FuncDecl>(named)) {
       if (auto *ASD = fn->getAccessorStorageDecl()) {

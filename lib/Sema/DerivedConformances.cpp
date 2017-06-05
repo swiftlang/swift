@@ -15,7 +15,9 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
@@ -57,22 +59,49 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_nsErrorDomain))
       return getRequirement(KnownProtocolKind::BridgedNSError);
 
+    // CodingKey.stringValue
+    if (name.isSimpleName(ctx.Id_stringValue))
+      return getRequirement(KnownProtocolKind::CodingKey);
+
+    // CodingKey.intValue
+    if (name.isSimpleName(ctx.Id_intValue))
+      return getRequirement(KnownProtocolKind::CodingKey);
+
     return nullptr;
   }
 
   // Functions.
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
-    if (func->isOperator() && name.getBaseName().str() == "==")
+    if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
+
+    // Encodable.encode(to: Encoder)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_to)
+        return getRequirement(KnownProtocolKind::Encodable);
+    }
 
     return nullptr;
   }
 
   // Initializers.
-  if (isa<ConstructorDecl>(requirement)) {
+  if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
     auto argumentNames = name.getArgumentNames();
-    if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_rawValue)
-      return getRequirement(KnownProtocolKind::RawRepresentable);
+    if (argumentNames.size() == 1) {
+      if (argumentNames[0] == ctx.Id_rawValue)
+        return getRequirement(KnownProtocolKind::RawRepresentable);
+
+      // CodingKey.init?(stringValue:), CodingKey.init?(intValue:)
+      if (ctor->getFailability() == OTK_Optional &&
+          (argumentNames[0] == ctx.Id_stringValue ||
+           argumentNames[0] == ctx.Id_intValue))
+        return getRequirement(KnownProtocolKind::CodingKey);
+
+      // Decodable.init(from: Decoder)
+      if (argumentNames[0] == ctx.Id_from)
+        return getRequirement(KnownProtocolKind::Decodable);
+    }
 
     return nullptr;
   }
@@ -147,7 +176,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
   // normally.
-  if (parentDecl->hasClangNode())
+  if (isa<ClangModuleUnit>(parentDC->getModuleScopeContext()))
     tc.Context.addExternalDecl(getterDecl);
 
   return getterDecl;

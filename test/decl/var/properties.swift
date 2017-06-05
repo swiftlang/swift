@@ -265,7 +265,7 @@ var computed_prop_with_init_1: X {
 } = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}}
 
 // FIXME: Redundant error below
-var x2 { // expected-error{{computed property must have an explicit type}} expected-error{{type annotation missing in pattern}}
+var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}} expected-error{{type annotation missing in pattern}}
   get {
     return _x // expected-error{{unexpected non-void return value in void function}}
   }
@@ -469,8 +469,8 @@ protocol ProtocolWithExtension1 {
   static var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 {
-  final var fooExt: Int // expected-error{{extensions may not contain stored properties}}
-  final static var fooExtStatic = 4 // expected-error{{static stored properties not supported in generic types}}
+  var fooExt: Int // expected-error{{extensions may not contain stored properties}}
+  static var fooExtStatic = 4 // expected-error{{static stored properties not supported in generic types}}
 }
 
 func getS() -> S {

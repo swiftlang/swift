@@ -67,13 +67,13 @@ public func test5() -> Int32
 public func test6() -> Int32?
 
 
-sil_global [fragile] @_TZvOs7Process5_argcVs5Int32 : $Int32
+sil_global [serialized] @_TZvOs7Process5_argcVs5Int32 : $Int32
 
 
-sil_global private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
 
 
-sil_global [fragile] @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+sil_global [serialized] @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 
 
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
@@ -94,7 +94,7 @@ bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 }
 
 
-sil [transparent] [fragile] @_TFs13_didEnterMainFTVs5Int324argvGVs20UnsafeMutablePointerGS0_Vs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
+sil [transparent] [serialized] @_TFs13_didEnterMainFTVs5Int324argvGVs20UnsafeMutablePointerGS0_Vs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
 
 
 sil hidden [noinline] @_TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error) {
@@ -107,7 +107,7 @@ bb0(%0 : $Base):
 }
 
 
-sil [transparent] [fragile] @_TFVs5Int32CfMS_FT22_builtinIntegerLiteralBi2048__S_ : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
+sil [transparent] [serialized] @_TFVs5Int32CfMS_FT22_builtinIntegerLiteralBi2048__S_ : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
 
 
 sil hidden [noinline] @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error) {
@@ -481,7 +481,7 @@ bb4(%20 : $Error):
 }
 
 
-sil [transparent] [fragile] @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <T> (@thin Optional<T>.Type) -> @out Optional<T>
+sil [transparent] [serialized] @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <T> (@thin Optional<T>.Type) -> @out Optional<T>
 
 
 // Check that -specdevirt can devirtualize it
@@ -780,7 +780,7 @@ bb4(%19 : $Error):
 }
 
 
-sil private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> ()
+sil private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> ()
 
 
 public class A {

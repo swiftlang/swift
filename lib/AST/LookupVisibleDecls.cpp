@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -278,7 +278,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
     LookupState LS;
     const DeclContext *CurrDC;
     LazyResolver *TypeResolver;
-    llvm::DenseSet<std::pair<Identifier, CanType>> FunctionsReported;
+    llvm::DenseSet<std::pair<DeclBaseName, CanType>> FunctionsReported;
     llvm::DenseSet<CanType> SubscriptsReported;
     llvm::DenseSet<std::pair<Identifier, CanType>> PropertiesReported;
 
@@ -349,7 +349,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
                         ->getResult()
                         ->getCanonicalType();
 
-        auto Signature = std::make_pair(D->getName(), T);
+        auto Signature = std::make_pair(D->getBaseName(), T);
         if (!FunctionsReported.insert(Signature).second)
           return;
         break;
@@ -471,11 +471,6 @@ static void lookupVisibleProtocolMemberDecls(
     Type BaseTy, ProtocolType *PT, VisibleDeclConsumer &Consumer,
     const DeclContext *CurrDC, LookupState LS, DeclVisibilityKind Reason,
     LazyResolver *TypeResolver, VisitedSet &Visited) {
-  if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-    // Handle AnyObject in a special way.
-    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
-    return;
-  }
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
@@ -493,7 +488,7 @@ static void lookupVisibleMemberDeclsImpl(
     VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   assert(BaseTy && "lookup into null type");
-  BaseTy = BaseTy->getRValueType();
+  assert(!BaseTy->isLValueType());
 
   // Handle metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
@@ -527,6 +522,12 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
+  // If the base is AnyObject, we are doing dynamic lookup.
+  if (BaseTy->isAnyObject()) {
+    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
+    return;
+  }
+
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
@@ -536,8 +537,8 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol composition, enumerate members of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
-    for (auto Proto : PC->getProtocols())
-      lookupVisibleMemberDeclsImpl(Proto, Consumer, CurrDC, LS, Reason,
+    for (auto Member : PC->getMembers())
+      lookupVisibleMemberDeclsImpl(Member, Consumer, CurrDC, LS, Reason,
                                    TypeResolver, Visited);
     return;
   }
@@ -556,6 +557,7 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
+  llvm::SmallPtrSet<ClassDecl *, 8> Ancestors;
   do {
     NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
     if (!CurNominal)
@@ -567,11 +569,16 @@ static void lookupVisibleMemberDeclsImpl(
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
                                              Reason, TypeResolver, Visited);
     // If we have a class type, look into its superclass.
-    ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
+    auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
     if (CurClass && CurClass->hasSuperclass()) {
-      assert(BaseTy.getPointer() != CurClass->getSuperclass().getPointer() &&
-             "type is its own superclass");
+      // FIXME: This path is no substitute for an actual circularity check.
+      // The real fix is to check that the superclass doesn't introduce a
+      // circular reference before it's written into the AST.
+      if (Ancestors.count(CurClass)) {
+        break;
+      }
+
       BaseTy = CurClass->getSuperclass();
       Reason = getReasonForSuper(Reason);
 
@@ -587,6 +594,7 @@ static void lookupVisibleMemberDeclsImpl(
     } else {
       break;
     }
+    Ancestors.insert(CurClass);
   } while (1);
 }
 
@@ -663,10 +671,21 @@ static bool relaxedConflicting(const OverloadSignature &sig1,
          sig1.IsInstanceMember == sig2.IsInstanceMember;
 }
 
+/// Hack to guess at whether substituting into the type of a declaration will
+/// be okay.
+/// FIXME: This is awful. We should either have Type::subst() work for
+/// GenericFunctionType, or we should kill it outright.
+static bool shouldSubstIntoDeclType(Type type) {
+  auto genericFnType = type->getAs<GenericFunctionType>();
+  if (!genericFnType) return true;
+
+  return false;
+}
+
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> AllFoundDecls;
-  std::map<Identifier, std::set<ValueDecl *>> FoundDecls;
+  std::map<DeclBaseName, std::set<ValueDecl *>> FoundDecls;
   llvm::SetVector<FoundDeclTy> DeclsToReport;
   Type BaseTy;
   const DeclContext *DC;
@@ -674,7 +693,10 @@ public:
 
   OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
                             LazyResolver *resolver)
-      : BaseTy(BaseTy->getRValueType()), DC(DC), TypeResolver(resolver) {
+      : BaseTy(BaseTy), DC(DC), TypeResolver(resolver) {
+    assert(!BaseTy->isLValueType());
+    if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>())
+      BaseTy = MetaTy->getInstanceType();
     assert(DC && BaseTy);
   }
 
@@ -695,11 +717,11 @@ public:
     }
 
     if (VD->isInvalid()) {
-      FoundDecls[VD->getName()].insert(VD);
+      FoundDecls[VD->getBaseName()].insert(VD);
       DeclsToReport.insert(FoundDeclTy(VD, Reason));
       return;
     }
-    auto &PossiblyConflicting = FoundDecls[VD->getName()];
+    auto &PossiblyConflicting = FoundDecls[VD->getBaseName()];
 
     // Check all overridden decls.
     {
@@ -724,15 +746,29 @@ public:
     }
 
     // Does it make sense to substitute types?
-    bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
-                       !BaseTy->is<AnyMetatypeType>() &&
-                       !BaseTy->isExistentialType() &&
-                       !BaseTy->hasTypeVariable() &&
-                       VD->getDeclContext()->isTypeContext();
+
+    // Don't pass UnboundGenericType here. If you see this assertion
+    // being hit, fix the caller, don't remove it.
+    assert(!BaseTy->hasUnboundGenericType());
+
+    // If the base type is AnyObject, we might be doing a dynamic
+    // lookup, so the base type won't match the type of the member's
+    // context type.
+    //
+    // If the base type is not a nominal type, we can't substitute
+    // the member type.
+    //
+    // If the member is a free function and not a member of a type,
+    // don't substitute either.
+    bool shouldSubst = (!BaseTy->isAnyObject() &&
+                        !BaseTy->hasTypeVariable() &&
+                        BaseTy->getNominalOrBoundGenericNominal() &&
+                        VD->getDeclContext()->isTypeContext());
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
-    if (FoundSignature.InterfaceType && shouldSubst) {
+    if (FoundSignature.InterfaceType && shouldSubst &&
+        shouldSubstIntoDeclType(FoundSignature.InterfaceType)) {
       auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
       if (auto CT = FoundSignature.InterfaceType.subst(subs))
         FoundSignature.InterfaceType = CT->getCanonicalType();
@@ -748,7 +784,8 @@ public:
       }
 
       auto OtherSignature = OtherVD->getOverloadSignature();
-      if (OtherSignature.InterfaceType && shouldSubst) {
+      if (OtherSignature.InterfaceType && shouldSubst &&
+          shouldSubstIntoDeclType(OtherSignature.InterfaceType)) {
         auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
         if (auto CT = OtherSignature.InterfaceType.subst(subs))
           OtherSignature.InterfaceType = CT->getCanonicalType();
@@ -860,7 +897,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       if (ExtendedType)
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
-      ExtendedType = ND->getDeclaredType();
+      ExtendedType = ND->getDeclaredTypeInContext();
       BaseDecl = ND;
     }
 

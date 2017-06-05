@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O %s %S/Inputs/whole_module_optimization_helper.swift -o %t.sil -module-name main
+// RUN: %target-swift-frontend -emit-sil -O %s %S/Inputs/whole_module_optimization_helper.swift -o %t.sil -module-name main
 // RUN: %FileCheck %s < %t.sil
 // RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.sil
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O -primary-file %s %S/Inputs/whole_module_optimization_helper.swift -o %t.unopt.sil -module-name main
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s %S/Inputs/whole_module_optimization_helper.swift -o %t.unopt.sil -module-name main
 // RUN: %FileCheck %s -check-prefix=CHECK-SINGLE-FILE < %t.unopt.sil
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O -enable-testing %s %S/Inputs/whole_module_optimization_helper.swift -o %t.testing.sil -module-name main
+// RUN: %target-swift-frontend -emit-sil -O -enable-testing %s %S/Inputs/whole_module_optimization_helper.swift -o %t.testing.sil -module-name main
 // RUN: %FileCheck %s < %t.testing.sil
 // RUN: %FileCheck %s -check-prefix=NEGATIVE-TESTABLE < %t.testing.sil
 

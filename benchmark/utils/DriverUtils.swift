@@ -64,6 +64,7 @@ struct Test {
 
 public var precommitTests: [String : (Int) -> ()] = [:]
 public var otherTests: [String : (Int) -> ()] = [:]
+public var stringTests: [String : (Int) -> ()] = [:]
 
 enum TestAction {
   case Run
@@ -173,6 +174,10 @@ struct TestConfig {
     }
     for benchName in otherTests.keys.sorted() {
       tests.append(Test(name: benchName, n: i, f: otherTests[benchName]!))
+      i += 1
+    }
+    for benchName in stringTests.keys.sorted() {
+      tests.append(Test(name: benchName, n: i, f: stringTests[benchName]!))
       i += 1
     }
     for i in 0..<tests.count {

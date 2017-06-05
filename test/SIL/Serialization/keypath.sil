@@ -1,0 +1,107 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name boxes
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name boxes
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name boxes | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+struct S {
+  var x: Int
+  let y: String
+  var z: C
+}
+class C {
+  final var x: Int
+  final let y: String
+  final var z: S
+
+  init()
+  var overridable: Int {
+    get set
+  }
+}
+
+protocol P {}
+protocol Q {}
+protocol R {}
+
+struct Gen<A: P, B: Q, C: R> {
+  var x: A
+  let y: B
+  var z: C
+}
+
+// CHECK-LABEL: sil shared @stored_properties
+sil shared @stored_properties : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  %a = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  %b = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  // CHECK: keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
+  %c = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
+  // CHECK: keypath $ReferenceWritableKeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
+  %d = keypath $ReferenceWritableKeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared @stored_properties_generic
+sil shared @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.x : $τ_0_0) <D, E, F>
+  %a = keypath $WritableKeyPath<Gen<D,E,F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.x : $G) <D, E, F>
+  // CHECK: keypath $KeyPath<Gen<D, E, F>, E>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.y : $τ_0_1) <D, E, F>
+  %b = keypath $KeyPath<Gen<D,E,F>, E>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.y : $H) <D, E, F>
+
+  return undef : $()
+}
+
+sil @id_a : $@convention(thin) () -> ()
+sil @get_s_int : $@convention(thin) (@in S) -> @out Int
+sil @set_s_int : $@convention(thin) (@in Int, @in S) -> ()
+sil @get_c_int : $@convention(thin) (@in C) -> @out Int
+sil @set_c_int : $@convention(thin) (@in Int, @in C) -> ()
+sil @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S) -> @out @callee_owned (@in C) -> @out C
+sil @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S) -> ()
+
+// CHECK-LABEL: sil shared @computed_properties
+sil shared @computed_properties : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int)
+  %a = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int)
+  // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int, setter @set_s_int : $@convention(thin) (@in Int, @in S) -> ())
+  %b = keypath $WritableKeyPath<S, Int>, (root $S; settable_property $Int, id @id_a : $@convention(thin) () -> (), getter @get_s_int : $@convention(thin) (@in S) -> @out Int, setter @set_s_int : $@convention(thin) (@in Int, @in S) -> ())
+  // CHECK: keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S) -> @out @callee_owned (@in C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S) -> ())
+  %c = keypath $WritableKeyPath<(S) -> S, (C) -> C>, (root $(S) -> S; settable_property $(C) -> C, id @id_a : $@convention(thin) () -> (), getter @get_fns_fnc : $@convention(thin) (@in @callee_owned (@in S) -> @out S) -> @out @callee_owned (@in C) -> @out C, setter @set_fns_fnc : $@convention(thin) (@in @callee_owned (@in C) -> @out C, @in @callee_owned (@in S) -> @out S) -> ())
+  // CHECK: keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in C) -> @out Int, setter @set_c_int : $@convention(thin) (@in Int, @in C) -> ())
+  %d = keypath $WritableKeyPath<C, Int>, (root $C; settable_property $Int, id #C.overridable!getter.1 : (C) -> () -> Int, getter @get_c_int : $@convention(thin) (@in C) -> @out Int, setter @set_c_int : $@convention(thin) (@in Int, @in C) -> ())
+
+  return undef : $()
+}
+
+sil @get_gen_a : $@convention(thin) <X1: P, Y1: Q, Z1: R> (@in Gen<X1, Y1, Z1>) -> @out X1
+sil @set_gen_a : $@convention(thin) <X2: P, Y2: Q, Z2: R> (@in X2, @in Gen<X2, Y2, Z2>) -> ()
+
+// CHECK-LABEL: sil shared @computed_properties_generic
+sil shared @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; settable_property $τ_0_0, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in Gen<τ_0_0, τ_0_1, τ_0_2>) -> @out τ_0_0, setter @set_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in τ_0_0, @in Gen<τ_0_0, τ_0_1, τ_0_2>) -> ()) <D, E, F>
+  %a = keypath $KeyPath<Gen<D, E, F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; settable_property $G, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <X3: P, Y3: Q, Z3: R> (@in Gen<X3, Y3, Z3>) -> @out X3, setter @set_gen_a : $@convention(thin) <X4: P, Y4: Q, Z4: R> (@in X4, @in Gen<X4, Y4, Z4>) -> ()) <D, E, F>
+
+  return undef : $()
+}
+
+sil @serialize_all : $@convention(thin) () -> () {
+entry:
+  %0 = function_ref @stored_properties : $@convention(thin) () -> ()
+  %1 = function_ref @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %2 = function_ref @computed_properties : $@convention(thin) () -> ()
+  %3 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+
+  unreachable
+}

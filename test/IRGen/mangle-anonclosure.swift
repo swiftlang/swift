@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -o - | %FileCheck %s
 
 func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 

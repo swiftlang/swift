@@ -3,7 +3,7 @@
 // RUN: %target-clang -fmodules -c -o %t/ErrorBridgedStaticImpl.o %S/Inputs/ErrorBridgedStaticImpl.m 
 // RUN: %target-build-swift -static-stdlib -o %t/ErrorBridgedStatic %t/ErrorBridgedStaticImpl.o %s -import-objc-header %S/Inputs/ErrorBridgedStaticImpl.h
 // RUN: strip %t/ErrorBridgedStatic
-// RUN: %t/ErrorBridgedStatic
+// RUN: %target-run %t/ErrorBridgedStatic
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

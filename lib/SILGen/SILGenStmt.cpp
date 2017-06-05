@@ -17,7 +17,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -190,7 +189,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
-  LexicalScope BraceScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  LexicalScope BraceScope(SGF, CleanupLocation(S));
   // Keep in sync with DiagnosticsSIL.def.
   const unsigned ReturnStmtType   = 0;
   const unsigned BreakStmtType    = 1;
@@ -210,9 +209,9 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     if (!SGF.B.hasValidInsertionPoint()) {
       // If this is an implicit statement or expression, just skip over it,
       // don't emit a diagnostic here.
-      if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+      if (auto *S = ESD.dyn_cast<Stmt*>()) {
         if (S->isImplicit()) continue;
-      } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+      } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         if (E->isImplicit()) continue;
       }
       
@@ -227,7 +226,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     }
 
     // Process children.
-    if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+    if (auto *S = ESD.dyn_cast<Stmt*>()) {
       visit(S);
       if (isa<ReturnStmt>(S))
         StmtType = ReturnStmtType;
@@ -237,7 +236,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         StmtType = ContinueStmtType;
       if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
-    } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+    } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
       SGF.visit(ESD.get<Decl*>());
@@ -254,7 +253,6 @@ namespace {
                               SmallVectorImpl<CleanupHandle> &cleanups)
       : Storage(storage), Cleanups(cleanups) {}
 
-    SILValue getAddressOrNull() const override { return SILValue(); }
     void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
                              ManagedValue value, bool isInit) override {
       Storage = value.getValue();
@@ -477,7 +475,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   // the CondFalseBB.
   {
     // Enter a scope for any bound pattern variables.
-    LexicalScope trueScope(SGF.Cleanups, SGF, S);
+    LexicalScope trueScope(SGF, S);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S);
     
@@ -550,8 +548,8 @@ void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
-  LexicalScope condBufferScope(SGF.Cleanups, SGF, S);
-  
+  LexicalScope condBufferScope(SGF, S);
+
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
   SGF.B.emitBlock(loopDest.getBlock(), S);
@@ -744,7 +742,7 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
-  LexicalScope OuterForScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  LexicalScope OuterForScope(SGF, CleanupLocation(S));
   SGF.visitPatternBindingDecl(S->getIterator());
 
   // If we ever reach an unreachable point, stop emitting statements.
@@ -862,7 +860,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         // Otherwise, associate the loop body's closing brace with this branch.
         RegularLocation L(S->getBody());
         L.pointToEnd();
-        scope.exit(L);
+        scope.exitAndBranch(L);
       });
 
   // We add loop fail block, just to be defensive about intermediate
@@ -873,7 +871,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       failExitingBlock,
       [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
         assert(!inputValue && "None should not be passed an argument!");
-        scope.exit(S);
+        scope.exitAndBranch(S);
       });
 
   std::move(switchEnumBuilder).emit();

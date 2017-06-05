@@ -33,7 +33,7 @@ void escapeNewlines(std::string &S) {
     Index += 3;
   }
 }
-}
+} // end anonymous namespace
 
 void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   printRepeated(OS, ' ', Indent);

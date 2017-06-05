@@ -20,7 +20,7 @@
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
-namespace NewMangling {
+namespace Mangle {
 
 enum class SpecializationKind : uint8_t {
   Generic,
@@ -32,12 +32,12 @@ enum class SpecializationKind : uint8_t {
 using SpecializationPass = Demangle::SpecializationPass;
 
 /// The base class for specialization mangles.
-class SpecializationMangler : public NewMangling::ASTMangler {
+class SpecializationMangler : public Mangle::ASTMangler {
 protected:
   /// The specialization pass.
   SpecializationPass Pass;
 
-  IsFragile_t Fragile;
+  IsSerialized_t Serialized;
 
   /// The original function which is specialized.
   SILFunction *Function;
@@ -46,9 +46,9 @@ protected:
   llvm::raw_svector_ostream ArgOpBuffer;
 
 protected:
-  SpecializationMangler(SpecializationPass P, IsFragile_t Fragile,
+  SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
                         SILFunction *F)
-      : Pass(P), Fragile(Fragile), Function(F), ArgOpBuffer(ArgOpStorage) {}
+      : Pass(P), Serialized(Serialized), Function(F), ArgOpBuffer(ArgOpStorage) {}
 
   SILFunction *getFunction() const { return Function; }
 
@@ -72,9 +72,9 @@ public:
 
   GenericSpecializationMangler(SILFunction *F,
                                SubstitutionList Subs,
-                               IsFragile_t Fragile,
+                               IsSerialized_t Serialized,
                                bool isReAbstracted)
-    : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
+    : SpecializationMangler(SpecializationPass::GenericSpecializer, Serialized, F),
       Subs(Subs), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
@@ -88,9 +88,9 @@ class PartialSpecializationMangler : public SpecializationMangler {
 public:
   PartialSpecializationMangler(SILFunction *F,
                                CanSILFunctionType SpecializedFnTy,
-                               IsFragile_t Fragile,
+                               IsSerialized_t Serialized,
                                bool isReAbstracted)
-    : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),
+    : SpecializationMangler(SpecializationPass::GenericSpecializer, Serialized, F),
       SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
@@ -141,7 +141,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
 public:
   FunctionSignatureSpecializationMangler(SpecializationPass Pass,
-                                         IsFragile_t Fragile,
+                                         IsSerialized_t Serialized,
                                          SILFunction *F);
   void setArgumentConstantProp(unsigned OrigArgIdx, LiteralInst *LI);
   void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
@@ -164,7 +164,7 @@ private:
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
 
-} // end namespace NewMangling
+} // end namespace Mangle
 } // end namespace swift
 
 #endif

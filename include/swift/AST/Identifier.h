@@ -192,7 +192,7 @@ namespace llvm {
   class PointerLikeTypeTraits<swift::Identifier> {
   public:
     static inline void *getAsVoidPointer(swift::Identifier I) {
-      return (void*)I.get();
+      return const_cast<void *>(I.getAsOpaquePointer());
     }
     static inline swift::Identifier getFromVoidPointer(void *P) {
       return swift::Identifier::getFromOpaquePointer(P);
@@ -203,7 +203,104 @@ namespace llvm {
 } // end namespace llvm
 
 namespace swift {
-  
+
+/// Wrapper that may either be an Identifier or a special name
+/// (e.g. for subscripts)
+class DeclBaseName {
+  Identifier Ident;
+
+public:
+  DeclBaseName() : DeclBaseName(Identifier()) {}
+
+  DeclBaseName(Identifier I) : Ident(I) {}
+
+  bool isSpecial() const { return false; }
+
+  /// Return the identifier backing the name. Assumes that the name is not
+  /// special.
+  Identifier getIdentifier() const {
+    assert(!isSpecial() && "Cannot retrieve identifier from special names");
+    return Ident;
+  }
+
+  bool empty() const { return !isSpecial() && getIdentifier().empty(); }
+
+  bool isOperator() const {
+    return !isSpecial() && getIdentifier().isOperator();
+  }
+
+  bool isEditorPlaceholder() const {
+    return !isSpecial() && getIdentifier().isEditorPlaceholder();
+  }
+
+  int compare(DeclBaseName other) const {
+    // TODO: Sort special names cleverly
+    return getIdentifier().compare(other.getIdentifier());
+  }
+
+  bool operator==(StringRef Str) const {
+    return !isSpecial() && getIdentifier().str() == Str;
+  }
+  bool operator!=(StringRef Str) const { return !(*this == Str); }
+
+  bool operator==(DeclBaseName RHS) const { return Ident == RHS.Ident; }
+  bool operator!=(DeclBaseName RHS) const { return !(*this == RHS); }
+
+  bool operator<(DeclBaseName RHS) const {
+    return Ident.get() < RHS.Ident.get();
+  }
+
+  // TODO: Remove once migration to DeclBaseName has been completed
+  operator Identifier() {
+    return getIdentifier();
+  }
+
+  const void *getAsOpaquePointer() const { return Ident.get(); }
+
+  static DeclBaseName getFromOpaquePointer(void *P) {
+    return Identifier::getFromOpaquePointer(P);
+  }
+};
+
+} // end namespace swift
+
+namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &OS, swift::DeclBaseName D);
+
+// DeclBaseNames hash just like pointers.
+template<> struct DenseMapInfo<swift::DeclBaseName> {
+  static swift::DeclBaseName getEmptyKey() {
+    return swift::Identifier::getEmptyKey();
+  }
+  static swift::DeclBaseName getTombstoneKey() {
+    return swift::Identifier::getTombstoneKey();
+  }
+  static unsigned getHashValue(swift::DeclBaseName Val) {
+    return DenseMapInfo<const void *>::getHashValue(Val.getAsOpaquePointer());
+  }
+  static bool isEqual(swift::DeclBaseName LHS, swift::DeclBaseName RHS) {
+    return LHS == RHS;
+  }
+};
+
+// A DeclBaseName is "pointer like".
+template <typename T> class PointerLikeTypeTraits;
+template <> class PointerLikeTypeTraits<swift::DeclBaseName> {
+public:
+  static inline void *getAsVoidPointer(swift::DeclBaseName D) {
+    return const_cast<void *>(D.getAsOpaquePointer());
+  }
+  static inline swift::DeclBaseName getFromVoidPointer(void *P) {
+    return swift::DeclBaseName::getFromOpaquePointer(P);
+  }
+  enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::Identifier>::NumLowBitsAvailable };
+};
+
+} // end namespace llvm
+
+namespace swift {
+
 /// A declaration name, which may comprise one or more identifier pieces.
 class DeclName {
   friend class ASTContext;
@@ -214,12 +311,11 @@ class DeclName {
     friend TrailingObjects;
     friend class DeclName;
 
-    Identifier BaseName;
+    DeclBaseName BaseName;
     size_t NumArgs;
-    
-    explicit CompoundDeclName(Identifier BaseName, size_t NumArgs)
-      : BaseName(BaseName), NumArgs(NumArgs)
-    {
+
+    explicit CompoundDeclName(DeclBaseName BaseName, size_t NumArgs)
+        : BaseName(BaseName), NumArgs(NumArgs) {
       assert(NumArgs > 0 && "Should use IdentifierAndCompound");
     }
     
@@ -231,10 +327,9 @@ class DeclName {
     }
       
     /// Uniquing for the ASTContext.
-    static void Profile(llvm::FoldingSetNodeID &id,
-                        Identifier baseName,
+    static void Profile(llvm::FoldingSetNodeID &id, DeclBaseName baseName,
                         ArrayRef<Identifier> argumentNames);
-    
+
     void Profile(llvm::FoldingSetNodeID &id) {
       Profile(id, BaseName, getArgumentNames());
     }
@@ -242,45 +337,56 @@ class DeclName {
 
   // A single stored identifier, along with a bit stating whether it is the
   // base name for a zero-argument compound name.
-  typedef llvm::PointerIntPair<Identifier, 1, bool> IdentifierAndCompound;
+  typedef llvm::PointerIntPair<DeclBaseName, 1, bool> BaseNameAndCompound;
 
   // Either a single identifier piece stored inline (with a bit to say whether
   // it is simple or compound), or a reference to a compound declaration name.
-  llvm::PointerUnion<IdentifierAndCompound, CompoundDeclName*> SimpleOrCompound;
-  
+  llvm::PointerUnion<BaseNameAndCompound, CompoundDeclName *> SimpleOrCompound;
+
   DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
-  void initialize(ASTContext &C, Identifier baseName,
+  void initialize(ASTContext &C, DeclBaseName baseName,
                   ArrayRef<Identifier> argumentNames);
-  
+
 public:
   /// Build a null name.
-  DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
-  
+  DeclName() : SimpleOrCompound(BaseNameAndCompound()) {}
+
   /// Build a simple value name with one component.
+  /*implicit*/ DeclName(DeclBaseName simpleName)
+      : SimpleOrCompound(BaseNameAndCompound(simpleName, false)) {}
+
   /*implicit*/ DeclName(Identifier simpleName)
-    : SimpleOrCompound(IdentifierAndCompound(simpleName, false)) {}
-  
+      : DeclName(DeclBaseName(simpleName)) {}
+
   /// Build a compound value name given a base name and a set of argument names.
-  DeclName(ASTContext &C, Identifier baseName,
+  DeclName(ASTContext &C, DeclBaseName baseName,
            ArrayRef<Identifier> argumentNames) {
     initialize(C, baseName, argumentNames);
   }
 
   /// Build a compound value name given a base name and a set of argument names
   /// extracted from a parameter list.
-  DeclName(ASTContext &C, Identifier baseName, ParameterList *paramList);
-  
+  DeclName(ASTContext &C, DeclBaseName baseName, ParameterList *paramList);
+
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
-  Identifier getBaseName() const {
+  DeclBaseName getBaseName() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return compound->BaseName;
-    
-    return SimpleOrCompound.get<IdentifierAndCompound>().getPointer();
+
+    return SimpleOrCompound.get<BaseNameAndCompound>().getPointer();
+  }
+
+  /// Assert that the base name is not special and return its identifier.
+  Identifier getBaseIdentifier() const {
+    auto baseName = getBaseName();
+    assert(!baseName.isSpecial() &&
+           "Can't retrieve the identifier of a special base name");
+    return baseName.getIdentifier();
   }
 
   /// Retrieve the names of the arguments, if there are any.
@@ -291,10 +397,12 @@ public:
     return { };
   }
 
+  bool isSpecial() const { return getBaseName().isSpecial(); }
+
   explicit operator bool() const {
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
-    return !SimpleOrCompound.get<IdentifierAndCompound>().getPointer().empty();
+    return !SimpleOrCompound.get<BaseNameAndCompound>().getPointer().empty();
   }
   
   /// True if this is a simple one-component name.
@@ -302,7 +410,7 @@ public:
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return false;
 
-    return !SimpleOrCompound.get<IdentifierAndCompound>().getInt();
+    return !SimpleOrCompound.get<BaseNameAndCompound>().getInt();
   }
 
   /// True if this is a compound name.
@@ -310,19 +418,25 @@ public:
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
 
-    return SimpleOrCompound.get<IdentifierAndCompound>().getInt();
+    return SimpleOrCompound.get<BaseNameAndCompound>().getInt();
   }
   
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
-  bool isSimpleName(Identifier name) const {
+  bool isSimpleName(DeclBaseName name) const {
     return isSimpleName() && getBaseName() == name;
   }
   
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    return isSimpleName() && getBaseName().str().equals(name);
+    if (!isSimpleName())
+      return false;
+
+    if (getBaseName().isSpecial())
+      return false;
+
+    return getBaseIdentifier().str().equals(name);
   }
   
   /// True if this name is an operator.

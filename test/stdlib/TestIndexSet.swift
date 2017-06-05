@@ -326,7 +326,7 @@ class TestIndexSet : TestIndexSetSuper {
     }
     
     func testEmptyIteration() {
-        let empty = IndexSet()
+        var empty = IndexSet()
         let start = empty.startIndex
         let end = empty.endIndex
         
@@ -344,6 +344,21 @@ class TestIndexSet : TestIndexSetSuper {
             count += 1
         }
         
+        expectEqual(count, 0)
+
+        empty.insert(5)
+        empty.remove(5)
+        
+        count = 0
+        for _ in empty {
+            count += 1
+        }
+        expectEqual(count, 0)
+
+        count = 0
+        for _ in empty.rangeView {
+            count += 1
+        }
         expectEqual(count, 0)
     }
     
@@ -819,6 +834,10 @@ class TestIndexSet : TestIndexSetSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(IndexSet(), IndexSet._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -844,6 +863,7 @@ IndexSetTests.test("test_findIndex") { TestIndexSet().test_findIndex() }
 // IndexSetTests.test("testIndexingPerformance") { TestIndexSet().testIndexingPerformance() }
 IndexSetTests.test("test_AnyHashableContainingIndexSet") { TestIndexSet().test_AnyHashableContainingIndexSet() }
 IndexSetTests.test("test_AnyHashableCreatedFromNSIndexSet") { TestIndexSet().test_AnyHashableCreatedFromNSIndexSet() }
+IndexSetTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexSet().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif
 

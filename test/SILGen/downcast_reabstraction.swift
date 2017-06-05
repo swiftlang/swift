@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T022downcast_reabstraction19condFunctionFromAnyyypF 
 // CHECK:         checked_cast_addr_br take_always Any in [[IN:%.*]] : $*Any to () -> () in [[OUT:%.*]] : $*@callee_owned (@in ()) -> @out (), [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]

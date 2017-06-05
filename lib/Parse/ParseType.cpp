@@ -111,24 +111,24 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
     // There was an error during parsing.
     skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   if (!consumeIf(tok::r_paren)) {
     // Expected a closing r_paren.
     diagnose(Tok.getLoc(), diag::expected_rparen_layout_constraint);
     consumeToken();
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   if (size < 0) {
     diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   if (alignment < 0) {
     diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-    return LayoutConstraint::getUnknownLayout(Context);
+    return LayoutConstraint::getUnknownLayout();
   }
 
   // Otherwise it is a trivial layout constraint with
@@ -196,7 +196,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     }
     LLVM_FALLTHROUGH;
   default:
-    diagnose(Tok, MessageID);
+    {
+      auto diag = diagnose(Tok, MessageID);
+      // If the next token is closing or separating, the type was likely forgotten
+      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
+                    tok::equal, tok::comma, tok::semi))
+        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
+    }
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
       ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
       consumeToken();
@@ -407,8 +413,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
-            if (isa<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(decl->getName());
+            if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
+              ident->overwriteIdentifier(genericParam->getName());
           }
         }
         return true;
@@ -581,8 +587,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
     if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
-      if (isa<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(Entry);
+      if (auto *TD = dyn_cast<TypeDecl>(Entry))
+        ComponentsR[0]->setValue(TD);
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
@@ -1136,9 +1142,13 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::exclaim_postfix:
   case tok::question_postfix:
     return true;
-  
-  case tok::oper_binary_unspaced:
+
   case tok::oper_binary_spaced:
+    if (tok.getText() == "&")
+      return true;
+
+    LLVM_FALLTHROUGH;
+  case tok::oper_binary_unspaced:
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
     return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);

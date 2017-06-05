@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 @discardableResult
 func takeFunc(_ f: (Int) -> Int) -> Int {}
@@ -271,4 +271,99 @@ func testOverloadAmbiguity() {
   overloadOnSomeDefaultArgsOnly(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly'}}
   overloadOnSomeDefaultArgsOnly2(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly2'}}
   overloadOnSomeDefaultArgsOnly3(1) {} // expected-error {{ambiguous use of 'overloadOnSomeDefaultArgsOnly3(_:x:a:)'}}
+}
+
+func overloadMismatch(a: () -> Void) -> Bool { return true}
+func overloadMismatch(x: Int = 0, a: () -> Void) -> Int { return 0 }
+
+func overloadMismatchLabel(a: () -> Void) -> Bool { return true}
+func overloadMismatchLabel(x: Int = 0, b: () -> Void) -> Int { return 0 }
+
+func overloadMismatchArgs(_: Int, a: () -> Void) -> Bool { return true}
+func overloadMismatchArgs(_: Int, x: Int = 0, a: () -> Void) -> Int { return 0 }
+
+func overloadMismatchArgsLabel(_: Int, a: () -> Void) -> Bool { return true}
+func overloadMismatchArgsLabel(_: Int, x: Int = 0, b: () -> Void) -> Int { return 0 }
+
+func overloadMismatchMultiArgs(_: Int, a: () -> Void) -> Bool { return true}
+func overloadMismatchMultiArgs(_: Int, x: Int = 0, y: Int = 1, a: () -> Void) -> Int { return 0 }
+
+func overloadMismatchMultiArgsLabel(_: Int, a: () -> Void) -> Bool { return true}
+func overloadMismatchMultiArgsLabel(_: Int, x: Int = 0, y: Int = 1, b: () -> Void) -> Int { return 0 }
+
+func overloadMismatchMultiArgs2(_: Int, z: Int = 0, a: () -> Void) -> Bool { return true}
+func overloadMismatchMultiArgs2(_: Int, x: Int = 0, y: Int = 1, a: () -> Void) -> Int { return 0 }
+
+func overloadMismatchMultiArgs2Label(_: Int, z: Int = 0, a: () -> Void) -> Bool { return true}
+func overloadMismatchMultiArgs2Label(_: Int, x: Int = 0, y: Int = 1, b: () -> Void) -> Int { return 0 }
+
+func testOverloadDefaultArgs() {
+  let a = overloadMismatch {}
+  _ = a as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+  let b = overloadMismatch() {}
+  _ = b as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let c = overloadMismatchLabel {}
+  _ = c as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+  let d = overloadMismatchLabel() {}
+  _ = d as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let e = overloadMismatchArgs(0) {}
+  _ = e as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let f = overloadMismatchArgsLabel(0) {}
+  _ = f as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let g = overloadMismatchMultiArgs(0) {}
+  _ = g as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let h = overloadMismatchMultiArgsLabel(0) {}
+  _ = h as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let i = overloadMismatchMultiArgs2(0) {}
+  _ = i as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let j = overloadMismatchMultiArgs2Label(0) {}
+  _ = j as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+}
+
+func variadic(_: (() -> Void)...) {}
+func variadicLabel(closures: (() -> Void)...) {}
+
+func variadicOverloadMismatch(_: (() -> Void)...) -> Bool { return true }
+func variadicOverloadMismatch(x: Int = 0, _: (() -> Void)...) -> Int { return 0 }
+
+func variadicOverloadMismatchLabel(a: (() -> Void)...) -> Bool { return true }
+func variadicOverloadMismatchLabel(x: Int = 0, b: (() -> Void)...) -> Int { return 0 }
+
+func variadicAndNonOverload(_: (() -> Void)) -> Bool { return false }
+func variadicAndNonOverload(_: (() -> Void)...) -> Int { return 0 }
+
+func variadicAndNonOverloadLabel(a: (() -> Void)) -> Bool { return false }
+func variadicAndNonOverloadLabel(b: (() -> Void)...) -> Int { return 0 }
+
+func testVariadic() {
+  variadic {}
+  variadic() {}
+  variadic({}) {} // expected-error {{extra argument in call}}
+
+  variadicLabel {}
+  variadicLabel() {}
+  variadicLabel(closures: {}) {} // expected-error {{extra argument 'closures' in call}}
+
+  let a1 = variadicOverloadMismatch {}
+  _ = a1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+  let a2 = variadicOverloadMismatch() {}
+  _ = a2 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let b1 = variadicOverloadMismatchLabel {}
+  _ = b1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+  let b2 = variadicOverloadMismatchLabel() {}
+  _ = b2 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let c1 = variadicAndNonOverloadLabel {}
+  _ = c1 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
+
+  let c2 = variadicAndNonOverload {}
+  _ = c2 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
 }

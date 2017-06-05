@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-struct MyType<TyA, TyB> { // expected-note {{declared here}}
+struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
 
@@ -10,8 +10,7 @@ struct MyType<TyA, TyB> { // expected-note {{declared here}}
 // arguments to them.
 //
 
-// FIXME: This should work?
-typealias OurType = MyType  // expected-error {{reference to generic type 'MyType' requires arguments in <...>}}
+typealias OurType = MyType
 
 typealias YourType = Swift.Optional
 
@@ -19,8 +18,9 @@ struct Container {
   typealias YourType = Swift.Optional
 }
 
-let _ : YourType<Int>
-let _ : Container.YourType<Int>
+let _: OurType<Int, String>
+let _: YourType<Int>
+let _: Container.YourType<Int>
 
 //
 // Bona-fide generic type aliases
@@ -164,6 +164,11 @@ class GenericClass<T> {
       return TA(a: x, b: y)
     }
   }
+
+  // Stupid corner case -- underlying type is not dependent
+  typealias NotDependent<T> = Int
+
+  func misleadingCode(_: NotDependent<String>) {}
 }
 
 let gc = GenericClass<Double>()
@@ -219,15 +224,24 @@ let _: ConcreteStruct.O<Int> = ConcreteStruct.O(123)
 let _: ConcreteStruct.O<Int> = ConcreteStruct.O<Int>(123)
 
 // Qualified lookup of generic typealiases nested inside generic contexts
+//
+// FIXME marks cases which still don't work correctly, and either produce a
+// spurious diagnostic, or are actually invalid and do not diagnose.
+//
+// This occurs because the constraint solver does the wrong thing with an
+// UnresolvedSpecializeExpr applied to a generic typealias.
+//
+// In the other cases, we manage to fold the UnresolvedSpecializeExpr in the
+// precheckExpression() phase, which handles generic typealiases correctly.
 
 let _ = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
 let _ = GenericClass.TA<Float>(a: 1, b: 4.0)
 
-let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Int, _>.Type' with argument list '(a: Double, b: Int)'}}
+let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _ = GenericClass<Int>.TA(a: 1, b: 4.0)
 
-let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Int' is not convertible to 'Float'}}
-let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{'Int' is not convertible to 'Float'}}
+let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
+let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
 let _: GenericClass.TA = GenericClass.TA(a: 4.0, b: 1)
 let _: GenericClass.TA = GenericClass.TA(a: 1, b: 4.0)
@@ -235,35 +249,35 @@ let _: GenericClass.TA = GenericClass.TA(a: 1, b: 4.0)
 let _: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
 let _: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Int, _>.Type' with argument list '(a: Double, b: Int)'}}
+let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Int' is not convertible to 'Float'}}
-let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{'Int' is not convertible to 'Float'}}
+let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
+let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<_, _>.Type' with argument list '(a: Double, b: Int)'}}
+let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA'}}
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Float, _>.Type' with argument list '(a: Double, b: Int)'}}
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot invoke value of type 'MyType<Float, _>.Type' with argument list '(a: Int, b: Double)'}}
+let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'GenericClass<Int>.TA'}}
+let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'GenericClass<Int>.TA'}}
 
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Int, _>.Type' with argument list '(a: Double, b: Int)'}}
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Int' is not convertible to 'Float'}}
-let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{'Int' is not convertible to 'Float'}}
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
+let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<_, _>.Type' with argument list '(a: Double, b: Int)'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'MyType<Int, Float>'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Float, _>.Type' with argument list '(a: Double, b: Int)'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot invoke value of type 'MyType<Float, _>.Type' with argument list '(a: Int, b: Double)'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'MyType<Int, Float>'}}
 
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot invoke value of type 'MyType<Int, _>.Type' with argument list '(a: Double, b: Int)'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Int' is not convertible to 'Float'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{'Int' is not convertible to 'Float'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
 func takesUnsugaredType2(m: MyType<Int, Float>) {}
 func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
@@ -340,3 +354,16 @@ func f(x: S.G1<Int>, y: S.G2<Int>) {
   takesMyType(x: x)
   takesMyType(y: y)
 }
+
+//
+// Generic typealiases with requirements
+//
+
+typealias Element<S> = S.Iterator.Element where S : Sequence
+
+func takesInt(_: Element<[Int]>) {}
+
+takesInt(10)
+
+func failsRequirementCheck(_: Element<Int>) {}
+// expected-error@-1 {{type 'Int' does not conform to protocol 'Sequence'}}

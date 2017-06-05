@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
 
 sil_stage canonical
 

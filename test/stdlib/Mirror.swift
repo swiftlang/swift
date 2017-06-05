@@ -9,8 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
@@ -21,10 +20,6 @@
 // RUN: fi
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
-
-// FIXME: rdar://30332105 LLVM miscompile of vector instructions
-//   in optimized build of Mirrors.LabeledStructure
-// UNSUPPORTED: CPU=armv7s
 
 import StdlibUnittest
 
@@ -728,7 +723,7 @@ mirrors.test("PlaygroundQuickLook") {
   case .text(let text):
 #if _runtime(_ObjC)
 // FIXME: Enable if non-objc hasSuffix is implemented.
-    expectTrue(text.hasSuffix(".(X #1)()"), text)
+    expectTrue(text.contains("X #1 in"), text)
 #endif
   default:
     expectTrue(false)

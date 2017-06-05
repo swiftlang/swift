@@ -54,15 +54,15 @@ enum class ImportNameVersion : unsigned {
   Swift4,
 
   /// A placeholder for the latest version, to be used in loops and such.
-  LAST_VERSION = Swift4
-};
+  LAST_VERSION = Swift4,
 
-static inline void
-forEachImportNameVersion(llvm::function_ref<void(ImportNameVersion)> action) {
-  auto limit = static_cast<unsigned>(ImportNameVersion::LAST_VERSION);
-  for (unsigned raw = 0; raw <= limit; ++raw)
-    action(static_cast<ImportNameVersion>(raw));
-}
+  /// The version which should be used for importing types, which need to have
+  /// one canonical definition.
+  ///
+  /// FIXME: Is this supposed to be the /newest/ version, or a canonical
+  /// version that lasts forever as part of the ABI?
+  ForTypes = Swift4
+};
 
 static inline ImportNameVersion &operator++(ImportNameVersion &value) {
   assert(value != ImportNameVersion::LAST_VERSION);
@@ -74,6 +74,36 @@ static inline ImportNameVersion &operator--(ImportNameVersion &value) {
   assert(value != ImportNameVersion::Raw);
   value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) - 1);
   return value;
+}
+
+/// Calls \p action for each name version, starting with \p current, then going
+/// backwards until ImportNameVersion::Raw, and then finally going forwards to
+/// ImportNameVersion::LAST_VERSION.
+///
+/// This is the most useful order for importing compatibility stubs.
+static inline void forEachImportNameVersionFromCurrent(
+    ImportNameVersion current,
+    llvm::function_ref<void(ImportNameVersion)> action) {
+  action(current);
+  ImportNameVersion nameVersion = current;
+  while (nameVersion != ImportNameVersion::Raw) {
+    --nameVersion;
+    action(nameVersion);
+  }
+  nameVersion = current;
+  while (nameVersion != ImportNameVersion::LAST_VERSION) {
+    ++nameVersion;
+    action(nameVersion);
+  }
+}
+
+/// Calls \p action for each name version, starting with ImportNameVersion::Raw
+/// and going forwards.
+static inline void
+forEachImportNameVersion(llvm::function_ref<void(ImportNameVersion)> action) {
+  auto limit = static_cast<unsigned>(ImportNameVersion::LAST_VERSION);
+  for (unsigned raw = 0; raw <= limit; ++raw)
+    action(static_cast<ImportNameVersion>(raw));
 }
 
 /// Map a language version into an import name version.
@@ -332,9 +362,6 @@ private:
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
-
-  /// Whether we should import this as Swift Private
-  bool shouldBeSwiftPrivate(const clang::NamedDecl *, clang::Sema &clangSema);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

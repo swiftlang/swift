@@ -80,7 +80,7 @@ public:
 /// Depending on whether a type is address-only, it may be representable using
 /// BB argument passing or by storing to a common result buffer.
 class ConditionalValue {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
   const TypeLowering &tl;
   
   /// The continuation block that receives the conditional value.
@@ -104,7 +104,7 @@ public:
   /// type lowering. This potentially emits a temporary allocation for the
   /// result, so it must be called with the insertion point valid and dominating
   /// any branches that will be involved in the computation.
-  ConditionalValue(SILGenFunction &gen, SGFContext C, SILLocation loc,
+  ConditionalValue(SILGenFunction &SGF, SGFContext C, SILLocation loc,
                    const TypeLowering &valueTL);
   
   /// Enter a branch of the conditional value computation. Expression evaluation

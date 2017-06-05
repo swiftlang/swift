@@ -398,8 +398,6 @@ namespace {
 
 class LoopRotation : public SILFunctionTransform {
 
-  StringRef getName() override { return "SIL Loop Rotation"; }
-
   void run() override {
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     assert(LA);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 class TestClass {
 
@@ -21,13 +21,13 @@ class TestDerived : TestClass {
 // CHECK-LABEL: sil hidden @{{.*}}testDirectDispatch{{.*}} : $@convention(thin) (@owned TestClass) -> Int {
 // CHECK: bb0([[ARG:%.*]] : $TestClass):
 // CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_T05final9TestClassC0A6Method{{[_0-9a-zA-Z]*}}F
-// CHECK: [[BORROWED_ARG_1:%.*]] = begin_borrow [[ARG]]
-// CHECK: apply [[FINALMETH]]([[BORROWED_ARG_1]])
-// CHECK: [[BORROWED_ARG_2:%.*]] = begin_borrow [[ARG]]
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: apply [[FINALMETH]]([[BORROWED_ARG]])
+// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: [[FINALPROP:%[0-9]+]] = function_ref @_T05final9TestClassC0A8PropertySifg
-// CHECK: apply [[FINALPROP]]([[BORROWED_ARG_2]])
-// CHECK: end_borrow [[BORROWED_ARG_2]] from [[ARG]]
-// CHECK: end_borrow [[BORROWED_ARG_1]] from [[ARG]]
+// CHECK: apply [[FINALPROP]]([[BORROWED_ARG]])
+// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 func testDirectDispatch(c : TestClass) -> Int {
   return c.finalMethod()+c.finalProperty
 }
@@ -36,8 +36,8 @@ func testDirectDispatch(c : TestClass) -> Int {
 // Verify that the non-overriding final methods don't get emitted to the vtable.
 // CHECK-LABEL: sil_vtable TestClass {
 // CHECK-NEXT:  #TestClass.baseMethod!1: {{.*}} : _T05final9TestClassC10baseMethod{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:  #TestClass.deinit!
 // CHECK-NEXT:  #TestClass.init!initializer.1: {{.*}} : _T05final9TestClassC{{[_0-9a-zA-Z]*}}fc
+// CHECK-NEXT:  #TestClass.deinit!
 // CHECK-NEXT: }
 
 // Verify that overriding final methods don't get emitted to the vtable.

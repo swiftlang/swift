@@ -61,8 +61,6 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   switch (AI.getInstruction()->getKind()) {
   case ValueKind::ApplyInst:
     NAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
-                                   AI.getSubstCalleeSILType(),
-                                   AI.getType(),
                                    AI.getSubstitutions(),
                                    Ret,
                                    cast<ApplyInst>(AI)->isNonThrowing());
@@ -70,7 +68,6 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   case ValueKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
     NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
-                                      AI.getSubstCalleeSILType(),
                                       AI.getSubstitutions(),
                                       Ret,
                                       TryApplyI->getNormalBB(),
@@ -204,7 +201,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
       Args.push_back(Arg);
     }
     FullApplySite NewVirtAI = Builder.createTryApply(VirtAI.getLoc(), VirtAI.getCallee(),
-        VirtAI.getSubstCalleeSILType(), VirtAI.getSubstitutions(),
+        VirtAI.getSubstitutions(),
         Args, NormalBB, ErrorBB);
     VirtAI.getInstruction()->eraseFromParent();
     VirtAI = NewVirtAI;
@@ -348,7 +345,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (SubType.getSwiftRValueType()->hasArchetype())
+  if (SubType.hasArchetype())
     return false;
 
   auto &M = CMI->getModule();
@@ -392,12 +389,12 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   SmallVector<ClassDecl *, 8> Subs(DirectSubs);
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
-  if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
+  if (ClassType.is<BoundGenericClassType>()) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(),
         Subs.end(),
-        [&ClassType, &M](ClassDecl *Sub){
+        [&ClassType](ClassDecl *Sub){
           auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
           // Unbound generic type can override a method from
           // a bound generic class, but this unbound generic
@@ -499,7 +496,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
       auto InstTy = ClassType.getSwiftRValueType();
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
-      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+      auto CanMetaTy = CanMetatypeType(MetaTy);
       ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
     }
 
@@ -577,7 +574,6 @@ namespace {
       }
     }
 
-    StringRef getName() override { return "Speculative Devirtualization"; }
   };
 
 } // end anonymous namespace

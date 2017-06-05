@@ -103,6 +103,8 @@ class GlobalPropertyOpt {
   /// All found calls to get-property semantic functions.
   std::vector<ApplyInst *> propertyCalls;
 
+  llvm::SetVector<SILFunction *> ChangedFunctions;
+
   /// Contains entries with a false property value, which must be propagated
   /// to their dependencies.
   llvm::SmallVector<Entry *, 32> WorkList;
@@ -120,7 +122,7 @@ class GlobalPropertyOpt {
   /// Returns true if the type is a tuple which contains at least one array
   /// (we don't check for arrays in nested tuples).
   bool isTupleWithArray(CanType type) {
-    if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+    if (auto tuple = dyn_cast<TupleType>(type)) {
       for (Type subType : tuple->getElementTypes()) {
         if (CanType(subType).getNominalOrBoundGenericNominal() == ArrayType)
           return true;
@@ -145,9 +147,7 @@ class GlobalPropertyOpt {
         linkage = SILLinkage::Public;
         break;
     }
-    if (isPossiblyUsedExternally(linkage, M.isWholeModule()))
-      return true;
-    return false;
+    return isPossiblyUsedExternally(linkage, M.isWholeModule());
   }
   
   static bool canAddressEscape(SILValue V, bool acceptStore);
@@ -223,13 +223,13 @@ class GlobalPropertyOpt {
   
   void propagatePropertiesInGraph();
   
-  bool replacePropertyCalls();
+  void replacePropertyCalls();
   
 public:
   GlobalPropertyOpt(SILModule &Module) :
       M(Module), ArrayType(nullptr) {}
   
-  bool run();
+  void run(SILModuleTransform *T);
 };
 
 /// Checks if an address value does escape. If \p acceptStore is false, then
@@ -286,7 +286,7 @@ bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
 
 /// Scan an instruction and build dependencies for it.
 void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
-  if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst)) {
+  if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
     ArraySemanticsCall semCall(AI);
     switch (semCall.getKind()) {
       case ArrayCallKind::kArrayInit:
@@ -305,7 +305,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       default:
         break;
     }
-  } else if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
+  } else if (auto *LI = dyn_cast<LoadInst>(Inst)) {
     if (isArrayType(LI->getType())) {
       // Add a dependency from the value at the address to the loaded value.
       SILValue loadAddr = LI->getOperand();
@@ -313,7 +313,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       addDependency(getAddrEntry(loadAddr), getValueEntry(LI));
       return;
     }
-  } else if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
+  } else if (auto *SI = dyn_cast<StoreInst>(Inst)) {
     SILValue src = SI->getSrc();
     if (isArrayType(src->getType())) {
       // Add a dependency from the operand to the value at the store-address.
@@ -332,21 +332,21 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       }
       return;
     }
-  } else if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(Inst)) {
+  } else if (auto *SEI = dyn_cast<StructExtractInst>(Inst)) {
     if (isArrayType(SEI->getType())) {
       // Add a dependency from the field to the extracted value.
       VarDecl *Field = SEI->getField();
       addDependency(getFieldEntry(Field), getValueEntry(SEI));
       return;
     }
-  } else if (TupleExtractInst *TEI = dyn_cast<TupleExtractInst>(Inst)) {
+  } else if (auto *TEI = dyn_cast<TupleExtractInst>(Inst)) {
     if (isArrayType(TEI->getType())) {
       // Add a dependency from the tuple itself to the extracted element.
       SILValue tuple = TEI->getOperand();
       addDependency(getValueEntry(tuple), getValueEntry(TEI));
       return;
     }
-  } else if (TupleInst *TI = dyn_cast<TupleInst>(Inst)) {
+  } else if (auto *TI = dyn_cast<TupleInst>(Inst)) {
     if (isTupleWithArray(TI->getType().getSwiftRValueType())) {
       // Add dependencies from array elements to the tuple itself.
       for (Operand &Op : TI->getAllOperands()) {
@@ -357,7 +357,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       }
       return;
     }
-  } else if (StructInst *SI = dyn_cast<StructInst>(Inst)) {
+  } else if (auto *SI = dyn_cast<StructInst>(Inst)) {
     // Add dependencies from the array operands to the struct array-fields.
     StructDecl *S = SI->getStructDecl();
     NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
@@ -404,9 +404,9 @@ void GlobalPropertyOpt::scanInstructions() {
             hasPreds = true;
             auto *Term = Pred->getTerminator();
             SILValue PredArg;
-            if (BranchInst *BI = dyn_cast<BranchInst>(Term)) {
+            if (auto *BI = dyn_cast<BranchInst>(Term)) {
               PredArg = BI->getArg(argIdx);
-            } else if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Term)) {
+            } else if (auto *CBI = dyn_cast<CondBranchInst>(Term)) {
               PredArg = CBI->getArgForDestBB(&BB, BBArg);
             }
             if (PredArg) {
@@ -453,12 +453,14 @@ void GlobalPropertyOpt::propagatePropertiesInGraph() {
 
 /// Replaces all get-property calls, which we can prove to be true, with
 /// true-literals.
-bool GlobalPropertyOpt::replacePropertyCalls() {
-  bool Changed = false;
+void GlobalPropertyOpt::replacePropertyCalls() {
   for (ApplyInst *AI : propertyCalls) {
+    SILFunction *F = AI->getFunction();
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (!AI->getFunction()->shouldOptimize())
+    if (!F->shouldOptimize())
       continue;
+
+    ChangedFunctions.insert(F);
 
     SILValue array = AI->getArgument(0);
     
@@ -481,14 +483,12 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
       
       semCall.removeCall();
       NumPropertiesReplaced++;
-      Changed = true;
     }
   }
-  return Changed;
 }
  
 /// The main entry point to the optimization.
-bool GlobalPropertyOpt::run() {
+void GlobalPropertyOpt::run(SILModuleTransform *T) {
   
   assert(WorkList.empty());
   assert(FieldEntries.empty() && ValueEntries.empty());
@@ -502,7 +502,12 @@ bool GlobalPropertyOpt::run() {
   propagatePropertiesInGraph();
 
   // Step 3: replace get-property calls with literals.
-  return replacePropertyCalls();
+  replacePropertyCalls();
+
+  for (SILFunction *ChangedFn : ChangedFunctions) {
+    T->invalidateAnalysis(ChangedFn,
+                          SILAnalysis::InvalidationKind::CallsAndInstructions);
+  }
 }
 
 /// The module pass, which runs the optimization.
@@ -513,14 +518,9 @@ class GlobalPropertyOptPass : public SILModuleTransform {
     
     DEBUG(llvm::dbgs() << "** GlobalPropertyOpt **\n");
     
-    bool Changed = GlobalPropertyOpt(*M).run();
-    
-    if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    }
+    GlobalPropertyOpt(*M).run(this);
   }
   
-  StringRef getName() override { return "GlobalPropertyOpt"; }
 };
 
 } // end anonymous namespace

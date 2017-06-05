@@ -24,8 +24,10 @@
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 public protocol ${Self} : ${Conformance} {
+%   if Self == '_Strideable':
   /// A type that represents the distance between two values of `Self`.
-  associatedtype Stride : SignedNumber
+  associatedtype Stride : SignedNumeric, Comparable
+%   end
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
@@ -53,140 +55,118 @@ public protocol ${Self} : ${Conformance} {
 
 % end
 
-/// Compare two `Strideable`s.
-public func < <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) > 0
+extension Strideable {
+  @_inlineable
+  public static func < (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) > 0
+  }
+
+  @_inlineable
+  public static func == (x: Self, y: Self) -> Bool {
+    return x.distance(to: y) == 0
+  }
 }
 
-public func == <T : Strideable>(x: T, y: T) -> Bool {
-  return x.distance(to: y) == 0
-}
+//===----------------------------------------------------------------------===//
 
-% for Base in ['Strideable', 'SignedInteger']:
-%   deprecated = Base == 'SignedInteger'
-%   # FIXME: technically the deprecation version is incorrect and should be 3.1
-%   #        instead but due to <rdar://problem/29884401> it does not work as
-%   #        expected.
-%   DeprecationVersion = '3.0'
+%{
+  # Strideable used to provide + and - unconditionally. With the updated
+  # collection indexing model of Swift 3 this became unnecessary for integer
+  # types, and was deprecated, as it was a way to write mixed-type arithmetic
+  # expressions, that are otherwise are not allowed.
+}%
+% for Base, VersionInfo in [
+%   ('Strideable where Self : _Pointer', None),
+%   ('Strideable', 'deprecated: 3, obsoleted: 4'),
+%   ]:
+%   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
-%   end
-public func + <T : ${Base}>(lhs: T, rhs: T.Stride) -> T {
-  return lhs.advanced(by: rhs)
-}
+extension ${Base} {
+  @_transparent
+  ${Availability}
+  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: rhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
-%   end
-public func + <T : ${Base}>(lhs: T.Stride, rhs: T) -> T {
-  return rhs.advanced(by: lhs)
-}
+  @_transparent
+  ${Availability}
+  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
+    return rhs.advanced(by: lhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
-%   end
-public func - <T : ${Base}>(lhs: T, rhs: T.Stride) -> T {
-  return lhs.advanced(by: -rhs)
-}
+  @_transparent
+  ${Availability}
+  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
+    return lhs.advanced(by: -rhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
-%   end
-public func - <T : ${Base}>(lhs: T, rhs: T) -> T.Stride {
-  return rhs.distance(to: lhs)
-}
+  @_transparent
+  ${Availability}
+  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
+    return rhs.distance(to: lhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
-%   end
-public func += <T : ${Base}>(lhs: inout T, rhs: T.Stride) {
-  lhs = lhs.advanced(by: rhs)
-}
+  @_transparent
+  ${Availability}
+  public static func += (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: rhs)
+  }
 
-%   if deprecated:
-@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
-%   end
-public func -= <T : ${Base}>(lhs: inout T, rhs: T.Stride) {
-  lhs = lhs.advanced(by: -rhs)
+  @_transparent
+  ${Availability}
+  public static func -= (lhs: inout Self, rhs: Self.Stride) {
+    lhs = lhs.advanced(by: -rhs)
+  }
 }
 
 % end
 
-//===--- Deliberately-ambiguous operators for UnsignedIntegerTypes --------===//
-// The UnsignedIntegerTypes all have a signed Stride type.  Without these     //
-// overloads, expressions such as UInt(2) + Int(3) would compile.             //
-//===----------------------------------------------------------------------===//
-
-public func + <T : UnsignedInteger>(
-  lhs: T, rhs: T._DisallowMixedSignArithmetic
-) -> T {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func + <T : UnsignedInteger>(
-  lhs: T._DisallowMixedSignArithmetic, rhs: T
-) -> T {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func - <T : _DisallowMixedSignArithmetic>(
-  lhs: T, rhs: T._DisallowMixedSignArithmetic
-) -> T {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func - <T : _DisallowMixedSignArithmetic>(
-  lhs: T, rhs: T
-) -> T._DisallowMixedSignArithmetic {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func += <T : UnsignedInteger>(
-  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
-) {
-  _sanityCheckFailure("Should not be callable.")
-}
-
-public func -= <T : UnsignedInteger>(
-  lhs: inout T, rhs: T._DisallowMixedSignArithmetic
-) {
-  _sanityCheckFailure("Should not be callable.")
-}
-
 //===----------------------------------------------------------------------===//
 
 extension Strideable {
+  @_inlineable
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
-    return (nil, current.value + distance)
+    return (nil, current.value.advanced(by: distance))
   }
 }
 
 extension Strideable where Stride : FloatingPoint {
+  @_inlineable
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
     if let i = current.index {
-      return (i + 1, start + Stride(i + 1) * distance)
+      return (i + 1, start.advanced(by: Stride(i + 1) * distance))
     }
     // If current.index == nil, either we're just starting out (in which case
     // the next index is 1), or we should proceed without an index just as
     // though this floating point specialization doesn't exist.
-    return (current.value == start ? 1 : nil, current.value + distance)
+    return (current.value == start ? 1 : nil,
+            current.value.advanced(by: distance))
   }
 }
 
 /// An iterator for `StrideTo<Element>`.
+@_fixed_layout
 public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
+  @_versioned
   internal let _start: Element
+
+  @_versioned
   internal let _end: Element
+
+  @_versioned
   internal let _stride: Element.Stride
+
+  @_versioned
   internal var _current: (index: Int?, value: Element)
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
     _end = end
@@ -198,6 +178,8 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
+
+  @_inlineable
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
@@ -209,16 +191,20 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a half-open interval.
+@_fixed_layout
 public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   // FIXME: should really be a Collection, as it is multipass
 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @_inlineable
   public func makeIterator() -> StrideToIterator<Element> {
     return StrideToIterator(_start: _start, end: _end, stride: _stride)
   }
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     // At start, striding away from end is allowed; it just makes for an
@@ -228,8 +214,13 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
     self._stride = stride
   }
 
+  @_versioned
   internal let _start: Element
+
+  @_versioned
   internal let _end: Element
+
+  @_versioned
   internal let _stride: Element.Stride
 
   public var customMirror: Mirror {
@@ -240,20 +231,33 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 /// Returns the sequence of values (`self`, `self + stride`, `self +
 /// 2 * stride`, ... *last*) where *last* is the last value in the
 /// progression that is less than `end`.
-public func stride<T : Strideable>(
+@_inlineable
+public func stride<T>(
   from start: T, to end: T, by stride: T.Stride
 ) -> StrideTo<T> {
   return StrideTo(_start: start, end: end, stride: stride)
 }
 
 /// An iterator for `StrideThrough<Element>`.
+@_fixed_layout
 public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
+  @_versioned
   internal let _start: Element
+
+  @_versioned
   internal let _end: Element
+
+  @_versioned
   internal let _stride: Element.Stride
+
+  @_versioned
   internal var _current: (index: Int?, value: Element)
+
+  @_versioned
   internal var _didReturnEnd: Bool = false
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
     _end = end
@@ -265,6 +269,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
+  @_inlineable
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
@@ -283,6 +288,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a closed interval.
+@_fixed_layout
 public struct StrideThrough<
   Element : Strideable
 > : Sequence, CustomReflectable {
@@ -291,10 +297,13 @@ public struct StrideThrough<
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @_inlineable
   public func makeIterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(_start: _start, end: _end, stride: _stride)
   }
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     self._start = _start
@@ -302,8 +311,11 @@ public struct StrideThrough<
     self._stride = stride
   }
 
+  @_versioned
   internal let _start: Element
+  @_versioned
   internal let _end: Element
+  @_versioned
   internal let _stride: Element.Stride
 
   public var customMirror: Mirror {
@@ -317,7 +329,8 @@ public struct StrideThrough<
 /// progression less than or equal to `end`.
 ///
 /// - Note: There is no guarantee that `end` is an element of the sequence.
-public func stride<T : Strideable>(
+@_inlineable
+public func stride<T>(
   from start: T, through end: T, by stride: T.Stride
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)

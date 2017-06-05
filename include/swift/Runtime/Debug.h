@@ -93,6 +93,10 @@ LLVM_ATTRIBUTE_NORETURN
 extern void
 fatalError(uint32_t flags, const char *format, ...);
 
+/// swift::warning() emits a warning from the runtime.
+extern void
+warning(uint32_t flags, const char *format, ...);
+
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
 LLVM_ATTRIBUTE_NORETURN
@@ -119,6 +123,16 @@ void swift_abortRetainOverflow();
 // Halt due to reading an unowned reference to a dead object.
 LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
 void swift_abortRetainUnowned(const void *object);
+
+/// This function dumps one line of a stack trace. It is assumed that \p framePC
+/// is the address of the stack frame at index \p index. If \p shortOutput is
+/// true, this functions prints only the name of the symbol and offset, ignores
+/// \p index argument and omits the newline.
+void dumpStackTraceEntry(unsigned index, void *framePC,
+                         bool shortOutput = false);
+
+LLVM_ATTRIBUTE_NOINLINE
+void printCurrentBacktrace(unsigned framesToSkip = 1);
 
 // namespace swift
 }

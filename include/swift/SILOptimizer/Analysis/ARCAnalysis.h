@@ -196,6 +196,7 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
+  ArrayRef<SILArgumentConvention> ArgumentConventions;
   llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
 
   /// Set to true if we found some releases but not all for the argument.
@@ -221,6 +222,10 @@ private:
   /// arguments. 
   void collectMatchingReleases(SILBasicBlock *BB);
 
+  /// Walk the function and find all the destroy_addr instructions that match
+  /// to function arguments. 
+  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
+
   /// For every argument in the function, check to see whether all epilogue
   /// releases are found. Clear all releases for the argument if not all 
   /// epilogue releases are found.
@@ -228,9 +233,12 @@ private:
 
 public:
   /// Finds matching releases in the return block of the function \p F.
-  ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCFI,
-                                      SILFunction *F,
-                                      ExitKind Kind = ExitKind::Return);
+  ConsumedArgToEpilogueReleaseMatcher(
+      RCIdentityFunctionInfo *RCFI,
+      SILFunction *F,
+      ArrayRef<SILArgumentConvention> ArgumentConventions =
+          {SILArgumentConvention::Direct_Owned},
+      ExitKind Kind = ExitKind::Return);
 
   /// Finds matching releases in the provided block \p BB.
   void findMatchingReleases(SILBasicBlock *BB);

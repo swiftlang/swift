@@ -577,6 +577,19 @@ func useEnums() {
       case .West: // We do not expect an error here
         markUsed("W")
 
+      case .WithUnavailablePayload(_):
+        markUsed("WithUnavailablePayload")
+      case .WithUnavailablePayload1(_):
+        markUsed("WithUnavailablePayload1")
+      case .WithUnavailablePayload2(_):
+        markUsed("WithUnavailablePayload2")
+
+      case .WithAvailableByEnumPayload(_):
+        markUsed("WithAvailableByEnumPayload")
+      case .WithAvailableByEnumElementPayload1(_):
+        markUsed("WithAvailableByEnumElementPayload1")
+      case .WithAvailableByEnumElementPayload2(_):
+        markUsed("WithAvailableByEnumElementPayload2")
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
 
@@ -1310,7 +1323,7 @@ class Y {
 
 @objc
 class X {
-  var y = Y()
+  @objc var y = Y()
 }
 
 func testForFixitWithNestedMemberRefExpr() {

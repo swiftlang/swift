@@ -65,8 +65,10 @@ public protocol _BidirectionalIndexable : _Indexable {
 ///   `c.index(before: c.index(after: i)) == i`.
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
-public protocol BidirectionalCollection
-  : _BidirectionalIndexable, Collection {
+public protocol BidirectionalCollection : _BidirectionalIndexable, Collection 
+// FIXME(ABI) (Revert Where Clauses): Restore these 
+// where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection
+{
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the position immediately before the given index.
@@ -84,23 +86,17 @@ public protocol BidirectionalCollection
 
   /// A sequence that can represent a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : _BidirectionalIndexable, Collection
+  associatedtype SubSequence
+  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
+  : _BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
-  // FIXME(ABI)#93 (Recursive Protocol Constraints):
-  // FIXME(ABI)#94 (Associated Types with where clauses):
-  // This is dependent on both recursive protocol constraints AND associated 
-  // types with where clauses.
-  // associatedtype SubSequence : BidirectionalCollection
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : _BidirectionalIndexable, Collection
+  associatedtype Indices 
+  // FIXME(ABI) (Revert Where Clauses): Remove these conformances
+  : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
-  // FIXME(ABI)#95 (Recursive Protocol Constraints):
-  // FIXME(ABI)#96 (Associated Types with where clauses):
-  // This is dependent on both recursive protocol constraints AND associated 
-  // types with where clauses.
-  // associatedtype Indices : BidirectionalCollection
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -133,7 +129,7 @@ public protocol BidirectionalCollection
   ///     // Prints "50"
   ///     
   /// - Complexity: O(1)
-  var last: Iterator.Element? { get }
+  var last: Element? { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -237,7 +233,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1).
   /// - SeeAlso: `removeLast()`
-  public mutating func popLast() -> Iterator.Element? {
+  public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
@@ -254,7 +250,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Complexity: O(1)
   /// - SeeAlso: `popLast()`
   @discardableResult
-  public mutating func removeLast() -> Iterator.Element {
+  public mutating func removeLast() -> Element {
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
     return element

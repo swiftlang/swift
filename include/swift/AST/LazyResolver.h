@@ -52,11 +52,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve an inherited conformance.
-  virtual ProtocolConformance *resolveInheritedConformance(
-                                 const NormalProtocolConformance *conformance,
-                                 ProtocolDecl *inherited) = 0;
-
   /// Resolve the accessibility of a value.
   ///
   /// It does no type-checking.
@@ -86,9 +81,6 @@ public:
 
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
-
-  /// Introduce the accessors for a 'lazy' variable.
-  virtual void introduceLazyVarAccessors(VarDecl *var) = 0;
 
   /// Resolve the type of an extension.
   ///
@@ -127,12 +119,6 @@ public:
     Principal.resolveWitness(conformance, requirement);
   }
 
-  ProtocolConformance *resolveInheritedConformance(
-                         const NormalProtocolConformance *conformance,
-                         ProtocolDecl *inherited) override {
-    return Principal.resolveInheritedConformance(conformance, inherited);
-  }
-
   void resolveAccessibility(ValueDecl *VD) override {
     Principal.resolveAccessibility(VD);
   }
@@ -162,10 +148,6 @@ public:
     Principal.bindExtension(ext);
   }
 
-  void introduceLazyVarAccessors(VarDecl *var) override {
-    Principal.introduceLazyVarAccessors(var);
-  }
-
   void resolveExtension(ExtensionDecl *ext) override {
     Principal.resolveExtension(ext);
   }
@@ -183,6 +165,8 @@ public:
     return Principal.isProtocolExtensionUsable(dc, type, protocolExtension);
   }
 };
+
+class LazyMemberLoader;
 
 /// Context data for lazy deserialization.
 class LazyContextData {

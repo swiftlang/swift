@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // Build swift modules this test depends on.
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
@@ -8,9 +8,9 @@
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -typecheck -verify %s -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -typecheck -verify %s -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module
 //
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
@@ -21,7 +21,7 @@
 // RUN: %FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
@@ -32,8 +32,8 @@
 // RUN: %FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module %s
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -module-to-print=print_ast_tc_decls -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -emit-module -o %t -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -module-to-print=print_ast_tc_decls -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_NO_GET_SET -strict-whitespace < %t.printed.txt
@@ -585,7 +585,7 @@ struct d0200_EscapedIdentifiers {
   }
 // PASS_COMMON-NEXT: {{^}}  enum `enum` {{{$}}
 // PASS_COMMON-NEXT: {{^}}    case `case`{{$}}
-// PASS_COMMON-NEXT: {{^}}    static func ==(a: d0200_EscapedIdentifiers.`enum`, b: d0200_EscapedIdentifiers.`enum`) -> Bool
+// PASS_COMMON-NEXT: {{^}}    {{.*}}static func __derived_enum_equals(_ a: d0200_EscapedIdentifiers.`enum`, _ b: d0200_EscapedIdentifiers.`enum`) -> Bool
 // PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -865,6 +865,9 @@ protocol AssociatedType1 {
 
   associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
+
+  associatedtype AssociatedTypeDecl4 where AssociatedTypeDecl4 : QuxProtocol, AssociatedTypeDecl4.Qux == Int
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  associatedtype AssociatedTypeDecl4 where Self.AssociatedTypeDecl4 : QuxProtocol, Self.AssociatedTypeDecl4.Qux == Int{{$}}
 }
 
 //===---
@@ -1007,7 +1010,7 @@ enum d2000_EnumDecl1 {
 // PASS_COMMON: {{^}}enum d2000_EnumDecl1 {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case ED1_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case ED1_Second{{$}}
-// PASS_COMMON-NEXT: {{^}}  static func ==(a: d2000_EnumDecl1, b: d2000_EnumDecl1) -> Bool
+// PASS_COMMON-NEXT: {{^}}  {{.*}}static func __derived_enum_equals(_ a: d2000_EnumDecl1, _ b: d2000_EnumDecl1) -> Bool
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -1329,6 +1332,21 @@ protocol ProtocolToExtend {
 
 extension ProtocolToExtend where Self.Assoc == Int {}
 // PREFER_TYPE_REPR_PRINTING: extension ProtocolToExtend where Self.Assoc == Int {
+
+// Protocol with where clauses
+
+protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int, Self : FooProtocol {}
+// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : QuxProtocol where Self : FooProtocol, Self.Qux == Int {
+
+protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int, Self : FooProtocol {
+// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self : FooProtocol, Self.Qux == Int {
+  associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
+// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : QuxProtocol where Self.A1 : FooProtocol, Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
+
+  // FIXME: this same type requirement with Self should be printed here
+  associatedtype A2 : QuxProtocol where A2.Qux == Self
+// PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2 : QuxProtocol where Self.A2.Qux == Self{{$}}
+}
 
 #if true
 #elseif false

@@ -134,7 +134,9 @@ func typeOfShadowing() {
   // TODO: Errors need improving here.
   _ = type(of: Gen<Foo>.Bar) // expected-error{{argument labels '(of:)' do not match any available overloads}}
                              // expected-note@-1{{overloads for 'type' exist with these partially matching parameter lists: (T.Type), (fo: T.Type)}}
-  _ = type(Gen<Foo>.Bar) // expected-warning{{missing '.self' for reference to metatype of type 'Gen<Foo>.Bar'}}
+  _ = type(Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
+  // expected-note@-1{{add arguments after the type to construct a value of the type}}
+  // expected-note@-2{{use '.self' to reference the type object}}
   _ = type(of: Gen<Foo>.Bar.self, flag: false) // No error here.
   _ = type(fo: Foo.Bar.self) // No error here.
   _ = type(of: Foo.Bar.self, [1, 2, 3]) // No error here.
@@ -262,14 +264,14 @@ protocol P2 {}
 protocol P3 {}
 func compositionType() {
   _ = P1 & P2 // expected-error {{expected member name or constructor call after type name}} expected-note{{use '.self'}} {{7-7=(}} {{14-14=).self}}
-  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads for '&' exist }}
+  _ = P1 & P2.self // expected-error {{binary operator '&' cannot be applied to operands of type 'P1.Protocol' and 'P2.Protocol'}} expected-note {{overloads}}
   _ = (P1 & P2).self // Ok.
   _ = (P1 & (P2)).self // FIXME: OK? while `typealias P = P1 & (P2)` is rejected.
-  _ = (P1 & (P2, P3)).self // expected-error {{non-protocol type '(P2, P3)' cannot be used within a protocol composition}}
-  _ = (P1 & Int).self // expected-error {{non-protocol type 'Int' cannot be used within a protocol composition}}
-  _ = (P1? & P2).self // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
+  _ = (P1 & (P2, P3)).self // expected-error {{non-protocol, non-class type '(P2, P3)' cannot be used within a protocol-constrained type}}
+  _ = (P1 & Int).self // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+  _ = (P1? & P2).self // expected-error {{non-protocol, non-class type 'P1?' cannot be used within a protocol-constrained type}}
 
-  _ = (P1 & P2.Type).self // expected-error {{non-protocol type 'P2.Type' cannot be used within a protocol composition}}
+  _ = (P1 & P2.Type).self // expected-error {{non-protocol, non-class type 'P2.Type' cannot be used within a protocol-constrained type}}
 
   _ = P1 & P2 -> P3
   // expected-error @-1 {{single argument function types require parentheses}} {{7-7=(}} {{14-14=)}}
@@ -297,4 +299,44 @@ func complexSequence() {
   // expected-error @-2 {{single argument function types require parentheses}} {{none}} {{11-11=(}} {{18-18=)}}
   // expected-error @-3 {{expected member name or constructor call after type name}}
   // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
+}
+
+func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
+
+func takesOneArg<T>(_: T.Type) {}
+func takesTwoArgs<T>(_: T.Type, _: Int) {}
+
+func testMissingSelf() {
+  // None of these were not caught in Swift 3.
+  // See test/Compatibility/type_expr.swift.
+
+  takesOneArg(Int)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  takesOneArg(Swift.Int)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  takesTwoArgs(Int, 0)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  takesTwoArgs(Swift.Int, 0)
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  Swift.Int // expected-warning {{expression of type 'Int.Type' is unused}}
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
+
+  _ = Swift.Int
+  // expected-error@-1 {{expected member name or constructor call after type name}}
+  // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+  // expected-note@-3 {{use '.self' to reference the type object}}
 }

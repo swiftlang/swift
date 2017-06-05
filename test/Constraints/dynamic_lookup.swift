@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
 // RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 
@@ -199,7 +199,7 @@ let prop3ResultCChecked: Int? = prop3ResultC
 
 var obj2 : AnyObject & P = Y()
 
-class Z2 : AnyObject { }
+class Z2 { }
 class Z3<T : AnyObject> { }
 class Z4<T> where T : AnyObject { }
 
@@ -235,7 +235,7 @@ _ = anyDict["test"]!.bar() // expected-error {{value of type 'Any' has no member
 // looked-up dynamically through AnyObject are treated as conforming
 // to the protocols they are supposed to conform to.
 class NSObjDerived1 : NSObject {
-  var everything: [Any] = []
+  @objc var everything: [Any] = []
 }
 
 class NSObjDerived2 : NSObject {

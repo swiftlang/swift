@@ -24,6 +24,7 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Basic/Lazy.h"
@@ -247,8 +248,7 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // Swift source.
 
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-        MANGLE_AS_STRING(SELECT_MANGLING(WPCSo7CFErrors5Error10Foundation,
-                                         So7CFErrorCs5Error10FoundationWP))));
+               MANGLE_AS_STRING(MANGLE_SYM(So7CFErrorCs5Error10FoundationWP))));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
@@ -258,8 +258,7 @@ static const WitnessTable *getNSErrorConformanceToError() {
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT, "_"
-      MANGLE_AS_STRING(SELECT_MANGLING(WPCSo8NSObjects8Hashable10ObjectiveC,
-                                       So8NSObjectCs8Hashable10ObjectiveCWP))));
+           MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWP))));
   assert(TheWitnessTable &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
@@ -514,8 +513,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   // protocol _ObjectiveCBridgeableError
   auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(SELECT_MANGLING(Mp10Foundation26_ObjectiveCBridgeableError,
-                               10Foundation26_ObjectiveCBridgeableErrorMp)))));
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp)))));
 
   // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
   if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -new-mangling-for-tests -print-indexed-symbols -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 
 // Enum
 enum AnEnumeration {
@@ -44,19 +44,27 @@ class AClass {
   // CHECK: [[@LINE-1]]:7 | class/Swift | AClass | s:14swift_ide_test6AClassC | Def | rel: 0
 
   // InstanceMethod + Parameters
-  func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,RelChild | rel: 1
+  func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
   // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Siv | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
-  // CHECK-NOT: [[@LINE-5]]:33 | param/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-6]]:43 | param/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-7]]:53 | param/Swift | d | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-8]]:61 | param/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-5]]:33 | param(local)/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-6]]:43 | param(local)/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-7]]:53 | param(local)/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-8]]:61 | param/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+
+    _ = a
+    // CHECK: [[@LINE-1]]:9 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
+    _ = b
+    // CHECK-NOT: [[@LINE-1]]:9 | param(local)/Swift | b | s:{{.*}} | Ref,Read,RelCont | rel: 1
+    _ = c
+    // CHECK-NOT: [[@LINE-1]]:9 | param(local)/Swift | c | s:{{.*}} | Ref,Read,RelCont | rel: 1
+  }
 
   // ClassMethod
   class func classMethod() {}
-  // CHECK: [[@LINE-1]]:14 | class-method/Swift | classMethod() | s:14swift_ide_test6AClassC11classMethodyyFZ | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | class-method/Swift | classMethod() | s:14swift_ide_test6AClassC11classMethodyyFZ | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
 
   // StaticMethod
@@ -71,7 +79,7 @@ class AClass {
 
     // Accessor + AccessorGetter
     get {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifg | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifg | Def,Dyn,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv
 
       return 1
@@ -79,7 +87,7 @@ class AClass {
 
     // Accessor + AccessorSetter
     set {}
-    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifs | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifs | Def,Dyn,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv
   }
 
@@ -150,7 +158,7 @@ extension AProtocol { func extFn() }
 
 // TypeAlias
 typealias SomeAlias = AStruct
-// CHECK: [[@LINE-1]]:11 | type-alias/Swift | SomeAlias | s:14swift_ide_test9SomeAlias | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | type-alias/Swift | SomeAlias | s:14swift_ide_test9SomeAliasa | Def | rel: 0
 // CHECK: [[@LINE-2]]:23 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Ref | rel: 0
 
 // GenericTypeParam
@@ -186,7 +194,7 @@ class MyTestCase : XCTestCase {
 // CHECK: [[@LINE-1]]:7 | class(test)/Swift | MyTestCase |
   func callit() {}
   func testMe() {
-  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR:.*]] | Def,RelChild
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR:.*]] | Def,Dyn,RelChild
     callit()
     // CHECK: [[@LINE-1]]:5 | instance-method/Swift | callit() | s:14swift_ide_test10MyTestCaseC6callityyF | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR]]
@@ -219,7 +227,7 @@ class AttrAnnots {
   @IBOutlet var iboutletString: AnyObject?
   // CHECK: [[@LINE-1]]:17 | instance-property(IB)/Swift | iboutletString |
   @IBAction func someibaction(o: TargetForIBAction) {}
-  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,RelChild,RelIBType | rel: 2
+  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,Dyn,RelChild,RelIBType | rel: 2
   // CHECK-NEXT: RelIBType | class/Swift | TargetForIBAction | [[TargetForIBAction_USR]]
   @GKInspectable var gkString = "gk"
   // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
@@ -234,3 +242,16 @@ typealias C1Alias = C1
 // CHECK: [[@LINE+2]]:15 | class/Swift | C1 | [[C1_USR]] | Ref,Impl,RelBase | rel: 1
 // CHECK-NEXT: RelBase | class/Swift | SubC1 | [[SubC1_USR]]
 class SubC1 : C1Alias {}
+
+struct ImplCtors {
+// CHECK: [[@LINE-1]]:8 | struct/Swift | ImplCtors | [[ImplCtors_USR:.*]] | Def | rel: 0
+  // CHECK: [[@LINE-2]]:8 | constructor/Swift | init(x:) | [[ImplCtors_init_with_param_USR:.*]] | Def,Impl,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | struct/Swift | ImplCtors | [[ImplCtors_USR]]
+  // CHECK: [[@LINE-4]]:8 | constructor/Swift | init() | [[ImplCtors_init_USR:.*]] | Def,Impl,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | struct/Swift | ImplCtors | [[ImplCtors_USR]]
+  var x = 0
+}
+_ = ImplCtors()
+// CHECK: [[@LINE-1]]:5 | constructor/Swift | init() | [[ImplCtors_init_USR]] | Ref,Call | rel: 0
+_ = ImplCtors(x:0)
+// CHECK: [[@LINE-1]]:5 | constructor/Swift | init(x:) | [[ImplCtors_init_with_param_USR]] | Ref,Call | rel: 0

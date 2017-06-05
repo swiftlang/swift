@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// `String` does not conform to `RangeReplaceableCollection`, but provides a
-// similar API.
-
-extension String {
+extension String : StringProtocol {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 
@@ -23,6 +20,36 @@ extension String {
   /// In Swift, *reachability* refers to the ability to produce one value from
   /// the other through zero or more applications of `index(after:)`.
   public typealias IndexDistance = CharacterView.IndexDistance
+
+  public typealias SubSequence = Substring
+
+  /// Creates a string representing the given character repeated the specified
+  /// number of times.
+  ///
+  /// For example, use this initializer to create a string with ten `"0"`
+  /// characters in a row.
+  ///
+  ///     let zeroes = String("0" as Character, count: 10)
+  ///     print(zeroes)
+  ///     // Prints "0000000000"
+  public init(repeating repeatedValue: Character, count: Int) {
+    self.init(repeating: String(repeatedValue), count: count)
+  }
+
+  // This initializer disambiguates between the following intitializers, now
+  // that String conforms to Collection:
+  // - init<T>(_ value: T) where T : LosslessStringConvertible
+  // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
+  public init<S : Sequence & LosslessStringConvertible>(_ other: S)
+  where S.Element == Character {
+    self._core = CharacterView(other)._core
+  }
+  
+  // This initializer satisfies the LosslessStringConvertible conformance
+  @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
+  public init?(_ other: String) {
+    self.init(other._core)
+  }
 
   /// The position of the first character in a nonempty string.
   ///
@@ -147,22 +174,6 @@ extension String {
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
   public subscript(i: Index) -> Character { return characters[i] }
-
-  /// Accesses the text in the given range.
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
-  }
-
-  /// Accesses the text in the given range.
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
-  }
 }
 
 extension String.Index {
@@ -191,7 +202,7 @@ extension String {
   ///
   /// - Parameter characters: A sequence of characters.
   public init<S : Sequence>(_ characters: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     self._core = CharacterView(characters)._core
   }
 
@@ -233,13 +244,12 @@ extension String {
   ///
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.append(contentsOf: newElements)
     }
   }
 
-% for Range in ['Range', 'ClosedRange']:
   /// Replaces the text within the specified bounds with the given characters.
   ///
   /// Calling this method invalidates any existing indices for use with this
@@ -255,35 +265,14 @@ extension String {
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
   public mutating func replaceSubrange<C>(
-    _ bounds: ${Range}<Index>,
+    _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C : Collection, C.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
     }
   }
-
-  /// Replaces the text within the specified bounds with the given string.
-  ///
-  /// Calling this method invalidates any existing indices for use with this
-  /// string.
-  ///
-  /// - Parameters:
-  ///   - bounds: The range of text to replace. The bounds of the range must be
-  ///     valid indices of the string.
-  ///   - newElements: The new text to add to the string.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the string and
-  ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
-  ///   removes text at the end of the string, the complexity is O(*n*), where
-  ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange(
-    _ bounds: ${Range}<Index>, with newElements: String
-  ) {
-    replaceSubrange(bounds, with: newElements.characters)
-  }
-% end
 
   /// Inserts a new character at the specified position.
   ///
@@ -318,7 +307,7 @@ extension String {
   ///   `newElements`.
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
-  ) where S.Iterator.Element == Character {
+  ) where S.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
@@ -349,26 +338,21 @@ extension String {
     }
   }
 
-% for Range in ['Range', 'ClosedRange']:
   /// Removes the characters in the given range.
   ///
   /// Calling this method invalidates any existing indices for use with this
   /// string.
   ///
-% if Range == 'ClosedRange':
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string and not
   ///   equal to the string's end index.
-% else:
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string.
-% end
-  public mutating func removeSubrange(_ bounds: ${Range}<Index>) {
+  public mutating func removeSubrange(_ bounds: Range<Index>) {
     withMutableCharacters {
       (v: inout CharacterView) in v.removeSubrange(bounds)
     }
   }
-% end
 
   /// Replaces this string with the empty string.
   ///
@@ -386,3 +370,61 @@ extension String {
   }
 }
 
+extension String {
+  // This is needed because of the issue described in SR-4660 which causes
+  // source compatibility issues when String becomes a collection
+  @_transparent
+  public func max<T : Comparable>(_ x: T, _ y: T) -> T {
+    return Swift.max(x,y)
+  }
+
+  // This is needed because of the issue described in SR-4660 which causes
+  // source compatibility issues when String becomes a collection
+  @_transparent
+  public func min<T : Comparable>(_ x: T, _ y: T) -> T {
+    return Swift.min(x,y)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// The following overloads of flatMap are carefully crafted to allow the code
+// like the following:
+//   ["hello"].flatMap { $0 }
+// return an array of strings without any type context in Swift 3 mode, at the
+// same time allowing the following code snippet to compile:
+//   [0, 1].flatMap { x in
+//     if String(x) == "foo" { return "bar" } else { return nil }
+//   }
+// Note that the second overload is delcared on a more specific protocol.
+// See: test/stdlib/StringFlatMap.swift for tests.
+extension Sequence {
+  @available(swift, obsoleted: 4)
+  public func flatMap(
+    _ transform: (Element) throws -> String
+  ) rethrows -> [String] {
+    return try map(transform)
+  }
+}
+
+extension Collection {
+  public func flatMap(
+    _ transform: (Element) throws -> String?
+  ) rethrows -> [String] {
+    return try _flatMap(transform)
+  }
+}
+//===----------------------------------------------------------------------===//
+
+extension String {
+  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
+  public static func + <S : Sequence>(lhs: S, rhs: String) -> Never
+    where S.Iterator.Element == String {
+      fatalError()
+  }
+
+  @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
+  public static func + <S : Sequence>(lhs: String, rhs: S) -> Never
+    where S.Iterator.Element == String {
+      fatalError()
+  }
+}

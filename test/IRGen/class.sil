@@ -33,10 +33,10 @@ sil_vtable C {}
 // \ CHECK:   i8* null
 // \ CHECK: }
 
-//   CHECK: @_TMfC5class1C = internal global <{ {{.*}} }> <{
-// \ CHECK:   void ([[C_CLASS]]*)* @_TFC5class1CD,
-// \ CHECK:   i8** @_TWVBo,
-// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
+//   CHECK: @_T05class1CCMf = internal global <{ {{.*}} }> <{
+// \ CHECK:   void ([[C_CLASS]]*)* @_T05class1CCfD,
+// \ CHECK:   i8** @_T0BoWV,
+// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_T05class1CCMm to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* null,
@@ -44,24 +44,24 @@ sil_vtable C {}
 // \ CHECK: }>
 
 // Destroying destructor
-// CHECK: define{{( protected)?}} swiftcc [[REF]]* @_TFC5class1Cd([[C_CLASS]]* swiftself) {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc [[REF]]* @_T05class1CCfd([[C_CLASS]]* swiftself) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
-sil @_TFC5class1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
+sil @_T05class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 
 // Deallocating destructor
-// CHECK: define{{( protected)?}} swiftcc void @_TFC5class1CD([[C_CLASS]]* swiftself)
-sil @_TFC5class1CD : $@convention(method) (@owned C) -> () {
+// CHECK: define{{( protected)?}} swiftcc void @_T05class1CCfD([[C_CLASS]]* swiftself)
+sil @_T05class1CCfD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
   // CHECK-NEXT: entry
-  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call swiftcc [[REF]]* @_TFC5class1Cd([[C_CLASS]]* swiftself %0)
+  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call swiftcc [[REF]]* @_T05class1CCfd([[C_CLASS]]* swiftself %0)
   // CHECK-NEXT: [[SELF_OBJ:%[a-zA-Z0-9]+]] = bitcast [[REF]]* [[SELF]] to [[C_CLASS]]*
-  %1 = function_ref @_TFC5class1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
+  %1 = function_ref @_T05class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
   %2 = apply %1(%0) : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %3
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $C // user: %4
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*

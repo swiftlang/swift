@@ -25,6 +25,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///                   "\(number) cookies cost \(price * number) dollars."
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
+  @_inlineable
   @effects(readonly)
   public init(stringInterpolation strings: String...) {
     self.init()
@@ -40,6 +41,7 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
+  @_inlineable
   public init<T>(stringInterpolationSegment expr: T) {
     self = String(describing: expr)
   }
@@ -50,6 +52,7 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
+  @_inlineable
   public init<T: TextOutputStreamable> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }
@@ -60,6 +63,7 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
+  @_inlineable
   public init<T: CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyPrintable(expr)
   }

@@ -11,13 +11,6 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public func run_StringWithCString(_ N: Int) {
-  let str = String(repeating: "x", count: 100 * (1 << 16))
-  for _ in 0 ..< N {
-    str.withCString { _ in }
-  }
-}
-
 // FIXME(string)
 public func run_StringHasPrefix(_ N: Int) {
 #if _runtime(_ObjC)
@@ -26,7 +19,7 @@ public func run_StringHasPrefix(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasPrefix(prefix) {
-        CheckResults(false, "prefix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -41,7 +34,7 @@ public func run_StringHasSuffix(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasSuffix(suffix) {
-        CheckResults(false, "suffix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -56,7 +49,7 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasPrefix(prefix) {
-        CheckResults(false, "prefix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -71,7 +64,7 @@ public func run_StringHasSuffixUnicode(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !testString.hasSuffix(suffix) {
-        CheckResults(false, "suffix check failed")
+        CheckResults(false)
       }
     }
   }
@@ -89,7 +82,7 @@ public func run_StringEqualPointerComparison(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
       if !compareEqual(str1, str2) {
-        CheckResults(false, "Strings should be equal")
+        CheckResults(false)
       }
     }
   }

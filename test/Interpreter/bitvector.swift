@@ -8,13 +8,13 @@ struct BitVector64 {
 
   subscript (bit : Int) -> Bool {
     get {
-      if (bits & (1 << Int64(bit))) != 0 {
+      if (bits & (1 &<< Int64(bit))) != 0 {
         return true
       }
       return false
     }
     set {
-      var mask = 1 << Int64(bit)
+      var mask: Int64 = 1 &<< bit
       if newValue {
         bits = bits | mask
       } else {

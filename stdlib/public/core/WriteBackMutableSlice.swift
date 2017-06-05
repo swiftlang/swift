@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_inlineable
+@_versioned
 internal func _writeBackMutableSlice<C, Slice_>(
   _ self_: inout C, bounds: Range<C.Index>, slice: Slice_
 ) where
   C : MutableCollection,
   Slice_ : Collection,
-  C._Element == Slice_.Iterator.Element,
+  C.Element == Slice_.Element,
   C.Index == Slice_.Index {
 
   self_._failEarlyRangeCheck(bounds, bounds: self_.startIndex..<self_.endIndex)

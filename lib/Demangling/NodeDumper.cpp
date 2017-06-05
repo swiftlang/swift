@@ -1,4 +1,4 @@
-//===--- NodeDumper.cpp - Swift Demangling Node Dumper --------------------===//
+//===--- NodeDumper.cpp - Swift Demangling Debug Dump Functions -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
 #include <cstdio>
 
 using namespace swift;
@@ -48,7 +49,7 @@ static void printNode(DemanglerPrinter &Out, const Node *node, unsigned depth) {
   }
 }
 
-std::string &&Demangle::getNodeTreeAsString(NodePointer Root) {
+std::string Demangle::getNodeTreeAsString(NodePointer Root) {
   DemanglerPrinter Printer;
   printNode(Printer, Root, 0);
   return std::move(Printer).str();
@@ -58,3 +59,14 @@ void swift::Demangle::Node::dump() {
   std::string TreeStr = getNodeTreeAsString(this);
   fputs(TreeStr.c_str(), stderr);
 }
+
+void Demangler::dump() {
+  for (unsigned Idx = 0; Idx < NodeStack.size(); ++Idx) {
+    fprintf(stderr, "NodeStack[%u]:\n", Idx);
+    NodeStack[Idx]->dump();
+    fprintf(stderr, "\n");
+  }
+  fprintf(stderr, "Position = %zd:\n%.*s\n%*s\n", Pos,
+          (int)Text.size(), Text.data(), (int)Pos + 1, "^");
+}
+

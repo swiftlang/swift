@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-ir -g %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -g %s -o - | %FileCheck %s
 //
 // A top-level closure is expected to have the main module as scope and not the
 // top_level_code function.

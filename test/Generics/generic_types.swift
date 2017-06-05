@@ -241,3 +241,4 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 // expected-error@-2 {{inheritance from non-protocol, non-class type 'T.A'}}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum element 'X' is not a member type of 'X7<T>'}}
+// expected-error@-1{{use of undeclared type 'G'}}

@@ -50,6 +50,7 @@ public:
   static SwiftInterfaceGenContextRef createForSwiftSource(StringRef DocumentName,
                                                           StringRef SourceFileName,
                                                           ASTUnitRef AstUnit,
+                                                          swift::CompilerInvocation Invocation,
                                                           std::string &ErrMsg);
 
   ~SwiftInterfaceGenContext();

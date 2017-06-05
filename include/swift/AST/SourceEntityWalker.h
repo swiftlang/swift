@@ -37,6 +37,7 @@ namespace swift {
   class Expr;
   class Type;
 
+
 /// An abstract class used to traverse the AST and provide source information.
 /// Visitation happens in source-order and compiler-generated semantic info,
 /// like implicit declarations, is ignored.
@@ -97,7 +98,7 @@ public:
   /// in \c ExtensionDecl.
   virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                                   TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                                  Type T, SemaReferenceKind Kind);
+                                  Type T, ReferenceMetaData Data);
 
   /// This method is called when a ValueDecl for a subscript is referenced in
   /// source. If it returns false, the remaining traversal is terminated
@@ -122,6 +123,19 @@ public:
   /// \param D the referenced decl.
   virtual bool visitCallArgName(Identifier Name, CharSourceRange Range,
                                 ValueDecl *D);
+
+  /// This method is called for each external argument name in function-like
+  /// declarations like constructor, function and subscript. The function is
+  /// called only when an external argument label is specifically specified,
+  /// like func foo(External Internal: Int) {}.
+  /// If it returns false, the remaining traversal is terminated and returns
+  /// failure.
+  ///
+  /// \param Name the argument name.
+  /// \param StartLoc the source loc of the argument name start.
+  /// \param D the function-like decl.
+  virtual bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
+                                            ValueDecl *D);
 
   /// This method is called when a Module is referenced in source.
   virtual bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range);

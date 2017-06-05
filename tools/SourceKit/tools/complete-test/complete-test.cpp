@@ -57,7 +57,7 @@ struct TestOptions {
   bool structureOutput = false;
   ArrayRef<const char *> compilerArgs;
 };
-}
+} // end anonymous namespace
 static int handleTestInvocation(TestOptions &options);
 
 static sourcekitd_uid_t KeyRequest;
@@ -548,7 +548,7 @@ public:
     return OS;
   }
 };
-}
+} // end anonymous namespace
 
 static void printResponse(sourcekitd_response_t resp, bool raw, bool structure,
                           unsigned indentation) {

@@ -1,9 +1,13 @@
 
 /* Removed Decls */
+Class C3 has been removed
+Constructor C1.init() has been removed
+Constructor Somestruct2.init(_:) has been removed
 
 /* Moved Decls */
 
 /* Renamed Decls */
+Struct Somestruct2 has been renamed to Struct NSSomestruct2
 Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
 
 /* Type Changes */

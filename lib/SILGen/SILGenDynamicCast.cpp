@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
-#include "swift/AST/AST.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -103,7 +102,8 @@ namespace {
       ManagedValue result;
       if (Strategy == CastStrategy::Address) {
         result = SGF.B.createUnconditionalCheckedCastValue(
-            Loc, operand, origTargetTL.getLoweredType());
+            Loc, CastConsumptionKind::TakeAlways, operand,
+            origTargetTL.getLoweredType());
       } else {
         result = SGF.B.createUnconditionalCheckedCast(
             Loc, operand, origTargetTL.getLoweredType());
@@ -224,11 +224,8 @@ namespace {
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (SILValue addr = emitInto->getAddressOrNull()) {
-            return addr;
-          }
-        }
+        if (auto address = ctx.getAddressForInPlaceInitialization(SGF, Loc))
+          return address;
       }
 
       return SGF.emitTemporaryAllocation(Loc, origTargetTL.getLoweredType());
@@ -239,12 +236,8 @@ namespace {
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (emitInto->getAddressOrNull()) {
-            emitInto->finishInitialization(SGF);
-            return ManagedValue::forInContext();
-          }
-        }
+        if (ctx.finishInPlaceInitialization(SGF))
+          return ManagedValue::forInContext();
       }
 
       ManagedValue result;
@@ -389,7 +382,8 @@ namespace {
       SILValue resultScalar;
       if (Strategy == CastStrategy::Address) {
         resultScalar = SGF.B.createUnconditionalCheckedCastValue(
-            Loc, operand.forward(SGF), origTargetTL.getLoweredType());
+            Loc, CastConsumptionKind::TakeAlways, operand.forward(SGF),
+            origTargetTL.getLoweredType());
       } else {
         resultScalar = SGF.B.createUnconditionalCheckedCast(
             Loc, operand.forward(SGF), origTargetTL.getLoweredType());
@@ -480,12 +474,11 @@ namespace {
     SILValue createAbstractResultBuffer(bool hasAbstraction,
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
+      // Note that the conditions here must exactly match the criteria in
+      // finishFromResultBuffer.
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (SILValue addr = emitInto->getAddressOrNull()) {
-            return addr;
-          }
-        }
+        if (auto address = ctx.getAddressForInPlaceInitialization(SGF, Loc))
+          return address;
       }
 
       return SGF.emitTemporaryAllocation(Loc, origTargetTL.getLoweredType());
@@ -496,13 +489,11 @@ namespace {
                                         AbstractionPattern abstraction,
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
+      // Note that the conditions here must exactly match the criteria in
+      // createAbstractResultBuffer.
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (emitInto->getAddressOrNull()) {
-            emitInto->finishInitialization(SGF);
-            return ManagedValue::forInContext();
-          }
-        }
+        if (ctx.finishInPlaceInitialization(SGF))
+          return ManagedValue::forInContext();
       }
 
       ManagedValue result;
@@ -711,8 +702,8 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   SILValue resultObjectBuffer;
   Optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
-  if (resultTL.isAddressOnly() ||
-      (C.getEmitInto() && C.getEmitInto()->getAddressOrNull())) {
+  if ((resultTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
+      (C.getEmitInto() && C.getEmitInto()->canPerformInPlaceInitialization())) {
     SILType resultTy = resultTL.getLoweredType();
     resultBuffer = SGF.getBufferForExprResult(loc, resultTy, C);
     resultObjectBuffer =

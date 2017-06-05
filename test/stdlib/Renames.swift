@@ -178,23 +178,6 @@ func _Filter<C>(c: LazyFilterCollection<C>) {
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
 }
 
-func _FixedPoint() {
-  var i: Int = 0
-  var u: UInt = 0
-  i++ // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{4-6= += 1}} {{none}}
-  ++i // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= += 1}} {{none}}
-  i-- // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{4-6= -= 1}} {{none}}
-  --i // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= -= 1}} {{none}}
-  u++ // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{4-6= += 1}} {{none}}
-  ++u // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= += 1}} {{none}}
-  u-- // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{4-6= -= 1}} {{none}}
-  --u // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= -= 1}} {{none}}
-
-  func fn1<T: IntegerType>(i: T) {} // expected-error {{'IntegerType' has been renamed to 'Integer'}} {{15-26=Integer}} {{none}}
-  func fn2<T: SignedIntegerType>(i: T) {} // expected-error {{'SignedIntegerType' has been renamed to 'SignedInteger'}} {{15-32=SignedInteger}} {{none}}
-  func fn3<T: UnsignedIntegerType>(i: T) {} // expected-error {{'UnsignedIntegerType' has been renamed to 'UnsignedInteger'}} {{15-34=UnsignedInteger}} {{none}}
-}
-
 func _Flatten() {
   func fn<T>(i: FlattenGenerator<T>) {} // expected-error {{'FlattenGenerator' has been renamed to 'FlattenIterator'}} {{17-33=FlattenIterator}} {{none}}
 }
@@ -217,6 +200,8 @@ func _FloatingPoint<F : BinaryFloatingPoint>(f: F) {
 
 func _FloatingPointTypes() {
   var x: Float = 1, y: Float = 1
+  x += 1
+  y += 1
   // FIXME: isSignMinus -> sign is OK? different type.
   _ = x.isSignMinus // expected-error {{'isSignMinus' has been renamed to 'sign'}} {{9-20=sign}} {{none}}
   _ = x % y // expected-error {{'%' is unavailable: Use truncatingRemainder instead}} {{none}}
@@ -267,11 +252,6 @@ func _Index() {
 func _InputStream() {
   _ = readLine(stripNewline: true) // expected-error {{'readLine(stripNewline:)' has been renamed to 'readLine(strippingNewline:)'}} {{7-15=readLine}} {{16-28=strippingNewline}} {{none}}
   _ = readLine() // ok
-}
-
-func _IntegerArithmetic() {
-  func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'IntegerArithmetic'}} {{16-37=IntegerArithmetic}} {{none}}
-  func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedNumber'}} {{16-32=SignedNumber}} {{none}}
 }
 
 func _Join() {
@@ -358,10 +338,6 @@ func _TextOutputStream() {
 func _TextOutputStream<S : TextOutputStreamable, O : TextOutputStream>(s: S, o: O) {
   var o = o
   s.writeTo(&o) // expected-error {{'writeTo' has been renamed to 'write(to:)'}} {{5-12=write}} {{13-13=to: }} {{none}}
-}
-
-func _Policy() {
-  func fn<O : BitwiseOperationsType>(_: O) {} // expected-error {{'BitwiseOperationsType' has been renamed to 'BitwiseOperations'}} {{15-36=BitwiseOperations}} {{none}}
 }
 
 func _Print<T, O : TextOutputStream>(x: T, out: O) {
@@ -541,7 +517,7 @@ func _StringAppend(s: inout String, u: UnicodeScalar) {
 func _StringLegacy(c: Character, u: UnicodeScalar) {
   _ = String(count: 1, repeatedValue: c) // expected-error {{'init(count:repeatedValue:)' is unavailable: Renamed to init(repeating:count:) and reordered parameters}} {{none}}
   _ = String(count: 1, repeatedValue: u) // expected-error {{'init(count:repeatedValue:)' is unavailable: Renamed to init(repeating:count:) and reordered parameters}} {{none}}
-  _ = String(repeating: c, count: 1) // expected-error {{'init(repeating:count:)' is unavailable: Replaced by init(repeating: String, count: Int)}} {{none}}
+  _ = String(repeating: c, count: 1) // no more error, since String conforms to BidirectionalCollection
   _ = String(repeating: u, count: 1) // expected-error {{'init(repeating:count:)' is unavailable: Replaced by init(repeating: String, count: Int)}} {{none}}
 }
 
@@ -560,7 +536,7 @@ func _Unicode<I : IteratorProtocol, E : UnicodeCodec>(i: I, e: E.Type) where I.E
 }
 
 func _UnicodeScalar(s: UnicodeScalar) {
-  _ = UnicodeScalar() // expected-error {{'init()' is unavailable: use 'UnicodeScalar(0)'}} {{none}}
+  _ = UnicodeScalar() // expected-error {{'init()' is unavailable: use 'Unicode.Scalar(0)'}} {{none}}
   _ = s.escape(asASCII: true) // expected-error {{'escape(asASCII:)' has been renamed to 'escaped(asASCII:)'}} {{9-15=escaped}} {{none}}
 }
 

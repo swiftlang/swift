@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 struct Foo {
   // Allocating constructor - should have no line table info.
   // CHECK: !DISubprogram(name: "init", linkageName: "_T012Constructors3FooVACs5Int64V1x_tcfC",

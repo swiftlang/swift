@@ -1,7 +1,7 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -Xllvm -new-mangling-for-tests -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -11,7 +11,7 @@ class Blub : NSObject {
    func blub() throws {}
 }
 
-// CHECK-LABEL: sil hidden @_T021dynamic_lookup_throws8testBlubys9AnyObject_p1a_tKF : $@convention(thin) (@owned AnyObject) -> @error Error
+// CHECK-LABEL: sil hidden @_T021dynamic_lookup_throws8testBlubyyXl1a_tKF : $@convention(thin) (@owned AnyObject) -> @error Error
 // CHECK: bb0([[ARG:%.*]] : $AnyObject):
 func testBlub(a: AnyObject) throws {
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]

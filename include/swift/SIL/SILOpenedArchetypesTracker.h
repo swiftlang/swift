@@ -54,9 +54,9 @@ public:
   const SILFunction &getFunction() const { return F; }
 
   // Register a definition of a given opened archetype.
-  void addOpenedArchetypeDef(ArchetypeType *archetype, SILValue Def);
+  void addOpenedArchetypeDef(CanArchetypeType archetype, SILValue Def);
 
-  void removeOpenedArchetypeDef(ArchetypeType *archetype, SILValue Def) {
+  void removeOpenedArchetypeDef(CanArchetypeType archetype, SILValue Def) {
     auto FoundDef = getOpenedArchetypeDef(archetype);
     assert(FoundDef &&
            "Opened archetype definition is not registered in SILFunction");
@@ -66,7 +66,7 @@ public:
 
   // Return the SILValue defining a given archetype.
   // If the defining value is not known, return an empty SILValue.
-  SILValue getOpenedArchetypeDef(ArchetypeType *archetype) const {
+  SILValue getOpenedArchetypeDef(CanArchetypeType archetype) const {
     return OpenedArchetypeDefs.lookup(archetype);
   }
 
@@ -78,16 +78,19 @@ public:
   // Can be used to incrementally populate the mapping, e.g.
   // if it is done when performing a scan of all instructions
   // inside a function.
-  void registerOpenedArchetypes(const SILInstruction *I);
+  // Returns true if any opened archetypes were registered.
+  bool registerOpenedArchetypes(const SILInstruction *I);
 
   // Register opened archetypes whose definitions are referenced by
   // the typedef operands of this instruction.
-  void registerUsedOpenedArchetypes(const SILInstruction *I);
+  // Returns true if any opened archetypes were registered.
+  bool registerUsedOpenedArchetypes(const SILInstruction *I);
 
   // Register opened archetypes referenced by this type, if they
   // are not registered yet. Create placeholders representing forward
   // definitions of these opened archetypes.
-  void registerUsedOpenedArchetypes(Type Ty);
+  // Returns true if any opened archetypes were registered.
+  bool registerUsedOpenedArchetypes(CanType Ty);
 
   // Unregister archetypes opened by a given instruction.
   // Should be only called when this instruction is to be removed.
@@ -102,6 +105,9 @@ public:
 
   // Handle notifications about removals of instructions.
   void handleDeleteNotification(swift::ValueBase *Value);
+
+  // Dump the contents.
+  void dump() const;
 
   virtual ~SILOpenedArchetypesTracker() {
     // Unregister the handler.
@@ -157,12 +163,15 @@ public:
   /// Lookup the instruction defining an opened archetype by first 
   /// performing a quick lookup in the opened archetypes operands
   /// and then in the opened archetypes tracker.
-  SILValue getOpenedArchetypeDef(ArchetypeType *archetypeTy) const;
+  SILValue getOpenedArchetypeDef(CanArchetypeType archetypeTy) const;
+
+  // Dump the contents.
+  void dump() const;
 };
 
 /// Find an opened archetype defined by an instruction.
 /// \returns The found archetype or empty type otherwise.
-ArchetypeType *getOpenedArchetypeOf(const SILInstruction *I);
+CanArchetypeType getOpenedArchetypeOf(const SILInstruction *I);
 
 /// Find an opened archetype represented by this type.
 /// It is assumed by this method that the type contains
@@ -172,7 +181,7 @@ ArchetypeType *getOpenedArchetypeOf(const SILInstruction *I);
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-ArchetypeType *getOpenedArchetypeOf(Type Ty);
+CanArchetypeType getOpenedArchetypeOf(CanType Ty);
 
 } // end swift namespace
 #endif

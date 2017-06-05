@@ -39,6 +39,9 @@ void getDocumentationCommentAsDoxygen(const DocComment *DC, raw_ostream &OS);
 /// Extract and normalize text from the given comment.
 std::string extractPlainTextFromComment(const StringRef Text);
 
+/// Given the raw text in markup format, convert its content to xml.
+bool convertMarkupToXML(StringRef Text, raw_ostream &OS);
+
 } // namespace ide
 } // namespace swift
 

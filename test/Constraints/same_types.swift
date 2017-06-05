@@ -59,7 +59,7 @@ func fail1<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{associated type 'T.Foo' cannot be equal to both 'X' and 'Y'}}
-  return (t.foo, u.foo)
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
 func fail2<
@@ -118,13 +118,13 @@ func fail6<T>(_ t: T) -> Int where T == Int { // expected-error{{same-type requi
 }
 
 func test8<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
-  where T.Bar == Y, U.Bar.Foo == X, T.Bar == U.Bar {
+  where T.Bar == Y, U.Bar.Foo == X, T.Bar == U.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
 func test8a<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   where
-  T.Bar == Y, U.Bar.Foo == X, U.Bar == T.Bar {
+  T.Bar == Y, U.Bar.Foo == X, U.Bar == T.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 

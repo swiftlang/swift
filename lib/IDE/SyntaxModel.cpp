@@ -716,9 +716,9 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         return { false, nullptr };
 
       for (auto &Element : Clause.Elements) {
-        if (Expr *E = Element.dyn_cast<Expr*>()) {
+        if (auto *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);
-        } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
+        } else if (auto *S = Element.dyn_cast<Stmt*>()) {
           S->walk(*this);
         } else {
           Element.get<Decl*>()->walk(*this);
@@ -761,7 +761,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     return false;
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
+    auto *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isAccessor()) {
       // Pass context sensitive keyword token.
       SourceLoc SL = FD->getFuncLoc();
@@ -1038,8 +1038,9 @@ public:
         return { true, E };
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
+      // TODO: Handle special names
       if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getBaseName().getLength())))
+                              DRE->getName().getBaseIdentifier().getLength())))
         return { false, nullptr };
     }
     return { true, E };
@@ -1055,9 +1056,7 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
   };
 
   IdRefWalker<decltype(passNode)> Walker(passNode);
-  if (!Cond->walk(Walker))
-    return false;
-  return true;
+  return Cond->walk(Walker);
 }
 
 bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
@@ -1248,9 +1247,7 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
     }
   }
 
-  if (!Walker.walkToNodePost(Node))
-    return false;
-  return true;
+  return Walker.walkToNodePost(Node);
 }
 
 bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,

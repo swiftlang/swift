@@ -22,8 +22,6 @@ class ComputeLoopInfo : public SILFunctionTransform {
   void run() override {
     PM->getAnalysis<SILLoopAnalysis>()->get(getFunction());
   }
-
-  StringRef getName() override { return "Compute Loop Info"; }
 };
 
 SILTransform *swift::createComputeLoopInfo() { return new ComputeLoopInfo(); }

@@ -88,16 +88,71 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
     : ExistentialBoxBase<OpaqueExistentialBoxBase> {
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
-    value->getType()->vw_destroyBuffer(value->getBuffer(args...));
+    auto *type = value->getType();
+    auto *vwt = type->getValueWitnesses();
+    if (vwt->isValueInline()) {
+      // destroy(&valueBuffer)
+      type->vw_destroy(
+          reinterpret_cast<OpaqueValue *>(value->getBuffer(args...)));
+    } else {
+      // release(valueBuffer[0])
+      swift_release(
+          *reinterpret_cast<HeapObject **>(value->getBuffer(args...)));
+    }
   }
-  
-  
+
+  enum class Dest {
+    Assign,
+    Init,
+  };
+  enum class Source {
+    Copy,
+    Take
+  };
+
+  template <class Container, class... A>
+  static void copyReference(Container *dest, Container *src, Dest d, Source s,
+                            A... args) {
+    auto *destRefAddr =
+        reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
+
+    // Load the source reference.
+    auto *srcRef = *reinterpret_cast<HeapObject **>(src->getBuffer(args...));
+
+    // Load the old destination reference so we can release it later if this is
+    // an assignment.
+    HeapObject *destRef = d == Dest::Assign ? *destRefAddr : nullptr;
+
+    // Do the assignment.
+    *destRefAddr = srcRef;
+
+    // If we copy the source retain the reference.
+    if (s == Source::Copy)
+      swift_retain(srcRef);
+
+    // If we have an assignment release the old reference.
+    if (d == Dest::Assign)
+      swift_release(destRef);
+  }
+
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-    src->getType()->vw_initializeBufferWithCopyOfBuffer(dest->getBuffer(args...),
-                                                        src->getBuffer(args...));
+    auto *type = src->getType();
+    auto *vwt = type->getValueWitnesses();
+
+    if (vwt->isValueInline()) {
+      auto *destValue =
+          reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+      auto *srcValue =
+          reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+
+      type->vw_initializeWithCopy(destValue, srcValue);
+    } else {
+      // initWithCopy of the reference to the cow box.
+      copyReference(dest, src, Dest::Init, Source::Copy, args...);
+    }
     return dest;
   }
   
@@ -105,25 +160,104 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-    src->getType()->vw_initializeBufferWithTakeOfBuffer(dest->getBuffer(args...),
-                                                        src->getBuffer(args...));
+    auto *type = src->getType();
+    auto *vwt = type->getValueWitnesses();
+
+    if (vwt->isValueInline()) {
+      auto *destValue =
+          reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+      auto *srcValue =
+          reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+
+      type->vw_initializeWithTake(destValue, srcValue);
+    } else {
+      // initWithTake of the reference to the cow box.
+      copyReference(dest, src, Dest::Init, Source::Take, args...);
+    }
     return dest;
   }
-  
+
   template <class Container, class... A>
   static Container *assignWithCopy(Container *dest, Container *src,
                                    A... args) {
     auto srcType = src->getType();
     auto destType = dest->getType();
-    if (srcType == destType) {
-      OpaqueValue *srcValue = srcType->vw_projectBuffer(src->getBuffer(args...));
-      OpaqueValue *destValue = srcType->vw_projectBuffer(dest->getBuffer(args...));
-      srcType->vw_assignWithCopy(destValue, srcValue);
+    if (src == dest)
       return dest;
+    if (srcType == destType) {
+      // Types match.
+      auto *vwt = srcType->getValueWitnesses();
+
+      if (vwt->isValueInline()) {
+        // Inline.
+        auto *destValue =
+            reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+        auto *srcValue =
+            reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+        // assignWithCopy.
+        srcType->vw_assignWithCopy(destValue, srcValue);
+      } else {
+        // Outline (boxed value).
+        // assignWithCopy.
+        copyReference(dest, src, Dest::Assign, Source::Copy, args...);
+      }
     } else {
-      destType->vw_destroyBuffer(dest->getBuffer(args...));
-      return initializeWithCopy(dest, src, args...);
+      // Different types.
+      auto *destVwt = destType->getValueWitnesses();
+      auto *srcVwt = srcType->getValueWitnesses();
+      if (destVwt->isValueInline()) {
+        // Inline destination value.
+        ValueBuffer tmpBuffer;
+        auto *opaqueTmpBuffer = reinterpret_cast<OpaqueValue *>(&tmpBuffer);
+        auto *destValue =
+            reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+        auto *srcValue =
+            reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+
+        // Move dest value asside so we can destroy it later.
+        destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
+
+        src->copyTypeInto(dest, args...);
+        if (srcVwt->isValueInline()) {
+          // Inline src value.
+
+          srcType->vw_initializeWithCopy(destValue, srcValue);
+        } else {
+          // Outline src value.
+
+          // initWithCopy of reference to cow box.
+          copyReference(dest, src, Dest::Init, Source::Copy, args...);
+        }
+
+        // Finally, destroy the old dest value.
+        destType->vw_destroy(opaqueTmpBuffer);
+      } else {
+        // Outline destination value.
+
+        // Get the dest reference so we can release it later.
+        auto *destRef =
+            *reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
+
+        src->copyTypeInto(dest, args...);
+        if (srcVwt->isValueInline()) {
+
+          // initWithCopy.
+          auto *destValue =
+              reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+          auto *srcValue =
+              reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+          srcType->vw_initializeWithCopy(destValue, srcValue);
+        } else {
+
+          // initWithCopy of reference to cow box.
+          copyReference(dest, src, Dest::Init, Source::Copy, args...);
+        }
+
+        // Release dest reference.
+        swift_release(destRef);
+      }
     }
+    return dest;
   }
 
   template <class Container, class... A>
@@ -131,15 +265,88 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
                                    A... args) {
     auto srcType = src->getType();
     auto destType = dest->getType();
-    if (srcType == destType) {
-      OpaqueValue *srcValue = srcType->vw_projectBuffer(src->getBuffer(args...));
-      OpaqueValue *destValue = srcType->vw_projectBuffer(dest->getBuffer(args...));
-      srcType->vw_assignWithTake(destValue, srcValue);
+    if (src == dest)
       return dest;
+
+    if (srcType == destType) {
+      // Types match.
+
+      auto *vwt = srcType->getValueWitnesses();
+      if (vwt->isValueInline()) {
+        // Inline.
+
+        auto *destValue =
+            reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+        auto *srcValue =
+            reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+        // assignWithTake.
+        srcType->vw_assignWithTake(destValue, srcValue);
+      } else {
+        // Outline (boxed value).
+
+        // assignWithTake of reference to cow box.
+        copyReference(dest, src, Dest::Assign, Source::Take, args...);
+      }
     } else {
-      destType->vw_destroyBuffer(dest->getBuffer(args...));
-      return initializeWithTake(dest, src, args...);
+      // Different types.
+
+      auto *destVwt = destType->getValueWitnesses();
+      auto *srcVwt = srcType->getValueWitnesses();
+      if (destVwt->isValueInline()) {
+        // Inline destination value.
+
+        ValueBuffer tmpBuffer;
+        auto *opaqueTmpBuffer = reinterpret_cast<OpaqueValue *>(&tmpBuffer);
+        auto *destValue =
+            reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+        auto *srcValue =
+            reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+
+        // Move dest value asside.
+        destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
+
+        src->copyTypeInto(dest, args...);
+        if (srcVwt->isValueInline()) {
+          // Inline src value.
+
+          srcType->vw_initializeWithTake(destValue, srcValue);
+        } else {
+          // Outline src value.
+
+          // initWithTake of reference to cow box.
+          copyReference(dest, src, Dest::Init, Source::Take, args...);
+        }
+
+        // Destroy old dest value.
+        destType->vw_destroy(opaqueTmpBuffer);
+      } else {
+        // Outline destination value.
+
+        // Get the old dest reference.
+        auto *destRef =
+            *reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
+
+        src->copyTypeInto(dest, args...);
+        if (srcVwt->isValueInline()) {
+          // initWithCopy.
+
+          auto *destValue =
+              reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
+          auto *srcValue =
+              reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
+          // initWithTake.
+          srcType->vw_initializeWithTake(destValue, srcValue);
+        } else {
+
+          // initWithTake of reference to cow box.
+          copyReference(dest, src, Dest::Init, Source::Take, args...);
+        }
+
+        // Release old dest reference.
+        swift_release(destRef);
+      }
     }
+    return dest;
   }
 };
 

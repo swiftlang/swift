@@ -1,4 +1,4 @@
-// RUN: not %swift -emit-sil -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
+// RUN: not %swift -emit-sil -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs -diagnostics-editor-mode
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 enum E1 : Int {
@@ -12,9 +12,12 @@ func foo1(_ e : E1) -> Int {
   switch(e) {
   case .e1:
     return 1
-  case .e2: <#code#>
-case .e3: <#code#>
-case .e4: <#code#>
+  case .e2:
+<#code#>
+case .e3:
+<#code#>
+case .e4:
+<#code#>
 }
 }
 
@@ -22,7 +25,8 @@ func foo2(_ i : Int) -> Int {
   switch i {
   case 1:
     return 1
-  default: <#code#>
+  default:
+<#code#>
 }
 }
 
@@ -30,7 +34,8 @@ func foo3(_ c : Character) -> Character {
   switch c {
   case "a":
     return "a"
-  default: <#code#>
+  default:
+<#code#>
 }
 }
 
@@ -50,14 +55,22 @@ func foo4(_ e : E2) -> Int {
   switch e {
   case .e2:
     return 1
-  case .e1(let a, let s): <#code#>
-case .e3(let a): <#code#>
-case .e4(_): <#code#>
-case .e5(_, _): <#code#>
-case .e6(let a, _): <#code#>
-case .e7: <#code#>
-case .e8(let a, _, _): <#code#>
-case .e9(_, _, _): <#code#>
+  case .e1(_, _):
+<#code#>
+case .e3(_):
+<#code#>
+case .e4(_):
+<#code#>
+case .e5(_, _):
+<#code#>
+case .e6(_, _):
+<#code#>
+case .e7:
+<#code#>
+case .e8(_, _, _):
+<#code#>
+case .e9(_, _, _):
+<#code#>
 }
 }
 
@@ -65,7 +78,14 @@ func foo5(_ e : E1) -> Int {
   switch e {
   case _ where e.rawValue > 0:
     return 1
-  default: <#code#>
+  case .e1:
+<#code#>
+case .e2:
+<#code#>
+case .e3:
+<#code#>
+case .e4:
+<#code#>
 }
 }
 
@@ -73,14 +93,22 @@ func foo6(_ e : E2) -> Int {
   switch e {
   case let .e1(x, y):
     return x + y
-  case .e2(let a): <#code#>
-case .e3(let a): <#code#>
-case .e4(_): <#code#>
-case .e5(_, _): <#code#>
-case .e6(let a, _): <#code#>
-case .e7: <#code#>
-case .e8(let a, _, _): <#code#>
-case .e9(_, _, _): <#code#>
+  case .e2(_):
+<#code#>
+case .e3(_):
+<#code#>
+case .e4(_):
+<#code#>
+case .e5(_, _):
+<#code#>
+case .e6(_, _):
+<#code#>
+case .e7:
+<#code#>
+case .e8(_, _, _):
+<#code#>
+case .e9(_, _, _):
+<#code#>
 }
 }
 
@@ -89,11 +117,19 @@ func foo7(_ e : E2) -> Int {
   case .e2(1): return 0
   case .e1: return 0
   case .e3: return 0
-  case .e4(_): <#code#>
-case .e5(_, _): <#code#>
-case .e6(let a, _): <#code#>
-case .e7: <#code#>
-case .e8(let a, _, _): <#code#>
-case .e9(_, _, _): <#code#>
+  case .e2(_):
+<#code#>
+case .e4(_):
+<#code#>
+case .e5(_, _):
+<#code#>
+case .e6(_, _):
+<#code#>
+case .e7:
+<#code#>
+case .e8(_, _, _):
+<#code#>
+case .e9(_, _, _):
+<#code#>
 }
 }

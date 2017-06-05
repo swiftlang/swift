@@ -33,6 +33,25 @@ public:
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
   const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod);
+
+  /// Invalidate all information in this analysis.
+  virtual void invalidate() override {
+    // Nothing can invalidate, because types are static and cannot be changed
+    // during the SIL pass pipeline.
+  }
+
+  /// Invalidate all of the information for a specific function.
+  virtual void invalidate(SILFunction *F, InvalidationKind K)  override { }
+
+  /// Notify the analysis about a newly created function.
+  virtual void notifyAddFunction(SILFunction *F) override { }
+
+  /// Notify the analysis about a function which will be deleted from the
+  /// module.
+  virtual void notifyDeleteFunction(SILFunction *F) override { }
+
+  /// Notify the analysis about changed witness or vtables.
+  virtual void invalidateFunctionTables() override { }
 };
 
 }

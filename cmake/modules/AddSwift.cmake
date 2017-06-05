@@ -99,9 +99,9 @@ function(_add_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  # MSVC and clang-cl dont't understand -target.
+  # MSVC and clang-cl don't understand -target.
   if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
+    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
   endif()
 
   is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
@@ -265,6 +265,10 @@ function(_add_variant_c_compile_flags)
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
   endif()
 
+  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+    list(APPEND result "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -277,9 +281,14 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
   endif()
 
-  list(APPEND result
-      "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
-      "-resource-dir" "${SWIFTLIB_DIR}")
+  if(BUILD_STANDALONE)
+    list(APPEND result
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+  else()
+    list(APPEND result
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
+        "-resource-dir" "${SWIFTLIB_DIR}")
+  endif()
 
   is_darwin_based_sdk("${sdk}" IS_DARWIN)
   if(IS_DARWIN)
@@ -759,19 +768,19 @@ function(_add_swift_library_single target name)
       DEPENDS ${swift_module_dependency_target})
   endif()
 
-  if (swift_sib_dependency_target)
-    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib
-      ${swift_sib_dependency_target})
-  endif()
+  # For standalone overlay builds to work
+  if(NOT BUILD_STANDALONE)
+    if (EXISTS swift_sib_dependency_target AND NOT "${swift_sib_dependency_target}" STREQUAL "")
+      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib ${swift_sib_dependency_target})
+    endif()
 
-  if (swift_sibopt_dependency_target)
-    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt
-      ${swift_sibopt_dependency_target})
-  endif()
+    if (EXISTS swift_sibopt_dependency_target AND NOT "${swift_sibopt_dependency_target}" STREQUAL "")
+      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt ${swift_sibopt_dependency_target})
+    endif()
 
-  if (swift_sibgen_dependency_target)
-    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibgen
-      ${swift_sibgen_dependency_target})
+    if (EXISTS swift_sibgen_dependency_target AND NOT "${swift_sibgen_dependency_target}" STREQUAL "")
+      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibgen ${swift_sibgen_dependency_target})
+    endif()
   endif()
 
   set(SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS)
@@ -1408,7 +1417,7 @@ function(add_swift_library name)
   endif()
 
   if(SWIFTLIB_TARGET_LIBRARY)
-    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
       list(APPEND SWIFTLIB_DEPENDS clang)
     endif()
 
@@ -1421,7 +1430,13 @@ function(add_swift_library name)
           "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}"
           SWIFTLIB_TARGET_SDKS)
     endif()
+
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
+      if(NOT SWIFT_SDK_${sdk}_ARCHITECTURES)
+        # SWIFT_SDK_${sdk}_ARCHITECTURES is empty, so just continue
+        continue()
+      endif()
+
       set(THIN_INPUT_TARGETS)
 
       # For each architecture supported by this SDK
@@ -1470,12 +1485,16 @@ function(add_swift_library name)
         # linked libraries.  Find targets for both of these here.
         set(swiftlib_module_dependency_targets)
         set(swiftlib_private_link_libraries_targets)
-        foreach(mod ${swiftlib_module_depends_flattened})
-          list(APPEND swiftlib_module_dependency_targets
-              "swift${mod}${MODULE_VARIANT_SUFFIX}")
-          list(APPEND swiftlib_private_link_libraries_targets
-              "swift${mod}${VARIANT_SUFFIX}")
-        endforeach()
+
+        if(NOT BUILD_STANDALONE)
+          foreach(mod ${swiftlib_module_depends_flattened})
+            list(APPEND swiftlib_module_dependency_targets
+                "swift${mod}${MODULE_VARIANT_SUFFIX}")
+
+            list(APPEND swiftlib_private_link_libraries_targets
+                "swift${mod}${VARIANT_SUFFIX}")
+          endforeach()
+        endif()
 
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
           if("${lib}" STREQUAL "ICU_UC")
@@ -1528,6 +1547,11 @@ function(add_swift_library name)
           elseif(SWIFTLIB_STATIC)
             list(APPEND swiftlib_swift_compile_flags_all -D_LIB)
           endif()
+        endif()
+
+        # Add PrivateFrameworks, rdar://28466433
+        if(SWIFTLIB_IS_SDK_OVERLAY)
+          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
         endif()
 
         # Add this library variant.
@@ -1616,6 +1640,7 @@ function(add_swift_library name)
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           set(codesign_arg CODESIGN)
         endif()
+        precondition(THIN_INPUT_TARGETS)
         _add_swift_lipo_target(
             SDK ${sdk}
             TARGET ${lipo_target}
@@ -2082,7 +2107,7 @@ function(add_swift_host_tool executable)
       TARGETS ${executable}
       RUNTIME DESTINATION bin)
 
-     swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
       is_installing)
   
     if(NOT is_installing)

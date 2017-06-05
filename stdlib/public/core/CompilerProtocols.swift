@@ -61,7 +61,7 @@
 /// `OptionSet` protocol. Whether using an option set or creating your own,
 /// you use the raw value of an option set instance to store the instance's
 /// bitfield. The raw value must therefore be of a type that conforms to the
-/// `BitwiseOperations` protocol, such as `UInt8` or `Int`. For example, the
+/// `FixedWidthInteger` protocol, such as `UInt8` or `Int`. For example, the
 /// `Direction` type defines an option set for the four directions you can
 /// move in a game.
 ///
@@ -99,7 +99,7 @@
 ///     print(allowedMoves.rawValue & Directions.right.rawValue)
 ///     // Prints "0"
 ///
-/// - SeeAlso: `OptionSet`, `BitwiseOperations`
+/// - SeeAlso: `OptionSet`, `FixedWidthInteger`
 public protocol RawRepresentable {
   /// The raw type that can be used to represent all values of the conforming
   /// type.
@@ -320,12 +320,12 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// A type that can be initialized with a string literal containing a single
 /// Unicode scalar value.
 ///
-/// The `String`, `StaticString`, `Character`, and `UnicodeScalar` types all
+/// The `String`, `StaticString`, `Character`, and `Unicode.Scalar` types all
 /// conform to the `ExpressibleByUnicodeScalarLiteral` protocol. You can
 /// initialize a variable of any of these types using a string literal that
 /// holds a single Unicode scalar.
 ///
-///     let ñ: UnicodeScalar = "ñ"
+///     let ñ: Unicode.Scalar = "ñ"
 ///     print(ñ)
 ///     // Prints "ñ"
 ///
@@ -337,14 +337,22 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
-  /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
-  /// `String`, and `StaticString`.
+  /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
+  /// `Character`, `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
   ///
   /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
+}
+
+public protocol _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral
+  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    utf16CodeUnitCount: Builtin.Word)
 }
 
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
@@ -395,6 +403,15 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
+extension ExpressibleByExtendedGraphemeClusterLiteral
+  where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
+
+  @_transparent
+  public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
+    self.init(extendedGraphemeClusterLiteral: value)
+  }
+}
+
 public protocol _ExpressibleByBuiltinStringLiteral
   : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
@@ -412,6 +429,18 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
     utf16CodeUnitCount: Builtin.Word)
 }
 
+public protocol _ExpressibleByBuiltinConstStringLiteral
+  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+
+  init(_builtinConstStringLiteral constantString: Builtin.RawPointer)
+}
+
+public protocol _ExpressibleByBuiltinConstUTF16StringLiteral
+  : _ExpressibleByBuiltinConstStringLiteral {
+
+  init(_builtinConstUTF16StringLiteral constantUTF16String: Builtin.RawPointer)
+}
+
 /// A type that can be initialized with a string literal.
 ///
 /// The `String` and `StaticString` types conform to the
@@ -427,8 +456,6 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
 /// implement the required initializer.
 public protocol ExpressibleByStringLiteral
   : ExpressibleByExtendedGraphemeClusterLiteral {
-  // FIXME: when we have default function implementations in protocols, provide
-  // an implementation of init(extendedGraphemeClusterLiteral:).
   
   /// A type that represents a string literal.
   ///
@@ -439,6 +466,15 @@ public protocol ExpressibleByStringLiteral
   ///
   /// - Parameter value: The value of the new instance.
   init(stringLiteral value: StringLiteralType)
+}
+
+extension ExpressibleByStringLiteral
+  where StringLiteralType == ExtendedGraphemeClusterLiteralType {
+
+  @_transparent
+  public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
+    self.init(stringLiteral: value)
+  }
 }
 
 /// A type that can be initialized using an array literal.
@@ -552,9 +588,9 @@ public protocol ExpressibleByStringLiteral
 ///     }
 public protocol ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
-  associatedtype Element
+  associatedtype ArrayLiteralElement
   /// Creates an instance initialized with the given elements.
-  init(arrayLiteral elements: Element...)
+  init(arrayLiteral elements: ArrayLiteralElement...)
 }
 
 /// A type that can be initialized using a dictionary literal.

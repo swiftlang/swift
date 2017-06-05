@@ -32,12 +32,6 @@ using namespace Demangle;
 using llvm::Optional;
 using llvm::None;
 
-[[noreturn]]
-static void unreachable(const char *Message) {
-  fprintf(stderr, "fatal error: %s\n", Message);
-  std::abort();
-}
-
 namespace {
   struct FindPtr {
     FindPtr(Node *v) : Target(v) {}
@@ -388,12 +382,6 @@ private:
         DEMANGLE_CHILD_OR_RETURN(witnessTable, Type);
         return witnessTable;
       }
-      if (Mangled.nextIf('o')) {
-        auto witnessTableOffset =
-            Factory.createNode(Node::Kind::WitnessTableOffset);
-        DEMANGLE_CHILD_OR_RETURN(witnessTableOffset, Entity);
-        return witnessTableOffset;
-      }
       if (Mangled.nextIf('v')) {
         auto fieldOffset = Factory.createNode(Node::Kind::FieldOffset);
         DEMANGLE_CHILD_AS_NODE_OR_RETURN(fieldOffset, Directness);
@@ -581,7 +569,8 @@ private:
       return true;
     }
 
-    unreachable("Unknown constant prop specialization");
+    // Unknown constant prop specialization
+    return false;
   }
 
   bool demangleFuncSigSpecializationClosureProp(NodePointer parent) {
@@ -1399,7 +1388,7 @@ private:
 
     // A dependent member type begins with a non-index, non-'d' character.
     auto c = Mangled.peek();
-    if (c != 'd' && c != '_' && !NewMangling::isDigit(c)) {
+    if (c != 'd' && c != '_' && !Mangle::isDigit(c)) {
       NodePointer baseType = demangleType();
       if (!baseType) return nullptr;
       return demangleDependentMemberTypeName(baseType);
@@ -1489,7 +1478,8 @@ private:
       return Factory.createNode(Node::Kind::MetatypeRepresentation,
                                  "@objc_metatype");
 
-    unreachable("Unhandled metatype representation");
+    // Unknown metatype representation
+    return nullptr;
   }
   
   NodePointer demangleGenericRequirement() {
@@ -1552,7 +1542,7 @@ private:
           return nullptr;
         name = "m";
       } else {
-        unreachable("Unknown layout constraint");
+        return nullptr;
       }
 
       NodePointer second = Factory.createNode(kind, name);
@@ -1654,13 +1644,12 @@ private:
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
-    NodePointer tuple = Factory.createNode(
-        isV == IsVariadic::yes ? Node::Kind::VariadicTuple
-                               : Node::Kind::NonVariadicTuple);
+    NodePointer tuple = Factory.createNode(Node::Kind::Tuple);
+    NodePointer elt = nullptr;
     while (!Mangled.nextIf('_')) {
       if (!Mangled)
         return nullptr;
-      NodePointer elt = Factory.createNode(Node::Kind::TupleElement);
+      elt = Factory.createNode(Node::Kind::TupleElement);
 
       if (isStartOfIdentifier(Mangled.peek())) {
         NodePointer label = demangleIdentifier(Node::Kind::TupleElementName);
@@ -1675,6 +1664,12 @@ private:
       elt->addChild(type, Factory);
 
       tuple->addChild(elt, Factory);
+    }
+    if (isV == IsVariadic::yes && elt) {
+      elt->reverseChildren();
+      NodePointer marker = Factory.createNode(Node::Kind::VariadicMarker);
+      elt->addChild(marker, Factory);
+      elt->reverseChildren();
     }
     return tuple;
   }
@@ -2115,7 +2110,7 @@ private:
       case ImplConventionContext::Parameter: return (FOR_PARAMETER); \
       case ImplConventionContext::Result: return (FOR_RESULT);       \
       }                                                              \
-      unreachable("bad context");                               \
+      return StringRef();                                            \
     }
     auto Nothing = StringRef();
     CASE('a',   Nothing,                Nothing,         "@autoreleased")
@@ -2178,18 +2173,18 @@ private:
         return nullptr;
       kind = Node::Kind::ImplErrorResult;
     }
-  
-    auto getContext = [](Node::Kind kind) -> ImplConventionContext {
-      if (kind == Node::Kind::ImplParameter)
-        return ImplConventionContext::Parameter;
-      else if (kind == Node::Kind::ImplResult
-               || kind == Node::Kind::ImplErrorResult)
-        return ImplConventionContext::Result;
-      else
-        unreachable("unexpected node kind");
-    };
 
-    auto convention = demangleImplConvention(getContext(kind));
+    ImplConventionContext ConvCtx;
+    if (kind == Node::Kind::ImplParameter) {
+      ConvCtx = ImplConventionContext::Parameter;
+    } else if (kind == Node::Kind::ImplResult
+               || kind == Node::Kind::ImplErrorResult) {
+      ConvCtx = ImplConventionContext::Result;
+    } else {
+      return nullptr;
+    }
+
+    auto convention = demangleImplConvention(ConvCtx);
     if (convention.empty()) return nullptr;
     auto type = demangleType();
     if (!type) return nullptr;
@@ -2228,8 +2223,3 @@ swift::Demangle::demangleOldSymbolAsNode(StringRef MangledName,
   return demangler.demangleTopLevel();
 }
 
-NodePointer swift::Demangle::demangleOldTypeAsNode(llvm::StringRef MangledName,
-                                                   NodeFactory &Factory) {
-  OldDemangler demangler(MangledName, Factory);
-  return demangler.demangleTypeName();
-}

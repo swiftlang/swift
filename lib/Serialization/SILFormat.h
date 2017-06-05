@@ -69,6 +69,17 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
 };
 
+enum class KeyPathComponentKindEncoding : uint8_t {
+  StoredProperty,
+  GettableProperty,
+  SettableProperty,
+};
+enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
+  Property,
+  Function,
+  DeclRef,
+};
+
 // Constants for packing an encoded CheckedCastKind and
 // CastConsumptionKind together.
 enum {
@@ -181,7 +192,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
-    BCFixed<1>           // IsFragile.
+    BCFixed<1>           // IsSerialized.
     // Conformance follows
     // Witness table entries will be serialized after.
   >;
@@ -231,7 +242,7 @@ namespace sil_block {
   using SILGlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
     SILLinkageField,
-    BCFixed<1>,          // fragile
+    BCFixed<1>,          // serialized
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
     TypeIDField,
@@ -241,7 +252,7 @@ namespace sil_block {
   using SILFunctionLayout =
       BCRecordLayout<SIL_FUNCTION, SILLinkageField,
                      BCFixed<1>,  // transparent
-                     BCFixed<1>,  // fragile
+                     BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunk/reabstraction_thunk
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
@@ -357,7 +368,7 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<3>,          // Optional attributes
+    BCFixed<4>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
@@ -367,7 +378,7 @@ namespace sil_block {
   using SILTwoOperandsLayout = BCRecordLayout<
     SIL_TWO_OPERANDS,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<4>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

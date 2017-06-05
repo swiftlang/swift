@@ -23,6 +23,7 @@ add_swift_library(swiftAST STATIC
   DeclContext.cpp
   DeclNameLoc.cpp
   DefaultArgumentKind.cpp
+  DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
@@ -33,8 +34,8 @@ add_swift_library(swiftAST STATIC
   Identifier.cpp
   LayoutConstraint.cpp
   LookupVisibleDecls.cpp
-  Mangle.cpp
   Module.cpp
+  ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
   Parameter.cpp

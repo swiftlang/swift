@@ -89,9 +89,15 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
                 "--num-iters={}".format(num_iters), data['test_name']],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             error_out = p.communicate()[1].split("\n")
-        except OSError:
-            print("Child Process Failed! (%s,%s)" % (
+            result = p.returncode
+            if result is None:
+                raise RuntimeError("Expected one line of output")
+            if result != 0:
+                raise RuntimeError("Process segfaulted")
+        except Exception:
+            sys.stderr.write("Child Process Failed! (%s,%s)\n" % (
                 data['path'], data['test_name']))
+            sys.stderr.flush()
             return None
 
         try:
@@ -104,9 +110,10 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
 
             total_count = d['objc_count'] + d['swift_count']
             return total_count
-        except (KeyError, ValueError):
-            print("Failed parse output! (%s,%s)" %
-                  (data['path'], data['test_name']))
+        except Exception:
+            tmp = (data['path'], data['test_name'])
+            sys.stderr.write("Failed parse output! (%s,%s)\n" % tmp)
+            sys.stderr.flush()
             return None
 
     def process_input(self, data):
@@ -121,6 +128,7 @@ class LeaksRunnerBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             return LeaksRunnerResult(test_name)
         return LeaksRunnerResult(test_name, total_count2 - total_count1)
 
+
 SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -133,6 +141,7 @@ def parse_args():
     parser.add_argument('-num-samples', type=int, default=2)
     parser.add_argument('-num-iters', type=int, default=2)
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()

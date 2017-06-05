@@ -1,9 +1,10 @@
-// RUN: rm -rf %t && mkdir -p %t/secret
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/secret)
 // RUN: %target-swift-frontend -emit-module -o %t/secret %S/Inputs/struct_with_operators.swift
-// RUN: mkdir -p %t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule/
+// RUN: %empty-directory(%t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule)
 // RUN: %target-swift-frontend -emit-module -o %t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule/%target-swiftmodule-name %S/Inputs/alias.swift -module-name has_alias
 
-// RUN: cd %t/secret && %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -DDUMMY
+// RUN: cd %t/secret && %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -ivfsoverlay -Xcc %S/../Inputs/unextended-module-overlay.yaml -Xcc -DDUMMY
 // RUN: %target-swift-frontend %s -typecheck -I %t
 
 // Check the actual serialized search paths.
@@ -30,3 +31,5 @@ numeric(42)
 
 // NEGATIVE-NOT: '.'
 // NEGATIVE-NOT: '../Frameworks'
+// This should be filtered out.
+// NEGATIVE-NOT: -ivfsoverlay{{.*}}unextended-module-overlay.yaml

@@ -277,6 +277,11 @@ private:
 
   /// Returns the last use of the value in the live block \p BB.
   SILInstruction *findLastUserInBlock(SILBasicBlock *BB);
+
+  /// Returns true if the value is alive at the begin of block \p BB.
+  bool isAliveAtBeginOfBlock(SILBasicBlock *BB) {
+    return LiveBlocks.count(BB) && BB != DefValue->getParentBlock();
+  }
 };
 
 /// Base class for BB cloners.

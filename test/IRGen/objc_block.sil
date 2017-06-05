@@ -9,7 +9,7 @@ import Swift
 class Foo {}
 sil_vtable Foo {}
 
-sil @_TFC10objc_block3FooD : $Foo -> ()
+sil @_T010objc_block3FooCfD : $Foo -> ()
 
 sil @call_block : $@convention(thin) (@convention(block) Foo -> Foo, Foo) -> Foo {
 entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):

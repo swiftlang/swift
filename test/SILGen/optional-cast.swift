@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 class A {}
 class B : A {}
@@ -163,7 +163,7 @@ func bar(_ y : A????) {
 }
 
 
-// CHECK-LABEL: sil hidden @_T04main3bazys9AnyObject_pSgF : $@convention(thin) (@owned Optional<AnyObject>) -> () {
+// CHECK-LABEL: sil hidden @_T04main3bazyyXlSgF : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 // CHECK:       bb0([[ARG:%.*]] : $Optional<AnyObject>):
 // CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
@@ -178,7 +178,7 @@ func bar(_ y : A????) {
 // CHECK:         store [[CASTED_VALUE]] to [init] [[X_VALUE]]
 // CHECK:       [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : $AnyObject):
 // CHECK:         destroy_value [[ORIGINAL_VALUE]]
-// CHECK: } // end sil function '_T04main3bazys9AnyObject_pSgF'
+// CHECK: } // end sil function '_T04main3bazyyXlSgF'
 func baz(_ y : AnyObject?) {
   var x = (y as? B)
 }

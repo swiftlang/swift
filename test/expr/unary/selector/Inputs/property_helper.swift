@@ -5,7 +5,7 @@ class OtherObjCClass: NSObject {
   @objc private(set) var privateSetVar = 2 // expected-note 2{{'privateSetVar' declared here}}
   @objc internal var internalVar = 2
 
-  internal func internalFunc() {}
+  @objc internal func internalFunc() {}
 
   private func privateFunc() {} // expected-note 2{{'privateFunc' declared here}}
 }

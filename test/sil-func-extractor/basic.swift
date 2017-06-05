@@ -1,16 +1,16 @@
 // Passing demangled name
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.foo" | %FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.X.test" | %FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.Vehicle.init" | %FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.Vehicle.now" | %FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.foo" | %FileCheck %s -check-prefix=EXTRACT-FOO
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.X.test" | %FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.Vehicle.init" | %FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.Vehicle.now" | %FileCheck %s -check-prefix=EXTRACT-NOW
 
 // Passing mangled name
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic3fooSiyF" | %FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic1XV4testyyF" | %FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic7VehicleCACSi1n_tcfc" | %FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic7VehicleC3nowSiyF" | %FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic3fooSiyF" | %FileCheck %s -check-prefix=EXTRACT-FOO
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic1XV4testyyF" | %FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic7VehicleCACSi1n_tcfc" | %FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="_T05basic7VehicleC3nowSiyF" | %FileCheck %s -check-prefix=EXTRACT-NOW
 
 
 // EXTRACT-FOO-NOT: sil hidden @_T05basic1XV4testyyF : $@convention(method) (X) -> () {
@@ -20,8 +20,8 @@
 // EXTRACT-FOO-LABEL: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
 // EXTRACT-FOO:       bb0:
 // EXTRACT-FOO-NEXT:    %0 = integer_literal
-// EXTRACT-FOO-NEXT:    %1 = struct $Int
-// EXTRACT-FOO-NEXT:    return %1 : $Int
+// EXTRACT-FOO:         %[[POS:.*]] = struct $Int
+// EXTRACT-FOO-NEXT:    return %[[POS]] : $Int
 
 
 // EXTRACT-TEST-NOT: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
@@ -44,7 +44,9 @@
 // EXTRACT-INIT-LABEL:   sil hidden @_T05basic7VehicleCACSi1n_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
 // EXTRACT-INIT-NEXT:      ref_element_addr
+// EXTRACT-INIT-NEXT:      begin_access [modify] [dynamic]
 // EXTRACT-INIT-NEXT:      store
+// EXTRACT-INIT-NEXT:      end_access
 // EXTRACT-INIT-NEXT:      return
 
 
@@ -55,7 +57,9 @@
 // EXTRACT-NOW-LABEL:   sil hidden @_T05basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
 // EXTRACT-NOW:           ref_element_addr
+// EXTRACT-NOW-NEXT:      begin_access [read] [dynamic]
 // EXTRACT-NOW-NEXT:      load
+// EXTRACT-NOW-NEXT:      end_access
 // EXTRACT-NOW-NEXT:      return
 
 struct X {
@@ -76,6 +80,7 @@ class Vehicle {
     }
 }
 
+@discardableResult
 func foo() -> Int {
   return 7
 }

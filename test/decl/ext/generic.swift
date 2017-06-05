@@ -138,7 +138,7 @@ extension GenericClass : P3 where T : P3 { } // expected-error{{extension of typ
 
 extension GenericClass where Self : P3 { }
 // expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
-// expected-error@-2{{type 'GenericClass' in conformance requirement does not refer to a generic parameter or associated type}}
+// expected-error@-2{{type 'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol P4 {
   associatedtype T

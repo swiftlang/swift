@@ -285,7 +285,8 @@ namespace {
     void mangleNominalType(Node *node, char basicKind, EntityContext &ctx);
 
     void mangleProtocolWithoutPrefix(Node *node);
-    void mangleProtocolListWithoutPrefix(Node *node);
+    void mangleProtocolListWithoutPrefix(Node *node,
+                                         Node *additionalProto = nullptr);
 
     void mangleEntityContext(Node *node, EntityContext &ctx);
     void mangleEntityType(Node *node, EntityContext &ctx);
@@ -413,7 +414,7 @@ void Remangler::mangleInfixOperator(Node *node) {
   mangleIdentifier(node->getText(), OperatorKind::Infix);
 }
 void Remangler::mangleIdentifier(StringRef ident, OperatorKind operatorKind) {
-  ::mangleIdentifier(ident, operatorKind, /*usePunycode*/ true, Out);
+  ::mangleIdentifier(ident, operatorKind, /*usePunycode*/ false, Out);
 }
 
 void Remangler::mangleNumber(Node *node) {
@@ -652,6 +653,10 @@ void Remangler::manglePartialApplyObjCForwarder(Node *node) {
   mangleSingleChildNode(node); // global
 }
 
+void Remangler::mangleMergedFunction(Node *node) {
+  Out << "Tm";
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {
@@ -677,11 +682,6 @@ void Remangler::mangleValueWitness(Node *node) {
 void Remangler::mangleValueWitnessTable(Node *node) {
   Out << "WV";
   mangleSingleChildNode(node); // type
-}
-
-void Remangler::mangleWitnessTableOffset(Node *node) {
-  Out << "Wo";
-  mangleSingleChildNode(node); // entity
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {
@@ -1021,7 +1021,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
   }
 }
 
-void Remangler::mangleTypeAlias(Node *node) {
+void Remangler::mangleTypeAlias(Node *node, EntityContext &ctx) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry)) return;
   Out << 'a';
@@ -1220,13 +1220,17 @@ void Remangler::mangleProtocolList(Node *node) {
   mangleProtocolListWithoutPrefix(node);
 }
 
-void Remangler::mangleProtocolListWithoutPrefix(Node *node) {
+void Remangler::mangleProtocolListWithoutPrefix(Node *node,
+                                                Node *additionalProto) {
   assert(node->getKind() == Node::Kind::ProtocolList);
   assert(node->getNumChildren() == 1);
   auto typeList = node->begin()[0];
   assert(typeList->getKind() == Node::Kind::TypeList);
   for (auto &child : *typeList) {
     mangleProtocolWithoutPrefix(child);
+  }
+  if (additionalProto) {
+    mangleProtocolWithoutPrefix(additionalProto);
   }
   Out << '_';
 }
@@ -1251,14 +1255,15 @@ void Remangler::mangleInOut(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
-void Remangler::mangleNonVariadicTuple(Node *node) {
-  Out << 'T';
-  mangleChildNodes(node); // tuple elements
-  Out << '_';
-}
-
-void Remangler::mangleVariadicTuple(Node *node) {
-  Out << 't';
+void Remangler::mangleTuple(Node *node) {
+  size_t NumElems = node->getNumChildren();
+  if (NumElems > 0 &&
+      node->getChild(NumElems - 1)->getFirstChild()->getKind() ==
+      Node::Kind::VariadicMarker) {
+    Out << 't';
+  } else {
+    Out << 'T';
+  }
   mangleChildNodes(node); // tuple elements
   Out << '_';
 }
@@ -1638,7 +1643,7 @@ void Remangler::mangleFirstElementMarker(Node *node) {
 }
 
 void Remangler::mangleVariadicMarker(Node *node) {
-  Out << "<vararg>";
+  // Handled in mangleTuple
 }
 
 void Remangler::mangleOutlinedCopy(Node *node) {
@@ -1648,6 +1653,45 @@ void Remangler::mangleOutlinedCopy(Node *node) {
 
 void Remangler::mangleOutlinedConsume(Node *node) {
   Out << "We";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleOutlinedRetain(Node *node) {
+  Out << "Wr";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedRelease(Node *node) {
+  Out << "Ws";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleKeyPathGetterThunkHelper(Node *node) {
+  Out << "TK";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleKeyPathSetterThunkHelper(Node *node) {
+  Out << "Tk";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleProtocolListWithClass(Node *node) {
+  Out << "Xc";
+  mangleChildNode(node, 1);
+  mangleProtocolListWithoutPrefix(node->getChild(0));
+}
+
+void Remangler::mangleProtocolListWithAnyObject(Node *node) {
+  Node *P = Factory.createNode(Node::Kind::Protocol);
+  P->addChild(Factory.createNode(Node::Kind::Module, "Swift"), Factory);
+  P->addChild(Factory.createNode(Node::Kind::Identifier, "AnyObject"), Factory);
+  Out << "P";
+  mangleProtocolListWithoutPrefix(node->getChild(0), /*additionalProto*/ P);
+}
+
+void Remangler::mangleVTableThunk(Node *node) {
+  Out << "TV";
   mangleChildNodes(node);
 }
 

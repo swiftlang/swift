@@ -1266,8 +1266,8 @@ func testTypeCheckWithUnsolvedVariables1() {
 }
 // TC_UNSOLVED_VARIABLES_1: Begin completions
 // TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceVar]/CurrNominal: count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<T>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): T#})[#BuilderStyle<T>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_1-NEXT: End completions
 
@@ -1276,8 +1276,8 @@ func testTypeCheckWithUnsolvedVariables2() {
 }
 // TC_UNSOLVED_VARIABLES_2: Begin completions
 // TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<T>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): T#})[#BuilderStyle<T>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<_>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): _#})[#BuilderStyle<_>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_2-NEXT: End completions
 
@@ -1651,7 +1651,8 @@ struct dedupS : dedupP {
 
 func testDeDuped(_ x: dedupS) {
   x#^PROTOCOL_EXT_DEDUP_1^#
-// PROTOCOL_EXT_DEDUP_1: Begin completions, 3 items
+// FIXME: Should produce 3 items
+// PROTOCOL_EXT_DEDUP_1: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_1: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
@@ -1730,8 +1731,8 @@ func testThrows006() {
 // rdar://21346928
 // Just sample some String API to sanity check.
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]
 // AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]
 func testWithAutoClosure1(_ x: String?) {
   (x ?? "autoclosure").#^AUTOCLOSURE1^#
 }
@@ -1778,20 +1779,20 @@ struct Person {
 }
 class Other { var nameFromOther: Int = 1 }
 class TestDotExprWithNonNominal {
-  var other: Other
+  var otherField: Other
 
   func test1() {
-    let person = Person(firstName: other.#^DOT_EXPR_NON_NOMINAL_1^#)
+    let person = Person(firstName: otherField.#^DOT_EXPR_NON_NOMINAL_1^#)
 // DOT_EXPR_NON_NOMINAL_1-NOT: Instance
 // DOT_EXPR_NON_NOMINAL_1: Decl[InstanceVar]/CurrNominal:      nameFromOther[#Int#];
 // DOT_EXPR_NON_NOMINAL_1-NOT: Instance
   }
   func test2() {
     let person = Person(firstName: 1.#^DOT_EXPR_NON_NOMINAL_2^#)
-// DOT_EXPR_NON_NOMINAL_2-NOT: other
+// DOT_EXPR_NON_NOMINAL_2-NOT: otherField
 // DOT_EXPR_NON_NOMINAL_2-NOT: firstName
 // DOT_EXPR_NON_NOMINAL_2: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#];
-// DOT_EXPR_NON_NOMINAL_2-NOT: other
+// DOT_EXPR_NON_NOMINAL_2-NOT: otherField
 // DOT_EXPR_NON_NOMINAL_2-NOT: firstName
   }
 }

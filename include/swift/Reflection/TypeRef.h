@@ -396,10 +396,6 @@ public:
     FIND_OR_CREATE_TYPEREF(A, ProtocolTypeRef, MangledName);
   }
 
-  bool isAnyObject() const {
-    return MangledName == "s9AnyObject_p";
-  }
-
   bool isError() const {
     return MangledName == "s5Error_p";
   }
@@ -421,28 +417,39 @@ public:
 };
 
 class ProtocolCompositionTypeRef final : public TypeRef {
-  std::vector<const TypeRef *> Protocols;
+  std::vector<const TypeRef *> Members;
+  bool HasExplicitAnyObject;
 
-  static TypeRefID Profile(const std::vector<const TypeRef *> &Protocols) {
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Members,
+                           bool HasExplicitAnyObject) {
     TypeRefID ID;
-    for (auto Protocol : Protocols) {
-      ID.addPointer(Protocol);
+    ID.addInteger((uint32_t)HasExplicitAnyObject);
+    for (auto Member : Members) {
+      ID.addPointer(Member);
     }
     return ID;
   }
 
 public:
-  ProtocolCompositionTypeRef(std::vector<const TypeRef *> Protocols)
-    : TypeRef(TypeRefKind::ProtocolComposition), Protocols(Protocols) {}
+  ProtocolCompositionTypeRef(std::vector<const TypeRef *> Members,
+                            bool HasExplicitAnyObject)
+    : TypeRef(TypeRefKind::ProtocolComposition),
+      Members(Members), HasExplicitAnyObject(HasExplicitAnyObject) {}
 
   template <typename Allocator>
   static const ProtocolCompositionTypeRef *
-  create(Allocator &A, std::vector<const TypeRef *> Protocols) {
-    FIND_OR_CREATE_TYPEREF(A, ProtocolCompositionTypeRef, Protocols);\
+  create(Allocator &A, std::vector<const TypeRef *> Members,
+        bool HasExplicitAnyObject) {
+    FIND_OR_CREATE_TYPEREF(A, ProtocolCompositionTypeRef, Members,
+                           HasExplicitAnyObject);
   }
 
-  const std::vector<const TypeRef *> &getProtocols() const {
-    return Protocols;
+  const std::vector<const TypeRef *> &getMembers() const {
+    return Members;
+  }
+
+  bool hasExplicitAnyObject() const {
+    return HasExplicitAnyObject;
   }
 
   static bool classof(const TypeRef *TR) {

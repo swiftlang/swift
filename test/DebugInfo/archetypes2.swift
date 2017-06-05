@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -verify -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -verify -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

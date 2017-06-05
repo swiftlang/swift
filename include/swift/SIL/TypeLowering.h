@@ -405,9 +405,6 @@ class TypeConverter {
   friend class TypeLowering;
 
   llvm::BumpPtrAllocator IndependentBPA;
-  /// BumpPtrAllocator for types dependent on contextual generic parameters,
-  /// which is reset when the generic context is popped.
-  llvm::BumpPtrAllocator DependentBPA;
 
   enum : unsigned {
     /// There is a unique entry with this uncurry level in the
@@ -490,21 +487,31 @@ class TypeConverter {
   /// Insert a mapping into the cache.
   void insert(TypeKey k, const TypeLowering *tl);
   
-  /// Mapping for types independent on contextual generic parameters, which is
-  /// cleared when the generic context is popped.
+  /// Mapping for types independent on contextual generic parameters.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> IndependentTypes;
-  /// Mapping for types dependent on contextual generic parameters, which is
-  /// cleared when the generic context is popped.
-  llvm::DenseMap<CachingTypeKey, const TypeLowering *> DependentTypes;
-  
+
+  struct DependentTypeState {
+    llvm::BumpPtrAllocator BPA;
+    CanGenericSignature Sig;
+    llvm::DenseMap<TypeConverter::CachingTypeKey,
+                   const TypeLowering *> Map;
+
+    explicit DependentTypeState(CanGenericSignature sig) : Sig(sig) {}
+
+    DependentTypeState(DependentTypeState &&) = default;
+
+    // No copy constructor or assignment.
+    DependentTypeState(const DependentTypeState &) = delete;
+    void operator=(const DependentTypeState &) = delete;
+  };
+
+  llvm::SmallVector<DependentTypeState, 1> DependentTypes;
+
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
-  
+
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
-  
-  /// The current generic context signature.
-  CanGenericSignature CurGenericContext;
   
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -577,7 +584,7 @@ public:
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
   const TypeLowering &getTypeLowering(Type t) {
-    AbstractionPattern pattern(CurGenericContext, t->getCanonicalType());
+    AbstractionPattern pattern(getCurGenericContext(), t->getCanonicalType());
     return getTypeLowering(pattern, t);
   }
 
@@ -603,7 +610,9 @@ public:
 
   SILType getLoweredLoadableType(Type t) {
     const TypeLowering &ti = getTypeLowering(t);
-    assert(ti.isLoadable() && "unexpected address-only type");
+    assert(
+        (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
+        "unexpected address-only type");
     return ti.getLoweredType();
   }
 
@@ -653,24 +662,34 @@ public:
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
-  
-  /// Returns the SILFunctionType the given declaration must use to override.
-  /// Will be the same as getConstantFunctionType if the declaration does
-  /// not override.
+
+  /// Return the most derived override which requires a new vtable entry.
+  /// If the method does not override anything or no override is vtable
+  /// dispatched, will return the least derived method.
+  SILDeclRef getOverriddenVTableEntry(SILDeclRef method);
+
+  /// Returns the SILFunctionType that must be used to perform a vtable dispatch
+  /// to the given declaration.
+  ///
+  /// Will be the same as getConstantFunctionType() if the declaration does not
+  /// override anything.
   CanSILFunctionType getConstantOverrideType(SILDeclRef constant) {
-    // Fast path if the constant isn't overridden.
-    if (constant.getNextOverriddenVTableEntry().isNull())
-      return getConstantFunctionType(constant);
-    SILDeclRef base = constant;
-    while (SILDeclRef overridden = base.getOverridden())
-      base = overridden;
-    
-    return getConstantOverrideType(constant, base);
+    return getConstantOverrideInfo(constant).SILFnType;
   }
 
-  CanSILFunctionType getConstantOverrideType(SILDeclRef constant,
-                                             SILDeclRef base) {
-    return getConstantOverrideInfo(constant, base).SILFnType;
+  /// Returns the SILConstantInfo that must be used to perform a vtable dispatch
+  /// to the given declaration.
+  ///
+  /// Will be the same as getConstantInfo() if the declaration does not
+  /// override anything.
+  SILConstantInfo getConstantOverrideInfo(SILDeclRef constant) {
+    // Fast path if the constant does not override anything.
+    auto next = constant.getNextOverriddenVTableEntry();
+    if (next.isNull())
+      return getConstantInfo(constant);
+
+    auto base = getOverriddenVTableEntry(constant);
+    return getConstantOverrideInfo(constant, base);
   }
 
   SILConstantInfo getConstantOverrideInfo(SILDeclRef constant,
@@ -678,7 +697,7 @@ public:
 
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
-    return getLoweredType(TupleType::getEmpty(Context));
+    return SILType::getPrimitiveObjectType(TupleType::getEmpty(Context));
   }
   
   /// Get a function type curried with its capture context.
@@ -732,6 +751,9 @@ public:
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
                                                    CaptureInfo captureInfo);
 
+  /// Retrieve the set of generic parameters closed over by the context.
+  CanGenericSignature getEffectiveGenericSignature(DeclContext *dc);
+
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.
   ///
@@ -743,7 +765,9 @@ public:
   /// Return the current generic context.  This should only be used in
   /// the type-conversion routines.
   CanGenericSignature getCurGenericContext() const {
-    return CurGenericContext;
+    if (DependentTypes.empty())
+      return CanGenericSignature();
+    return DependentTypes.back().Sig;
   }
   
   /// Pop a generic function context. See GenericContextScope for an RAII

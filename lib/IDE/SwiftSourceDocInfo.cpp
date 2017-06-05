@@ -19,6 +19,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Subsystems.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
@@ -111,7 +112,7 @@ bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Rang
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
   return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                            SemaReferenceKind::SubscriptRef);
+                    ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
 }
 
 SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
@@ -129,7 +130,7 @@ bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (isa<ExtensionDecl>(D))
     return true;
 
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+  if (auto *VD = dyn_cast<ValueDecl>(D))
     return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
                        Range.getStart(), /*IsRef=*/false);
 
@@ -166,7 +167,7 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
                                          TypeDecl *CtorTyRef,
                                          ExtensionDecl *ExtTyRef, Type T,
-                                         SemaReferenceKind Kind) {
+                                         ReferenceMetaData Data) {
   if (isDone())
     return false;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
@@ -198,6 +199,13 @@ bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
   return !Found;
 }
 
+bool SemaLocResolver::
+visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
+  if (isDone())
+    return false;
+  return !tryResolve(D, nullptr, nullptr, StartLoc, /*IsRef=*/false);
+}
+
 bool SemaLocResolver::visitModuleReference(ModuleEntity Mod,
                                            CharSourceRange Range) {
   if (isDone())
@@ -213,21 +221,37 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   case RangeKind::SingleExpression: OS << "SingleExpression"; break;
   case RangeKind::SingleDecl: OS << "SingleDecl"; break;
   case RangeKind::MultiStatement: OS << "MultiStatement"; break;
+  case RangeKind::PartOfExpression: OS << "PartOfExpression"; break;
   case RangeKind::SingleStatement: OS << "SingleStatement"; break;
   case RangeKind::Invalid: OS << "Invalid"; break;
   }
   OS << "</Kind>\n";
 
-  OS << "<Content>" << Content << "</Content>\n";
-  if (Ty) {
+  OS << "<Content>" << Content.str() << "</Content>\n";
+
+  if (auto Ty = getType()) {
     OS << "<Type>";
     Ty->print(OS);
-    OS << "</Type>\n";
+    OS << "</Type>";
+    switch(exit()) {
+    case ExitState::Positive: OS << "<Exit>true</Exit>"; break;
+    case ExitState::Unsure: OS << "<Exit>unsure</Exit>"; break;
+    case ExitState::Negative: OS << "<Exit>false</Exit>"; break;
+    }
+    OS << "\n";
   }
 
-  OS << "<Context>";
-  printContext(OS, RangeContext);
-  OS << "</Context>\n";
+  if (RangeContext) {
+    OS << "<Context>";
+    printContext(OS, RangeContext);
+    OS << "</Context>\n";
+  }
+
+  if (CommonExprParent) {
+    OS << "<Parent>";
+    OS << Expr::getKindName(CommonExprParent->getKind());
+    OS << "</Parent>\n";
+  }
 
   if (!HasSingleEntry) {
     OS << "<Entry>Multi</Entry>\n";
@@ -276,10 +300,6 @@ bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
   return VD == Other.VD;
 }
 
-bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
-  return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
-}
-
 static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
   class ThrowingEntityAnalyzer : public SourceEntityWalker {
     bool Throwing;
@@ -317,6 +337,23 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
   });
 }
 
+ReturnInfo::
+ReturnInfo(ASTContext &Ctx, ArrayRef<ReturnInfo> Branches):
+    ReturnType(Ctx.TheErrorType.getPointer()), Exit(ExitState::Unsure) {
+  std::set<TypeBase*> AllTypes;
+  std::set<ExitState> AllExitStates;
+  for (auto I : Branches) {
+    AllTypes.insert(I.ReturnType);
+    AllExitStates.insert(I.Exit);
+  }
+  if (AllTypes.size() == 1) {
+    ReturnType = *AllTypes.begin();
+  }
+  if (AllExitStates.size() == 1) {
+    Exit = *AllExitStates.begin();
+  }
+}
+
 struct RangeResolver::Implementation {
   SourceFile &File;
   ASTContext &Ctx;
@@ -339,11 +376,29 @@ private:
     std::vector<ASTNode> EndMatches;
     ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
       ContainedInRange(ContainedInRange) {}
+
+    bool isMultiStatement() {
+      if (StartMatches.empty() || EndMatches.empty())
+        return false;
+
+      // Multi-statement should have a common parent of brace statement, this
+      // can be implicit brace statement, e.g. in case statement.
+      if (Parent.isStmt(StmtKind::Brace))
+        return true;
+
+      // Explicitly allow the selection of multiple case statements.
+      auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
+      return llvm::any_of(StartMatches, IsCase) &&
+          llvm::any_of(EndMatches, IsCase);
+    }
   };
 
+  std::vector<Token> AllTokens;
+  Token &StartTok;
+  Token &EndTok;
   SourceLoc Start;
   SourceLoc End;
-  StringRef Content;
+  CharSourceRange Content;
   Optional<ResolvedRangeInfo> Result;
   std::vector<ContextInfo> ContextStack;
   ContextInfo &getCurrentDC() {
@@ -358,17 +413,62 @@ private:
   std::vector<ASTNode> ContainedASTNodes;
 
   /// Collect the type that an ASTNode should be evaluated to.
-  Type resolveNodeType(ASTNode N) {
-    if (N.is<Stmt*>()) {
-      if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
-        return resolveNodeType(RS->getResult());
+  ReturnInfo resolveNodeType(ASTNode N, RangeKind Kind) {
+    auto *VoidTy = Ctx.getVoidDecl()->getDeclaredInterfaceType().getPointer();
+    if (N.isNull())
+      return {VoidTy, ExitState::Negative};
+    switch(Kind) {
+    case RangeKind::Invalid:
+    case RangeKind::SingleDecl:
+    case RangeKind::PartOfExpression:
+      llvm_unreachable("cannot get type.");
+
+    // For a single expression, its type is apparent.
+    case RangeKind::SingleExpression:
+      return {N.get<Expr*>()->getType().getPointer(), ExitState::Negative};
+
+    // For statements, we either resolve to the returning type or Void.
+    case RangeKind::SingleStatement:
+    case RangeKind::MultiStatement: {
+      if (N.is<Stmt*>()) {
+        if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+          return {
+            resolveNodeType(RS->hasResult() ? RS->getResult() : nullptr,
+              RangeKind::SingleExpression).ReturnType, ExitState::Positive };
+        }
+
+        // Unbox the brace statement to find its type.
+        if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
+          if (!BS->getElements().empty()) {
+            return resolveNodeType(BS->getElements().back(),
+                                   RangeKind::SingleStatement);
+          }
+        }
+
+        // Unbox the if statement to find its type.
+        if (auto *IS = dyn_cast<IfStmt>(N.get<Stmt*>())) {
+          llvm::SmallVector<ReturnInfo, 2> Branches;
+          Branches.push_back(resolveNodeType(IS->getThenStmt(),
+                             RangeKind::SingleStatement));
+          Branches.push_back(resolveNodeType(IS->getElseStmt(),
+                             RangeKind::SingleStatement));
+          return {Ctx, Branches};
+        }
+
+        // Unbox switch statement to find return information.
+        if (auto *SWS = dyn_cast<SwitchStmt>(N.get<Stmt*>())) {
+          llvm::SmallVector<ReturnInfo, 4> Branches;
+          for (auto *CS : SWS->getCases()) {
+            Branches.push_back(resolveNodeType(CS->getBody(),
+              RangeKind::SingleStatement));
+          }
+          return {Ctx, Branches};
+        }
       }
       // For other statements, the type should be void.
-      return Ctx.getVoidDecl()->getDeclaredInterfaceType();
-    } else if (N.is<Expr*>()) {
-      return N.get<Expr*>()->getType();
+      return {VoidTy, ExitState::Negative};
     }
-    return Type();
+    }
   }
 
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
@@ -380,23 +480,32 @@ private:
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               resolveNodeType(Node), Content,
-                               getImmediateContext(), SingleEntry,
+                               resolveNodeType(Node, RangeKind::SingleExpression),
+                               Content,
+                               getImmediateContext(),
+                               /*Common Parent Expr*/nullptr,
+                               SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
-                               Content, getImmediateContext(), SingleEntry,
+      return ResolvedRangeInfo(RangeKind::SingleStatement,
+                               resolveNodeType(Node, RangeKind::SingleStatement),
+                               Content, getImmediateContext(),
+                               /*Common Parent Expr*/nullptr,
+                               SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
-      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
-                               getImmediateContext(), SingleEntry,
+      return ResolvedRangeInfo(RangeKind::SingleDecl,
+                               ReturnInfo(), Content,
+                               getImmediateContext(),
+                               /*Common Parent Expr*/nullptr,
+                               SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
@@ -412,43 +521,6 @@ private:
     return true;
   }
 
-  static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
-                                             unsigned BufferID,
-                                             unsigned Offset) {
-    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-    StringRef Buffer = SM.extractText(entireRange);
-
-    const char *BufStart = Buffer.data();
-    if (Offset >= Buffer.size())
-      return SourceLoc();
-
-    for (unsigned Off = Offset; Off != 0; Off --) {
-      if (!clang::isWhitespace(*(BufStart + Off))) {
-        return SM.getLocForOffset(BufferID, Off);
-      }
-    }
-    return clang::isWhitespace(*BufStart) ? SourceLoc() :
-    SM.getLocForOffset(BufferID, 0);
-  }
-
-  static SourceLoc getNonwhitespaceLocAfter(SourceManager &SM,
-                                            unsigned BufferID,
-                                            unsigned Offset) {
-    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-    StringRef Buffer = SM.extractText(entireRange);
-
-    const char *BufStart = Buffer.data();
-    if (Offset >= Buffer.size())
-      return SourceLoc();
-
-    for (unsigned Off = Offset; Off < Buffer.size(); Off ++) {
-      if (!clang::isWhitespace(*(BufStart + Off))) {
-        return SM.getLocForOffset(BufferID, Off);
-      }
-    }
-    return SourceLoc();
-  }
-
   DeclContext *getImmediateContext() {
     for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
       if (auto *DC = It->Parent.getAsDeclContext())
@@ -457,9 +529,14 @@ private:
     return static_cast<DeclContext*>(&File);
   }
 
-  Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
-    File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr), Start(Start),
-    End(End), Content(getContent()) {}
+  Implementation(SourceFile &File, std::vector<Token> AllTokens,
+                 unsigned StartIdx, unsigned EndIdx) :
+    File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
+    AllTokens(AllTokens), StartTok(AllTokens[StartIdx]), EndTok(AllTokens[EndIdx]),
+    Start(StartTok.getLoc()), End(EndTok.getLoc()),
+    Content(getContentRange()) {
+      assert(Start.isValid() && End.isValid());
+  }
 
 public:
   bool hasResult() { return Result.hasValue(); }
@@ -482,6 +559,22 @@ public:
   }
 
   void leave(ASTNode Node) {
+    if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
+      if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
+        Result = {
+          RangeKind::PartOfExpression, ReturnInfo(), Content,
+          getImmediateContext(),
+          Parent,
+          hasSingleEntryPoint(ContainedASTNodes),
+          hasUnhandledError(ContainedASTNodes),
+          getOrphanKind(ContainedASTNodes),
+          llvm::makeArrayRef(ContainedASTNodes),
+          llvm::makeArrayRef(DeclaredDecls),
+          llvm::makeArrayRef(ReferencedDecls)
+        };
+      }
+    }
+
     assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
     ContextStack.pop_back();
   }
@@ -490,14 +583,33 @@ public:
                                         unsigned Length) {
     SourceManager &SM = File.getASTContext().SourceMgr;
     unsigned BufferId = File.getBufferID().getValue();
-    SourceLoc StartLoc = Implementation::getNonwhitespaceLocAfter(SM, BufferId,
-                                                                  StartOff);
-    SourceLoc EndLoc = Implementation::getNonwhitespaceLocBefore(SM, BufferId,
-                                                         StartOff + Length - 1);
-    StartLoc = Lexer::getLocForStartOfToken(SM, StartLoc);
-    EndLoc = Lexer::getLocForStartOfToken(SM, EndLoc);
-    return StartLoc.isInvalid() || EndLoc.isInvalid() ? nullptr :
-      new Implementation(File, StartLoc, EndLoc);
+
+    LangOptions Opts = File.getASTContext().LangOpts;
+    Opts.AttachCommentsToDecls = true;
+    std::vector<Token> AllTokens = tokenize(Opts, SM, BufferId, 0, 0, false);
+    auto TokenComp = [&](Token &LHS, SourceLoc Loc) {
+      return SM.isBeforeInBuffer(LHS.getLoc(), Loc);
+    };
+
+    SourceLoc StartRaw = SM.getLocForOffset(BufferId, StartOff);
+    SourceLoc EndRaw = SM.getLocForOffset(BufferId, StartOff + Length);
+
+    // This points to the first token after or on the start loc.
+    auto StartIt = std::lower_bound(AllTokens.begin(), AllTokens.end(), StartRaw,
+                                    TokenComp);
+    // This points to the first token after or on the end loc;
+    auto EndIt = std::lower_bound(AllTokens.begin(), AllTokens.end(), EndRaw,
+                                  TokenComp);
+    // Erroneous case.
+    if (StartIt == AllTokens.end() || EndIt == AllTokens.begin())
+      return nullptr;
+
+    // The start token is inclusive.
+    unsigned StartIdx = StartIt - AllTokens.begin();
+
+    // The end token is exclusive.
+    unsigned EndIdx = EndIt - 1 - AllTokens.begin();
+    return new Implementation(File, std::move(AllTokens), StartIdx, EndIdx);
   }
 
   static Implementation *createInstance(SourceFile &File, SourceLoc Start,
@@ -516,8 +628,8 @@ public:
     if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
       if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
                                                  VD->getEndLoc())))
-        if(std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
-                     DeclaredDecl(VD)) == DeclaredDecls.end())
+        if (std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
+                      DeclaredDecl(VD)) == DeclaredDecls.end())
           DeclaredDecls.push_back(VD);
     }
   }
@@ -525,13 +637,15 @@ public:
   class CompleteWalker : public SourceEntityWalker {
     Implementation *Impl;
     bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      if (D->isImplicit())
+        return false;
       Impl->analyzeDecl(D);
       return true;
     }
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                            SemaReferenceKind Kind) override {
-      Impl->analyzeDeclRef(D, Range, T, Kind);
+                            ReferenceMetaData Data) override {
+      Impl->analyzeDeclRef(D, Range, T, Data);
       return true;
     }
   public:
@@ -544,7 +658,7 @@ public:
     Implementation *Impl;
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                            SemaReferenceKind Kind) override {
+                            ReferenceMetaData Data) override {
       // If the reference is after the given range, continue logic.
       if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
         return true;
@@ -577,14 +691,12 @@ public:
     for (auto N : Nodes) {
       if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
         if (S->getKind() == StmtKind::Case)
-          CaseCount ++;
+          CaseCount++;
       }
     }
     // If there are more than one case/default statements, there are more than
     // one entry point.
-    if (CaseCount > 1)
-      return false;
-    return true;
+    return CaseCount == 0;
   }
 
   OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {
@@ -624,15 +736,19 @@ public:
   }
 
   void analyze(ASTNode Node) {
+    if (!shouldAnalyze(Node))
+      return;
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
     switch (getRangeMatchKind(Node.getSourceRange())) {
-    case RangeMatchKind::NoneMatch:
+    case RangeMatchKind::NoneMatch: {
       // PatternBindingDecl is not visited; we need to explicitly analyze here.
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
-        analyze(VA->getParentPatternBinding());
+        if (auto PBD = VA->getParentPatternBinding())
+          analyze(PBD);
       break;
+    }
     case RangeMatchKind::RangeMatch: {
       postAnalysis(Node);
 
@@ -649,30 +765,27 @@ public:
       break;
     }
 
-    // If the node's parent is not contained in the range under question but the
-    // node itself is, we keep track of the node as top-level contained node.
-    if (!getCurrentDC().ContainedInRange &&
-        isContainedInSelection(CharSourceRange(SM, Node.getStartLoc(),
-                                               Node.getEndLoc()))) {
-      if (std::find_if(ContainedASTNodes.begin(), ContainedASTNodes.end(),
-          [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
-            Node.getSourceRange()); }) == ContainedASTNodes.end()) {
-        ContainedASTNodes.push_back(Node);
-      }
+    // If no parent is considered as a contained node; this node should be
+    // a top-level contained node.
+    if (std::none_of(ContainedASTNodes.begin(), ContainedASTNodes.end(),
+      [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
+                                               Node.getSourceRange()); })) {
+      ContainedASTNodes.push_back(Node);
     }
 
-    if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
+    if (DCInfo.isMultiStatement()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
-                resolveNodeType(DCInfo.EndMatches.back()), Content,
-                getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
+                resolveNodeType(DCInfo.EndMatches.back(),
+                                RangeKind::MultiStatement), Content,
+                getImmediateContext(), nullptr,
+                hasSingleEntryPoint(ContainedASTNodes),
                 hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
-      return;
     }
   }
 
@@ -686,16 +799,39 @@ public:
     return true;
   }
 
+  bool nodeContainSelection(ASTNode Node) {
+    // If the selection starts before the node, return false.
+    if (SM.isBeforeInBuffer(Start, Node.getStartLoc()))
+      return false;
+    // If the node ends before the selection, return false.
+    if (SM.isBeforeInBuffer(Lexer::getLocForEndOfToken(SM, Node.getEndLoc()), End))
+      return false;
+    // Contained.
+    return true;
+  }
+
+  bool shouldAnalyze(ASTNode Node) {
+    // Avoid analyzing implicit nodes.
+    if (Node.isImplicit())
+      return false;
+    // Avoid analyzing nodes that are not enclosed.
+    if (SM.isBeforeInBuffer(End, Node.getEndLoc()))
+      return false;
+    if (SM.isBeforeInBuffer(Node.getStartLoc(), Start))
+      return false;
+    return true;
+  }
+
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
-    return ResolvedRangeInfo();
+    return ResolvedRangeInfo(Content);
   }
 
   void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
-                      SemaReferenceKind Kind) {
+                      ReferenceMetaData Data) {
     // Only collect decl ref.
-    if (Kind != SemaReferenceKind::DeclRef)
+    if (Data.Kind != SemaReferenceKind::DeclRef)
       return;
 
     if (!isContainedInSelection(Range))
@@ -705,11 +841,28 @@ public:
     if (VD->getDeclContext()->getParentSourceFile() != &File)
       return;
 
-    // Collect referenced decls in the range.
-    ReferencedDecl RD(VD, Ty);
-    if (std::find(ReferencedDecls.begin(), ReferencedDecls.end(), RD) ==
-          ReferencedDecls.end())
-      ReferencedDecls.push_back(RD);
+    // Down-grade LValue type to RValue type if it's read-only.
+    if (auto Access = Data.AccKind) {
+      switch (Access.getValue()) {
+      case AccessKind::Read:
+        Ty = Ty->getRValueType();
+        break;
+      case AccessKind::Write:
+      case AccessKind::ReadWrite:
+        break;
+      }
+    }
+
+    auto It = llvm::find_if(ReferencedDecls,
+                            [&](ReferencedDecl D) { return D.VD == VD; });
+    if (It == ReferencedDecls.end()) {
+      ReferencedDecls.emplace_back(VD, Ty);
+    } else {
+      // LValue type should take precedence.
+      if (!It->Ty->isLValueType() && Ty->isLValueType()) {
+        It->Ty = Ty;
+      }
+    }
   }
 
 private:
@@ -726,9 +879,11 @@ private:
       return RangeMatchKind::NoneMatch;
   }
 
-  StringRef getContent() {
+  CharSourceRange getContentRange() {
     SourceManager &SM = File.getASTContext().SourceMgr;
-    return CharSourceRange(SM, Start, Lexer::getLocForEndOfToken(SM, End)).str();
+    return CharSourceRange(SM, StartTok.hasComment() ?
+                            StartTok.getCommentStart() : StartTok.getLoc(),
+                           Lexer::getLocForEndOfToken(SM, End));
   }
 };
 
@@ -757,6 +912,8 @@ bool RangeResolver::walkToStmtPre(Stmt *S) {
 };
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  if (D->isImplicit())
+    return false;
   if (!Impl->shouldEnter(D))
     return false;
   Impl->analyze(D);
@@ -782,14 +939,14 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
-                   ExtensionDecl *ExtTyRef, Type T, SemaReferenceKind Kind) {
-  Impl->analyzeDeclRef(D, Range, T, Kind);
+                   ExtensionDecl *ExtTyRef, Type T, ReferenceMetaData Data) {
+  Impl->analyzeDeclRef(D, Range, T, Data);
   return true;
 }
 
 ResolvedRangeInfo RangeResolver::resolve() {
   if (!Impl)
-    return ResolvedRangeInfo();
+    return ResolvedRangeInfo(CharSourceRange());
   Impl->enter(ASTNode());
   walk(Impl->File);
   return Impl->getResult();
@@ -850,7 +1007,8 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, R);
     } else {
       if (VD->hasName()) {
-        NameLen = VD->getName().getLength();
+        // TODO: Handle special names
+        NameLen = VD->getBaseName().getIdentifier().getLength();
       } else {
         NameLen = getCharLength(SM, VD->getLoc());
       }
@@ -867,4 +1025,66 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
     return getLocationInfoForClangNode(ClangNode, Importer,
                                        DeclarationLoc, Filename);
   }
+}
+
+CharSourceRange CallArgInfo::getEntireCharRange(const SourceManager &SM) const {
+  return CharSourceRange(SM, LabelRange.getStart(),
+                         Lexer::getLocForEndOfToken(SM, ArgExp->getEndLoc()));
+}
+
+static Expr* getSingleNonImplicitChild(Expr *Parent) {
+  // If this expr is non-implicit, we are done.
+  if (!Parent->isImplicit())
+    return Parent;
+
+  // Collect all immediate children.
+  llvm::SmallVector<Expr*, 4> Children;
+  Parent->forEachImmediateChildExpr([&](Expr *E) {
+    Children.push_back(E);
+    return E;
+  });
+
+  // If more than one children are found, we are not sure the non-implicit node.
+  if (Children.size() != 1)
+    return Parent;
+
+  // Dig deeper if necessary.
+  return getSingleNonImplicitChild(Children[0]);
+}
+
+std::vector<CallArgInfo> swift::ide::
+getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
+  std::vector<CallArgInfo> InfoVec;
+  if (auto *TE = dyn_cast<TupleExpr>(Arg)) {
+    size_t ElemIndex = 0;
+    for (Expr *Elem : TE->getElements()) {
+      SourceLoc LabelStart(Elem->getStartLoc());
+      SourceLoc LabelEnd(LabelStart);
+
+      auto NameIdentifier = TE->getElementName(ElemIndex);
+      if (!NameIdentifier.empty()) {
+        LabelStart = TE->getElementNameLoc(ElemIndex);
+        if (EndKind == LabelRangeEndAt::LabelNameOnly)
+          LabelEnd = LabelStart.getAdvancedLoc(NameIdentifier.getLength());
+      }
+
+      InfoVec.push_back({getSingleNonImplicitChild(Elem),
+        CharSourceRange(SM, LabelStart, LabelEnd)});
+      ++ElemIndex;
+    }
+  } else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
+    if (auto Sub = PE->getSubExpr())
+      InfoVec.push_back({getSingleNonImplicitChild(Sub),
+        CharSourceRange(Sub->getStartLoc(), 0)});
+  }
+  return InfoVec;
+}
+
+std::vector<CharSourceRange> swift::ide::
+getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
+  std::vector<CharSourceRange> Ranges;
+  auto InfoVec = getCallArgInfo(SM, Arg, EndKind);
+  std::transform(InfoVec.begin(), InfoVec.end(), std::back_inserter(Ranges),
+                 [](CallArgInfo &Info) { return Info.LabelRange; });
+  return Ranges;
 }

@@ -17,6 +17,11 @@
 #include "InstrumenterSupport.h"
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
 
 #include <random>
 #include <forward_list>
@@ -238,7 +243,7 @@ public:
   }
 
   DoStmt *transformDoStmt(DoStmt *DS) {
-    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
+    if (auto *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
       BraceStmt *NB = transformBraceStmt(B);
       if (NB != B) {
         DS->setBody(NB);
@@ -248,14 +253,14 @@ public:
   }
 
   DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
-    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
+    if (auto *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
       BraceStmt *NB = transformBraceStmt(B);
       if (NB != B) {
         DCS->setBody(NB);
       }
     }
     for (CatchStmt *C : DCS->getCatches()) {
-      if (BraceStmt *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
+      if (auto *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
         BraceStmt *NCB = transformBraceStmt(CB);
         if (NCB != CB) {
           C->setBody(NCB);
@@ -268,7 +273,7 @@ public:
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
       return D;
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getBody()) {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
         BraceStmt *NB = transformBraceStmt(B);
@@ -326,7 +331,7 @@ public:
     ValueDecl *VD = nullptr;
     std::tie(RE, VD) = digForVariable(E);
     if (VD) {
-      return VD->getName().str();
+      return VD->getBaseName().getIdentifier().str();
     } else {
       return std::string("");
     }
@@ -371,9 +376,9 @@ public:
 
     for (size_t EI = 0; EI != Elements.size(); ++EI) {
       swift::ASTNode &Element = Elements[EI];
-      if (Expr *E = Element.dyn_cast<Expr *>()) {
+      if (auto *E = Element.dyn_cast<Expr *>()) {
         E->walk(CF);
-        if (AssignExpr *AE = dyn_cast<AssignExpr>(E)) {
+        if (auto *AE = dyn_cast<AssignExpr>(E)) {
           if (auto *MRE = dyn_cast<MemberRefExpr>(AE->getDest())) {
             // an assignment to a property of an object counts as a mutation of
             // that object
@@ -417,9 +422,9 @@ public:
               EI += 3;
             }
           }
-        } else if (ApplyExpr *AE = dyn_cast<ApplyExpr>(E)) {
+        } else if (auto *AE = dyn_cast<ApplyExpr>(E)) {
           bool Handled = false;
-          if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(AE->getFn())) {
+          if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn())) {
             auto *FnD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               StringRef FnName = FnD->getNameStr();
@@ -515,9 +520,9 @@ public:
             }
           }
         }
-      } else if (Stmt *S = Element.dyn_cast<Stmt *>()) {
+      } else if (auto *S = Element.dyn_cast<Stmt *>()) {
         S->walk(CF);
-        if (ReturnStmt *RS = dyn_cast<ReturnStmt>(S)) {
+        if (auto *RS = dyn_cast<ReturnStmt>(S)) {
           if (RS->hasResult()) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
                 buildPatternAndVariable(RS->getResult());
@@ -554,7 +559,7 @@ public:
             Elements[EI] = NS;
           }
         }
-      } else if (Decl *D = Element.dyn_cast<Decl *>()) {
+      } else if (auto *D = Element.dyn_cast<Decl *>()) {
         D->walk(CF);
         if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
           if (VarDecl *VD = PBD->getSingleVar()) {
@@ -607,7 +612,7 @@ public:
   }
 
   Added<Stmt *> logDeclOrMemberRef(Added<Expr *> RE) {
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(*RE)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
 
       if (isa<ConstructorDecl>(TypeCheckDC) &&
@@ -621,7 +626,7 @@ public:
                                     true, // implicit
                                     AccessSemantics::Ordinary, Type()),
           DRE->getSourceRange(), VD->getName().str().str().c_str());
-    } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(*RE)) {
+    } else if (auto *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
 
@@ -634,7 +639,8 @@ public:
           new (Context) MemberRefExpr(B, SourceLoc(), M, DeclNameLoc(),
                                       true, // implicit
                                       AccessSemantics::Ordinary),
-          MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
+          MRE->getSourceRange(),
+          M.getDecl()->getBaseName().getIdentifier().str().str().c_str());
     } else {
       return nullptr;
     }
@@ -643,7 +649,7 @@ public:
   std::pair<PatternBindingDecl *, VarDecl *>
   maybeFixupPrintArgument(ApplyExpr *Print) {
     Expr *ArgTuple = Print->getArg();
-    if (ParenExpr *PE = dyn_cast<ParenExpr>(ArgTuple)) {
+    if (auto *PE = dyn_cast<ParenExpr>(ArgTuple)) {
       std::pair<PatternBindingDecl *, VarDecl *> PV =
           buildPatternAndVariable(PE->getSubExpr());
       PE->setSubExpr(new (Context) DeclRefExpr(
@@ -651,7 +657,7 @@ public:
           true, // implicit
           AccessSemantics::Ordinary, PE->getSubExpr()->getType()));
       return PV;
-    } else if (TupleExpr *TE = dyn_cast<TupleExpr>(ArgTuple)) {
+    } else if (auto *TE = dyn_cast<TupleExpr>(ArgTuple)) {
       if (TE->getNumElements() == 0) {
         return std::make_pair(nullptr, nullptr);
       } else {
@@ -663,7 +669,7 @@ public:
           useJustFirst = true;
         } else {
           for (Expr *Arg : TE->getElements()) {
-            if (Arg->getType()->getAs<InOutType>()) {
+            if (Arg->getType()->is<InOutType>()) {
               useJustFirst = true;
               break;
             }
@@ -813,10 +819,10 @@ public:
     char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
 
-    ::snprintf(start_line_buf, buf_size, "%d", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%d", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%d", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%d", EndLC.second);
+    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
+    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
+    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
+    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
 
     Expr *StartLine =
         new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);
@@ -897,7 +903,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     ExpressionFinder(bool HP) : HighPerformance(HP) {}
 
     bool walkToDeclPre(Decl *D) override {
-      if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
             ASTContext &ctx = FD->getASTContext();
@@ -910,7 +916,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             return false;
           }
         }
-      } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             ASTContext &ctx = static_cast<Decl *>(TLCD)->getASTContext();

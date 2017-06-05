@@ -37,7 +37,32 @@ namespace swift {
 /// UnqualifiedLookupResult - One result of unqualified lookup.
 struct UnqualifiedLookupResult {
 private:
+
+  /// The declaration through where we find Value. For instance,
+  ///
+  /// class BaseClass {
+  ///   func foo() {}
+  /// }
+  ///
+  /// class DerivedClass : BaseClass {
+  ///   func bar() {}
+  /// }
+  ///
+  /// When finding foo() from the body of DerivedClass, Base is DerivedClass.
+  ///
+  /// Another example:
+  ///
+  /// class BaseClass {
+  ///   func bar() {}
+  ///   func foo() {}
+  /// }
+  ///
+  /// When finding bar() from the function body of foo(), Base is the implicit
+  /// self parameter in foo().
   ValueDecl *Base;
+
+  /// The declaration corresponds to the given name; i.e. the decl we are
+  /// looking up.
   ValueDecl *Value;
 
 public:

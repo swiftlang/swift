@@ -26,6 +26,7 @@ class Pattern;
 class TypeRepr;
 struct TypeLoc;
 class ParameterList;
+enum class AccessKind: unsigned char;
 
 enum class SemaReferenceKind : uint8_t {
   ModuleRef = 0,
@@ -35,6 +36,13 @@ enum class SemaReferenceKind : uint8_t {
   TypeRef,
   EnumElementRef,
   SubscriptRef,
+};
+
+struct ReferenceMetaData {
+  SemaReferenceKind Kind;
+  llvm::Optional<AccessKind> AccKind;
+  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind) :
+    Kind(Kind), AccKind(AccKind) {}
 };
 
 /// \brief An abstract class used to traverse an AST.

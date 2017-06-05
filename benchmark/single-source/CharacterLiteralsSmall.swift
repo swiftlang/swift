@@ -55,15 +55,20 @@ func makeCharacter_UTF8Length8() -> Character {
   return "\u{00a9}\u{0300}\u{0301}\u{0302}"
 }
 
+@inline(never)
+func makeLiterals() {
+  blackHole(makeCharacter_UTF8Length1())
+  blackHole(makeCharacter_UTF8Length2())
+  blackHole(makeCharacter_UTF8Length3())
+  blackHole(makeCharacter_UTF8Length4())
+  blackHole(makeCharacter_UTF8Length5())
+  blackHole(makeCharacter_UTF8Length6())
+  blackHole(makeCharacter_UTF8Length7())
+  blackHole(makeCharacter_UTF8Length8())
+}
+
 public func run_CharacterLiteralsSmall(_ N: Int) {
   for _ in 0...10000 * N {
-    _ = makeCharacter_UTF8Length1()
-    _ = makeCharacter_UTF8Length2()
-    _ = makeCharacter_UTF8Length3()
-    _ = makeCharacter_UTF8Length4()
-    _ = makeCharacter_UTF8Length5()
-    _ = makeCharacter_UTF8Length6()
-    _ = makeCharacter_UTF8Length7()
-    _ = makeCharacter_UTF8Length8()
+    makeLiterals()
   }
 }

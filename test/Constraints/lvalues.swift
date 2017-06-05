@@ -28,9 +28,8 @@ var x : X
 var y : Y
 
 func +=(lhs: inout X, rhs : X) {}
-func +=(lhs: inout Double, rhs : Double) {}
-prefix func ++(rhs: inout X) {}
-postfix func ++(lhs: inout X) {}
+prefix operator +++
+prefix func +++(rhs: inout X) {}
 
 f0(&i)
 f1(&i)
@@ -44,7 +43,7 @@ f1(y[i]) // expected-error{{passing value of type 'Float' to an inout parameter 
 
 // Assignment operators
 x += x
-++x
++++x
 
 var yi = y[i]
 
@@ -77,28 +76,28 @@ f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argu
 f1(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout assignment
 non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-++non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 
 // non-settable property is non-settable:
 z.non_settable_x = x // expected-error{{cannot assign to property: 'non_settable_x' is a get-only property}}
 f2(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-++z.non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++z.non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 
 // non-settable subscript is non-settable:
 z[0] = 0.0 // expected-error{{cannot assign through subscript: subscript is get-only}}
 f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 z[0] += 0.0 // expected-error{{left side of mutating operator isn't mutable: subscript is get-only}}
-++z[0] // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
++++z[0] // expected-error{{cannot pass immutable value as inout argument: subscript is get-only}}
 
 // settable property of an rvalue value type is non-settable:
 fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns immutable value}}
 f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns immutable value}}
-++fz().settable_x // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
++++fz().settable_x // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 
 // settable property of an rvalue reference type IS SETTABLE:
 fref().property = 0.0
@@ -112,7 +111,7 @@ z.non_settable_x.property = 1.0 // expected-error{{cannot assign to property: 'n
 f2(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x.property += 1.0 // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-++z.non_settable_x.property // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++z.non_settable_x.property // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 
 // settable property of a non-settable reference type IS SETTABLE:
 z.non_settable_reftype.property = 1.0
@@ -233,3 +232,13 @@ func r23331567(_ fn: (_ x: inout Int) -> Void) {
 }
 r23331567 { $0 += 1 }
 
+// <rdar://problem/30685195> Compiler crash with invalid assignment
+struct G<T> {
+  subscript(x: Int) -> T { get { } nonmutating set { } }
+  // expected-note@-1 {{'subscript' declared here}}
+}
+
+func wump<T>(to: T, _ body: (G<T>) -> ()) {}
+
+wump(to: 0, { $0[] = 0 })
+// expected-error@-1 {{missing argument for parameter #1 in call}}

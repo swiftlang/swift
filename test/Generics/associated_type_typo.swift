@@ -14,32 +14,33 @@ protocol P2 {
 protocol P3 { }
 protocol P4 { }
 
-// expected-error@+1{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{30-35=Assoc}}
-func typoAssoc1<T : P1>(x: T.assoc) { } 
+// expected-error@+1{{'assoc' is not a member type of 'T'}}
+func typoAssoc1<T : P1>(x: T.assoc, _: T) { } 
 
-// expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{43-48=Assoc}}
-// expected-error@+1{{'U' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{54-59=Assoc}}
-func typoAssoc2<T : P1, U : P1>() where T.assoc == U.assoc {}
+// expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{53-58=Assoc}}
+// expected-error@+1{{'U' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{64-69=Assoc}}
+func typoAssoc2<T : P1, U : P1>(_: T, _: U) where T.assoc == U.assoc {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc2
 // CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, T.Assoc == U.Assoc>
 
 // expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{42-47=Assoc}}
 // expected-error@+2{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{19-24=Assoc}}
-func typoAssoc3<T : P2, U : P2>()
+func typoAssoc3<T : P2, U : P2>(t: T, u: U)
   where U.AssocP2.assoc : P3,  T.AssocP2.assoc : P4,
         T.AssocP2 == U.AssocP2 {}
 
+// expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{47-52=Assoc}}
 // expected-error@+2{{'T' does not have a member type named 'Assocp2'; did you mean 'AssocP2'?}}{{39-46=AssocP2}}
-// expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{47-52=Assoc}}
+// expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
 func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
 // CHECK-GENERIC-NEXT:   τ_0_0 : P2 [τ_0_0: Explicit @ {{.*}}:21]
-// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [τ_0_0: Explicit @ {{.*}}:21 -> Protocol requirement (via Self.AssocP2 in P2)]
-// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [τ_0_0[.P2].AssocP2.assoc: Explicit @ {{.*}}:53]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [τ_0_0: Explicit @ {{.*}}:21 -> Protocol requirement (via Self.AssocP2 in P2)
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [τ_0_0[.P2].AssocP2[.P1].Assoc: Explicit @ {{.*}}:53]
 // CHECK-GENERIC-NEXT: Potential archetypes
 
 // <rdar://problem/19620340>
@@ -59,10 +60,10 @@ func typoFunc3<T : P1>(x: TypoType, y: (T.Assoc) -> ()) { // expected-error{{use
 typealias Element_<S: Sequence> = S.Iterator.Element
 
 public protocol _Indexable1 {
-  associatedtype Slice
+  associatedtype Slice // expected-note{{declared here}}
 }
 public protocol Indexable : _Indexable1 {
-  associatedtype Slice : _Indexable1
+  associatedtype Slice : _Indexable1 // expected-warning{{redeclaration of associated type 'Slice'}}
 }
 
 protocol Pattern {

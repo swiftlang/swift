@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -parse-as-library -O -enable-experimental-property-behaviors %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -O -enable-experimental-property-behaviors %s | %FileCheck %s
 
 @inline(never) func whatever<T>() -> T { fatalError("") }
 

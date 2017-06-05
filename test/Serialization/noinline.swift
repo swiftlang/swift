@@ -1,8 +1,7 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module -sil-serialize-all -o %t %S/Inputs/def_noinline.swift
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_noinline.swift
 // RUN: llvm-bcanalyzer %t/def_noinline.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
@@ -20,6 +19,6 @@ var raw = testNoinline(x: false)
 
 var a = NoInlineInitStruct(x: false)
 
-// SIL-LABEL: [fragile] [noinline] @_T012def_noinline12testNoinlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [serialized] [noinline] @_T012def_noinline12testNoinlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [fragile] [noinline] @_T012def_noinline18NoInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [noinline] @_T012def_noinline18NoInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {

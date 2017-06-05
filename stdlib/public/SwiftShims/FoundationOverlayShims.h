@@ -17,11 +17,13 @@
 
 #import "FoundationShimSupport.h"
 #import "NSCalendarShims.h"
+#import "NSCharacterSetShims.h"
 #import "NSCoderShims.h"
 #import "NSDataShims.h"
 #import "NSDictionaryShims.h"
 #import "NSErrorShims.h"
 #import "NSFileManagerShims.h"
+#import "NSIndexPathShims.h"
 #import "NSIndexSetShims.h"
 #import "NSKeyedArchiverShims.h"
 #import "NSLocaleShims.h"

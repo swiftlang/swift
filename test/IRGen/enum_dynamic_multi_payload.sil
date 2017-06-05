@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 import Builtin
 
@@ -427,14 +427,14 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 17
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 11
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF0]]
 
 // CHECK:      [[BUF1:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 1
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %U to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 17
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 11
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF1]]
 
 // CHECK:   call void @swift_initEnumMetadataMultiPayload(i8** {{%.*}}, %swift.type* [[METADATA]], {{i(32|64)}} 2, i8*** [[BUF0]])

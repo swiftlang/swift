@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the interface for expresion-specific syntax nodes,
+// This file defines the interface for expression-specific syntax nodes,
 // such as 
 //
 //===----------------------------------------------------------------------===//

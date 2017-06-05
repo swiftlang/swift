@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgensil"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
@@ -44,6 +45,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "CallEmission.h"
@@ -101,6 +103,11 @@ public:
   
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
 };
+
+struct DynamicallyEnforcedAddress {
+  Address Addr;
+  llvm::Value *ScratchBuffer;
+};
   
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
@@ -129,6 +136,10 @@ public:
     /// reset the stack pointer to this point.
     Address,
 
+    /// The lowered value of a begin_access instruction using dynamic
+    /// enforcement.
+    DynamicallyEnforcedAddress,
+
     /// The following kinds correspond to SIL non-address values.
     Value_First,
       /// A normal value, represented as an exploded array of llvm Values.
@@ -156,6 +167,7 @@ private:
     ContainedAddress containedAddress;
     StackAddress address;
     OwnedAddress boxWithAddress;
+    DynamicallyEnforcedAddress dynamicallyEnforcedAddress;
     struct {
       ExplosionVector values;
     } explosion;
@@ -173,6 +185,12 @@ public:
   /// Create an address value with an optional stack restore point.
   LoweredValue(const StackAddress &address)
     : kind(Kind::Address), address(address)
+  {}
+
+  /// Create an address value using dynamic enforcement.
+  LoweredValue(const DynamicallyEnforcedAddress &address)
+    : kind(Kind::DynamicallyEnforcedAddress),
+      dynamicallyEnforcedAddress(address)
   {}
   
   enum ContainerForUnallocatedAddress_t { ContainerForUnallocatedAddress };
@@ -217,6 +235,10 @@ public:
     case Kind::Address:
       ::new (&address) StackAddress(std::move(lv.address));
       break;
+    case Kind::DynamicallyEnforcedAddress:
+      ::new (&dynamicallyEnforcedAddress) DynamicallyEnforcedAddress(
+                 std::move(lv.dynamicallyEnforcedAddress));
+      break;
     case Kind::Explosion:
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
       break;
@@ -240,7 +262,7 @@ public:
   }
   
   bool isAddress() const {
-    return kind == Kind::Address && address.getAddress().isValid();
+    return (kind == Kind::Address || kind == Kind::DynamicallyEnforcedAddress);
   }
   bool isUnallocatedAddressInBuffer() const {
     return kind == Kind::ContainedAddress &&
@@ -253,13 +275,8 @@ public:
     return kind == Kind::BoxWithAddress;
   }
   
-  Address getAddress() const {
-    assert(isAddress() && "not an allocated address");
-    return address.getAddress();
-  }
-
   StackAddress getStackAddress() const {
-    assert(isAddress() && "not an allocated address");
+    assert(kind == Kind::Address && "not an allocated address");
     return address;
   }
   
@@ -274,6 +291,22 @@ public:
     assert(containedAddress.getContainer().isValid() &&
            "address has no container");
     return containedAddress.getAddress();
+  }
+
+  const DynamicallyEnforcedAddress &getDynamicallyEnforcedAddress() const {
+    assert(kind == Kind::DynamicallyEnforcedAddress);
+    return dynamicallyEnforcedAddress;
+  }
+
+  Address getAnyAddress() const {
+    if (kind == LoweredValue::Kind::Address) {
+      return address.getAddress();
+    } else if (kind == LoweredValue::Kind::ContainedAddress) {
+      return getAddressInContainer();
+    } else {
+      assert(kind == LoweredValue::Kind::DynamicallyEnforcedAddress);
+      return getDynamicallyEnforcedAddress().Addr;
+    }
   }
   
   void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
@@ -308,6 +341,9 @@ public:
       break;
     case Kind::ContainedAddress:
       containedAddress.~ContainedAddress();
+      break;
+    case Kind::DynamicallyEnforcedAddress:
+      dynamicallyEnforcedAddress.~DynamicallyEnforcedAddress();
       break;
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
@@ -358,7 +394,10 @@ public:
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
-  llvm::SmallDenseMap<llvm::Instruction *, DominancePoint, 8> ValueVariables;
+  /// To avoid inserting elements into ValueDomPoints twice.
+  llvm::SmallDenseSet<llvm::Instruction *, 8> ValueVariables;
+  /// Holds the DominancePoint of values that are storage for a source variable.
+  SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
   unsigned NumCondFails = 0;
 
@@ -403,6 +442,13 @@ public:
   void setLoweredStackAddress(SILValue v, const StackAddress &address) {
     assert(v->getType().isAddress() && "address for non-address value?!");
     setLoweredValue(v, address);
+  }
+
+  void setLoweredDynamicallyEnforcedAddress(SILValue v,
+                                            const Address &address,
+                                            llvm::Value *scratch) {
+    assert(v->getType().isAddress() && "address for non-address value?!");
+    setLoweredValue(v, DynamicallyEnforcedAddress{address, scratch});
   }
   
   void setContainerOfUnallocatedAddress(SILValue v,
@@ -520,14 +566,15 @@ public:
   /// Get the Address of a SIL value of address type, which must have been
   /// lowered.
   Address getLoweredAddress(SILValue v) {
-    if (getLoweredValue(v).kind == LoweredValue::Kind::Address)
-      return getLoweredValue(v).getAddress();
-    else
-      return getLoweredValue(v).getAddressInContainer();
+    return getLoweredValue(v).getAnyAddress();
   }
 
   StackAddress getLoweredStackAddress(SILValue v) {
     return getLoweredValue(v).getStackAddress();
+  }
+
+  llvm::Value *getLoweredDynamicEnforcementScratchBuffer(BeginAccessInst *v) {
+    return getLoweredValue(v).getDynamicallyEnforcedAddress().ScratchBuffer;
   }
 
   /// Add the unmanaged LLVM values lowered from a SIL value to an explosion.
@@ -582,7 +629,7 @@ public:
   void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
     if (IGM.IRGen.Opts.Optimize)
       return;
-    for (auto &Variable : ValueVariables) {
+    for (auto &Variable : ValueDomPoints) {
       auto VarDominancePoint = Variable.second;
       llvm::Value *Storage = Variable.first;
       if (getActiveDominancePoint() == VarDominancePoint ||
@@ -670,7 +717,8 @@ public:
       if (!needsShadowCopy(Storage)) {
         // Mark for debug value range extension unless this is a constant.
         if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
-          ValueVariables.insert({Value, getActiveDominancePoint()});
+          if (ValueVariables.insert(Value).second)
+            ValueDomPoints.push_back({Value, getActiveDominancePoint()});
         return Storage;
       }
 
@@ -681,7 +729,7 @@ public:
     if (!Alloca.isValid())
       Alloca = createAlloca(Ty, Align, Name+".addr");
 
-    ArtificialLocation AutoRestore(getDebugScope(), IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
@@ -721,7 +769,7 @@ public:
     Alignment align(layout->getAlignment());
 
     auto alloca = createAlloca(aggregateType, align, Name + ".debug");
-    ArtificialLocation AutoRestore(getDebugScope(), IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     size_t i = 0;
     for (auto val : vals) {
       auto addr = Builder.CreateStructGEP(alloca, i,
@@ -763,8 +811,8 @@ public:
     auto runtimeTy = getRuntimeReifiedType(IGM,
                                            Ty.getType()->getCanonicalType());
     if (!IGM.IRGen.Opts.Optimize && runtimeTy->hasArchetype())
-      runtimeTy.visit([&](Type t) {
-        if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
+      runtimeTy.visit([&](CanType t) {
+        if (auto archetype = dyn_cast<ArchetypeType>(t))
           emitTypeMetadataRef(archetype);
        });
 
@@ -817,6 +865,7 @@ public:
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
+  void visitConstStringLiteralInst(ConstStringLiteralInst *i);
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
@@ -840,11 +889,13 @@ public:
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
+  void visitRetainValueAddrInst(RetainValueAddrInst *i);
   void visitCopyValueInst(CopyValueInst *i);
   void visitCopyUnownedValueInst(CopyUnownedValueInst *i) {
     llvm_unreachable("unimplemented");
   }
   void visitReleaseValueInst(ReleaseValueInst *i);
+  void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitSetDeallocatingInst(SetDeallocatingInst *i);
@@ -917,6 +968,10 @@ public:
   void visitStoreBorrowInst(StoreBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }
+  void visitBeginAccessInst(BeginAccessInst *i);
+  void visitEndAccessInst(EndAccessInst *i);
+  void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *i);
+  void visitEndUnpairedAccessInst(EndUnpairedAccessInst *i);
   void visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *i) {
     llvm_unreachable("unimplemented");
   }
@@ -1000,6 +1055,8 @@ public:
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
+  
+  void visitKeyPathInst(KeyPathInst *I);
 };
 
 } // end anonymous namespace
@@ -1012,6 +1069,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   switch (kind) {
   case Kind::Address:
   case Kind::ContainedAddress:
+  case Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("not a value");
       
   case Kind::Explosion:
@@ -1037,6 +1095,7 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
   switch (kind) {
   case Kind::Address:
   case Kind::ContainedAddress:
+  case Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("not a value");
 
   case Kind::Explosion:
@@ -1066,7 +1125,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
   if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Address)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread) {
-    if (dyn_cast_or_null<DestructorDecl>(f->getDeclContext()))
+    auto declContext = f->getDeclContext();
+    if (declContext && isa<DestructorDecl>(declContext))
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.
@@ -1587,12 +1647,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   bool InCleanupBlock = false;
   bool KeepCurrentLocation = false;
 
-  for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
-    auto &I = *InsnIter;
-#ifndef NDEBUG
-    IGM.EligibleConfs.collect(&I);
-    IGM.CurrentInst = &I;
-#endif
+  for (auto &I : *BB) {
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
       SILLocation ILoc = I.getLoc();
@@ -1608,7 +1663,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           InCleanupBlock = true;
           // Scan ahead to see if this is the final cleanup block in
           // this basic block.
-          auto It = InsnIter;
+          auto It = I.getIterator();
           do ++It; while (It != BB->end() &&
                           It->getLoc().is<CleanupLocation>());
           // We are still in the middle of a basic block?
@@ -1638,19 +1693,20 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       // Set the builder's debug location.
       if (DS && !KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-      else
+      else {
+        // Reuse the last scope for an easier-to-read line table.
+        auto Prev = --I.getIterator();
+        if (Prev != BB->end())
+          DS = Prev->getDebugScope();
         // Use an artificial (line 0) location.
         IGM.DebugInfo->setCurrentLoc(Builder, DS);
+      }
 
       if (isa<TermInst>(&I))
         emitDebugVariableRangeExtension(BB);
     }
     visit(&I);
 
-#ifndef NDEBUG
-    IGM.EligibleConfs.clear();
-    IGM.CurrentInst = nullptr;
-#endif
   }
   
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
@@ -1684,7 +1740,7 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
   // buffer.
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
-  (void) ti.allocateBuffer(*this, addr, loweredTy);
+  emitAllocateValueInBuffer(*this, loweredTy, addr);
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -1714,7 +1770,7 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
 
   // Otherwise, the static storage for the global consists of a fixed-size
   // buffer; project it.
-  addr = ti.projectBuffer(*this, addr, loweredTy);
+  addr = emitProjectValueInBuffer(*this, loweredTy, addr);
   
   setLoweredAddress(i, addr);
 }
@@ -2027,6 +2083,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     llvm_unreachable("@box isn't a valid callee");
   case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("sil address isn't a valid callee");
   }
   
@@ -2185,6 +2242,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   switch (lv.kind) {
   case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("can't partially apply an address");
   case LoweredValue::Kind::BoxWithAddress:
     llvm_unreachable("can't partially apply a @box");
@@ -2330,6 +2388,22 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
     addr = emitObjCSelectorRefLoad(i->getValue());
   else
     addr = emitAddrOfConstantString(IGM, i);
+
+  Explosion e;
+  e.add(addr);
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitConstStringLiteralInst(
+    swift::ConstStringLiteralInst *i) {
+
+  llvm::Constant *addr;
+  if (i->getEncoding() == ConstStringLiteralInst::Encoding::UTF8)
+    addr = IGM.getAddrOfGlobalConstantString(i->getValue());
+  else
+    addr = IGM.getAddrOfGlobalUTF16ConstantString(i->getValue());
+
+  addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
 
   Explosion e;
   e.add(addr);
@@ -2544,14 +2618,13 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
                                               OperandValueArrayRef args) {
   unsigned phiIndex = 0;
   for (SILValue arg : args) {
-    const LoweredValue &lv = IGF.getLoweredValue(arg);
-  
-    if (lv.isAddress()) {
-      addIncomingAddressToPHINodes(IGF, lbb, phiIndex, lv.getAddress());
+    if (arg->getType().isAddress()) {
+      addIncomingAddressToPHINodes(IGF, lbb, phiIndex,
+                                   IGF.getLoweredAddress(arg));
       continue;
     }
     
-    Explosion argValue = lv.getExplosion(IGF);
+    Explosion argValue = IGF.getLoweredExplosion(arg);
     addIncomingExplosionToPHINodes(IGF, lbb, phiIndex, argValue);
   }
 }
@@ -2720,7 +2793,7 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
     return nullptr;
   
   llvm::Type *type = schema[0].getScalarType();
-  llvm::IntegerType *resultType = dyn_cast<llvm::IntegerType>(type);
+  auto *resultType = dyn_cast<llvm::IntegerType>(type);
   if (!resultType)
     return nullptr;
   
@@ -2736,7 +2809,7 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
     if (index < 0)
       return nullptr;
     
-    IntegerLiteralInst *intLit = dyn_cast<IntegerLiteralInst>(casePair.second);
+    auto *intLit = dyn_cast<IntegerLiteralInst>(casePair.second);
     if (!intLit)
       return nullptr;
     
@@ -3008,6 +3081,25 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   (void)out.claimAll();
 }
 
+void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
+  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
+         "Non atomic retains are not supported");
+  SILValue operandValue = i->getOperand();
+  Address addr = getLoweredAddress(operandValue);
+  SILType addrTy = operandValue->getType();
+  SILType objectT = addrTy.getObjectType();
+  llvm::Type *llvmType = addr.getAddress()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto *outlinedF = IGM.getOrCreateRetainFunction(
+      addrTI, i->getFunction()
+                  ->mapTypeOutOfContext(objectT.getSwiftRValueType())
+                  ->getCanonicalType(),
+      llvmType);
+  llvm::Value *args[] = {addr.getAddress()};
+  llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
+  call->setCallingConv(IGM.DefaultCC);
+}
+
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
@@ -3065,6 +3157,26 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
       .consume(*this, in, i->isAtomic() ? irgen::Atomicity::Atomic
                                         : irgen::Atomicity::NonAtomic);
+}
+
+void IRGenSILFunction::visitReleaseValueAddrInst(
+    swift::ReleaseValueAddrInst *i) {
+  assert(i->getAtomicity() == RefCountingInst::Atomicity::Atomic &&
+         "Non atomic retains are not supported");
+  SILValue operandValue = i->getOperand();
+  Address addr = getLoweredAddress(operandValue);
+  SILType addrTy = operandValue->getType();
+  SILType objectT = addrTy.getObjectType();
+  llvm::Type *llvmType = addr.getAddress()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  auto *outlinedF = IGM.getOrCreateReleaseFunction(
+      addrTI, i->getFunction()
+                  ->mapTypeOutOfContext(objectT.getSwiftRValueType())
+                  ->getCanonicalType(),
+      llvmType);
+  llvm::Value *args[] = {addr.getAddress()};
+  llvm::CallInst *call = Builder.CreateCall(outlinedF, args);
+  call->setCallingConv(IGM.DefaultCC);
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
@@ -3267,8 +3379,9 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
   SILDebugVariable Var = DbgValue->getVarInfo();
   auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
                                 Var.Name, Var.ArgNo);
-  DebugTypeInfo DTI(nullptr, ErrorInfo.getType(), ErrorResultSlot->getType(),
-                    IGM.getPointerSize(), IGM.getPointerAlignment());
+  DebugTypeInfo DTI(nullptr, nullptr, ErrorInfo.getType(),
+                    ErrorResultSlot->getType(), IGM.getPointerSize(),
+                    IGM.getPointerAlignment(), true);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
                                          nullptr, Var.Name, Var.ArgNo,
                                          IndirectValue, ArtificialValue);
@@ -3296,13 +3409,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto RealTy = SILVal->getType().getSwiftRValueType();
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
-        CurSILFn->getDeclContext(), Decl, RealTy,
-        getTypeInfo(SILVal->getType()), /*Unwrap=*/false);
+        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
+        RealTy, getTypeInfo(SILVal->getType()), /*Unwrap=*/false);
   } else if (i->getFunction()->isBare() &&
              !SILTy.hasArchetype() && !Name.empty()) {
     // Preliminary support for .sil debug information.
-    DbgTy = DebugTypeInfo::getFromTypeInfo(CurSILFn->getDeclContext(), RealTy,
-                                           getTypeInfo(SILTy));
+    DbgTy = DebugTypeInfo::getFromTypeInfo(CurSILFn->getDeclContext(),
+                                           CurSILFn->getGenericEnvironment(),
+                                           RealTy, getTypeInfo(SILTy));
   } else
     return;
 
@@ -3342,8 +3456,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
       i->getVarInfo().Constant ||
       SILTy.is<ArchetypeType>();
   auto DbgTy = DebugTypeInfo::getLocalVariable(
-      CurSILFn->getDeclContext(), Decl, RealType,
-      getTypeInfo(SILVal->getType()), Unwrap);
+      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
+      RealType, getTypeInfo(SILVal->getType()), Unwrap);
   // Put the value's address into a stack slot at -Onone and emit a debug
   // intrinsic.
   unsigned ArgNo = i->getVarInfo().ArgNo;
@@ -3549,60 +3663,6 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
   setLoweredExplosion(i, out);
 }
 
-static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
-                                                  SILInstruction *allocInst,
-                                                  const TypeInfo &ti,
-                                                  Address fixedSizeBuffer,
-                                                  const llvm::Twine &name) {
-  // There's no point in doing this for fixed-sized types, since we'll allocate
-  // an appropriately-sized buffer for them statically.
-  if (ti.isFixedSize())
-    return false;
-
-  // TODO: More interesting dominance analysis could be done here to see
-  // if the alloc_stack is dominated by copy_addrs into it on all paths.
-  // For now, check only that the copy_addr is the first use within the same
-  // block.
-  for (auto ii = std::next(allocInst->getIterator()),
-            ie = std::prev(allocInst->getParent()->end());
-       ii != ie; ++ii) {
-    auto *inst = &*ii;
-
-    // Does this instruction use the allocation? If not, continue.
-    auto Ops = inst->getAllOperands();
-    if (std::none_of(Ops.begin(), Ops.end(),
-                     [allocInst](const Operand &Op) {
-                       return Op.get() == allocInst;
-                     }))
-      continue;
-
-    // Is this a copy?
-    auto *copy = dyn_cast<swift::CopyAddrInst>(inst);
-    if (!copy)
-      return false;
-
-    // Destination must be the allocation.
-    if (copy->getDest() != SILValue(allocInst))
-      return false;
-
-    // Copy must be an initialization.
-    if (!copy->isInitializationOfDest())
-      return false;
-    
-    // We can defer to this initialization. Allocate the fixed-size buffer
-    // now, but don't allocate the value inside it.
-    if (!fixedSizeBuffer.getAddress()) {
-      fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
-      IGF.Builder.CreateLifetimeStart(fixedSizeBuffer,
-                                      getFixedBufferSize(IGF.IGM));
-    }
-    IGF.setContainerOfUnallocatedAddress(allocInst, fixedSizeBuffer);
-    return true;
-  }
-  
-  return false;
-}
-
 void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                                   const TypeInfo &type,
                                                   llvm::Value *addr) {
@@ -3616,8 +3676,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
     SILType SILTy = i->getType();
     auto RealType = SILTy.getSwiftRValueType();
-    auto DbgTy = DebugTypeInfo::getLocalVariable(CurSILFn->getDeclContext(),
-                                                 Decl, RealType, type, false);
+    auto DbgTy = DebugTypeInfo::getLocalVariable(
+        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
+        RealType, type, false);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
       emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
@@ -3803,7 +3864,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     if (SILTy.isAddress())
       RealType = CanInOutType::get(RealType);
     auto DbgTy = DebugTypeInfo::getLocalVariable(
-        CurSILFn->getDeclContext(), Decl,
+        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
         RealType, type, /*Unwrap=*/false);
 
     if (isInlinedGeneric(Decl, i->getDebugScope()))
@@ -3831,6 +3892,185 @@ void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
     auto addr = emitProjectBox(*this, box.claimNext(), boxTy);
     setLoweredAddress(i, addr);
   }
+}
+
+static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
+  switch (kind) {
+  case SILAccessKind::Read:
+    return ExclusivityFlags::Read;
+  case SILAccessKind::Modify:
+    return ExclusivityFlags::Modify;
+  case SILAccessKind::Init:
+  case SILAccessKind::Deinit:
+    llvm_unreachable("init/deinit access should not use dynamic enforcement");
+  }
+  llvm_unreachable("bad access kind");
+}
+
+static ExclusivityFlags getExclusivityFlags(SILModule &M,
+                                            SILAccessKind kind) {
+  auto flags = getExclusivityAction(kind);
+
+  // In old Swift compatibility modes, downgrade this to a warning.
+  if (M.getASTContext().LangOpts.isSwiftVersion3())
+    flags |= ExclusivityFlags::WarningOnly;
+
+  return flags;
+}
+
+static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
+                                                    BeginAccessInst *access) {
+  auto enforcement = access->getEnforcement();
+
+  // Don't use dynamic enforcement for known-empty types; there's no
+  // actual memory there, and the address may not be valid and unique.
+  // This is really a hack; we don't necessarily know that all clients
+  // will agree whether a type is empty.  On the other hand, the situations
+  // where IRGen generates a meaningless address should always be a subset
+  // of cases where this triggers, because of the restrictions on abstracting
+  // over addresses and the fact that we use static enforcement on inouts.
+  if (enforcement == SILAccessEnforcement::Dynamic &&
+      IGF.IGM.isKnownEmpty(access->getSource()->getType(),
+                           ResilienceExpansion::Maximal)) {
+    enforcement = SILAccessEnforcement::Unsafe;
+  }
+
+  return enforcement;
+}
+
+template <class Inst>
+static ExclusivityFlags getExclusivityFlags(Inst *i) {
+  return getExclusivityFlags(i->getModule(), i->getAccessKind());
+}
+
+void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
+  Address addr = getLoweredAddress(access->getOperand());
+  switch (getEffectiveEnforcement(*this, access)) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    setLoweredAddress(access, addr);
+    return;
+
+  case SILAccessEnforcement::Dynamic: {
+    llvm::Value *scratch = createAlloca(IGM.getFixedBufferTy(),
+                                        IGM.getPointerAlignment(),
+                                        "access-scratch").getAddress();
+    Builder.CreateLifetimeStart(scratch);
+
+    llvm::Value *pointer =
+      Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy);
+    llvm::Value *flags =
+      llvm::ConstantInt::get(IGM.SizeTy, uint64_t(getExclusivityFlags(access)));
+    llvm::Value *pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    auto call = Builder.CreateCall(IGM.getBeginAccessFn(),
+                                   { pointer, scratch, flags, pc });
+    call->setDoesNotThrow();
+
+    setLoweredDynamicallyEnforcedAddress(access, addr, scratch);
+    return;
+  }
+  }
+  llvm_unreachable("bad access enforcement");
+}
+
+static bool hasBeenInlined(BeginUnpairedAccessInst *access) {
+  // Check to see if the buffer is defined locally.
+  return isa<AllocStackInst>(access->getBuffer());
+}
+
+void IRGenSILFunction::visitBeginUnpairedAccessInst(
+                                              BeginUnpairedAccessInst *access) {
+  Address addr = getLoweredAddress(access->getSource());
+  switch (access->getEnforcement()) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    return;
+
+  case SILAccessEnforcement::Dynamic: {
+    llvm::Value *scratch = getLoweredAddress(access->getBuffer()).getAddress();
+
+    llvm::Value *pointer =
+      Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy);
+    llvm::Value *flags =
+      llvm::ConstantInt::get(IGM.SizeTy, uint64_t(getExclusivityFlags(access)));
+
+    // Compute the effective PC of the access.
+    // Since begin_unpaired_access is designed for materializeForSet, our
+    // heuristic here is as well: we've either been inlined, in which case
+    // we should use the current PC (i.e. pass null), or we haven't,
+    // in which case we should use the caller, which is generally ok because
+    // materializeForSet can't usually be thunked.
+    llvm::Value *pc;
+    if (hasBeenInlined(access)) {
+      pc = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    } else {
+      auto retAddrFn =
+        llvm::Intrinsic::getDeclaration(IGM.getModule(),
+                                        llvm::Intrinsic::returnaddress);
+      pc = Builder.CreateCall(retAddrFn,
+                              { llvm::ConstantInt::get(IGM.Int32Ty, 0) });
+    }
+
+    auto call = Builder.CreateCall(IGM.getBeginAccessFn(),
+                                   { pointer, scratch, flags, pc });
+    call->setDoesNotThrow();
+    return;
+  }
+  }
+  llvm_unreachable("bad access enforcement");
+}
+
+void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
+  auto access = i->getBeginAccess();
+  switch (getEffectiveEnforcement(*this, access)) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    return;
+
+  case SILAccessEnforcement::Dynamic: {
+    auto scratch = getLoweredDynamicEnforcementScratchBuffer(access);
+
+    auto call = Builder.CreateCall(IGM.getEndAccessFn(), { scratch });
+    call->setDoesNotThrow();
+
+    Builder.CreateLifetimeEnd(scratch);
+    return;
+  }
+  }
+  llvm_unreachable("bad access enforcement");
+}
+
+void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
+  switch (i->getEnforcement()) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    return;
+
+  case SILAccessEnforcement::Dynamic: {
+    auto scratch = getLoweredAddress(i->getBuffer()).getAddress();
+
+    auto call = Builder.CreateCall(IGM.getEndAccessFn(), { scratch });
+    call->setDoesNotThrow();
+    return;
+  }
+  }
+  llvm_unreachable("bad access enforcement");
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
@@ -4358,20 +4598,62 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                        getLoweredBB(i->getFailureBB()).bb);
 }
 
+void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
+  auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
+  // Build up the argument vector to instantiate the pattern here.
+  llvm::Value *args;
+  if (!I->getSubstitutions().empty()) {
+    auto sig = I->getPattern()->getGenericSignature();
+    auto subs = sig->getSubstitutionMap(I->getSubstitutions());
+
+    SmallVector<GenericRequirement, 4> requirements;
+    enumerateGenericSignatureRequirements(sig,
+            [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+
+    auto argsBufTy = llvm::ArrayType::get(IGM.TypeMetadataPtrTy,
+                                          requirements.size());
+    auto argsBuf = createAlloca(argsBufTy, IGM.getPointerAlignment(),
+                                "keypath_args");
+    emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
+      [&](GenericRequirement reqt) -> llvm::Value * {
+        return emitGenericRequirementFromSubstitutions(*this, sig,
+                                         *IGM.getSwiftModule(),
+                                         reqt, subs);
+      });
+    args = Builder.CreateBitCast(argsBuf.getAddress(), IGM.Int8PtrTy);
+  } else {
+    // No arguments necessary, so the argument ought to be ignored by any
+    // callbacks in the pattern.
+    assert(I->getAllOperands().empty() && "indices not implemented");
+    args = llvm::UndefValue::get(IGM.Int8PtrTy);
+  }
+  auto patternPtr = llvm::ConstantExpr::getBitCast(pattern, IGM.Int8PtrTy);
+  auto call = Builder.CreateCall(IGM.getGetKeyPathFn(), {patternPtr, args});
+  call->setDoesNotThrow();
+
+  auto resultStorageTy = IGM.getTypeInfo(I->getType()).getStorageType();
+
+  Explosion e;
+  e.add(Builder.CreateBitCast(call, resultStorageTy));
+  setLoweredExplosion(I, e);
+}
+
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   // Get the value we're testing, which may be a function, an address or an
   // instance pointer.
   llvm::Value *val;
-  const LoweredValue &lv = getLoweredValue(i->getOperand());
-  
-  if (i->getOperand()->getType().is<SILFunctionType>()) {
-    Explosion values = lv.getExplosion(*this);
-    val = values.claimNext();   // Function pointer.
-    values.claimNext();         // Ignore the data pointer.
-  } else if (lv.isAddress()) {
-    val = lv.getAddress().getAddress();
+
+  SILValue operand = i->getOperand();
+  auto type = operand->getType();
+  if (type.isAddress()) {
+    val = getLoweredAddress(operand).getAddress();
+  } else if (auto fnType = type.getAs<SILFunctionType>()) {
+    Explosion values = getLoweredExplosion(operand);
+    val = values.claimNext();    // Function pointer.
+    if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Thick)
+      (void) values.claimNext(); // Ignore the data pointer.
   } else {
-    Explosion values = lv.getExplosion(*this);
+    Explosion values = getLoweredExplosion(operand);
     val = values.claimNext();
   }
   
@@ -4453,8 +4735,7 @@ void IRGenSILFunction::visitAllocValueBufferInst(
                                           swift::AllocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  Address value =
-    getTypeInfo(valueType).allocateBuffer(*this, buffer, valueType);
+  Address value = emitAllocateValueInBuffer(*this, valueType, buffer);
   setLoweredAddress(i, value);
 }
 
@@ -4462,8 +4743,7 @@ void IRGenSILFunction::visitProjectValueBufferInst(
                                           swift::ProjectValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  Address value =
-    getTypeInfo(valueType).projectBuffer(*this, buffer, valueType);
+  Address value = emitProjectValueInBuffer(*this, valueType, buffer);
   setLoweredAddress(i, value);
 }
 
@@ -4471,36 +4751,21 @@ void IRGenSILFunction::visitDeallocValueBufferInst(
                                           swift::DeallocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  getTypeInfo(valueType).deallocateBuffer(*this, buffer, valueType);
+  emitDeallocateValueInBuffer(*this, valueType, buffer);
 }
 
 void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand()->getType();
-  Address buffer = emitOpaqueExistentialContainerInit(*this,
-                                                container,
-                                                destType,
-                                                i->getFormalConcreteType(),
-                                                i->getLoweredConcreteType(),
-                                                i->getConformances());
+  emitOpaqueExistentialContainerInit(
+      *this, container, destType, i->getFormalConcreteType(),
+      i->getLoweredConcreteType(), i->getConformances());
   auto srcType = i->getLoweredConcreteType();
-  auto &srcTI = getTypeInfo(srcType);
 
-  // Allocate a COW box for the value if neceesary.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    auto *genericEnv = CurSILFn->getGenericEnvironment();
-    setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
-                             *this, destType, srcType, container, genericEnv));
-    return;
-  }
-
-  // See if we can defer initialization of the buffer to a copy_addr into it.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, buffer, ""))
-    return;
-  
-  // Allocate in the destination fixed-size buffer.
-  Address address = srcTI.allocateBuffer(*this, buffer, srcType);
-  setLoweredAddress(i, address);
+  // Allocate a COW box for the value if necessary.
+  auto *genericEnv = CurSILFn->getGenericEnvironment();
+  setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
+                           *this, destType, srcType, container, genericEnv));
 }
 
 void IRGenSILFunction::visitInitExistentialOpaqueInst(
@@ -4536,15 +4801,9 @@ void IRGenSILFunction::visitDeinitExistentialAddrInst(
                                               swift::DeinitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
 
-  // Deallocate the COW box for the value if neceesary.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    emitDeallocateBoxedOpaqueExistentialBuffer(
-        *this, i->getOperand()->getType(), container);
-    return;
-  }
-
-  emitOpaqueExistentialContainerDeinit(*this, container,
-                                       i->getOperand()->getType());
+  // Deallocate the COW box for the value if necessary.
+  emitDeallocateBoxedOpaqueExistentialBuffer(*this, i->getOperand()->getType(),
+                                             container);
 }
 
 void IRGenSILFunction::visitDeinitExistentialOpaqueInst(
@@ -4560,17 +4819,9 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
                            i->getType().getSwiftRValueType());
 
   // Insert a copy of the boxed value for COW semantics if necessary.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    auto accessKind = i->getAccessKind();
-    Address object = emitOpaqueBoxedExistentialProjection(
-        *this, accessKind, base, baseTy, openedArchetype);
-
-    setLoweredAddress(i, object);
-    return;
-  }
-
-  Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
-                                                   openedArchetype);
+  auto accessKind = i->getAccessKind();
+  Address object = emitOpaqueBoxedExistentialProjection(
+      *this, accessKind, base, baseTy, openedArchetype);
 
   setLoweredAddress(i, object);
 }
@@ -4735,37 +4986,20 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
+  assert(!loweredDest.isUnallocatedAddressInBuffer());
+  Address dest = loweredDest.getAnyAddress();
 
-  if (loweredDest.isUnallocatedAddressInBuffer()) {
-    // We should never have a deferred initialization with COW existentials.
-    assert(!getSILModule().getOptions().UseCOWExistentials &&
-           "Should never have an unallocated buffer and COW existentials");
-
-    assert(i->isInitializationOfDest()
-           && "need to initialize an unallocated buffer");
-    Address cont = loweredDest.getContainerOfAddress();
+  if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
-      Address addr = addrTI.initializeBufferWithTake(*this, cont, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
+      addrTI.initializeWithTake(*this, dest, src, addrTy);
     } else {
-      Address addr = addrTI.initializeBufferWithCopy(*this, cont, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
+      addrTI.initializeWithCopy(*this, dest, src, addrTy);
     }
   } else {
-    Address dest = loweredDest.getAddress();
-    
-    if (i->isInitializationOfDest()) {
-      if (i->isTakeOfSrc()) {
-        addrTI.initializeWithTake(*this, dest, src, addrTy);
-      } else {
-        addrTI.initializeWithCopy(*this, dest, src, addrTy);
-      }
+    if (i->isTakeOfSrc()) {
+      addrTI.assignWithTake(*this, dest, src, addrTy);
     } else {
-      if (i->isTakeOfSrc()) {
-        addrTI.assignWithTake(*this, dest, src, addrTy);
-      } else {
-        addrTI.assignWithCopy(*this, dest, src, addrTy);
-      }
+      addrTI.assignWithCopy(*this, dest, src, addrTy);
     }
   }
 }

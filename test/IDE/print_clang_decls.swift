@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // XFAIL: linux
 
@@ -93,17 +92,30 @@
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case mince{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(swift, obsoleted: 3, renamed: "mince"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var Mince: NSRuncingMode { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case quince{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(swift, obsoleted: 3, renamed: "quince"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var Quince: NSRuncingMode { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
+// FOUNDATION-NEXT: {{^}}  typealias RawValue = UInt
+// FOUNDATION-NEXT: {{^}}  typealias Element = NSRuncingOptions
 // FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
 // FOUNDATION-NEXT: {{^}}  static var none: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(swift, obsoleted: 3, renamed: "none"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var None: NSRuncingOptions { get }
 // FOUNDATION-NEXT: {{^}}  static var enableMince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(swift, obsoleted: 3, renamed: "enableMince"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var enableQuince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  @available(swift, obsoleted: 3, renamed: "enableQuince"){{$}}
+// FOUNDATION-NEXT: {{^}}  static var EnableQuince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
