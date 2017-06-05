@@ -608,6 +608,10 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
   if (!Callee)
     return false;
 
+  if (Callee->hasSemanticsAttr("self_no_escaping_closure") ||
+      Callee->hasSemanticsAttr("pair_no_escaping_closure"))
+    return true;
+
   // Add here the checks for any specific @_effects attributes that need
   // to be skipped during the early inlining pass.
   if (Callee->hasEffectsKind())
