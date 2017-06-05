@@ -175,13 +175,11 @@ typedef std::vector<NodePtr> NodeVector;
 
 class SDKContext {
   llvm::StringSet<> TextData;
-  std::vector<std::unique_ptr<SDKNode>> OwnedNodes;
+  llvm::BumpPtrAllocator Allocator;
 
 public:
-  SDKNode* own(SDKNode *Node) {
-    assert(Node);
-    OwnedNodes.emplace_back(Node);
-    return Node;
+  llvm::BumpPtrAllocator &allocator() {
+    return Allocator;
   }
   StringRef buffer(StringRef Text) {
     return TextData.insert(Text).first->getKey();
@@ -1069,15 +1067,14 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
 }
 
 SDKNode *SDKNodeInitInfo::createSDKNode(SDKNodeKind Kind) {
-  SDKNode *Result;
   switch(Kind) {
 #define NODE_KIND(X)                                                           \
 case SDKNodeKind::X:                                                           \
-  Result = static_cast<SDKNode*>(new SDKNode##X(*this));                       \
+  return static_cast<SDKNode*>(new (Ctx.allocator().Allocate<SDKNode##X>())    \
+    SDKNode##X(*this));                                                        \
   break;
 #include "swift/IDE/DigesterEnums.def"
   }
-  return Ctx.own(Result);
 }
 
 // Recursively construct a node that represents a type, for instance,
