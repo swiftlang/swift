@@ -69,7 +69,7 @@ extension String {
     }
     // This efficiently normalizes the result to -1, 0, or 1 to match the
     // behavior of NSString's compare function.
-    return (compare > 0 ? 1 : 0) - (compare < 0 ? 1 : 0)
+    return compare.signum()
   }
 #endif
 
