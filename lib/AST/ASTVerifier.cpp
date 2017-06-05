@@ -446,7 +446,14 @@ public:
     bool shouldVerify(Decl *S) { return true; }
 
     // Default cases for whether we should verify a checked subtree.
-    bool shouldVerifyChecked(Expr *E) { return !E->getType().isNull(); }
+    bool shouldVerifyChecked(Expr *E) {
+      if (!E->getType()) {
+        Out << "expression has no type\n";
+        E->print(Out);
+        abort();
+      }
+      return true;
+    }
     bool shouldVerifyChecked(Stmt *S) { return true; }
     bool shouldVerifyChecked(Pattern *S) { return S->hasType(); }
     bool shouldVerifyChecked(Decl *S) { return true; }
@@ -1107,6 +1114,26 @@ public:
         Out << "\n";
         abort();
       }
+    }
+
+    void verifyParsed(ClosureExpr *E) {
+      E->getBody()->walk(*this);
+      verifyParsedBase(E);
+    }
+
+    void verifyChecked(ClosureExpr *E) {
+      E->getBody()->walk(*this);
+      verifyCheckedBase(E);
+    }
+
+    void verifyParsed(AutoClosureExpr *E) {
+      E->getBody()->walk(*this);
+      verifyParsedBase(E);
+    }
+
+    void verifyChecked(AutoClosureExpr *E) {
+      E->getBody()->walk(*this);
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(MetatypeConversionExpr *E) {
