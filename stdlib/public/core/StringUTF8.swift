@@ -190,6 +190,39 @@ extension String {
       self._startIndex = s
       self._endIndex = e
     }
+    
+    /// Copies `self` into the supplied buffer.
+    ///
+    /// - Precondition: The memory in `self` is uninitialized. The buffer must
+    ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+    ///
+    /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+    ///   initialized.
+    public func _copyContents(
+      initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+    ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+      guard var ptr = buffer.baseAddress
+        else { _preconditionFailure("Attempt to copy string contents into nil buffer pointer") }
+      var it = self.makeIterator()
+      
+      if let asciiBuffer = _core.asciiBuffer, let asciiPtr = asciiBuffer.baseAddress {
+        _precondition(asciiBuffer.count <= buffer.count, 
+          "Insufficient space allocated to copy string contents")
+        ptr.initialize(from: asciiPtr, count: asciiBuffer.count)
+        it._position = endIndex
+        return (it,buffer.index(buffer.startIndex, offsetBy: self.count))        
+      }
+      else {
+        for idx in buffer.startIndex..<buffer.count {
+          guard let x = it.next() else {
+            return (it, idx)
+          }
+          ptr.initialize(to: x)
+          ptr += 1
+        }
+        return (it,buffer.endIndex)        
+      }
+    }
 
     /// A position in a string's `UTF8View` instance.
     ///
