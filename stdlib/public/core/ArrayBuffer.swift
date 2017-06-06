@@ -83,7 +83,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   @_versioned
   internal var needsElementTypeCheck: Bool {
     // NSArray's need an element typecheck when the element type isn't AnyObject
-    return !_isNativeTypeChecked && !(AnyObject.self is Element.Type)
+    return !_isNativeTypeChecked && !(Element.self == AnyObject.self)
   }
   
   //===--- private --------------------------------------------------------===//
