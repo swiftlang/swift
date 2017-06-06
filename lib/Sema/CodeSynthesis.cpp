@@ -186,10 +186,6 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isGetterMutating())
     getter->setMutating();
 
-  // If the var is marked final, then so is the getter.
-  if (storage->isFinal())
-    makeFinal(TC.Context, getter);
-
   if (storage->isStatic())
     getter->setStatic();
 
@@ -238,10 +234,6 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   if (isStatic)
     setter->setStatic();
-
-  // If the var is marked final, then so is the getter.
-  if (storage->isFinal())
-    makeFinal(TC.Context, setter);
 
   return setter;
 }
@@ -824,17 +816,10 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   // Okay, we have both the getter and setter.  Set them in VD.
   storage->addTrivialAccessors(getter, setter, nullptr);
 
-  bool isDynamic = (storage->isDynamic() && storage->isObjC());
-  if (isDynamic)
-    makeDynamic(TC.Context, getter);
-
   // Synthesize the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
 
   if (setter) {
-    if (isDynamic)
-      makeDynamic(TC.Context, setter);
-
     // Synthesize the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
   }
