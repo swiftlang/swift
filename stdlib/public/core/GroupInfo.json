@@ -123,6 +123,7 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "DoubleWidth.swift",
       "Integers.swift",
       "IntegerParsing.swift"],
     "Floating": [
