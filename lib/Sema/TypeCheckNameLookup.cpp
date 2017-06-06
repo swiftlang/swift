@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/TopCollection.h"
@@ -192,7 +193,10 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       auto baseDC = baseParam->getDeclContext();
       if (isa<AbstractFunctionDecl>(baseDC))
         baseDC = baseDC->getParent();
+      if (isa<PatternBindingInitializer>(baseDC))
+        baseDC = baseDC->getParent();
       foundInType = baseDC->getDeclaredTypeInContext();
+      assert(foundInType && "bogus base declaration?");
     } else {
       auto baseNominal = cast<NominalTypeDecl>(found.getBaseDecl());
       for (auto currentDC = dc; currentDC; currentDC = currentDC->getParent()) {
