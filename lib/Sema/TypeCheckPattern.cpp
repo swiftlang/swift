@@ -869,6 +869,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, &resolver);
+
+    // If we have unbound generic types, don't apply them below; instead,
+    // the caller will call typeCheckBinding() later.
+    if (P->getType()->hasUnboundGenericType())
+      return hadError;
+
     Pattern *subPattern = TP->getSubPattern();
     if (coercePatternToType(subPattern, dc, P->getType(),
                             options|TR_FromNonInferredPattern, &resolver,
