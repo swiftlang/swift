@@ -1326,15 +1326,6 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
   auto concrete = pa->getConcreteType();
   if (!concrete) return nullptr;
 
-  // Lookup the conformance of the concrete type to this protocol.
-  auto conformance =
-    getLookupConformanceFn()(pa->getDependentType({ }, /*allowUnresolved=*/true)
-                               ->getCanonicalType(),
-                             concrete,
-                             proto->getDeclaredInterfaceType()
-                              ->castTo<ProtocolType>());
-  if (!conformance) return nullptr;
-
   // Conformance to this protocol is redundant; update the requirement source
   // appropriately.
   auto paEquivClass = pa->getOrCreateEquivalenceClass();
@@ -1344,6 +1335,23 @@ GenericSignatureBuilder::resolveConcreteConformance(PotentialArchetype *pa,
     concreteSource = writtenSource->source;
   else
     concreteSource = paEquivClass->concreteTypeConstraints.front().source;
+
+  // Lookup the conformance of the concrete type to this protocol.
+  auto conformance =
+    getLookupConformanceFn()(pa->getDependentType({ }, /*allowUnresolved=*/true)
+                               ->getCanonicalType(),
+                             concrete,
+                             proto->getDeclaredInterfaceType()
+                              ->castTo<ProtocolType>());
+  if (!conformance) {
+    if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
+      Diags.diagnose(concreteSource->getLoc(),
+                     diag::requires_generic_param_same_type_does_not_conform,
+                     concrete, proto->getName());
+    }
+
+    return nullptr;
+  }
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
   paEquivClass->conformsTo[proto].push_back({pa, proto, concreteSource});
@@ -3454,15 +3462,8 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   // Make sure the concrete type fulfills the conformance requirements of
   // this equivalence class.
   for (auto protocol : rep->getConformsTo()) {
-    if (!resolveConcreteConformance(rep, protocol)) {
-      if (!Concrete->hasError() && Source->getLoc().isValid()) {
-        Diags.diagnose(Source->getLoc(),
-                       diag::requires_generic_param_same_type_does_not_conform,
-                       Concrete, protocol->getName());
-      }
-
+    if (!resolveConcreteConformance(rep, protocol))
       return ConstraintResult::Conflicting;
-    }
   }
 
   // Eagerly resolve any existing nested types to their concrete forms (others
