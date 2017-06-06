@@ -781,8 +781,7 @@ void ide::collectModuleNames(StringRef SDKPath,
   }
 }
 
-
-DeclNameViewer::DeclNameViewer(StringRef Text): HasParen(false) {
+DeclNameViewer::DeclNameViewer(StringRef Text): IsValid(true), HasParen(false) {
   auto ArgStart = Text.find_first_of('(');
   if (ArgStart == StringRef::npos) {
     BaseName = Text;
@@ -791,17 +790,21 @@ DeclNameViewer::DeclNameViewer(StringRef Text): HasParen(false) {
   HasParen = true;
   BaseName = Text.substr(0, ArgStart);
   auto ArgEnd = Text.find_last_of(')');
-  assert(ArgEnd != StringRef::npos);
+  if (ArgEnd == StringRef::npos) {
+    IsValid = false;
+    return;
+  }
   StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
   AllArgs.split(Labels, ":");
   if (Labels.empty())
     return;
-  assert(Labels.back().empty());
-  Labels.pop_back();
-  std::transform(Labels.begin(), Labels.end(), Labels.begin(),
-      [](StringRef Label) {
-    return Label == "_" ? StringRef() : Label;
-  });
+  if ((IsValid = Labels.back().empty())) {
+    Labels.pop_back();
+    std::transform(Labels.begin(), Labels.end(), Labels.begin(),
+        [](StringRef Label) {
+      return Label == "_" ? StringRef() : Label;
+    });
+  }
 }
 
 unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {
