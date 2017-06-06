@@ -118,6 +118,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::StoredType:
     case StorageKind::ProtocolConformance:
     case StorageKind::AssociatedTypeDecl:
+    case StorageKind::None:
       return false;
     }
 
@@ -129,6 +130,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::RootArchetype:
     case StorageKind::StoredType:
     case StorageKind::ProtocolConformance:
+    case StorageKind::None:
       return false;
     }
 
@@ -141,6 +143,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::RootArchetype:
     case StorageKind::ProtocolConformance:
     case StorageKind::AssociatedTypeDecl:
+    case StorageKind::None:
       return false;
     }
 
@@ -153,6 +156,19 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::RootArchetype:
     case StorageKind::StoredType:
     case StorageKind::AssociatedTypeDecl:
+    case StorageKind::None:
+      return false;
+    }
+
+  case Derived:
+    switch (storageKind) {
+    case StorageKind::None:
+      return true;
+
+    case StorageKind::RootArchetype:
+    case StorageKind::StoredType:
+    case StorageKind::ProtocolConformance:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
   }
@@ -163,6 +179,9 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
 const void *RequirementSource::getOpaqueStorage1() const {
   switch (storageKind) {
+  case StorageKind::None:
+    return nullptr;
+
   case StorageKind::RootArchetype:
     return storage.rootArchetype;
 
@@ -213,6 +232,7 @@ bool RequirementSource::isInferredRequirement(bool includeQuietInferred) const {
     case ProtocolRequirement:
     case RequirementSignatureSelf:
     case Superclass:
+    case Derived:
       break;
     }
   }
@@ -238,6 +258,7 @@ bool RequirementSource::isDerivedRequirement() const {
   case Superclass:
   case Concrete:
   case RequirementSignatureSelf:
+  case Derived:
     return true;
 
   case ProtocolRequirement:
@@ -286,6 +307,7 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
     case RequirementSource::NestedTypeNameMatch:
     case RequirementSource::Concrete:
     case RequirementSource::Superclass:
+    case RequirementSource::Derived:
       return false;
     }
   }) == nullptr;
@@ -395,6 +417,7 @@ bool RequirementSource::isSelfDerivedConformance(
     case Concrete:
     case Superclass:
     case Parent:
+    case Derived:
       return false;
     case Explicit:
     case Inferred:
@@ -548,6 +571,14 @@ const RequirementSource *RequirementSource::viaParent(
                         0, WrittenRequirementLoc());
 }
 
+const RequirementSource *RequirementSource::viaDerived(
+                           GenericSignatureBuilder &builder) const {
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Derived, this, nullptr, nullptr, nullptr),
+                        (Derived, this),
+                        0, WrittenRequirementLoc());
+}
+
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
 
 const RequirementSource *RequirementSource::getRoot() const {
@@ -602,6 +633,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
 
   case RequirementSource::Concrete:
   case RequirementSource::Superclass:
+  case RequirementSource::Derived:
     return parent->visitPotentialArchetypesAlongPath(visitor);
 
   case RequirementSource::ProtocolRequirement:
@@ -618,6 +650,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
 
 Type RequirementSource::getStoredType() const {
   switch (storageKind) {
+  case StorageKind::None:
   case StorageKind::RootArchetype:
   case StorageKind::ProtocolConformance:
   case StorageKind::AssociatedTypeDecl:
@@ -632,6 +665,9 @@ Type RequirementSource::getStoredType() const {
 
 ProtocolDecl *RequirementSource::getProtocolDecl() const {
   switch (storageKind) {
+  case StorageKind::None:
+    return nullptr;
+
   case StorageKind::RootArchetype:
     if (kind == RequirementSignatureSelf)
       return getTrailingObjects<ProtocolDecl *>()[0];
@@ -808,6 +844,10 @@ void RequirementSource::print(llvm::raw_ostream &out,
   case Superclass:
     out << "Superclass";
     break;
+
+  case Derived:
+    out << "Derived";
+    break;
   }
 
   // Local function to dump a source location, if we can.
@@ -822,6 +862,7 @@ void RequirementSource::print(llvm::raw_ostream &out,
   };
 
   switch (storageKind) {
+  case StorageKind::None:
   case StorageKind::RootArchetype:
     break;
 
@@ -961,6 +1002,7 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement:
     case RequirementSource::Superclass:
+    case RequirementSource::Derived:
       return false;
     }
 
@@ -981,6 +1023,7 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::NestedTypeNameMatch:
     case RequirementSource::Parent:
     case RequirementSource::Superclass:
+    case RequirementSource::Derived:
       return false;
     }
   }
@@ -3010,7 +3053,7 @@ void GenericSignatureBuilder::updateSuperclass(
 
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
-    auto layoutReqSource = source->viaSuperclass(*this, nullptr);
+    auto layoutReqSource = source->viaDerived(*this);
     addLayoutRequirementDirect(T,
                          LayoutConstraint::getLayoutConstraint(
                              superclass->getClassOrBoundGenericClass()->isObjC()
