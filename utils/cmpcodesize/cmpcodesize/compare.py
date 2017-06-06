@@ -32,7 +32,8 @@ categories = [
     # Function signature specialization of a generic specialization.
     ["FuncSigGen Spec", re.compile(
         '^__(TTSf.*__TTSg|T0.*T[gGpP]q?[0-9].*Tfq?[0-9])')],
-    ["Generic Spec", re.compile('^__(TTSg|T0.*T[gGpP]q?[0-9])')],
+    ["Generic Spec", re.compile('^__(TTSg|T0.*T[gG]q?[0-9])')],
+    ["Partial Spec", re.compile('^__(T0.*T[pP]q?[0-9])')],
     ["FuncSig Spec", re.compile('^__(TTSf|T0.*Tfq?[0-9])')],
     ["Generic Function", re.compile(
         '__(T[^0].*q(x|d?[0-9]*_)|T0.*q(z|d?[0-9]*_))')],
