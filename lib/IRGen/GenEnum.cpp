@@ -1603,9 +1603,20 @@ namespace {
       auto opaqueAddr = IGF.Builder.CreateBitCast(enumAddr.getAddress(),
                                                   IGF.IGM.OpaquePtrTy);
 
-      return IGF.Builder.CreateCall(
+      llvm::Value *Result = IGF.Builder.CreateCall(
                  IGF.IGM.getGetEnumCaseSinglePayloadFn(),
                  {opaqueAddr, payloadMetadata, numEmptyCases});
+      // If this is a switch on Optional, then it is more likely
+      // that it is a non-nil.
+      if (T.getAnyOptionalObjectType()) {
+        auto *expectInstrinsic = llvm::Intrinsic::getDeclaration(
+            IGF.IGM.getModule(), llvm::Intrinsic::expect, {Result->getType()});
+        llvm::Constant *ExpectedValue =
+            llvm::ConstantInt::get(Result->getType(), 1);
+        Result =
+            IGF.Builder.CreateCall(expectInstrinsic, {Result, ExpectedValue});
+      }
+      return Result;
     }
 
     /// The payload for a single-payload enum is always placed in front and

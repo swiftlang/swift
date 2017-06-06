@@ -2656,6 +2656,14 @@ static llvm::BasicBlock *emitBBMapForSwitchEnum(
 
 void IRGenSILFunction::visitSwitchEnumInst(SwitchEnumInst *inst) {
   Explosion value = getLoweredExplosion(inst->getOperand());
+  if (inst->getOperand()->getType().getAnyOptionalObjectType()) {
+    llvm::Value *val = value.takeLast();
+    auto *expectInstrinsic = llvm::Intrinsic::getDeclaration(
+        IGM.getModule(), llvm::Intrinsic::expect, {val->getType()});
+    llvm::Constant *ExpectedValue = llvm::ConstantInt::get(val->getType(), 1);
+    val = Builder.CreateCall(expectInstrinsic, {val, ExpectedValue});
+    value.add(val);
+  }
   
   // Map the SIL dest bbs to their LLVM bbs.
   SmallVector<std::pair<EnumElementDecl*, llvm::BasicBlock*>, 4> dests;
