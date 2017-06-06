@@ -3286,15 +3286,21 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 ///
 /// \returns an empty result on success, or a description of the error.
 static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
+                                               ProtocolDecl *proto,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
-  if (auto superclass = assocType->getSuperclass()) {
+  auto *moduleDecl = dc->getParentModule();
+  auto *reqtSig = assocType->getProtocol()->getRequirementSignature();
+  auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
+                                         assocType);
+
+  if (auto superclass = reqtSig->getSuperclassBound(depTy, *moduleDecl)) {
     if (!superclass->isExactSuperclassOf(type))
       return superclass->getAnyNominal();
   }
 
   // Check protocol conformances.
-  for (auto reqProto : assocType->getConformingProtocols()) {
+  for (auto reqProto : reqtSig->getConformsTo(depTy, *moduleDecl)) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
 
@@ -3323,6 +3329,11 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
+  if (!Proto->isRequirementSignatureComputed()) {
+    Conformance->setInvalid();
+    return ResolveWitnessResult::Missing;
+  }
+
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
                                         NameLookupFlags::ProtocolMembers);
@@ -3342,7 +3353,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
         continue;
 
     // Check this type against the protocol requirements.
-    if (auto checkResult = checkTypeWitness(TC, DC, assocType, 
+    if (auto checkResult = checkTypeWitness(TC, DC, Proto, assocType,
                                             candidate.second)) {
       auto reqProto = checkResult.getProtocolOrClass();
       nonViable.push_back({candidate.first, reqProto});
@@ -3603,7 +3614,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
       if (!canInferFromOtherAssociatedType) {
         // Check that the type witness meets the
         // requirements on the associated type.
-        if (auto failed = checkTypeWitness(TC, DC, result.first,
+        if (auto failed = checkTypeWitness(TC, DC, Proto, result.first,
                                            result.second)) {
           witnessResult.NonViable.push_back(
                               std::make_tuple(result.first,result.second,failed));
@@ -4196,7 +4207,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (!defaultType)
       return Type();
 
-    if (auto failed = checkTypeWitness(TC, DC, assocType, defaultType)) {
+    if (auto failed = checkTypeWitness(TC, DC, Proto, assocType, defaultType)) {
       // Record the failure, if we haven't seen one already.
       if (!failedDefaultedAssocType) {
         failedDefaultedAssocType = assocType;
@@ -4231,7 +4242,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       return Type();
 
     // Make sure that the derived type is sane.
-    if (checkTypeWitness(TC, DC, assocType, derivedType)) {
+    if (checkTypeWitness(TC, DC, Proto, assocType, derivedType)) {
       diagnoseOrDefer(assocType, true,
         [derivedType](NormalProtocolConformance *conformance) {
           // FIXME: give more detail here?
