@@ -2338,11 +2338,21 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
 /// Whether we should short-circuit a disjunction that already has a
 /// solution when we encounter the given constraint.
 static bool shortCircuitDisjunctionAt(Constraint *constraint,
-                                      Constraint *successfulConstraint) {
-  
+                                      Constraint *successfulConstraint,
+                                      ASTContext &ctx) {
+
   // If the successfully applied constraint is favored, we'll consider that to
   // be the "best".
   if (successfulConstraint->isFavored() && !constraint->isFavored()) {
+#if !defined(NDEBUG)
+    if (successfulConstraint->getKind() == ConstraintKind::BindOverload) {
+      auto overloadChoice = successfulConstraint->getOverloadChoice();
+      assert((!overloadChoice.isDecl() ||
+              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
+             "Unavailable decl should not be favored!");
+    }
+#endif
+
     return true;
   }
   
@@ -2533,7 +2543,8 @@ bool ConstraintSystem::solveSimplified(
     // short-circuit the disjunction.
     if (lastSolvedChoice) {
       auto *lastChoice = lastSolvedChoice->getConstraint();
-      if (shortCircuitDisjunctionAt(&currentChoice, lastChoice))
+      if (shortCircuitDisjunctionAt(&currentChoice, lastChoice,
+                                    getASTContext()))
         break;
     }
 
