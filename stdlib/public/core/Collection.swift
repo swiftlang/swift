@@ -1440,23 +1440,16 @@ extension Collection {
   public func map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    // TODO: swift-3-indexing-model - review the following
     let count: Int = numericCast(self.count)
-    if count == 0 {
-      return []
-    }
+    guard count > 0 else { return [] }
 
     var result = ContiguousArray<T>()
     result.reserveCapacity(count)
-
-    var i = self.startIndex
-
-    for _ in 0..<count {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
+    
+    for element in self {
+      result.append(try transform(element))
     }
-
-    _expectEnd(of: self, is: i)
+    
     return Array(result)
   }
 
