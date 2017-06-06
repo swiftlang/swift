@@ -170,14 +170,6 @@ void SILInstruction::dropAllReferences() {
   }
 }
 
-void SILInstruction::replaceAllUsesWithUndef() {
-  SILModule &Mod = getModule();
-  while (!use_empty()) {
-    Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get()->getType(), Mod));
-  }
-}
-
 namespace {
   class InstructionDestroyer : public SILVisitor<InstructionDestroyer> {
   public:
