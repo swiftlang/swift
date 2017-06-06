@@ -414,6 +414,14 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           continue;
         }
       }
+
+      // Nominal type members of protocols cannot be accessed with an
+      // archetype base, because we have no way to recover the correct
+      // substitutions.
+      if (type->is<ArchetypeType>() &&
+          isa<NominalTypeDecl>(typeDecl)) {
+        continue;
+      }
     }
 
     // Substitute the base into the member's type.
