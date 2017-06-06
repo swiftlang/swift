@@ -1481,10 +1481,36 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     return false;
   }
 
+  // FIXME: Remove this after Swift 4.
   if (DK == DAK_Count && Tok.getText() == "NSKeyedArchiverClassName") {
-    DK = DAK_ObjC;
-    diagnose(Tok, diag::attr_nskeyedarchiverclassname_removed)
-      .fixItReplace(Tok.getLoc(), "objc");
+    auto activeDiag = diagnose(Tok,diag::attr_nskeyedarchiverclassname_removed);
+    activeDiag.fixItReplace(Tok.getLoc(), "objc");
+    consumeToken();
+    SourceLoc lParenLoc;
+    if (consumeIf(tok::l_paren, lParenLoc)) {
+      if (Tok.is(tok::string_literal)) {
+        activeDiag.fixItRemoveChars(Tok.getLoc(),
+                                    Tok.getLoc().getAdvancedLoc(1));
+        SourceLoc endLoc = Tok.getLoc().getAdvancedLoc(Tok.getLength());
+        activeDiag.fixItRemoveChars(endLoc.getAdvancedLoc(-1), endLoc);
+      }
+      skipUntil(tok::r_paren);
+      SourceLoc rParenLoc;
+      parseMatchingToken(tok::r_paren, rParenLoc,
+                         diag::attr_warn_unused_result_expected_rparen,
+                         lParenLoc);
+    }
+    return false;
+  }
+
+  // FIXME: Remove this after Swift 4.
+  if (DK == DAK_Count &&
+      Tok.getText() == "NSKeyedArchiverEncodeNonGenericSubclassesOnly") {
+    diagnose(Tok,
+             diag::attr_nskeyedarchiverencodenongenericsubclassesonly_removed)
+      .fixItRemove(SourceRange(AtLoc, Tok.getLoc()));
+    consumeToken();
+    return false;
   }
 
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))

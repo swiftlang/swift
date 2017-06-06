@@ -229,7 +229,7 @@ namespace swift {
       Swift3ObjCInferenceWarnings::None;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
-    bool EnableNSKeyedArchiverDiagnostics = false;
+    bool EnableNSKeyedArchiverDiagnostics = true;
     
     /// Enable keypath components that aren't fully implemented.
     bool EnableExperimentalKeyPathComponents = false;

@@ -106,7 +106,6 @@ public:
   IGNORED_ATTR(DiscardableResult)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
-  IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
   IGNORED_ATTR(DowngradeExhaustivityCheck)
 #undef IGNORED_ATTR
 
@@ -785,7 +784,6 @@ public:
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
-    IGNORED_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly)
     IGNORED_ATTR(DowngradeExhaustivityCheck)
 #undef IGNORED_ATTR
 
