@@ -459,6 +459,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // Use the type witness.
       auto concrete = conformance->getConcrete();
       Type memberType = concrete->getTypeWitness(assocType, this);
+
+      // This is the only case where NormalProtocolConformance::
+      // getTypeWitnessAndDecl() returns a null type.
+      if (concrete->getState() ==
+          ProtocolConformanceState::CheckingTypeWitnesses)
+        continue;
+
       assert(memberType && "Missing type witness?");
 
       // If we haven't seen this type result yet, add it to the result set.
