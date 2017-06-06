@@ -417,7 +417,7 @@ ERROR(expr_keypath_non_objc_property,none,
       (DeclName))
 WARNING(expr_keypath_swift3_objc_inference,none,
         "argument of '#keyPath' refers to property %0 in %1 that depends on "
-        "'@objc' attribute inference deprecated in Swift 4",
+        "'@objc' inference deprecated in Swift 4",
         (DeclName, Identifier))
 ERROR(expr_keypath_type_of_property,none,
       "cannot refer to type member %0 within instance of type %1",
@@ -489,7 +489,7 @@ NOTE(make_decl_objc,none,
      (DescriptiveDeclKind))
 WARNING(expr_selector_swift3_objc_inference,none,
         "argument of '#selector' refers to %0 %1 in %2 that depends on "
-        "'@objc' attribute inference deprecated in Swift 4",
+        "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
 
 // Selectors-as-string-literals.
@@ -1154,7 +1154,7 @@ NOTE(variadic_superclass_init_here,none,
      "variadic superclass initializer defined here", ())
 
 WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
-        "reference to %0 %1 of %2 depends on '@objc' attribute inference "
+        "reference to %0 %1 of %2 depends on '@objc' inference "
         "deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
 
@@ -3143,7 +3143,7 @@ NOTE(objc_inference_swift3_addnonobjc,none,
 
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
-      "attribute because they are not directly visible from Objective-C", ())
+      "because they are not directly visible from Objective-C", ())
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
@@ -3247,6 +3247,11 @@ NOTE(objc_overriding_objc_decl,none,
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %0 %1 in protocol %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(witness_swift3_objc_inference,none,
+        "use of %0 %1 to satisfy a requirement of protocol %2 depends on "
+        "'@objc' inference deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Type))
+
 
 ERROR(objc_invalid_on_func_curried,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
