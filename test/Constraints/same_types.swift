@@ -88,6 +88,7 @@ func test6<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y {
 
 func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
 	// expected-warning@-1{{redundant same-type constraint 'T.Bar.Foo' == 'X'}}
+        // expected-note@-2{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
   return (t.bar, t.bar.foo)
 }
 
@@ -237,6 +238,15 @@ func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U)
   where T.Assoc1 == Tuple2<T.Assoc1, U> // expected-error{{same-type constraint 'T.Assoc1' == '(T.Assoc1, U)' is recursive}}
 { }
 
+
+protocol P3 {
+}
+
+protocol P4 {
+  associatedtype A
+}
+
+func test9<T>(_: T) where T.A == X, T: P4, T.A: P3 { } // expected-error{{same-type constraint type 'X' does not conform to required protocol 'P3'}}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'
