@@ -40,9 +40,11 @@ protocol Racoon {
   associatedtype Stripes
   class Claw<T> { // expected-error{{type 'Claw' cannot be nested in protocol 'Racoon'}}
     func mangle(_ s: Stripes) {}
+    // expected-error@-1 {{use of undeclared type 'Stripes'}}
   }
   struct Fang<T> { // expected-error{{type 'Fang' cannot be nested in protocol 'Racoon'}}
     func gnaw(_ s: Stripes) {}
+    // expected-error@-1 {{use of undeclared type 'Stripes'}}
   }
   enum Fur { // expected-error{{type 'Fur' cannot be nested in protocol 'Racoon'}}
     case Stripes
