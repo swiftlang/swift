@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -286,6 +287,15 @@ private:
                                    FloatingRequirementSource source,
                                    UnresolvedHandlingKind unresolvedHandling);
 
+  /// Resolve the conformance of the given potential archetype to
+  /// the given protocol when the potential archetype is known to be equivalent
+  /// to a concrete type.
+  ///
+  /// \returns the requirement source for the resolved conformance, or nullptr
+  /// if the conformance could not be resolved.
+  const RequirementSource *resolveConcreteConformance(PotentialArchetype *pa,
+                                                      ProtocolDecl *proto);
+
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///
@@ -293,9 +303,8 @@ private:
   /// queried.
   ///
   /// \param proto The protocol to which we are establishing conformance.
-  const RequirementSource *resolveSuperConformance(
-                            GenericSignatureBuilder::PotentialArchetype *pa,
-                            ProtocolDecl *proto);
+  const RequirementSource *resolveSuperConformance(PotentialArchetype *pa,
+                                                   ProtocolDecl *proto);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
@@ -775,7 +784,7 @@ public:
 
     /// A requirement that was resolved via a superclass requirement.
     ///
-    /// This stores the \c ProtocolConformance* used to resolve the
+    /// This stores the \c ProtocolConformanceRef used to resolve the
     /// requirement.
     Superclass,
 
@@ -826,7 +835,7 @@ private:
     TypeBase *type;
 
     /// A protocol conformance used to satisfy the requirement.
-    ProtocolConformance *conformance;
+    void *conformance;
 
     /// An associated type to which a requirement is being applied.
     AssociatedTypeDecl *assocType;
@@ -943,7 +952,7 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    ProtocolConformance *conformance)
+                    ProtocolConformanceRef conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
       hasTrailingWrittenRequirementLoc(false),
       usesRequirementSignature(false), parent(parent) {
@@ -952,7 +961,7 @@ public:
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.conformance = conformance;
+    storage.conformance = conformance.getOpaqueValue();
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
@@ -1019,13 +1028,14 @@ public:
   /// A requirement source that describes that a requirement that is resolved
   /// via a superclass requirement.
   const RequirementSource *viaSuperclass(
-                                        GenericSignatureBuilder &builder,
-                                        ProtocolConformance *conformance) const;
+                                    GenericSignatureBuilder &builder,
+                                    ProtocolConformanceRef conformance) const;
 
   /// A requirement source that describes that a requirement that is resolved
   /// via a same-type-to-concrete requirement.
-  const RequirementSource *viaConcrete(GenericSignatureBuilder &builder,
-                                       ProtocolConformance *conformance) const;
+  const RequirementSource *viaConcrete(
+                                     GenericSignatureBuilder &builder,
+                                     ProtocolConformanceRef conformance) const;
 
   /// A constraint source that describes that a constraint that is resolved
   /// for a nested type via a constraint on its parent.
@@ -1126,9 +1136,9 @@ public:
   ProtocolDecl *getProtocolDecl() const;
 
   /// Retrieve the protocol conformance for this requirement, if there is one.
-  ProtocolConformance *getProtocolConformance() const {
-    if (storageKind != StorageKind::ProtocolConformance) return nullptr;
-    return storage.conformance;
+  ProtocolConformanceRef getProtocolConformance() const {
+    assert(storageKind == StorageKind::ProtocolConformance);
+    return ProtocolConformanceRef::getFromOpaqueValue(storage.conformance);
   }
 
   /// Retrieve the associated type declaration for this requirement, if there
