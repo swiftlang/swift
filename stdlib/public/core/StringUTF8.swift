@@ -22,75 +22,6 @@
 // FIXME(ABI)#73 : The UTF-8 string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
-extension _StringCore {
-  /// An integral type that holds a sequence of UTF-8 code units, starting in
-  /// its low byte.
-  internal typealias _UTF8Chunk = UInt64
-
-  /// Encode text starting at `i` as UTF-8.  Returns a pair whose first
-  /// element is the index of the text following whatever got encoded,
-  /// and the second element contains the encoded UTF-8 starting in its
-  /// low byte.  Any unused high bytes in the result will be set to
-  /// 0xFF.
-  @inline(__always)
-  func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
-    _sanityCheck(i <= count)
-
-    if let asciiBuffer = self.asciiBuffer {
-      // How many UTF-16 code units might we use before we've filled up
-      // our _UTF8Chunk with UTF-8 code units?
-      let utf16Count =
-        Swift.min(MemoryLayout<_UTF8Chunk>.size, asciiBuffer.count - i)
-
-      var result: _UTF8Chunk = ~0 // Start with all bits set
-
-      _memcpy(
-        dest: UnsafeMutableRawPointer(Builtin.addressof(&result)),
-        src: asciiBuffer.baseAddress! + i,
-        size: numericCast(utf16Count))
-
-      // Convert the _UTF8Chunk into host endianness.
-      return (i + utf16Count, _UTF8Chunk(littleEndian: result))
-    } else if _fastPath(_baseAddress != nil) {
-      // Transcoding should return a _UTF8Chunk in host endianness.
-      return _encodeSomeContiguousUTF16AsUTF8(from: i)
-    } else {
-#if _runtime(_ObjC)
-      return _encodeSomeNonContiguousUTF16AsUTF8(from: i)
-#else
-      _sanityCheckFailure("_encodeSomeUTF8: Unexpected cocoa string")
-#endif
-    }
-  }
-
-  /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
-  /// storage is contiguous UTF-16.
-  func _encodeSomeContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
-    _sanityCheck(elementWidth == 2)
-    _sanityCheck(_baseAddress != nil)
-
-    let storage = UnsafeBufferPointer(start: startUTF16, count: self.count)
-    return _transcodeSomeUTF16AsUTF8(storage, i)
-  }
-
-#if _runtime(_ObjC)
-  /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
-  /// storage is non-contiguous UTF-16.
-  func _encodeSomeNonContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
-    _sanityCheck(elementWidth == 2)
-    _sanityCheck(_baseAddress == nil)
-
-    let storage = _CollectionOf<Int, UInt16>(
-      _startIndex: 0, endIndex: self.count
-    ) {
-      (i: Int) -> UInt16 in
-      return _cocoaStringSubscript(self, i)
-    }
-    return _transcodeSomeUTF16AsUTF8(storage, i)
-  }
-#endif
-}
-
 extension String {
   /// A view of a string's contents as a collection of UTF-8 code units.
   ///
@@ -170,6 +101,7 @@ extension String {
     : Collection, 
       CustomStringConvertible, 
       CustomDebugStringConvertible {
+    @_versioned
     internal let _core: _StringCore
 
     init(_ _core: _StringCore) {
@@ -195,56 +127,97 @@ extension String {
       return Index(encodedOffset: _core.endIndex)
     }
 
+    @_versioned
     internal func _index(atEncodedOffset n: Int) -> Index {
       if _fastPath(_core.isASCII) { return Index(encodedOffset: n) }
+      if n == _core.endIndex { return endIndex }
+      
       var p = UTF16.ForwardParser()
       var i = _core[n...].makeIterator()
-      let s = p.parseScalar(from: &i)
-      
-      if case .valid(let u16) = s {
-        _onFastPath()
-        let u8 = UTF8.transcode(u16, from: UTF16.self)
-        _sanityCheck(u16.count >= 0 && u16.count <= 2)
-        let stride = UInt8(extendingOrTruncating: u16.count)
-        return Index(
-          encodedOffset: n,
-          .utf8(
-            encodedScalar: u8._unsafelyUnwrappedUnchecked, stride: stride))
+      var buffer = Index._UTF8Buffer()
+    Loop:
+      while true {
+        switch p.parseScalar(from: &i) {
+        case .valid(let u16):
+          let u8 = Unicode.UTF8.transcode(u16, from: Unicode.UTF16.self)
+           ._unsafelyUnwrappedUnchecked
+          if buffer.count + u8.count > buffer.capacity { break Loop }
+          buffer.append(contentsOf: u8)
+        case .error:
+          let u8 = Unicode.UTF8.encodedReplacementCharacter
+          if buffer.count + u8.count > buffer.capacity { break Loop }
+          buffer.append(contentsOf: u8)
+        case .emptyInput:
+          break Loop
+        }
       }
-      
-      if case .error(let stride) = s {
-        return Index(
-          encodedOffset: n,
-          .utf8(
-            encodedScalar: UTF8.encodedReplacementCharacter,
-            stride: UInt8(extendingOrTruncating: stride)))
-      }
-      _onFastPath()
-      return Index(encodedOffset: n)
+      return Index(encodedOffset: n, .utf8(buffer: buffer))
     }
   
     /// Returns the next consecutive position after `i`.
     ///
     /// - Precondition: The next position is representable.
+    @inline(__always)
     public func index(after i: Index) -> Index {
-      _precondition(i != endIndex, "Can't advance past endIndex")
       if _fastPath(_core.isASCII) {
+        precondition(i.encodedOffset < _core.count)
         return Index(encodedOffset: i.encodedOffset + 1)
       }
+      
       var j = i
       while true {
-        if case .utf8(let encodedScalar, let stride) = j._cache {
+        if case .utf8(let buffer) = j._cache {
           _onFastPath()
-          j._transcodedOffset += 1
-          if _fastPath(j._transcodedOffset < encodedScalar.count) {
-            return j
+          var scalarLength16 = 1
+          let b0 = buffer.first._unsafelyUnwrappedUnchecked
+          var nextBuffer = buffer
+          
+          let leading1s = (~b0).leadingZeroBitCount
+          if leading1s == 0 {
+            nextBuffer.removeFirst()
           }
-          return _index(atEncodedOffset: j.encodedOffset &+ numericCast(stride))
+          else {
+            let n8 = j._transcodedOffset + 1
+            // If we haven't reached a scalar boundary...
+            if _fastPath(n8 < leading1s) {
+              return Index(
+                encodedOffset: j.encodedOffset,
+                transcodedOffset: n8, .utf8(buffer: nextBuffer))
+            }
+            scalarLength16 = n8 >> 2 + 1
+            nextBuffer.removeFirst(n8)
+          }
+          if _fastPath(!nextBuffer.isEmpty) {
+            return Index(
+              encodedOffset: j.encodedOffset + scalarLength16,
+              .utf8(buffer: nextBuffer))
+          }
+          return _index(atEncodedOffset: j.encodedOffset + scalarLength16)
         }
         j = _index(atEncodedOffset: j.encodedOffset)
+        precondition(j != endIndex, "index out of bounds")
       }
     }
 
+    public func distance(from i: Index, to j: Index) -> IndexDistance {
+      if _fastPath(_core.isASCII) {
+        return j.encodedOffset - i.encodedOffset
+      }
+      return j >= i
+        ? _forwardDistance(from: i, to: j) : -_forwardDistance(from: j, to: i)
+    }
+
+    @_versioned
+    @inline(__always)
+    internal func _forwardDistance(from i: Index, to j: Index) -> IndexDistance {
+      var r: IndexDistance = j._transcodedOffset - i._transcodedOffset
+      UTF8._transcode(
+        _core[i.encodedOffset..<j.encodedOffset], from: UTF16.self) {
+        r += $0.count
+      }
+      return r
+    }
+    
     /// Accesses the code unit at the given position.
     ///
     /// The following example uses the subscript to print the value of a
@@ -258,27 +231,27 @@ extension String {
     /// - Parameter position: A valid index of the view. `position`
     ///   must be less than the view's end index.
     public subscript(position: Index) -> UTF8.CodeUnit {
-      _precondition(position != endIndex, "cannot subscript using endIndex")
-      if _fastPath(_core.isASCII) {
-        return UTF8.CodeUnit(_core[position.encodedOffset])
-      }
-      var j = position
-      while true {
-        if case let .utf8(encodedScalar, _) = j._cache {
-          _onFastPath()
-          _sanityCheck((0..<4).contains(j._transcodedOffset))
-          
-          let i = encodedScalar.index(
-            encodedScalar.startIndex, offsetBy: j._transcodedOffset)
-          
-          return encodedScalar[i]
+      @inline(__always)
+      get {
+        if _fastPath(_core.asciiBuffer != nil), let ascii = _core.asciiBuffer {
+          _precondition(position < endIndex, "index out of bounds")
+          return ascii[position.encodedOffset]
         }
-        j = _index(atEncodedOffset: j.encodedOffset)
+        var j = position
+        while true {
+          if case .utf8(let buffer) = j._cache {
+            _onFastPath()
+            return buffer[
+              buffer.index(buffer.startIndex, offsetBy: j._transcodedOffset)]
+          }
+          j = _index(atEncodedOffset: j.encodedOffset)
+          precondition(j < endIndex, "index out of bounds")
+        }
       }
     }
 
     public var description: String {
-      return String._fromCodeUnitSequenceWithRepair(UTF8.self, input: self).0
+      return String(_core)
     }
 
     public var debugDescription: String {
@@ -445,7 +418,6 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     refillingFrom source: Source
   ) -> Unicode.UTF8.CodeUnit?
   where Source.Element == Unicode.UTF16.CodeUnit,
-  Source._Element == Unicode.UTF16.CodeUnit,
   Source.Index == Int
   {
     _sanityCheck(_buffer == 0)

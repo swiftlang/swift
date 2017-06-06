@@ -13,14 +13,33 @@ extension String {
   /// A position of a character or code unit in a string.
   public struct Index {
     internal var _compoundOffset : UInt64
+    @_versioned
     internal var _cache: _Cache
-    
+
+    internal typealias _UTF8Buffer = _ValidUTF8Buffer<UInt64>
+    @_versioned
     internal enum _Cache {
     case utf16
-    case utf8(encodedScalar: Unicode.UTF8.EncodedScalar, stride: UInt8)
+    case utf8(buffer: _UTF8Buffer)
     case character(stride: UInt16)
     case unicodeScalar(value: Unicode.Scalar)
     }
+  }
+}
+
+/// Convenience accessors
+extension String.Index._Cache {
+  var utf16: Void? {
+    if case .utf16 = self { return () } else { return nil }
+  }
+  var utf8: String.Index._UTF8Buffer? {
+    if case .utf8(let r) = self { return r } else { return nil }
+  }
+  var character: UInt16? {
+    if case .character(let r) = self { return r } else { return nil }
+  }
+  var unicodeScalar: UnicodeScalar? {
+    if case .unicodeScalar(let r) = self { return r } else { return nil }
   }
 }
 
@@ -46,9 +65,10 @@ extension String.Index {
     _compoundOffset = UInt64(offset << _Self._strideBits)
     _cache = .utf16
   }
-  
-  internal init(encodedOffset o: Int, _ c: _Cache) {
-    _compoundOffset = UInt64(o << _Self._strideBits)
+
+  @_versioned
+  internal init(encodedOffset o: Int, transcodedOffset: Int = 0, _ c: _Cache) {
+    _compoundOffset = UInt64(o << _Self._strideBits | transcodedOffset)
     _cache = c
   }
   
@@ -65,6 +85,7 @@ extension String.Index {
   }
 
   /// The offset of this index within whatever encoding this is being viewed as
+  @_versioned
   internal var _transcodedOffset : Int {
     get {
       return Int(_compoundOffset & _Self._mask)
