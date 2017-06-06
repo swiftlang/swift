@@ -45,7 +45,7 @@ namespace json {
 
   template<>
   struct ScalarEnumerationTraits<types::ID> {
-    static void enumeration(Output &out, types::ID &value) {
+    static void enumeration(Output &out, const types::ID &value) {
       types::forAllTypes([&](types::ID ty) {
         std::string typeName = types::getTypeName(ty);
         out.enumCase(value, typeName.c_str(), ty);
@@ -55,7 +55,7 @@ namespace json {
 
   template<>
   struct ObjectTraits<std::pair<types::ID, std::string>> {
-    static void mapping(Output &out, std::pair<types::ID, std::string> &value) {
+    static void mapping(Output &out, const std::pair<types::ID, std::string> &value) {
       out.mapRequired("type", value.first);
       out.mapRequired("path", value.second);
     }
@@ -63,13 +63,11 @@ namespace json {
 
   template<typename T, unsigned N>
   struct ArrayTraits<SmallVector<T, N>> {
-    static size_t size(Output &out, SmallVector<T, N> &seq) {
+    static size_t size(Output &out, const SmallVector<T, N> &seq) {
       return seq.size();
     }
 
-    static T &element(Output &out, SmallVector<T, N> &seq, size_t index) {
-      if (index >= seq.size())
-        seq.resize(index+1);
+    static const T &element(Output &out, const SmallVector<T, N> &seq, size_t index) {
       return seq[index];
     }
   };
@@ -85,7 +83,7 @@ public:
   Message(StringRef Kind, StringRef Name) : Kind(Kind), Name(Name) {}
   virtual ~Message() = default;
 
-  virtual void provideMapping(swift::json::Output &out) {
+  virtual void provideMapping(swift::json::Output &out) const {
     out.mapRequired("kind", Kind);
     out.mapRequired("name", Name);
   }
@@ -140,7 +138,7 @@ public:
     });
   }
 
-  void provideMapping(swift::json::Output &out) override {
+  void provideMapping(swift::json::Output &out) const override {
     Message::provideMapping(out);
     out.mapRequired("command", CommandLine);
     out.mapOptional("inputs", Inputs);
@@ -154,7 +152,7 @@ public:
   TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
       CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
 
-  void provideMapping(swift::json::Output &out) override {
+  void provideMapping(swift::json::Output &out) const override {
     CommandBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
   }
@@ -166,7 +164,7 @@ public:
   BeganMessage(const Job &Cmd, ProcessId Pid) :
       DetailedCommandBasedMessage("began", Cmd), Pid(Pid) {}
 
-  void provideMapping(swift::json::Output &out) override {
+  void provideMapping(swift::json::Output &out) const override {
     DetailedCommandBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
   }
@@ -179,7 +177,7 @@ public:
                     StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
                                         Output(Output) {}
 
-  void provideMapping(swift::json::Output &out) override {
+  void provideMapping(swift::json::Output &out) const override {
     TaskBasedMessage::provideMapping(out);
     out.mapOptional("output", Output, std::string());
   }
@@ -193,7 +191,7 @@ public:
                                                       Output),
                                     ExitStatus(ExitStatus) {}
 
-  void provideMapping(swift::json::Output &out) override {
+  void provideMapping(swift::json::Output &out) const override {
     TaskOutputMessage::provideMapping(out);
     out.mapRequired("exit-status", ExitStatus);
   }
@@ -208,7 +206,7 @@ public:
       TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
       Signal(Signal) {}
 
-  void provideMapping(swift::json::Output &out) override {
+  void provideMapping(swift::json::Output &out) const override {
     TaskOutputMessage::provideMapping(out);
     out.mapOptional("error-message", ErrorMsg, std::string());
     out.mapOptional("signal", Signal);
@@ -228,7 +226,7 @@ namespace json {
 
 template<>
 struct ObjectTraits<Message> {
-  static void mapping(Output &out, Message &msg) {
+  static void mapping(Output &out, const Message &msg) {
     msg.provideMapping(out);
   }
 };
@@ -236,7 +234,7 @@ struct ObjectTraits<Message> {
 } // namespace json
 } // namespace swift
 
-static void emitMessage(raw_ostream &os, Message &msg) {
+static void emitMessage(raw_ostream &os, const Message &msg) {
   std::string JSONString;
   llvm::raw_string_ostream BufferStream(JSONString);
   json::Output yout(BufferStream);

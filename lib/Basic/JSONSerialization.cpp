@@ -80,8 +80,7 @@ void Output::endObject() {
 }
 
 bool Output::preflightKey(const char *Key, bool Required, bool SameAsDefault,
-                          bool &UseDefault, void *&) {
-  UseDefault = false;
+                          void *&) {
   if (Required || !SameAsDefault) {
     if (StateStack.back() != ObjectFirstKey) {
       assert(StateStack.back() == ObjectOtherKey && "We must be in an object!");
@@ -110,13 +109,12 @@ void Output::beginEnumScalar() {
   EnumerationMatchFound = false;
 }
 
-bool Output::matchEnumScalar(const char *Str, bool Match) {
+void Output::matchEnumScalar(const char *Str, bool Match) {
   if (Match && !EnumerationMatchFound) {
     StringRef StrRef(Str);
     scalarString(StrRef, true);
     EnumerationMatchFound = true;
   }
-  return false;
 }
 
 void Output::endEnumScalar() {
@@ -133,7 +131,7 @@ bool Output::beginBitSetScalar(bool &DoClear) {
   return true;
 }
 
-bool Output::bitSetMatch(const char *Str, bool Matches) {
+void Output::bitSetMatch(const char *Str, bool Matches) {
   if (Matches) {
     if (NeedBitValueComma) {
       Stream << ',';
@@ -143,7 +141,6 @@ bool Output::bitSetMatch(const char *Str, bool Matches) {
     StringRef StrRef(Str);
     scalarString(StrRef, true);
   }
-  return false;
 }
 
 void Output::endBitSetScalar() {
