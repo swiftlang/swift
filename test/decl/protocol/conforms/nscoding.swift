@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -enable-nskeyedarchiver-diagnostics -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s 2>&1 | %FileCheck -check-prefix CHECK-NO-DIAGS %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -verify
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -disable-nskeyedarchiver-diagnostics 2>&1 | %FileCheck -check-prefix CHECK-NO-DIAGS %s
 
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -dump-ast 2> %t.ast
 // RUN: %FileCheck %s < %t.ast
@@ -12,6 +12,7 @@
 import Foundation
 
 // Top-level classes
+// CHECK-NOT: class_decl "CodingA"{{.*}}@_staticInitializeObjCMetadata
 class CodingA : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
@@ -20,26 +21,29 @@ class CodingA : NSObject, NSCoding {
 
 // Nested classes
 extension CodingA {
+  // CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
   class NestedA : NSObject, NSCoding { // expected-error{{nested class 'CodingA.NestedA' has an unstable name when archiving via 'NSCoding'}}
-    // expected-note@-1{{for new classes, add '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#Objective-C class name#>)}}
-    // expected-note@-2{{for compatibility with existing archives, use '@NSKeyedArchiverClassName' to record the Swift 3 mangled name}}{{3-3=@NSKeyedArchiverClassName("_TtCC8nscoding7CodingA7NestedA")}}
+    // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{3-3=@objc(_TtCC8nscoding7CodingA7NestedA)}}
+    // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#prefixed Objective-C class name#>)}}
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
 
   class NestedB : NSObject {
-    // expected-note@-1{{for new classes, add '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#Objective-C class name#>)}}
-    // expected-note@-2{{for compatibility with existing archives, use '@NSKeyedArchiverClassName' to record the Swift 3 mangled name}}{{3-3=@NSKeyedArchiverClassName("_TtCC8nscoding7CodingA7NestedB")}}
+    // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{3-3=@objc(_TtCC8nscoding7CodingA7NestedB)}}
+    // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#prefixed Objective-C class name#>)}}
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
 
+  // CHECK: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
   @objc(CodingA_NestedC)
   class NestedC : NSObject, NSCoding {
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
 
+  // CHECK: class_decl "NestedD"{{.*}}@_staticInitializeObjCMetadata
   @objc(CodingA_NestedD)
   class NestedD : NSObject {
     required init(coder: NSCoder) { }
@@ -54,102 +58,102 @@ extension CodingA.NestedD: NSCoding { // okay
 }
 
 // Generic classes
-class CodingB<T> : NSObject, NSCoding {   // expected-error{{generic class 'CodingB<T>' has an unstable name when archiving via 'NSCoding'}}
-  // expected-note@-1{{generic class 'CodingB<T>' should not be archived directly}}{{1-1=@NSKeyedArchiverEncodeNonGenericSubclassesOnly}}
+// CHECK-NOT: class_decl "CodingB"{{.*}}@_staticInitializeObjCMetadata
+class CodingB<T> : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
 extension CodingB {
-  class NestedA : NSObject, NSCoding { // expected-error{{generic class 'CodingB<T>.NestedA' has an unstable name when archiving via 'NSCoding'}}
-    // expected-note@-1{{generic class 'CodingB<T>.NestedA' should not be archived directly}}{{3-3=@NSKeyedArchiverEncodeNonGenericSubclassesOnly}}
+  class NestedA : NSObject, NSCoding {
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
 }
 
 // Fileprivate classes.
-fileprivate class CodingC : NSObject, NSCoding {    // expected-error{{fileprivate class 'CodingC' has an unstable name when archiving via 'NSCoding'}}
-  // expected-note@-1{{for new classes, add '@objc' to specify a unique, prefixed Objective-C runtime name}}{{1-1=@objc(<#Objective-C class name#>)}}
-  // expected-note@-2{{for compatibility with existing archives, use '@NSKeyedArchiverClassName' to record the Swift 3 mangled name}}{{1-1=@NSKeyedArchiverClassName("_TtC8nscodingP33_0B4E7641C0BD1F170280EEDD0D0C1F6C7CodingC")}}
+// CHECK-NOT: class_decl "CodingC"{{.*}}@_staticInitializeObjCMetadata
+fileprivate class CodingC : NSObject, NSCoding { // expected-error{{fileprivate class 'CodingC' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{1-1=@objc(_TtC8nscodingP33_0B4E7641C0BD1F170280EEDD0D0C1F6C7CodingC)}}
+  // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{1-1=@objc(<#prefixed Objective-C class name#>)}}
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
 // Private classes
-private class CodingD : NSObject, NSCoding {       // expected-error{{private class 'CodingD' has an unstable name when archiving via 'NSCoding'}}
-  // expected-note@-1{{for new classes, add '@objc' to specify a unique, prefixed Objective-C runtime name}}{{1-1=@objc(<#Objective-C class name#>)}}
-  // expected-note@-2{{for compatibility with existing archives, use '@NSKeyedArchiverClassName' to record the Swift 3 mangled name}}{{1-1=@NSKeyedArchiverClassName("_TtC8nscodingP33_0B4E7641C0BD1F170280EEDD0D0C1F6C7CodingD")}}
+private class CodingD : NSObject, NSCoding { // expected-error{{private class 'CodingD' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{1-1=@objc(_TtC8nscodingP33_0B4E7641C0BD1F170280EEDD0D0C1F6C7CodingD)}}
+  // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{1-1=@objc(<#prefixed Objective-C class name#>)}}
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
 // Local classes.
 func someFunction() {
-  class LocalCoding : NSObject, NSCoding {       // expected-error{{local class 'LocalCoding' has an unstable name when archiving via 'NSCoding'}}
-  // expected-note@-1{{for new classes, add '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#Objective-C class name#>)}}
-  // expected-note@-2{{for compatibility with existing archives, use '@NSKeyedArchiverClassName' to record the Swift 3 mangled name}}{{3-3=@NSKeyedArchiverClassName("_TtCF8nscoding12someFunctionFT_T_L_11LocalCoding")}}
+  class LocalCoding : NSObject, NSCoding { // expected-error{{local class 'LocalCoding' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{3-3=@objc(_TtCF8nscoding12someFunctionFT_T_L_11LocalCoding)}}
+  // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#prefixed Objective-C class name#>)}}
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 }
 
 // Inherited conformances.
-class CodingE<T> : CodingB<T> {   // expected-error{{generic class 'CodingE<T>' has an unstable name when archiving via 'NSCoding'}}
-    // expected-note@-1{{generic class 'CodingE<T>' should not be archived directly}}{{1-1=@NSKeyedArchiverEncodeNonGenericSubclassesOnly}}
+// CHECK-NOT: class_decl "CodingE"{{.*}}@_staticInitializeObjCMetadata
+class CodingE<T> : CodingB<T> {
   required init(coder: NSCoder) { super.init(coder: coder) }
   override func encode(coder: NSCoder) { }
 }
 
-// @NSKeyedArchiverClassName suppressions
-extension CodingA {
-  @NSKeyedArchiverClassName("TheNestedE")
-  class NestedE : NSObject, NSCoding {
-    required init(coder: NSCoder) { }
-    func encode(coder: NSCoder) { }
-  }
-}
-
-@NSKeyedArchiverEncodeNonGenericSubclassesOnly
-class CodingGeneric<T> : NSObject, NSCoding {
-  required init(coder: NSCoder) { }
-  func encode(coder: NSCoder) { }
-}
-
-@NSKeyedArchiverClassName("TheCodingF")
+// @objc suppressions
+@objc(TheCodingF)
 fileprivate class CodingF : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
-@NSKeyedArchiverClassName("TheCodingG")
+@objc(TheCodingG)
 private class CodingG : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
-// Errors with @NSKeyedArchiverClassName.
-@NSKeyedArchiverClassName("TheCodingG") // expected-error{{@NSKeyedArchiverClassName may only be used on 'class' declarations}}
-struct Foo { }
-
-@NSKeyedArchiverClassName("TheCodingG") // expected-error{{'@NSKeyedArchiverClassName' cannot be applied to generic class 'Bar<T>'}}
-class Bar<T> : NSObject { }
-
 extension CodingB {
-  @NSKeyedArchiverClassName("GenericViaParent") // expected-error{{'@NSKeyedArchiverClassName' cannot be applied to generic class 'CodingB<T>.GenericViaParent'}}
-  class GenericViaParent : NSObject { }
+  // CHECK-NOT: class_decl "GenericViaScope"{{.*}}@_staticInitializeObjCMetadata
+  @objc(GenericViaScope) // expected-error {{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}}
+  class GenericViaScope : NSObject { }
 }
 
 // Inference of @_staticInitializeObjCMetadata.
+// CHECK-NOT: class_decl "SubclassOfCodingA"{{.*}}@_staticInitializeObjCMetadata
+class SubclassOfCodingA : CodingA { }
+
+// CHECK: class_decl "SubclassOfCodingE"{{.*}}@_staticInitializeObjCMetadata
 class SubclassOfCodingE : CodingE<Int> { }
 
-// But don't allow one to write @_staticInitializeObjCMetadata!
+// Do not warn when simply inheriting from classes that conform to NSCoding.
+// The subclass may never be serialized. But do still infer static
+// initialization, just in case.
+// CHECK-NOT: class_decl "PrivateSubclassOfCodingA"{{.*}}@_staticInitializeObjCMetadata
+private class PrivateSubclassOfCodingA : CodingA { }
+// CHECK: class_decl "PrivateSubclassOfCodingE"{{.*}}@_staticInitializeObjCMetadata
+private class PrivateSubclassOfCodingE : CodingE<Int> { }
+
+// But do warn when inherited through a protocol.
+protocol AlsoNSCoding : NSCoding {}
+private class CodingH : NSObject, AlsoNSCoding { // expected-error{{private class 'CodingH' has an unstable name when archiving via 'NSCoding'}}
+  // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{1-1=@objc(_TtC8nscodingP33_0B4E7641C0BD1F170280EEDD0D0C1F6C7CodingH)}}
+  // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{1-1=@objc(<#prefixed Objective-C class name#>)}}
+  required init(coder: NSCoder) { }
+  func encode(coder: NSCoder) { }
+}
+
+@NSKeyedArchiverClassName( "abc" ) // expected-error {{@NSKeyedArchiverClassName has been removed; use @objc instead}} {{2-26=objc}} {{28-29=}} {{32-33=}}
+class OldArchiverAttribute: NSObject {}
+
+@NSKeyedArchiverEncodeNonGenericSubclassesOnly // expected-error {{@NSKeyedArchiverEncodeNonGenericSubclassesOnly is no longer necessary}} {{1-48=}}
+class OldArchiverAttributeGeneric<T>: NSObject {}
+
+// Don't allow one to write @_staticInitializeObjCMetadata!
 @_staticInitializeObjCMetadata // expected-error{{unknown attribute '_staticInitializeObjCMetadata'}}
 class DontAllowStaticInits { }
-
-// CHECK-NOT: class_decl "CodingA"{{.*}}@_staticInitializeObjCMetadata
-// CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
-// CHECK: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
-// CHECK-NOT: class_decl "NestedE"{{.*}}@_staticInitializeObjCMetadata
-// CHECK-NOT: class_decl "CodingGeneric"{{.*}}@_staticInitializeObjCMetadata
-// CHECK: class_decl "SubclassOfCodingE"{{.*}}@_staticInitializeObjCMetadata

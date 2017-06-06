@@ -948,8 +948,8 @@ void IRGenerator::emitLazyDefinitions() {
   }
 }
 
-void IRGenerator::emitNSArchiveClassNameRegistration() {
-  if (ClassesForArchiveNameRegistration.empty())
+void IRGenerator::emitEagerClassInitialization() {
+  if (ClassesForEagerInitialization.empty())
     return;
 
   // Emit the register function in the primary module.
@@ -957,37 +957,28 @@ void IRGenerator::emitNSArchiveClassNameRegistration() {
 
   llvm::Function *RegisterFn = llvm::Function::Create(
                                 llvm::FunctionType::get(IGM->VoidTy, false),
-                                llvm::GlobalValue::InternalLinkage,
-                                "_swift_register_class_names_for_archives");
+                                llvm::GlobalValue::PrivateLinkage,
+                                "_swift_eager_class_initialization");
   IRGenFunction RegisterIGF(*IGM, RegisterFn);
   RegisterFn->setAttributes(IGM->constructInitialAttributes());
   IGM->Module.getFunctionList().push_back(RegisterFn);
   RegisterFn->setCallingConv(IGM->DefaultCC);
 
-  for (ClassDecl *CD : ClassesForArchiveNameRegistration) {
+  for (ClassDecl *CD : ClassesForEagerInitialization) {
     Type Ty = CD->getDeclaredType();
     llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(getAsCanType(Ty));
-    if (auto *LegacyAttr = CD->getAttrs().
-          getAttribute<NSKeyedArchiverClassNameAttr>()) {
-      // Register the name for the class in the NSKeyed(Un)Archiver.
-      llvm::Value *NameStr = IGM->getAddrOfGlobalString(LegacyAttr->Name);
-      RegisterIGF.Builder.CreateCall(IGM->getRegisterClassNameForArchivingFn(),
-                                     {NameStr, MetaData});
-    } else {
-      assert(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>());
+    assert(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>());
 
-      // In this case we don't add a name mapping, but just get the metadata
-      // to make sure that the class is registered. But: we need to add a use
-      // (empty inline asm instruction) for the metadata. Otherwise
-      // llvm would optimize the metadata accessor call away because it's
-      // defined as "readnone".
-      llvm::FunctionType *asmFnTy =
-        llvm::FunctionType::get(IGM->VoidTy, {MetaData->getType()},
-                                false /* = isVarArg */);
-      llvm::InlineAsm *inlineAsm =
-        llvm::InlineAsm::get(asmFnTy, "", "r", true /* = SideEffects */);
-      RegisterIGF.Builder.CreateCall(inlineAsm, MetaData);
-    }
+    // Get the metadata to make sure that the class is registered. We need to 
+    // add a use (empty inline asm instruction) for the metadata. Otherwise
+    // llvm would optimize the metadata accessor call away because it's
+    // defined as "readnone".
+    llvm::FunctionType *asmFnTy =
+      llvm::FunctionType::get(IGM->VoidTy, {MetaData->getType()},
+                              false /* = isVarArg */);
+    llvm::InlineAsm *inlineAsm =
+      llvm::InlineAsm::get(asmFnTy, "", "r", true /* = SideEffects */);
+    RegisterIGF.Builder.CreateCall(inlineAsm, MetaData);
   }
   RegisterIGF.Builder.CreateRetVoid();
 

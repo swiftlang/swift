@@ -748,11 +748,8 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
   }
 }
 
-void IRGenerator::addClassForArchiveNameRegistration(ClassDecl *ClassDecl) {
-
-  // Those two attributes are interesting to us
-  if (!ClassDecl->getAttrs().hasAttribute<NSKeyedArchiverClassNameAttr>() &&
-      !ClassDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
+void IRGenerator::addClassForEagerInitialization(ClassDecl *ClassDecl) {
+  if (!ClassDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
   // Exclude some classes where those attributes make no sense but could be set
@@ -765,7 +762,7 @@ void IRGenerator::addClassForArchiveNameRegistration(ClassDecl *ClassDecl) {
   if (ClassDecl->hasClangNode())
     return;
 
-  ClassesForArchiveNameRegistration.push_back(ClassDecl);
+  ClassesForEagerInitialization.push_back(ClassDecl);
 }
 
 llvm::AttributeList IRGenModule::getAllocAttrs() {
