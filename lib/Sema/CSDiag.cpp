@@ -5317,6 +5317,97 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       .diagnose();
 }
 
+static bool isRawRepresentableMismatch(Type fromType, Type toType,
+                                       KnownProtocolKind kind,
+                                       const ConstraintSystem *CS) {
+  toType = toType->lookThroughAllAnyOptionalTypes();
+  fromType = fromType->lookThroughAllAnyOptionalTypes();
+
+  // First check if this is an attempt to convert from something to
+  // raw representable.
+  if (conformsToKnownProtocol(fromType, kind, CS)) {
+    if (auto rawType = isRawRepresentable(toType, kind, CS))
+      return true;
+  }
+
+  // Otherwise, it might be an attempt to convert from raw representable
+  // to its raw value.
+  if (auto rawType = isRawRepresentable(fromType, kind, CS)) {
+    if (conformsToKnownProtocol(toType, kind, CS))
+      return true;
+  }
+
+  return false;
+}
+
+static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
+                                             Expr *argExpr,
+                                             ArrayRef<Identifier> argLabels) {
+  // We are only interested in cases which are
+  // unrelated to argument count or label mismatches.
+  switch (CCI.closeness) {
+    case CC_OneArgumentNearMismatch:
+    case CC_OneArgumentMismatch:
+    case CC_OneGenericArgumentNearMismatch:
+    case CC_OneGenericArgumentMismatch:
+    case CC_ArgumentNearMismatch:
+    case CC_ArgumentMismatch:
+      break;
+
+    default:
+      return false;
+  }
+
+  auto argType = argExpr->getType();
+  if (!argType || argType->hasTypeVariable() || argType->hasUnresolvedType())
+    return false;
+
+  ArrayRef<KnownProtocolKind> rawRepresentableProtocols = {
+      KnownProtocolKind::ExpressibleByStringLiteral,
+      KnownProtocolKind::ExpressibleByIntegerLiteral};
+
+  const auto *CS = CCI.CS;
+  auto arguments = decomposeArgType(argType, argLabels);
+  auto *tupleArgs = dyn_cast<TupleExpr>(argExpr);
+
+  for (auto &candidate : CCI.candidates) {
+    auto *decl = candidate.getDecl();
+    if (!decl)
+      continue;
+
+    auto parameters =
+        decomposeParamType(candidate.getArgumentType(), decl, candidate.level);
+
+    if (parameters.size() != arguments.size())
+      continue;
+
+    for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
+      auto paramType = parameters[i].Ty;
+      auto argType = arguments[i].Ty;
+
+      for (auto kind : rawRepresentableProtocols) {
+        // If trying to convert from raw type to raw representable,
+        // or vice versa from raw representable (e.g. enum) to raw type.
+        if (!isRawRepresentableMismatch(argType, paramType, kind, CS))
+          continue;
+
+        auto *expr = argExpr;
+        if (tupleArgs)
+          expr = tupleArgs->getElement(i);
+
+        auto diag =
+            CS->TC.diagnose(expr->getLoc(), diag::cannot_convert_argument_value,
+                            argType, paramType);
+
+        tryRawRepresentableFixIts(diag, CS, argType, paramType, kind, expr);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /// If the candidate set has been narrowed down to a specific structural
 /// problem, e.g. that there are too few parameters specified or that argument
 /// labels don't match up, diagnose that error and return true.
@@ -6163,6 +6254,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (isContextualConversionFailure(argTuple))
       return false;
 
+    if (diagnoseRawRepresentableMismatch(calleeInfo, argExpr, argLabels))
+      return true;
+
     if (!lhsType->isEqual(rhsType)) {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
                overloadName, lhsType, rhsType)
@@ -6214,8 +6308,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
   if (argExpr->getType()->hasUnresolvedType())
     return false;
-  
-  
+
+  if (diagnoseRawRepresentableMismatch(calleeInfo, argExpr, argLabels))
+    return true;
+
   std::string argString = getTypeListString(argExpr->getType());
 
   // If we couldn't get the name of the callee, then it must be something of a
