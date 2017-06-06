@@ -152,17 +152,26 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
     add_function(sizes, curr_func, start_addr, end_addr, group_by_prefix)
 
 
-def compare_sizes(old_sizes, new_sizes, name_key, title):
+def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key=""):
     old_size = old_sizes[name_key]
     new_size = new_sizes[name_key]
+    if total_size_key:
+        old_total_size = old_sizes[total_size_key]
+        new_total_size = new_sizes[total_size_key]
     if old_size is not None and new_size is not None:
         if old_size != 0:
             perc = "%.1f%%" % (
                 (1.0 - float(new_size) / float(old_size)) * 100.0)
         else:
             perc = "- "
-        print("%-26s%16s: %8d  %8d  %6s" %
-              (title, name_key, old_size, new_size, perc))
+        if total_size_key:
+            print("%-26s%16s: %8d (%2d%%)  %8d (%2d%%)  %7s" %
+                  (title, name_key, old_size,
+                   old_size * 100.0 / old_total_size,
+                   new_size, new_size * 100.0 / new_total_size, perc))
+        else:
+            print("%-26s%16s: %14d  %14d  %7s" %
+                  (title, name_key, old_size, new_size, perc))
 
 
 def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
@@ -182,11 +191,11 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories):
     else:
         title = "old-new"
 
-    compare_sizes(old_sizes, new_sizes, "__text", title)
+    compare_sizes(old_sizes, new_sizes, "__text", title, "")
     if list_categories:
         for cat in categories:
             cat_name = cat[0]
-            compare_sizes(old_sizes, new_sizes, cat_name, "")
+            compare_sizes(old_sizes, new_sizes, cat_name, "", "__text")
 
     if all_sections:
         section_title = "    section"
