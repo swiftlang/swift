@@ -1700,17 +1700,17 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
         lookupBaseType = objectType;
       }
 
-      if (!lookupBaseType->mayHaveMembers()) return type;
-
-      auto subs = lookupBaseType->getContextSubstitutionMap(
+      if (lookupBaseType->mayHaveMembers()) {
+        auto subs = lookupBaseType->getContextSubstitutionMap(
           cs.DC->getParentModule(),
-          assocType->getDeclContext());
-      auto result = assocType->getDeclaredInterfaceType().subst(subs);
+            assocType->getDeclContext());
+        auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
-      if (result)
-        return result;
+        if (result)
+          return result;
+      }
 
-      return DependentMemberType::get(ErrorType::get(newBase), assocType);
+      return DependentMemberType::get(lookupBaseType, assocType);
     }
 
     return type;
