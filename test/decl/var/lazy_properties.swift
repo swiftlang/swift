@@ -159,4 +159,6 @@ class ReferenceSelfInLazyProperty : BaseClass {
 
   var i = 42
   func f() -> Int { return 0 }
+
+  lazy var refBaseClassProp = baseInstanceProp
 }
