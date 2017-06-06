@@ -273,8 +273,8 @@ DECL_ATTR(_implements, Implements,
           | NotSerialized | UserInaccessible,
           /* Not serialized */ 67)
 
-DECL_ATTR(NSKeyedArchiverClassName, NSKeyedArchiverClassName,
-          OnClass | NotSerialized | LongAttribute,
+DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
+          OnClass | NotSerialized | UserInaccessible | RejectByParser,
           /*Not serialized */ 68)
 
 SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,

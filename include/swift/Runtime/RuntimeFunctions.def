@@ -1217,14 +1217,6 @@ FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
          ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
-// func _registerClassNameForArchiving(_ nameOrNull: UnsafePointer<CChar>?,
-//                                     _ c: AnyClass)
-FUNCTION(RegisterClassNameForArchiving, swift_registerClassNameForArchiving,
-         SwiftCC,
-         RETURNS(VoidTy),
-         ARGS(Int8PtrTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
-
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:

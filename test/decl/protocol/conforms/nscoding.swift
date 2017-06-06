@@ -101,9 +101,9 @@ class CodingE<T> : CodingB<T> {   // expected-error{{generic class 'CodingE<T>' 
   override func encode(coder: NSCoder) { }
 }
 
-// @NSKeyedArchiverClassName suppressions
+// @objc suppressions
 extension CodingA {
-  @NSKeyedArchiverClassName("TheNestedE")
+  @objc(TheNestedE)
   class NestedE : NSObject, NSCoding {
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
@@ -116,28 +116,21 @@ class CodingGeneric<T> : NSObject, NSCoding {
   func encode(coder: NSCoder) { }
 }
 
-@NSKeyedArchiverClassName("TheCodingF")
+@objc(TheCodingF)
 fileprivate class CodingF : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
-@NSKeyedArchiverClassName("TheCodingG")
+@objc(TheCodingG)
 private class CodingG : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
 }
 
-// Errors with @NSKeyedArchiverClassName.
-@NSKeyedArchiverClassName("TheCodingG") // expected-error{{@NSKeyedArchiverClassName may only be used on 'class' declarations}}
-struct Foo { }
-
-@NSKeyedArchiverClassName("TheCodingG") // expected-error{{'@NSKeyedArchiverClassName' cannot be applied to generic class 'Bar<T>'}}
-class Bar<T> : NSObject { }
-
 extension CodingB {
-  @NSKeyedArchiverClassName("GenericViaParent") // expected-error{{'@NSKeyedArchiverClassName' cannot be applied to generic class 'CodingB<T>.GenericViaParent'}}
-  class GenericViaParent : NSObject { }
+  @objc(GenericViaScope) // expected-error {{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}}
+  class GenericViaScope : NSObject { }
 }
 
 // Inference of @_staticInitializeObjCMetadata.
@@ -150,6 +143,7 @@ class DontAllowStaticInits { }
 // CHECK-NOT: class_decl "CodingA"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
-// CHECK-NOT: class_decl "NestedE"{{.*}}@_staticInitializeObjCMetadata
+// CHECK: class_decl "NestedE"{{.*}}@_staticInitializeObjCMetadata
 // CHECK-NOT: class_decl "CodingGeneric"{{.*}}@_staticInitializeObjCMetadata
+// CHECK-NOT: class_decl "GenericViaScope"{{.*}}@_staticInitializeObjCMetadata
 // CHECK: class_decl "SubclassOfCodingE"{{.*}}@_staticInitializeObjCMetadata

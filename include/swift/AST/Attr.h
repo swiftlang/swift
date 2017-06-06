@@ -1161,21 +1161,26 @@ public:
   }
 };
 
-/// Defines the @NSKeyedArchiverClassNameAttr attribute.
-class NSKeyedArchiverClassNameAttr : public DeclAttribute {
+/// A limited variant of \c @objc that's used for classes with generic ancestry.
+class ObjCRuntimeNameAttr : public DeclAttribute {
+  static StringRef getSimpleName(const ObjCAttr &Original) {
+    assert(Original.hasName());
+    return Original.getName()->getSimpleName().str();
+  }
 public:
-  NSKeyedArchiverClassNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_NSKeyedArchiverClassName, AtLoc, Range, Implicit),
+  ObjCRuntimeNameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range,
+                      bool Implicit)
+    : DeclAttribute(DAK_ObjCRuntimeName, AtLoc, Range, Implicit),
       Name(Name) {}
 
-  NSKeyedArchiverClassNameAttr(StringRef Name, bool Implicit)
-    : NSKeyedArchiverClassNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  explicit ObjCRuntimeNameAttr(const ObjCAttr &Original)
+    : ObjCRuntimeNameAttr(getSimpleName(Original), Original.AtLoc,
+                          Original.Range, Original.isImplicit()) {}
 
-  /// The legacy mangled name.
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_NSKeyedArchiverClassName;
+    return DA->getKind() == DAK_ObjCRuntimeName;
   }
 };
 

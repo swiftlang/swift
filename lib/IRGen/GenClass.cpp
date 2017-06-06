@@ -971,7 +971,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
                     classTI.getLayout(*this, selfType),
                     classTI.getClassLayout(*this, selfType));
 
-  IRGen.addClassForArchiveNameRegistration(D);
+  IRGen.addClassForEagerInitialization(D);
 
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
