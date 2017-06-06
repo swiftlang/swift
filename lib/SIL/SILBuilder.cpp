@@ -364,7 +364,7 @@ SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
     if (metatypeInst->use_empty() &&
         metatypeInst->getParent() == getInsertionBB()) {
       auto origLoc = metatypeInst->getLoc();
-      metatypeInst->removeFromParent();
+      metatypeInst->eraseFromParent();
       return createMetatype(origLoc, Ty);
     }
   }
@@ -382,7 +382,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
     if (metatypeInst->use_empty() &&
         metatypeInst->getParent() == getInsertionBB()) {
       auto origLoc = metatypeInst->getLoc();
-      metatypeInst->removeFromParent();
+      metatypeInst->eraseFromParent();
       return createMetatype(origLoc, Ty);
     }
   }
