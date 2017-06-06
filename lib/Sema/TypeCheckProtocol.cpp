@@ -4200,7 +4200,13 @@ void ConformanceChecker::resolveTypeWitnesses() {
     }
 
     TC.validateDecl(assocType);
-    Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
+    Type defaultType = assocType->getDefaultDefinitionLoc().getType();
+
+    // FIXME: Circularity
+    if (!defaultType)
+      return Type();
+
+    defaultType = defaultType.subst(
         QueryTypeSubstitutionMap{substitutions},
         LookUpConformanceInModule(DC->getParentModule()));
 
