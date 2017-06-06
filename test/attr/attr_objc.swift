@@ -419,6 +419,13 @@ extension ConcreteSubclassOfGeneric2 {
   @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
 }
 
+@objc(CustomNameForSubclassOfGeneric) // okay
+class ConcreteSubclassOfGeneric3 : GenericContext3<Int> {}
+
+extension ConcreteSubclassOfGeneric3 {
+  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+}
+
 class subject_subscriptIndexed1 {
   @objc
   subscript(a: Int) -> Int { // no-error

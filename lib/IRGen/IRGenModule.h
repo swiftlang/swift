@@ -222,7 +222,7 @@ private:
   /// The queue of lazy witness tables to emit.
   llvm::SmallVector<SILWitnessTable *, 4> LazyWitnessTables;
 
-  llvm::SmallVector<ClassDecl *, 4> ClassesForArchiveNameRegistration;
+  llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
   /// The order in which all the SIL function definitions should
   /// appear in the translation unit.
@@ -298,7 +298,7 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
-  void emitNSArchiveClassNameRegistration();
+  void emitEagerClassInitialization();
 
   /// Checks if the metadata of \p Nominal can be emitted lazily.
   ///
@@ -338,7 +338,7 @@ public:
                                       fn, IGM});
   }
 
-  void addClassForArchiveNameRegistration(ClassDecl *ClassDecl);
+  void addClassForEagerInitialization(ClassDecl *ClassDecl);
 
   unsigned getFunctionOrder(SILFunction *F) {
     auto it = FunctionOrder.find(F);
