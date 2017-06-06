@@ -477,7 +477,7 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()
     var identity1 = d1._rawIdentifier()
@@ -501,6 +501,13 @@ DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
     assert(d1.count == 7)
     assert(d1[30]! == 1030)
     assert(d1[70]! == 2070)
+
+    let d2 = d1.merging([(40, 3040), (80, 3080)]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+    assert(d2.count == 8)
+    assert(d2[40]! == 3040)
+    assert(d2[80]! == 3080)
   }
 
   do {
@@ -572,6 +579,127 @@ DictionaryTestSuite.test("COW.Fast.MergeDoesNotReallocate") {
 
     // Merge, keeping existing values.
     d2.merge([(10, 2010)]) { x, _ in x }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+}
+
+DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate") {
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    // Merge some new values.
+    d1.merge([40: 2040, 50: 2050]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 5)
+    assert(d1[50]! == 2050)
+
+    // Merge and overwrite some existing values.
+    d1.merge([10: 2010, 60: 2060]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 6)
+    assert(d1[10]! == 2010)
+    assert(d1[60]! == 2060)
+
+    // Merge, keeping existing values.
+    d1.merge([30: 2030, 70: 2070]) { x, _ in x }
+    assert(identity1 == d1._rawIdentifier())
+    assert(d1.count == 7)
+    assert(d1[30]! == 1030)
+    assert(d1[70]! == 2070)
+
+    let d2 = d1.merging([40: 3040, 80: 3080]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+    assert(d2.count == 8)
+    assert(d2[40]! == 3040)
+    assert(d2[80]! == 3080)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge some new values.
+    d2.merge([40: 2040, 50: 2050]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+    assert(d1[40] == nil)
+
+    assert(d2.count == 5)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+    assert(d2[40]! == 2040)
+    assert(d2[50]! == 2050)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge and overwrite some existing values.
+    d2.merge([10: 2010]) { _, y in y }
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 != d2._rawIdentifier())
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 2010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    _fixLifetime(d1)
+    _fixLifetime(d2)
+  }
+
+  do {
+    var d1 = getCOWFastDictionary()
+    var identity1 = d1._rawIdentifier()
+
+    var d2 = d1
+    assert(identity1 == d1._rawIdentifier())
+    assert(identity1 == d2._rawIdentifier())
+
+    // Merge, keeping existing values.
+    d2.merge([10: 2010]) { x, _ in x }
     assert(identity1 == d1._rawIdentifier())
     assert(identity1 != d2._rawIdentifier())
 
