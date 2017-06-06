@@ -171,13 +171,6 @@ public:
   /// \brief Drops all uses that belong to this instruction.
   void dropAllReferences();
 
-  /// \brief Replace all uses of this instruction with Undef.
-  ///
-  /// TODO: This should be on ValueBase, but ValueBase currently does not have
-  /// access to a SILModule. If that ever changes, this method should move to
-  /// ValueBase.
-  void replaceAllUsesWithUndef();
-
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
 
