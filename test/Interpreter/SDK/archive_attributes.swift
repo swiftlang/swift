@@ -51,7 +51,6 @@ private class PrivateClass : NSObject, NSCoding {
   }
 }
 
-@NSKeyedArchiverEncodeNonGenericSubclassesOnly
 class GenericClass<T> : NSObject, NSCoding {
   var gi : T? = nil
 

@@ -281,10 +281,7 @@ SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
                  OnClass | NotSerialized | LongAttribute | RejectByParser,
                  /*Not serialized */ 69)
 
-SIMPLE_DECL_ATTR(NSKeyedArchiverEncodeNonGenericSubclassesOnly,
-                 NSKeyedArchiverEncodeNonGenericSubclassesOnly,
-                 OnClass | NotSerialized | LongAttribute,
-                 /*Not serialized */ 70)
+// 70 is available; it was not a serialized attribute.
 
 // HACK: Attribute needed to preserve source compatibility by downgrading errors
 // due to an SDK change in Dispatch

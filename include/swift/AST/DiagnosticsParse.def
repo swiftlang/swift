@@ -1319,6 +1319,9 @@ ERROR(attr_objc_empty_name,none,
       "expected name within parentheses of @objc attribute", ())
 ERROR(attr_nskeyedarchiverclassname_removed, none,
       "@NSKeyedArchiverClassName has been removed; use @objc instead", ())
+ERROR(attr_nskeyedarchiverencodenongenericsubclassesonly_removed, none,
+      "@NSKeyedArchiverEncodeNonGenericSubclassesOnly is no longer necessary",
+      ())
 
 // opened
 ERROR(opened_attribute_expected_lparen,none,
