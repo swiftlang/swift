@@ -2980,8 +2980,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
           }
         }
       }
-      
-      // If the invocation's argument expression has a favored constraint,
+
+      // If the invocation's argument expression has a favored type,
       // use that information to determine whether a specific overload for
       // the initializer should be favored.
       if (favoredType && result.FavoredChoice == ~0U) {
@@ -2996,7 +2996,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
             argType = ctor.Decl->getInnermostDeclContext()
                 ->mapTypeIntoContext(argType);
             if (argType->isEqual(favoredType))
-              result.FavoredChoice = result.ViableCandidates.size();
+              if (!ctor->getAttrs().isUnavailable(getASTContext()))
+                result.FavoredChoice = result.ViableCandidates.size();
           }
         }
       }
