@@ -163,10 +163,15 @@ public:
   }
 
   /// Replace every use of a result of this instruction with the corresponding
-  /// result from RHS. The method assumes that both instructions have the same
-  /// number of results. To replace just one result use
-  /// SILValue::replaceAllUsesWith.
+  /// result from RHS.
+  ///
+  /// The method assumes that both instructions have the same number of
+  /// results. To replace just one result use SILValue::replaceAllUsesWith.
   void replaceAllUsesWith(ValueBase *RHS);
+
+  /// \brief Replace all uses of this instruction with an undef value of the
+  /// same type as the result of this instruction.
+  void replaceAllUsesWithUndef();
 
   /// Returns true if this value has no uses.
   /// To ignore debug-info instructions use swift::onlyHaveDebugUses instead

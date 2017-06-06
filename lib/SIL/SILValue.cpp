@@ -45,6 +45,18 @@ void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
   }
 }
 
+void ValueBase::replaceAllUsesWithUndef() {
+  SILModule *Mod = getModule();
+  if (!Mod) {
+    llvm_unreachable("replaceAllUsesWithUndef can only be used on ValueBase "
+                     "that have access to the parent module.");
+  }
+  while (!use_empty()) {
+    Operand *Op = *use_begin();
+    Op->set(SILUndef::get(Op->get()->getType(), Mod));
+  }
+}
+
 SILBasicBlock *ValueBase::getParentBlock() const {
   auto *NonConstThis = const_cast<ValueBase *>(this);
   if (auto *Inst = dyn_cast<SILInstruction>(NonConstThis))
