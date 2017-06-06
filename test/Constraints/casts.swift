@@ -210,3 +210,11 @@ _ = seven as Int // expected-error {{cannot convert value of type 'Double' to ty
 func rdar29894174(v: B?) {
   let _ = [v].flatMap { $0 as? D }
 }
+
+enum AGreatEnum<T> {}
+
+func isCastFromOptionalToNonOptional(_ value: Any?) {
+  assert(value is AGreatEnum) // expected-error{{generic parameter 'T' could not be inferred in cast to 'AGreatEnum<_>'}}
+  // epected-note@-1{{'T' declared as parameter to type 'AGreatEnum'}}
+  // epected-note@-2{{explicitly specify the generic arguments to fix this issue}}{{29-34=<Any>}}
+}
