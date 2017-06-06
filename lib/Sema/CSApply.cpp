@@ -7085,12 +7085,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
 
-  // If this is an UnresolvedType in the system, preserve it.
-  if (ty->is<UnresolvedType>()) {
-    cs.setType(apply, ty);
-    return apply;
-  }
-
   if (!cs.isTypeReference(fn)) {
     bool isExistentialType = false;
     // If this is an attempt to initialize existential type.
@@ -7117,12 +7111,18 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
-  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-         ty->isExistentialType() || ty->is<ArchetypeType>());
   auto ctorLocator = cs.getConstraintLocator(
                  locator.withPathElement(ConstraintLocator::ApplyFunction)
                         .withPathElement(ConstraintLocator::ConstructorMember));
   auto selected = getOverloadChoiceIfAvailable(ctorLocator);
+  if (!selected) {
+    assert(ty->hasError() || ty->hasUnresolvedType());
+    cs.setType(apply, ty);
+    return apply;
+  }
+
+  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+         ty->isExistentialType() || ty->is<ArchetypeType>());
 
   // We have the constructor.
   auto choice = selected->choice;
