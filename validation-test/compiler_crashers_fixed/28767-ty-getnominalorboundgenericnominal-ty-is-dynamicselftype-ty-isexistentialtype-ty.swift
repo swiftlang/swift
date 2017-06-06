@@ -6,5 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-&{LazyFilterIndex{
+// RUN: not %target-swift-frontend %s -emit-ir
+@objc protocol P{struct B{var f=_=a{}}class a{}typealias a
