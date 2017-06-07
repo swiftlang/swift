@@ -202,6 +202,8 @@ struct S7 : P7 {
 
   func inExpressionContext() {
     _ = Y.self
+    _ = T5.T1.self
+    _ = T5.T2.self
   }
 }
 

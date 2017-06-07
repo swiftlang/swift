@@ -6,6 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-typealias e:a
-struct A:a{}typealias a=A
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol A:a{{}typealias e:a}{}class a:A{typealias e:b
