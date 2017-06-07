@@ -1065,6 +1065,19 @@ bool FloatingRequirementSource::isRecursive(
 
       pa = parent;
     }
+
+    // Also check the root type.
+    grossCount = 0;
+    for (Type type = rootType;
+         auto depTy = type->getAs<DependentMemberType>();
+         type = depTy->getBase()) {
+      if (depTy->getName() == nestedName) {
+        if (++grossCount > 4) {
+          ++NumRecursive;
+          return true;
+        }
+      }
+    }
   }
 
   return false;
