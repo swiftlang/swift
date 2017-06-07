@@ -90,9 +90,17 @@ Using the Benchmark Driver
 
 ### Examples
 
-1. `$ ./Benchmark_O --num-iters=1 --num-samples=1`
-2. `$ ./Benchmark_Onone --list`
-3. `$ ./Benchmark_Ounchecked Ackermann`
+* `$ ./Benchmark_O --num-iters=1 --num-samples=1`
+* `$ ./Benchmark_Onone --list`
+* `$ ./Benchmark_Ounchecked Ackermann`
+
+### Note
+As a shortcut, you can also refer to benchmarks by their ordinal numbers.
+The regular `--list` option does not provide these, but you can run:
+* `$ ./Benchmark_O --list --run-all | tail -n +2 | nl`
+You can use ordinal numbers instead of test names like this:
+* `$ ./Benchmark_O 1 42`
+* `$ ./Benchmark_Driver run 1 42`
 
 Using the Harness Generator
 ---------------------------
