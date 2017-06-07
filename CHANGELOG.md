@@ -309,6 +309,31 @@ Swift 4.0
 
 Swift 3.1
 ---------
+* [SE-0075][]:
+
+  Build configuration statements may now use `#if canImport(ModuleName)` to 
+  test if a module can be imported without importing the module itself.  It can
+  be used to conditionalize API imports or exports based on the presence or 
+  absence of modules:
+
+  ```swift
+  #if canImport(UIKit)
+    import UIKit
+
+    typealias View = UIView
+    typealias Color = UIColor
+  #elseif canImport(AppKit)
+    import AppKit
+
+    typealias View = NSView
+    typealias Color = NSColor    
+  #endif
+
+  class CustomView : View {
+    var foregroundColor: Color? = nil
+  }
+  ```
+
 
 ### 2017-03-27 (Xcode 8.3)
 
