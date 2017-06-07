@@ -6,6 +6,19 @@ func foo(a: Int?, b: Int?) -> Int {
   case (_, .none): return 2
   case (.some(_), .some(_)): return 3
   }
+    
+  switch (a, b) {
+  case (.none, _): return 1
+  case (_, .none): return 2
+  case (_?, _?): return 3
+  }
+  
+  switch Optional<(Int?, Int?)>.some((a, b)) {
+  case .none: return 1
+  case let (_, x?)?: return x
+  case let (x?, _)?: return x
+  case (.none, .none)?: return 0
+  }
 }
 
 func bar(a: Bool, b: Bool) -> Int {
@@ -46,6 +59,15 @@ func foo() {
     ()
   case (_, .B(_)):
     ()
+  }
+  
+  switch (Foo.A(1), Optional<(Int, Int)>.some((0, 0))) {
+  case (.A(_), _):
+    break
+  case (.B(_), (let q, _)?):
+    print(q)
+  case (.B(_), nil):
+    break
   }
 }
 
