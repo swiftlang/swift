@@ -322,15 +322,6 @@ public:
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
-  /// \brief Add a new same-type requirement between two fully resolved types
-  /// (output of GenericSignatureBuilder::resolve).
-  ///
-  /// The two types must not be incompatible concrete types.
-  ConstraintResult addSameTypeRequirementDirect(
-                                            ResolvedType paOrT1,
-                                            ResolvedType paOrT2,
-                                            FloatingRequirementSource Source);
-
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
