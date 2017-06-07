@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# android/build-toolchain
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+set -e
+
+cd "$(dirname $0)/../.." || exit
+SRC_DIR=$PWD
+
+ANDROID_NDK_DIR="${ANDROID_NDK_DIR:?Please set the Android NDK directory in the ANDROID_NDK_DIR environment variable}"
+ANDROID_ICU_DIR="${ANDROID_ICU_DIR:?Please set the libiconv-libicu-android directory in the ANDROID_ICU_DIR environment variable}"
+
+SWIFT_TOOLCHAIN_DIR="${SRC_DIR}/../swift-android-toolchain"
+SWIFT_LINUX_DIR="${SRC_DIR}/../build/Ninja-ReleaseAssert/swift-linux-x86_64"
+
+./utils/build-script \
+    -R \
+    --android \
+    --android-ndk "${ANDROID_NDK_DIR}" \
+    --android-api-level 21 \
+    --android-icu-uc "${ANDROID_ICU_DIR}/armeabi-v7a" \
+    --android-icu-uc-include "${ANDROID_ICU_DIR}/armeabi-v7a/icu/source/common" \
+    --android-icu-i18n "${ANDROID_ICU_DIR}/armeabi-v7a" \
+    --android-icu-i18n-include "${ANDROID_ICU_DIR}/armeabi-v7a/icu/source/i18n" || exit
+
+test -e ${SWIFT_LINUX_DIR} || exit
+rm -rf ${SWIFT_TOOLCHAIN_DIR}
+mkdir -p ${SWIFT_TOOLCHAIN_DIR}/usr
+
+cp -r ${SWIFT_LINUX_DIR}/{bin,lib,include} ${SWIFT_TOOLCHAIN_DIR}/usr
