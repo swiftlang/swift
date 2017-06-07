@@ -28,7 +28,17 @@ import argparse
 import os
 import subprocess
 
-import lldb
+try:
+    import lldb
+except ImportError:
+    from distutils import spawn
+    swift_exec = spawn.find_executable('swift')
+    if swift_exec is not None:
+        site_packages = os.path.join(os.path.dirname(swift_exec),
+                                     '../lib/python2.7/site-packages/')
+        import sys
+        sys.path.append(site_packages)
+        import lldb
 
 
 def process_ldd(lddoutput):
@@ -38,7 +48,7 @@ def process_ldd(lddoutput):
         if len(ldd_tokens) >= 2:
             lib = ldd_tokens[-2]
             dyn_libs[ldd_tokens[0]] = lib
-            real_name = os.path.basename(os.path.realpath(lib)) 
+            real_name = os.path.basename(os.path.realpath(lib))
             dyn_libs[real_name] = lib
     return dyn_libs
 
@@ -58,7 +68,19 @@ def create_lldb_target(binary, memmap):
     return lldb_target
 
 
+def add_lldb_target_modules(lldb_target, memmap):
+    for dynlib_path in memmap:
+        module = lldb_target.AddModule(
+            dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
+        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
+
+lldb_target = None
+known_memmap = {}
+
+
 def process_stack(binary, dyn_libs, stack):
+    global lldb_target
+    global known_memmap
     if len(stack) == 0:
         return
     memmap = {}
@@ -77,21 +99,29 @@ def process_stack(binary, dyn_libs, stack):
             framePC = int(stack_tokens[2], 16)
             symbol_offset = int(stack_tokens[-1], 10)
             dynlib_baseaddr = framePC - symbol_offset
-            if dynlib_path in memmap:
-                if memmap[dynlib_path] != dynlib_baseaddr:
+            if dynlib_path in memmap or dynlib_path in known_memmap:
+                if dynlib_path in memmap:
+                    existing_baseaddr = memmap[dynlib_path]
+                else:
+                    existing_baseaddr = known_memmap[dynlib_path]
+                if existing_baseaddr != dynlib_baseaddr:
                     error_msg = "Mismatched base address for: {0:s}, " \
                                 "had: {1:x}, now got {2:x}"
                     error_msg = error_msg.format(
-                        dynlib_path, memmap[dynlib_path], dynlib_baseaddr)
+                        dynlib_path, existing_baseaddr, dynlib_baseaddr)
                     raise Exception(error_msg)
             else:
+                known_memmap[dynlib_path] = dynlib_baseaddr
                 memmap[dynlib_path] = dynlib_baseaddr
         else:
             framePC = int(stack_tokens[2], 16) + int(stack_tokens[-1], 10)
         full_stack.append(
             {"line": line, "framePC": framePC, "dynlib_fname": dynlib_fname})
 
-    lldb_target = create_lldb_target(binary, memmap)
+    if lldb_target is None:
+        lldb_target = create_lldb_target(binary, memmap)
+    else:
+        add_lldb_target_modules(lldb_target, memmap)
     frame_idx = 0
     for frame in full_stack:
         use_orig_line = True
@@ -130,8 +160,8 @@ def main():
     parser.add_argument(
         "binary", help="Executable which produced the log file")
     parser.add_argument(
-        "log", type=argparse.FileType("rU"),
-        help="Log file containing the stack trace to symbolicate")
+        "log", nargs='?', type=argparse.FileType("rU"), default="-",
+        help="Log file for symbolication. Defaults to stdin.")
     args = parser.parse_args()
 
     binary = args.binary
