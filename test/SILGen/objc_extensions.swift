@@ -110,7 +110,7 @@ testOverrideProperty(Sub())
 // CHECK-LABEL: sil shared [thunk] @_T015objc_extensions3SubC3fooyyFTc
 // CHECK:         function_ref @_T015objc_extensions3SubC3fooyyFTD
 // CHECK: } // end sil function '_T015objc_extensions3SubC3fooyyFTc'
-// CHECK:       sil shared [transparent] [thunk] @_T015objc_extensions3SubC3fooyyFTD
+// CHECK:       sil shared [transparent] [serializable] [thunk] @_T015objc_extensions3SubC3fooyyFTD
 // CHECK:       bb0([[SELF:%.*]] : $Sub):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:         class_method [volatile] [[SELF_COPY]] : $Sub, #Sub.foo!1.foreign

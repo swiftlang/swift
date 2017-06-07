@@ -27,7 +27,7 @@ class Pool {
 
 public:
   Pool() : Stop(false) {
-    for(size_t i = 0; i < NumThreads; ++i)
+    for (size_t i = 0; i < NumThreads; ++i)
       Workers.emplace_back([this] {
         while (true) {
           std::function<void()> Task;
@@ -38,7 +38,7 @@ public:
               return Stop || !Tasks.empty();
             });
 
-            if(Stop && Tasks.empty()) {
+            if (Stop && Tasks.empty()) {
               return;
             }
 
@@ -70,7 +70,7 @@ public:
       Stop = true;
     }
     Condition.notify_all();
-    for(auto &Worker : Workers) {
+    for (auto &Worker : Workers) {
       Worker.join();
     }
   }

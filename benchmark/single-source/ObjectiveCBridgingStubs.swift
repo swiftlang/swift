@@ -24,15 +24,15 @@ func testObjectiveCBridgeStubFromNSString() {
    for _ in 0 ..< 10_000 {
      str = b.testToString()
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
+   CheckResults(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSString(_ N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubFromNSString()
     }
   }
@@ -54,8 +54,8 @@ func testObjectiveCBridgeStubToNSString() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSString(_ N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubToNSString()
     }
   }
@@ -71,15 +71,15 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
      arr = b.testToArrayOfStrings()
      str = arr[0]
    }
-   CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
+   CheckResults(str != "" && str == "Default string value no tagged pointer")
 }
 #endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromArrayOfNSString(_ N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubFromArrayOfNSString()
     }
   }
@@ -100,8 +100,8 @@ func testObjectiveCBridgeStubToArrayOfNSString() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToArrayOfNSString(_ N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubToArrayOfNSString()
     }
   }
@@ -124,8 +124,8 @@ func testObjectiveCBridgeStubFromNSDate() {
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSDate(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubFromNSDate()
     }
   }
@@ -146,8 +146,8 @@ public func testObjectiveCBridgeStubToNSDate() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSDate(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubToNSDate()
     }
   }
@@ -168,8 +168,8 @@ func testObjectiveCBridgeStubDateAccess() {
 @inline(never)
 public func run_ObjectiveCBridgeStubDateAccess(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubDateAccess()
     }
   }
@@ -189,8 +189,8 @@ func testObjectiveCBridgeStubDateMutation() {
 @inline(never)
 public func run_ObjectiveCBridgeStubDateMutation(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubDateMutation()
     }
   }
@@ -213,8 +213,8 @@ func testObjectiveCBridgeStubURLAppendPath() {
 @inline(never)
 public func run_ObjectiveCBridgeStubURLAppendPath(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubURLAppendPath()
     }
   }
@@ -238,8 +238,8 @@ func testObjectiveCBridgeStubDataAppend() {
 @inline(never)
 public func run_ObjectiveCBridgeStubDataAppend(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubDataAppend()
     }
   }

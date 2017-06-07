@@ -126,7 +126,7 @@ struct SyntaxFactory {
 
   /// Make a function parameter list with the given parameters.
   static FunctionParameterListSyntax makeFunctionParameterList(
-    const std::vector<FunctionParameterSyntax> &Parameters);
+    std::vector<FunctionParameterSyntax> Parameters);
 
   /// Make an empty function parameter list.
   static FunctionParameterListSyntax makeBlankFunctionParameterList();
@@ -579,7 +579,7 @@ struct SyntaxFactory {
   static FunctionTypeSyntax
   makeFunctionType(TypeAttributesSyntax TypeAttributes,
                    RC<TokenSyntax> LeftParen,
-                   TupleTypeElementListSyntax ArgumentList,
+                   FunctionParameterListSyntax ArgumentList,
                    RC<TokenSyntax> RightParen, RC<TokenSyntax> ThrowsOrRethrows,
                    RC<TokenSyntax> Arrow, TypeSyntax ReturnType);
 

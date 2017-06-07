@@ -83,12 +83,12 @@ func testUpcastBridge() {
   dictBO = dictBB as [BridgedToObjC: ObjC]
   dictOB = dictBB as [ObjC: BridgedToObjC]
 
-  dictBB = dictBO // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, ObjC>' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
-  dictBB = dictOB // expected-error{{cannot assign value of type 'Dictionary<ObjC, BridgedToObjC>' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictBB = dictBO // expected-error{{cannot assign value of type '[BridgedToObjC : ObjC]' to type '[BridgedToObjC : BridgedToObjC]'}}
+  dictBB = dictOB // expected-error{{cannot assign value of type '[ObjC : BridgedToObjC]' to type '[BridgedToObjC : BridgedToObjC]'}}
 
-  dictDO = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<DerivesObjC, ObjC>'}}
-  dictOD = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<ObjC, DerivesObjC>'}}
-  dictDD = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<DerivesObjC, DerivesObjC>'}}
+  dictDO = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[DerivesObjC : ObjC]'}}
+  dictOD = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[ObjC : DerivesObjC]'}}
+  dictDD = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[DerivesObjC : DerivesObjC]'}}
   
   _ = dictDD; _ = dictDO; _ = dictOD; _ = dictOO; _ = dictOR; _ = dictOR; _ = dictRR; _ = dictRO
 }
@@ -119,7 +119,7 @@ func testDowncastBridge() {
   _ = dictOB as Dictionary<BridgedToObjC, BridgedToObjC>
 
   // We don't do mixed down/upcasts.
-  _ = dictDO as! Dictionary<BridgedToObjC, BridgedToObjC> // expected-warning{{forced cast from 'Dictionary<DerivesObjC, ObjC>' to 'Dictionary<BridgedToObjC, BridgedToObjC>' always succeeds; did you mean to use 'as'?}}
+  _ = dictDO as! Dictionary<BridgedToObjC, BridgedToObjC> // expected-warning{{forced cast from '[DerivesObjC : ObjC]' to 'Dictionary<BridgedToObjC, BridgedToObjC>' always succeeds; did you mean to use 'as'?}}
 }
 
 func testConditionalDowncastBridge() {
@@ -149,7 +149,7 @@ func testConditionalDowncastBridge() {
 
   // Mixed down/upcasts.
   if let d = dictDO as? Dictionary<BridgedToObjC, BridgedToObjC> { _ = d }
-  // expected-warning@-1{{conditional cast from 'Dictionary<DerivesObjC, ObjC>' to 'Dictionary<BridgedToObjC, BridgedToObjC>' always succeeds}}
+  // expected-warning@-1{{conditional cast from '[DerivesObjC : ObjC]' to 'Dictionary<BridgedToObjC, BridgedToObjC>' always succeeds}}
 
   _ = dictRR
   _ = dictRO

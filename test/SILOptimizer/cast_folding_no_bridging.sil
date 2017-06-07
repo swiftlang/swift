@@ -88,7 +88,7 @@ bb2:
 // CHECK: bb0(
 // CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
 // CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
-// CHECK:      [[FN:%.*]] = function_ref @_T0SSs21_ObjectiveCBridgeable10FoundationsAAP024_conditionallyBridgeFromA1CSb01_A5CTypeQz_xSgz6resulttFZTW : $@convention(witness_method) (@owned NSString, @inout Optional<String>, @thick String.Type) -> Bool
+// CHECK:      [[FN:%.*]] = function_ref @_T0SS10FoundationE34_conditionallyBridgeFromObjectiveCSbSo8NSStringC_SSSgz6resulttFZ : $@convention(method) (@owned NSString, @inout Optional<String>, @thin String.Type) -> Bool
 // CHECK: apply [[FN]]([[T1]], {{.*}}, {{.*}})
 sil @testCFToSwift : $@convention(thin) (@in CFString) -> @out String {
 bb0(%0 : $*String, %1 : $*CFString):

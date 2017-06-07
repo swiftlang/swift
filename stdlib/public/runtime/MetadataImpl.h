@@ -769,32 +769,7 @@ struct SwiftAllocator {
 
 /// A CRTP class which provides basic implementations for a number of
 /// value witnesses relating to buffers.
-template <class Impl> struct BufferValueWitnessesBase {
-  static void destroyBuffer(ValueBuffer *buffer, const Metadata *self) {
-    Impl::destroy(Impl::projectBuffer(buffer, self), self);
-    Impl::deallocateBuffer(buffer, self);
-  }
-
-  static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    return Impl::initializeBufferWithCopy(dest,
-                                          Impl::projectBuffer(src, self),
-                                          self);
-  }
-
-  static OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
-                                               OpaqueValue *src,
-                                               const Metadata *self) {
-    return Impl::initializeWithCopy(Impl::allocateBuffer(dest, self), src, self);
-  }
-
-  static OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
-                                               OpaqueValue *src,
-                                               const Metadata *self) {
-    return Impl::initializeWithTake(Impl::allocateBuffer(dest, self), src, self);
-  }
-};
+template <class Impl> struct BufferValueWitnessesBase {};
 
 /// How should a type be packed into a fixed-size buffer?
 enum class FixedPacking {
@@ -819,12 +794,6 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = true;
 
-  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    return reinterpret_cast<OpaqueValue*>(buffer);
-  }
-  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
-    return reinterpret_cast<OpaqueValue*>(buffer);
-  }
   static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
@@ -832,7 +801,12 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
                                     reinterpret_cast<OpaqueValue*>(src),
                                     self);
   }
-  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {}
+  static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                       ValueBuffer *src,
+                                                       const Metadata *self) {
+    return Impl::initializeWithCopy(reinterpret_cast<OpaqueValue *>(dest),
+                                    reinterpret_cast<OpaqueValue *>(src), self);
+  }
 };
 
 /// An implementation of BufferValueWitnesses suitable for types that
@@ -842,23 +816,34 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = false;
 
-  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    OpaqueValue *value =
-      static_cast<OpaqueValue*>(SwiftAllocator<Size, Alignment>::alloc());
-    buffer->PrivateData[0] = value;
-    return value;
-  }
-  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
-    return reinterpret_cast<OpaqueValue*>(buffer->PrivateData[0]);
-  }
-  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    SwiftAllocator<Size, Alignment>::dealloc(buffer->PrivateData[0]);
-  }
   static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
-    dest->PrivateData[0] = src->PrivateData[0];
-    return (OpaqueValue*) dest->PrivateData[0];
+    auto wtable = self->getValueWitnesses();
+    auto *srcReference = *reinterpret_cast<HeapObject **>(src);
+    *reinterpret_cast<HeapObject **>(dest) = srcReference;
+
+    // Project the address of the value in the buffer.
+    unsigned alignMask = wtable->getAlignmentMask();
+    // Compute the byte offset of the object in the box.
+    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+    auto *bytePtr = reinterpret_cast<char *>(srcReference);
+    return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
+  }
+
+  static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                       ValueBuffer *src,
+                                                       const Metadata *self) {
+    auto wtable = self->getValueWitnesses();
+    auto reference = src->PrivateData[0];
+    dest->PrivateData[0] = reference;
+    swift_retain(reinterpret_cast<HeapObject *>(reference));
+    // Project the address of the value in the buffer.
+    unsigned alignMask = wtable->getAlignmentMask();
+    // Compute the byte offset of the object in the box.
+    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+    auto *bytePtr = reinterpret_cast<char *>(reference);
+    return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
   }
 };
 
@@ -866,49 +851,46 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
 /// fixed in size.
 template <class Impl, bool IsKnownAllocated>
 struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
-  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return reinterpret_cast<OpaqueValue*>(buffer);
-    } else {
-      OpaqueValue *value =
-        static_cast<OpaqueValue*>(swift_slowAlloc(vwtable->size,
-                                                  vwtable->getAlignmentMask()));
-      buffer->PrivateData[0] = value;
-      return value;
-    }
-  }
-
-  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    (void)vwtable;
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return reinterpret_cast<OpaqueValue*>(buffer);
-    } else {
-      return reinterpret_cast<OpaqueValue*>(buffer->PrivateData[0]);
-    }
-  }
-
-  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    if (IsKnownAllocated || !vwtable->isValueInline()) {
-      swift_slowDealloc(buffer->PrivateData[0], vwtable->size,
-                        vwtable->getAlignmentMask());
-    }
-  }
-
   static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
     auto vwtable = self->getValueWitnesses();
     (void)vwtable;
-    if (!IsKnownAllocated && !vwtable->isValueInline()) {
-      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
+    if (!IsKnownAllocated && vwtable->isValueInline()) {
+      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue *>(dest),
+                                      reinterpret_cast<OpaqueValue *>(src),
+                                      self);
+    } else {
+      auto reference = src->PrivateData[0];
+      dest->PrivateData[0] = reference;
+      // Project the address of the value in the buffer.
+      unsigned alignMask = vwtable->getAlignmentMask();
+      // Compute the byte offset of the object in the box.
+      unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+      auto *bytePtr = reinterpret_cast<char *>(reference);
+      return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
+    }
+  }
+
+  static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                       ValueBuffer *src,
+                                                       const Metadata *self) {
+    auto vwtable = self->getValueWitnesses();
+    (void)vwtable;
+    if (!IsKnownAllocated && vwtable->isValueInline()) {
+      return Impl::initializeWithCopy(reinterpret_cast<OpaqueValue*>(dest),
                                       reinterpret_cast<OpaqueValue*>(src),
                                       self);
     } else {
-      dest->PrivateData[0] = src->PrivateData[0];
-      return (OpaqueValue*) dest->PrivateData[0];
+      auto reference = src->PrivateData[0];
+      dest->PrivateData[0] = reference;
+      swift_retain(reinterpret_cast<HeapObject*>(reference));
+      // Project the address of the value in the buffer.
+      unsigned alignMask = vwtable->getAlignmentMask();
+      // Compute the byte offset of the object in the box.
+      unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+      auto *bytePtr = reinterpret_cast<char *>(reference);
+      return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
     }
   }
 };

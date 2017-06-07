@@ -21,7 +21,7 @@
 // to expressSwiftTypeConverter that at this layer.
 //
 // These are internal implementation ONLY - do not expose anything involving
-// RawSyntax publically. Clients of lib/Syntax should not be aware that they
+// RawSyntax publicly. Clients of lib/Syntax should not be aware that they
 // exist.
 //
 //===----------------------------------------------------------------------===//

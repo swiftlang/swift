@@ -7,10 +7,10 @@ import Swift
 import SwiftShims
 
 
-//CHECK-LABEL: caller_function
+//CHECK-LABEL: sil @caller_function
 //CHECK-NOT: try_apply
 //CHECK: throw {{.*}} : $Error
-sil  @caller_function : $@convention(thin) () -> @error Error {
+sil @caller_function : $@convention(thin) () -> @error Error {
 bb0:
   // function_ref main.inner () throws -> ()
   %0 = function_ref @callee_function : $@convention(thin) () -> @error Error // user: %1
@@ -24,7 +24,7 @@ bb2(%5 : $Error):                             // Preds: bb0
   throw %5 : $Error                           // id: %6
 }
 
-//CHECK-LABEL: callee_function
+//CHECK-LABEL: sil [always_inline] @callee_function
 //CHECK: return
 
 // main.inner () throws -> ()

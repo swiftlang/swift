@@ -32,7 +32,7 @@ func test0() throws {
 // CHECK:     [[ERROR]]([[T0:%.*]] : $Error):
 // CHECK-NEXT:  throw [[T0]]
 //   Closure.
-// CHECK-LABEL: sil shared @_T08rethrows5test1yyKFSiyKcfU_ : $@convention(thin) () -> (Int, @error Error) {
+// CHECK-LABEL: sil private @_T08rethrows5test1yyKFSiyKcfU_ : $@convention(thin) () -> (Int, @error Error) {
 // CHECK:       [[RETHROWER:%.*]] = function_ref @_T08rethrows9rethrowerS2iyKcKF : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (Int, @error Error)
 // CHECK:       [[THROWER:%.*]] = function_ref @_T08rethrows7throwerSiyKF : $@convention(thin) () -> (Int, @error Error)
 // CHECK:       [[T0:%.*]] = thin_to_thick_function [[THROWER]]

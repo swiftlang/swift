@@ -10,7 +10,7 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
-    var type: T { return type(of: self) }
+    var type: T { return type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
 // FIXME: The "associated type 'Foo' is not a member type of 'Self'" diagnostic
@@ -65,8 +65,7 @@ public struct S<A: P> where A.T == S<A> {
 }
 
 protocol I {
-  // FIXME: these are spurious
-  init() // expected-note {{protocol requires initializer 'init()' with type '()'}}
+  init()
 }
 
 protocol PI {
@@ -99,6 +98,10 @@ struct S4<A: PI> : I where A : I {
 }
 
 struct S5<A: PI> : I where A : I, A.T == S4<A> {
+// expected-warning@-1{{redundant conformance constraint 'A': 'I'}}
+// expected-warning@-2{{redundant conformance constraint 'A': 'PI'}}
+// expected-note@-3{{conformance constraint 'A': 'PI' inferred from type here}}
+// expected-note@-4{{conformance constraint 'A': 'I' inferred from type here}}
 }
 
 // Used to hit ArchetypeBuilder assertions

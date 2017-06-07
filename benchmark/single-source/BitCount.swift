@@ -33,8 +33,8 @@ func countBitSet(_ num: Int) -> Int {
 public func run_BitCount(_ N: Int) {
   for _ in 1...100*N {
     // Check some results.
-    CheckResults(countBitSet(1) == 1, "Incorrect results in BitCount.")
-    CheckResults(countBitSet(2) == 1, "Incorrect results in BitCount.")
-    CheckResults(countBitSet(2457) == 6, "Incorrect results in BitCount.")
+    CheckResults(countBitSet(1) == 1)
+    CheckResults(countBitSet(2) == 1)
+    CheckResults(countBitSet(2457) == 6)
   }
 }

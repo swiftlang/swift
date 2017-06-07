@@ -33,7 +33,7 @@ extension CocoaError.Code {
   public static var serviceMalformedServiceDictionary: CocoaError.Code {
     return CocoaError.Code(rawValue: 66564)
   }
-  public static var serviceMiscellaneous: CocoaError.Code {
+  public static var serviceMiscellaneousError: CocoaError.Code {
     return CocoaError.Code(rawValue: 66800)
   }
   public static var sharingServiceNotConfigured: CocoaError.Code {
@@ -71,8 +71,8 @@ extension CocoaError.Code {
   public static var serviceMalformedServiceDictionaryError: CocoaError.Code {
     return CocoaError.Code(rawValue: 66564)
   }
-  @available(*, deprecated, renamed: "serviceMiscellaneous")
-  public static var serviceMiscellaneousError: CocoaError.Code {
+  @available(*, deprecated, renamed: "serviceMiscellaneousError")
+  public static var serviceMiscellaneous: CocoaError.Code {
     return CocoaError.Code(rawValue: 66800)
   }
   @available(*, deprecated, renamed: "sharingServiceNotConfigured")

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #if DEPLOYMENT_RUNTIME_SWIFT
-
+    
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux)
@@ -19,24 +19,24 @@ import Glibc
 #endif
     
 import CoreFoundation
-
+    
 internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     munmap(mem, length)
 }
-
+    
 internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     free(mem)
 }
-
+    
 #else
-
+    
 @_exported import Foundation // Clang module
 import _SwiftFoundationOverlayShims
 import _SwiftCoreFoundationOverlayShims
-
+    
 @_silgen_name("__NSDataWriteToURL")
 internal func __NSDataWriteToURL(_ data: NSData, _ url: NSURL, _ options: UInt, _ error: NSErrorPointer) -> Bool
-
+    
 #endif
 
 public final class _DataStorage {
@@ -189,7 +189,7 @@ public final class _DataStorage {
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
                 let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.length, &stopv)
+                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.location, &stopv)
                 if stopv {
                     stop.pointee = true
                 }
@@ -198,7 +198,7 @@ public final class _DataStorage {
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
                 let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.length, &stopv)
+                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.location, &stopv)
                 if stopv {
                     stop.pointee = true
                 }
@@ -341,7 +341,7 @@ public final class _DataStorage {
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.append(bytes, length: length)
-            _backing = .customReference(data)
+            _backing = .customMutableReference(data)
         case .customMutableReference(let d):
             d.append(bytes, length: length)
         }
@@ -350,11 +350,11 @@ public final class _DataStorage {
     
     // fast-path for appending directly from another data storage
     @inline(__always)
-    public func append(_ otherData: _DataStorage) {
+    public func append(_ otherData: _DataStorage, startingAt start: Int) {
         let otherLength = otherData.length
         if otherLength == 0 { return }
         if let bytes = otherData.bytes {
-            append(bytes, length: otherLength)
+            append(bytes.advanced(by: start), length: otherLength)
         }
     }
     
@@ -421,7 +421,7 @@ public final class _DataStorage {
             if _length < range.location + range.length {
                 let newLength = range.location + range.length
                 if _capacity < newLength {
-
+                    
                     _grow(newLength, false)
                 }
                 _length = newLength
@@ -471,7 +471,7 @@ public final class _DataStorage {
                     memset(mutableBytes! + start, 0, replacementLength)
                 }
             }
-
+            
             if resultingLength < currentLength {
                 setLength(resultingLength)
             }
@@ -703,50 +703,64 @@ public final class _DataStorage {
     }
     
     public func withInteriorPointerReference<T>(_ range: Range<Int>, _ work: (NSData) throws -> T) rethrows -> T {
+        if range.count == 0 {
+            return try work(NSData()) // zero length data can be optimized as a singleton
+        }
+        
         switch _backing {
         case .swift:
-            let d = _bytes == nil ? NSData() : NSData(bytesNoCopy: _bytes!.advanced(by: range.lowerBound), length: range.count, freeWhenDone: false)
-            return try work(d)
+            return try work(NSData(bytesNoCopy: _bytes!.advanced(by: range.lowerBound), length: range.count, freeWhenDone: false))
         case .immutable(let d):
-            if range.lowerBound == 0 && range.upperBound == _length {
-                return try work(d)
-            } else {
-                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            guard range.lowerBound == 0 && range.upperBound == _length else {
+                return try work(NSData(bytesNoCopy: _bytes!.advanced(by: range.lowerBound), length: range.count, freeWhenDone: false))
             }
+            return try work(d)
         case .mutable(let d):
-            if range.lowerBound == 0 && range.upperBound == _length {
-                return try work(d)
-            } else {
-                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            guard range.lowerBound == 0 && range.upperBound == _length else {
+                return try work(NSData(bytesNoCopy: _bytes!.advanced(by: range.lowerBound), length: range.count, freeWhenDone: false))
             }
+            return try work(d)
         case .customReference(let d):
-            if range.lowerBound == 0 && range.upperBound == _length {
-                return try work(d)
-            } else {
-                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            guard range.lowerBound == 0 && range.upperBound == _length else {
+                
+                return try work(NSData(bytesNoCopy: UnsafeMutableRawPointer(mutating: d.bytes.advanced(by: range.lowerBound)), length: range.count, freeWhenDone: false))
             }
+            return try work(d)
         case .customMutableReference(let d):
-            if range.lowerBound == 0 && range.upperBound == _length {
-                return try work(d)
-            } else {
-                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            guard range.lowerBound == 0 && range.upperBound == _length else {
+                return try work(NSData(bytesNoCopy: UnsafeMutableRawPointer(mutating: d.bytes.advanced(by: range.lowerBound)), length: range.count, freeWhenDone: false))
             }
+            return try work(d)
         }
     }
     
-    public func bridgedReference() -> NSData {
+    public func bridgedReference(_ range: Range<Int>) -> NSData {
+        if range.count == 0 {
+            return NSData() // zero length data can be optimized as a singleton
+        }
+        
         switch _backing {
         case .swift:
-            return _NSSwiftData(backing: self)
+            return _NSSwiftData(backing: self, range: range)
         case .immutable(let d):
+            guard range.lowerBound == 0 && range.upperBound == _length else {
+                return _NSSwiftData(backing: self, range: range)
+            }
             return d
         case .mutable(let d):
+            guard range.lowerBound == 0 && range.upperBound == _length else {
+                return _NSSwiftData(backing: self, range: range)
+            }
             return d
         case .customReference(let d):
+            guard range.lowerBound == 0 && range.upperBound == d.length else {
+                return _NSSwiftData(backing: self, range: range)
+            }
             return d
         case .customMutableReference(let d):
-            // Because this is returning an object that may be mutated in the future it needs to create a copy to prevent
-            // any further mutations out from under the receiver
+            guard range.lowerBound == 0 && range.upperBound == d.length else {
+                return d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC()
+            }
             return d.copy() as! NSData
         }
     }
@@ -777,14 +791,15 @@ public final class _DataStorage {
 
 internal class _NSSwiftData : NSData {
     var _backing: _DataStorage!
+    var _range: Range<Data.Index>!
     
-    convenience init(backing: _DataStorage) {
+    convenience init(backing: _DataStorage, range: Range<Data.Index>) {
         self.init()
         _backing = backing
+        _range = range
     }
-    
     override var length: Int {
-        return _backing.length
+        return _range.count
     }
     
     override var bytes: UnsafeRawPointer {
@@ -795,20 +810,28 @@ internal class _NSSwiftData : NSData {
         // return value here is not needed to be an allocated value. This is specifically
         // needed to live like this to be source compatible with Swift3. Beyond that point
         // this API may be subject to correction.
-        return _backing.bytes ?? UnsafeRawPointer(bitPattern: 0xBAD0)!
+        guard let bytes = _backing.bytes else {
+            return UnsafeRawPointer(bitPattern: 0xBAD0)!
+        }
+        
+        return bytes.advanced(by: _range.lowerBound)
     }
     
     override func copy(with zone: NSZone? = nil) -> Any {
-        return NSData(bytes: _backing.bytes, length: _backing.length)
+        return self
     }
-
+    
+    override func mutableCopy(with zone: NSZone? = nil) -> Any {
+        return NSMutableData(bytes: bytes, length: length)
+    }
+    
 #if !DEPLOYMENT_RUNTIME_SWIFT
     @objc
     func _isCompact() -> Bool {
         return true
     }
 #endif
-
+    
 #if DEPLOYMENT_RUNTIME_SWIFT
     override func _providesConcreteBacking() -> Bool {
         return true
@@ -942,7 +965,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         _sliceRange = 0..<count
     }
-
+    
     /// Initialize a `Data` with a repeating byte pattern
     ///
     /// - parameter repeatedValue: A byte to initialize the pattern
@@ -1055,7 +1078,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             _backing = _DataStorage(customReference: reference.copy() as! NSData)
             _sliceRange = 0..<reference.length
         }
-
+        
     }
     
     @_versioned
@@ -1089,7 +1112,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
     @inline(__always)
     public func withUnsafeBytes<ResultType, ContentType>(_ body: (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
-        let bytes =  _backing.bytes ?? UnsafeRawPointer(bitPattern: 0xBAD0)!
+        let bytes =  _backing.bytes?.advanced(by: _sliceRange.lowerBound) ?? UnsafeRawPointer(bitPattern: 0xBAD0)!
         let contentPtr = bytes.bindMemory(to: ContentType.self, capacity: count / MemoryLayout<ContentType>.stride)
         return try body(contentPtr)
     }
@@ -1104,7 +1127,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
-        let mutableBytes = _backing.mutableBytes ?? UnsafeMutableRawPointer(bitPattern: 0xBAD0)!
+        let mutableBytes = _backing.mutableBytes?.advanced(by: _sliceRange.lowerBound) ?? UnsafeMutableRawPointer(bitPattern: 0xBAD0)!
         let contentPtr = mutableBytes.bindMemory(to: ContentType.self, capacity: count / MemoryLayout<ContentType>.stride)
         return try body(UnsafeMutablePointer(contentPtr))
     }
@@ -1126,7 +1149,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: NSRange) {
         if range.length == 0 { return }
-        memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!.advanced(by: range.location + _sliceRange.lowerBound), range.length)
+        memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!.advanced(by: range.location), range.length)
     }
     
     /// Copy a subset of the contents of the data to a pointer.
@@ -1174,7 +1197,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #if !DEPLOYMENT_RUNTIME_SWIFT
     @inline(__always)
     private func _shouldUseNonAtomicWriteReimplementation(options: Data.WritingOptions = []) -> Bool {
-        
+    
         // Avoid a crash that happens on OS X 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
         if !options.contains(.atomic) {
             #if os(OSX)
@@ -1256,7 +1279,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
-        _backing.append(other._backing)
+        _backing.append(other._backing, startingAt: other._sliceRange.lowerBound)
         _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + other.count)
     }
     
@@ -1271,15 +1294,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         _backing.append(buffer.baseAddress!, length: buffer.count * MemoryLayout<SourceType>.stride)
         _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + buffer.count * MemoryLayout<SourceType>.stride)
-    }
-    
-    @inline(__always)
-    public mutating func append(_ other: MutableRangeReplaceableRandomAccessSlice<Data>) {
-        let count = other.count
-        if count == 0 { return }
-        other.base.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Void in
-            append(bytes, count: count)
-        }
     }
     
     @inline(__always)
@@ -1337,12 +1351,27 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
-        data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Void in
+        let resultingLength = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in
             let currentLength = _backing.length
             _backing.replaceBytes(in: nsRange, with: bytes, length: cnt)
-            let resultingLength = currentLength - nsRange.length + cnt
-            _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
+            return currentLength - nsRange.length + cnt
         }
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
+    }
+    
+    @inline(__always)
+    public mutating func replaceSubrange(_ subrange: CountableRange<Index>, with data: Data) {
+        let nsRange = NSMakeRange(subrange.lowerBound, subrange.upperBound - subrange.lowerBound)
+        let cnt = data.count
+        if !isKnownUniquelyReferenced(&_backing) {
+            _backing = _backing.mutableCopy(_sliceRange)
+        }
+        let resultingLength = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in
+            let currentLength = _backing.length
+            _backing.replaceBytes(in: nsRange, with: bytes, length: cnt)
+            return currentLength - nsRange.length + cnt
+        }
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
     }
     
     /// Replace a region of bytes in the data with new bytes from a buffer.
@@ -1396,7 +1425,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 // In the future, if we keep the malloced pointer and count inside this struct/ref instead of deferring to NSData, we may be able to do this more efficiently.
                 self.count = resultCount
             }
-
+            
             let shift = resultCount - currentCount
             let start = subrange.lowerBound
             
@@ -1426,7 +1455,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let resultingLength = currentLength - nsRange.length + cnt
         _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
     }
-
+    
     /// Return a new copy of the data in a specified range.
     ///
     /// - parameter range: The range to copy.
@@ -1489,9 +1518,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public subscript(index: Index) -> UInt8 {
         @inline(__always)
         get {
-            return withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> UInt8 in
-                return bytes.advanced(by: index).pointee
-            }
+            return _backing.bytes!.advanced(by: index).assumingMemoryBound(to: UInt8.self).pointee
         }
         @inline(__always)
         set {
@@ -1513,6 +1540,24 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
+    public subscript<R: RangeExpression>(_ rangeExpression: R) -> Data
+        where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+        @inline(__always)
+        get {
+            let range = rangeExpression.relative(to: 0..<R.Bound.max)
+            let start: Int = numericCast(range.lowerBound)
+            let end: Int = numericCast(range.upperBound)
+            return Data(backing: _backing, range: start..<end)
+        }
+        @inline(__always)
+        set {
+            let range = rangeExpression.relative(to: 0..<R.Bound.max)
+            let start: Int = numericCast(range.lowerBound)
+            let end: Int = numericCast(range.upperBound)
+            replaceSubrange(start..<end, with: newValue)
+        }
+            
+    }
     
     /// The start `Index` in the data.
     public var startIndex: Index {
@@ -1609,14 +1654,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let backing1 = d1._backing
         let backing2 = d2._backing
         if backing1 === backing2 {
-            return true
+            if d1._sliceRange == d2._sliceRange {
+                return true
+            }
         }
-        let length1 = backing1.length
-        if length1 != backing2.length {
+        let length1 = d1.count
+        if length1 != d2.count {
             return false
         }
         if backing1.bytes == backing2.bytes {
-            return true
+            if d1._sliceRange == d2._sliceRange {
+                return true
+            }
         }
         if length1 > 0 {
             return d1.withUnsafeBytes { (b1) in
@@ -1679,7 +1728,7 @@ internal typealias DataBridgeType = _ObjectiveCBridgeable
 extension Data : DataBridgeType {
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSData {
-        return _backing.bridgedReference()
+        return _backing.bridgedReference(_sliceRange)
     }
     
     public static func _forceBridgeFromObjectiveC(_ input: NSData, result: inout Data?) {
@@ -1694,9 +1743,8 @@ extension Data : DataBridgeType {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSData?) -> Data {
-        var result: Data?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return Data() }
+        return Data(referencing: src)
     }
 }
 
@@ -1705,5 +1753,49 @@ extension NSData : _HasCustomAnyHashableRepresentation {
     @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
         return AnyHashable(Data._unconditionallyBridgeFromObjectiveC(self))
+    }
+}
+
+extension Data : Codable {
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        
+        // It's more efficient to pre-allocate the buffer if we can.
+        if let count = container.count {
+            self.init(count: count)
+            
+            // Loop only until count, not while !container.isAtEnd, in case count is underestimated (this is misbehavior) and we haven't allocated enough space.
+            // We don't want to write past the end of what we allocated.
+            for i in 0 ..< count {
+                let byte = try container.decode(UInt8.self)
+                self[i] = byte
+            }
+        } else {
+            self.init()
+        }
+        
+        while !container.isAtEnd {
+            var byte = try container.decode(UInt8.self)
+            self.append(&byte, count: 1)
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        
+        // Since enumerateBytes does not rethrow, we need to catch the error, stow it away, and rethrow if we stopped.
+        var caughtError: Error? = nil
+        self.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, byteIndex: Data.Index, stop: inout Bool) in
+            do {
+                try container.encode(contentsOf: buffer)
+            } catch {
+                caughtError = error
+                stop = true
+            }
+        }
+        
+        if let error = caughtError {
+            throw error
+        }
     }
 }

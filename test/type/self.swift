@@ -23,5 +23,5 @@ extension X {
 }
 
 extension X.Inner {
-  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'Inner'?}}{{21-25=Inner}}
+  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'X.Inner'?}}{{21-25=X.Inner}}
 }

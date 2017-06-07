@@ -469,7 +469,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,
-                  DRE->getDecl()->getName(), isa<ParamDecl>(DRE->getDecl()));
+                  DRE->getDecl()->getBaseName(),
+                  isa<ParamDecl>(DRE->getDecl()));
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(DRE->getDecl());
@@ -482,7 +483,39 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       } else if (isAutoClosure)
         // TODO: add in a fixit for autoclosure
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
-                    DRE->getDecl()->getName());
+                    DRE->getDecl()->getBaseName());
+    }
+
+    // Swift 3 mode produces a warning + Fix-It for the missing ".self"
+    // in certain cases.
+    bool shouldWarnOnMissingSelf(Expr *E) {
+      if (!TC.Context.isSwiftVersion3())
+        return false;
+
+      if (auto *TE = dyn_cast<TypeExpr>(E)) {
+        if (auto *TR = TE->getTypeRepr()) {
+          if (auto *ITR = dyn_cast<IdentTypeRepr>(TR)) {
+            auto range = ITR->getComponentRange();
+            assert(!range.empty());
+
+            // Swift 3 did not consistently diagnose identifier type reprs
+            // with multiple components.
+            if (range.front() != range.back())
+              return true;
+          }
+        }
+      }
+
+      auto *ParentExpr = Parent.getAsExpr();
+
+      // Swift 3 did not diagnose missing '.self' in argument lists.
+      if (ParentExpr &&
+          (isa<ParenExpr>(ParentExpr) ||
+           isa<TupleExpr>(ParentExpr)) &&
+          CallArgs.count(ParentExpr) > 0)
+        return true;
+
+      return false;
     }
 
     // Diagnose metatype values that don't appear as part of a property,
@@ -509,22 +542,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<OpenExistentialExpr>(ParentExpr)) {
           return;
         }
+      }
 
-        // Note: as a specific hack, produce a warning + Fix-It for
-        // the missing ".self" as the subexpression of a parenthesized
-        // expression, which is a historical bug.
-        if (isa<ParenExpr>(ParentExpr) && CallArgs.count(ParentExpr) > 0) {
-          auto diag = TC.diagnose(E->getEndLoc(),
-              diag::warn_value_of_metatype_missing_self,
-              E->getType()->getRValueInstanceType());
-          if (E->canAppendCallParentheses()) {
-            diag.fixItInsertAfter(E->getEndLoc(), ".self");
-          } else {
-            diag.fixItInsert(E->getStartLoc(), "(");
-            diag.fixItInsertAfter(E->getEndLoc(), ").self");
-          }
-          return;
+      if (shouldWarnOnMissingSelf(E)) {
+        auto diag = TC.diagnose(E->getEndLoc(),
+                                diag::warn_value_of_metatype_missing_self,
+                                E->getType()->getRValueInstanceType());
+        if (E->canAppendPostfixExpression()) {
+          diag.fixItInsertAfter(E->getEndLoc(), ".self");
+        } else {
+          diag.fixItInsert(E->getStartLoc(), "(");
+          diag.fixItInsertAfter(E->getEndLoc(), ").self");
         }
+        return;
       }
 
       // Is this a protocol metatype?
@@ -548,7 +578,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Add fix-it to insert ".self".
       auto diag = TC.diagnose(E->getEndLoc(), diag::add_self_to_type);
-      if (E->canAppendCallParentheses()) {
+      if (E->canAppendPostfixExpression()) {
         diag.fixItInsertAfter(E->getEndLoc(), ".self");
       } else {
         diag.fixItInsert(E->getStartLoc(), "(");
@@ -584,7 +614,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                  VD->getName(), VD->getDescriptiveKind(),
+                  VD->getBaseName(), VD->getDescriptiveKind(),
                   declParent->getDescriptiveKind(), declParent->getFullName());
       TC.diagnose(VD, diag::decl_declared_here, VD->getFullName());
 
@@ -638,7 +668,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (TC.getDeclTypeCheckingSemantics(DRE->getDecl())
             != DeclTypeCheckingSemantics::Normal) {
         TC.diagnose(DRE->getLoc(), diag::unsupported_special_decl_ref,
-                    DRE->getDecl()->getName());
+                    DRE->getDecl()->getBaseName());
       }
     }
     
@@ -726,7 +756,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   
       // Casting to the same type or a superclass is a no-op.
       if (toTy->isEqual(fromTy) ||
-          toTy->isExactSuperclassOf(fromTy, &TC)) {
+          toTy->isExactSuperclassOf(fromTy)) {
         auto d = TC.diagnose(DRE->getLoc(), diag::bitcasting_is_no_op,
                              fromTy, toTy);
         if (subExpr) {
@@ -757,7 +787,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
       
       // Unchecked casting to a subclass is better done by unsafeDowncast.
-      if (fromTy->isBindableToSuperclassOf(toTy, &TC)) {
+      if (fromTy->isBindableToSuperclassOf(toTy)) {
         TC.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
                     fromTy, toTy)
           .fixItReplace(DRE->getNameLoc().getBaseNameLoc(),
@@ -1185,8 +1215,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       
       auto lhs = args->getElement(0);
       auto rhs = args->getElement(1);
-      auto calleeName = DRE->getDecl()->getName().str();
-      
+      auto calleeName = DRE->getDecl()->getBaseName();
+
       Expr *subExpr = nullptr;
       if (calleeName == "??" &&
           (subExpr = isImplicitPromotionToOptional(lhs))) {
@@ -1286,7 +1316,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = isStore;
 
             // But silence the warning if the base was explicitly qualified.
-            if (dyn_cast_or_null<DotSyntaxBaseIgnoredExpr>(Parent.getAsExpr()))
+            auto parentAsExpr = Parent.getAsExpr();
+            if (parentAsExpr && isa<DotSyntaxBaseIgnoredExpr>(parentAsExpr))
               shouldDiagnose = false;
 
             if (shouldDiagnose) {
@@ -1412,7 +1443,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         if (isImplicitSelfUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
-                      MRE->getMember().getDecl()->getName())
+                      MRE->getMember().getDecl()->getBaseName())
             .fixItInsert(MRE->getLoc(), "self.");
           return { false, E };
         }
@@ -1424,7 +1455,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           TC.diagnose(DSCE->getLoc(),
                       diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getName())
+                      MethodExpr->getDecl()->getBaseName())
             .fixItInsert(DSCE->getLoc(), "self.");
           return { false, E };
         }
@@ -1468,53 +1499,46 @@ bool TypeChecker::getDefaultGenericArgumentsString(
   genericParamText << "<";
 
   auto printGenericParamSummary =
-      [&](const GenericTypeParamType *genericParamTy) {
+      [&](GenericTypeParamType *genericParamTy) {
     const GenericTypeParamDecl *genericParam = genericParamTy->getDecl();
     if (Type result = getPreferredType(genericParam)) {
       result.print(genericParamText);
       return;
     }
 
-    ArrayRef<ProtocolDecl *> protocols =
-        genericParam->getConformingProtocols();
+    auto contextTy = typeDecl->mapTypeIntoContext(genericParamTy);
+    if (auto archetypeTy = contextTy->getAs<ArchetypeType>()) {
+      SmallVector<Type, 2> members;
 
-    Type superclass = genericParam->getSuperclass();
-    if (superclass && !superclass->hasError()) {
-      if (protocols.empty()) {
-        superclass.print(genericParamText);
+      bool hasExplicitAnyObject = archetypeTy->requiresClass();
+      if (auto superclass = archetypeTy->getSuperclass()) {
+        hasExplicitAnyObject = false;
+        members.push_back(superclass);
+      }
+
+      for (auto proto : archetypeTy->getConformsTo()) {
+        members.push_back(proto->getDeclaredType());
+        if (proto->requiresClass())
+          hasExplicitAnyObject = false;
+      }
+
+      if (hasExplicitAnyObject)
+        members.push_back(typeDecl->getASTContext().getAnyObjectType());
+
+      auto type = ProtocolCompositionType::get(typeDecl->getASTContext(),
+                                               members, hasExplicitAnyObject);
+
+      if (type->isObjCExistentialType() || type->isAny()) {
+        genericParamText << type;
         return;
       }
 
       genericParamText << "<#" << genericParam->getName() << ": ";
-      superclass.print(genericParamText);
-      for (const ProtocolDecl *proto : protocols) {
-        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-          continue;
-        genericParamText << " & " << proto->getName();
-      }
-      genericParamText << "#>";
+      genericParamText << type << "#>";
       return;
     }
 
-    if (protocols.empty()) {
-      genericParamText << Context.Id_Any;
-      return;
-    }
-
-    if (protocols.size() == 1 &&
-        (protocols.front()->isObjC() ||
-         protocols.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))) {
-      genericParamText << protocols.front()->getName();
-      return;
-    }
-
-    genericParamText << "<#" << genericParam->getName() << ": ";
-    interleave(protocols,
-               [&](const ProtocolDecl *proto) {
-                 genericParamText << proto->getName();
-               },
-               [&] { genericParamText << " & "; });
-    genericParamText << "#>";
+    genericParamText << contextTy;
   };
 
   interleave(typeDecl->getInnermostGenericParamTypes(),
@@ -1738,9 +1762,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     // bridging---that doesn't count.
     Type bridged;
     if (normalizedBaseTy->isAny()) {
-      const ProtocolDecl *anyObjectProto =
-          ctx.getProtocol(KnownProtocolKind::AnyObject);
-      bridged = anyObjectProto->getDeclaredType();
+      bridged = ctx.getAnyObjectType();
     } else {
       bridged = ctx.getBridgedToObjC(DC, normalizedBaseTy);
     }
@@ -1989,7 +2011,8 @@ public:
         unsigned defaultFlags = 0;
         // If this VarDecl is nested inside of a CaptureListExpr, remember that
         // fact for better diagnostics.
-        if (dyn_cast_or_null<CaptureListExpr>(Parent.getAsExpr()))
+        auto parentAsExpr = Parent.getAsExpr();
+        if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
           defaultFlags = RK_CaptureList;
         VarDecls[vd] |= defaultFlags;
       }
@@ -2018,7 +2041,7 @@ public:
         if (node.is<Decl *>()) {
           // Flag all variables in a PatternBindingDecl
           Decl *D = node.get<Decl *>();
-          PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D);
+          auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
           for (PatternBindingEntry PBE : PBD->getPatternList()) {
             PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
@@ -2028,7 +2051,7 @@ public:
         } else if (node.is<Stmt *>()) {
           // Flag all variables in guard statements
           Stmt *S = node.get<Stmt *>();
-          GuardStmt *GS = dyn_cast<GuardStmt>(S);
+          auto *GS = dyn_cast<GuardStmt>(S);
           if (!GS) continue;
           for (StmtConditionElement SCE : GS->getCond()) {
             if (auto pattern = SCE.getPatternOrNull()) {
@@ -2167,7 +2190,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
               if (isa<NamedPattern>(LP->getSubPattern())) {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
-                  unsigned noParens = initExpr->canAppendCallParentheses();
+                  unsigned noParens = initExpr->canAppendPostfixExpression();
                   
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
@@ -2601,7 +2624,7 @@ static void checkCStyleForLoop(TypeChecker &TC, const ForStmt *FS) {
   if (!loopVarDecl || loopVarDecl->getNumPatternEntries() != 1)
     return;
 
-  VarDecl *loopVar = dyn_cast<VarDecl>(initializers[1]);
+  auto *loopVar = dyn_cast<VarDecl>(initializers[1]);
   Expr *startValue = loopVarDecl->getInit(0);
   OperatorKind OpKind;
   Expr *endValue = endConditionValueForConvertingCStyleForLoop(FS, loopVar, OpKind);
@@ -2933,7 +2956,7 @@ public:
     : TC(tc), DC(dc), SelectorTy(selectorTy) { }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-    StringLiteralExpr *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
+    auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
     bool fromStringLiteral = false;
     bool hadParens = false;
     if (stringLiteral) {
@@ -3170,7 +3193,7 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName().str();
+        out << nominal->getName().str() << "." << name.getBaseName();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument
@@ -3590,7 +3613,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   // String'ify the arguments.
-  StringRef baseNameStr = name.getBaseName().str();
+  StringRef baseNameStr = name.getBaseIdentifier().str();
   SmallVector<StringRef, 4> argNameStrs;
   for (auto arg : name.getArgumentNames()) {
     if (arg.empty())
@@ -3658,7 +3681,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   };
 
   Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseName());
+                                                    name.getBaseIdentifier());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {

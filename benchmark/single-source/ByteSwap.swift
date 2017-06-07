@@ -18,14 +18,25 @@ import TestsUtils
 
 // a naive O(n) implementation of byteswap.
 func byteswap_n(_ a: UInt64) -> UInt64 {
+#if swift(>=4)
+  return ((a & 0x00000000000000FF) &<< 56) |
+         ((a & 0x000000000000FF00) &<< 40) |
+         ((a & 0x0000000000FF0000) &<< 24) |
+         ((a & 0x00000000FF000000) &<<  8) |
+         ((a & 0x000000FF00000000) &>>  8) |
+         ((a & 0x0000FF0000000000) &>> 24) |
+         ((a & 0x00FF000000000000) &>> 40) |
+         ((a & 0xFF00000000000000) &>> 56)
+#else
   return ((a & 0x00000000000000FF) << 56) |
-      ((a & 0x000000000000FF00) << 40) |
-      ((a & 0x0000000000FF0000) << 24) |
-      ((a & 0x00000000FF000000) <<  8) |
-      ((a & 0x000000FF00000000) >>  8) |
-      ((a & 0x0000FF0000000000) >> 24) |
-      ((a & 0x00FF000000000000) >> 40) |
-      ((a & 0xFF00000000000000) >> 56)
+         ((a & 0x000000000000FF00) << 40) |
+         ((a & 0x0000000000FF0000) << 24) |
+         ((a & 0x00000000FF000000) <<  8) |
+         ((a & 0x000000FF00000000) >>  8) |
+         ((a & 0x0000FF0000000000) >> 24) |
+         ((a & 0x00FF000000000000) >> 40) |
+         ((a & 0xFF00000000000000) >> 56)
+#endif
 }
 
 // a O(logn) implementation of byteswap.
@@ -41,8 +52,8 @@ func byteswap_logn(_ a: UInt64) -> UInt64 {
 public func run_ByteSwap(_ N: Int) {
   for _ in 1...100*N {
     // Check some results.
-    CheckResults(byteswap_logn(byteswap_n(2457)) == 2457, "Incorrect results in ByteSwap.")
-    CheckResults(byteswap_logn(byteswap_n(9129)) == 9129, "Incorrect results in ByteSwap.")
-    CheckResults(byteswap_logn(byteswap_n(3333)) == 3333, "Incorrect results in ByteSwap.")
+    CheckResults(byteswap_logn(byteswap_n(2457)) == 2457)
+    CheckResults(byteswap_logn(byteswap_n(9129)) == 9129)
+    CheckResults(byteswap_logn(byteswap_n(3333)) == 3333)
   }
 }

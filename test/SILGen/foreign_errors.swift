@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -parse-as-library %s | %FileCheck %s
 
@@ -148,12 +148,12 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil shared [thunk] @_T0So10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error Error
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error Error
 // CHECK:      [[T0:%.*]] = function_ref @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]](%0)
 // CHECK-NEXT: return [[T1]]
 
-// CHECK-LABEL: sil shared [thunk] @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
 // CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
 // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 // CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
@@ -190,19 +190,19 @@ class VeryErrorProne : ErrorProne {
 // on than is being tested here, we should consider adding FileCheck tests for
 // it.
 
-// CHECK-LABEL:    sil hidden @_T014foreign_errors14VeryErrorProneCACs9AnyObject_pSg7withTwo_tKcfc
+// CHECK-LABEL:    sil hidden @_T014foreign_errors14VeryErrorProneCACyXlSg7withTwo_tKcfc
 // CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var VeryErrorProne }
-// CHECK:      [[PB:%.*]] = project_box [[BOX]]
-// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
-// CHECK:      store [[ARG2]] to [init] [[MARKED_BOX]]
-// CHECK:      [[T0:%.*]] = load [take] [[MARKED_BOX]]
+// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
+// CHECK:      [[PB:%.*]] = project_box [[MARKED_BOX]]
+// CHECK:      store [[ARG2]] to [init] [[PB]]
+// CHECK:      [[T0:%.*]] = load [take] [[PB]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
 // CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne, $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
 // CHECK:      [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:      [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
-// CHECK-NOT:  [[MARKED_BOX]]{{^[0-9]}}
+// CHECK-NOT:  [[PB]]{{^[0-9]}}
 // CHECK:      apply [[T2]]([[ARG1_COPY]], {{%.*}}, [[T1]])
 
 // rdar://21051021
@@ -298,3 +298,14 @@ func testPreservedResultInverted() throws {
 // CHECK-NOT: destroy_value
 // CHECK:   return {{%.+}} : $()
 // CHECK: [[ERROR_BB]]
+
+// Make sure that we do not crash when emitting the error value here.
+//
+// TODO: Add some additional filecheck tests.
+extension NSURL {
+  func resourceValue<T>(forKey key: String) -> T? {
+    var prop: AnyObject? = nil
+    _ = try? self.getResourceValue(&prop, forKey: key)
+    return prop as? T
+  }
+}

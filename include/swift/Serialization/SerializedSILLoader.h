@@ -112,6 +112,12 @@ public:
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables for
   /// a given Module.
+  ///
+  /// If PrimaryFile is nullptr, all definitions are brought in with
+  /// definition linkage.
+  ///
+  /// Otherwise, definitions not in the primary file are brought in
+  /// with external linkage.
   void getAllForModule(Identifier Mod, FileUnit *PrimaryFile);
 
   /// Deserialize all SILFunctions in all SILModules.

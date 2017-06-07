@@ -192,6 +192,45 @@ protected:
 
   }
   
+  /// Marks the declarations referenced by a key path pattern as alive if they
+  /// aren't yet.
+  void ensureKeyPathComponentsAreAlive(KeyPathPattern *KP) {
+    for (auto &component : KP->getComponents()) {
+      switch (component.getKind()) {
+      case KeyPathPatternComponent::Kind::SettableProperty:
+        ensureAlive(component.getComputedPropertySetter());
+        LLVM_FALLTHROUGH;
+      case KeyPathPatternComponent::Kind::GettableProperty: {
+        ensureAlive(component.getComputedPropertyGetter());
+        auto id = component.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto decl = cast<AbstractFunctionDecl>(id.getDeclRef().getDecl());
+          if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+            ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
+                                   dyn_cast<FuncDecl>(decl),
+                                   clas);
+          } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
+            ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
+          } else {
+            llvm_unreachable("key path keyed by a non-class, non-protocol method");
+          }
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          ensureAlive(id.getFunction());
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          break;
+        }
+        continue;
+      }
+      case KeyPathPatternComponent::Kind::StoredProperty:
+        continue;
+      }
+    }
+  }
+  
   /// Marks a function as alive if it is not alive yet.
   void ensureAlive(SILFunction *F) {
     if (!isAlive(F))
@@ -313,6 +352,8 @@ protected:
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
+        } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
+          ensureKeyPathComponentsAreAlive(KPI->getPattern());
         }
       }
     }
@@ -756,7 +797,8 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
         for (SILInstruction &I : BB) {
           if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
             SILFunction *RefF = FRI->getReferencedFunction();
-            if (RefF->isTransparent() && RefF->isFragile())
+            // FIXME: Bad usage of transparent
+            if (RefF->isTransparent() && RefF->isSerialized())
               ensureAlive(RefF);
           }
         }
@@ -843,7 +885,6 @@ class SILDeadFuncElimination : public SILModuleTransform {
     deadFunctionElimination.eliminateFunctions(this);
   }
   
-  StringRef getName() override { return "Dead Function Elimination"; }
 };
 
 class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
@@ -861,9 +902,6 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
     EFDFE.eliminateFunctions(this);
  }
 
-  StringRef getName() override {
-    return "External Function Definitions Elimination";
-  }
 };
 
 } // end anonymous namespace

@@ -20,7 +20,7 @@ func test0() {
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK:    sil shared [transparent] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Optional<Int>) -> @out Optional<Int> {
+// CHECK:    sil shared [transparent] [serializable] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Optional<Int>) -> @out Optional<Int> {
 // CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
 // CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
 // CHECK-NEXT: store [[T1]] to [trivial] %0
@@ -62,5 +62,5 @@ func testInoutOpaque(_ c: C, i: Int) {
 // CHECK:         partial_apply
 // CHECK:         apply
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T010reabstract1CCSiIxly_ACSiytIxlir_TR : $@convention(thin) (@inout C, @in Int, @owned @callee_owned (@inout C, Int) -> ()) -> @out () {
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T010reabstract1CCSiytIxlir_ACSiIxly_TR : $@convention(thin) (@inout C, Int, @owned @callee_owned (@inout C, @in Int) -> @out ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T010reabstract1CCSiIxly_ACSiytIxlir_TR : $@convention(thin) (@inout C, @in Int, @owned @callee_owned (@inout C, Int) -> ()) -> @out () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T010reabstract1CCSiytIxlir_ACSiIxly_TR : $@convention(thin) (@inout C, Int, @owned @callee_owned (@inout C, @in Int) -> @out ()) -> () {

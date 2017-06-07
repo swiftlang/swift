@@ -20,7 +20,7 @@
 
 #include "swift/AST/Decl.h"
 
-#include "ValueWitness.h"
+#include "swift/IRGen/ValueWitness.h"
 #include "WitnessIndex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ArrayRef.h"

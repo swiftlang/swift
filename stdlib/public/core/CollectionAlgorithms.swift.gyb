@@ -10,14 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-%{
-
-# We know we will eventually get a Sequence.Element type.  Define
-# a shorthand that we can use today.
-IElement = "Iterator.Element"
-
-}%
-
 //===----------------------------------------------------------------------===//
 // last
 //===----------------------------------------------------------------------===//
@@ -33,7 +25,7 @@ extension BidirectionalCollection {
   ///     }
   ///     // Prints "50"
   @_inlineable
-  public var last: Iterator.Element? {
+  public var last: Element? {
     return isEmpty ? nil : self[index(before: endIndex)]
   }
 }
@@ -42,7 +34,7 @@ extension BidirectionalCollection {
 // index(of:)/index(where:)
 //===----------------------------------------------------------------------===//
 
-extension Collection where ${IElement} : Equatable {
+extension Collection where Element : Equatable {
   /// Returns the first index where the specified value appears in the
   /// collection.
   ///
@@ -64,7 +56,7 @@ extension Collection where ${IElement} : Equatable {
   ///
   /// - SeeAlso: `index(where:)`
   @_inlineable
-  public func index(of element: ${IElement}) -> Index? {
+  public func index(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -105,7 +97,7 @@ extension Collection {
   /// - SeeAlso: `index(of:)`
   @_inlineable
   public func index(
-    where predicate: (${IElement}) throws -> Bool
+    where predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
     var i = self.startIndex
     while i != self.endIndex {
@@ -148,7 +140,7 @@ orderingExplanation = """\
 extension MutableCollection {
   @_inlineable
   public mutating func partition(
-    by belongsInSecondPartition: (${IElement}) throws -> Bool
+    by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
 
     var pivot = startIndex
@@ -165,7 +157,7 @@ extension MutableCollection {
     var i = index(after: pivot)
     while i < endIndex {
       if try !belongsInSecondPartition(self[i]) {
-        swap(&self[i], &self[pivot])
+        swapAt(i, pivot)
         formIndex(after: &pivot)
       }
       formIndex(after: &i)
@@ -177,7 +169,7 @@ extension MutableCollection {
 extension MutableCollection where Self : BidirectionalCollection {
   @_inlineable
   public mutating func partition(
-    by belongsInSecondPartition: (${IElement}) throws -> Bool
+    by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Int in
@@ -217,7 +209,7 @@ extension MutableCollection where Self : BidirectionalCollection {
         break Loop
       } while false
 
-      swap(&self[lo], &self[hi])
+      swapAt(lo, hi)
       formIndex(after: &lo)
     }
 
@@ -233,7 +225,7 @@ extension MutableCollection where Self : BidirectionalCollection {
 
 % sequenceKind = 'sequence' if 'Sequence' in Self else 'collection'
 
-extension ${Self} where Self.Iterator.Element : Comparable {
+extension ${Self} where Element : Comparable {
   /// Returns the elements of the ${sequenceKind}, sorted.
   ///
   /// You can sort any ${sequenceKind} of elements that conform to the
@@ -263,7 +255,7 @@ extension ${Self} where Self.Iterator.Element : Comparable {
   ///
   /// - SeeAlso: `sorted(by:)`, `sort()`
   @_inlineable
-  public func sorted() -> [Iterator.Element] {
+  public func sorted() -> [Element] {
     var result = ContiguousArray(self)
     result.sort()
     return Array(result)
@@ -339,10 +331,10 @@ ${orderingExplanation}
   @_inlineable
   public func sorted(
     by areInIncreasingOrder:
-      (${IElement}, ${IElement}) -> Bool
-  ) -> [Iterator.Element] {
+      (Element, Element) throws -> Bool
+  ) rethrows -> [Element] {
     var result = ContiguousArray(self)
-    result.sort(by: areInIncreasingOrder)
+    try result.sort(by: areInIncreasingOrder)
     return Array(result)
   }
 }
@@ -351,8 +343,7 @@ ${orderingExplanation}
 
 extension MutableCollection
   where
-  Self : RandomAccessCollection,
-  Self.Iterator.Element : Comparable {
+  Self : RandomAccessCollection, Element : Comparable {
 
   /// Sorts the collection in place.
   ///
@@ -397,6 +388,9 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   /// Sorts the collection in place, using the given predicate as the
   /// comparison between elements.
+  ///
+  /// This method can take throwing closure. If closure throws error while sorting,
+  /// order of elements may change. No elements will be lost.
   ///
   /// When you want to sort a collection of elements that doesn't conform to
   /// the `Comparable` protocol, pass a closure to this method that returns
@@ -452,19 +446,19 @@ ${orderingExplanation}
   @_inlineable
   public mutating func sort(
     by areInIncreasingOrder:
-      (${IElement}, ${IElement}) -> Bool
-  ) {
+      (Element, Element) throws -> Bool
+  ) rethrows {
 
     let didSortUnsafeBuffer: Void? =
-      _withUnsafeMutableBufferPointerIfSupported {
+      try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(by: areInIncreasingOrder)
+      try bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(
+      try _introSort(
         &self,
         subRange: startIndex..<endIndex,
         by: areInIncreasingOrder)
@@ -472,112 +466,12 @@ ${orderingExplanation}
   }
 }
 
-% for Self in '_Indexable', '_MutableIndexable':
-%{
-
-subscriptCommentPre = """\
-  /// Accesses a contiguous subrange of the collection's elements.
-  ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4"""
-
-if 'Mutable' in Self:
-  subscriptCommentMid = """\
-  ///     streets[index!] = "Eustace"
-  ///     print(streets[index!])
-  ///     // Prints "Eustace\""""
-else:
-  subscriptCommentMid = """\
-  ///     print(streets[index!])
-  ///     // Prints "Evarts\""""
-
-subscriptCommentPost = """\
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The bounds of
-  ///   the range must be valid indices of the collection."""
-}%
-// FIXME(ABI)#180 (Type checker)
-// WORKAROUND rdar://25214066 - should be on Collection
-extension ${Self} {
-${subscriptCommentPre}
-${subscriptCommentMid}
-${subscriptCommentPost}
-  @_inlineable
-  public subscript(bounds: ClosedRange<Index>) -> SubSequence {
-    get {
-      return self[
-        Range(
-          uncheckedBounds: (
-            lower: bounds.lowerBound,
-            upper: index(after: bounds.upperBound)))
-      ]
-    }
-%   if 'Mutable' in Self:
-    set {
-      self[
-        Range(
-          uncheckedBounds: (
-            lower: bounds.lowerBound,
-            upper: index(after: bounds.upperBound)))
-      ] = newValue
-    }
-%   end
-  }
-}
-
-// FIXME(ABI)#180 (Type checker)
-// WORKAROUND rdar://25214066 - should be on Collection
-extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
-${subscriptCommentPre}
-${subscriptCommentMid}
-${subscriptCommentPost}
-  @_inlineable
-  public subscript(bounds: CountableRange<Index>) -> SubSequence {
-    get {
-      return self[Range(bounds)]
-    }
-%   if 'Mutable' in Self:
-    set {
-      self[Range(bounds)] = newValue
-    }
-%   end
-  }
-
-${subscriptCommentPre}
-${subscriptCommentMid}
-${subscriptCommentPost}
-  @_inlineable
-  public subscript(bounds: CountableClosedRange<Index>) -> SubSequence {
-    get {
-      return self[ClosedRange(bounds)]
-    }
-%   if 'Mutable' in Self:
-    set {
-      self[ClosedRange(bounds)] = newValue
-    }
-%   end
-  }
-}
-% end
-
 //===--- Unavailable stuff ------------------------------------------------===//
 
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, message: "call partition(by:)")
   public mutating func partition(
-    isOrderedBefore: (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore: (Element, Element) -> Bool
   ) -> Index {
     Builtin.unreachable()
   }
@@ -585,14 +479,14 @@ extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, message: "slice the collection using the range, and call partition(by:)")
   public mutating func partition(
     _ range: Range<Index>,
-    isOrderedBefore: (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore: (Element, Element) -> Bool
   ) -> Index {
     Builtin.unreachable()
   }
 }
 
 extension MutableCollection
-  where Self : RandomAccessCollection, ${IElement} : Comparable {
+  where Self : RandomAccessCollection, Element : Comparable {
 
   @available(*, unavailable, message: "call partition(by:)")
   public mutating func partition() -> Index {
@@ -608,23 +502,22 @@ extension MutableCollection
 extension Sequence {
   @available(*, unavailable, renamed: "sorted(by:)")
   public func sort(
-    _ isOrderedBefore: (${IElement}, ${IElement}) -> Bool
-  ) -> [${IElement}] {
+    _ isOrderedBefore: (Element, Element) -> Bool
+  ) -> [Element] {
     Builtin.unreachable()
   }
 }
 
-extension Sequence where ${IElement} : Comparable {
+extension Sequence where Element : Comparable {
   @available(*, unavailable, renamed: "sorted()")
-  public func sort() -> [${IElement}] {
+  public func sort() -> [Element] {
     Builtin.unreachable()
   }
 }
 
 extension MutableCollection
   where
-  Self : RandomAccessCollection,
-  Self.Iterator.Element : Comparable {
+  Self : RandomAccessCollection, Element : Comparable {
 
   @available(*, unavailable, renamed: "sort()")
   public mutating func sortInPlace() {
@@ -635,15 +528,15 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed: "sort(by:)")
   public mutating func sortInPlace(
-    _ isOrderedBefore: (${IElement}, ${IElement}) -> Bool
+    _ isOrderedBefore: (Element, Element) -> Bool
   ) {
     Builtin.unreachable()
   }
 }
 
-extension Collection where ${IElement} : Equatable {
+extension Collection where Element : Equatable {
   @available(*, unavailable, renamed: "index(of:)")
-  public func indexOf(_ element: ${IElement}) -> Index? {
+  public func indexOf(_ element: Element) -> Index? {
     Builtin.unreachable()
   }
 }
@@ -651,7 +544,7 @@ extension Collection where ${IElement} : Equatable {
 extension Collection {
   @available(*, unavailable, renamed: "index(where:)")
   public func indexOf(
-    _ predicate: (${IElement}) throws -> Bool
+    _ predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
     Builtin.unreachable()
   }

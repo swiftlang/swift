@@ -29,15 +29,15 @@ func testObjectiveCBridgeStubFromNSStringRef() {
   for _ in 0 ..< 10_000 {
     nsString = b.testToString()
   }
-  CheckResults(nsString.isEqual(to: "Default string value no tagged pointer" as NSString), "Wrong value returned")
+  CheckResults(nsString.isEqual(to: "Default string value no tagged pointer" as NSString))
 }
 #endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSStringRef(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubFromNSStringRef()
     }
   }
@@ -58,8 +58,8 @@ func testObjectiveCBridgeStubToNSStringRef() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSStringRef(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubToNSStringRef()
     }
   }
@@ -102,8 +102,8 @@ public func testObjectiveCBridgeStubToNSDateRef() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSDateRef(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubToNSDateRef()
     }
   }
@@ -125,8 +125,8 @@ func testObjectiveCBridgeStubNSDateRefAccess() {
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDateRefAccess(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubNSDateRefAccess()
     }
   }
@@ -146,8 +146,8 @@ func testObjectiveCBridgeStubNSDateMutationRef() {
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDateMutationRef(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubNSDateMutationRef()
     }
   }
@@ -170,10 +170,10 @@ func testObjectiveCBridgeStubURLAppendPathRef() {
 @inline(never)
 public func run_ObjectiveCBridgeStubURLAppendPathRef(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
-      testObjectiveCBridgeStubURLAppendPathRef()
-    }
+  for _ in 0 ..< N {
+   autoreleasepool {
+     testObjectiveCBridgeStubURLAppendPathRef()
+   }
   }
 #endif
 }
@@ -195,8 +195,8 @@ func testObjectiveCBridgeStubNSDataAppend() {
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDataAppend(N: Int) {
 #if _runtime(_ObjC)
-  autoreleasepool {
-    for _ in 0 ..< N {
+  for _ in 0 ..< N {
+    autoreleasepool {
       testObjectiveCBridgeStubNSDataAppend()
     }
   }

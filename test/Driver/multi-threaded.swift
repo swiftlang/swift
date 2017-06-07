@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -emit-module -o test.swiftmodule | %FileCheck -check-prefix=MODULE %s
 // RUN: echo "{\"%s\": {\"assembly\": \"/build/multi-threaded.s\"}, \"%S/Inputs/main.swift\": {\"assembly\": \"/build/main.s\"}}" > %t/ofms.json
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofms.json -S | %FileCheck -check-prefix=ASSEMBLY %s
@@ -58,8 +58,8 @@
 // EXEC: ld
 // EXEC: /tmp/main{{[^ ]*}}.o /tmp/multi-threaded{{[^ ]*}}.o
 
-// DEPENDENCIES-DAG: {{.*}}/multi-threaded.o : {{.*}}/Inputs/main.swift {{.*}}/multi-threaded.swift
-// DEPENDENCIES-DAG: {{.*}}/main.o : {{.*}}/Inputs/main.swift {{.*}}/multi-threaded.swift
+// DEPENDENCIES-DAG: {{.*}}/multi-threaded.o : {{.*}}/multi-threaded.swift {{.*}}/Inputs/main.swift
+// DEPENDENCIES-DAG: {{.*}}/main.o : {{.*}}/multi-threaded.swift {{.*}}/Inputs/main.swift
 
 // PARSEABLE2: "name": "compile"
 // PARSEABLE2: "outputs": [

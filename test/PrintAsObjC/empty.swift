@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-objc-header-path %t/empty.h
 // RUN: %FileCheck %s < %t/empty.h
 // RUN: %check-in-clang -std=c99 %t/empty.h
@@ -12,6 +11,10 @@
 // REQUIRES: objc_interop
 
 // CHECK-NOT: @import Swift;
+
+// CHECK-LABEL: #if !defined(__has_feature)
+// CHECK-NEXT: # define __has_feature(x) 0
+// CHECK-NEXT: #endif
 
 // CHECK-LABEL: #include <objc/NSObject.h>
 // CHECK: #include <stdint.h>
@@ -26,7 +29,7 @@
 // CHECK: # define SWIFT_EXTENSION(M)
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
 
-// CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
+// CHECK-LABEL: #if __has_feature(modules)
 // CHECK-NEXT: #endif
 
 

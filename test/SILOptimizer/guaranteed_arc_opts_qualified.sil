@@ -137,3 +137,24 @@ bb0(%0 : $*Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+class C {
+  var val: Builtin.Int32
+  init(i: Builtin.Int32)
+  deinit
+}
+
+// CHECK-LABEL: sil @access_test : $@convention(thin) (@owned C, Builtin.Int32) -> ()
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @access_test : $@convention(thin) (@owned C, Builtin.Int32) -> () {
+bb0(%0 : $C, %1 : $Builtin.Int32):
+  strong_retain %0 : $C
+  %valadr = ref_element_addr %0 : $C, #C.val
+  %access = begin_access [modify] [dynamic] %valadr : $*Builtin.Int32
+  store %1 to %access : $*Builtin.Int32
+  end_access %access : $*Builtin.Int32
+  strong_release %0 : $C
+  %9999 = tuple()
+  return %9999 : $()
+}

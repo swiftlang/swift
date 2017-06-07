@@ -25,11 +25,11 @@ struct GenericComputed<T> : DerivedFromSimpleAssoc where T : P {
   init()
 }
 
-sil_witness_table shared [fragile] <T where T : P> GenericComputed<T>: DerivedFromSimpleAssoc module nix {
+sil_witness_table shared [serialized] <T where T : P> GenericComputed<T>: DerivedFromSimpleAssoc module nix {
   base_protocol HasSimpleAssoc: <T where T : P> GenericComputed<T>: HasSimpleAssoc module nix
 }
 
-sil_witness_table shared [fragile] <T where T : P> GenericComputed<T>: HasSimpleAssoc module nix {
+sil_witness_table shared [serialized] <T where T : P> GenericComputed<T>: HasSimpleAssoc module nix {
   associated_type Assoc: PBox<T>
 }
 

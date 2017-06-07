@@ -37,7 +37,7 @@ static void cleanFunction(SILFunction &Fn) {
       ++I;
 
       // Remove calls to Builtin.staticReport().
-      if (BuiltinInst *BI = dyn_cast<BuiltinInst>(Inst)) {
+      if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
         const BuiltinInfo &B = BI->getBuiltinInfo();
         if (B.ID == BuiltinValueKind::StaticReport) {
           // The call to the builtin should get removed before we reach
@@ -46,12 +46,6 @@ static void cleanFunction(SILFunction &Fn) {
         }
       }
     }
-  }
-
-  // Rename functions with public_external linkage to prevent symbol conflict
-  // with stdlib.
-  if (Fn.isDefinition() && Fn.getLinkage() == SILLinkage::PublicExternal) {
-    Fn.setLinkage(SILLinkage::SharedExternal);
   }
 }
 
@@ -64,7 +58,6 @@ class SILCleanup : public swift::SILFunctionTransform {
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
-  StringRef getName() override { return "SIL Cleanup"; }
 };
 } // end anonymous namespace
 

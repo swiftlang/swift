@@ -33,7 +33,7 @@ void dumpSyntaxKind(llvm::raw_ostream &OS, const SyntaxKind Kind) {
   case SyntaxKind::Token: OS << "Token"; break;
   }
 }
-}
+} // end anonymous namespace
 
 void RawSyntax::print(llvm::raw_ostream &OS) const {
   if (const auto Tok = dyn_cast<TokenSyntax>(this)) {
@@ -131,7 +131,7 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << ')';
 }
 
-RC<RawSyntax>
+swift::RC<RawSyntax>
 RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
   auto NewLayout = Layout;
   NewLayout.push_back(NewLayoutElement);

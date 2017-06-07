@@ -303,11 +303,17 @@ public func _swift_Foundation_getErrorDefaultUserInfo<T: Error>(_ error: T)
 // or CFError is used as an Error existential.
 
 extension NSError : Error {
+  @nonobjc
   public var _domain: String { return domain }
+
+  @nonobjc
   public var _code: Int { return code }
+
+  @nonobjc
   public var _userInfo: AnyObject? { return userInfo as NSDictionary }
 
   /// The "embedded" NSError is itself.
+  @nonobjc
   public func _getEmbeddedNSError() -> AnyObject? {
     return self
   }
@@ -374,14 +380,14 @@ public protocol __BridgedNSError : Error {
 extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: SignedInteger {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
+    return lhs.rawValue == rhs.rawValue
   }
 }
 
 public extension __BridgedNSError 
     where Self: RawRepresentable, Self.RawValue: SignedInteger {
   public var _domain: String { return Self._nsErrorDomain }
-  public var _code: Int { return Int(rawValue.toIntMax()) }
+  public var _code: Int { return Int(rawValue) }
 
   public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, to: Self.self)
@@ -402,7 +408,7 @@ public extension __BridgedNSError
 extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
+    return lhs.rawValue == rhs.rawValue
   }
 }
 
@@ -410,7 +416,7 @@ public extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
   public var _domain: String { return Self._nsErrorDomain }
   public var _code: Int {
-    return Int(bitPattern: UInt(rawValue.toUIntMax()))
+    return Int(bitPattern: UInt(rawValue))
   }
 
   public init?(rawValue: RawValue) {
@@ -830,12 +836,24 @@ extension CocoaError.Code {
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderReadCorrupt: CocoaError.Code {
+    return _coderReadCorrupt
+  }
+
+  internal static var _coderReadCorrupt: CocoaError.Code {
     return CocoaError.Code(rawValue: 4864)
   }
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
+    return _coderValueNotFound
+  }
+
+  internal static var _coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
+  }
+
+  public static var coderInvalidValue: CocoaError.Code {
+    return CocoaError.Code(rawValue: 4866)
   }
 }
 
@@ -1269,12 +1287,24 @@ extension CocoaError {
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderReadCorrupt: CocoaError.Code {
+    return _coderReadCorrupt
+  }
+
+  public static var _coderReadCorrupt: CocoaError.Code {
     return CocoaError.Code(rawValue: 4864)
   }
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
+    return _coderValueNotFound
+  }
+
+  internal static var _coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
+  }
+
+  public static var coderInvalidValue: CocoaError.Code {
+    return CocoaError.Code(rawValue: 4866)
   }
 }
 

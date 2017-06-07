@@ -27,7 +27,7 @@ import Swift
 // --       generic parameter count, primary count, witness table counts
 // CHECK:   i32 1, i32 1, i32 0
 // CHECK: }
-// CHECK: @_T015generic_classes11RootGenericCMP = hidden global
+// CHECK: @_T015generic_classes11RootGenericCMP = internal global
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_RootGeneric
 // --       nominal type descriptor
@@ -84,7 +84,7 @@ import Swift
 // CHECK:   {{.*}}* @_T015generic_classes14RootNonGenericCMn
 // CHECK: }>
 
-// CHECK: @_T015generic_classes015GenericInheritsC0CMP = hidden global
+// CHECK: @_T015generic_classes015GenericInheritsC0CMP = internal global
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericInheritsGeneric
 // --       RootGeneric vtable
@@ -352,10 +352,10 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8***
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
 // CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 18
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 12
 // CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]], align 8
 // CHECK:   [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
 // CHECK:   [[ALIGN:%.*]] = and i64 [[T2]], 65535

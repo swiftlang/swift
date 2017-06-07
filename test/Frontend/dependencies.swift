@@ -1,6 +1,6 @@
 // XFAIL: linux
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -typecheck %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC %s
 // RUN: %target-swift-frontend -emit-reference-dependencies-path - -typecheck -primary-file %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC-YAML %s
@@ -43,26 +43,26 @@
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift
-// CHECK-IMPORT-DAG: Inputs/dependencies/$$$$$$$$$$.h
-// CHECK-IMPORT-DAG: Inputs/dependencies/extra-header.h
 // CHECK-IMPORT-DAG: Swift.swiftmodule
-// CHECK-IMPORT-DAG: Foundation.swift
-// CHECK-IMPORT-DAG: ObjectiveC.swift
-// CHECK-IMPORT-DAG: CoreGraphics.swift
+// CHECK-IMPORT-DAG: Inputs/dependencies/$$$$$$$$$$.h
 // CHECK-IMPORT-DAG: Inputs/dependencies/UserClangModule.h
+// CHECK-IMPORT-DAG: Inputs/dependencies/extra-header.h
 // CHECK-IMPORT-DAG: Inputs/dependencies/module.modulemap
+// CHECK-IMPORT-DAG: ObjectiveC.swift
+// CHECK-IMPORT-DAG: Foundation.swift
+// CHECK-IMPORT-DAG: CoreGraphics.swift
 // CHECK-IMPORT-NOT: :
 
 // CHECK-IMPORT-YAML-LABEL: depends-external:
 // CHECK-IMPORT-YAML-NOT: dependencies.swift
-// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/$$$$$.h"
-// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/extra-header.h"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}/Swift.swiftmodule"
-// CHECK-IMPORT-YAML-DAG: "{{.*}}/Foundation.swift"
-// CHECK-IMPORT-YAML-DAG: "{{.*}}/ObjectiveC.swift"
-// CHECK-IMPORT-YAML-DAG: "{{.*}}/CoreGraphics.swift"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/$$$$$.h"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/UserClangModule.h"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/extra-header.h"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/module.modulemap"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/ObjectiveC.swift"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/Foundation.swift"
+// CHECK-IMPORT-YAML-DAG: "{{.*}}/CoreGraphics.swift"
 // CHECK-IMPORT-YAML-NOT: {{^-}}
 // CHECK-IMPORT-YAML-NOT: {{:$}}
 

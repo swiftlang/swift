@@ -9,12 +9,12 @@ struct S {
   var x : Int
 }
 
-// CHECK: [[@LINE+1]]:11 s:14swift_ide_test6MyGInt{{$}}
+// CHECK: [[@LINE+1]]:11 s:14swift_ide_test6MyGInta{{$}}
 typealias MyGInt = Int
 
 // CHECK: [[@LINE+1]]:7 s:14swift_ide_test5MyClsC{{$}}
 class MyCls {
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test5MyClsC2TA{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test5MyClsC2TAa{{$}}
   typealias TA = Int
   // CHECK: [[@LINE+1]]:7 s:14swift_ide_test5MyClsC3wwwSiv{{$}}
   var www : Int = 0
@@ -27,12 +27,19 @@ class MyCls {
     // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSicfs{{$}}
     set {}
   }
+  // CHECK: [[@LINE+1]]:3 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitci{{$}}
+  subscript(_: Int, _: Int) -> Float {
+    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitcfg{{$}}
+    get { return 0.0 }
+    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitcfs{{$}}
+    set {}
+  }
 }
 
 // CHECK: [[@LINE+1]]:7 s:14swift_ide_test12GenericClassC{{$}}
 class GenericClass {
 
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassC2TA{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassC2TAa{{$}}
   typealias TA = Int
 
   // CHECK: [[@LINE+1]]:7 s:14swift_ide_test12GenericClassC11instanceVarSiv{{$}}
@@ -57,7 +64,7 @@ class GenericClass {
   // CHECK: [[@LINE+1]]:3 s:14swift_ide_test12GenericClassCfd{{$}}
   deinit {
     // CHECK: [[@LINE+2]]:18 s:14swift_ide_test12GenericClassC9classFuncyACFZ{{$}}
-    // CHECK: [[@LINE+1]]:28 ERROR:no-usr{{$}}
+    // CHECK: [[@LINE+1]]:28 s:14swift_ide_test12GenericClassCfd4selfL_ACv{{$}}
     GenericClass.classFunc(self)
   }
 
@@ -79,7 +86,7 @@ protocol Prot {
 protocol Prot2 {}
 
 class SubCls : MyCls, Prot {
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test6SubClsC5Blarg{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test6SubClsC5Blarga{{$}}
   typealias Blarg = Prot2
   // CHECK: [[@LINE+1]]:8 s:14swift_ide_test6SubClsC8protMethAA5Prot2_pAaE_pF{{$}}
   func protMeth(_ x: Blarg) -> Blarg {}
@@ -149,36 +156,36 @@ class Observers {
   }
 }
 
-// CHECK: [[@LINE+2]]:7 c:objc(cs)ObjCClass1{{$}}
+// CHECK: [[@LINE+2]]:7 c:@M@swift_ide_test@objc(cs)ObjCClass1{{$}}
 @objc
 class ObjCClass1 {
-  // CHECK: [[@LINE+1]]:7 c:objc(cs)ObjCClass1(py)instanceVar{{$}}
+  // CHECK: [[@LINE+1]]:7 c:@M@swift_ide_test@objc(cs)ObjCClass1(py)instanceVar{{$}}
   var instanceVar: Int = 1
-  // CHECK: [[@LINE+1]]:14 c:objc(cs)ObjCClass1(cpy)typeVar{{$}}
+  // CHECK: [[@LINE+1]]:14 c:@M@swift_ide_test@objc(cs)ObjCClass1(cpy)typeVar{{$}}
   static var typeVar: Int = 1
 
-  // CHECK: [[@LINE+1]]:7 c:objc(cs)ObjCClass1(py)computed{{$}}
+  // CHECK: [[@LINE+1]]:7 c:@M@swift_ide_test@objc(cs)ObjCClass1(py)computed{{$}}
   var computed: Int {
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)computed{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)computed{{$}}
     get { return 1}
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)setComputed:{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)setComputed:{{$}}
     set {}
   }
 
-  // CHECK: [[@LINE+1]]:13 c:objc(cs)ObjCClass1(cpy)typeComputed{{$}}
+  // CHECK: [[@LINE+1]]:13 c:@M@swift_ide_test@objc(cs)ObjCClass1(cpy)typeComputed{{$}}
   class var typeComputed: Int {
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(cm)typeComputed{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(cm)typeComputed{{$}}
     get { return 1 }
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(cm)setTypeComputed:{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(cm)setTypeComputed:{{$}}
     set {}
   }
 
-  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(im)initWithX:{{$}}
+  // CHECK: [[@LINE+1]]:3 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)initWithX:{{$}}
   init(x: Int) {}
-  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(im)init{{$}}
+  // CHECK: [[@LINE+1]]:3 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)init{{$}}
   init() {}
 
-  // CHECK: [[@LINE+1]]:8 c:objc(cs)ObjCClass1(im)instanceFunc1:{{$}}
+  // CHECK: [[@LINE+1]]:8 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)instanceFunc1:{{$}}
   func instanceFunc1(_ a: Int) {
 
     // CHECK: [[@LINE+1]]:16 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF9LocalEnumL_O
@@ -187,17 +194,17 @@ class ObjCClass1 {
       case someCase
     }
   }
-  // CHECK: [[@LINE+1]]:14 c:objc(cs)ObjCClass1(cm)staticFunc1:{{$}}
+  // CHECK: [[@LINE+1]]:14 c:@M@swift_ide_test@objc(cs)ObjCClass1(cm)staticFunc1:{{$}}
   class func staticFunc1(_ a: Int) {}
 
   // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1C9subscriptS2ici{{$}}
   // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_Siv{{$}}
   public subscript(x: Int) -> Int {
 
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)objectAtIndexedSubscript:{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)objectAtIndexedSubscript:{{$}}
     get { return 1 }
 
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)setObject:atIndexedSubscript:{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)setObject:atIndexedSubscript:{{$}}
     set {}
   }
 
@@ -205,10 +212,10 @@ class ObjCClass1 {
   // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_ACv{{$}}
   public subscript(x: ObjCClass1) -> Int {
 
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)objectForKeyedSubscript:{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)objectForKeyedSubscript:{{$}}
     get { return 1 }
 
-    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)setObject:forKeyedSubscript:{{$}}
+    // CHECK: [[@LINE+1]]:5 c:@M@swift_ide_test@objc(cs)ObjCClass1(im)setObject:forKeyedSubscript:{{$}}
     set {}
   }
 
@@ -217,22 +224,22 @@ class ObjCClass1 {
   @objc class Nested {}
 }
 
-// CHECK: [[@LINE+1]]:23 c:objc(pl)ObjCProto{{$}}
+// CHECK: [[@LINE+1]]:23 c:@M@swift_ide_test@objc(pl)ObjCProto{{$}}
 @objc public protocol ObjCProto {
 
-  // CHECK: [[@LINE+1]]:8 c:objc(pl)ObjCProto(im)protoMeth{{$}}
+  // CHECK: [[@LINE+1]]:8 c:@M@swift_ide_test@objc(pl)ObjCProto(im)protoMeth{{$}}
   func protoMeth()
 }
 
-// CHECK: [[@LINE+1]]:12 c:@E@ObjCEnum{{$}}
+// CHECK: [[@LINE+1]]:12 c:@M@swift_ide_test@E@ObjCEnum{{$}}
 @objc enum ObjCEnum : Int {
 
-  // CHECK: [[@LINE+1]]:8 c:@E@ObjCEnum@ObjCEnumAmazingCase{{$}}
+  // CHECK: [[@LINE+1]]:8 c:@M@swift_ide_test@E@ObjCEnum@ObjCEnumAmazingCase{{$}}
   case amazingCase
 }
 
 extension ObjCClass1 {
-  // CHECK: [[@LINE+1]]:15 c:objc(cs)ObjCClass1(im)objcExtMethodWithX:{{$}}
+  // CHECK: [[@LINE+1]]:15 c:@CM@swift_ide_test@objc(cs)ObjCClass1(im)objcExtMethodWithX:{{$}}
   public func objcExtMethod(x: Int) {}
 }
 
@@ -258,3 +265,14 @@ func importedMacros() {
   _ = m1; _ = m2; _ = m3
 }
 
+class OverloadVarsByAvailability {
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public var memory: Int8 { get { } set { } }
+  // CHECK: [[@LINE-1]]:14 s:14swift_ide_test26OverloadVarsByAvailabilityC6memorys4Int8Vv
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public var memory: Int16 { get { } set { } }
+  // CHECK: [[@LINE-1]]:14 s:14swift_ide_test26OverloadVarsByAvailabilityC6memorys5Int16Vv
+}

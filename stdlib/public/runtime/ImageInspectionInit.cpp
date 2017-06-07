@@ -9,10 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file along with swift_sections.S is prepended to each shared library
-// on an ELF target which contains protocol and metadata sections.
-//
+///
+/// \file
+///
+/// This file along with swift_sections.S is prepended to each shared library on
+/// an ELF target which contains protocol and metadata sections.
+///
 //===----------------------------------------------------------------------===//
 
 #if defined(__ELF__) || defined(__ANDROID__)

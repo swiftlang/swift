@@ -65,6 +65,10 @@ def fline_map(target_filename):
 def map_line_to_source_file(target_filename, target_line_num):
     """
     >>> from tempfile import *
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
     >>> t = NamedTemporaryFile(delete=False)
     >>> t.write('''line 1
     ... line 2
@@ -111,6 +115,10 @@ def map_line_from_source_file(source_filename, source_line_num,
                               target_filename):
     """
     >>> from tempfile import *
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
     >>> t = NamedTemporaryFile(delete=False)
     >>> t.write('''line 1
     ... line 2
@@ -189,6 +197,10 @@ def run():
     """Simulate a couple of gyb-generated files
 
     >>> from tempfile import *
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
     >>> target1 = NamedTemporaryFile(delete=False)
     >>> target1.write('''line 1
     ... line 2
@@ -200,6 +212,10 @@ def run():
     ... line 8
     ... ''')
     >>> target1.flush()
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
     >>> target2 = NamedTemporaryFile(delete=False)
     >>> target2.write('''// ###sourceLocation(file: "foo.bar", line: 7)
     ... line 2
@@ -212,6 +228,10 @@ def run():
 
     Simulate the raw output of compilation
 
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
     >>> raw_output = NamedTemporaryFile(delete=False)
     >>> target1_name, target2_name = target1.name, target2.name
     >>> raw_output.write('''A
@@ -239,13 +259,12 @@ def run():
     ...    __file__, target1.name, target2.name, '--',
     ...    sys.executable, '-c',
     ...   'import sys;sys.stdout.write(open(sys.argv[1]).read())',
-    ...   raw_output.name])
+    ...   raw_output.name], universal_newlines=True)
 
     Replace temporary filenames and check it.
 
     >>> print(output.replace(target1.name,'TARGET1-NAME')
-    ...             .replace(target2.name,'TARGET2-NAME')
-    ...             .replace('\\r', '') + 'EOF')
+    ...             .replace(target2.name,'TARGET2-NAME') + 'EOF')
     A
     TARGET1-NAME:2:111: error one
     B
@@ -262,13 +281,19 @@ def run():
     glitch in [fox.box:28 assert six
     EOF
     >>> print(subprocess.check_output([sys.executable, __file__, 'foo.bar',
-    ...                                '21', target1.name]).rstrip())
+    ...                                '21', target1.name],
+    ...                               universal_newlines=True), end='')
     5
     >>> print(subprocess.check_output([sys.executable, __file__, 'foo.bar',
-    ...                                '8', target2.name]).rstrip())
+    ...                                '8', target2.name],
+    ...                               universal_newlines=True), end='')
     3
 
     Simulate errors on different line numbers
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
     >>> long_output = NamedTemporaryFile(delete=False)
     >>> long_output.write('''
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 1)
@@ -599,6 +624,11 @@ def run():
     >>> os.remove(target2.name)
     >>> raw_output.close()
     >>> os.remove(raw_output.name)
+
+    Lint this file.
+    >>> import python_lint
+    >>> python_lint.lint([os.path.realpath(__file__)], verbose=False)
+    0
     """
     if len(sys.argv) <= 1:
         import doctest

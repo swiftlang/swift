@@ -15,28 +15,28 @@ let E : Either = .Neither;
 
 // CHECK: !DICompositeType({{.*}}name: "Color",
 // CHECK-SAME:             line: [[@LINE+3]]
-// CHECK-SAME:             size: 8, align: 8,
+// CHECK-SAME:             size: 8,
 // CHECK-SAME:             identifier: "_T04enum5ColorOD"
 enum Color : UInt64 {
 // This is effectively a 2-bit bitfield:
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "Red"
 // DWARF-SAME:           baseType: ![[UINT64:[0-9]+]]
-// DWARF-SAME:           size: 8, align: 8{{[,)]}}
+// DWARF-SAME:           size: 8{{[,)]}}
 // DWARF: ![[UINT64]] = !DICompositeType({{.*}}identifier: "_T0s6UInt64VD"
   case Red, Green, Blue
 }
 
 // CHECK: !DICompositeType({{.*}}name: "MaybeIntPair",
 // CHECK-SAME:             line: [[@LINE+3]],
-// CHECK-SAME:             size: 136, align: 64{{[,)]}}
+// CHECK-SAME:             size: 136{{[,)]}}
 // CHECK-SAME:             identifier: "_T04enum12MaybeIntPairOD"
 enum MaybeIntPair {
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "none"
-// DWARF-SAME:           baseType: ![[INT]], align: 8{{[,)]}}
+// DWARF-SAME:           baseType: ![[INT]]{{[,)]}}
   case none
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "just"
 // DWARF-SAME:           baseType: ![[INTTUP:[0-9]+]]
-// DWARF-SAME:           size: 128, align: 64{{[,)]}}
+// DWARF-SAME:           size: 128{{[,)]}}
 // DWARF: ![[INTTUP]] = !DICompositeType({{.*}}identifier: "_T0s5Int64V_ABtD"
   case just(Int64, Int64)
 }
@@ -50,7 +50,7 @@ let r = Color.Red
 let c = MaybeIntPair.just(74, 75)
 // CHECK: !DICompositeType({{.*}}name: "Maybe",
 // CHECK-SAME:             line: [[@LINE-8]],
-// CHECK-SAME:             size: 8, align: 8{{[,)]}}
+// CHECK-SAME:             size: 8{{[,)]}}
 // CHECK-SAME:             identifier: "_T04enum5MaybeOyAA5ColorOGD"
 let movie : Maybe<Color> = .none
 

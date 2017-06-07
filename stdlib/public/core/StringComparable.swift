@@ -53,9 +53,17 @@ extension String {
   /// - Precondition: Both `self` and `rhs` are ASCII strings.
   public // @testable
   func _compareASCII(_ rhs: String) -> Int {
-    var compare = Int(_swift_stdlib_memcmp(
-      self._core.startASCII, rhs._core.startASCII,
-      min(self._core.count, rhs._core.count)))
+    var compare: Int
+    
+    if self._core.startASCII == rhs._core.startASCII  { 
+      compare = 0 
+    }
+    else {
+      compare = Int(extendingOrTruncating: _swift_stdlib_memcmp(
+        self._core.startASCII, rhs._core.startASCII,
+        Swift.min(self._core.count, rhs._core.count)))      
+    }
+
     if compare == 0 {
       compare = self._core.count - rhs._core.count
     }
@@ -120,6 +128,7 @@ extension String {
 }
 
 extension String : Equatable {
+  @inline(__always)
   public static func == (lhs: String, rhs: String) -> Bool {
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
@@ -129,9 +138,12 @@ extension String : Equatable {
       if lhs._core.count != rhs._core.count {
         return false
       }
+      if lhs._core.startASCII == rhs._core.startASCII {
+        return true
+      }
       return _swift_stdlib_memcmp(
         lhs._core.startASCII, rhs._core.startASCII,
-        rhs._core.count) == 0
+        rhs._core.count) == (0 as CInt)
     }
 #endif
     return lhs._compareString(rhs) == 0

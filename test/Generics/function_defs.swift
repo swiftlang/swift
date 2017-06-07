@@ -244,7 +244,7 @@ protocol GeneratesMetaAssoc2 {
 
 func recursiveSameType
        <T : GeneratesMetaAssoc1, U : GeneratesMetaAssoc2, V : GeneratesAssoc1>
-       (_ t: T, u: U)
+       (_ t: T, u: U, v: V)
   where T.MetaAssoc1 == V.Assoc1, V.Assoc1 == U.MetaAssoc2
 {
   t.get().accept(t.get().makeIterator())
@@ -295,5 +295,5 @@ func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-err
 
 func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
-func badSameType<T, U : GeneratesAnElement, V>(_ : T)
+func badSameType<T, U : GeneratesAnElement, V>(_ : T, _ : U)
   where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

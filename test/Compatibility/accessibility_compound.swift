@@ -9,7 +9,7 @@ public struct PublicStruct {
 
 private typealias PrivateAlias = PublicStruct // expected-note * {{type declared here}}
 
-public let a0 = nil as PrivateAlias.Inner? // expected-warning {{constant should not be declared public because its type 'PrivateAlias.Inner?' uses a private type}}
+public let a0 = nil as PrivateAlias.Inner? // expected-warning {{constant should not be declared public because its type 'PrivateAlias.Inner?' (aka 'Optional<PublicStruct.Inner>') uses a private type}}
 public let a: PrivateAlias.Inner? // expected-warning {{constant should not be declared public because its type uses a private type}}
 public let b: PrivateAlias.Internal? // expected-error {{constant cannot be declared public because its type uses an internal type}}
 public let c: Pair<PrivateAlias.Inner, PublicStruct.Internal>? // expected-error {{constant cannot be declared public because its type uses an internal type}}

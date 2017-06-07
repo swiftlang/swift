@@ -26,12 +26,13 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
-#include "swift/Demangling/ManglingMacros.h"
 
 #include "CallEmission.h"
 #include "ConstantBuilder.h"
@@ -47,7 +48,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "NativeConventionSchema.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
@@ -581,6 +581,11 @@ namespace {
   };
 } // end anonymous namespace
 
+llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(SILDeclRef method) {
+  assert(method.isForeign);
+  return getAddrOfObjCSelectorRef(Selector(method).str());
+}
+
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,
                               Explosion &selfValues,
@@ -603,8 +608,17 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     ClassDecl *searchClassDecl =
       searchClass.castTo<MetatypeType>().getInstanceType()
         .getClassOrBoundGenericClass();
-    searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
-                                                   NotForDefinition);
+    if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, searchClassDecl)) {
+      searchValue = emitClassHeapMetadataRef(IGF,
+                                             searchClass.castTo<MetatypeType>().getInstanceType(),
+                                             MetadataValueType::ObjCClass,
+                                             /*allow uninitialized*/ true);
+      searchValue = emitLoadOfObjCHeapMetadataRef(IGF, searchValue);
+      searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
+    } else {
+      searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
+                                                     NotForDefinition);
+    }
   }
   
   // Store the receiver and class to the struct.
@@ -738,7 +752,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
 /// Call [self allocWithZone: nil].
 llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             llvm::Value *self,
-                                            CanType classType) {
+                                            SILType selfType) {
   // Get an appropriately-cast function pointer.
   auto fn = IGF.IGM.getObjCAllocWithZoneFn();
 
@@ -749,7 +763,11 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
   }
   
   auto call = IGF.Builder.CreateCall(fn, self);
-  return call;
+
+  // Cast the returned pointer to the right type.
+  auto &classTI = IGF.getTypeInfo(selfType);
+  llvm::Type *destType = classTI.getStorageType();
+  return IGF.Builder.CreateBitCast(call, destType);
 }
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
@@ -816,6 +834,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     break;
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("self passed indirectly?!");
@@ -1003,13 +1022,8 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  // FIXME: Explosion level
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-
-  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func,
-                                 expansion,
-                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                 /*foreign*/ true);
+  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, getter);
 }
@@ -1027,11 +1041,8 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   assert(property->isSettable(property->getDeclContext()) &&
          "property is not settable?!");
   
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func,
-                                 expansion,
-                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                 /*foreign*/ true);
+  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, setter);
 }
@@ -1046,11 +1057,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(method->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,
-                                  expansion,
-                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                  /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, declRef);
 }
@@ -1065,11 +1073,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(constructor->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer,
-                                  expansion,
-                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                  /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, declRef);
 }
@@ -1080,11 +1085,8 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                             DestructorDecl *destructor) {
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator,
-                                  expansion,
-                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                                  /*foreign*/ true);
+  SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator)
+    .asForeign();
 
   return findSwiftAsObjCThunk(IGM, declRef);
 }

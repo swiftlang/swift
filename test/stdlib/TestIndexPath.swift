@@ -226,9 +226,8 @@ class TestIndexPath: TestIndexPathSuper {
         let ip2: IndexPath = [1, 1, 1]
         
         expectNotEqual(ip1.hashValue, ip2.hashValue)
-        
-        let nsip1 = ip1._bridgeToObjectiveC()
-        expectEqual(nsip1.hash, ip1.hashValue)
+
+        IndexPath(indexes: [Int.max >> 8, 2, Int.max >> 36]).hashValue // this should not cause an overflow crash
     }
     
     func testEquality() {
@@ -708,6 +707,10 @@ class TestIndexPath: TestIndexPathSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(IndexPath(), IndexPath._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -758,5 +761,6 @@ IndexPathTests.test("testUnconditionalBridgeFromObjC") { TestIndexPath().testUnc
 IndexPathTests.test("testObjcBridgeType") { TestIndexPath().testObjcBridgeType() }
 IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().test_AnyHashableContainingIndexPath() }
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
+IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif

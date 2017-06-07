@@ -128,7 +128,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       if (decls.size() != 1)
         return CanType();
 
-      const TypeDecl *typeDecl = dyn_cast<TypeDecl>(decls.front());
+      const auto *typeDecl = dyn_cast<TypeDecl>(decls.front());
       if (!typeDecl)
         return CanType();
 
@@ -521,7 +521,7 @@ enum class ConventionsKind : uint8_t {
       }
 
       // Okay, handle 'self'.
-      if (CanTupleType substTupleType = dyn_cast<TupleType>(substType)) {
+      if (auto substTupleType = dyn_cast<TupleType>(substType)) {
         unsigned numEltTypes = substTupleType.getElementTypes().size();
         assert(numEltTypes > 0);
 
@@ -766,10 +766,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     auto origGenericSig
       = function->getGenericSignature();
     auto getCanonicalType = [origGenericSig, &M](Type t) -> CanType {
-      if (origGenericSig)
-        return origGenericSig->getCanonicalTypeInContext(t,
-                                                         *M.getSwiftModule());
-      return t->getCanonicalType();
+      return t->getCanonicalType(origGenericSig, *M.getSwiftModule());
     };
 
     auto &Types = M.Types;
@@ -779,7 +776,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       if (capture.isDynamicSelfMetadata()) {
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
         auto selfMetatype = MetatypeType::get(
-            loweredCaptures.getDynamicSelfType()->getSelfType(),
+            loweredCaptures.getDynamicSelfType(),
             MetatypeRepresentation::Thick);
         auto canSelfMetatype = getCanonicalType(selfMetatype);
         SILParameterInfo param(canSelfMetatype, convention);
@@ -1401,7 +1398,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
 
 /// Try to find a clang method declaration for the given function.
 static const clang::Decl *findClangMethod(ValueDecl *method) {
-  if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
+  if (auto *methodFn = dyn_cast<FuncDecl>(method)) {
     if (auto *decl = methodFn->getClangDecl())
       return decl;
 
@@ -1409,7 +1406,7 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
       return findClangMethod(overridden);
   }
 
-  if (ConstructorDecl *constructor = dyn_cast<ConstructorDecl>(method)) {
+  if (auto *constructor = dyn_cast<ConstructorDecl>(method)) {
     if (auto *decl = constructor->getClangDecl())
       return decl;
   }
@@ -1482,8 +1479,11 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     case AccessorKind::IsGetter:
       // Getter selectors can belong to families if their name begins with the
       // wrong thing.
-      if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign)
-        return getSelectorFamily(FD->getAccessorStorageDecl()->getName());
+      if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign) {
+        // TODO: Handle special names (subscript).
+        auto name = FD->getAccessorStorageDecl()->getBaseName().getIdentifier();
+        return getSelectorFamily(name);
+      }
       return SelectorFamily::None;
 
       // Other accessors are never selector family members.
@@ -1643,9 +1643,10 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
 CanSILFunctionType TypeConverter::
 getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                       CanAnyFunctionType origInterfaceType) {
-  auto origLoweredInterfaceType = getLoweredASTFunctionType(origInterfaceType,
-                                                            constant.uncurryLevel,
-                                                            constant);
+  auto origLoweredInterfaceType =
+    getLoweredASTFunctionType(origInterfaceType,
+                              constant.getUncurryLevel(),
+                              constant);
   return ::getUncachedSILFunctionTypeForConstant(M, constant,
                                                  origLoweredInterfaceType);
 }
@@ -1688,8 +1689,13 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
-  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext()))
+  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
+    // Use the regular method convention for foreign-to-native thunks.
+    if (c.isForeignToNativeThunk())
+      return SILFunctionTypeRepresentation::Method;
+    assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
     return getProtocolWitnessRepresentation(proto);
+  }
 
   switch (c.kind) {
     case SILDeclRef::Kind::GlobalAccessor:
@@ -1732,7 +1738,8 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
   auto loweredInterfaceType =
-    getLoweredASTFunctionType(formalInterfaceType, constant.uncurryLevel,
+    getLoweredASTFunctionType(formalInterfaceType,
+                              constant.getUncurryLevel(),
                               constant);
 
   // The SIL type encodes conventions according to the original type.
@@ -1781,6 +1788,109 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
   return ty->getParameters().back();
 }
 
+static bool requiresNewVTableEntry(SILDeclRef method) {
+  if (cast<AbstractFunctionDecl>(method.getDecl())->needsNewVTableEntry())
+    return true;
+  if (method.kind == SILDeclRef::Kind::Allocator) {
+    auto *ctor = cast<ConstructorDecl>(method.getDecl());
+    if (ctor->isRequired() && !ctor->getOverriddenDecl()->isRequired())
+      return true;
+  }
+  return false;
+}
+
+// This check duplicates TypeConverter::checkForABIDifferences(),
+// but on AST types. The issue is we only want to introduce a new
+// vtable thunk if the AST type changes, but an abstraction change
+// is OK; we don't want a new entry if an @in parameter became
+// @guaranteed or whatever.
+static bool checkASTTypeForABIDifferences(CanType type1,
+                                          CanType type2) {
+  return !type1->matches(type2, TypeMatchFlags::AllowABICompatible,
+                         /*resolver*/nullptr);
+}
+
+SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
+  SILDeclRef cur = method, next = method;
+  do {
+    cur = next;
+    if (requiresNewVTableEntry(cur))
+      return cur;
+    next = cur.getNextOverriddenVTableEntry();
+  } while (next);
+
+  return cur;
+}
+
+// FIXME: This makes me very upset. Can we do without this?
+static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
+                                                CanType derived,
+                                                CanType base) {
+  // Unwrap optionals, but remember that we did.
+  bool derivedWasOptional = false;
+  if (auto object = derived.getAnyOptionalObjectType()) {
+    derivedWasOptional = true;
+    derived = object;
+  }
+  if (auto object = base.getAnyOptionalObjectType()) {
+    base = object;
+  }
+
+  // T? +> S = (T +> S)?
+  // T? +> S? = (T +> S)?
+  if (derivedWasOptional) {
+    base = copyOptionalityFromDerivedToBase(tc, derived, base);
+
+    auto optDecl = tc.Context.getOptionalDecl();
+    return CanType(BoundGenericEnumType::get(optDecl, Type(), base));
+  }
+
+  // (T1, T2, ...) +> (S1, S2, ...) = (T1 +> S1, T2 +> S2, ...)
+  if (auto derivedTuple = dyn_cast<TupleType>(derived)) {
+    if (auto baseTuple = dyn_cast<TupleType>(base)) {
+      assert(derivedTuple->getNumElements() == baseTuple->getNumElements());
+      SmallVector<TupleTypeElt, 4> elements;
+      for (unsigned i = 0, e = derivedTuple->getNumElements(); i < e; i++) {
+        elements.push_back(
+          baseTuple->getElement(i).getWithType(
+            copyOptionalityFromDerivedToBase(
+              tc,
+              derivedTuple.getElementType(i),
+              baseTuple.getElementType(i))));
+      }
+      return CanType(TupleType::get(elements, tc.Context));
+    }
+  }
+
+  // (T1 -> T2) +> (S1 -> S2) = (T1 +> S1) -> (T2 +> S2)
+  if (auto derivedFunc = dyn_cast<AnyFunctionType>(derived)) {
+    if (auto baseFunc = dyn_cast<FunctionType>(base)) {
+      return CanFunctionType::get(
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getInput(),
+                                         baseFunc.getInput()),
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getResult(),
+                                         baseFunc.getResult()),
+        baseFunc->getExtInfo());
+    }
+
+    if (auto baseFunc = dyn_cast<GenericFunctionType>(base)) {
+      return CanGenericFunctionType::get(
+        baseFunc.getGenericSignature(),
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getInput(),
+                                         baseFunc.getInput()),
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getResult(),
+                                         baseFunc.getResult()),
+        baseFunc->getExtInfo());
+    }
+  }
+
+  return base;
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
@@ -1793,8 +1903,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   if (found != ConstantOverrideTypes.end())
     return found->second;
 
-  assert(base.getNextOverriddenVTableEntry().isNull()
-         && "base must not be an override");
+  assert(requiresNewVTableEntry(base) && "base must not be an override");
 
   auto baseInfo = getConstantInfo(base);
   auto derivedInfo = getConstantInfo(derived);
@@ -1803,15 +1912,14 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // vtable thunk the same signature as the derived method.
   auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
 
-  auto baseInterfaceTy = makeConstantInterfaceType(base);
-  auto derivedInterfaceTy = makeConstantInterfaceType(derived);
+  auto baseInterfaceTy = baseInfo.FormalInterfaceType;
+  auto derivedInterfaceTy = derivedInfo.FormalInterfaceType;
 
   auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          base.getDecl(), derived.getDecl(), baseInterfaceTy,
-          /*resolver=*/nullptr);
+          base.getDecl(), derived.getDecl(), baseInterfaceTy);
 
   // Copy generic signature from derived to the override type, to handle
   // the case where the base member is not generic (because the base class
@@ -1829,25 +1937,23 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // Lower the formal AST type.
   auto overrideLoweredInterfaceTy = getLoweredASTFunctionType(
       cast<AnyFunctionType>(overrideInterfaceTy->getCanonicalType()),
-      derived.uncurryLevel, derived);
+      derived.getUncurryLevel(), derived);
+
+  if (!checkASTTypeForABIDifferences(derivedInfo.LoweredInterfaceType,
+                                     overrideLoweredInterfaceTy)) {
+    basePattern = AbstractionPattern(
+      copyOptionalityFromDerivedToBase(
+        *this,
+        derivedInfo.LoweredInterfaceType,
+        baseInfo.LoweredInterfaceType));
+    overrideLoweredInterfaceTy = derivedInfo.LoweredInterfaceType;
+  }
 
   // Build the SILFunctionType for the vtable thunk.
   CanSILFunctionType fnTy = getNativeSILFunctionType(M, basePattern,
                                                      overrideLoweredInterfaceTy,
                                                      derived,
                                                      derived.kind);
-
-  {
-    GenericContextScope scope(*this, fnTy->getGenericSignature());
-
-    // Is the vtable thunk type actually ABI compatible with the derived type?
-    // Then we don't need a thunk.
-    if (checkFunctionForABIDifferences(derivedInfo.SILFnType, fnTy)
-          == ABIDifference::Trivial) {
-      ConstantOverrideTypes[{derived, base}] = derivedInfo;
-      return derivedInfo;
-    }
-  }
 
   // Build the SILConstantInfo and cache it.
   SILConstantInfo overrideInfo;
@@ -2032,12 +2138,14 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
                                   const SubstitutionMap &subs) {
+  if (!isPolymorphic()) {
+    return CanSILFunctionType(this);
+  }
+  
   if (subs.empty()) {
-    assert(!isPolymorphic() && "no args for polymorphic substitution");
     return CanSILFunctionType(this);
   }
 
-  assert(isPolymorphic());
   return substGenericArgs(silModule,
                           QuerySubstitutionMap{subs},
                           LookUpConformanceInSubstitutionMap(subs));

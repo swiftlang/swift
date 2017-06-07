@@ -158,9 +158,6 @@ public:
   }
 
 
-  StringRef getName() override {
-    return "Sinks instructions closer to their users";
-  }
 };
 } // end anonymous namespace
 

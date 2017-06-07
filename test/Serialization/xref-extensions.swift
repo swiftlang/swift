@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // This check uses -parse-stdlib in order to have an exact count of declarations
 // imported.

@@ -41,8 +41,6 @@ class CapturePropagation : public SILFunctionTransform
 public:
   void run() override;
 
-  StringRef getName() override { return "Captured Constant Propagation"; }
-
 protected:
   bool optimizePartialApply(PartialApplyInst *PAI);
   SILFunction *specializeConstClosure(PartialApplyInst *PAI,
@@ -72,10 +70,10 @@ static bool isConstant(SILValue V) {
   return V && isOptimizableConstant(V);
 }
 
-static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
+static std::string getClonedName(PartialApplyInst *PAI, IsSerialized_t Serialized,
                                  SILFunction *F) {
   auto P = Demangle::SpecializationPass::CapturePropagation;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
 
   // We know that all arguments are literal insts.
   unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
@@ -233,16 +231,16 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
 /// function body.
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
-  IsFragile_t Fragile = IsNotFragile;
-  if (PAI->getFunction()->isFragile() && OrigF->isFragile())
-    Fragile = IsFragile;
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (PAI->getFunction()->isSerialized() && OrigF->isSerialized())
+    Serialized = IsSerializable;
 
-  std::string Name = getClonedName(PAI, Fragile, OrigF);
+  std::string Name = getClonedName(PAI, Serialized, OrigF);
 
   // See if we already have a version of this function in the module. If so,
   // just return it.
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
-    assert(NewF->isFragile() == Fragile);
+    assert(NewF->isSerialized() == Serialized);
     DEBUG(llvm::dbgs()
               << "  Found an already specialized version of the callee: ";
           NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -262,8 +260,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILFunction *NewF = OrigF->getModule().createFunction(
       SILLinkage::Shared, Name, NewFTy,
       GenericEnv, OrigF->getLocation(), OrigF->isBare(),
-      OrigF->isTransparent(), Fragile, OrigF->isThunk(),
-      OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
+      OrigF->isTransparent(), Serialized, OrigF->isThunk(),
+      OrigF->getClassSubclassScope(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (OrigF->hasUnqualifiedOwnership()) {
@@ -322,9 +320,7 @@ static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
   for (SILInstruction &I : *BB) {
     if (isa<ReturnInst>(&I) || isa<ThrowInst>(&I)) {
       SILValue RetVal = I.getOperand(0);
-      if (BB->getNumArguments() == 1 && RetVal == BB->getArgument(0))
-        return true;
-      return false;
+      return BB->getNumArguments() == 1 && RetVal == BB->getArgument(0);
     }
     if (I.mayHaveSideEffects() || isa<TermInst>(&I))
       return false;
@@ -383,7 +379,7 @@ static SILFunction *getSpecializedWithDeadParams(
           return nullptr;
       }
 
-      if (TryApplyInst *TAI = dyn_cast<TryApplyInst>(&I)) {
+      if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
         // Check the normal and throw blocks of the try_apply.
         if (onlyContainsReturnOrThrowOfArg(TAI->getNormalBB()) &&
             onlyContainsReturnOrThrowOfArg(TAI->getErrorBB()))
@@ -414,7 +410,7 @@ static SILFunction *getSpecializedWithDeadParams(
                              /* ConvertIndirectToDirect */ false);
     GenericFuncSpecializer FuncSpecializer(Specialized,
                                            ReInfo.getClonerParamSubstitutions(),
-                                           Specialized->isFragile(), ReInfo);
+                                           Specialized->isSerialized(), ReInfo);
 
     SILFunction *GenericSpecializedFunc = FuncSpecializer.trySpecialization();
     if (!GenericSpecializedFunc)
@@ -492,7 +488,7 @@ void CapturePropagation::run() {
     while (I != BB.end()) {
       SILInstruction *Inst = &*I;
       ++I;
-      if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Inst))
+      if (auto *PAI = dyn_cast<PartialApplyInst>(Inst))
         HasChanged |= optimizePartialApply(PAI);
     }
   }

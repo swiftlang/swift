@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -c %s -parse-as-library -force-single-frontend-invocation -o %t/swift.o -emit-objc-header-path %t/swift.h
 
 // RUN: %target-clang -c -Weverything -Werror -Wno-unused-macros -Wno-incomplete-module -fobjc-arc -fmodules %S/Inputs/arc-conventions.m -o %t/main.o -I %t
@@ -15,7 +15,7 @@
 import Foundation
 
 public class Test: NSObject {
-  public func initAllTheThings() -> AnyObject {
+  @objc public func initAllTheThings() -> AnyObject {
     print("method called")
     return "initialized" as NSString
   }

@@ -819,7 +819,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
 
     // Handle SILArgument, SILArgument can invalidate.
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
-      SILArgument *A = dyn_cast<SILArgument>(RCRootVault[i]);
+      auto *A = dyn_cast<SILArgument>(RCRootVault[i]);
       if (!A || A->getParent() != BB)
         continue;
       InterestBlock = true;
@@ -986,7 +986,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
     for (unsigned i = 0; i < RCRootVault.size(); ++i) {
       if (!S->BBSetOut[i]) 
         continue;
-      SILArgument *A = dyn_cast<SILArgument>(RCRootVault[i]);
+      auto *A = dyn_cast<SILArgument>(RCRootVault[i]);
       if (!A || A->getParent() != BB)
         continue;
       InsertPoints[RCRootVault[i]].push_back(&*BB->begin());
@@ -1018,8 +1018,6 @@ class ARCCodeMotion : public SILFunctionTransform {
   bool FreezeEpilogueReleases;
 
 public:
-  StringRef getName() override { return "SIL ARC Code Motion"; }
-
   /// Constructor.
   ARCCodeMotion(CodeMotionKind H, bool F) : Kind(H), FreezeEpilogueReleases(F) {}
 
@@ -1055,7 +1053,9 @@ public:
     if (Kind == Release) {
       // TODO: we should consider Throw block as well, or better we should
       // abstract the Return block or Throw block away in the matcher.
-      ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F, 
+      SILArgumentConvention Conv[] = {SILArgumentConvention::Direct_Owned};
+      ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F,
+            Conv,
             ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
 
       ReleaseCodeMotionContext RelCM(BPA, F, PO, AA, RCFI, 

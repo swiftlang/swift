@@ -21,6 +21,11 @@
 
 #include "swift/AST/Substitution.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FoldingSet.h"
+
+namespace llvm {
+class FoldingSetNodeID;
+} // end namespace llvm
 
 namespace swift {
 
@@ -28,6 +33,22 @@ namespace swift {
 using SubstitutionList = ArrayRef<Substitution>;
 
 void dump(SubstitutionList subs);
+
+/// Create a canonicalized substitution list from subs.
+/// subs is the substitution list to be canonicalized.
+/// canSubs is an out-parameter, which is used to store the results in case
+/// the list of substitutions was not canonical.
+/// The function returns a list of canonicalized substitutions.
+/// If the substitution list subs was canonical already, it will be returned and
+/// canSubs out-parameter will be empty.
+/// If something had to be canonicalized, then the canSubs out-parameter will be
+/// populated and the returned SubstitutionList would refer to canSubs storage.
+SubstitutionList
+getCanonicalSubstitutionList(SubstitutionList subs,
+                             SmallVectorImpl<Substitution> &canSubs);
+
+/// Profile the substitution list for use in a folding set.
+void profileSubstitutionList(llvm::FoldingSetNodeID &id, SubstitutionList subs);
 
 } // end namespace swift
 

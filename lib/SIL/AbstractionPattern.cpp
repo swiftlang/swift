@@ -52,9 +52,10 @@ TypeConverter::getIndicesAbstractionPattern(SubscriptDecl *decl) {
   CanGenericSignature genericSig;
   if (auto sig = decl->getGenericSignatureOfContext())
     genericSig = sig->getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getIndicesInterfaceType()
-                                ->getCanonicalType());
+  auto indicesTy = decl->getIndicesInterfaceType();
+  auto indicesCanTy = indicesTy->getCanonicalType(genericSig,
+                                                  *decl->getParentModule());
+  return AbstractionPattern(genericSig, indicesCanTy);
 }
 
 static const clang::Type *getClangType(const clang::Decl *decl) {
@@ -90,7 +91,7 @@ AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
 }
 
 AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
-  assert(decl->getArgumentInterfaceType());
+  assert(decl->hasAssociatedValues());
   assert(!decl->hasClangNode());
 
   // This cannot be implemented correctly for Optional.Some.

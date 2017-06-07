@@ -95,8 +95,8 @@ if True:
 ///
 ///     let midpoint = absences.count / 2
 ///
-///     let firstHalf = absences.prefix(upTo: midpoint)
-///     let secondHalf = absences.suffix(from: midpoint)
+///     let firstHalf = absences[..<midpoint]
+///     let secondHalf = absences[midpoint...]
 ///
 /// Neither the `firstHalf` nor `secondHalf` slices allocate any new storage
 /// of their own. Instead, each presents a view onto the storage of the
@@ -151,7 +151,7 @@ if True:
 /// Here's an implementation of those steps:
 ///
 ///     if let i = absences.index(where: { $0 > 0 }) {                      // 1
-///         let absencesAfterFirst = absences.suffix(from: i + 1)           // 2
+///         let absencesAfterFirst = absences[(i + 1)...]                   // 2
 ///         if let j = absencesAfterFirst.index(where: { $0 > 0 }) {        // 3
 ///             print("The first day with absences had \(absences[i]).")    // 4
 ///             print("The second day with absences had \(absences[j]).")
@@ -1083,7 +1083,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Parameter s: The sequence of elements to turn into an array.
   @_inlineable
   public init<S : Sequence>(_ s: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
 
     self = ${Self}(
       _buffer: _Buffer(
@@ -1411,6 +1411,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///   bridged `NSArray` instance as its storage, the efficiency is
   ///   unspecified.
   @_inlineable
+  @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
@@ -1433,22 +1434,14 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   @_inlineable
+  @_semantics("array.append_contentsOf")
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
+    reserveCapacityForAppend(newElementsCount: newElementsCount)
 
     let oldCount = self.count
-    let oldCapacity = self.capacity
-    let newCount = oldCount + newElementsCount
-
-    // Ensure uniqueness, mutability, and sufficient storage.  Note that
-    // for consistency, we need unique self even if newElements is empty.
-    self.reserveCapacity(
-      newCount > oldCapacity ?
-      Swift.max(newCount, _growArrayCapacity(oldCapacity))
-      : newCount)
-
     let startNewElements = _buffer.firstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
                 start: startNewElements, 
@@ -1469,6 +1462,22 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       // append them in slow sequence-only mode
       _buffer._arrayAppendSequence(IteratorSequence(remainder))
     }
+  }
+
+  @_inlineable
+  @_versioned
+  @_semantics("array.reserve_capacity_for_append")
+  internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
+    let oldCount = self.count
+    let oldCapacity = self.capacity
+    let newCount = oldCount + newElementsCount
+
+    // Ensure uniqueness, mutability, and sufficient storage.  Note that
+    // for consistency, we need unique self even if newElements is empty.
+    self.reserveCapacity(
+      newCount > oldCapacity ?
+      Swift.max(newCount, _growArrayCapacity(oldCapacity))
+      : newCount)
   }
 
 %if Self == 'ArraySlice':
@@ -1668,15 +1677,15 @@ extension ${Self} {
   ///     }
   ///     // 'sum' == 9
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeBufferPointer(_:)`. Do not store or return the
+  /// pointer for later use.
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
   ///   points to the contiguous storage for the array. ${contiguousCaveat} If
   ///   `body` has a return value, it is used as the return value for the
   ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid
-  ///   only for the duration of the closure's execution.
+  ///   only for the duration of the method's execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///
   /// - SeeAlso: `withUnsafeMutableBufferPointer`, `UnsafeBufferPointer`
@@ -1701,15 +1710,15 @@ extension ${Self} {
   ///     var numbers = [1, 2, 3, 4, 5]
   ///     numbers.withUnsafeMutableBufferPointer { buffer in
   ///         for i in stride(from: buffer.startIndex, to: buffer.endIndex - 1, by: 2) {
-  ///             swap(&buffer[i], &buffer[i + 1])
+  ///             buffer.swapAt(i, i + 1)
   ///         }
   ///     }
   ///     print(numbers)
   ///     // Prints "[2, 1, 4, 3, 5]"
   ///
-  /// The pointer passed as an argument to `body` is valid only for the
-  /// lifetime of the closure. Do not escape it from the closure for later
-  /// use.
+  /// The pointer passed as an argument to `body` is valid only during the
+  /// execution of `withUnsafeMutableBufferPointer(_:)`. Do not store or
+  /// return the pointer for later use.
   ///
   /// - Warning: Do not rely on anything about the array that is the target of
   ///   this method during execution of the `body` closure; it might not
@@ -1720,7 +1729,7 @@ extension ${Self} {
   ///   parameter that points to the contiguous storage for the array.
   ///   ${contiguousCaveat} If `body` has a return value, it is used as the
   ///   return value for the `withUnsafeMutableBufferPointer(_:)` method. The
-  ///   pointer argument is valid only for the duration of the closure's
+  ///   pointer argument is valid only for the duration of the method's
   ///   execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///
@@ -1747,7 +1756,7 @@ extension ${Self} {
     // empty array.
 
     var work = ${Self}()
-    swap(&work, &self)
+    (work, self) = (self, work)
 
     // Create an UnsafeBufferPointer over work that we can pass to body
     let pointer = work._buffer.firstElementAddress
@@ -1761,7 +1770,7 @@ extension ${Self} {
         inoutBufferPointer.count == count,
         "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
 
-      swap(&work, &self)
+      (work, self) = (self, work)
     }
 
     // Invoke the body.
@@ -1770,8 +1779,8 @@ extension ${Self} {
 
   @_inlineable
   public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 
     guard !self.isEmpty else { return (makeIterator(),buffer.startIndex) }
 
@@ -1808,7 +1817,7 @@ internal struct _InitializeMemoryFromCollection<
 > : _PointerFunction {
   @_inlineable
   @_versioned
-  func call(_ rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
+  func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
@@ -1837,7 +1846,7 @@ extension _ArrayBufferProtocol {
     _ bounds: Range<Int>,
     with newValues: C,
     count insertCount: Int
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
 
     let growth = insertCount - bounds.count
     let newCount = self.count + growth
@@ -1909,7 +1918,7 @@ extension ${Self} {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
 % if Self in ['Array', 'ContiguousArray']:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
@@ -2122,7 +2131,7 @@ extension _ArrayBufferProtocol {
   @_versioned
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
@@ -2401,13 +2410,13 @@ extension ${Self} {
   public mutating func replaceRange<C>(
     _ subRange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     Builtin.unreachable()
   }
 }

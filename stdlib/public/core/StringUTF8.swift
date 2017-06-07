@@ -32,6 +32,7 @@ extension _StringCore {
   /// and the second element contains the encoded UTF-8 starting in its
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
+  @inline(__always)
   func _encodeSomeUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(i <= count)
 
@@ -199,10 +200,10 @@ extension String {
     /// position in the UTF-8 view.
     ///
     ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     if let i = hearts.characters.index(of: " ") {
+    ///     if let i = hearts.index(of: " ") {
     ///         let j = i.samePosition(in: hearts.utf8)
-    ///         print(Array(hearts.utf8.prefix(upTo: j)))
-    ///         print(hearts.utf8.prefix(upTo: j))
+    ///         print(Array(hearts.utf8[..<j]))
+    ///         print(hearts.utf8[..<j])
     ///     }
     ///     // Prints "[72, 101, 97, 114, 116, 115]"
     ///     // Prints "Hearts"
@@ -215,9 +216,9 @@ extension String {
       }
 
       /// True iff the index is at the end of its view or if the next
-      /// byte begins a new UnicodeScalar.
+      /// byte begins a new Unicode.Scalar.
       internal func _isOnUnicodeScalarBoundary(in core: _StringCore) -> Bool {
-        let buffer = UInt32(truncatingBitPattern: _buffer)
+        let buffer = UInt32(extendingOrTruncating: _buffer)
         let (codePoint, _) = UTF8._decodeOne(buffer)
         return codePoint != nil || _isEndIndex(of: core)
       }
@@ -237,7 +238,7 @@ extension String {
         var count = 0
         
         while true {
-          let currentUnit = UTF8.CodeUnit(truncatingBitPattern: buffer)
+          let currentUnit = UTF8.CodeUnit(extendingOrTruncating: buffer)
           if currentUnit & 0b1100_0000 != 0b1000_0000 {
             break
           }
@@ -254,13 +255,13 @@ extension String {
 
       /// A Buffer value with the high byte set
       internal static var _bufferHiByte: Buffer {
-        return 0xFF << numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
+        return 0xFF &<< ((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
       
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
       internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
-        return (thisBuffer >> 8) | _bufferHiByte
+        return (thisBuffer &>> (8 as Buffer)) | _bufferHiByte
       }
 
       /// The position of `self`, rounded up to the nearest unicode
@@ -295,8 +296,8 @@ extension String {
     /// - Precondition: The next position is representable.
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      let currentUnit = UTF8.CodeUnit(truncatingBitPattern: i._buffer)
-      let hiNibble = currentUnit >> 4
+      let currentUnit = UTF8.CodeUnit(extendingOrTruncating: i._buffer)
+      let hiNibble = currentUnit &>> (4 as UTF8.CodeUnit)
 
       // Amounts to increment the UTF-16 index based on the high nibble of a
       // UTF-8 code unit. If the high nibble is:
@@ -312,7 +313,8 @@ extension String {
       
       // Map the high nibble of the current code unit into the
       // amount by which to increment the UTF-16 index.
-      let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
+      let increment = (u16Increments &>>
+        Int(extendingOrTruncating: hiNibble &<< (1 as UTF8.CodeUnit))) & 0x3
       let nextCoreIndex = i._coreIndex &+ increment
       let nextBuffer = Index._nextBuffer(after: i._buffer)
 
@@ -347,7 +349,7 @@ extension String {
     /// - Parameter position: A valid index of the view. `position`
     ///   must be less than the view's end index.
     public subscript(position: Index) -> UTF8.CodeUnit {
-      let result = UTF8.CodeUnit(truncatingBitPattern: position._buffer & 0xFF)
+      let result = UTF8.CodeUnit(extendingOrTruncating: position._buffer & 0xFF)
       _precondition(result != 0xFF, "cannot subscript using endIndex")
       return result
     }
@@ -428,7 +430,7 @@ extension String {
   ///
   ///     let picnicGuest = "Deserving porcupine"
   ///     if let i = picnicGuest.utf8.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf8.prefix(upTo: i))
+  ///         let adjective = String(picnicGuest.utf8[..<i])
   ///         print(adjective)
   ///     }
   ///     // Prints "Optional(Deserving)"
@@ -452,6 +454,11 @@ extension String {
   public typealias UTF8Index = UTF8View.Index
 }
 
+extension String.UTF8View : _SwiftStringView {
+  var _persistentContent : String { return String(self._core) }
+}
+
+
 extension String.UTF8View.Index : Comparable {
   // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
   //        assuming String.UTF8View.Index continues to exist
@@ -469,8 +476,8 @@ extension String.UTF8View.Index : Comparable {
     var isContinuation: Bool
     while true {
       let unit = (
-        UTF8.CodeUnit(truncatingBitPattern: buffer.0),
-        UTF8.CodeUnit(truncatingBitPattern: buffer.1))
+        UTF8.CodeUnit(extendingOrTruncating: buffer.0),
+        UTF8.CodeUnit(extendingOrTruncating: buffer.1))
 
       isContinuation = UTF8.isContinuation(unit.0)
       if !isContinuation {
@@ -522,7 +529,7 @@ extension String.UTF8View.Index {
   ///     let utf16Index = cafe.utf16.index(of: 32)!
   ///     let utf8Index = String.UTF8View.Index(utf16Index, within: cafe.utf8)!
   ///
-  ///     print(Array(cafe.utf8.prefix(upTo: utf8Index)))
+  ///     print(Array(cafe.utf8[..<utf8Index]))
   ///     // Prints "[67, 97, 102, 195, 169]"
   ///
   /// If the position passed in `utf16Index` doesn't have an exact
@@ -580,7 +587,7 @@ extension String.UTF8View.Index {
   ///     let scalarsIndex = cafe.unicodeScalars.index(of: "e")!
   ///     let utf8Index = String.UTF8View.Index(scalarsIndex, within: cafe.utf8)
   ///
-  ///     print(Array(cafe.utf8.prefix(through: utf8Index)))
+  ///     print(Array(cafe.utf8[...utf8Index]))
   ///     // Prints "[67, 97, 102, 101]"
   ///
   /// - Parameters:
@@ -602,19 +609,19 @@ extension String.UTF8View.Index {
   /// into its corresponding position in the string's `utf8` view.
   ///
   ///     let cafe = "Café 🍵"
-  ///     let characterIndex = cafe.characters.index(of: "🍵")!
-  ///     let utf8Index = String.UTF8View.Index(characterIndex, within: cafe.utf8)
+  ///     let stringIndex = cafe.index(of: "🍵")!
+  ///     let utf8Index = String.UTF8View.Index(stringIndex, within: cafe.utf8)
   ///
-  ///     print(Array(cafe.utf8.suffix(from: utf8Index)))
+  ///     print(Array(cafe.utf8[utf8Index...]))
   ///     // Prints "[240, 159, 141, 181]"
   ///
   /// - Parameters:
-  ///   - characterIndex: A position in a `CharacterView` instance.
-  ///     `characterIndex` must be an element of
-  ///     `String(utf8).characters.indices`.
+  ///   - index: A position in a string instance.
+  ///     `index` must be an element of
+  ///     `String(utf8).indices`.
   ///   - utf8: The `UTF8View` in which to find the new position.
-  public init(_ characterIndex: String.Index, within utf8: String.UTF8View) {
-    self.init(utf8._core, _utf16Offset: characterIndex._base._position)
+  public init(_ index: String.Index, within utf8: String.UTF8View) {
+    self.init(utf8._core, _utf16Offset: index._base._position)
   }
 
   /// Returns the position in the given UTF-16 view that corresponds exactly to
@@ -629,7 +636,7 @@ extension String.UTF8View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf8.index(of: 32)!
   ///     let j = i.samePosition(in: cafe.utf16)!
-  ///     print(cafe.utf16.prefix(upTo: j))
+  ///     print(cafe.utf16[..<j])
   ///     // Prints "Café"
   ///
   /// - Parameter utf16: The view to use for the index conversion.
@@ -655,7 +662,7 @@ extension String.UTF8View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf8.index(of: 32)!
   ///     let j = i.samePosition(in: cafe.unicodeScalars)!
-  ///     print(cafe.unicodeScalars.prefix(upTo: j))
+  ///     print(cafe.unicodeScalars[..<j])
   ///     // Prints "Café"
   ///
   /// - Parameter unicodeScalars: The view to use for the index conversion.
@@ -673,7 +680,7 @@ extension String.UTF8View.Index {
   /// Returns the position in the given string that corresponds exactly to this
   /// index.
   ///
-  /// This index must be a valid index of `characters.utf8`.
+  /// This index must be a valid index of `utf8`.
   ///
   /// This example first finds the position of a space (UTF-8 code point `32`)
   /// in a string's `utf8` view and then uses this method find the same position
@@ -682,7 +689,7 @@ extension String.UTF8View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf8.index(of: 32)!
   ///     let j = i.samePosition(in: cafe)!
-  ///     print(cafe[cafe.startIndex ..< j])
+  ///     print(cafe[..<j])
   ///     // Prints "Café"
   ///
   /// - Parameter characters: The string to use for the index conversion.

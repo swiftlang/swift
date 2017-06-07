@@ -174,7 +174,7 @@ The layout of class instances is mostly opaque. This is to avoid the vexing prob
 
 The run-time type of a non-final class instance or a class existential is not known statically. To facilitate dynamic casts, the object must store a pointer to its type, called the *isa* pointer. The *isa* pointer is always stored at offset 0 within the object. How that type is represented and what information it provides is part of the class's metadata and is covered in the [class metadata section](#class-metadata). Similarly, the function for a non-final method call is also not known statically and is dispatched based on the run-time type. Method dispatch is covered in the [method dispatch section](#method-dispatch).
 
-Class instances will, as part of ABI-stability, guarantee a word-sized field of opaque data following the isa field that may be used for reference counting by the runtime. But, the format and conventions of this opaque data will not be ABI at first in order to have more flexibility for language or implementation changes. Instead, runtime functions provide the means to interact with reference counts. This opaque data and its conventions may be locked down for more efficient access in the future, which will be an ABI-additive change.
+Class instances will, as part of ABI-stability, guarantee a word-sized field of opaque data following the isa field that may be used for reference counting by the runtime [[SR-4353](https://bugs.swift.org/browse/SR-4353)]. But, the format and conventions of this opaque data will not be ABI at first in order to have more flexibility for language or implementation changes. Instead, runtime functions provide the means to interact with reference counts. This opaque data and its conventions may be locked down for more efficient access in the future, which will be an ABI-additive change.
 
 ##### References
 
@@ -202,7 +202,7 @@ A type's conformance to a protocol consists of functions (whether methods or get
 
 Class-constrained existentials omit the metadata pointer (as the object itself contains a pointer to its type), as well as any excess inline buffer space. `Any`, which is an existential value without any conformances, has no witness table pointer.
 
-We are re-evaluating the inline buffer size for existential containers prior to ABI stability [[SR-3729](https://bugs.swift.org/browse/SR-3729)]. We are also considering making the out-of-line allocation be copy-on-write (COW) [[SR-xxxx]()]. We should also explore "exploding" existential parameters, i.e. converting an existential parameter into a protocol-constrained generic parameter [[SR-xxxx]()].
+We are re-evaluating the inline buffer size for existential containers prior to ABI stability [[SR-3340](https://bugs.swift.org/browse/SR-3340)]. We are also considering making the out-of-line allocation be copy-on-write (COW) [[SR-4330](https://bugs.swift.org/browse/SR-4330)]. We should also explore "exploding" existential parameters, i.e. converting an existential parameter into a protocol-constrained generic parameter [[SR-4331](https://bugs.swift.org/browse/SR-4331)].
 
 ### Declaring Stability
 
@@ -245,7 +245,7 @@ Value type metadata also has kind-specific entries. Struct metadata stores infor
 
 Every concrete type has a *value witness table* that provides information about how to lay out and manipulate values of that type. When a value type has [opaque layout](#opaque-layout), the actual layout and properties of that value type are not known at compilation time, so the value witness table is consulted.
 
-The value witness table stores whether a type is trivial and/or bitwise movable, whether there are extra inhabitants and if so how to store and retrieve them, etc. For enums, the value witness table will also provide functionality for interacting with the discriminator. There may be more efficient ways of representing enums that simplify this functionality (or provide a fast path), and that's under investigation [[SR-xxxx]()].
+The value witness table stores whether a type is trivial and/or bitwise movable, whether there are extra inhabitants and if so how to store and retrieve them, etc. For enums, the value witness table will also provide functionality for interacting with the discriminator. There may be more efficient ways of representing enums that simplify this functionality (or provide a fast path), and that's under investigation [[SR-4332](https://bugs.swift.org/browse/SR-4332)].
 
 These value witness tables may be constructed statically for known values or dynamically for some generic values. While every unique type in Swift has a unique metadata pointer, value witness tables can be shared by types so long as the information provided is identical (i.e. same layout). Value witness tables always represent a type at its highest [abstraction level](#abstraction-levels). The value witness table entries and structure need to be locked down for ABI stability [[SR-3927](https://bugs.swift.org/browse/SR-3927)].
 
@@ -253,7 +253,7 @@ These value witness tables may be constructed statically for known values or dyn
 
 Swift class metadata is layout-compatible with Objective-C class objects on Apple's platforms, which places requirements on the contents of the first section of class metadata. In this first section, entries such as super class pointers, instance size, instance alignment, flags, and opaque data for the Objective-C runtime are stored.
 
-Following that are superclass members, parent type metadata, generic parameter metadata, class members, and *vtables*, described below. Library evolution may present many changes to what exactly is present and will likely make many of the contents opaque to accommodate changes.
+Following that are superclass members, parent type metadata, generic parameter metadata, class members, and *vtables*, described below. Library evolution may present many changes to what exactly is present and will likely make many of the contents opaque to accommodate changes [[SR-4343](https://bugs.swift.org/browse/SR-4343)].
 
 ##### <a name="method-dispatch"></a>Method Dispatch
 
@@ -271,12 +271,11 @@ Protocol witness tables may be created dynamically by the runtime or statically 
 
 ##### Existential Metadata
 
-Existential type metadata contains the number of witness tables present, whether the type is class-constrained, and a *protocol descriptor* for each protocol constraint. A protocol descriptor describes an individual protocol constraint, such as whether it is class-constrained, the size of conforming witness tables, and protocol descriptors for any protocols it refines. Protocol descriptors are layout compatible with the Objective-C runtime's protocol records on Apple platforms.
-
+Existential type metadata contains the number of witness tables present, whether the type is class-constrained, and a *protocol descriptor* for each protocol constraint. A protocol descriptor describes an individual protocol constraint, such as whether it is class-constrained, the size of conforming witness tables, and protocol descriptors for any protocols it refines. Protocol descriptors are layout compatible with the Objective-C runtime's protocol records on Apple platforms. The format of the existential type metadata needs to be reviewed as part of the ABI definition [[SR-4341](https://bugs.swift.org/browse/SR-4341)].
 
 ### Function Metadata
 
-In addition to common metadata entries, function type metadata stores information about the function signature: parameter and result type metadata, calling convention, per-parameter ownership conventions, and whether the function throws. Function type metadata always represents the function at its highest abstraction level, which is explained later in the [function signature lowering section](#lowering-higher-order-functions). Function parameters are currently modeled with a tuple-based design, but this should be updated to match modern Swift [[SR-xxxx]()]. As more ownership semantics are modeled, more information may be stored about each parameter.
+In addition to common metadata entries, function type metadata stores information about the function signature: parameter and result type metadata, calling convention, per-parameter ownership conventions, and whether the function throws. Function type metadata always represents the function at its highest abstraction level, which is explained later in the [function signature lowering section](#lowering-higher-order-functions). Function parameters are currently modeled with a tuple-based design, but this should be updated to match modern Swift [[SR-4333](https://bugs.swift.org/browse/SR-4333)]. As more ownership semantics are modeled, more information may be stored about each parameter.
 
 ## <a name="mangling"></a>Mangling
 
@@ -288,11 +287,11 @@ There are some corner cases currently in the mangling scheme that should be fixe
 
 Mangling design centers around coming up with short and efficient manglings that still retain important properties such as uniqueness and integration with existing tools and formats. Given the prevalence of public symbols in libraries and frameworks, and debugging symbols in applications, the symbol names themselves can make up a significant portion of binary size. Reducing this impact is a major focus of stabilizing the mangling. Post-ABI-stability, any new manglings or techniques must be additive and must support the existing manglings.
 
-There are many ways to improve the existing mangling without major impact on existing tools. Throughout these endeavors, we will be empirically measuring and tracking symbol size and its impact on binary size [[SR-xxxx]()]. ABI work on mangling focuses on producing *compact manglings* and using *suffix differentiation*.
+There are many ways to improve the existing mangling without major impact on existing tools. Throughout these endeavors, we will be empirically measuring and tracking symbol size and its impact on binary size. ABI work on mangling focuses on producing *compact manglings* and using *suffix differentiation*.
 
 ### Compact Manglings
 
-Minor tweaks to shorten the mangling can have a beneficial impact on all Swift program binary sizes. These tweaks should compact existing manglings while preserving a simple unique mapping. One example is not distinguishing between struct/enum in mangling structures, which would also provide more library evolution freedom [[SR-3930](https://bugs.swift.org/browse/SR-3930)]. We are considering dropping some internal witness table symbols when they don't provide any meaningful information conducive to debugging [[SR-3931](https://bugs.swift.org/browse/SR-3931)]. We are currently overhauling word substitutions in mangling, with the goal of reducing as much redundancy in names as possible [[SR-xxxx]()].
+Minor tweaks to shorten the mangling can have a beneficial impact on all Swift program binary sizes. These tweaks should compact existing manglings while preserving a simple unique mapping. One example is not distinguishing between struct/enum in mangling structures, which would also provide more library evolution freedom [[SR-3930](https://bugs.swift.org/browse/SR-3930)]. We are considering dropping some internal witness table symbols when they don't provide any meaningful information conducive to debugging [[SR-3931](https://bugs.swift.org/browse/SR-3931)]. We recently overhauled word substitutions in mangling, with the goal of reducing as much redundancy in names as possible [[SR-4344](https://bugs.swift.org/browse/SR-4344)].
 
 There are other aggressive directions to investigate as well, such as mangling based on a known overload set for non-resilient functions. This does have the downside of making manglings unstable when new overloads are added, so its benefits would have to be carefully weighed [[SR-3933](https://bugs.swift.org/browse/SR-3933)].
 
@@ -304,7 +303,7 @@ There are many existing low level tools and formats that store and consume the s
 
 ## <a name="calling-convention"></a>Calling Convention
 
-For the purposes of this document, "standard calling convention" refers to the C calling convention for a given platform (see [appendix](#platform-abis)), and "Swift calling convention" refers to the calling convention used by Swift code when calling other Swift code. The Swift runtime uses the standard calling convention, though it may make alterations (see section [Runtime calling convention](#runtime-calling-convention)).
+For the purposes of this document, "standard calling convention" refers to the C calling convention for a given platform (see [appendix](#platform-abis)), and "Swift calling convention" refers to the calling convention used by Swift code when calling other Swift code. One of the first steps toward ABI stability is for Swift to adopt the Swift calling convention [[SR-4346](https://bugs.swift.org/browse/SR-4346)]. The Swift runtime uses the standard calling convention, though it may make alterations (see section [Runtime calling convention](#runtime-calling-convention)).
 
 Calling convention stability pertains to public interfaces. The Swift compiler is free to choose any convention for internal (intra-module) functions and calls.
 
@@ -339,7 +338,7 @@ Throwing functions communicate error values to their callers through the *error*
 
 Function signature lowering is the mapping of a function's source-language type, which includes formal parameters and results, all the way down to a physical convention, which dictates what values are stored in what registers and what values to pass on the stack.
 
-ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/master/docs/CallingConvention.rst#function-signature-lowering).
+ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions [[SR-4349](https://bugs.swift.org/browse/SR-4349)]. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/master/docs/CallingConvention.rst#function-signature-lowering).
 
 Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[SR-3946](https://bugs.swift.org/browse/SR-3946)].
 
@@ -384,7 +383,7 @@ Every existing runtime function will need to be audited for its desirability and
 * If yes, then we need to precisely specify the semantics and guarantees of the API. 
 * If not, we need to either change, remove, or replace the API, and precisely specify the new semantics.
 
-The runtime is also responsible for lazily creating new type metadata entries at run time, either for generic type instantiations or for resilient constructs. Library evolution in general introduces a whole new category of needs from the runtime by making data and metadata more opaque, requiring interaction to be done through runtime APIs. Additionally, ownership semantics may require new runtime APIs or modifications to existing APIs. These new runtime needs are still under investigation [[SR-xxxx]()].
+The runtime is also responsible for lazily creating new type metadata entries at run time, either for generic type instantiations or for resilient constructs. Library evolution in general introduces a whole new category of needs from the runtime by making data and metadata more opaque, requiring interaction to be done through runtime APIs. Additionally, ownership semantics may require new runtime APIs or modifications to existing APIs. These new runtime needs are still under investigation [[SR-4352](https://bugs.swift.org/browse/SR-4352)].
 
 There are many potential future directions to open up the ABI and operate on less-opaque data directly, as well a techniques such as call-site caching. These are ABI-additive, and will be interesting to explore in the future.
 
@@ -410,9 +409,9 @@ This tradeoff between performance and flexibility also affects the ability to de
 
 While the standard library is already ensuring source stability, it will be changing many of its fundamental underlying representations this year. When ABI stability lands, the standard library will be severely limited in the kinds of changes it can make to existing APIs and non-resilient types. Getting the standard library in the right place is of critical importance.
 
-The programming model for String is still being redesigned [[SR-xxxx]()], and many types such as Int are undergoing implementation changes [[SR-3196](https://bugs.swift.org/browse/SR-3196)]. At the same time, the standard library is simultaneously switching to new compiler features such as conditional conformances to clean up and deliver the best APIs [[SR-xxxx]()].
+The programming model for String is still being redesigned [[SR-4354](https://bugs.swift.org/browse/SR-4354)], and many types such as Int are undergoing implementation changes [[SR-3196](https://bugs.swift.org/browse/SR-3196)]. At the same time, the standard library is simultaneously switching to new compiler features such as conditional conformances to clean up and deliver the best APIs [[SR-3458](https://bugs.swift.org/browse/SR-3458)].
 
-Another goal of Swift is to improve the applicability of Swift to systems programming. Ownership semantics may make a large impact, including things such as improved `inout` semantics that allow for efficient and safe array slicing. Providing the right abstractions for efficient use of contiguous memory is still under investigation [[SR-xxxx]()].
+Another goal of Swift is to improve the applicability of Swift to systems programming. Ownership semantics may make a large impact, including things such as improved `inout` semantics that allow for efficient and safe array slicing. Providing the right abstractions for efficient use of contiguous memory is still under investigation [[SR-4355](https://bugs.swift.org/browse/SR-4355)].
 
 ## Next Steps
 

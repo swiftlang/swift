@@ -35,6 +35,7 @@ namespace swift {
 class SILFunction;
 class SILModule;
 class NormalProtocolConformance;
+enum IsSerialized_t : unsigned char;
 
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
@@ -190,13 +191,13 @@ private:
   /// that is not a declaration.
   bool IsDeclaration;
  
-  /// Whether or not this witness table is fragile. Fragile means that the
-  /// table may be serialized and "inlined" into another module.
-  bool IsFragile;
+  /// Whether or not this witness table is serialized, which allows
+  /// devirtualization from another module.
+  bool Serialized;
 
   /// Private constructor for making SILWitnessTable definitions.
   SILWitnessTable(SILModule &M, SILLinkage Linkage,
-                  bool IsFragile, StringRef Name,
+                  IsSerialized_t Serialized, StringRef Name,
                   NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
 
@@ -209,7 +210,7 @@ private:
 public:
   /// Create a new SILWitnessTable definition with the given entries.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
-                                 bool IsFragile,
+                                 IsSerialized_t Serialized,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries);
 
@@ -236,8 +237,8 @@ public:
   /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
  
-  /// Returns true if this witness table is fragile.
-  bool isFragile() const { return IsFragile; }
+  /// Returns true if this witness table is going to be (or was) serialized.
+  IsSerialized_t isSerialized() const;
 
   /// Return all of the witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
@@ -265,7 +266,8 @@ public:
   void setLinkage(SILLinkage l) { Linkage = l; }
 
   /// Change a SILWitnessTable declaration into a SILWitnessTable definition.
-  void convertToDefinition(ArrayRef<Entry> newEntries, bool isFragile);
+  void convertToDefinition(ArrayRef<Entry> newEntries,
+                           IsSerialized_t isSerialized);
 
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;

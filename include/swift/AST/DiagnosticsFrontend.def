@@ -58,6 +58,9 @@ ERROR(error_unsupported_opt_for_target, none,
 ERROR(error_argument_not_allowed_with, none,
   "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
 
+WARNING(warning_argument_not_supported_with_optimization, none,
+  "argument '%0' is not supported with optimization", (StringRef))
+
 ERROR(error_option_requires_sanitizer, none,
   "option '%0' requires a sanitizer to be enabled. Use -sanitize= to enable a"
   " sanitizer", (StringRef))
@@ -106,6 +109,8 @@ ERROR(error_mode_cannot_emit_dependencies,none,
   "this mode does not support emitting dependency files", ())
 ERROR(error_mode_cannot_emit_header,none,
   "this mode does not support emitting Objective-C headers", ())
+ERROR(error_mode_cannot_emit_loaded_module_trace,none,
+  "this mode does not support emitting the loaded module trace", ())
 ERROR(error_mode_cannot_emit_module,none,
   "this mode does not support emitting modules", ())
 ERROR(error_mode_cannot_emit_module_doc,none,
@@ -170,6 +175,13 @@ ERROR(error_formatting_invalid_range,none,
 
 WARNING(stats_disabled,none,
   "compiler was not built with support for collecting statistics", ())
+
+ERROR(symbol_in_tbd_not_in_ir,none,
+      "symbol '%0' (%1) is in TBD file, but not in generated IR",
+      (StringRef, StringRef))
+ERROR(symbol_in_ir_not_in_tbd,none,
+      "symbol '%0' (%1) is in generated IR file, but not in TBD file",
+      (StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

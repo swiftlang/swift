@@ -1,5 +1,7 @@
 Name: APINotesFrameworkTest
 Classes:
+  - Name: A
+    SwiftObjCMembers: true
   - Name: TestProperties
     Properties:
       - Name: accessorsOnly
@@ -82,18 +84,76 @@ SwiftVersions:
           - Name: accessorsOnlyRenamedRetypedClass
             PropertyKind:    Class
             SwiftImportAsAccessors: true
+      - Name: NewlyGenericSub
+        SwiftImportAsNonGeneric: true
+      - Name: RenamedGeneric
+        SwiftName: OldRenamedGeneric
+      - Name: ClassWithManyRenames
+        Methods:
+          - Selector: "classWithManyRenamesForInt:"
+            MethodKind: Class
+            SwiftName: "init(swift3Factory:)"
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift3Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift3DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift3ClassProperty"
+          - Name: "importantInstanceProperty"
+            PropertyKind: Instance
+            SwiftName: "swift3InstanceProperty"
     Protocols:
       - Name: ProtoWithVersionedUnavailableMember
         Methods:
           - Selector: requirement
             MethodKind: Instance
             ResultType: 'ForwardClass * _Nullable'
+      - Name: ProtoWithManyRenames
+        Methods:
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift3Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift3DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift3ClassProperty"
     Functions:
       - Name: acceptDoublePointer
         SwiftName: 'acceptPointer(_:)'
         Nullability: [ O ]
+      - Name: normallyUnchanged
+        SwiftName: normallyUnchangedButChangedInSwift3()
+      - Name: normallyChangedOriginal
+        SwiftName: normallyChangedButSpecialInSwift3()
     Tags:
       - Name: SomeCStruct
         SwiftName: ImportantCStruct
       - Name: InnerInSwift4
         SwiftName: InnerInSwift4
+      - Name: NormallyUnchangedWrapper
+        SwiftName: NormallyUnchangedButChangedInSwift3Wrapper
+      - Name: NormallyChangedOriginalWrapper
+        SwiftName: NormallyChangedButSpecialInSwift3Wrapper
+    Typedefs:
+      - Name: SomeCAlias
+        SwiftName: ImportantCAlias
+      - Name: EnclosingStructIdentifier
+        SwiftName: EnclosingStructIdentifier
+    Enumerators:
+      - Name: AnonymousEnumRenamed
+        SwiftName: AnonymousEnumRenamedSwift3
+      - Name: UnknownEnumRenamed
+        SwiftName: UnknownEnumRenamedSwift3
+      - Name: TrueEnumRenamed
+        SwiftName: renamedSwift3
+      - Name: TrueEnumAliasRenamed
+        SwiftName: aliasRenamedSwift3
+      - Name: OptionyEnumRenamed
+        SwiftName: renamedSwift3

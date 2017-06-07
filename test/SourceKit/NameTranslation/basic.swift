@@ -18,11 +18,18 @@ func foo2 (_ a : FooClassDerived) {
   _ = FooClassBase()
 }
 
+class MyDerived: FooClassDerived {
+  override func fooInstanceFunc0() {
+    self.fooInstanceFunc0()
+  }
+}
+
 // REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=translate -objc-name FooClassDerived2 -pos=5:30 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector FooClassDerived2 -pos=3:23 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK11 %s
 // RUN: %sourcekitd-test -req=translate -objc-name fooProperty2 -pos=6:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc1 -pos=7:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK3 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc1: -pos=7:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK3 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector fooFunc3:d:d:d: -pos=8:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
 
 // RUN: %sourcekitd-test -req=translate -objc-selector fooBaseInstanceFuncOverridden1 -pos=12:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK4 %s
@@ -32,15 +39,20 @@ func foo2 (_ a : FooClassDerived) {
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21:withBB: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK8 %s
 // RUN: %sourcekitd-test -req=translate -objc-name fooProperty11 -pos=16:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK9 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21:withBB:withC: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
-// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKFEWER1 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21:: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING1 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector :withBB: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING2 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector :: -pos=15:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECKMISSING3 %s
 
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc21: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK10 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithfloat2: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK12 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithfloat2:D: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
 // RUN: %sourcekitd-test -req=translate -objc-selector init: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector iit: -pos=17:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
-// RUN: %sourcekitd-test -req=translate -objc-selector init: -pos=18:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
 // RUN: %sourcekitd-test -req=translate -objc-selector NAME -pos=18:13 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
+
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc01 -pos=22:17 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK5 %s
+// RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc01 -pos=23:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK5 %s
 
 // CHECK1: FooClassDerived2
 // CHECK-NONE: <empty name translation info>
@@ -57,3 +69,8 @@ func foo2 (_ a : FooClassDerived) {
 // CHECK12: init(float2:)
 // CHECK13: init(_:)
 // CHECK14: init
+
+// CHECKFEWER1: fooInstanceFunc21(_:withB:)
+// CHECKMISSING1: fooInstanceFunc21(_:withB:)
+// CHECKMISSING2: fooInstanceFunc2(_:withBB:)
+// CHECKMISSING3: fooInstanceFunc2(_:withB:)

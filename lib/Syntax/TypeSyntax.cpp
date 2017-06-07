@@ -879,9 +879,8 @@ FunctionTypeSyntaxData::FunctionTypeSyntaxData(RC<RawSyntax> Raw,
   syntax_assert_child_token_text(Raw, FunctionTypeSyntax::Cursor::LeftParen,
                                  tok::l_paren, "(");
 
-  // FIXME: This needs its own element and element list.
   syntax_assert_child_kind(Raw, FunctionTypeSyntax::Cursor::ArgumentList,
-                           SyntaxKind::TupleTypeElementList);
+                           SyntaxKind::FunctionParameterList);
 
   syntax_assert_child_token_text(Raw, FunctionTypeSyntax::Cursor::RightParen,
                                  tok::r_paren, ")");
@@ -911,8 +910,7 @@ RC<FunctionTypeSyntaxData> FunctionTypeSyntaxData::makeBlank() {
     {
       RawSyntax::missing(SyntaxKind::TypeAttributes),
       TokenSyntax::missingToken(tok::l_paren, "("),
-      // FIXME: This needs its own element and element list.
-      RawSyntax::missing(SyntaxKind::TupleTypeElementList),
+      RawSyntax::missing(SyntaxKind::FunctionParameterList),
       TokenSyntax::missingToken(tok::r_paren, ")"),
       TokenSyntax::missingToken(tok::kw_throws, "throws"),
       TokenSyntax::missingToken(tok::arrow, "->"),
@@ -1042,7 +1040,7 @@ addArgumentTypeSyntax(Optional<RC<TokenSyntax>> MaybeComma,
 
   TypeArgumentsLayout.push_back(NewTypeArgument.getRaw());
 
-  FunctionTypeLayout[Index] = RawSyntax::make(SyntaxKind::TupleTypeElementList,
+  FunctionTypeLayout[Index] = RawSyntax::make(SyntaxKind::FunctionParameterList,
                                               TypeArgumentsLayout,
                                               SourcePresence::Present);
   return *this;

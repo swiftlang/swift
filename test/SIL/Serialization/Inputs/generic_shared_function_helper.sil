@@ -5,7 +5,7 @@ import Swift
 
 sil public_external @impl_func : $@convention(thin) <T> () -> @out Optional<T>
 
-sil shared [fragile] @shared_func : $@convention(thin) <T> () -> @out Optional<T> {
+sil shared [serialized] @shared_func : $@convention(thin) <T> () -> @out Optional<T> {
 bb0(%0 : $*Optional<T>):
   %1 = function_ref @impl_func : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0> // user: %2
   %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
@@ -13,7 +13,7 @@ bb0(%0 : $*Optional<T>):
   return %3 : $()                                 // id: %4
 }
 
-sil public [fragile] @public_func : $@convention(thin) <T> () -> @out Optional<T> {
+sil public [serialized] @public_func : $@convention(thin) <T> () -> @out Optional<T> {
 bb0(%0 : $*Optional<T>):
   %1 = function_ref @shared_func : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0> // user: %2
   %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>

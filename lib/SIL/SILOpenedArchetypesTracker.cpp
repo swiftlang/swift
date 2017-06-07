@@ -39,10 +39,11 @@ bool SILOpenedArchetypesTracker::hasUnresolvedOpenedArchetypeDefinitions() {
   return false;
 }
 
-void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
+bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
+  bool Registered = false;
   // Nothing else to be done if the type does not contain an opened archetype.
   if (!Ty || !Ty->hasOpenedExistential())
-    return;
+    return Registered;
 
   // Find all opened existentials used by this type and check if their
   // definitions are known.
@@ -64,33 +65,39 @@ void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
     // archetype can be constructed.
     addOpenedArchetypeDef(archetypeTy, Placeholder);
   });
+  return Registered;
 }
 
 // Register archetypes opened by a given instruction.
 // Can be used to incrementally populate the mapping, e.g.
 // if it is done when performing a scan of all instructions
 // inside a function.
-void SILOpenedArchetypesTracker::registerOpenedArchetypes(
+bool SILOpenedArchetypesTracker::registerOpenedArchetypes(
     const SILInstruction *I) {
   assert((!I->getParent() || I->getFunction() == &F) &&
          "Instruction does not belong to a proper SILFunction");
   auto Archetype = getOpenedArchetypeOf(I);
-  if (Archetype)
-    addOpenedArchetypeDef(Archetype, I);
+  if (!Archetype)
+    return false;
+  addOpenedArchetypeDef(Archetype, I);
+  return true;
 }
 
 // Register opened archetypes whose definitions are referenced by
 // the typedef operands of this instruction.
-void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
+bool SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
     const SILInstruction *I) {
   assert((!I->getParent() || I->getFunction() == &F) &&
          "Instruction does not belong to a proper SILFunction");
+  bool Registered = false;
   for (auto &Op : I->getTypeDependentOperands()) {
     auto OpenedArchetypeDef = Op.get();
     if (auto *DefInst = dyn_cast<SILInstruction>(OpenedArchetypeDef)) {
       addOpenedArchetypeDef(getOpenedArchetypeOf(DefInst), OpenedArchetypeDef);
+      Registered = true;
     }
   }
+  return Registered;
 }
 
 // Unregister archetypes opened by a given instruction.
@@ -152,11 +159,40 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
   // First perform a quick check.
   for (auto &Op : OpenedArchetypeOperands) {
     auto Def = Op.get();
-    if (getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
+    if (isa<SILInstruction>(Def) &&
+        getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
       return Def;
   }
   // Then use a regular lookup.
   if (OpenedArchetypesTracker)
     return OpenedArchetypesTracker->getOpenedArchetypeDef(archetypeTy);
   return SILValue();
+}
+
+void SILOpenedArchetypesTracker::dump() const {
+  llvm::dbgs() << "SILOpenedArchetypesTracker {\n";
+  llvm::dbgs() << "Tracks open archetypes for function: " << F.getName()
+               << "\n";
+  llvm::dbgs() << "Open archetype operands and their definitions:\n";
+  for (auto &KV : OpenedArchetypeDefs) {
+    auto Archetype = KV.first;
+    auto Def = KV.second;
+    llvm::dbgs() << "open archetype:\n";
+    Type(Archetype)->dump();
+    llvm::dbgs() << "defined at: " << *Def << "\n";
+  }
+  llvm::dbgs() << "}\n";
+}
+
+void SILOpenedArchetypesState::dump() const {
+  ArrayRef<Operand> OpenedArchetypeOperands;
+  // A non-modifiable mapping provided by the tracker.
+  llvm::dbgs() << "SILOpenedArchetypesState {\n";
+  llvm::dbgs() << "Open archetype operands:\n";
+  for (auto &Op : OpenedArchetypeOperands) {
+    Op.get()->dump();
+  }
+  if (OpenedArchetypesTracker)
+    OpenedArchetypesTracker->dump();
+  llvm::dbgs() << "}\n";
 }

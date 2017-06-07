@@ -276,3 +276,9 @@ void CleanupManager::dump(CleanupHandle handle) const {
   llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
   stackCleanup.dump(SGF);
 }
+
+void CleanupManager::checkIterator(CleanupHandle handle) const {
+#ifndef NDEBUG
+  stack.checkIterator(handle);
+#endif
+}

@@ -9,6 +9,7 @@
 // Backtraces are not emitted when optimizations are enabled. This test can not
 // run when optimizations are enabled.
 // REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: swift_stdlib_asserts
 
 func funcB() {
     fatalError("linux-fatal-backtrace");

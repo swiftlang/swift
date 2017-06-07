@@ -243,10 +243,6 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
   endif()
 
-  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
-    list(APPEND swift_flags "-Xfrontend" "-enable-cow-existentials")
-  endif()
-
   if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
   endif()
@@ -268,8 +264,17 @@ function(_compile_swift_files
     endif()
   endif()
 
+  # Force swift 3 compatibility mode for Standard Library and overlay.
+  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-swift-version" "3")
+  endif()
+
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
+  endif()
+
+  if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
   endif()
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
@@ -385,6 +390,11 @@ function(_compile_swift_files
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
   endif()
 
+  if (SWIFT_REPORT_STATISTICS)
+    list(GET obj_dirs 0 first_obj_dir)
+    list(APPEND swift_flags "-stats-output-dir" ${first_obj_dir})
+  endif()
+
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
   set(module_outputs "${module_file}" "${module_doc_file}")
@@ -490,6 +500,8 @@ function(_compile_swift_files
         module_dependency_target
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}

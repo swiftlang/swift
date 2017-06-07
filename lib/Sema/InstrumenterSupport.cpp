@@ -33,12 +33,16 @@ public:
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
     if (Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    llvm::errs() << Text << "\n";
+    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
+                                           FormatArgs);
+    llvm::errs() << "\n";
   }
   bool hadError() { return error; }
 };
@@ -57,7 +61,7 @@ public:
     return {true, E};
   }
   bool walkToDeclPre(Decl *D) override {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError()) {
         error = true;
         return false;

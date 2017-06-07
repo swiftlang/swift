@@ -57,14 +57,14 @@ func testVariableTypes(_ param: Int, param2: inout Double) {
   _ = typealias1 ; typealias1 = 1
 
   var optional1 = Optional<Int>.none
-// CHECK: VarDecl '''optional1''' Optional<Int>{{$}}
-// FULL:  VarDecl '''optional1''' Swift.Optional<Swift.Int>{{$}}
+// CHECK: VarDecl '''optional1''' Int?{{$}}
+// FULL:  VarDecl '''optional1''' Swift.Int?{{$}}
   _ = optional1 ; optional1 = nil
 
   var optional2 = Optional<[Int]>.none
   _ = optional2 ; optional2 = nil
-// CHECK: VarDecl '''optional2''' Optional<[Int]>{{$}}
-// FULL:  VarDecl '''optional2''' Swift.Optional<[Swift.Int]>{{$}}
+// CHECK: VarDecl '''optional2''' [Int]?{{$}}
+// FULL:  VarDecl '''optional2''' [Swift.Int]?{{$}}
 }
 
 func testFuncType1() {}
@@ -134,7 +134,7 @@ func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: 
 // FULL:          ConstructorRefCallExpr:[[@LINE-7]] '''GenericStruct<A, B>''' () -> swift_ide_test.GenericStruct<A, B>
 }
 
-func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>() where T.Qux == U.Qux {}
-// CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> () -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> () -> (){{$}}
+func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>(_: T, _: U) where T.Qux == U.Qux {}
+// CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
 

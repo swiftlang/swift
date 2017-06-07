@@ -18,7 +18,7 @@
 #ifndef SWIFT_IRGEN_WITNESSINDEX_H
 #define SWIFT_IRGEN_WITNESSINDEX_H
 
-#include "ValueWitness.h"
+#include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
 namespace irgen {

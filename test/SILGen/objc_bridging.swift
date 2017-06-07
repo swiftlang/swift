@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
@@ -343,7 +343,8 @@ class Bas : NSObject {
 
   // CHECK-LABEL: sil hidden @_T013objc_bridging3BasC11strRealPropSSfg
   // CHECK:   [[PROP_ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Bas.strRealProp
-  // CHECK:   [[PROP:%.*]] = load [copy] [[PROP_ADDR]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[PROP_ADDR]] : $*String
+  // CHECK:   [[PROP:%.*]] = load [copy] [[READ]]
 
 
   // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11strRealPropSSfsTo : $@convention(objc_method) (NSString, Bas) -> () {
@@ -365,7 +366,8 @@ class Bas : NSObject {
   // CHECK: bb0(%0 : $String, %1 : $Bas):
 
   // CHECK:   [[STR_ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Bas.strRealProp
-  // CHECK:   assign {{.*}} to [[STR_ADDR]]
+  // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[STR_ADDR]] : $*String
+  // CHECK:   assign {{.*}} to [[WRITE]]
   // CHECK: }
 
   var strFakeProp: String {
@@ -467,7 +469,7 @@ class Bas : NSObject {
     super.init()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC8arrayArgySays9AnyObject_pGFTo : $@convention(objc_method) (NSArray, Bas) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC8arrayArgySayyXlGFTo : $@convention(objc_method) (NSArray, Bas) -> ()
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
   // CHECK:   [[NSARRAY_COPY:%.*]] = copy_value [[NSARRAY]] : $NSArray
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Bas
@@ -476,18 +478,18 @@ class Bas : NSObject {
   // CHECK:   [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T013objc_bridging3BasC8arrayArgySays9AnyObject_pGF : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T013objc_bridging3BasC8arrayArgySayyXlGF : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(_ array: [AnyObject]) { }
   
-  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11arrayResultSays9AnyObject_pGyFTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
+  // CHECK-LABEL: sil hidden [thunk] @_T013objc_bridging3BasC11arrayResultSayyXlGyFTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Bas
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T013objc_bridging3BasC11arrayResultSays9AnyObject_pGyF : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T013objc_bridging3BasC11arrayResultSayyXlGyF : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
@@ -548,9 +550,9 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // arguments lifetime-extends the bridged pointer for the right duration.
 // <rdar://problem/16738050>
 
-// CHECK-LABEL: sil shared @_T0So7NSArrayCABSQySPys9AnyObject_pSgGG7objects_s5Int32V5counttcfC
+// CHECK-LABEL: sil shared [serializable] @_T0So7NSArrayCABSQySPyyXlSgGG7objects_s5Int32V5counttcfC
 // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic
-// CHECK:         [[METHOD:%.*]] = function_ref @_T0So7NSArrayCABSQySPys9AnyObject_pSgGG7objects_s5Int32V5counttcfcTO
+// CHECK:         [[METHOD:%.*]] = function_ref @_T0So7NSArrayCABSQySPyyXlSgGG7objects_s5Int32V5counttcfcTO
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
 // CHECK:         return [[RESULT]]
 
@@ -613,17 +615,19 @@ func getFridge(_ home: APPHouse) -> Refrigerator {
   return home.fridge
 }
 
-// CHECK-LABEL: sil hidden @_T013objc_bridging16updateFridgeTemp{{.*}}F
-// CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse, [[DELTA:%[0-9]+]] : $Double):
+// FIXME(integers): the following checks should be updated for the new integer
+// protocols. <rdar://problem/29939484>
+// XCHECK-LABEL: sil hidden @_T013objc_bridging16updateFridgeTemp{{.*}}F
+// XCHECK: bb0([[HOME:%[0-9]+]] : $APPHouse, [[DELTA:%[0-9]+]] : $Double):
 func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // +=
-  // CHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @_T0s2peoiySdz_SdtF
+  // XCHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @_T0s2peoiySdz_SdtF
 
   // Borrowed home
   // CHECK: [[BORROWED_HOME:%.*]] = begin_borrow [[HOME]]
 
   // Temporary fridge
-  // CHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
+  // XCHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
 
   // Get operation
   // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
@@ -633,17 +637,17 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // CHECK: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
 
   // Addition
-  // CHECK: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
-  // CHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
+  // XCHECK: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
+  // XCHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
 
   // Setter
-  // CHECK: [[FRIDGE:%[0-9]+]] = load [trivial] [[TEMP_FRIDGE]] : $*Refrigerator
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
-  // CHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @_T010Appliances12RefrigeratorV19_bridgeToObjectiveCSo15APPRefrigeratorCyF
-  // CHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
-  // CHECK: apply [[SETTER]]([[OBJC_ARG]], [[BORROWED_HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
-  // CHECK: destroy_value [[OBJC_ARG]]
-  // CHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
-  // CHECK: destroy_value [[HOME]]
+  // XCHECK: [[FRIDGE:%[0-9]+]] = load [trivial] [[TEMP_FRIDGE]] : $*Refrigerator
+  // XCHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
+  // XCHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @_T010Appliances12RefrigeratorV19_bridgeToObjectiveCSo15APPRefrigeratorCyF
+  // XCHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
+  // XCHECK: apply [[SETTER]]([[OBJC_ARG]], [[BORROWED_HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
+  // XCHECK: destroy_value [[OBJC_ARG]]
+  // XCHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
+  // XCHECK: destroy_value [[HOME]]
   home.fridge.temperature += delta
 }

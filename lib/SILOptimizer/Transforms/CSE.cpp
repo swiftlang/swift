@@ -822,10 +822,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
         case ArrayCallKind::kGetCapacity:
         case ArrayCallKind::kCheckIndex:
         case ArrayCallKind::kCheckSubscript:
-          if (SemCall.hasGuaranteedSelf()) {
-            return true;
-          }
-          return false;
+          return SemCall.hasGuaranteedSelf();
         default:
           return false;
       }
@@ -1012,12 +1009,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
       Args.push_back(Op == From ? To : Op);
   }
 
-  auto FnTy = ToAI->getSubstCalleeSILType();
-  SILFunctionConventions fnConv(FnTy.castTo<SILFunctionType>(),
-                                Builder.getModule());
-  auto ResTy = fnConv.getSILResultType();
-
-  ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI, FnTy, ResTy,
+  ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
                                        ToAI->getSubstitutions(), Args,
                                        ToAI->isNonThrowing());
   FromAI->replaceAllUsesWith(NAI);
@@ -1156,10 +1148,6 @@ class SILCSE : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override {
-    return RunsOnHighLevelSil ? "High-level CSE" : "CSE";
-  }
-  
 public:
   SILCSE(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 };

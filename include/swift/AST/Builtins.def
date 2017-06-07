@@ -393,6 +393,9 @@ BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 
+/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
+
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
@@ -463,6 +466,8 @@ BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
+/// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
+BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
 
 /// unreachable has type () -> Never
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
@@ -487,6 +492,9 @@ BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
 
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
+
+// Swift3ImplicitObjCEntrypoint has type () -> ()
+BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

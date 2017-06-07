@@ -6,7 +6,7 @@ import Foundation
 
 // Ensure we emit allocating constructor thunks for ObjC initializers that
 // were inherited.
-// CHECK-LABEL: sil shared @_T0So3FooCABycfC : $@convention(method) (@thick Foo.Type) -> @owned Foo {
+// CHECK-LABEL: sil shared [serializable] @_T0So3FooCABycfC : $@convention(method) (@thick Foo.Type) -> @owned Foo {
 func foo() {
   _ = Foo()
 }

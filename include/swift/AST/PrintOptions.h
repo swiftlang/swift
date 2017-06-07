@@ -238,6 +238,9 @@ struct PrintOptions {
   /// Whether to skip parameter type attributes
   bool SkipParameterTypeAttributes = false;
 
+  /// Whether to skip placeholder members.
+  bool SkipMissingMemberPlaceholders = true;
+
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;
@@ -342,6 +345,19 @@ struct PrintOptions {
 
   bool PrintAsMember = false;
 
+  /// \see ShouldQualifyNestedDeclarations
+  enum class QualifyNestedDeclarations {
+    Never,
+    TypesOnly,
+    Always
+  };
+
+  /// Controls when a nested declaration's name should be printed qualified with
+  /// its enclosing context, if it's being printed on its own (rather than as
+  /// part of the context).
+  QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
+      QualifyNestedDeclarations::Never;
+
   /// \brief If this is not \c nullptr then functions (including accessors and
   /// constructors) will be printed with a body that is determined by this
   /// function.
@@ -386,6 +402,8 @@ struct PrintOptions {
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
     result.PrintIfConfig = false;
+    result.ShouldQualifyNestedDeclarations =
+        QualifyNestedDeclarations::TypesOnly;
     return result;
   }
 
@@ -400,6 +418,8 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DAK_DiscardableResult);
     result.EmptyLineBetweenMembers = true;
     result.ElevateDocCommentFromConformance = true;
+    result.ShouldQualifyNestedDeclarations =
+        QualifyNestedDeclarations::Always;
     return result;
   }
 
@@ -472,6 +492,7 @@ struct PrintOptions {
     result.AbstractAccessors = false;
     result.PrintAccessibility = true;
     result.SkipEmptyExtensionDecls = false;
+    result.SkipMissingMemberPlaceholders = false;
     return result;
   }
 
@@ -486,6 +507,7 @@ struct PrintOptions {
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.SkipPrivateStdlibDecls = true;
     PO.ExplodeEnumCaseDecls = true;
+    PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     return PO;
   }
 };

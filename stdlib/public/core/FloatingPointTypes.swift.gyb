@@ -27,14 +27,12 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 builtinIntLiteralBits = 2048
 }%
 
-//  TODO: remove once integer proposal is available ----------------------------
+// TODO: remove once integer proposal is available ----------------------------
+// FIXME(integers): ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 %for bits in [32,64]:
 extension UInt${bits} {
   var signBitIndex: Int {
-    return ${bits-1} - Int(Int${bits}(Builtin.int_ctlz_Int${bits}(self._value, false._value)))
-  }
-  var countTrailingZeros: Int {
-    return Int(Int${bits}(Builtin.int_cttz_Int${bits}(self._value, false._value)))
+    return ${bits-1} - leadingZeroBitCount
   }
 }
 %end
@@ -105,6 +103,7 @@ extension ${Self} : CustomDebugStringConvertible {
 
 extension ${Self}: BinaryFloatingPoint {
 
+  public typealias Magnitude = ${Self}
   public typealias Exponent = Int
   public typealias RawSignificand = ${RawSignificand}
 
@@ -127,23 +126,23 @@ extension ${Self}: BinaryFloatingPoint {
   //  Implementation details.
   @_versioned
   static var _infinityExponent: UInt {
-    @inline(__always) get { return 1 << UInt(exponentBitCount) - 1 }
+    @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
   static var _exponentBias: UInt {
-    @inline(__always) get { return _infinityExponent >> 1 }
+    @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
   static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
-      return 1 << ${RawSignificand}(significandBitCount) - 1
+      return 1 &<< ${RawSignificand}(significandBitCount) - 1
     }
   }
 
   @_versioned
   static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
-      return 1 << ${RawSignificand}(significandBitCount - 1)
+      return 1 &<< ${RawSignificand}(significandBitCount - 1)
     }
   }
 
@@ -183,14 +182,14 @@ extension ${Self}: BinaryFloatingPoint {
 
   public var sign: FloatingPointSign {
     let shift = ${Self}.significandBitCount + ${Self}.exponentBitCount
-    return FloatingPointSign(rawValue: Int(bitPattern >> ${RawSignificand}(shift)))!
+    return FloatingPointSign(rawValue: Int(bitPattern &>> ${RawSignificand}(shift)))!
   }
 
   @available(*, unavailable, renamed: "sign")
   public var isSignMinus: Bool { Builtin.unreachable() }
 
   public var exponentBitPattern: UInt {
-    return UInt(bitPattern >> UInt${bits}(${Self}.significandBitCount)) &
+    return UInt(bitPattern &>> UInt${bits}(${Self}.significandBitCount)) &
       ${Self}._infinityExponent
   }
 
@@ -208,8 +207,8 @@ extension ${Self}: BinaryFloatingPoint {
     let significand = UInt${bits}(
       significandBitPattern & ${Self}._significandMask)
     self.init(bitPattern:
-      sign << UInt${bits}(signShift) |
-      exponent << UInt${bits}(${Self}.significandBitCount) |
+      sign &<< UInt${bits}(signShift) |
+      exponent &<< UInt${bits}(${Self}.significandBitCount) |
       significand)
   }
 
@@ -223,7 +222,7 @@ extension ${Self}: BinaryFloatingPoint {
     var signAndExponent: UInt16
     var _padding: (UInt16, UInt16, UInt16) = (0, 0, 0)
     var sign: FloatingPointSign {
-      return FloatingPointSign(rawValue: Int(signAndExponent >> 15))!
+      return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
     var exponentBitPattern: UInt { return UInt(signAndExponent) & 0x7fff }
     init(explicitSignificand: UInt64, signAndExponent: UInt16) {
@@ -241,7 +240,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   static var _explicitBitMask: UInt64 {
-    @inline(__always) get { return 1 << 63 }
+    @inline(__always) get { return 1 &<< 63 }
   }
 
   public var exponentBitPattern: UInt {
@@ -347,7 +346,8 @@ extension ${Self}: BinaryFloatingPoint {
     if exponentBitPattern > UInt(${Self}.significandBitCount) {
       // self is large enough that self.ulp is normal, so we just compute its
       // exponent and construct it with a significand of zero.
-      let ulpExponent = exponentBitPattern - UInt(${Self}.significandBitCount)
+      let ulpExponent =
+        exponentBitPattern - UInt(${Self}.significandBitCount)
       return ${Self}(sign: .plus,
         exponentBitPattern: ulpExponent,
         significandBitPattern: 0)
@@ -357,7 +357,7 @@ extension ${Self}: BinaryFloatingPoint {
       let ulpShift = ${RawSignificand}(exponentBitPattern - 1)
       return ${Self}(sign: .plus,
         exponentBitPattern: 0,
-        significandBitPattern: 1 << ulpShift)
+        significandBitPattern: 1 &<< ulpShift)
     }
     return ${Self}(sign: .plus,
       exponentBitPattern: 0,
@@ -400,7 +400,7 @@ extension ${Self}: BinaryFloatingPoint {
       let shift = ${Self}.significandBitCount - significandBitPattern.signBitIndex
       return ${Self}(sign: .plus,
         exponentBitPattern: ${Self}._exponentBias,
-        significandBitPattern: significandBitPattern << ${RawSignificand}(shift))
+        significandBitPattern: significandBitPattern &<< ${RawSignificand}(shift))
     }
     // zero or infinity.
     return ${Self}(sign: .plus,
@@ -459,10 +459,10 @@ extension ${Self}: BinaryFloatingPoint {
   ///     a quiet NaN.
   public init(nan payload: RawSignificand, signaling: Bool) {
     // We use significandBitCount - 2 bits for NaN payload.
-    _precondition(payload < (${Self}._quietNaNMask >> 1),
+    _precondition(payload < (${Self}._quietNaNMask &>> 1),
       "NaN payload is not encodable.")
     var significand = payload
-    significand |= ${Self}._quietNaNMask >> (signaling ? 1 : 0)
+    significand |= ${Self}._quietNaNMask &>> (signaling ? 1 : 0)
     self.init(sign: .plus,
               exponentBitPattern: ${Self}._infinityExponent,
               significandBitPattern: significand)
@@ -538,23 +538,23 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @_transparent
-  public mutating func add(_ other: ${Self}) {
-    _value = Builtin.fadd_FPIEEE${bits}(self._value, other._value)
+  public static func +=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fadd_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public mutating func subtract(_ other: ${Self}) {
-    _value = Builtin.fsub_FPIEEE${bits}(self._value, other._value)
+  public static func -=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fsub_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public mutating func multiply(by other: ${Self}) {
-    _value = Builtin.fmul_FPIEEE${bits}(self._value, other._value)
+  public static func *=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fmul_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public mutating func divide(by other: ${Self}) {
-    _value = Builtin.fdiv_FPIEEE${bits}(self._value, other._value)
+  public static func /=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fdiv_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
@@ -646,17 +646,17 @@ extension ${Self}: BinaryFloatingPoint {
     // For subnormals, we isolate the leading significand bit.
     let index = significandBitPattern.signBitIndex
     return ${Self}(sign: sign, exponentBitPattern: 0,
-      significandBitPattern: 1 << RawSignificand(index))
+      significandBitPattern: 1 &<< RawSignificand(index))
   }
 
   public var significandWidth: Int {
-    let trailingZeros = significandBitPattern.countTrailingZeros
+    let trailingZeroBits = significandBitPattern.trailingZeroBitCount
     if isNormal {
       guard significandBitPattern != 0 else { return 0 }
-      return ${Self}.significandBitCount - trailingZeros
+      return ${Self}.significandBitCount - trailingZeroBits
     }
     if isSubnormal {
-      return significandBitPattern.signBitIndex - trailingZeros
+      return significandBitPattern.signBitIndex - trailingZeroBits
     }
     return -1
   }
@@ -758,11 +758,11 @@ extension ${Self} : Hashable {
     %if bits <= word_bits:
       return Int(bitPattern: UInt(bitPattern))
     %elif bits == 64: # Double -> 32-bit Int
-      return Int(truncatingBitPattern: bitPattern >> 32) ^
-             Int(truncatingBitPattern: bitPattern)
+      return Int(extendingOrTruncating: bitPattern &>> 32) ^
+             Int(extendingOrTruncating: bitPattern)
     %elif word_bits == 32: # Float80 -> 32-bit Int
-      return Int(truncatingBitPattern: significandBitPattern >> 32) ^
-             Int(truncatingBitPattern: significandBitPattern) ^
+      return Int(extendingOrTruncating: significandBitPattern &>> 32) ^
+             Int(extendingOrTruncating: significandBitPattern) ^
              Int(_representation.signAndExponent)
     %else: # Float80 -> 64-bit Int
       return Int(bitPattern: UInt(significandBitPattern)) ^
@@ -772,7 +772,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : Arithmetic {
+extension ${Self} {
   /// The magnitude of this value.
   ///
   /// For any value `x`, `x.magnitude.sign` is `.plus`. If `x` is not NaN,
@@ -799,16 +799,18 @@ extension ${Self} : Arithmetic {
   public var magnitude: ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
   }
+
+  // FIXME(integers): implement properly
+  public init?<T : BinaryInteger>(exactly source: T) {
+    fatalError()
+  }
 }
 
-@_transparent
-public prefix func + (x: ${Self}) -> ${Self} {
-  return x
-}
-
-@_transparent
-public prefix func - (x: ${Self}) -> ${Self} {
-  return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
+extension ${Self} {
+  @_transparent
+  public static prefix func - (x: ${Self}) -> ${Self} {
+    return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -929,44 +931,34 @@ extension ${Self} {
 //  tweaking the overload resolution rules, or by removing the other
 //  definitions in the standard lib, or both.
 
-@_transparent
-public func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.adding(rhs)
-}
+extension ${Self} {
+  @_transparent
+  public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs += rhs
+    return lhs
+  }
 
-@_transparent
-public func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.subtracting(rhs)
-}
+  @_transparent
+  public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs -= rhs
+    return lhs
+  }
 
-@_transparent
-public func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.multiplied(by: rhs)
-}
+  @_transparent
+  public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs *= rhs
+    return lhs
+  }
 
-@_transparent
-public func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.divided(by: rhs)
-}
-
-@_transparent
-public func += (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.add(rhs)
-}
-
-@_transparent
-public func -= (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.subtract(rhs)
-}
-
-@_transparent
-public func *= (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.multiply(by: rhs)
-}
-
-@_transparent
-public func /= (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.divide(by: rhs)
+  @_transparent
+  public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1020,18 +1012,6 @@ extension ${Self} : Strideable {
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@available(*, unavailable, message: "Use truncatingRemainder instead")
-public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  fatalError("% is not available.")
-}
-
-@_transparent
-@available(*, unavailable, message: "Use formTruncatingRemainder instead")
-public func %= (lhs: inout ${Self}, rhs: ${Self}) {
-  fatalError("%= is not available.")
-}
-
-@_transparent
 @available(*, unavailable, message: "use += 1")
 @discardableResult
 public prefix func ++ (rhs: inout ${Self}) -> ${Self} {
@@ -1068,3 +1048,15 @@ extension ${Self} {
 #endif
 % end
 % end # for bits in all_floating_point_types
+
+@_transparent
+@available(*, unavailable, message: "Use truncatingRemainder instead")
+public func % <T : BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
+  fatalError("% is not available.")
+}
+
+@_transparent
+@available(*, unavailable, message: "Use formTruncatingRemainder instead")
+public func %= <T : BinaryFloatingPoint> (lhs: inout T, rhs: T) {
+  fatalError("%= is not available.")
+}

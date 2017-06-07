@@ -199,6 +199,8 @@ public:
     return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
   }
 
+  StringRef getEntireTextForBuffer(unsigned BufferID) const;
+
   StringRef extractText(CharSourceRange Range,
                         Optional<unsigned> BufferID = None) const;
 

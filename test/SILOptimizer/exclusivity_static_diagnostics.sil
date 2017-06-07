@@ -1,0 +1,547 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -enforce-exclusivity=unchecked -diagnose-static-exclusivity -verify | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+
+sil @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+sil @takesOneInout : $@convention(thin) (@inout Int) -> ()
+sil @makesInt : $@convention(thin) () -> Int
+
+// CHECK-LABEL: sil hidden @twoLocalInoutsDisaliased
+sil hidden @twoLocalInoutsDisaliased : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %5 = alloc_box ${ var Int }
+  %6 = project_box %5 : ${ var Int }, 0
+  store %0 to [trivial] %6 : $*Int
+  %8 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %9 = begin_access [modify] [unknown] %3 : $*Int
+  %10 = begin_access [modify] [unknown] %6 : $*Int  // no-error
+  %11 = apply %8(%9, %10) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %10 : $*Int
+  end_access %9: $*Int
+  destroy_value %5 : ${ var Int }
+  destroy_value %2 : ${ var Int }
+  %14 = tuple ()
+  return %14 : $()
+}
+
+// CHECK-LABEL: sil hidden @twoLocalInoutsSimpleAliasing
+sil hidden @twoLocalInoutsSimpleAliasing : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
+  %7 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden @conflictingPriorAccess
+sil hidden @conflictingPriorAccess : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = begin_access [modify] [unknown] %5 : $*Int
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
+  %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*Int
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil hidden @twoSequentialInouts
+sil hidden @twoSequentialInouts : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesOneInout : $@convention(thin) (@inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int
+  %6 = apply %4(%5) : $@convention(thin) (@inout Int) -> ()
+  end_access %5 : $*Int
+  %7 = begin_access [modify] [unknown] %3 : $*Int // no-error
+  %8 = apply %4(%7) : $@convention(thin) (@inout Int) -> ()
+  end_access %7: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %8 : $()
+}
+
+
+// CHECK-LABEL: sil hidden @unconditionalBranch
+sil hidden @unconditionalBranch : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = begin_access [modify] [unknown] %3 : $*Int
+  br finish
+finish:
+  end_access %4: $*Int
+  destroy_value %2 : ${ var Int }
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden @diamondMergeStacks
+sil hidden @diamondMergeStacks : $@convention(thin) (Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = begin_access [modify] [unknown] %3 : $*Int
+  cond_br %1, then, else
+then:
+  br finish
+else:
+  br finish
+finish:
+  end_access %4: $*Int
+  destroy_value %2 : ${ var Int }
+  %5 = tuple ()
+  return %5 : $()
+}
+
+
+// CHECK-LABEL: sil hidden @loopMergeStacks
+sil hidden @loopMergeStacks : $@convention(thin) (Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = begin_access [modify] [unknown] %3 : $*Int
+  br bb1
+bb1:
+  cond_br %1, bb1, bb2
+bb2:
+  end_access %4: $*Int
+  destroy_value %2 : ${ var Int }
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden @loopWithError
+sil hidden @loopWithError : $@convention(thin) (Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  br bb1
+bb1:
+  // Make sure we don't diagnose twice.
+  %4 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %5 = begin_access [modify] [unknown] %3 : $*Int // expected-note {{conflicting access is here}}
+  end_access %5: $*Int
+  end_access %4: $*Int
+  cond_br %1, bb1, bb2
+bb2:
+  destroy_value %2 : ${ var Int }
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil hidden @modifySubAccessesAreAllowed
+sil hidden @modifySubAccessesAreAllowed : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int
+  %6 = begin_access [modify] [unknown] %5 : $*Int  // no-error
+  %7 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// Multiple access kinds
+
+// CHECK-LABEL: sil hidden @twoLocalReadsSimpleAliasing
+sil hidden @twoLocalReadsSimpleAliasing : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = project_box %1 : ${ var Int }, 0
+  store %0 to [trivial] %2 : $*Int
+  %4 = begin_access [read] [unknown] %2 : $*Int
+  %5 = begin_access [read] [unknown] %2 : $*Int  // no-error
+  end_access %5 : $*Int
+  end_access %4: $*Int
+  destroy_value %1 : ${ var Int }
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil hidden @localReadFollowedByModify
+sil hidden @localReadFollowedByModify : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = project_box %1 : ${ var Int }, 0
+  store %0 to [trivial] %2 : $*Int
+  %4 = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
+  %5 = begin_access [modify] [unknown] %2 : $*Int // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  end_access %5 : $*Int
+  end_access %4: $*Int
+  destroy_value %1 : ${ var Int }
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil hidden @localModifyFollowedByRead
+sil hidden @localModifyFollowedByRead : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = project_box %1 : ${ var Int }, 0
+  store %0 to [trivial] %2 : $*Int
+  %4 = begin_access [modify] [unknown] %2 : $*Int // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %5 = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
+  end_access %5 : $*Int
+  end_access %4: $*Int
+  destroy_value %1 : ${ var Int }
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+class ClassWithStoredProperty {
+  @sil_stored var f: Int
+  init()
+}
+// CHECK-LABEL: sil hidden @classStoredProperty
+sil hidden @classStoredProperty : $@convention(thin) (ClassWithStoredProperty) -> () {
+bb0(%0 : $ClassWithStoredProperty):
+  %1 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-error@+1{{simultaneous accesses to var 'f', but modification requires exclusive access; consider copying to a local variable}}
+  %2 = begin_access [modify] [dynamic] %1 : $*Int
+  %3 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-note@+1{{conflicting access is here}}
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  end_access %4 : $*Int
+  end_access %2 : $*Int
+  destroy_value %0 : $ClassWithStoredProperty
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden @lookThroughBeginBorrow
+sil hidden @lookThroughBeginBorrow : $@convention(thin) (ClassWithStoredProperty) -> () {
+bb0(%0 : $ClassWithStoredProperty):
+  %1 = begin_borrow %0 : $ClassWithStoredProperty
+  %2 = begin_borrow %0 : $ClassWithStoredProperty
+  %3 = ref_element_addr %1 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-error@+1{{simultaneous accesses to var 'f', but modification requires exclusive access; consider copying to a local variable}}
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  %5 = ref_element_addr %2 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-note@+1{{conflicting access is here}}
+  %6 = begin_access [modify] [dynamic] %5 : $*Int
+  end_access %6 : $*Int
+  end_access %4 : $*Int
+  end_borrow %2 from %0 : $ClassWithStoredProperty, $ClassWithStoredProperty
+  end_borrow %1 from %0 : $ClassWithStoredProperty, $ClassWithStoredProperty
+  destroy_value %0 : $ClassWithStoredProperty
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Tests for address identity
+
+// Treat 'alloc_box' as identity for project_box
+
+// CHECK-LABEL: sil hidden @twoAllocBoxProjections
+sil hidden @twoAllocBoxProjections : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = copy_value %2 : ${ var Int }
+  %5 = project_box %4 : ${ var Int }, 0
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %7 = begin_access [modify] [unknown] %5 : $*Int  // expected-note {{conflicting access is here}}
+  end_access %7 : $*Int
+  end_access %6: $*Int
+  destroy_value %2 : ${ var Int }
+  destroy_value %4 : ${ var Int }
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden @lookThroughMarkUninitialized
+sil hidden @lookThroughMarkUninitialized : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = mark_uninitialized [rootself] %1 : ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = project_box %2 : ${ var Int }, 0
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = begin_access [modify] [unknown] %4 : $*Int  // expected-note {{conflicting access is here}}
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Treat global as identity for global_addr instruction-
+sil_global hidden @global1 : $Int
+sil_global hidden @global2 : $Int
+
+// CHECK-LABEL: sil hidden @modifySameGlobal
+sil hidden @modifySameGlobal : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_addr @global1 :$*Int
+  %2 = global_addr @global1 :$*Int
+  %3 = begin_access [modify] [unknown] %1 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %4 = begin_access [modify] [unknown] %2 : $*Int  // expected-note {{conflicting access is here}}
+  end_access %4 : $*Int
+  end_access %3: $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden @modifyDifferentGlobal
+sil hidden @modifyDifferentGlobal : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_addr @global1 :$*Int
+  %2 = global_addr @global2 :$*Int
+  %3 = begin_access [modify] [unknown] %1 : $*Int
+  %4 = begin_access [modify] [unknown] %2 : $*Int  // no-error
+  end_access %4 : $*Int
+  end_access %3: $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Multiple errors accessing the same location
+
+// If we have a sequence of begin read - begin write - begin read accesses make
+// sure the second read doesn't report a confusing read-read conflict.
+// CHECK-LABEL: sil hidden @readWriteReadConflictingThirdAccess
+sil hidden @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [read] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %7 = begin_access [read] [unknown] %3 : $*Int // no-error
+  %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*Int
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// If we have a sequence of begin write - begin write - begin write accesses make sure the
+// third write doesn't report a conflict.
+// CHECK-LABEL: sil hidden @writeWriteWriteConflictingThirdAccess
+sil hidden @writeWriteWriteConflictingThirdAccess : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // no-error
+  %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*Int
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// If we have a sequence of begin write - end write - begin write - begin write
+// accesses make sure the it is the second begin write that gets the note
+// about the conflict and not the first
+// CHECK-LABEL: sil hidden @resetFirstAccessForNote
+sil hidden @resetFirstAccessForNote : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // no-note
+  end_access %5 : $*Int
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting access is here}}
+  %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*Int
+  end_access %6: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Check for iterator invalidation issues when the hash from
+// basic blocks to analysis state is re-hashed. The number of
+// blocks in this test is determined by the initial size of the
+// 'BlockOutAccesses' DenseMap in the implementation.
+//
+//  The unreachable block below must branch to bN where
+//    N = 3/4 * INITIAL_SIZE - 2
+sil @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
+bb0(%0: $Builtin.Int1):
+ br bb1
+bb1:
+  br bb2
+bb2:
+  br bb3
+bb3:
+  br bb4
+bb4:
+  br bb5
+bb5:
+  br bb6
+bb6:
+  br bb7
+bb7:
+  br bb8
+bb8:
+  br bb9
+bb9:
+  br bb10
+bb10:
+  br bb11
+bb11:
+  br bb12
+bb12:
+  br bb13
+bb13:
+  br bb14
+bb14:
+  br bb15
+bb15:
+  br bb16
+bb16:
+   br bb17
+bb17:
+  br bb18
+bb18:
+  br bb19
+bb19:
+  br bb20
+bb20:
+  br bb21
+bb21:
+  br bb22
+bb22:
+  br bb23 // no-crash
+bb23:
+  %1 = tuple ()
+  return %1 : $()
+bbUnreachable:
+  br bb22
+}
+
+// Check that a pointer_to_address access passes diagnostics.
+//
+// CHECK-LABEL: sil hidden  @pointerToAddr
+sil hidden  @pointerToAddr : $@convention(thin) (Builtin.RawPointer) -> Int {
+bb0(%0: $Builtin.RawPointer):
+  %adr = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
+  %access = begin_access [read] [dynamic] %adr : $*Int
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  return %val : $Int
+}
+
+// Helper.
+struct S {
+  var x: Int
+}
+
+// Check inlined struct element access.
+// This only happens when mandatory passes are applied repeatedly.
+// e.g. importing from a debug standard library.
+//
+// CHECK-LABEL: sil hidden @inlinedStructElement
+sil hidden @inlinedStructElement : $@convention(thin) (@inout S) -> Int {
+bb0(%0 : $*S):
+  %2 = begin_access [modify] [static] %0 : $*S
+  %3 = struct_element_addr %2 : $*S, #S.x
+  %4 = begin_access [read] [static] %3 : $*Int
+  %5 = load [trivial] %4 : $*Int
+  end_access %4 : $*Int
+  end_access %2 : $*S
+  return %5 : $Int
+}
+
+// Check inlined tuple element access.
+// This only happens when mandatory passes are applied repeatedly.
+//
+// CHECK-LABEL: sil hidden @inlinedTupleElement
+sil hidden @inlinedTupleElement : $@convention(thin) (@inout (Int, Int)) -> Int {
+bb0(%0 : $*(Int, Int)):
+  %2 = begin_access [modify] [static] %0 : $*(Int, Int)
+  %3 = tuple_element_addr %2 : $*(Int, Int), 0
+  %4 = begin_access [read] [static] %3 : $*Int
+  %5 = load [trivial] %4 : $*Int
+  end_access %4 : $*Int
+  end_access %2 : $*(Int, Int)
+  return %5 : $Int
+}
+
+// Check inlined enum access.
+// This only happens when mandatory passes are applied repeatedly.
+//
+// CHECK-LABEL: sil hidden @inlinedEnumValue
+sil hidden @inlinedEnumValue : $@convention(thin) (Int) -> (@out Optional<Int>, Int) {
+bb0(%0 : $*Optional<Int>, %1 : $Int):
+  %6 = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt.1
+  %7 = begin_access [read] [static] %6 : $*Int
+  %8 = load [trivial] %7 : $*Int
+  end_access %7 : $*Int
+  return %8 : $Int
+}
+
+// Helper.
+class Storage {}
+
+// Check inlined array access.
+// This only happens when mandatory passes are applied repeatedly.
+//
+// CHECK-LABEL: sil hidden @inlinedArrayProp
+sil hidden @inlinedArrayProp : $@convention(thin) (@guaranteed Storage, Builtin.Word) -> Int {
+bb0(%0 : $Storage, %1 : $Builtin.Word):
+  %2 = ref_tail_addr %0 : $Storage, $UInt
+  %3 = begin_access [read] [static] %2 : $*UInt
+  %4 = tail_addr %3 : $*UInt, %1 : $Builtin.Word, $Int
+  %5 = begin_access [read] [static] %4 : $*Int
+  %6 = index_addr %5 : $*Int, %1 : $Builtin.Word
+  %7 = begin_access [read] [static] %6 : $*Int
+  %8 = load [trivial] %7 : $*Int
+  end_access %7 : $*Int
+  end_access %5 : $*Int
+  end_access %3 : $*UInt
+  return %8 : $Int
+}

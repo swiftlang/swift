@@ -1,10 +1,8 @@
-// RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/FloatingPoint.swift
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/FloatingPoint.swift
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-build-swift -parse-stdlib %t/FloatingPoint.swift -o %t/a.out
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
-
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
 
 %{
 from gyb_stdlib_unittest_support import TRACE, stackTrace, trace

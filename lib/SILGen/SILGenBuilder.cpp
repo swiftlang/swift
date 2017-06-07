@@ -108,7 +108,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation loc, SILValue fn,
                                       SubstitutionList subs,
                                       ArrayRef<SILValue> args) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
-  return SILBuilder::createApply(loc, fn, substFnTy, result, subs, args, false);
+  return SILBuilder::createApply(loc, fn, subs, args, false);
 }
 
 TryApplyInst *
@@ -116,8 +116,7 @@ SILGenBuilder::createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
                               SubstitutionList subs, ArrayRef<SILValue> args,
                               SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
-  return SILBuilder::createTryApply(loc, fn, substFnTy, subs, args, normalBB,
-                                    errorBB);
+  return SILBuilder::createTryApply(loc, fn, subs, args, normalBB, errorBB);
 }
 
 PartialApplyInst *
@@ -125,8 +124,9 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                   SILType substFnTy, SubstitutionList subs,
                                   ArrayRef<SILValue> args, SILType closureTy) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
-  return SILBuilder::createPartialApply(loc, fn, substFnTy, subs, args,
-                                        closureTy);
+  return SILBuilder::createPartialApply(
+      loc, fn, subs, args,
+      closureTy.getAs<SILFunctionType>()->getCalleeConvention());
 }
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
@@ -209,7 +209,7 @@ ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
                                             ManagedValue originalValue) {
-  auto &lowering = getFunction().getTypeLowering(originalValue.getType());
+  auto &lowering = SGF.getTypeLowering(originalValue.getType());
   return createCopyValue(loc, originalValue, lowering);
 }
 
@@ -314,7 +314,7 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
                                              ManagedValue base) {
-  if (getFunction().getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
     auto *i = SILBuilder::createLoad(loc, base.getValue(),
                                      LoadOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(i);
@@ -326,7 +326,7 @@ ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
 
 ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
                                                          ManagedValue base) {
-  if (getFunction().getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
     auto *i = SILBuilder::createLoad(loc, base.getValue(),
                                      LoadOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(i);
@@ -342,7 +342,7 @@ ManagedValue
 SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue) {
   SILType ty = originalValue.getType();
-  const auto &lowering = getFunction().getTypeLowering(ty);
+  const auto &lowering = SGF.getTypeLowering(ty);
   if (lowering.isTrivial())
     return originalValue;
 
@@ -372,7 +372,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
     SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -384,8 +384,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -402,7 +401,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
     SGFContext context, std::function<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -414,8 +413,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -460,7 +458,7 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
 }
 
 ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
-  auto &lowering = getFunction().getTypeLowering(v.getType());
+  auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadTake(loc, v, lowering);
 }
 
@@ -476,7 +474,7 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
 }
 
 ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v) {
-  auto &lowering = getFunction().getTypeLowering(v.getType());
+  auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadCopy(loc, v, lowering);
 }
 
@@ -484,7 +482,7 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
                                            const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getAddressType() == v.getType());
   SILValue result =
-      lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsNotTake);
+      lowering.emitLoadOfCopy(*this, loc, v.getValue(), IsNotTake);
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(result);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
@@ -575,7 +573,7 @@ ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
 ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
-  auto &argTL = getFunction().getTypeLowering(arg.getType());
+  auto &argTL = SGF.getTypeLowering(arg.getType());
   SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
@@ -588,7 +586,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
   ArgumentSource argValue(loc, std::move(rvalue));
   SGF.emitInjectOptionalValueInto(
       loc, std::move(argValue), tempResult,
-      getFunction().getTypeLowering(tempResult->getType()));
+      SGF.getTypeLowering(tempResult->getType()));
   return ManagedValue::forUnmanaged(tempResult);
 }
 
@@ -601,7 +599,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);
   SGF.emitInjectOptionalNothingInto(loc, tempResult,
-                                    SGF.F.getTypeLowering(type));
+                                    SGF.getTypeLowering(type));
   return ManagedValue::forUnmanaged(tempResult);
 }
 
@@ -644,7 +642,8 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule());
+  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule()) &&
+                       getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
@@ -673,6 +672,28 @@ void SwitchEnumBuilder::emit() && {
     }
   }
 
+  // If we are asked to create a default block and it is specified that the
+  // default block should be emitted before normal cases, emit it now.
+  if (defaultBlockData &&
+      defaultBlockData->dispatchTime ==
+          DefaultDispatchTime::BeforeNormalCases) {
+    SILBasicBlock *defaultBlock = defaultBlockData->block;
+    NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
+    DefaultCaseHandler handler = defaultBlockData->handler;
+
+    // Don't allow cleanups to escape the conditional block.
+    SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
+                                    CleanupLocation::get(loc),
+                                    contBB.getPtrOrNull());
+    builder.emitBlock(defaultBlock);
+    ManagedValue input = optional;
+    if (!isAddressOnly) {
+      input = builder.createOwnedPHIArgument(optional.getType());
+    }
+    handler(input, presentScope);
+    assert(!builder.hasValidInsertionPoint());
+  }
+
   for (NormalCaseData &caseData : caseDataArray) {
     EnumElementDecl *decl = caseData.decl;
     SILBasicBlock *caseBlock = caseData.block;
@@ -683,10 +704,11 @@ void SwitchEnumBuilder::emit() && {
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
                                     CleanupLocation::get(loc),
                                     contBlock.getPtrOrNull());
+
     builder.emitBlock(caseBlock);
 
     ManagedValue input;
-    if (decl->getArgumentInterfaceType()) {
+    if (decl->hasAssociatedValues()) {
       // Pull the payload out if we have one.
       SILType inputType =
           optional.getType().getEnumElementType(decl, builder.getModule());
@@ -699,9 +721,10 @@ void SwitchEnumBuilder::emit() && {
     assert(!builder.hasValidInsertionPoint());
   }
 
-  // If we have a default BB, create an argument for the original loaded value
-  // and destroy it there.
-  if (defaultBlockData) {
+  // If we are asked to create a default block and it is specified that the
+  // default block should be emitted after normal cases, emit it now.
+  if (defaultBlockData &&
+      defaultBlockData->dispatchTime == DefaultDispatchTime::AfterNormalCases) {
     SILBasicBlock *defaultBlock = defaultBlockData->block;
     NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
     DefaultCaseHandler handler = defaultBlockData->handler;

@@ -56,7 +56,7 @@ extension String {
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
   ///     if let i = favemoji.utf16.index(where: { $0 >= 128 }) {
-  ///         let asciiPrefix = String(favemoji.utf16.prefix(upTo: i))
+  ///         let asciiPrefix = String(favemoji.utf16[..<i])
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
@@ -120,14 +120,14 @@ extension String {
     /// You can convert between indices of the different string views by using
     /// conversion initializers and the `samePosition(in:)` method overloads.
     /// For example, the following code sample finds the index of the first
-    /// space in the string's character view and then converts that to the same
+    /// space in a string and then converts that to the same
     /// position in the UTF-16 view.
     ///
     ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     if let i = hearts.characters.index(of: " ") {
+    ///     if let i = hearts.index(of: " ") {
     ///         let j = i.samePosition(in: hearts.utf16)
-    ///         print(Array(hearts.utf16.suffix(from: j)))
-    ///         print(hearts.utf16.suffix(from: j))
+    ///         print(Array(hearts.utf16[j...]))
+    ///         print(hearts.utf16[j...])
     ///     }
     ///     // Prints "[32, 60, 51, 32, 9829, 65038, 32, 55357, 56472]"
     ///     // Prints " <3 ♥︎ 💘"
@@ -225,18 +225,18 @@ extension String {
 
       let index = _internalIndex(at: i._offset)
       let u = _core[index]
-      if _fastPath((u >> 11) != 0b1101_1) {
+      if _fastPath((u &>> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
         // of 1 code unit.
         return u
       }
 
-      if (u >> 10) == 0b1101_10 {
+      if (u &>> 10) == 0b1101_10 {
         // `u` is a high-surrogate.  Sequence is well-formed if it
         // is followed by a low-surrogate.
         if _fastPath(
                index + 1 < _core.count &&
-               (_core[index + 1] >> 10) == 0b1101_11) {
+               (_core[index + 1] &>> 10) == 0b1101_11) {
           return u
         }
         return 0xfffd
@@ -244,7 +244,7 @@ extension String {
 
       // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
-      if _fastPath(index != 0 && (_core[index - 1] >> 10) == 0b1101_10) {
+      if _fastPath(index != 0 && (_core[index - 1] &>> 10) == 0b1101_10) {
         return u
       }
       return 0xfffd
@@ -324,7 +324,7 @@ extension String {
   ///
   ///     let picnicGuest = "Deserving porcupine"
   ///     if let i = picnicGuest.utf16.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf16.prefix(upTo: i))
+  ///         let adjective = String(picnicGuest.utf16[..<i])
   ///         print(adjective)
   ///     }
   ///     // Prints "Optional(Deserving)"
@@ -350,6 +350,11 @@ extension String {
 
   /// The index type for subscripting a string's `utf16` view.
   public typealias UTF16Index = UTF16View.Index
+}
+
+extension String.UTF16View : _SwiftStringView {
+  var _ephemeralContent : String { return _persistentContent }
+  var _persistentContent : String { return String(self._core) }
 }
 
 extension String.UTF16View.Index : Comparable {
@@ -384,7 +389,7 @@ extension String.UTF16View.Index {
   ///     let utf8Index = cafe.utf8.index(of: 32)!
   ///     let utf16Index = String.UTF16View.Index(utf8Index, within: cafe.utf16)!
   ///
-  ///     print(cafe.utf16.prefix(upTo: utf16Index))
+  ///     print(cafe.utf16[..<utf16Index])
   ///     // Prints "Café"
   ///
   /// If the position passed as `utf8Index` doesn't have an exact corresponding
@@ -425,7 +430,7 @@ extension String.UTF16View.Index {
   ///     let scalarIndex = cafe.unicodeScalars.index(of: "é")!
   ///     let utf16Index = String.UTF16View.Index(scalarIndex, within: cafe.utf16)
   ///
-  ///     print(cafe.utf16.prefix(through: utf16Index))
+  ///     print(cafe.utf16[...utf16Index])
   ///     // Prints "Café"
   ///
   /// - Parameters:
@@ -440,27 +445,25 @@ extension String.UTF16View.Index {
   }
 
   /// Creates an index in the given UTF-16 view that corresponds exactly to the
-  /// specified `CharacterView` position.
+  /// specified string position.
   ///
-  /// The following example finds the position of a space in a string's `characters`
-  /// view and then converts that position to an index in the string's
-  /// `utf16` view.
+  /// The following example finds the position of a space in a string and then
+  /// converts that position to an index in the string's `utf16` view.
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let characterIndex = cafe.characters.index(of: "é")!
-  ///     let utf16Index = String.UTF16View.Index(characterIndex, within: cafe.utf16)
+  ///     let stringIndex = cafe.index(of: "é")!
+  ///     let utf16Index = String.UTF16View.Index(stringIndex, within: cafe.utf16)
   ///
-  ///     print(cafe.utf16.prefix(through: utf16Index))
+  ///     print(cafe.utf16[...utf16Index])
   ///     // Prints "Café"
   ///
   /// - Parameters:
-  ///   - characterIndex: A position in a `CharacterView` instance.
-  ///     `characterIndex` must be an element in
-  ///     `String(utf16).characters.indices`.
+  ///   - index: A position in a string. `index` must be an element in
+  ///     `String(utf16).indices`.
   ///   - utf16: The `UTF16View` in which to find the new position.
-  public init(_ characterIndex: String.Index, within utf16: String.UTF16View) {
-    _offset = characterIndex._utf16Index
+  public init(_ index: String.Index, within utf16: String.UTF16View) {
+    _offset = index._utf16Index
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -475,7 +478,7 @@ extension String.UTF16View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf16.index(of: 32)!
   ///     let j = i.samePosition(in: cafe.utf8)!
-  ///     print(Array(cafe.utf8.prefix(upTo: j)))
+  ///     print(Array(cafe.utf8[..<j]))
   ///     // Prints "[67, 97, 102, 195, 169]"
   ///
   /// - Parameter utf8: The view to use for the index conversion.
@@ -501,7 +504,7 @@ extension String.UTF16View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf16.index(of: 32)!
   ///     let j = i.samePosition(in: cafe.unicodeScalars)!
-  ///     print(cafe.unicodeScalars.prefix(upTo: j))
+  ///     print(cafe.unicodeScalars[..<j])
   ///     // Prints "Café"
   ///
   /// - Parameter unicodeScalars: The view to use for the index conversion.
@@ -528,7 +531,7 @@ extension String.UTF16View.Index {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.utf16.index(of: 32)!
   ///     let j = i.samePosition(in: cafe)!
-  ///     print(cafe[cafe.startIndex ..< j])
+  ///     print(cafe[..<j])
   ///     // Prints "Café"
   ///
   /// - Parameter characters: The string to use for the index conversion.

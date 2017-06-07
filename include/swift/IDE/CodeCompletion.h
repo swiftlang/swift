@@ -503,6 +503,7 @@ enum class CompletionKind {
   ReturnStmtExpr,
   AfterPound,
   GenericParams,
+  SwiftKeyPath,
 };
 
 /// \brief A single code completion result.

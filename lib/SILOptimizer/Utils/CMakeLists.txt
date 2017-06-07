@@ -13,5 +13,6 @@ set(UTILS_SOURCES
   Utils/SILInliner.cpp
   Utils/SILSSAUpdater.cpp
   Utils/SpecializationMangler.cpp
+  Utils/StackNesting.cpp
   PARENT_SCOPE)
 

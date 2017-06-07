@@ -17,19 +17,19 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 11
 // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
 // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK: [[X_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK: [[X_TMP:%.*]] = bitcast i8* [[X_ALLOCA]] to %swift.opaque*
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 2
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
 // CHECK-NEXT: [[INITIALIZE_WITH_COPY:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* [[X_TMP]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)
 //   Copy 'x' into the first result.
 // CHECK-NEXT: call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* %0, [[OPAQUE]]* [[X_TMP]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
 // CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* %1, [[OPAQUE]]* [[X_TMP]], [[TYPE]]* %T)
@@ -83,13 +83,13 @@ func lump3<T>(_ x: T) -> (T, T, T) { return (x,x,x) }
 // CHECK: define hidden swiftcc i64 @_T014generic_tuples5lump4x_SixtxlF(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump4<T>(_ x: T) -> (T, Int, T) { return (x,0,x) }
 
-// CHECK: define hidden swiftcc i64 @_T014generic_tuples6unlumpS2i_xxtlF(i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc i64 @_T014generic_tuples6unlumpS2i_xxt_tlF(i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump<T>(_ x: (Int, T, T)) -> Int { return x.0 }
-// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump1xSi_xxtlF(%swift.opaque* noalias nocapture sret, i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump1xSi_xxt_tlF(%swift.opaque* noalias nocapture sret, i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump1<T>(_ x: (Int, T, T)) -> T { return x.1 }
-// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump2xx_SixtlF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump2xx_Sixt_tlF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump2<T>(_ x: (T, Int, T)) -> T { return x.0 }
-// CHECK: define hidden swiftcc i64 @_T014generic_tuples7unlump3Six_SixtlF(%swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc i64 @_T014generic_tuples7unlump3Six_Sixt_tlF(%swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump3<T>(_ x: (T, Int, T)) -> Int { return x.1 }
 
 

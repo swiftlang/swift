@@ -569,7 +569,6 @@ private:
     }
   }
 
-  StringRef getName() override { return "StackPromotion"; }
 };
 
 } // end anonymous namespace

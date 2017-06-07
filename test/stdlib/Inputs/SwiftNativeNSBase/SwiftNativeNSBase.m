@@ -55,7 +55,6 @@ void TestSwiftNativeNSBase(void)
       @"_SwiftNativeNSStringBase",
       @"_SwiftNativeNSEnumeratorBase",
       @"_SwiftNativeNSDataBase",
-      @"_SwiftNativeNSCharacterSetBase",
       @"_SwiftNativeNSIndexSetBase",
       nil];
 

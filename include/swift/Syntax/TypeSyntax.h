@@ -403,7 +403,12 @@ public:
     return S->getKind() == SyntaxKind::TupleTypeElement;
   }
 };
-  
+
+#pragma mark - tuple-type-element-list API
+
+using TupleTypeElementListSyntax =
+  SyntaxCollection<SyntaxKind::TupleTypeElementList, TupleTypeElementSyntax>;
+
 #pragma mark - tuple-type Data
 
 class TupleTypeSyntaxData final : public TypeSyntaxData {

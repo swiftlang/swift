@@ -99,6 +99,8 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{[_0-9a-zA-Z]*}}3Not{{.*}}Tg5 : $@convention(thin) (NotUInt8) -> NotUInt8 {
 // CHECK: bb0
 // CHECK-NEXT: debug_value %0
+// TODO: the second debug_value is redundant and should be removed
+// CHECK-NEXT: debug_value %0
 // CHECK-NEXT: return %0
 
 // x -> y where y is a class but x is not.
@@ -351,7 +353,7 @@ public func ExistentialToArchetype<T>(o o : AnyObject, t : T) -> T {
 // CHECK: return
 
 // AnyObject -> AnyObject
-// CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}AnyObject{{.*}}Tg5 : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned AnyObject {
+// CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast22ExistentialToArchetype{{[_0-9a-zA-Z]*}}yXl{{.*}}Tg5 : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned AnyObject {
 // CHECK: bb0(%0 : $AnyObject, %1 : $AnyObject):
 // CHECK: strong_release %1
 // CHECK: return %0

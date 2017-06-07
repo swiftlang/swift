@@ -136,3 +136,34 @@ func superclassConformance4<T: P3, U: P3>(_: T, _: U)
   where T.T: C, // expected-note{{superclass constraint 'T.T' : 'C' written here}}
         U.T: C, // expected-warning{{redundant superclass constraint 'U.T' : 'C'}}
         T.T == U.T { }
+
+// Lookup of superclass associated types from inheritance clause
+
+protocol Elementary {
+  associatedtype Element
+
+  func get() -> Element
+}
+
+class Classical : Elementary {
+  func get() -> Int {
+    return 0
+  }
+}
+
+func genericFunc<T : Elementary, U : Classical>(_: T, _: U) where T.Element == U.Element {}
+
+// Lookup within superclass constraints.
+protocol P8 {
+  associatedtype B
+}
+
+class C8 {
+  struct A { }
+}
+
+func superclassLookup1<T: C8 & P8>(_: T) where T.A == T.B { }
+
+func superclassLookup2<T: P8>(_: T) where T.A == T.B, T: C8 { }
+
+func superclassLookup3<T>(_: T) where T.A == T.B, T: C8, T: P8 { }

@@ -4,3 +4,16 @@
 enum InvalidEnum {
   case
 }
+
+func qualifiedModuleName() {
+  let a = Swift.Array<Int>()
+
+  _ = a
+}
+
+func amazingCode() {
+  let a = Swift
+  let b = (Swift, Swift)
+
+  _ = a, _ = b
+}

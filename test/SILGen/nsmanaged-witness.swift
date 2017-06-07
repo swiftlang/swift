@@ -61,5 +61,5 @@ extension Foo: NativeIntProperty {}
 // TODO: We can't emit a vtable entry for materializeForSet for ObjC types.
 // CHECK-NOT: class_method {{.*}}Foo{{.*}}intProperty{{.*}}materializeForSet
 
-// CHECK-LABEL: sil shared @_T0So3FooC11intPropertys5Int32Vfm
+// CHECK-LABEL: sil shared [serializable] @_T0So3FooC11intPropertys5Int32Vfm
 

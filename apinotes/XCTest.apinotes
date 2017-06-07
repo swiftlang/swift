@@ -18,6 +18,7 @@ Classes:
     MethodKind: Instance
     SwiftName: 'matching(identifier:)'
 - Name: XCTestCase
+  SwiftObjCMembers: true
   Methods:
   - Selector: 'waitForExpectationsWithTimeout:handler:'
     MethodKind: Instance

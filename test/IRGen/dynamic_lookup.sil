@@ -76,6 +76,8 @@ bb2:
   br bb3
 
 bb3:
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %43 = tuple ()
   return %43 : $()
 }
@@ -119,6 +121,7 @@ bb2:
   br bb3
 
 bb3:
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>
   %43 = tuple ()
   return %43 : $()
 }
@@ -153,6 +156,8 @@ bb2:
   br bb3
 
 bb3:
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>
   %30 = tuple ()
   return %30 : $()
 }

@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -921,6 +922,21 @@ void swift::swift_unknownUnownedTakeAssign(UnownedReference *dest,
   dest->Value = src->Value;
 }
 
+bool swift::swift_unknownUnownedIsEqual(UnownedReference *ref, void *value) {
+  if (!ref->Value) {
+    return value == nullptr;
+  } else if (auto objcRef = dyn_cast<ObjCUnownedReference>(ref)) {
+    auto refValue = objc_loadWeakRetained(&objcRef->storage()->WeakRef);
+    bool isEqual = (void*)refValue == value;
+    // This ObjC case has no deliberate unowned check here,
+    // unlike the Swift case.
+    [refValue release];
+    return isEqual;
+  } else {
+    return swift_unownedIsEqual(ref, (HeapObject *)value);
+  }
+}
+
 /*****************************************************************************/
 /************************** UNKNOWN WEAK REFERENCES **************************/
 /*****************************************************************************/
@@ -1357,6 +1373,69 @@ swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
     return ClassExtents{0, class_getInstanceSize((Class)c)};
 
   return swift_class_getInstanceExtents(c);
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_EXPORT
+void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
+                                             const char *filename,
+                                             size_t filenameLength,
+                                             size_t line, size_t column,
+                                             std::atomic<bool> *didLog) {
+  // Only log once. We should have been given a unique zero-initialized
+  // atomic flag for each entry point.
+  if (didLog->exchange(true))
+    return;
+  
+  // Figure out how much reporting we want by querying the environment
+  // variable SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT. We have four meaningful
+  // levels:
+  //
+  //   0: Don't report anything
+  //   1: Complain about uses of implicit @objc entrypoints.
+  //   2: Complain about uses of implicit @objc entrypoints, with backtraces
+  //      if possible.
+  //   3: Complain about uses of implicit @objc entrypoints, then abort().
+  //
+  // The actual reportLevel is stored as the above values +1, so that
+  // 0 indicates we have not yet checked. It's fine to race through here.
+  //
+  // The default, if SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT is not set, is 2.
+  static int storedReportLevel = 0;
+  if (storedReportLevel == 0) {
+    auto reportLevelStr = getenv("SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT");
+    if (reportLevelStr &&
+        reportLevelStr[0] >= '0' && reportLevelStr[0] <= '3' &&
+        reportLevelStr[1] == 0)
+      storedReportLevel = (reportLevelStr[0] - '0') + 1;
+    else
+      storedReportLevel = 3;
+  }
+
+  int reportLevel = storedReportLevel - 1;
+  if (reportLevel < 1) return;
+
+  // Report the error.
+  uint32_t flags = 0;
+  if (reportLevel >= 2)
+    flags |= 1 << 0; // Backtrace
+  bool isInstanceMethod = !class_isMetaClass(object_getClass(self));
+  void (*reporter)(uint32_t, const char *, ...) =
+    reportLevel > 2 ? swift::fatalError : swift::warning;
+  
+  if (filenameLength > INT_MAX)
+    filenameLength = INT_MAX;
+  
+  reporter(
+    flags,
+    "*** %*s:%zu:%zu: implicit Objective-C entrypoint %c[%s %s] "
+    "is deprecated and will be removed in Swift 4; "
+    "add explicit '@objc' to the declaration to emit the Objective-C "
+    "entrypoint in Swift 4 and suppress this message\n",
+    (int)filenameLength, filename, line, column,
+    isInstanceMethod ? '-' : '+',
+    class_getName([self class]),
+    sel_getName(selector));
 }
 
 #endif

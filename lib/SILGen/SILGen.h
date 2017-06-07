@@ -17,6 +17,7 @@
 #include "Cleanup.h"
 #include "SILGenProfiling.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -172,9 +173,8 @@ public:
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
-  SILFunction *emitVTableMethod(SILDeclRef derived,
-                                SILDeclRef base,
-                                SILLinkage &implLinkage);
+  SILVTable::Entry emitVTableMethod(SILDeclRef derived,
+                                    SILDeclRef base);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
@@ -196,7 +196,7 @@ public:
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
-                                           IsFragile_t Fragile);
+                                           IsSerialized_t Serialized);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -224,6 +224,7 @@ public:
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
+  void visitMissingMemberDecl(MissingMemberDecl *d) {}
 
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
@@ -273,9 +274,7 @@ public:
                                 ArrayRef<ParameterList*> paramLists);
 
   /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(ValueDecl *fd,
-                      SILDeclRef entryPoint,
-                      SILDeclRef nextEntryPoint);
+  void emitCurryThunk(SILDeclRef thunk);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
@@ -283,8 +282,9 @@ public:
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
-  template<typename T>
-  void preEmitFunction(SILDeclRef constant, T *astNode,
+  void preEmitFunction(SILDeclRef constant,
+                       llvm::PointerUnion<ValueDecl *,
+                                          Expr *> astNode,
                        SILFunction *F,
                        SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
@@ -316,6 +316,7 @@ public:
   /// Emit a protocol witness entry point.
   SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
                                    SILLinkage linkage,
+                                   IsSerialized_t isSerialized,
                                    SILDeclRef requirement,
                                    SILDeclRef witnessRef,
                                    IsFreeFunctionWitness_t isFree,

@@ -4,7 +4,7 @@
 
 import gizmo
 
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test3So8NSObjectCyF
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test3So8NSObjectCyF
 func test3() -> NSObject {
   // initializer returns at +1
   return Gizmo()
@@ -14,7 +14,7 @@ func test3() -> NSObject {
   // CHECK: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: return [[GIZMO_NS]] : $NSObject
 
-  // CHECK-LABEL: sil shared @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
+  // CHECK-LABEL: sil shared [serializable] @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
   // CHECK: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
@@ -29,7 +29,7 @@ func test3() -> NSObject {
 
 
 // Normal message send with argument, no transfers.
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F
 func test5(_ g: Gizmo) {
   var g = g
   Gizmo.inspect(g)
@@ -43,7 +43,8 @@ func test5(_ g: Gizmo) {
   // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
   // CHECK:   [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
+  // CHECK:   [[V:%.*]] = load [copy] [[READ]]
   // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
   // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK:   destroy_value [[G]]
@@ -53,7 +54,7 @@ func test5(_ g: Gizmo) {
 // CHECK: } // end sil function '_T026objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F'
 
 // The argument to consume is __attribute__((ns_consumed)).
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F
 func test6(_ g: Gizmo) {
   var g = g
   Gizmo.consume(g)
@@ -67,7 +68,8 @@ func test6(_ g: Gizmo) {
   // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
   // CHECK:   [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
-  // CHECK:   [[V:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
+  // CHECK:   [[V:%.*]] = load [copy] [[READ]]
   // CHECK:   [[G:%.*]] = enum $Optional<Gizmo>, #Optional.some!enumelt.1, [[V]]
   // CHECK:   apply [[METHOD]]([[G]], [[OBJC_CLASS]])
   // CHECK-NOT:  destroy_value [[G]]
@@ -79,7 +81,7 @@ func test6(_ g: Gizmo) {
 // CHECK: } // end sil function '_T026objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F'
 
 // fork is __attribute__((ns_consumes_self)).
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F
 func test7(_ g: Gizmo) {
   var g = g
   g.fork()
@@ -90,7 +92,8 @@ func test7(_ g: Gizmo) {
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   [[G:%.*]] = load [copy] [[GIZMO_BOX_PB]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[GIZMO_BOX_PB]] : $*Gizmo
+  // CHECK:   [[G:%.*]] = load [copy] [[READ]]
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
   // CHECK:   apply [[METHOD]]([[G]])
   // CHECK-NOT:  destroy_value [[G]]
@@ -102,7 +105,7 @@ func test7(_ g: Gizmo) {
 // CHECK: } // end sil function '_T026objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F'
 
 // clone is __attribute__((ns_returns_retained)).
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test8{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test8{{[_0-9a-zA-Z]*}}F
 func test8(_ g: Gizmo) -> Gizmo {
   return g.clone()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
@@ -117,7 +120,7 @@ func test8(_ g: Gizmo) -> Gizmo {
   // CHECK-NEXT: return [[RESULT]]
 }
 // duplicate returns an autoreleased object at +0.
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
 func test9(_ g: Gizmo) -> Gizmo {
   return g.duplicate()
   // CHECK: bb0([[G:%.*]] : $Gizmo):

@@ -52,7 +52,7 @@
 ///
 %if mutable:
 /// You can use methods like `initializeMemory(as:from:)` and
-/// `moveInitializeMemory(as:from:count)` to bind raw memory to a type and
+/// `moveInitializeMemory(as:from:count:)` to bind raw memory to a type and
 /// initialize it with a value or series of values. To bind uninitialized
 /// memory to a type without initializing it, use the `bindMemory(to:count:)`
 /// method. These methods all return typed pointers for further typed access
@@ -685,12 +685,12 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
-    as type: C.Iterator.Element.Type, from source: C
-  ) -> UnsafeMutablePointer<C.Iterator.Element> {
+    as type: C.Element.Type, from source: C
+  ) -> UnsafeMutablePointer<C.Element> {
     // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
     // Initialize and bind each element of the container.
     for (index, element) in source.enumerated() {
-      self.initializeMemory(as: C.Iterator.Element.self, at: index, to: element)
+      self.initializeMemory(as: C.Element.self, at: index, to: element)
     }
     return UnsafeMutablePointer(_rawValue)
   }
@@ -834,7 +834,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
-        /*alignment:*/ Int32(0)._value,
+        /*alignment:*/ Int32()._value,
         /*volatile:*/ false._value)
     }
   }

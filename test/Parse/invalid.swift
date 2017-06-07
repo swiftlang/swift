@@ -1,12 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-func foo(_ a: Int) {
-  // expected-error @+1 {{invalid character in source file}} {{8-9= }}
-  foo(<\a\>) // expected-error {{invalid character in source file}} {{10-11= }}
-  // expected-error @-1 {{'<' is not a prefix unary operator}}
-  // expected-error @-2 {{'>' is not a postfix unary operator}}
-}
-
 // rdar://15946844
 func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
@@ -51,7 +44,7 @@ func testNotCoveredCase(x: Int) {
     break
   }
 
-  switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
+  switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
 #if true // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
   case 1:
     break

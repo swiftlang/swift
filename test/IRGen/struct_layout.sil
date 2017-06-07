@@ -9,9 +9,9 @@ import Swift
 // 64: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
 // 64: %TSSSg = type <{ [24 x i8], [1 x i8] }>
 
-// 64: @_T04main14Rdar15410780_AVWV = hidden constant {{.*}} (i64 257
-// 64: @_T04main14Rdar15410780_BVWV = hidden constant {{.*}} (i64 258
-// 64: @_T04main14Rdar15410780_CVWV = hidden constant {{.*}} (i64 25
+// 64: @_T04main14Rdar15410780_AVWV = internal constant {{.*}} (i64 257
+// 64: @_T04main14Rdar15410780_BVWV = internal constant {{.*}} (i64 258
+// 64: @_T04main14Rdar15410780_CVWV = internal constant {{.*}} (i64 25
 
 
 // 32: %T4main14Rdar15410780_AV = type <{ i2048, %Ts4Int8V }>
@@ -20,9 +20,9 @@ import Swift
 // 32: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
 // 32: %TSSSg = type <{ [12 x i8], [1 x i8] }>
 
-// 32: @_T04main14Rdar15410780_AVWV = hidden constant {{.*}} (i32 257
-// 32: @_T04main14Rdar15410780_BVWV = hidden constant {{.*}} (i32 258
-// 32: @_T04main14Rdar15410780_CVWV = hidden constant {{.*}} (i32 13
+// 32: @_T04main14Rdar15410780_AVWV = internal constant {{.*}} (i32 257
+// 32: @_T04main14Rdar15410780_BVWV = internal constant {{.*}} (i32 258
+// 32: @_T04main14Rdar15410780_CVWV = internal constant {{.*}} (i32 13
 
 
 // <rdar://problem/15410780>

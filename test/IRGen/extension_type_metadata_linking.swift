@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -c  %S/Inputs/simple.swift %s -O  -num-threads 1 -o %t/simple.o -o %t/extension_type_metadata_linking.o
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -c  %S/Inputs/main.swift -o %t/main.o
 // RUN: %target-build-swift %t/extension_type_metadata_linking.o %t/simple.o %t/main.o -o %t/main.out

@@ -136,8 +136,6 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
     }
     return SymbolKind::InstanceProperty;
   }
-
-  assert(!DC->isLocalContext() && "local variable seen while indexing");
   return SymbolKind::Variable;
 }
 
@@ -234,5 +232,6 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
 
 bool index::isLocalSymbol(const swift::Decl *D) {
   return D->getDeclContext()->getLocalContext() &&
-    (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid());
+    (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid() ||
+     D->getDeclContext()->getContextKind() == DeclContextKind::AbstractClosureExpr);
 }

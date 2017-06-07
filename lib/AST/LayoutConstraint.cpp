@@ -39,6 +39,14 @@ LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx) {
     return LayoutConstraint::getLayoutConstraint(
         LayoutConstraintKind::NativeRefCountedObject, Ctx);
 
+  if (ID == Ctx.Id_ClassLayout)
+    return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::Class, Ctx);
+
+  if (ID == Ctx.Id_NativeClassLayout)
+    return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::NativeClass, Ctx);
+
   return LayoutConstraint::getLayoutConstraint(
       LayoutConstraintKind::UnknownLayout, Ctx);
 }
@@ -52,7 +60,7 @@ StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind) {
   case LayoutConstraintKind::UnknownLayout:
     return "_UnknownLayout";
   case LayoutConstraintKind::Class:
-    return "_Class";
+    return "AnyObject";
   case LayoutConstraintKind::NativeClass:
     return "_NativeClass";
   case LayoutConstraintKind::RefCountedObject:
@@ -170,43 +178,43 @@ static LayoutConstraintKind mergeTable[unsigned(E(LastLayout)) +
      E(/* RefCountedObject*/ RefCountedObject),
      E(/* NativeRefCountedObject */ NativeRefCountedObject)},
 
-    // Initiaze the row for TrivialOfExactSize.
+    // Initialize the row for TrivialOfExactSize.
     {E(/* UnknownLayout */ TrivialOfExactSize),
      E(/* TrivialOfExactSize */ TrivialOfExactSize), MERGE_CONFLICT,
      E(/* Trivial */ TrivialOfExactSize), MERGE_CONFLICT, MERGE_CONFLICT,
      MERGE_CONFLICT, MERGE_CONFLICT},
 
-    // Initiaze the row for TrivialOfAtMostSize.
+    // Initialize the row for TrivialOfAtMostSize.
     {E(/* UnknownLayout */ TrivialOfAtMostSize), MERGE_CONFLICT,
      E(/* TrivialOfAtMostSize */ TrivialOfAtMostSize),
      E(/* Trivial */ TrivialOfAtMostSize), MERGE_CONFLICT, MERGE_CONFLICT,
      MERGE_CONFLICT, MERGE_CONFLICT},
 
-    // Initiaze the row for Trivial.
+    // Initialize the row for Trivial.
     {E(/* UnknownLayout */ Trivial),
      E(/* TrivialOfExactSize */ TrivialOfExactSize),
      E(/* TrivialOfAtMostSize */ TrivialOfAtMostSize), E(/* Trivial */ Trivial),
      MERGE_CONFLICT, MERGE_CONFLICT, MERGE_CONFLICT, MERGE_CONFLICT},
 
-    // Initiaze the row for Class.
+    // Initialize the row for Class.
     {E(/* UnknownLayout*/ Class), MERGE_CONFLICT, MERGE_CONFLICT,
      MERGE_CONFLICT, E(/* Class */ Class), E(/* NativeClass */ NativeClass),
      E(/* RefCountedObject */ Class),
      E(/* NativeRefCountedObject */ NativeClass)},
 
-    // Initiaze the row for NativeClass.
+    // Initialize the row for NativeClass.
     {E(/* UnknownLayout */ NativeClass), MERGE_CONFLICT, MERGE_CONFLICT,
      MERGE_CONFLICT, E(/* Class */ NativeClass),
      E(/* NativeClass */ NativeClass), E(/* RefCountedObject */ NativeClass),
      E(/* NativeRefCountedObject */ NativeClass)},
 
-    // Initiaze the row for RefCountedObject.
+    // Initialize the row for RefCountedObject.
     {E(/* UnknownLayout */ RefCountedObject), MERGE_CONFLICT, MERGE_CONFLICT,
      MERGE_CONFLICT, E(/* Class */ Class), E(/* NativeClass */ NativeClass),
      E(/* RefCountedObject */ RefCountedObject),
      E(/* NativeRefCountedObject */ NativeRefCountedObject)},
 
-    // Initiaze the row for NativeRefCountedObject.
+    // Initialize the row for NativeRefCountedObject.
     {E(/* UnknownLayout */ NativeRefCountedObject), MERGE_CONFLICT,
      MERGE_CONFLICT, MERGE_CONFLICT, E(/* Class */ NativeClass),
      E(/* NativeClass */ NativeClass),
@@ -245,7 +253,7 @@ mergeKnownSizeTrivialConstraints(LayoutConstraint LHS, LayoutConstraint RHS) {
   if (!RHS->getAlignment())
     return LHS;
 
-  // Check if fixed_size_layout.alignment is a multple of
+  // Check if fixed_size_layout.alignment is a multiple of
   // at_most_size_layout.alignment.
   if (LHS->getAlignment() && LHS->getAlignment() % RHS->getAlignment() == 0)
     return LHS;

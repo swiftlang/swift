@@ -40,7 +40,6 @@ class EscapeAnalysisDumper : public SILModuleTransform {
 #endif
   }
 
-  StringRef getName() override { return "EscapeAnalysisDumper"; }
 };
 
 } // end anonymous namespace

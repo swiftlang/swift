@@ -153,7 +153,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 VariantFunctions *
 sourcekitd::getVariantFunctionsForCodeCompletionResultsArray() {

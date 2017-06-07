@@ -479,6 +479,9 @@ number of ways:
     initialized object; both the caller and callee promise not to mutate the
     pointee, allowing the callee to read it.
 
+  - An ``@in_constant`` parameter is indirect.  The address must be of an
+    initialized object; the function will treat the value held there as read-only.
+
   - Otherwise, the parameter is an unowned direct parameter.
 
 - A SIL function type declares the conventions for its results.
@@ -2453,7 +2456,7 @@ index_raw_pointer
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of a builtin integer type
-  // %2 will be of type $*T
+  // %2 will be of type $Builtin.RawPointer
 
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
@@ -2471,6 +2474,66 @@ bind_memory
 
 Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
 capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
+
+begin_access
+````````````
+
+::
+
+  sil-instruction ::= 'begin_access' '[' sil-access ']' '[' sil-enforcement ']' sil-operand
+  sil-access ::= init
+  sil-access ::= read
+  sil-access ::= modify
+  sil-access ::= deinit
+  sil-enforcement ::= unknown
+  sil-enforcement ::= static
+  sil-enforcement ::= dynamic
+  sil-enforcement ::= unsafe
+
+Begins an access to the target memory.
+
+The operand must be a *root address derivation*:
+
+- a function argument,
+- an ``alloc_stack`` instruction,
+- a ``project_box`` instruction,
+- a ``global_addr`` instruction,
+- a ``ref_element_addr`` instruction, or
+- another ``begin_access`` instruction.
+
+It will eventually become a basic structural rule of SIL that no memory
+access instructions can be directly applied to the result of one of these
+instructions; they can only be applied to the result of a ``begin_access``
+on them.  For now, this rule will be conditional based on compiler settings
+and the SIL stage.
+
+An access is ended with a corresponding ``end_access``.  Accesses must be
+uniquely ended on every control flow path which leads to either a function
+exit or back to the ``begin_access`` instruction.  The set of active
+accesses must be the same on every edge into a basic block.
+
+An ``init`` access takes uninitialized memory and initializes it.
+It must always use ``static`` enforcement.
+
+An ``deinit`` access takes initialized memory and leaves it uninitialized.
+It must always use ``static`` enforcement.
+
+``read`` and ``modify`` accesses take initialized memory and leave it
+initialized.  They may use ``unknown`` enforcement only in the ``raw``
+SIL stage.
+
+end_access
+``````````
+
+::
+
+  sil-instruction ::= 'end_access' ( '[' 'abort' ']' )? sil-operand
+
+Ends an access.  The operand must be a ``begin_access`` instruction.
+
+If the ``begin_access`` is ``init`` or ``deinit``, the ``end_access``
+may be an ``abort``, indicating that the described transition did not
+in fact take place.
 
 Reference Counting
 ~~~~~~~~~~~~~~~~~~
@@ -3236,6 +3299,18 @@ For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
+retain_value_addr
+`````````````````
+
+::
+
+  sil-instruction ::= 'retain_value_addr' sil-operand
+
+  retain_value_addr %0 : $*A
+
+Retains a loadable value inside given address,
+which simply retains any references it holds.
+
 unmanaged_retain_value
 ``````````````````````
 
@@ -3301,6 +3376,18 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+release_value_addr
+``````````````````
+
+::
+
+  sil-instruction ::= 'release_value_addr' sil-operand
+
+  release_value_addr %0 : $*A
+
+Destroys a loadable value inside given address,
+by releasing any retainable pointers within it.
 
 unmanaged_release_value
 ```````````````````````

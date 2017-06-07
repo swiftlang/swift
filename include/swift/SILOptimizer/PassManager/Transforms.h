@@ -66,8 +66,14 @@ namespace swift {
     /// Inject the pass manager running this pass.
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }
 
+    irgen::IRGenModule *getIRGenModule() {
+      auto *Mod = PM->getIRGenModule();
+      assert(Mod && "Expecting a valid module");
+      return Mod;
+    }
+
     /// Get the name of the transform.
-    virtual llvm::StringRef getName() = 0;
+    llvm::StringRef getName() { return PassKindName(getPassKind()); }
 
   protected:
     /// \brief Searches for an analysis of type T in the list of registered
@@ -116,12 +122,6 @@ namespace swift {
   protected:
     SILFunction *getFunction() { return F; }
 
-    irgen::IRGenModule *getIRGenModule() {
-      auto *Mod = PM->getIRGenModule();
-      assert(Mod && "Expecting a valid module");
-      return Mod;
-    }
-
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
     }
@@ -146,7 +146,7 @@ namespace swift {
 
     SILModule *getModule() { return M; }
 
-    /// Invalidate all analsysis data for the whole module.
+    /// Invalidate all analysis data for the whole module.
     void invalidateAll() {
       PM->invalidateAllAnalysis();
     }

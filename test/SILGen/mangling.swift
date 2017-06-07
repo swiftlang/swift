@@ -21,16 +21,16 @@ func Pročprostěnemluvíčesky() { }
 // non-variadic tuples.
 
 // CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1x_tF
-func r13757744(x x: [Int]) {}
-// CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1x_dtF
-func r13757744(x x: Int...) {}
+func r13757744(x: [Int]) {}
+// CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1xd_tF
+func r13757744(x: Int...) {}
 
 // <rdar://problem/13757750> Prefix, postfix, and infix operators need
 // distinct manglings.
 
-prefix operator +- {}
-postfix operator +- {}
-infix operator +- {}
+prefix operator +-
+postfix operator +-
+infix operator +-
 
 // CHECK-LABEL: sil hidden @_T08mangling2psopyxlF
 prefix func +- <T>(a: T) {}
@@ -40,9 +40,9 @@ postfix func +- <T>(a: T) {}
 // CHECK-LABEL: sil hidden @_T08mangling2psoiyx_xtlF
 func +- <T>(a: T, b: T) {}
 
-// CHECK-LABEL: sil hidden @_T08mangling2psopyx1a_x1btlF
+// CHECK-LABEL: sil hidden @_T08mangling2psopyx1a_x1bt_tlF
 prefix func +- <T>(_: (a: T, b: T)) {}
-// CHECK-LABEL: sil hidden @_T08mangling2psoPyx1a_x1btlF
+// CHECK-LABEL: sil hidden @_T08mangling2psoPyx1a_x1bt_tlF
 postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
@@ -73,21 +73,21 @@ class Zim<T> {
 
 // Don't crash mangling single-protocol "composition" types.
 // CHECK-LABEL: sil hidden @_T08mangling27single_protocol_compositionyAA3Foo_p1x_tF
-func single_protocol_composition(x x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+func single_protocol_composition(x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>
 // CHECK-LABEL: sil hidden @_T08mangling28uses_objc_class_and_protocolySo8NSObjectC1o_So8NSAnsing_p1ptF
-func uses_objc_class_and_protocol(o o: NSObject, p: NSAnsing) {}
+func uses_objc_class_and_protocol(o: NSObject, p: NSAnsing) {}
 
 // Clang-imported structs get mangled using their Clang module name.
 // FIXME: Temporarily mangles everything into the virtual module __C__
 // <rdar://problem/14221244>
 // CHECK-LABEL: sil hidden @_T08mangling17uses_clang_structySC6NSRectV1r_tF
-func uses_clang_struct(r r: NSRect) {}
+func uses_clang_struct(r: NSRect) {}
 
-// CHECK-LABEL: sil hidden @_T08mangling14uses_optionalsScSgSiSg1x_tF
-func uses_optionals(x x: Int?) -> UnicodeScalar? { return nil }
+// CHECK-LABEL: sil hidden @_T08mangling14uses_optionalss7UnicodeO6ScalarVSgSiSg1x_tF
+func uses_optionals(x: Int?) -> UnicodeScalar? { return nil }
 
 enum GenericUnion<T> {
   // CHECK-LABEL: sil shared [transparent] @_T08mangling12GenericUnionO3FooACyxGSicAEmlF
@@ -101,16 +101,16 @@ func instantiateGenericUnionConstructor<T>(_ t: T) {
 struct HasVarInit {
   static var state = true && false
 }
-// CHECK-LABEL: // function_ref static mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)
+// CHECK-LABEL: // function_ref implicit closure #1 : @autoclosure () throws -> Swift.Bool in variable initialization expression of static mangling.HasVarInit.state : Swift.Bool
 // CHECK-NEXT:  function_ref @_T08mangling10HasVarInitV5stateSbvZfiSbyKXKfu_
 
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
 
 // CHECK-LABEL: sil hidden @_T08mangling19autoClosureOverloadySiyXK1f_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
-func autoClosureOverload(f f: @autoclosure () -> Int) {}
+func autoClosureOverload(f: @autoclosure () -> Int) {}
 // CHECK-LABEL: sil hidden @_T08mangling19autoClosureOverloadySiyc1f_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
-func autoClosureOverload(f f: () -> Int) {}
+func autoClosureOverload(f: () -> Int) {}
 
 // CHECK-LABEL: sil hidden @_T08mangling24autoClosureOverloadCallsyyF : $@convention(thin) () -> () {
 func autoClosureOverloadCalls() {
@@ -132,7 +132,7 @@ protocol HasAssocType {
 // CHECK-LABEL: sil hidden @_T08mangling4fooAyxAA12HasAssocTypeRzlF : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
 func fooA<T: HasAssocType>(_: T) {}
 // CHECK-LABEL: sil hidden @_T08mangling4fooByxAA12HasAssocTypeRzAA0D4Reqt0D0RpzlF : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
-func fooB<T: HasAssocType where T.Assoc: AssocReqt>(_: T) {}
+func fooB<T: HasAssocType>(_: T) where T.Assoc: AssocReqt {}
 
 // CHECK-LABEL: sil hidden @_T08mangling2qqoiySi_SitF
 func ??(x: Int, y: Int) {}
@@ -179,3 +179,9 @@ func curry3() -> () throws -> () {
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }
+
+// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+func varargsVsArray(arr: Int..., n: String) { }
+
+// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arr_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+func varargsVsArray(arr: [Int], n: String) { }

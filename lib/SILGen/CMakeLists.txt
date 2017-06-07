@@ -29,6 +29,7 @@ add_swift_library(swiftSILGen STATIC
   SILGenProfiling.cpp
   SILGenProlog.cpp
   SILGenStmt.cpp
+  SILGenThunk.cpp
   SILGenType.cpp
   LINK_LIBRARIES
     swiftSIL

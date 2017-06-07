@@ -77,7 +77,7 @@ struct bind_ty {
 
   template<typename ITy>
   bool match(ITy *V) {
-    if (Class *CV = dyn_cast<Class>(V)) {
+    if (auto *CV = dyn_cast<Class>(V)) {
       VR = CV;
       return true;
     }
@@ -345,7 +345,9 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCMetatypeToObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCExistentialMetatypeToObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(IsNonnullInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueInst)
+UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedEnumDataInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(InitEnumDataAddrInst)

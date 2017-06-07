@@ -28,5 +28,5 @@ func test_capture_promotion() -> () -> Int {
   return { x + y.foo() + z.x }
 }
 
-// CHECK: sil shared @_T017capture_promotion05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @owned Foo, @owned Baz) -> Int
+// CHECK: sil private @_T017capture_promotion05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @owned Foo, @owned Baz) -> Int
 

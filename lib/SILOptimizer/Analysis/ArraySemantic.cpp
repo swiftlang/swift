@@ -162,7 +162,12 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-            .Case("array.withUnsafeMutableBufferPointer", ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.reserve_capacity_for_append",
+                  ArrayCallKind::kReserveCapacityForAppend)
+            .Case("array.withUnsafeMutableBufferPointer",
+                  ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
+            .Case("array.append_element", ArrayCallKind::kAppendElement)
             .Default(ArrayCallKind::kNone);
     if (Tmp != ArrayCallKind::kNone) {
       assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
@@ -562,6 +567,22 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   return true;
 }
 
+bool swift::ArraySemanticsCall::canInlineEarly() const {
+  switch (getKind()) {
+    default:
+      return false;
+    case ArrayCallKind::kAppendContentsOf:
+    case ArrayCallKind::kReserveCapacityForAppend:
+    case ArrayCallKind::kAppendElement:
+      // append(Element) calls other semantics functions. Therefore it's
+      // important that it's inlined by the early inliner (which is before all
+      // the array optimizations). Also, this semantics is only used to lookup
+      // Array.append(Element), so inlining it does not prevent any other
+      // optimization.
+      return true;
+  }
+}
+
 SILValue swift::ArraySemanticsCall::getInitializationCount() const {
   if (getKind() == ArrayCallKind::kArrayUninitialized) {
     // Can be either a call to _adoptStorage or _allocateUninitialized.
@@ -673,5 +694,74 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
                                 IsInitialization_t::IsInitialization);
   }
   removeCall();
+  return true;
+}
+
+bool swift::ArraySemanticsCall::replaceByAppendingValues(
+    SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
+    const SmallVectorImpl<SILValue> &Vals, ArrayRef<Substitution> Subs) {
+  assert(getKind() == ArrayCallKind::kAppendContentsOf &&
+         "Must be an append_contentsOf call");
+  assert(AppendFn && "Must provide an append SILFunction");
+
+  // We only handle loadable types.
+  if (any_of(Vals, [&M](SILValue V) -> bool {
+        return !V->getType().isLoadable(M);
+      }))
+    return false;
+  
+  CanSILFunctionType AppendFnTy = AppendFn->getLoweredFunctionType();
+  SILValue ArrRef = SemanticsCall->getArgument(1);
+  SILBuilderWithScope Builder(SemanticsCall);
+  auto Loc = SemanticsCall->getLoc();
+  auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
+
+  if (Vals.size() > 1) {
+    // Create a call to reserveCapacityForAppend() to reserve space for multiple
+    // elements.
+    FunctionRefInst *ReserveFnRef = Builder.createFunctionRef(Loc, ReserveFn);
+    SILFunctionType *ReserveFnTy =
+      ReserveFnRef->getType().castTo<SILFunctionType>();
+    assert(ReserveFnTy->getNumParameters() == 2);
+    StructType *IntType =
+      ReserveFnTy->getParameters()[0].getType()->castTo<StructType>();
+    StructDecl *IntDecl = IntType->getDecl();
+    VarDecl *field = *IntDecl->getStoredProperties().begin();
+    SILType BuiltinIntTy =SILType::getPrimitiveObjectType(
+                               field->getInterfaceType()->getCanonicalType());
+    IntegerLiteralInst *CapacityLiteral =
+      Builder.createIntegerLiteral(Loc, BuiltinIntTy, Vals.size());
+    StructInst *Capacity = Builder.createStruct(Loc,
+        SILType::getPrimitiveObjectType(CanType(IntType)), {CapacityLiteral});
+    Builder.createApply(Loc, ReserveFnRef, Subs, {Capacity, ArrRef}, false);
+  }
+
+  for (SILValue V : Vals) {
+    auto SubTy = V->getType();
+    auto &ValLowering = Builder.getModule().getTypeLowering(SubTy);
+    auto CopiedVal = ValLowering.emitCopyValue(Builder, Loc, V);
+    auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
+
+    ValLowering.emitStoreOfCopy(Builder, Loc, CopiedVal, AllocStackInst,
+                                IsInitialization_t::IsInitialization);
+
+    SILValue Args[] = {AllocStackInst, ArrRef};
+    Builder.createApply(Loc, FnRef, Subs, Args, false);
+    Builder.createDeallocStack(Loc, AllocStackInst);
+    if (!isConsumedParameter(AppendFnTy->getParameters()[0].getConvention())) {
+      ValLowering.emitDestroyValue(Builder, Loc, CopiedVal);
+    }
+  }
+  CanSILFunctionType AppendContentsOfFnTy =
+    SemanticsCall->getReferencedFunction()->getLoweredFunctionType();
+  if (AppendContentsOfFnTy->getParameters()[0].getConvention() ==
+        ParameterConvention::Direct_Owned) {
+    SILValue SrcArray = SemanticsCall->getArgument(0);
+    Builder.createReleaseValue(SemanticsCall->getLoc(), SrcArray,
+                               Builder.getDefaultAtomicity());
+  }
+
+  removeCall();
+
   return true;
 }

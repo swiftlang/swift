@@ -83,7 +83,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : 
   return %9999 : $()
 }
 
-sil_global [fragile] @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $Builtin.Word
+sil_global [serialized] @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $Builtin.Word
 
 sil @test_capture_propagation2_caller : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 0

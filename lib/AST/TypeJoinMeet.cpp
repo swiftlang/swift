@@ -65,14 +65,11 @@ Type Type::join(Type type1, Type type2) {
   // If both are class types or opaque types that potentially have superclasses,
   // find the common superclass.
   if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
-    ASTContext &ctx = type1->getASTContext();
-    LazyResolver *resolver = ctx.getLazyResolver();
-
     /// Walk the superclasses of type1 looking for type2. Record them for our
     /// second step.
     llvm::SmallPtrSet<CanType, 8> superclassesOfType1;
     CanType canType2 = type2->getCanonicalType();
-    for (Type super1 = type1; super1; super1 = super1->getSuperclass(resolver)){
+    for (Type super1 = type1; super1; super1 = super1->getSuperclass()) {
       CanType canSuper1 = super1->getCanonicalType();
 
       // If we have found the second type, we're done.
@@ -83,7 +80,7 @@ Type Type::join(Type type1, Type type2) {
 
     // Look through the superclasses of type2 to determine if any were also
     // superclasses of type1.
-    for (Type super2 = type2; super2; super2 = super2->getSuperclass(resolver)){
+    for (Type super2 = type2; super2; super2 = super2->getSuperclass()) {
       CanType canSuper2 = super2->getCanonicalType();
 
       // If we found the first type, we're done.

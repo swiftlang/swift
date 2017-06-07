@@ -30,24 +30,27 @@ struct D {
 // CHECK-LABEL: sil hidden @_T019default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
+// CHECK: [[PB_THIS:%.*]] = project_box [[THIS]]
 // CHECK: [[INIT:%[0-9]+]] = function_ref @_T019default_constructor1DV1iSivfi
 // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT]]()
 // CHECK: [[INTVAL:%[0-9]+]] = tuple_extract [[RESULT]] : $(Int, Double), 0
 // CHECK: [[FLOATVAL:%[0-9]+]] = tuple_extract [[RESULT]] : $(Int, Double), 1
-// CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[THIS]] : $*D, #D.i
+// CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.i
 // CHECK: assign [[INTVAL]] to [[IADDR]]
-// CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[THIS]] : $*D, #D.j
+// CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.j
 // CHECK: assign [[FLOATVAL]] to [[JADDR]]
 
 class E {
   var i = Int64()
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_T019default_constructor1EC1is5Int64Vvfi : $@convention(thin) () -> Int64
-// CHECK:      [[FN:%.*]] = function_ref @_T0s5Int64VABycfC : $@convention(method) (@thin Int64.Type) -> Int64
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int64.Type
-// CHECK-NEXT: [[VALUE:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thin Int64.Type) -> Int64
-// CHECK-NEXT: return [[VALUE]] : $Int64
+// FIXME(integers): the following checks should be updated for the new way +
+// gets invoked. <rdar://problem/29939484>
+// XCHECK-LABEL: sil hidden [transparent] @_T019default_constructor1EC1is5Int64Vvfi : $@convention(thin) () -> Int64
+// XCHECK:      [[FN:%.*]] = function_ref @_T0s5Int64VABycfC : $@convention(method) (@thin Int64.Type) -> Int64
+// XCHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int64.Type
+// XCHECK-NEXT: [[VALUE:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thin Int64.Type) -> Int64
+// XCHECK-NEXT: return [[VALUE]] : $Int64
 
 // CHECK-LABEL: sil hidden @_T019default_constructor1EC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned E) -> @owned E
 // CHECK: bb0([[SELFIN:%[0-9]+]] : $E)
@@ -56,7 +59,9 @@ class E {
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $E, #E.i
-// CHECK-NEXT: assign [[VALUE]] to [[IREF]] : $*Int64
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[IREF]] : $*Int64
+// CHECK-NEXT: assign [[VALUE]] to [[WRITE]] : $*Int64
+// CHECK-NEXT: end_access [[WRITE]] : $*Int64
 // CHECK-NEXT: end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK-NEXT: destroy_value [[SELF]]
@@ -67,20 +72,19 @@ class F : E { }
 // CHECK-LABEL: sil hidden @_T019default_constructor1FCACycfc : $@convention(method) (@owned F) -> @owned F
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
-// CHECK-NEXT: project_box [[SELF_BOX]]
-// CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
-// CHECK-NEXT: store [[ORIGSELF]] to [init] [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [take] [[SELF]] : $*F
+// CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[SELF]]
+// CHECK-NEXT: store [[ORIGSELF]] to [init] [[PB]] : $*F
+// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [take] [[PB]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
 // CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_T019default_constructor1ECACycfc : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
 
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
-// CHECK-NEXT: store [[ESELFW]] to [init] [[SELF]] : $*F
-// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [copy] [[SELF]] : $*F
-// CHECK-NEXT: destroy_value [[SELF_BOX]] : ${ var F }
+// CHECK-NEXT: store [[ESELFW]] to [init] [[PB]] : $*F
+// CHECK-NEXT: [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*F
+// CHECK-NEXT: destroy_value [[SELF]] : ${ var F }
 // CHECK-NEXT: return [[SELFP]] : $F
-
 
 // <rdar://problem/19780343> Default constructor for a struct with optional doesn't compile
 
@@ -90,10 +94,10 @@ struct G {
   let bar: Int32?
 }
 
-// CHECK-NOT: default_constructor.G.init ()
-// CHECK-LABEL: default_constructor.G.init (bar : Swift.Optional<Swift.Int32>)
+// CHECK-NOT: default_constructor.G.init()
+// CHECK-LABEL: default_constructor.G.init(bar: Swift.Optional<Swift.Int32>)
 // CHECK-NEXT: sil hidden @_T019default_constructor1GV{{[_0-9a-zA-Z]*}}fC
-// CHECK-NOT: default_constructor.G.init ()
+// CHECK-NOT: default_constructor.G.init()
 
 struct H<T> {
   var opt: T?

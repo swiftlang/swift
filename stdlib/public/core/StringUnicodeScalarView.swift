@@ -16,7 +16,7 @@ extension String {
   /// You can access a string's view of Unicode scalar values by using its
   /// `unicodeScalars` property. Unicode scalar values are the 21-bit codes
   /// that are the basic unit of Unicode. Each scalar value is represented by
-  /// a `UnicodeScalar` instance and is equivalent to a UTF-32 code unit.
+  /// a `Unicode.Scalar` instance and is equivalent to a UTF-32 code unit.
   ///
   ///     let flowers = "Flowers 💐"
   ///     for v in flowers.unicodeScalars {
@@ -34,10 +34,10 @@ extension String {
   ///
   /// Some characters that are visible in a string are made up of more than one
   /// Unicode scalar value. In that case, a string's `unicodeScalars` view
-  /// contains more values than its `characters` view.
+  /// contains more elements than the string itself.
   ///
   ///     let flag = "🇵🇷"
-  ///     for c in flag.characters {
+  ///     for c in flag {
   ///         print(c)
   ///     }
   ///     // 🇵🇷
@@ -53,7 +53,7 @@ extension String {
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
   ///     if let i = favemoji.unicodeScalars.index(where: { $0.value >= 128 }) {
-  ///         let asciiPrefix = String(favemoji.unicodeScalars.prefix(upTo: i))
+  ///         let asciiPrefix = String(favemoji.unicodeScalars[..<i])
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
@@ -94,10 +94,10 @@ extension String {
     /// position in the Unicode scalars view:
     ///
     ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     let i = hearts.characters.index(of: "♥︎")!
+    ///     let i = hearts.index(of: "♥︎")!
     ///
     ///     let j = i.samePosition(in: hearts.unicodeScalars)
-    ///     print(hearts.unicodeScalars.suffix(from: j))
+    ///     print(hearts.unicodeScalars[j...])
     ///     // Prints "♥︎ 💘"
     ///     print(hearts.unicodeScalars[j].value)
     ///     // Prints "9829"
@@ -179,7 +179,7 @@ extension String {
     ///
     /// - Parameter position: A valid index of the character view. `position`
     ///   must be less than the view's end index.
-    public subscript(position: Index) -> UnicodeScalar {
+    public subscript(position: Index) -> Unicode.Scalar {
       var scratch = _ScratchIterator(_core, _toCoreIndex(position))
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
@@ -188,7 +188,7 @@ extension String {
       case .emptyInput:
         _sanityCheckFailure("cannot subscript using an endIndex")
       case .error:
-        return UnicodeScalar(0xfffd)!
+        return Unicode.Scalar(0xfffd)!
       }
     }
 
@@ -244,13 +244,13 @@ extension String {
       ///
       /// - Precondition: `next()` has not been applied to a copy of `self`
       ///   since the copy was made.
-      public mutating func next() -> UnicodeScalar? {
+      public mutating func next() -> Unicode.Scalar? {
         var result: UnicodeDecodingResult
         if _baseSet {
           if _ascii {
             switch self._asciiBase.next() {
             case let x?:
-              result = .scalarValue(UnicodeScalar(x))
+              result = .scalarValue(Unicode.Scalar(x))
             case nil:
               result = .emptyInput
             }
@@ -266,7 +266,7 @@ extension String {
         case .emptyInput:
           return nil
         case .error:
-          return UnicodeScalar(0xfffd)
+          return Unicode.Scalar(0xfffd)
         }
       }
       internal var _decoder: UTF16 = UTF16()
@@ -279,7 +279,7 @@ extension String {
 
     /// Returns an iterator over the Unicode scalars that make up this view.
     ///
-    /// - Returns: An iterator over this collection's `UnicodeScalar` elements.
+    /// - Returns: An iterator over this collection's `Unicode.Scalar` elements.
     public func makeIterator() -> Iterator {
       return Iterator(_core)
     }
@@ -309,7 +309,7 @@ extension String {
   ///
   ///     let picnicGuest = "Deserving porcupine"
   ///     if let i = picnicGuest.unicodeScalars.index(of: " ") {
-  ///         let adjective = String(picnicGuest.unicodeScalars.prefix(upTo: i))
+  ///         let adjective = String(picnicGuest.unicodeScalars[..<i])
   ///         print(adjective)
   ///     }
   ///     // Prints "Deserving"
@@ -324,6 +324,10 @@ extension String {
 
   /// The index type for a string's `unicodeScalars` view.
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
+}
+
+extension String.UnicodeScalarView : _SwiftStringView {
+  var _persistentContent : String { return String(_core) }
 }
 
 extension String {
@@ -379,7 +383,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Appends the given Unicode scalar to the view.
   ///
   /// - Parameter c: The character to append to the string.
-  public mutating func append(_ x: UnicodeScalar) {
+  public mutating func append(_ x: Unicode.Scalar) {
     _core.append(x)
   }
 
@@ -389,7 +393,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting view.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == UnicodeScalar {
+    where S.Element == Unicode.Scalar {
     _core.append(contentsOf: newElements.lazy.flatMap { $0.utf16 })
   }
   
@@ -411,7 +415,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == UnicodeScalar {
+  ) where C : Collection, C.Element == Unicode.Scalar {
     let rawSubRange: Range<Int> = _toCoreIndex(bounds.lowerBound) ..<
       _toCoreIndex(bounds.upperBound)
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
@@ -433,7 +437,7 @@ extension String.UnicodeScalarIndex {
   ///     let utf16Index = cafe.utf16.index(of: 32)!
   ///     let scalarIndex = String.UnicodeScalarView.Index(utf16Index, within: cafe.unicodeScalars)!
   ///
-  ///     print(String(cafe.unicodeScalars.prefix(upTo: scalarIndex)))
+  ///     print(String(cafe.unicodeScalars[..<scalarIndex]))
   ///     // Prints "Café"
   ///
   /// If the position passed in `utf16Index` doesn't have an exact
@@ -442,10 +446,10 @@ extension String.UnicodeScalarIndex {
   /// the trailing surrogate of a UTF-16 surrogate pair fails.
   ///
   /// - Parameters:
-  ///   - utf16Index: A position in the `utf16` view of the `characters`
-  ///     parameter.
-  ///   - unicodeScalars: The `UnicodeScalarView` instance referenced by both
-  ///     `utf16Index` and the resulting index.
+  ///   - utf16Index: A position in the `utf16` view of a string. `utf16Index`
+  ///     must be an element of `String(unicodeScalars).utf16.indices`.
+  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
+  ///     position.
   public init?(
     _ utf16Index: String.UTF16Index,
     within unicodeScalars: String.UnicodeScalarView
@@ -457,7 +461,7 @@ extension String.UnicodeScalarIndex {
       _precondition(
         utf16Index >= utf16.startIndex
         && utf16Index <= utf16.endIndex,
-        "Invalid String.UTF16Index for this UnicodeScalar view")
+        "Invalid String.UTF16Index for this Unicode.Scalar view")
 
       // Detect positions that have no corresponding index.  Note that
       // we have to check before and after, because an unpaired
@@ -480,10 +484,10 @@ extension String.UnicodeScalarIndex {
   /// byte returns `nil`.
   ///
   /// - Parameters:
-  ///   - utf8Index: A position in the `utf8` view of the `characters`
-  ///     parameter.
-  ///   - unicodeScalars: The `UnicodeScalarView` instance referenced by both
-  ///     `utf8Index` and the resulting index.
+  ///   - utf8Index: A position in the `utf8` view of a string. `utf8Index`
+  ///     must be an element of `String(unicodeScalars).utf8.indices`.
+  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
+  ///     position.
   public init?(
     _ utf8Index: String.UTF8Index,
     within unicodeScalars: String.UnicodeScalarView
@@ -492,7 +496,7 @@ extension String.UnicodeScalarIndex {
 
     _precondition(
       utf8Index._coreIndex >= 0 && utf8Index._coreIndex <= core.endIndex,
-      "Invalid String.UTF8Index for this UnicodeScalar view")
+      "Invalid String.UTF8Index for this Unicode.Scalar view")
 
     // Detect positions that have no corresponding index.
     if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
@@ -508,22 +512,22 @@ extension String.UnicodeScalarIndex {
   /// into its corresponding position in the string's `unicodeScalars` view.
   ///
   ///     let cafe = "Café 🍵"
-  ///     let characterIndex = cafe.characters.index(of: "🍵")!
-  ///     let scalarIndex = String.UnicodeScalarView.Index(characterIndex, within: cafe.unicodeScalars)
+  ///     let stringIndex = cafe.index(of: "🍵")!
+  ///     let scalarIndex = String.UnicodeScalarView.Index(stringIndex, within: cafe.unicodeScalars)
   ///
-  ///     print(cafe.unicodeScalars.suffix(from: scalarIndex))
+  ///     print(cafe.unicodeScalars[scalarIndex...])
   ///     // Prints "🍵"
   ///
   /// - Parameters:
-  ///   - characterIndex: A position in a `CharacterView` instance.
-  ///     `characterIndex` must be an element of
-  ///     `String(utf8).characters.indices`.
-  ///   - utf8: The `UTF8View` in which to find the new position.
+  ///   - index: A position in a string. `index` must be an element of
+  ///     `String(unicodeScalars).indices`.
+  ///   - unicodeScalars: The `UnicodeScalarView` in which to find the new
+  ///     position.
   public init(
-    _ characterIndex: String.Index,
+    _ index: String.Index,
     within unicodeScalars: String.UnicodeScalarView
   ) {
-    self.init(_position: characterIndex._base._position)
+    self.init(_position: index._base._position)
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -537,7 +541,7 @@ extension String.UnicodeScalarIndex {
   ///     let cafe = "Café"
   ///     if let i = cafe.unicodeScalars.index(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf8)
-  ///         print(Array(cafe.utf8.suffix(from: j)))
+  ///         print(Array(cafe.utf8[j...]))
   ///     }
   ///     // Prints "[195, 169]"
   ///
@@ -556,7 +560,7 @@ extension String.UnicodeScalarIndex {
   /// this method find the same position in the string's `utf16` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.characters.index(of: "é") {
+  ///     if let i = cafe.unicodeScalars.index(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf16)
   ///         print(cafe.utf16[j])
   ///     }
@@ -582,7 +586,7 @@ extension String.UnicodeScalarIndex {
   ///     let cafe = "Café 🍵"
   ///     let i = cafe.unicodeScalars.index(of: "🍵")
   ///     let j = i.samePosition(in: cafe)!
-  ///     print(cafe.suffix(from: j))
+  ///     print(cafe[j...])
   ///     // Prints "🍵"
   ///
   /// - Parameter characters: The string to use for the index conversion.

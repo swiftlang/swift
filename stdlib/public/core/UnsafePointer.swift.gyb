@@ -52,8 +52,8 @@
 ///
 %if mutable:
 /// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
-/// `moveInitializeMemory(from:count)` to initialize the memory referenced by
-/// a pointer with a value or series of values.
+/// `moveInitialize(from:count:)` to initialize the memory referenced by a
+/// pointer with a value or series of values.
 ///
 % end
 /// Initialized Memory
@@ -640,7 +640,7 @@ public struct ${Self}<Pointee>
   @_inlineable
   @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C : Collection>(from source: C)
-    where C.Iterator.Element == Pointee {
+    where C.Element == Pointee {
     let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
     var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
     // ensure that exactly rhs.count elements were written
@@ -1188,6 +1188,13 @@ extension ${Self} {
 }
 
 extension Int {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   @_inlineable
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
@@ -1199,6 +1206,13 @@ extension Int {
 }
 
 extension UInt {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   @_inlineable
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
@@ -1206,6 +1220,15 @@ extension UInt {
     } else {
       self = 0
     }
+  }
+}
+
+extension ${Self} {
+  @_versioned
+  static var _max : ${Self} {
+    return ${Self}(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
   }
 }
 % end # for mutable

@@ -118,9 +118,16 @@ def instrument_test(driver_path, test, num_samples):
     return avg_test_output
 
 
-def get_tests(driver_path):
+def get_tests(driver_path, args):
     """Return a list of available performance tests"""
-    return subprocess.check_output([driver_path, '--list']).split()[2:]
+    tests = subprocess.check_output([driver_path, '--list']).split()[2:]
+    if args.filters:
+        regexes = [re.compile(pattern) for pattern in args.filters]
+        return sorted(list(set([name for pattern in regexes
+                                for name in tests if pattern.match(name)])))
+    if not args.benchmarks:
+        return tests
+    return sorted(list(set(tests).intersection(set(args.benchmarks))))
 
 
 def get_current_git_branch(git_repo_path):
@@ -128,6 +135,14 @@ def get_current_git_branch(git_repo_path):
     return subprocess.check_output(
         ['git', '-C', git_repo_path, 'rev-parse',
          '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
+
+
+def get_git_head_ID(git_repo_path):
+    """Return the short identifier for the HEAD commit of the repo
+        `git_repo_path`"""
+    return subprocess.check_output(
+        ['git', '-C', git_repo_path, 'rev-parse',
+         '--short', 'HEAD'], stderr=subprocess.STDOUT).strip()
 
 
 def log_results(log_directory, driver, formatted_output, swift_repo=None):
@@ -138,6 +153,10 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
         branch = get_current_git_branch(swift_repo)
     except (OSError, subprocess.CalledProcessError):
         branch = None
+    try:
+        head_ID = '-' + get_git_head_ID(swift_repo)
+    except (OSError, subprocess.CalledProcessError):
+        head_ID = ''
     timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
     if branch:
         output_directory = os.path.join(log_directory, branch)
@@ -149,7 +168,7 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
     except OSError:
         pass
     log_file = os.path.join(output_directory,
-                            driver_name + '-' + timestamp + '.log')
+                            driver_name + '-' + timestamp + head_ID + '.log')
     print('Logging results to: %s' % log_file)
     with open(log_file, 'w') as f:
         f.write(formatted_output)
@@ -168,9 +187,7 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
     if verbose and log_directory:
         print(line_format.format(*headings))
-    for test in get_tests(driver):
-        if benchmarks and test not in benchmarks:
-            continue
+    for test in benchmarks:
         test_output = instrument_test(driver, test, num_samples)
         if test_output[0] == 'Totals':
             continue
@@ -219,7 +236,7 @@ def submit(args):
         file = os.path.join(args.tests, "Benchmark_" + optset)
         try:
             res = run_benchmarks(
-                file, benchmarks=args.benchmark,
+                file, benchmarks=get_tests(file, args),
                 num_samples=args.iterations)
             data['Tests'].extend(parse_results(res, optset))
         except subprocess.CalledProcessError as e:
@@ -243,7 +260,7 @@ def run(args):
     optset = args.optimization
     file = os.path.join(args.tests, "Benchmark_" + optset)
     run_benchmarks(
-        file, benchmarks=args.benchmarks,
+        file, benchmarks=get_tests(file, args),
         num_samples=args.iterations, verbose=True,
         log_directory=args.output_dir,
         swift_repo=args.swift_repo)
@@ -346,17 +363,41 @@ def positive_int(value):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Swift benchmarks driver')
-    subparsers = parser.add_subparsers()
+    parser = argparse.ArgumentParser(
+        epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f .*Suffix.*'
+    )
+    subparsers = parser.add_subparsers(
+        title='Swift benchmark driver commands',
+        help='See COMMAND -h for additional arguments', metavar='<command>')
 
-    submit_parser = subparsers.add_parser(
-        'submit',
-        help='run benchmarks and submit results to LNT')
-    submit_parser.add_argument(
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    benchmarks_group = parent_parser.add_mutually_exclusive_group()
+    benchmarks_group.add_argument(
+        'benchmarks',
+        default=[],
+        help='benchmark to run (default: all)', nargs='*', metavar="BENCHMARK")
+    benchmarks_group.add_argument(
+        '-f', '--filter', dest='filters', action='append',
+        help='run all tests whose name match regular expression PATTERN, ' +
+        'multiple filters are supported', metavar="PATTERN")
+    parent_parser.add_argument(
         '-t', '--tests',
         help='directory containing Benchmark_O{,none,unchecked} ' +
         '(default: DRIVER_DIR)',
         default=DRIVER_DIR)
+
+    submit_parser = subparsers.add_parser(
+        'submit',
+        help='Run benchmarks and submit results to LNT',
+        parents=[parent_parser])
+    submit_parser.add_argument(
+        '-o', '--optimization', nargs='+',
+        help='optimization levels to use (default: O Onone Ounchecked)',
+        default=['O', 'Onone', 'Ounchecked'])
+    submit_parser.add_argument(
+        '-i', '--iterations',
+        help='number of times to run each test (default: 10)',
+        type=positive_int, default=10)
     submit_parser.add_argument(
         '-m', '--machine', required=True,
         help='LNT machine name')
@@ -366,48 +407,33 @@ def main():
     submit_parser.add_argument(
         '-l', '--lnt_host', required=True,
         help='LNT host to submit results to')
-    submit_parser.add_argument(
-        '-i', '--iterations',
-        help='number of times to run each test (default: 10)',
-        type=positive_int, default=10)
-    submit_parser.add_argument(
-        '-o', '--optimization', nargs='+',
-        help='optimization levels to use (default: O Onone Ounchecked)',
-        default=['O', 'Onone', 'Ounchecked'])
-    submit_parser.add_argument(
-        'benchmark',
-        help='benchmark to run (default: all)', nargs='*')
     submit_parser.set_defaults(func=submit)
 
     run_parser = subparsers.add_parser(
         'run',
-        help='run benchmarks and output results to stdout')
+        help='Run benchmarks and output results to stdout',
+        parents=[parent_parser])
     run_parser.add_argument(
-        '-t', '--tests',
-        help='directory containing Benchmark_O{,none,unchecked} ' +
-        '(default: DRIVER_DIR)',
-        default=DRIVER_DIR)
+        '-o', '--optimization',
+        metavar='OPT',
+        choices=['O', 'Onone', 'Ounchecked'],
+        help='optimization level to use: {O,Onone,Ounchecked}, (default: O)',
+        default='O')
     run_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 1)',
         type=positive_int, default=1)
-    run_parser.add_argument(
-        '-o', '--optimization',
-        help='optimization level to use (default: O)', default='O')
     run_parser.add_argument(
         '--output-dir',
         help='log results to directory (default: no logging)')
     run_parser.add_argument(
         '--swift-repo',
         help='absolute path to Swift source repo for branch comparison')
-    run_parser.add_argument(
-        'benchmarks',
-        help='benchmark to run (default: all)', nargs='*')
     run_parser.set_defaults(func=run)
 
     compare_parser = subparsers.add_parser(
         'compare',
-        help='compare benchmark results')
+        help='Compare benchmark results')
     compare_parser.add_argument(
         '--log-dir', required=True,
         help='directory containing benchmark logs')

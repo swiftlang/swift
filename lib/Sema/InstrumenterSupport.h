@@ -59,7 +59,7 @@ protected:
       }
     }
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
+      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
           BraceStmt *NB = I.transformBraceStmt(B);

@@ -217,3 +217,17 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
   auto substLoweredType = destTL.getLoweredType().getSwiftRValueType();
   RValue(SGF, loc, substLoweredType, outputValue).forwardInto(SGF, loc, dest);
 }
+
+SILType ArgumentSource::getSILSubstRValueType(SILGenFunction &SGF) const & {
+  CanSILFunctionType funcType = SGF.F.getLoweredFunctionType();
+  CanType substType = getSubstType();
+  AbstractionPattern origType(funcType->getGenericSignature(), substType);
+  return SGF.getLoweredType(origType, substType);
+}
+
+SILType ArgumentSource::getSILSubstType(SILGenFunction &SGF) const & {
+  CanSILFunctionType funcType = SGF.F.getLoweredFunctionType();
+  CanType substType = getSubstType();
+  AbstractionPattern origType(funcType->getGenericSignature(), substType);
+  return SGF.getLoweredType(origType, substType);
+}

@@ -4,23 +4,23 @@ import Builtin
 import Swift
 
 public struct PublicStruct { var x: Int }
-// CHECK: @_T014access_control12PublicStructVWV = {{(protected )?}}constant
+// CHECK: @_T014access_control12PublicStructVWV = internal constant
 // CHECK: @_T014access_control12PublicStructVMn = {{(protected )?}}constant
 // CHECK: @_T014access_control12PublicStructVMf = internal constant
 
 internal struct InternalStruct { var x: Int }
-// CHECK: @_T014access_control14InternalStructVWV = hidden constant
+// CHECK: @_T014access_control14InternalStructVWV = internal constant
 // CHECK: @_T014access_control14InternalStructVMn = hidden constant
 // CHECK: @_T014access_control14InternalStructVMf = internal constant
 
 private struct PrivateStruct { var x: Int }
-// CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVWV = hidden constant
+// CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVWV = internal constant
 // CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMn = hidden constant
 // CHECK: @_T014access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMf = internal constant
 
 func local() {
   struct LocalStruct { var x: Int }
-  // CHECK: @_T014access_control5localyyF11LocalStructL_VWV = hidden constant
+  // CHECK: @_T014access_control5localyyF11LocalStructL_VWV = internal constant
   // CHECK: @_T014access_control5localyyF11LocalStructL_VMn = hidden constant
   // CHECK: @_T014access_control5localyyF11LocalStructL_VMf = internal constant
 }

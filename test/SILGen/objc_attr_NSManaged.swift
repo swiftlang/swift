@@ -104,9 +104,9 @@ extension ProtoAdopter {
 // CHECK-LABEL: sil_vtable SwiftGizmo {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
-// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: _T019objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoCSQyACGycfc
 // CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoCSQyACGSi7bellsOn_tcfc
+// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: _T019objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable FinalGizmo {

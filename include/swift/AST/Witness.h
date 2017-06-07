@@ -108,6 +108,16 @@ public:
   /// not generic (excepting \c Self)  and the conforming type is non-generic.
   Witness(ValueDecl *witness) : storage(witness) { assert(witness != nullptr); }
 
+  /// Create an opaque witness for the given requirement.
+  ///
+  /// This indicates that a witness exists, but is not visible to the current
+  /// module.
+  static Witness forOpaque(ValueDecl *requirement) {
+    // TODO: It's probably a good idea to have a separate 'opaque' bit.
+    // Making req == witness is kind of a hack.
+    return Witness(requirement);
+  }
+
   /// Create a witness that requires substitutions.
   ///
   /// \param decl The declaration for the witness.

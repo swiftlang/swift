@@ -83,8 +83,6 @@ class ARCLoopOpts : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
   }
-
-  StringRef getName() override { return "ARC Loop Opts"; }
 };
 
 } // end anonymous namespace

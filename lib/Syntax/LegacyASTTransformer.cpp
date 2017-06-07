@@ -62,7 +62,7 @@ namespace {
 
     std::vector<RC<TokenSyntax>> TokensInRange;
 
-    while(Start < End.base()) {
+    while (Start < End.base()) {
       TokensInRange.push_back(Start->first);
       ++Start;
     }
@@ -273,6 +273,15 @@ LegacyASTTransformer::visitPrefixOperatorDecl(PrefixOperatorDecl *D,
 RC<SyntaxData>
 LegacyASTTransformer::visitPostfixOperatorDecl(
     PostfixOperatorDecl *D,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownDecl(D);
+}
+
+
+RC<SyntaxData>
+LegacyASTTransformer::visitMissingMemberDecl(
+    MissingMemberDecl *D,
     const SyntaxData *Parent,
     const CursorIndex IndexInParent) {
   return getUnknownDecl(D);
@@ -1147,14 +1156,6 @@ LegacyASTTransformer::visitPointerToPointerExpr(
   return getUnknownExpr(E);
 }
 
-RC<SyntaxData>
-LegacyASTTransformer::visitLValueToPointerExpr(
-    LValueToPointerExpr *E,
-    const SyntaxData *Parent,
-    const CursorIndex IndexInParent) {
-  return getUnknownExpr(E);
-}
-
 RC<SyntaxData> LegacyASTTransformer::visitForeignObjectConversionExpr(
     ForeignObjectConversionExpr *E,
     const SyntaxData *Parent,
@@ -1180,6 +1181,13 @@ LegacyASTTransformer::visitForcedCheckedCastExpr(
 
 RC<SyntaxData> LegacyASTTransformer::visitConditionalCheckedCastExpr(
     ConditionalCheckedCastExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData> LegacyASTTransformer::visitKeyPathApplicationExpr(
+    KeyPathApplicationExpr *E,
     const SyntaxData *Parent,
     const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
@@ -1258,9 +1266,16 @@ LegacyASTTransformer::visitObjCSelectorExpr(ObjCSelectorExpr *E,
 }
 
 RC<SyntaxData>
-LegacyASTTransformer::visitObjCKeyPathExpr(ObjCKeyPathExpr *E,
-                                           const SyntaxData *Parent,
-                                           const CursorIndex IndexInParent) {
+LegacyASTTransformer::visitKeyPathExpr(KeyPathExpr *E,
+                                       const SyntaxData *Parent,
+                                       const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitKeyPathDotExpr(KeyPathDotExpr *E,
+                                          const SyntaxData *Parent,
+                                          const CursorIndex IndexInParent) {
   return getUnknownExpr(E);
 }
 

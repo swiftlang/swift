@@ -681,9 +681,7 @@ public:
   void verify(SILModule &M);
 
   raw_ostream &print(raw_ostream &OS, SILModule &M);
-  raw_ostream &printProjections(raw_ostream &OS, SILModule &M) const;
   void dump(SILModule &M);
-  void dumpProjections(SILModule &M) const;
 };
 
 /// Returns the hashcode for the new projection path.

@@ -28,12 +28,12 @@ typealias Any2 = protocol< > // expected-warning {{'protocol<>' syntax is deprec
 // Okay to inherit a typealias for Any type.
 protocol P5 : Any { }
 protocol P6 : protocol<> { } // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}}
-                             // expected-error@-1 {{protocol composition is neither allowed nor needed here}}
+                             // expected-error@-1 {{protocol-constrained type is neither allowed nor needed here}}
 typealias P7 = Any & Any1
 
 extension Int : P5 { }
 
-typealias Bogus = P1 & Int // expected-error{{non-protocol type 'Int' cannot be used within a protocol composition}}
+typealias Bogus = P1 & Int // expected-error{{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
 
 func testEquality() {
   // Remove duplicates from protocol-conformance types.
@@ -81,19 +81,19 @@ protocol SuperREPLPrintable : REPLPrintable {
 }
 
 protocol FooProtocol {
-  func format(_ kind: UnicodeScalar, layout: String) -> String
+  func format(_ kind: Unicode.Scalar, layout: String) -> String
 }
 
 struct SuperPrint : REPLPrintable, FooProtocol, SuperREPLPrintable {
   func replPrint() {}
   func superReplPrint() {}
-  func format(_ kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: Unicode.Scalar, layout: String) -> String {}
 }
 
 struct Struct1 {}
 extension Struct1 : REPLPrintable, FooProtocol {
   func replPrint() {}
-  func format(_ kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: Unicode.Scalar, layout: String) -> String {}
 }
 
 func accept_manyPrintable(_: REPLPrintable & FooProtocol) {}
@@ -143,23 +143,33 @@ typealias H = protocol<P1>! // expected-warning {{'protocol<...>' composition sy
 typealias J = protocol<P1, P2>.Protocol // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{15-31=(P1 & P2)}}
 typealias K = protocol<P1, P2>? // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{15-32=(P1 & P2)?}}
 
-typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol type 'P1.Protocol' cannot be used within a protocol composition}}
-typealias T02 = P1.Type & P2 // expected-error {{non-protocol type 'P1.Type' cannot be used within a protocol composition}}
-typealias T03 = P1? & P2 // expected-error {{non-protocol type 'P1?' cannot be used within a protocol composition}}
-typealias T04 = P1 & P2! // expected-error {{non-protocol type 'P2!' cannot be used within a protocol composition}} expected-error {{implicitly unwrapped optionals}} {{24-25=?}}
+typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type 'P1.Protocol' cannot be used within a protocol-constrained type}}
+typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1.Type' cannot be used within a protocol-constrained type}}
+typealias T03 = P1? & P2 // expected-error {{non-protocol, non-class type 'P1?' cannot be used within a protocol-constrained type}}
+typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type 'P2!' cannot be used within a protocol-constrained type}} expected-error {{implicitly unwrapped optionals}} {{24-25=?}}
 typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
 typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
 typealias T07 = P1 & protocol<P2, P3> // expected-warning {{protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{22-38=P2 & P3}}
 func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is parsed as 'P1 & P2 & P3'.
 let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
 
-struct S01: P5 & P6 {} // expected-error {{protocol composition is neither allowed nor needed here}} {{none}}
+struct S01: P5 & P6 {} // expected-error {{protocol-constrained type is neither allowed nor needed here}} {{none}}
 struct S02: P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
-struct S03: Optional<P5> & P6 {} // expected-error {{inheritance from non-protocol type 'Optional<P5>'}} expected-error {{protocol composition is neither allowed nor needed here}}
+struct S03: Optional<P5> & P6 {} // expected-error {{inheritance from non-protocol type 'Optional<P5>'}} expected-error {{protocol-constrained type is neither allowed nor needed here}}
 struct S04<T : P5 & (P6)> {} // expected-error {{inheritance from non-named type '(P6)'}}
 struct S05<T> where T : P5? & P6 {} // expected-error {{inheritance from non-named type 'P5?'}}
 
 // SR-3124 - Protocol Composition Often Migrated Incorrectly
 struct S3124<T: protocol<P1, P3>> {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{17-34=P1 & P3>}}
-func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-warning {{'where' clause}}
+func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-error {{'where' clause}}
 func f3124_2<U : protocol<P1>>(x: U)  {} // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{18-31=P1>}}
+
+// Make sure we correctly form compositions in expression context
+func takesP1AndP2(_: [AnyObject & P1 & P2]) {}
+
+takesP1AndP2([AnyObject & P1 & P2]())
+takesP1AndP2([Swift.AnyObject & P1 & P2]())
+takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
+takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
+takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
+takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}

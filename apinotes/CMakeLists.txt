@@ -38,6 +38,7 @@ set(SWIFT_API_NOTES_INPUTS
   QuickLook
   SafariServices
   SceneKit
+  ScriptingBridge
   SpriteKit
   StoreKit
   TVMLKit

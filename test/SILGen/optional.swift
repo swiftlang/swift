@@ -45,20 +45,22 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: [[X:%.*]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>, var, name "x"
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[TEMP:%.*]] = init_enum_data_addr [[PBX]]
+// CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBF]]
 //   Check whether 'f' holds a value.
-// CHECK:      [[T1:%.*]] = select_enum_addr [[PBF]]
-// CHECK-NEXT: cond_br [[T1]], bb1, bb3
+// CHECK:      [[T1:%.*]] = select_enum_addr [[READ]]
+// CHECK-NEXT: cond_br [[T1]], bb2, bb1
 //   If so, pull out the value...
-// CHECK:    bb1:
-// CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[PBF]]
+// CHECK:    bb2:
+// CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[READ]]
 // CHECK-NEXT: [[T0:%.*]] = load [copy] [[T1]]
+// CHECK-NEXT: end_access [[READ]]
 //   ...evaluate the rest of the suffix...
 // CHECK-NEXT: apply [[T0]]([[TEMP]])
 //   ...and coerce to T?
 // CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}some
-// CHECK-NEXT: br bb2
+// CHECK-NEXT: br bb3
 //   Continuation block.
-// CHECK:    bb2
+// CHECK:    bb3
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NEXT: destroy_value [[F]]
 // CHECK-NEXT: destroy_value %0
@@ -66,9 +68,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: return [[T0]] : $()
 
 //   Nothing block.
-// CHECK:    bb3:
+// CHECK:    bb4:
 // CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}none
-// CHECK-NEXT: br bb2
+// CHECK-NEXT: br bb3
 
 
 // <rdar://problem/15180622>

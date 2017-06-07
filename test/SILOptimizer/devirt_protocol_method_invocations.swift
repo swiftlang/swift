@@ -1,12 +1,37 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
+protocol PPP {
+    func f()
+}
+
+protocol QQQ : PPP {
+}
+
+struct S : QQQ {}
+
+extension QQQ {
+    @_semantics("optimize.sil.never")
+    func f() {}
+}
+
+// Test that all witness_method instructions are devirtualized.
+// This test used to crash the compiler because it uses inherited conformances.
+// CHECK-LABEL: sil @_T034devirt_protocol_method_invocations24testInheritedConformanceyyF : $@convention(thin) () -> ()
+// CHECK-NOT: witness_method
+// CHECK-NOT: class_method
+// CHECK: apply
+// CHECK: // end sil function '_T034devirt_protocol_method_invocations24testInheritedConformanceyyF'
+public func testInheritedConformance() {
+    (S() as QQQ).f()
+}
+
 public protocol Foo { 
   func foo(_ x:Int) -> Int
 }
 
 public extension Foo {
   func boo(_ x:Int) -> Int32 {
-    return 2222 + x
+    return 2222 + Int32(x)
   }
 
   func getSelf() -> Self {
@@ -49,12 +74,10 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
   return callGetSelf(c)
 }
 
-// It's not obvious why this isn't completely devirtualized.
 // CHECK: sil @_T034devirt_protocol_method_invocations12test24114020SiyF
-// CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
-// CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
-// CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
-// CHECK:   return [[T2]]
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int{{.*}}, 1
+// CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int{{.*}})
+// CHECK:   return [[T1]]
 
 // CHECK: sil @_T034devirt_protocol_method_invocations14testExMetatypeSiyF
 // CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
@@ -68,7 +91,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // be propagated from init_existential_addr into witness_method and 
 // apply instructions.
 
-// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b1_C11_invocationSiAA1CCFTf4g_n
+// CHECK-LABEL: sil shared [noinline] @_T034devirt_protocol_method_invocations05test_a1_b1_C11_invocationSiAA1CCFTf4g_n
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -99,7 +122,7 @@ public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocations5Int32VAA1CCFTf4d_n
+// CHECK-LABEL: sil shared [noinline] @_T034devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocations5Int32VAA1CCFTf4d_n
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method
@@ -169,6 +192,12 @@ public func testExMetatype() -> Int {
   return type.size
 }
 
+// rdar://32288618
+public func testExMetatypeVar() -> Int {
+  var type: StaticP.Type = HasStatic<Int>.self
+  return type.size
+}
+
 // IRGen used to crash on the testPropagationOfConcreteTypeIntoExistential method.
 // rdar://26286278
 
@@ -204,10 +233,11 @@ public final class V {
 }
 
 // Check that all witness_method invocations are devirtualized.
-// CHECK-LABEL: sil @_T034devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistentialyAA1VC1v_s5Int32V1xtFTf4gd_n
+// CHECK-LABEL: sil shared [noinline] @_T034devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistentialyAA1VC1v_s5Int32V1xtFTf4gd_n
 // CHECK-NOT: witness_method
 // CHECK-NOT: class_method
 // CHECK: return
+@inline(never)
 public func testPropagationOfConcreteTypeIntoExistential(v: V, x: Int32) {
   let y = v.a.plus()
   defer {

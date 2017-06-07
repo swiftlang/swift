@@ -21,6 +21,8 @@ enum class swift::DiagID : uint32_t {
 #define DIAG(KIND,ID,Options,Text,Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
+static_assert(static_cast<uint32_t>(swift::DiagID::invalid_diagnostic) == 0,
+              "0 is not the invalid diagnostic ID");
 
 // Define all of the diagnostic objects and initialize them with their 
 // diagnostic IDs.

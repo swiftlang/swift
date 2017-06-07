@@ -270,6 +270,10 @@ public:
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
+  /// Given a scalar value, materialize it into memory with the
+  /// exact same level of cleanup it had before.
+  ManagedValue materialize(SILGenFunction &SGF, SILLocation loc) const;
+
   /// Disable the cleanup for this value.
   void forwardCleanup(SILGenFunction &SGF) const;
   
@@ -296,6 +300,9 @@ public:
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();
   }
+
+  void dump() const;
+  void print(raw_ostream &os) const;
 };
 
 /// A ManagedValue which may not be intended to be consumed.
@@ -371,6 +378,12 @@ public:
   /// value and promising not to consume it.
   ConsumableManagedValue asBorrowedOperand() const {
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
+  }
+
+  /// Return a managed value that's appropriate for copying this value and
+  /// always consuming it.
+  ConsumableManagedValue copy(SILGenFunction &SGF, SILLocation loc) const {
+    return ConsumableManagedValue::forOwned(asUnmanagedValue().copy(SGF, loc));
   }
 };
 

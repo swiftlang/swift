@@ -27,8 +27,7 @@ public func run_RGBHistogram(_ N: Int) {
             break
         }
     }
-    CheckResults(isCorrectHistogram(histogram),
-                 "Incorrect results in histogram")
+    CheckResults(isCorrectHistogram(histogram))
 }
 
 typealias rrggbb_t = UInt32
@@ -124,7 +123,7 @@ class Box<T : Hashable> : Hashable {
     return value.hashValue
   }
 
-  static func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+  static func ==(lhs: Box, rhs: Box) -> Bool {
     return lhs.value == rhs.value
   }
 }
@@ -166,8 +165,7 @@ public func run_RGBHistogramOfObjects(_ N: Int) {
             break
         }
     }
-    CheckResults(isCorrectHistogramOfObjects(histogram),
-                 "Incorrect results in histogram")
+    CheckResults(isCorrectHistogramOfObjects(histogram))
 }
 
 

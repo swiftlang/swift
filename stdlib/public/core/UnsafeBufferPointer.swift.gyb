@@ -68,8 +68,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias Iterator =
-    IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
+  public typealias Iterator = UnsafeBufferPointerIterator<Element>
 
   /// The index of the first element in a nonempty buffer.
   ///
@@ -183,6 +182,28 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return startIndex..<endIndex
   }
 
+  /// Copies `self` into the supplied buffer.
+  ///
+  /// - Precondition: The memory in `self` is uninitialized. The buffer must
+  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  ///
+  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+  ///   initialized.
+  public func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
+    guard !isEmpty else { return (makeIterator(),buffer.startIndex) }
+
+    guard count <= buffer.count, let ptr = buffer.baseAddress else {
+      fatalError("Insufficient space allocated to copy buffer contents")      
+    }
+  
+    ptr.initialize(from: baseAddress!, count: self.count)
+    var it: Iterator = self.makeIterator()
+    it._position = it._end
+    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))        
+  }
+
   /// Accesses the element at the specified position.
   ///
 %if Mutable:
@@ -276,6 +297,59 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _end = start.map { $0 + count }
   }
 
+  /// Creates a buffer pointer starting at `start` and extending up to the last
+  /// addressable pointer to `Element` in the memory space
+  @_inlineable
+  public init(_unboundedStartingAt start: Unsafe${Mutable}Pointer<Element>) {
+    _position = start
+    _end = type(of: start)._max
+  }
+
+  @_inlineable
+  public init(_empty: ()) {
+    _position = Unsafe${Mutable}Pointer._max
+    _end = _position
+  }
+  
+%  if not Mutable:
+  /// Creates a buffer over the same memory as the given buffer slice.
+  ///
+  /// The new buffer will represent the same region of memory as the slice,
+  /// but it's indices will be rebased to zero. Given:
+  ///
+  ///   let slice = buffer[n..<m]
+  ///   let rebased = UnsafeBufferPointer(rebasing: slice)
+  ///
+  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  ///
+  /// - Parameter slice: the raw buffer slice to rebase.
+  @_inlineable
+  public init(rebasing slice: RandomAccessSlice<UnsafeBufferPointer<Element>>) {
+    self.init(start: slice.base.baseAddress! + slice.startIndex,
+      count: slice.count)
+  }
+%  end # !mutable
+
+  /// Creates a buffer over the same memory as the given buffer slice.
+  ///
+  /// The new buffer will represent the same region of memory as the slice,
+  /// but it's indices will be rebased to zero. Given:
+  ///
+  ///   let slice = buffer[n..<m]
+  ///   let rebased = UnsafeBufferPointer(rebasing: slice)
+  ///
+  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  ///
+  /// - Parameter slice: the buffer slice to rebase.
+  @_inlineable
+  public init(
+    rebasing slice:
+    MutableRandomAccessSlice<UnsafeMutableBufferPointer<Element>>
+  ) {
+    self.init(start: slice.base.baseAddress! + slice.startIndex,
+      count: slice.count)
+  }
+
   /// Returns an iterator over the elements of this buffer.
   ///
   /// - Returns: An iterator over the elements of this buffer.
@@ -299,10 +373,12 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    if let pos = _position {
-      return _end! - pos
+    switch(_position, _end) {
+    case (.some(let pos), .some(let end)):
+      return (end - pos)
+    case _:
+      return 0
     }
-    return 0
   }
 
   @_versioned
@@ -333,7 +409,7 @@ extension UnsafeMutableBufferPointer {
   ///   initialized.
   @_inlineable
   public func initialize<S: Sequence>(from source: S) -> (S.Iterator, Index)
-    where S.Iterator.Element == Iterator.Element {
+    where S.Element == Element {
     return source._copyContents(initializing: self)
   }
 }

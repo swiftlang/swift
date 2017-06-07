@@ -20,10 +20,12 @@ func set(holder holder: inout Holder) {
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK:        [[T0:%.*]] = function_ref @_T09unmanaged1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:        [[C:%.*]] = apply [[T0]](
-// CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
+// CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [static] [[ADDR]] : $*Holder
+// CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[WRITE]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[C]]
 // CHECK-NEXT:   store [[T1]] to [[T0]]
 // CHECK-NEXT:   strong_release [[C]]
+// CHECK-NEXT:   end_access [[WRITE]] : $*Holder
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 
@@ -33,10 +35,12 @@ func get(holder holder: inout Holder) -> C {
 // CHECK-LABEL:sil hidden @_T09unmanaged3getAA1CCAA6HolderVz6holder_tF : $@convention(thin) (@inout Holder) -> @owned C
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
-// CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
+// CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [static] [[ADDR]] : $*Holder
+// CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[READ]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = load [[T0]] : $*@sil_unmanaged C
 // CHECK-NEXT:   [[T2:%.*]] = unmanaged_to_ref [[T1]]
 // CHECK-NEXT:   strong_retain [[T2]]
+// CHECK-NEXT:   end_access [[READ]] : $*Holder
 // CHECK-NEXT:   return [[T2]]
 
 func project(fn fn: () -> Holder) -> C {

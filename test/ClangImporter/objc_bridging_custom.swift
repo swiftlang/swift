@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift -module-name Appliances -o %t
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/../Inputs/ObjCBridging -I %t -parse-as-library -verify %s

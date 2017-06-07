@@ -29,7 +29,7 @@ using namespace Lowering;
 
 
 static unsigned getTupleSize(CanType t) {
-  if (TupleType *tt = dyn_cast<TupleType>(t))
+  if (auto tt = dyn_cast<TupleType>(t))
     return tt->getNumElements();
   return 1;
 }
@@ -93,6 +93,7 @@ public:
       auto eltTy = tuple.getType().getTupleElementType(i);
       assert(eltTy.isAddress() == tuple.getType().isAddress());
       auto &eltTI = SGF.getTypeLowering(eltTy);
+      (void)eltTI;
 
       // Project the element.
       assert(eltTI.isLoadable() || !SGF.silConv.useLoweredAddresses());
@@ -365,13 +366,12 @@ static void copyOrInitValuesInto(Initialization *init,
   
   bool implodeTuple = false;
 
-  if (auto Address = init->getAddressOrNull()) {
-    if (isa<GlobalAddrInst>(Address) &&
-        SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
-      // Implode tuples in initialization of globals if they are
-      // of trivial types.
-      implodeTuple = true;
-    }
+  if (init->canPerformInPlaceInitialization() &&
+      init->isInPlaceInitializationOfGlobal() &&
+      SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
+    // Implode tuples in initialization of globals if they are
+    // of trivial types.
+    implodeTuple = true;
   }
   
   // If we can satisfy the tuple type by breaking up the aggregate
@@ -690,4 +690,31 @@ ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
   auto temp = SGF.emitTemporary(loc, paramTL);
   std::move(*this).forwardInto(SGF, loc, temp.get());
   return temp->getManagedAddress();
+}
+
+bool RValue::isObviouslyEqual(const RValue &rhs) const {
+  assert(isComplete() && rhs.isComplete() && "Comparing incomplete rvalues");
+
+  // Compare the count of elements instead of the type.
+  if (values.size() != rhs.values.size())
+    return false;
+
+  return std::equal(values.begin(), values.end(), rhs.values.begin(),
+                [](const ManagedValue &lhs, const ManagedValue &rhs) -> bool {
+                  return areObviouslySameValue(lhs.getValue(), rhs.getValue());
+                });
+}
+
+static SILValue getCanonicalValueSource(SILValue value) {
+  while (true) {
+    if (auto access = dyn_cast<BeginAccessInst>(value)) {
+      value = access->getSource();
+    } else {
+      return value;
+    }
+  }
+}
+
+bool RValue::areObviouslySameValue(SILValue lhs, SILValue rhs) {
+  return getCanonicalValueSource(lhs) == getCanonicalValueSource(rhs);
 }

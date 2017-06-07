@@ -184,9 +184,9 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
 
   let ppp: P = p.init()
 
-  _ = pp() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
-  _ = pp().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
-  _ = pp().bar(2) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  _ = pp() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp().bar(2) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
 
   _ = pp.init() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
   _ = pp.init().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}

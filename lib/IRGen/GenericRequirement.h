@@ -46,6 +46,13 @@ struct GenericRequirement {
   ProtocolDecl *Protocol;
 };
 
+using RequirementCallback =
+  llvm::function_ref<void(GenericRequirement requirement)>;
+
+/// Enumerate the generic requirements imposed by a generic signature.
+void enumerateGenericSignatureRequirements(CanGenericSignature signature,
+                                           const RequirementCallback &callback);
+
 /// Given an array of substitutions that parallel the dependent
 /// signature for which a requirement was emitted, emit the required
 /// value.

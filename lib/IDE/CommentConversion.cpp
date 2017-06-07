@@ -344,6 +344,8 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     PO.PrintDocumentationComments = false;
     PO.TypeDefinitions = false;
     PO.VarInitializers = false;
+    PO.ShouldQualifyNestedDeclarations =
+        PrintOptions::QualifyNestedDeclarations::TypesOnly;
 
     OS << "<Declaration>";
     llvm::SmallString<32> DeclSS;
@@ -354,8 +356,10 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     appendWithXMLEscaping(OS, DeclSS);
     OS << "</Declaration>";
   }
-
+  
+  OS << "<CommentParts>";
   visitCommentParts(DC->getParts());
+  OS << "</CommentParts>";
 
   OS << RootEndTag;
 }

@@ -27,6 +27,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
@@ -35,11 +36,27 @@
 
 using namespace swift;
 
+std::string CompilerInvocation::getPCHHash() const {
+  using llvm::hash_code;
+  using llvm::hash_value;
+  using llvm::hash_combine;
+
+  auto Code = hash_value(LangOpts.getPCHHashComponents());
+  Code = hash_combine(Code, FrontendOpts.getPCHHashComponents());
+  Code = hash_combine(Code, ClangImporterOpts.getPCHHashComponents());
+  Code = hash_combine(Code, SearchPathOpts.getPCHHashComponents());
+  Code = hash_combine(Code, DiagnosticOpts.getPCHHashComponents());
+  Code = hash_combine(Code, SILOpts.getPCHHashComponents());
+  Code = hash_combine(Code, IRGenOpts.getPCHHashComponents());
+
+  return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
+}
+
 void CompilerInstance::createSILModule(bool WholeModule) {
   assert(MainModule && "main module not created yet");
-  TheSILModule = SILModule::createEmptyModule(getMainModule(),
-                                              Invocation.getSILOptions(),
-                                              WholeModule);
+  TheSILModule = SILModule::createEmptyModule(
+      getMainModule(), Invocation.getSILOptions(), WholeModule,
+      Invocation.getFrontendOptions().SILSerializeAll);
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -103,6 +120,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // knowledge.
   auto clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                          Invocation.getPCHHash(),
                           DepTracker);
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
@@ -562,6 +580,7 @@ void CompilerInstance::performParseOnly() {
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
          "only supports parsing .swift files");
+  (void)Kind;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::None;
 
@@ -614,4 +633,12 @@ void CompilerInstance::performParseOnly() {
 
   assert(Context->LoadedModules.size() == 1 &&
          "Loaded a module during parse-only");
+}
+
+void CompilerInstance::freeContextAndSIL() {
+  Context.reset();
+  TheSILModule.reset();
+  MainModule = nullptr;
+  SML = nullptr;
+  PrimarySourceFile = nullptr;
 }

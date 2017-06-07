@@ -1,0 +1,274 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+sil_stage canonical
+import Swift
+
+struct S {
+  var x: Int
+  let y: String
+  var z: C
+  var reabstracted: () -> ()
+}
+class C {
+  final var x: Int
+  final let y: String
+  final var z: S
+  var w: Int { get set }
+
+  init()
+}
+
+sil_vtable C {}
+
+// CHECK: %TSi = type <{ [[WORD:i.*]] }>
+
+// -- %a: S.x
+// CHECK: [[KP_A:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
+// -- offset of S.x
+// CHECK-SAME: i32 0 }>
+
+// -- %b: S.y
+// CHECK: [[KP_B:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
+// -- offset of S.y
+// CHECK-32-SAME: i32 4 }>
+// CHECK-64-SAME: i32 8 }>
+
+// -- %c: S.z
+// CHECK: [[KP_C:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
+// -- offset of S.z
+// CHECK-32-SAME: i32 16 }>
+// CHECK-64-SAME: i32 32 }>
+
+// -- %d: C.x
+// CHECK: [[KP_D:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
+// -- 0x4000_0000 (class) + offset of C.x
+// CHECK-32-SAME: i32 1073741836 }>
+// CHECK-64-SAME: i32 1073741840 }>
+
+// -- %e: C.y
+// CHECK: [[KP_E:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
+// -- 0x4000_0000 (class) + offset of C.y
+// CHECK-32-SAME: i32 1073741840 }>
+// CHECK-64-SAME: i32 1073741848 }>
+
+// -- %f: C.z
+// CHECK: [[KP_F:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
+// -- 0x4000_0000 (class) + offset of C.z
+// CHECK-32-SAME: i32 1073741852 }>
+// CHECK-64-SAME: i32 1073741872 }>
+
+// -- %g: S.z.x
+// CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//                  -- 0x8000_0010 - instantiable in-line, size 12
+// CHECK-32-SAME: i32 -2147483636,
+//                  -- 0x8000_0018 - instantiable in-line, size 16
+// CHECK-64-SAME: i32 -2147483632,
+// -- offset of S.z
+// CHECK-32-SAME: i32 16,
+// CHECK-64-SAME: i32 32,
+// CHECK: %swift.type* (i8*)*
+// -- 0x4000_0000 (class) + offset of C.x
+// CHECK-32-SAME: i32 1073741836 }>
+// CHECK-64-SAME: i32 1073741840 }>
+
+// -- %h: C.z.x
+// CHECK: [[KP_H:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//                  -- 0x8000_0010 - instantiable in-line, size 12
+// CHECK-32-SAME: i32 -2147483636,
+//                  -- 0x8000_0018 - instantiable in-line, size 16
+// CHECK-64-SAME: i32 -2147483632,
+// -- 0x4000_0000 (class) + offset of C.z
+// CHECK-32-SAME: i32 1073741852,
+// CHECK-64-SAME: i32 1073741872,
+// CHECK: %swift.type* (i8*)*
+// -- offset of S.x
+// CHECK-SAME: i32 0 }>
+
+// -- %k: computed
+// CHECK: [[KP_K:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//              -- 0x8000_0014 - instantiable in-line, size 20
+// CHECK-64-SAME: i32 -2147483628,
+//              -- 0x8000_000c - instantiable in-line, size 12
+// CHECK-32-SAME: i32 -2147483636,
+// -- 0x2000_0000 - computed, get-only, identified by function pointer, no args
+// CHECK-SAME: i32 536870912,
+// CHECK-SAME: void ()* @k_id,
+// CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* @k_get }>
+
+// -- %l: computed
+// CHECK: [[KP_L:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//              -- 0x8000_001c - instantiable in-line, size 28
+// CHECK-64-SAME: i32 -2147483620,
+//              -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+// -- 0x2a00_0000 - computed, settable, nonmutating, identified by vtable, no args
+// CHECK-SAME: i32 704643072,
+// CHECK-SAME: [[WORD]]
+// CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get,
+// CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set }>
+
+// -- %m: computed
+// CHECK: [[KP_M:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)*
+// CHECK-SAME: %swift.type* (i8*)*
+//              -- 0x8000_001c - instantiable in-line, size 28
+// CHECK-64-SAME: i32 -2147483620,
+//              -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+// -- 0x3c00_0000 - computed, settable, nonmutating, identified by property offset, no args
+// CHECK-SAME: i32 1006632960,
+// CHECK-SAME: [[WORD]]
+// CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_get,
+// CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_set }>
+
+
+// -- %i: Gen<A>.x
+// CHECK: [[KP_I:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)* [[I_GET_GEN_A_A:@[a-z_.0-9]+]],
+// CHECK-SAME: %swift.type* (i8*)* [[I_GET_A:@[a-z_.0-9]+]],
+//             -- size 8
+// CHECK-SAME: i32 8,
+//             -- 0x1ffffffe - struct with runtime-resolved offset
+// CHECK-SAME: i32 536870910,
+// CHECK-32-SAME: i32 12 }>
+// CHECK-64-SAME: i32 24 }>
+
+// -- %j: Gen<A>.y
+// CHECK: [[KP_J:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)* [[J_GET_GEN_A_A:@[a-z_.0-9]+]],
+// CHECK-SAME: %swift.type* (i8*)* [[J_GET_A:@[a-z_.0-9]+]],
+//             -- size 8
+// CHECK-SAME: i32 8,
+//             -- 0x1ffffffe - struct with runtime-resolved offset
+// CHECK-SAME: i32 536870910,
+// CHECK-32-SAME: i32 16 }>
+// CHECK-64-SAME: i32 32 }>
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
+sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
+entry:
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_A]] to i8*), i8* undef)
+  %a = keypath $KeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_B]] to i8*), i8* undef)
+  %b = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_C]] to i8*), i8* undef)
+  %c = keypath $KeyPath<S, C>, (root $S; stored_property #S.z : $C)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D]] to i8*), i8* undef)
+  %d = keypath $KeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_E]] to i8*), i8* undef)
+  %e = keypath $KeyPath<C, String>, (root $C; stored_property #C.y : $String)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_F]] to i8*), i8* undef)
+  %f = keypath $KeyPath<C, S>, (root $C; stored_property #C.z : $S)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_G]] to i8*), i8* undef)
+  %g = keypath $KeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_H]] to i8*), i8* undef)
+  %h = keypath $KeyPath<C, Int>, (root $C; stored_property #C.z : $S; stored_property #S.x : $Int)
+
+  %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in S) -> @out Int)
+  %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in C) -> @out Int, setter @l_set : $@convention(thin) (@in Int, @in C) -> ())
+  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in S) -> @out @callee_owned (@in ()) -> @out (), setter @m_set : $@convention(thin) (@in @callee_owned (@in ()) -> @out (), @inout S) -> ())
+
+  return undef : $()
+}
+
+sil @k_id : $@convention(thin) () -> ()
+sil @k_get : $@convention(thin) (@in S) -> @out Int
+
+sil @l_get : $@convention(thin) (@in C) -> @out Int
+sil @l_set : $@convention(thin) (@in Int, @in C) -> ()
+
+sil @m_get : $@convention(thin) (@in S) -> @out @callee_owned (@in ()) -> @out ()
+sil @m_set : $@convention(thin) (@in @callee_owned (@in ()) -> @out (), @inout S) -> ()
+
+struct Gen<T, U> {
+  var x: T
+  var y: U
+}
+
+struct Foo<T> {
+  var foo: T
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
+sil @stored_property_generics : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
+  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS_I8]])
+  %i = keypath $KeyPath<Gen<T,T>, T>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <T>
+
+  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %U, %swift.type** [[PTR]]
+  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_J]] to i8*), i8* [[ARGS_I8]])
+  %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
+
+  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: [[FOO_T:%.*]] = call %swift.type* @_T08keypaths3FooVMa(%swift.type* %T)
+  // CHECK: store %swift.type* [[FOO_T]], %swift.type** [[PTR]]
+  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS_I8]])
+  %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
+
+  return undef : $()
+}
+
+// CHECK: define private %swift.type* [[I_GET_GEN_A_A]](i8*)
+// CHECK:   [[BUF:%.*]] = bitcast i8* %0
+// CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
+// CHECK:   [[GEN:%.*]] = call %swift.type* @_T08keypaths3GenVMa(%swift.type* [[A]], %swift.type* [[A]])
+// CHECK:   ret %swift.type* [[GEN]]
+
+
+// CHECK: define private %swift.type* [[I_GET_A]](i8*)
+// CHECK:   [[BUF:%.*]] = bitcast i8* %0
+// CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
+// CHECK:   ret %swift.type* [[A]]

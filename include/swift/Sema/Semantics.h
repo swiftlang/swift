@@ -38,14 +38,14 @@ namespace sema {
 /// the infrastructure into the compiler.
 class Semantics final {
   friend class LegacyASTTransformer;
-  llvm::DenseMap<syntax::RC<syntax::SyntaxData>, ASTNode> SyntaxMap;
+  llvm::DenseMap<RC<syntax::SyntaxData>, ASTNode> SyntaxMap;
 public:
 
   /// Record a syntax node -> semantic node mapping for later retrieval.
   ///
   /// This is a temporary measure to get a syntax node's Type or resolved
   /// underlying declaration reference after semantic analysis is done.
-  void recordSyntaxMapping(syntax::RC<syntax::SyntaxData> FromNode,
+  void recordSyntaxMapping(RC<syntax::SyntaxData> FromNode,
                            ASTNode ToNode);
 
   /// Get the semantic node for a piece of syntax. This must have been

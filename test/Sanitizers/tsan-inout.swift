@@ -19,7 +19,7 @@ import TSanUninstrumented
 var gInThread1: () -> () = { }
 var gInThread2: () -> () = { }
 
-// Spawn two threads, run the the two passed in closures simultaneously, and
+// Spawn two threads, run the two passed in closures simultaneously, and
 // join them.
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
   var thread1: pthread_t?
@@ -159,7 +159,7 @@ testRace(name: "InoutAccessToStoredGlobalInUninstrumentedModule",
 // the read from the global is IRGen'd to a memcpy().
 testRace(name: "ReadAndWriteToStoredGlobalInUninstrumentedModule",
         thread: { storedGlobalInUninstrumentedModule2 = 7 },
-        thread: { _ = storedGlobalInUninstrumentedModule2 } )
+        thread: { uninstrumentedBlackHole(storedGlobalInUninstrumentedModule2) } )
 // CHECK-INTERCEPTORS-ACCESSES-LABEL: Running ReadAndWriteToStoredGlobalInUninstrumentedModule
 // CHECK-INTERCEPTORS-ACCESSES: ThreadSanitizer: data race
 // CHECK-INTERCEPTORS-ACCESSES: Location is global

@@ -18,8 +18,8 @@
 
 #include "swift/ABI/Class.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/AttrKind.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
@@ -27,14 +27,15 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/IR/CallSite.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/IR/CallSite.h"
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
@@ -48,7 +49,6 @@
 #include "IRGenModule.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
-#include "Linking.h"
 #include "MemberAccessStrategy.h"
 
 
@@ -63,20 +63,25 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
   return theClass;
 }
 
-/// What reference counting mechanism does a class have?
-ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
-                                                      ClassDecl *theClass) {
+/// What reference counting mechanism does a class-like type have?
+ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
+                                                     CanType type) {
   // If ObjC interop is disabled, we have a Swift refcount.
   if (!IGM.ObjCInterop)
     return ReferenceCounting::Native;
 
-  // NOTE: if you change this, change Type::usesNativeReferenceCounting.
-  // If the root class is implemented in swift, then we have a swift
-  // refcount; otherwise, we have an ObjC refcount.
-  if (getRootClass(theClass)->hasKnownSwiftImplementation())
+  if (type->usesNativeReferenceCounting(ResilienceExpansion::Maximal))
     return ReferenceCounting::Native;
 
-  return ReferenceCounting::ObjC;
+  // Class-constrained archetypes and existentials that don't use
+  // native reference counting and yet have a superclass must be
+  // using ObjC reference counting.
+  auto superclass = type->getSuperclass();
+  if (superclass)
+    return ReferenceCounting::ObjC;
+
+  // Otherwise, it could be either one.
+  return ReferenceCounting::Unknown;
 }
 
 /// What isa encoding mechanism does a type have?
@@ -226,7 +231,7 @@ namespace {
       }
 
       if (theClass->hasSuperclass()) {
-        SILType superclassType = classType.getSuperclass(nullptr);
+        SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 
@@ -238,6 +243,25 @@ namespace {
           // the field offset vector.
           ClassHasFixedSize = false;
 
+          // We can't use global offset variables if we are generic and layout
+          // dependent on a generic parameter because the objective-c layout might
+          // depend on the alignment of the generic stored property('t' in the
+          // example below).
+          //
+          // class Foo<T> : NSFoobar {
+          //   var x : AKlass = AKlass()
+          //   var y : AKlass = AKlass()
+          //   var t : T?
+          // }
+          if (classType.hasArchetype())
+            for (VarDecl *var : theClass->getStoredProperties()) {
+              SILType type = classType.getFieldType(var, IGM.getSILModule());
+              auto &eltType = IGM.getTypeInfo(type);
+              if (!eltType.isFixedSize()) {
+                if (type.hasArchetype())
+                  ClassHasConcreteLayout = false;
+              }
+            }
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
 
@@ -435,6 +459,37 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
 }
+
+llvm::Constant *
+irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
+                                                       SILType baseType,
+                                                       VarDecl *field) {
+  auto fieldType = baseType.getFieldType(field, IGM.getSILModule());
+  // If the field is empty, its address doesn't matter.
+  auto &fieldTI = IGM.getTypeInfo(fieldType);
+  if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
+    return llvm::ConstantInt::get(IGM.SizeTy, 0);
+  }
+
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
+  unsigned fieldIndex = classLayout.getFieldIndex(field);
+
+  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  case FieldAccess::ConstantDirect: {
+    auto &element = baseClassTI.getElements(IGM, baseType)[fieldIndex];
+    return llvm::ConstantInt::get(IGM.SizeTy,
+                                  element.getByteOffset().getValue());
+  }
+  case FieldAccess::NonConstantDirect:
+  case FieldAccess::ConstantIndirect:
+  case FieldAccess::NonConstantIndirect:
+    return nullptr;
+  }
+}
+
+
 
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
@@ -678,12 +733,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
                                /*allow uninitialized*/ true);
     StackAllocSize = -1;
-    auto &ti = IGF.getTypeInfo(selfType);
-    assert(ti.getSchema().size() == 1);
-    assert(!ti.getSchema().containsAggregate());
-    auto destType = ti.getSchema()[0].getScalarType();
-    auto *val = emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
-    return IGF.Builder.CreateBitCast(val, destType);
+    return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   llvm::Value *metadata =
@@ -719,8 +769,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                TailArraysRef TailArrays) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
-    return emitObjCAllocObjectCall(IGF, metadata, 
-                                   selfType.getSwiftRValueType());
+    return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   // Otherwise, allocate using Swift's routines.
@@ -762,10 +811,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
   }
 
   // Check whether the SIL module defines it.  (We need a type for it.)
-  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func,
-                   ResilienceExpansion::Minimal,
-                   /*uncurryLevel*/ 1,
-                   /*foreign*/ false);
+  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func);
   SILFunction *silFn = IGF.getSILModule().lookUpFunction(fnRef);
   if (!silFn)
     return false;
@@ -924,6 +970,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   emitClassMetadata(*this, D,
                     classTI.getLayout(*this, selfType),
                     classTI.getClassLayout(*this, selfType));
+
+  IRGen.addClassForEagerInitialization(D);
+
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
 }
@@ -1087,10 +1136,6 @@ namespace {
       for (ProtocolDecl *p : theProtocol->getInheritedProtocols()) {
         if (!p->isObjC())
           continue;
-        // Don't emit the magic AnyObject conformance.
-        if (auto known = p->getKnownProtocolKind())
-          if (*known == KnownProtocolKind::AnyObject)
-            continue;
         Protocols.push_back(p);
       }
 
@@ -1110,11 +1155,6 @@ namespace {
       }
 
       for (ProtocolDecl *proto : protocols) {
-        // Don't emit the magic AnyObject conformance.
-        if (auto known = proto->getKnownProtocolKind())
-          if (*known == KnownProtocolKind::AnyObject)
-            continue;
-
         Protocols.push_back(proto);
       }
     }
@@ -1445,10 +1485,8 @@ namespace {
 
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
-      SILDeclRef dtorRef(destructor, SILDeclRef::Kind::Deallocator,
-                         ResilienceExpansion::Minimal,
-                         SILDeclRef::ConstructAtNaturalUncurryLevel,
-                         /*isForeign=*/true);
+      auto dtorRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator)
+        .asForeign();
       if (auto silFn = IGM.getSILModule().lookUpFunction(dtorRef))
         return silFn->isDefinition();
 
@@ -1464,6 +1502,10 @@ namespace {
           hasObjCDeallocDefinition(destructor)) {
         InstanceMethods.push_back(destructor);
       }
+    }
+
+    void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+      llvm_unreachable("should not IRGen classes with missing members");
     }
 
     void addIVarInitializer() {
@@ -2087,7 +2129,7 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
-  ReferenceCounting refcount = ::getReferenceCountingForClass(IGM, D);
+  ReferenceCounting refcount = ::getReferenceCountingForType(IGM, type);
   
   SpareBitVector spareBits;
   
@@ -2187,7 +2229,7 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 bool irgen::doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
                                                        CanType conformingType) {
   NominalTypeDecl *nom = conformingType->getAnyNominal();
-  ClassDecl *clas = dyn_cast<ClassDecl>(nom);
+  auto *clas = dyn_cast<ClassDecl>(nom);
   if (nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel()))
     return true;
 

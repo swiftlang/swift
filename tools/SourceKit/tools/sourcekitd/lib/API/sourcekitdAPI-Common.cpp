@@ -55,6 +55,7 @@ UIdent sourcekitd::KeyEnableDiagnostics("key.enablediagnostics");
 UIdent sourcekitd::KeySyntacticOnly("key.syntactic_only");
 UIdent sourcekitd::KeyLength("key.length");
 UIdent sourcekitd::KeyActionable("key.actionable");
+UIdent sourcekitd::KeyParentLoc("key.parent_loc");
 UIdent sourcekitd::KeyKind("key.kind");
 UIdent sourcekitd::KeyAccessibility("key.accessibility");
 UIdent sourcekitd::KeySetterAccessibility("key.setter_accessibility");
@@ -123,6 +124,7 @@ UIdent sourcekitd::KeyUnpopular("key.unpopular");
 UIdent sourcekitd::KeyHide("key.hide");
 UIdent sourcekitd::KeySimplified("key.simplified");
 UIdent sourcekitd::KeyRangeContent("key.rangecontent");
+UIdent sourcekitd::KeyCancelOnSubsequentRequest("key.cancel_on_subsequent_request");
 
 UIdent sourcekitd::KeyIsDeprecated("key.is_deprecated");
 UIdent sourcekitd::KeyIsUnavailable("key.is_unavailable");
@@ -143,6 +145,9 @@ UIdent sourcekitd::KeyArgNames("key.argnames");
 UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
 UIdent sourcekitd::KeyNameKind("key.namekind");
 UIdent sourcekitd::KeyLocalizationKey("key.localization_key");
+UIdent sourcekitd::KeyIsZeroArgSelector("key.is_zero_arg_selector");
+
+UIdent sourcekitd::KeySwiftVersion("key.swift_version");
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
@@ -242,7 +247,10 @@ static UIdent *OrderedKeys[] = {
   &KeyArgNames,
   &KeySelectorPieces,
   &KeyNameKind,
+  &KeyLocalizationKey,
+  &KeyIsZeroArgSelector,
 
+  &KeySwiftVersion,
 };
 
 static unsigned findPrintOrderForDictKey(UIdent Key) {
@@ -329,7 +337,7 @@ public:
   VariantPrinter(raw_ostream &OS, unsigned Indent = 0, bool PrintAsJSON = false)
     : RequestResponsePrinterBase(OS, Indent, PrintAsJSON) { }
 };
-}
+} // end anonymous namespace
 
 void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
   for (unsigned i = 0, e = Str.size(); i != e; ++i) {

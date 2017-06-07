@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -Xllvm -sil-disable-pass=Inliner -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -Xllvm -sil-disable-pass="Function Inlining" -emit-sil -primary-file %s | %FileCheck %s
 
 // Check if GlobalOpt generates the getters with the right linkage and the right mangling
 
@@ -17,7 +17,7 @@ _ = testit()
 // CHECK: sil hidden @{{.*}}testit
 
 // CHECK:      // MyStruct.StaticVar.getter
-// CHECK-NEXT: sil private [fragile] @_{{.*}}StaticVar
+// CHECK-NEXT: sil private [serialized] @_{{.*}}StaticVar
 
 // CHECK:      // Global.getter
-// CHECK-NEXT: sil private [fragile] @_{{.*}}Global
+// CHECK-NEXT: sil private [serialized] @_{{.*}}Global

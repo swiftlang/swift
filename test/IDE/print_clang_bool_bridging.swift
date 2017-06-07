@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=BoolBridgingTests -function-definitions=false -print-regular-comments -skip-unavailable -F %S/Inputs/mock-sdk > %t.txt
 // RUN: diff -u <(tail +9 %s) %t.txt

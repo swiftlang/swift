@@ -527,8 +527,15 @@ public func refract(_ x: ${vectype},
                            n: ${vectype},
                            eta: ${type})
                              -> ${vectype} {
-  let k = 1 - eta * eta * (1 - dot(x, n) * dot(x, n))
-  if k >= 0 { return eta * x - (eta * dot(x, n) + sqrt(k)) * n }
+  // FIXME(integers): extra variables were introduced to speed up compilation.
+  let etaSquared = eta * eta
+  let dotSquared = dot(x, n) * dot(x, n)
+  let k = 1 - etaSquared * (1 - dotSquared)
+  if k >= 0 {
+    let etaX = eta * x
+    let etaDot = eta * dot(x, n)
+    return etaX - (etaDot + sqrt(k)) * n
+  }
   return ${vectype}(0)
 }
 

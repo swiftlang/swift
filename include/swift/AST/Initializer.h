@@ -70,17 +70,21 @@ public:
 class PatternBindingInitializer : public Initializer {
   PatternBindingDecl *Binding;
 
+  // created lazily for 'self' lookup from lazy property initializer
+  ParamDecl *SelfParam;
+
   friend class ASTContext; // calls reset on unused contexts
 
   void reset(DeclContext *parent) {
     setParent(parent);
     Binding = nullptr;
+    SelfParam = nullptr;
   }
 
 public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
-      Binding(nullptr) {
+      Binding(nullptr), SelfParam(nullptr) {
     SpareBits = 0;
   }
  
@@ -94,6 +98,8 @@ public:
   PatternBindingDecl *getBinding() const { return Binding; }
 
   unsigned getBindingIndex() const { return SpareBits; }
+
+  ParamDecl *getImplicitSelfDecl();
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

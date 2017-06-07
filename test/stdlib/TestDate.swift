@@ -51,12 +51,6 @@ class TestDate : TestDateSuper {
         d1 += 10
         expectTrue(d1 > d3)
     }
-    
-    func testDateHash() {
-        let d0 = NSDate()
-        let d1 = Date(timeIntervalSinceReferenceDate: d0.timeIntervalSinceReferenceDate)
-        expectEqual(d0.hashValue, d1.hashValue)
-    }
 
     func testCast() {
         let d0 = NSDate()
@@ -196,13 +190,16 @@ class TestDate : TestDateSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_dateComponents_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(DateComponents(), DateComponents._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
 var DateTests = TestSuite("TestDate")
 DateTests.test("testDateComparison") { TestDate().testDateComparison() }
 DateTests.test("testDateMutation") { TestDate().testDateMutation() }
-DateTests.test("testDateHash") { TestDate().testDateHash() }
 DateTests.test("testCast") { TestDate().testCast() }
 DateTests.test("testDistantPast") { TestDate().testDistantPast() }
 DateTests.test("testDistantFuture") { TestDate().testDistantFuture() }
@@ -213,5 +210,6 @@ DateTests.test("test_AnyHashableContainingDate") { TestDate().test_AnyHashableCo
 DateTests.test("test_AnyHashableCreatedFromNSDate") { TestDate().test_AnyHashableCreatedFromNSDate() }
 DateTests.test("test_AnyHashableContainingDateComponents") { TestDate().test_AnyHashableContainingDateComponents() }
 DateTests.test("test_AnyHashableCreatedFromNSDateComponents") { TestDate().test_AnyHashableCreatedFromNSDateComponents() }
+DateTests.test("test_dateComponents_unconditionallyBridgeFromObjectiveC") { TestDate().test_dateComponents_unconditionallyBridgeFromObjectiveC() }
 runAllTests()
 #endif

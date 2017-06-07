@@ -174,16 +174,9 @@ FunctionParameterSyntax SyntaxFactory::makeBlankFunctionParameter() {
 #pragma mark - function-parameter-list
 
 FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(
-    const std::vector<FunctionParameterSyntax> &Parameters) {
-  RawSyntax::LayoutList Layout;
-  for (auto Param : Parameters) {
-    Layout.push_back(Param.getRaw());
-  }
-
-  auto Raw = RawSyntax::make(SyntaxKind::FunctionParameterList, Layout,
-                             SourcePresence::Present);
-  auto Data = FunctionParameterListSyntaxData::make(Raw);
-  return { Data, Data.get() };
+    std::vector<FunctionParameterSyntax> Parameters) {
+  auto Data = FunctionParameterListSyntax::makeData(Parameters);
+  return FunctionParameterListSyntax { Data, Data.get() };
 }
 
 FunctionParameterListSyntax SyntaxFactory::makeBlankFunctionParameterList() {
@@ -1145,7 +1138,7 @@ MetatypeTypeSyntax SyntaxFactory::makeBlankMetatypeType() {
 
 FunctionTypeSyntax SyntaxFactory::makeFunctionType(
     TypeAttributesSyntax TypeAttributes, RC<TokenSyntax> LeftParen,
-    TupleTypeElementListSyntax ArgumentList, RC<TokenSyntax> RightParen,
+    FunctionParameterListSyntax ArgumentList, RC<TokenSyntax> RightParen,
     RC<TokenSyntax> ThrowsOrRethrows, RC<TokenSyntax> Arrow,
     TypeSyntax ReturnType) {
   auto Raw =

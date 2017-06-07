@@ -160,6 +160,14 @@ BoxPair::Return swift_allocBox(Metadata const *type);
 SWIFT_RUNTIME_EXPORT
 BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
+/// Performs a uniqueness check on the pointer to a box structure. If the check
+/// fails allocates a new box and stores the pointer in the buffer.
+///
+///  if (!isUnique(buffer[0]))
+///    buffer[0] = swift_allocBox(type)
+SWIFT_RUNTIME_EXPORT
+BoxPair::Return swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
+                                    size_t alignMask);
 
 // Allocate plain old memory. This is the generalized entry point
 // Never returns nil. The returned memory is uninitialized. 
@@ -629,6 +637,14 @@ static inline void swift_unownedTakeAssign(UnownedReference *dest,
   auto oldValue = dest->Value;
   dest->Value = newValue;
   swift_unownedRelease(oldValue);
+}
+
+static inline bool swift_unownedIsEqual(UnownedReference *ref,
+                                        HeapObject *value) {
+  bool isEqual = ref->Value == value;
+  if (isEqual)
+    swift_unownedCheck(value);
+  return isEqual;
 }
 
 /*****************************************************************************/
@@ -1144,6 +1160,22 @@ void swift_unknownUnownedTakeAssign(UnownedReference *dest,
 static inline void swift_unknownUnownedTakeAssign(UnownedReference *dest,
                                                   UnownedReference *src) {
   swift_unownedTakeAssign(dest, src);
+}
+
+#endif /* SWIFT_OBJC_INTEROP */
+
+#if SWIFT_OBJC_INTEROP
+
+/// Return `*ref == value` when ref might not refer to a native Swift object.
+/// Does not halt when *ref is a dead object as long as *ref != value.
+SWIFT_RUNTIME_EXPORT
+bool swift_unknownUnownedIsEqual(UnownedReference *ref, void *value);
+
+#else
+
+static inline bool swift_unknownUnownedIsEqual(UnownedReference *ref,
+                                               void *value) {
+  return swift_unownedIsEqual(ref, static_cast<HeapObject *>(value));
 }
 
 #endif /* SWIFT_OBJC_INTEROP */

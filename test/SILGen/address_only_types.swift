@@ -151,7 +151,7 @@ func address_only_materialize() -> Int {
   // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo!1
   // CHECK: [[RET:%[0-9]+]] = apply [[FOO_METHOD]]<[[OPENED]]>([[TEMP_PROJ]])
-  // CHECK: destroy_addr [[TEMP_PROJ]]
+  // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
   // CHECK: return [[RET]]
 }
@@ -161,7 +161,8 @@ func address_only_assignment_from_temp(_ dest: inout Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable):
   dest = some_address_only_function_1()
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: copy_addr [take] [[TEMP]] to %0 :
+  // CHECK: %[[ACCESS:.*]] = begin_access [modify] [unknown] %0 :
+  // CHECK: copy_addr [take] [[TEMP]] to %[[ACCESS]] :
   // CHECK-NOT: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
 }
@@ -174,8 +175,11 @@ func address_only_assignment_from_lv(_ dest: inout Unloadable, v: Unloadable) {
   // CHECK: [[PBOX:%[0-9]+]] = project_box [[VBOX]]
   // CHECK: copy_addr [[VARG]] to [initialization] [[PBOX]] : $*Unloadable
   dest = v
-  // FIXME: emit into?
-  // CHECK: copy_addr [[PBOX]] to %0 :
+  // CHECK: [[READBOX:%.*]] = begin_access [read] [unknown] [[PBOX]] :
+  // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
+  // CHECK: copy_addr [[READBOX]] to [initialization] [[TEMP]] :
+  // CHECK: [[RET:%.*]] = begin_access [modify] [unknown] %0 :
+  // CHECK: copy_addr [take] [[TEMP]] to [[RET]] :
   // CHECK: destroy_value [[VBOX]]
 }
 
@@ -216,7 +220,8 @@ func address_only_var() -> Unloadable {
   // CHECK: [[XPB:%.*]] = project_box [[XBOX]]
   // CHECK: apply {{%.*}}([[XPB]])
   return x
-  // CHECK: copy_addr [[XPB]] to [initialization] [[RET]]
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XPB]] :
+  // CHECK: copy_addr [[ACCESS]] to [initialization] %0
   // CHECK: destroy_value [[XBOX]]
   // CHECK: return
 }

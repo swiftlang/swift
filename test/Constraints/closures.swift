@@ -160,7 +160,7 @@ func r22162441(_ lines: [String]) {
 func testMap() {
   let a = 42
   [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
@@ -325,8 +325,7 @@ func someGeneric19997471<T>(_ x: T) {
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: (UInt, UInt), (Int, Int)}}
+  _ = x.filter { ($0 + y)  > 42 }  // expected-warning {{deprecated}}
 }
 
 
@@ -367,7 +366,8 @@ func rdar20868864(_ s: String) {
 func r22058555() {
   var firstChar: UInt8 = 0
   "abc".withCString { chars in
-    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
+    // FIXME https://bugs.swift.org/browse/SR-4836: was {{cannot assign value of type 'Int8' to type 'UInt8'}}
+    firstChar = chars[0]  // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
   }
 }
 
@@ -513,8 +513,19 @@ func returnsArray() -> [Int] { return [] }
 
 returnsArray().flatMap { $0 }.flatMap { }
 // expected-warning@-1 {{expression of type 'Int' is unused}}
-// expected-warning@-2 {{Please use map instead.}}
-// expected-warning@-3 {{result of call to 'flatMap' is unused}}
+// expected-warning@-2 {{result of call to 'flatMap' is unused}}
 
 // rdar://problem/30271695
 _ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }
+
+// rdar://problem/32432145 - compiler should emit fixit to remove "_ in" in closures if 0 parameters is expected
+
+func r32432145(_ a: () -> ()) {}
+r32432145 { _ in let _ = 42 } // Ok in Swift 3
+r32432145 { _ in // Ok in Swift 3
+  print("answer is 42")
+}
+r32432145 { _,_ in
+  // expected-error@-1 {{contextual closure type '() -> ()' expects 0 arguments, but 2 were used in closure body}} {{13-19=}}
+  print("answer is 42")
+}

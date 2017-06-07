@@ -164,9 +164,9 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
 // RUN: %target-swift-ide-test -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
 // RUN: %target-swift-ide-test -range -pos=114:1 -end-pos=115:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
 // RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=119:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
-// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:20 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
-// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
 // RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
@@ -180,7 +180,7 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
 // CHECK-NO-PATTERN-NEXT: <Context>swift_ide_test.(file).test_no_pattern_binding(_:)</Context>
 // CHECK-NO-PATTERN-NEXT: <Declared>key</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK-NO-PATTERN-NEXT: <Referenced>parameters</Referenced><Type>[String : Any]</Type>
-// CHECK-NO-PATTERN-NEXT: <Referenced>components</Referenced><Type>@lvalue [(String, String)]</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>components</Referenced><Type>[(String, String)]</Type>
 // CHECK-NO-PATTERN-NEXT: <Referenced>$0</Referenced><Type>String</Type>
 // CHECK-NO-PATTERN-NEXT: <Referenced>$1</Referenced><Type>String</Type>
 // CHECK-NO-PATTERN-NEXT: <ASTNodes>2</ASTNodes>
@@ -413,7 +413,7 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
 // CHECK17-NEXT: <Content>print(b + c)</Content>
 // CHECK17-NEXT: <Type>()</Type>
 // CHECK17-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
-// CHECK17-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
+// CHECK17-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK17-NEXT: <end>

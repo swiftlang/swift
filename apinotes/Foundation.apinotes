@@ -5,12 +5,22 @@ Classes:
   SwiftBridge: AffineTransform
 - Name: NSArray
   SwiftBridge: Swift.Array
+  SwiftImportAsNonGeneric: true
   Methods:
   - Selector: 'pathsMatchingExtensions:'
     SwiftName: pathsMatchingExtensions(_:)
     MethodKind: Instance
   - Selector: 'filteredArrayUsingPredicate:'
     SwiftName: filtered(using:)
+    MethodKind: Instance
+- Name: NSMutableArray
+  SwiftImportAsNonGeneric: true
+  Methods:
+  - Selector: 'removeObjectIdenticalTo:inRange:'
+    SwiftName: removeObject(identicalTo:in:)
+    MethodKind: Instance
+  - Selector: 'removeObjectIdenticalTo:'
+    SwiftName: removeObject(identicalTo:)
     MethodKind: Instance
 - Name: NSCachedURLResponse
   SwiftName: CachedURLResponse
@@ -51,6 +61,8 @@ Classes:
   - Selector: 'hasMemberInPlane:'
     SwiftName: hasMemberInPlane(_:)
     MethodKind: Instance
+- Name: NSCountedSet
+  SwiftImportAsNonGeneric: true
 - Name: NSData
   SwiftBridge: Data
   Methods:
@@ -85,6 +97,8 @@ Classes:
   SwiftBridge: DateComponents
 - Name: NSDateInterval
   SwiftBridge: DateInterval
+- Name: NSEnumerator
+  SwiftImportAsNonGeneric: true
 - Name: NSError
   SwiftBridge: Swift.Error
   Methods:
@@ -93,12 +107,18 @@ Classes:
     MethodKind: Class
 - Name: NSDictionary
   SwiftBridge: Swift.Dictionary
+  SwiftImportAsNonGeneric: true
+- Name: NSMutableDictionary
+  SwiftImportAsNonGeneric: true
 - Name: NSSet
   SwiftBridge: Swift.Set
+  SwiftImportAsNonGeneric: true
   Methods:
   - Selector: 'filteredSetUsingPredicate:'
     SwiftName: filtered(using:)
     MethodKind: Instance
+- Name: NSMutableSet
+  SwiftImportAsNonGeneric: true
 - Name: NSString
   SwiftBridge: Swift.String
   Methods:
@@ -313,14 +333,7 @@ Classes:
     MethodKind: Instance
 - Name: NSMeasurement
   SwiftBridge: Measurement
-- Name: NSMutableArray
-  Methods:
-  - Selector: 'removeObjectIdenticalTo:inRange:'
-    SwiftName: removeObject(identicalTo:in:)
-    MethodKind: Instance
-  - Selector: 'removeObjectIdenticalTo:'
-    SwiftName: removeObject(identicalTo:)
-    MethodKind: Instance
+  SwiftImportAsNonGeneric: true
 - Name: NSMutableData
   Methods:
   - Selector: 'appendBytes:length:'
@@ -445,6 +458,7 @@ Classes:
   - Name: unsignedIntegerValue
     SwiftName: uintValue
 - Name: NSOrderedSet
+  SwiftImportAsNonGeneric: true
   Methods:
   - Selector: 'enumerateObjectsWithOptions:usingBlock:'
     SwiftName: enumerateObjects(options:using:)
@@ -470,6 +484,8 @@ Classes:
   - Selector: 'indexOfObjectWithOptions:passingTest:'
     SwiftName: index(_:ofObjectPassingTest:)
     MethodKind: Instance
+- Name: NSMutableOrderedSet
+  SwiftImportAsNonGeneric: true
 - Name: NSTask
   SwiftName: Process
   Methods:
@@ -932,6 +948,7 @@ Classes:
   SwiftName: ValueTransformer
 - Name: NSDirectoryEnumerator
   SwiftName: FileManager.DirectoryEnumerator
+  SwiftImportAsNonGeneric: true
 - Name: NSDimension
   SwiftName: Dimension
 - Name: NSUnit

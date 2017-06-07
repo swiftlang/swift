@@ -58,10 +58,10 @@ private:
   /// The linkage of the global variable.
   unsigned Linkage : NumSILLinkageBits;
 
-  /// The global variable's fragile attribute.
-  /// Fragile means that the variable can be "inlined" into another module.
+  /// The global variable's serialized attribute.
+  /// Serialized means that the variable can be "inlined" into another module.
   /// Currently this flag is set for all global variables in the stdlib.
-  unsigned Fragile : 1;
+  unsigned Serialized : 1;
   
   /// Whether this is a 'let' property, which can only be initialized
   /// once (either in its declaration, or once later), making it immutable.
@@ -76,13 +76,14 @@ private:
   /// The static initializer.
   SILFunction *InitializerF;
 
-  SILGlobalVariable(SILModule &M, SILLinkage linkage, bool IsFragile,
+  SILGlobalVariable(SILModule &M, SILLinkage linkage,
+                    IsSerialized_t IsSerialized,
                     StringRef mangledName, SILType loweredType,
                     Optional<SILLocation> loc, VarDecl *decl);
   
 public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
-                                   bool IsFragile,
+                                   IsSerialized_t IsSerialized,
                                    StringRef MangledName, SILType LoweredType,
                                    Optional<SILLocation> Loc = None,
                                    VarDecl *Decl = nullptr);
@@ -107,9 +108,9 @@ public:
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
-  /// Get this global variable's fragile attribute.
-  bool isFragile() const { return Fragile != 0; }
-  void setFragile(bool isFrag) { Fragile = isFrag ? 1 : 0; }
+  /// Get this global variable's serialized attribute.
+  IsSerialized_t isSerialized() const;
+  void setSerialized(IsSerialized_t isSerialized);
   
   /// Is this an immutable 'let' property?
   bool isLet() const { return IsLet; }

@@ -18,6 +18,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringExtras.h"
+
+#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
+#error "Included ownership header?!"
+#endif
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -252,11 +257,12 @@ ValueDecl *DIMemoryObjectInfo::
 getPathStringToElement(unsigned Element, std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
+  // TODO: Handle special names
   if (isAnyInitSelf())
     Result = "self";
   else if (ValueDecl *VD =
         dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getName().str();
+    Result = VD->getBaseName().getIdentifier().str();
   else
     Result = "<unknown>";
 
@@ -594,6 +600,19 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   }
 }
 
+/// Return the underlying accessed pointer value. This peeks through
+/// begin_access patterns such as:
+///
+/// %mark = mark_uninitialized [rootself] %alloc : $*T
+/// %access = begin_access [modify] [unknown] %mark : $*T
+/// apply %f(%access) : $(@inout T) -> ()
+static SILValue getAccessedPointer(SILValue Pointer) {
+  if (auto *Access = dyn_cast<BeginAccessInst>(Pointer))
+    return Access->getSource();
+
+  return Pointer;
+}
+
 /// Returns true when the instruction represents added instrumentation for
 /// run-time sanitizers.
 static bool isSanitizerInstrumentation(SILInstruction *Instruction,
@@ -632,6 +651,17 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Instructions that compute a subelement are handled by a helper.
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
       collectTupleElementUses(TEAI, BaseEltNo);
+      continue;
+    }
+
+    // Look through begin_access.
+    if (isa<BeginAccessInst>(User)) {
+      collectUses(User, BaseEltNo);
+      continue;
+    }
+
+    // Ignore end_access.
+    if (isa<EndAccessInst>(User)) {
       continue;
     }
     
@@ -766,6 +796,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
       // If this is an in-parameter, it is like a load.
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
@@ -778,8 +809,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
         auto Kind = DIUseKind::InOutUse;
-        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf()) &&
-            Pointer == TheMemory.getAddress())
+        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf())
+            && getAccessedPointer(Pointer) == TheMemory.getAddress())
           Kind = DIUseKind::Escape;
  
         addElementUses(BaseEltNo, PointeeType, User, Kind);
@@ -1117,7 +1148,7 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
     if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
       if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
         if (DRE->getDecl()->isImplicit() &&
-            DRE->getDecl()->getName().str() == "self")
+            DRE->getDecl()->getBaseName() == "self")
           return User;
   }
 

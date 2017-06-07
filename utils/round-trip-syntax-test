@@ -33,10 +33,8 @@ class RoundTripTask(object):
 
     @property
     def test_command(self):
-        return [
-                self.swift_syntax_test, self.action,
-                '-input-source-filename', self.input_filename
-                ]
+        return [self.swift_syntax_test, self.action,
+                '-input-source-filename', self.input_filename]
 
     @property
     def diff_command(self):

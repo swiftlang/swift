@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/Version.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -124,7 +125,7 @@ public:
   AnnotatingPrinter(SourceTextInfo &Info, llvm::raw_ostream &OS)
     : StreamPrinter(OS), Info(Info) { }
 
-  ~AnnotatingPrinter() {
+  ~AnnotatingPrinter() override {
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
   }
 
@@ -223,10 +224,11 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
-static bool makeParserAST(CompilerInstance &CI, StringRef Text) {
-  CompilerInvocation Invocation;
+static bool makeParserAST(CompilerInstance &CI, StringRef Text,
+                          CompilerInvocation Invocation) {
+  Invocation.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::IFK_Swift);
 
@@ -358,6 +360,7 @@ SwiftInterfaceGenContextRef
 SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
                                                StringRef SourceFileName,
                                                ASTUnitRef AstUnit,
+                                               CompilerInvocation Invocation,
                                                std::string &ErrMsg) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
   IFaceGenCtx->Impl.DocumentName = DocumentName;
@@ -371,7 +374,8 @@ SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
   AnnotatingPrinter Printer(IFaceGenCtx->Impl.Info, OS);
   printSwiftSourceInterface(AstUnit->getPrimarySourceFile(), Printer, Options);
   IFaceGenCtx->Impl.Info.Text = OS.str();
-  if (makeParserAST(IFaceGenCtx->Impl.TextCI, IFaceGenCtx->Impl.Info.Text)) {
+  if (makeParserAST(IFaceGenCtx->Impl.TextCI, IFaceGenCtx->Impl.Info.Text,
+                    Invocation)) {
     ErrMsg = "Error during syntactic parsing";
     return nullptr;
   }
@@ -434,7 +438,8 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
       return nullptr;
   }
 
-  if (makeParserAST(IFaceGenCtx->Impl.TextCI, IFaceGenCtx->Impl.Info.Text)) {
+  if (makeParserAST(IFaceGenCtx->Impl.TextCI, IFaceGenCtx->Impl.Info.Text,
+                    Invocation)) {
     ErrMsg = "Error during syntactic parsing";
     return nullptr;
   }
@@ -482,7 +487,8 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
                               IFaceGenCtx->Impl.DocumentName, ErrorMsg))
     return nullptr;
   IFaceGenCtx->Impl.Info.Text = OS.str();
-  if (makeParserAST(IFaceGenCtx->Impl.TextCI, IFaceGenCtx->Impl.Info.Text)) {
+  if (makeParserAST(IFaceGenCtx->Impl.TextCI, IFaceGenCtx->Impl.Info.Text,
+                    Invocation)) {
     ErrorMsg = "Error during syntactic parsing";
     return nullptr;
   }
@@ -738,22 +744,26 @@ class PrimaryFileInterfaceConsumer : public SwiftASTConsumer {
   std::string SourceFileName;
   SwiftInterfaceGenMap &Contexts;
   std::shared_ptr<EditorConsumer> Consumer;
+  SwiftInvocationRef ASTInvok;
 
 public:
   PrimaryFileInterfaceConsumer(StringRef Name, StringRef SourceFileName,
                                SwiftInterfaceGenMap &Contexts,
-                               std::shared_ptr<EditorConsumer> Consumer) :
+                               std::shared_ptr<EditorConsumer> Consumer,
+                               SwiftInvocationRef ASTInvok) :
     Name(Name), SourceFileName(SourceFileName), Contexts(Contexts),
-      Consumer(Consumer) {}
+      Consumer(Consumer), ASTInvok(ASTInvok) {}
 
   void failed(StringRef Error) override {
     Consumer->handleRequestError(Error.data());
   }
 
   void handlePrimaryAST(ASTUnitRef AstUnit) override {
+    CompilerInvocation CompInvok;
+    ASTInvok->applyTo(CompInvok);
     std::string Error;
     auto IFaceGenRef = SwiftInterfaceGenContext::createForSwiftSource(Name,
-      SourceFileName, AstUnit, Error);
+      SourceFileName, AstUnit, CompInvok, Error);
     if (!Error.empty())
       Consumer->handleRequestError(Error.data());
     Contexts.set(Name, IFaceGenRef);
@@ -782,7 +792,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
                      std::make_pair("SourceName", SourceName)});
   }
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
-    SourceName, IFaceGenContexts, Consumer);
+    SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
   getASTManager().processASTAsync(Invocation, AstConsumer, &OncePerASTToken);
 }
@@ -791,7 +801,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  StringRef Name,
                                                  StringRef HeaderName,
                                                  ArrayRef<const char *> Args,
-                                                 bool SynthesizedExtensions) {
+                                                 bool SynthesizedExtensions,
+                                              Optional<unsigned> swiftVersion) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -822,6 +833,10 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   }
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
+  if (swiftVersion.hasValue()) {
+    auto swiftVer = version::Version({swiftVersion.getValue()});
+    Invocation.getLangOptions().EffectiveLanguageVersion = swiftVer;
+  }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,
                                                       HeaderName,

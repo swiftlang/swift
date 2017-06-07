@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -module-name Lib %S/Inputs/inherited-conformance-lib.swift
 // RUN: %target-swift-frontend -emit-module -o %t -module-name Base -I %t %S/Inputs/inherited-conformance-base.swift
 // RUN: %target-swift-frontend -emit-module -o %t -module-name User -I %t %S/Inputs/inherited-conformance-user.swift

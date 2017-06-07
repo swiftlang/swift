@@ -2184,7 +2184,7 @@ bb0(%0 : $Builtin.Word):
 struct GenContainer<T> {
 }
 
-sil public_external [fragile] @materializeForSetClosure : $@convention(thin) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<T>, @thick GenContainer<T>.Type) -> () {
+sil public_external [serialized] @materializeForSetClosure : $@convention(thin) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<T>, @thick GenContainer<T>.Type) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContainer<T>, %3 : $@thick GenContainer<T>.Type):
   unreachable
 }
@@ -3097,8 +3097,7 @@ bb0(%0 : $VV):
   %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
   %14 = function_ref @plus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %15 = apply %14<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13, %12) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  destroy_addr %12 : $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
-  deinit_existential_addr %10 : $*PM
+  destroy_addr %10 : $*PM
   dealloc_stack %10 : $*PM
   %20 = function_ref @minus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> ()
   %21 = apply %20<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> ()
@@ -3133,3 +3132,185 @@ bb0:
   %3 = tuple ()
   return %3 : $()
 }
+
+// Int1_const == x -> x == Int1_const
+// CHECK-LABEL: sil @canonicalize_bool_eq_checks
+sil @canonicalize_bool_eq_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "cmp_eq_Int1"(%1 : $Builtin.Int1, %0 : $Builtin.Int1) : $Builtin.Int1
+  return %2 : $Builtin.Int1
+}
+
+// Int1_const != x -> x != Int1_const
+// CHECK-LABEL: sil @canonicalize_bool_ne_checks
+sil @canonicalize_bool_ne_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "cmp_ne_Int1"(%1 : $Builtin.Int1, %0 : $Builtin.Int1) : $Builtin.Int1
+  return %2 : $Builtin.Int1
+}
+
+// cond_br(xor(x, 1)), t_label, f_label -> cond_br x, f_label, t_label
+// CHECK-LABEL: sil @negate_branch_condition_xor1
+// CHECK: bb0
+// CHECK-NEXT: cond_br %0, bb2, bb1
+sil @negate_branch_condition_xor1 : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %5 = integer_literal $Builtin.Int1, -1
+  %9 = builtin "xor_Int1"(%0 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %9, bb1, bb2                              // id: %10
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+
+// cond_br(xor(1, x)), t_label, f_label -> cond_br x, f_label, t_label
+// CHECK-LABEL: sil @negate_branch_condition_xor2
+// CHECK: bb0
+// CHECK-NEXT: cond_br %0, bb2, bb1
+sil @negate_branch_condition_xor2 : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %5 = integer_literal $Builtin.Int1, -1
+  %9 = builtin "xor_Int1"(%5 : $Builtin.Int1, %0 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %9, bb1, bb2                              // id: %10
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+
+// cond_br(x == 0), t_label, f_label -> cond_br x, f_label, t_label
+// CHECK-LABEL: sil @negate_branch_condition_eq_false
+// CHECK: bb0
+// CHECK-NEXT: cond_br %0, bb2, bb1
+sil @negate_branch_condition_eq_false : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %5 = integer_literal $Builtin.Int1, 0
+  %9 = builtin "cmp_eq_Int1"(%0 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %9, bb1, bb2                              // id: %10
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+
+// cond_br(x != -1), t_label, f_label -> cond_br x, f_label, t_label
+// CHECK-LABEL: sil @negate_branch_condition_ne_true
+// CHECK: bb0
+// CHECK-NEXT: cond_br %0, bb2, bb1
+sil @negate_branch_condition_ne_true : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %5 = integer_literal $Builtin.Int1, -1
+  %9 = builtin "cmp_ne_Int1"(%0 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %9, bb1, bb2                              // id: %10
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+
+// CHECK-LABEL: sil @switch_value_to_cond_br_1
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+sil @switch_value_to_cond_br_1 : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %t1 = integer_literal $Builtin.Int1, -1
+  switch_value %0 : $Builtin.Int1, case %t1: bb1, default bb2
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+
+// CHECK-LABEL: sil @switch_value_to_cond_br_2
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   cond_br %0, bb2, bb1
+sil @switch_value_to_cond_br_2 : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %f1 = integer_literal $Builtin.Int1, 0
+  switch_value %0 : $Builtin.Int1, case %f1: bb1, default bb2
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+
+// CHECK-LABEL: sil @switch_value_to_cond_br_3
+// CHECK:      bb0({{.*}}):
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+sil @switch_value_to_cond_br_3 : $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  %t1 = integer_literal $Builtin.Int1, -1
+  %f1 = integer_literal $Builtin.Int1, 0
+  switch_value %0 : $Builtin.Int1, case %t1: bb1, case %f1: bb2
+
+bb1:                                                // Preds: bb0
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)          // user: %12
+  br bb3(%2 : $Int32)                               // id: %12
+
+bb2:                                                // Preds: bb0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)          // user: %12
+  br bb3(%4 : $Int32)                               // id: %15
+
+bb3(%16 : $Int32):                                  // Preds: bb1 bb2
+  return %16 : $Int32                               // id: %17
+}
+

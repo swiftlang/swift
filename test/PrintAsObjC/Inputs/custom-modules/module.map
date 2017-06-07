@@ -32,3 +32,13 @@ module OverrideBase [system] {
 module OtherModule {
   // Deliberately empty. Used by depends-on-swift-framework.swift.
 }
+
+module CompatibilityAlias {
+  header "CompatibilityAlias.h"
+  export *
+}
+
+module NestedClass {
+  header "NestedClass.h"
+  export *
+}

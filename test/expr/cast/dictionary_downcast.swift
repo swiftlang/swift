@@ -34,12 +34,12 @@ if let _ = dictCC as? Dictionary<D, C> { }
 if let _ = dictCC as? Dictionary<D, D> { }
 
 // Test dictionary downcasts to unrelated types.
-dictCC as Dictionary<D, U> // expected-error{{cannot convert value of type 'Dictionary<C, C>' to type 'Dictionary<D, U>' in coercion}}
-dictCC as Dictionary<U, D> // expected-error{{cannot convert value of type 'Dictionary<C, C>' to type 'Dictionary<U, D>' in coercion}}
-dictCC as Dictionary<U, U> // expected-error{{cannot convert value of type 'Dictionary<C, C>' to type 'Dictionary<U, U>' in coercion}}
+dictCC as Dictionary<D, U> // expected-error{{cannot convert value of type '[C : C]' to type 'Dictionary<D, U>' in coercion}}
+dictCC as Dictionary<U, D> // expected-error{{cannot convert value of type '[C : C]' to type 'Dictionary<U, D>' in coercion}}
+dictCC as Dictionary<U, U> // expected-error{{cannot convert value of type '[C : C]' to type 'Dictionary<U, U>' in coercion}}
 
 // Test dictionary conditional downcasts to unrelated types
-if let _ = dictCC as? Dictionary<D, U> { } // expected-warning{{cast from 'Dictionary<C, C>' to unrelated type 'Dictionary<D, U>' always fails}}
-if let _ = dictCC as? Dictionary<U, D> { } // expected-warning{{cast from 'Dictionary<C, C>' to unrelated type 'Dictionary<U, D>' always fails}}
-if let _ = dictCC as? Dictionary<U, U> { } // expected-warning{{cast from 'Dictionary<C, C>' to unrelated type 'Dictionary<U, U>' always fails}}
+if let _ = dictCC as? Dictionary<D, U> { } // expected-warning{{cast from '[C : C]' to unrelated type 'Dictionary<D, U>' always fails}}
+if let _ = dictCC as? Dictionary<U, D> { } // expected-warning{{cast from '[C : C]' to unrelated type 'Dictionary<U, D>' always fails}}
+if let _ = dictCC as? Dictionary<U, U> { } // expected-warning{{cast from '[C : C]' to unrelated type 'Dictionary<U, U>' always fails}}
 

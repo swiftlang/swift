@@ -59,9 +59,7 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
 
   // Don't hoist generics with opened archetypes. We would have to hoist the
   // open archetype instruction which might not be possible.
-  if (!Inst->getTypeDependentOperands().empty())
-    return false;
-  return true;
+  return Inst->getTypeDependentOperands().empty();
 }
 
 /// A partition of alloc_stack instructions.
@@ -426,10 +424,9 @@ class AllocStackHoisting : public SILFunctionTransform {
       PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
     }
   }
-  StringRef getName() override { return "alloc_stack Hoisting"; }
 };
 } // end anonymous namespace
 
-SILFunctionTransform *irgen::createAllocStackHoisting() {
+SILTransform *irgen::createAllocStackHoisting() {
   return new AllocStackHoisting();
 }

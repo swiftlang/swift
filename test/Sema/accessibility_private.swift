@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 class Container {
   private func foo() {} // expected-note * {{declared here}}
@@ -15,8 +15,8 @@ class Container {
     _ = self.bar
     self.bar = 5
 
-    privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
-    self.privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
+    privateExtensionMethod()
+    self.privateExtensionMethod()
 
     _ = PrivateInner()
     _ = Container.PrivateInner()
@@ -27,14 +27,14 @@ class Container {
       obj.foo()
       _ = obj.bar
       obj.bar = 5
-      obj.privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
+      obj.privateExtensionMethod()
 
       _ = PrivateInner()
       _ = Container.PrivateInner()
     }
 
     var inner: PrivateInner? // expected-error {{property must be declared private because its type uses a private type}}
-    var innerQualified: Container.PrivateInner? // expected-error {{property must be declared private because its type uses a private type}}
+    var innerQualified: Container.PrivateInner? // expected-error {{property must be declared private because its type uses a private type}} expected-note {{declared here}}
   }
 
   var inner: PrivateInner? // expected-error {{property must be declared private because its type uses a private type}}
@@ -54,42 +54,42 @@ extension Container {
   private func privateExtensionMethod() {} // expected-note * {{declared here}}
 
   func extensionTest() {
-    foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
-    self.foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
+    foo()
+    self.foo()
 
-    _ = bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
-    bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
-    _ = self.bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
-    self.bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
+    _ = bar
+    bar = 5
+    _ = self.bar
+    self.bar = 5
 
     privateExtensionMethod()
     self.privateExtensionMethod()
 
-    _ = PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
-    _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
+    _ = PrivateInner()
+    _ = Container.PrivateInner()
   }
 
   // FIXME: Why do these errors happen twice?
-  var extensionInner: PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
-  var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
+  var extensionInner: PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
+  var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error {{property must be declared private because its type uses a private type}}
 }
 
 extension Container.Inner {
   func extensionTest(obj: Container) {
-    obj.foo() // expected-error {{'foo' is inaccessible due to 'private' protection level}}
-    _ = obj.bar // expected-error {{'bar' is inaccessible due to 'private' protection level}}
-    obj.bar = 5 // expected-error {{'bar' is inaccessible due to 'private' protection level}}
-    obj.privateExtensionMethod() // expected-error {{'privateExtensionMethod' is inaccessible due to 'private' protection level}}
+    obj.foo()
+    _ = obj.bar
+    obj.bar = 5
+    obj.privateExtensionMethod()
 
     // FIXME: Unqualified lookup won't look into Container from here.
     _ = PrivateInner() // expected-error {{use of unresolved identifier 'PrivateInner'}}
-    _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
+    _ = Container.PrivateInner()
   }
 
   // FIXME: Why do these errors happen twice?
   // FIXME: Unqualified lookup won't look into Container from here.
   var inner: PrivateInner? { return nil } // expected-error 2 {{use of undeclared type 'PrivateInner'}}
-  var innerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
+  var innerQualified: Container.PrivateInner? { return nil } // expected-error {{invalid redeclaration of 'innerQualified'}} expected-error {{property must be declared private because its type uses a private type}}
 }
 
 class Sub : Container {
@@ -149,17 +149,17 @@ private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
 }
 
 extension Container {
-  private typealias ExtensionConflictingType = Int // expected-note * {{declared here}}
+  private typealias ExtensionConflictingType = Int // expected-note {{found candidate with type}} expected-note {{previously declared here}}
 }
 extension Container {
-  private typealias ExtensionConflictingType = Double // expected-note * {{declared here}}
+  private typealias ExtensionConflictingType = Double  // expected-error {{invalid redeclaration of 'ExtensionConflictingType'}} expected-note {{found candidate with type}}
 }
 extension Container {
   func test() {
-    let a: ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
-    let b: Container.ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
-    _ = ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
-    _ = Container.ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
+    let a: ExtensionConflictingType? = nil
+    let b: Container.ExtensionConflictingType? = nil // expected-error {{ambiguous type name 'ExtensionConflictingType' in 'Container'}}
+    _ = ExtensionConflictingType()
+    _ = Container.ExtensionConflictingType()
   }
 }
 

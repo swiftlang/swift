@@ -23,7 +23,7 @@ Types = [
     ('Bool', '.bool', 'self'),
     ('String', '.text', 'self'),
     ('Character', '.text', 'String(self)'),
-    ('UnicodeScalar', '.uInt', 'UInt64(self)'),
+    ('Unicode.Scalar', '.uInt', 'UInt64(self)'),
 ]
 
 for self_ty in all_integer_types(word_bits):
