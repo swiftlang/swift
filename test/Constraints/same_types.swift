@@ -119,16 +119,22 @@ func fail6<T>(_ t: T) -> Int where T == Int { // expected-error{{same-type requi
 }
 
 func test8<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
-  where T.Bar == Y, U.Bar.Foo == X, T.Bar == U.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
-  // expected-note@-1{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+  where T.Bar == Y, // expected-note{{same-type constraint 'U.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+        U.Bar.Foo == X, T.Bar == U.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
 }
 
 func test8a<T: Barrable, U: Barrable>(_ t: T, u: U) -> (Y, Y, X, X)
   where
-  T.Bar == Y, U.Bar.Foo == X, U.Bar == T.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
-  // expected-note@-1{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+  T.Bar == Y, // expected-note{{same-type constraint 'U.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+  U.Bar.Foo == X, U.Bar == T.Bar { // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
   return (t.bar, u.bar, t.bar.foo, u.bar.foo)
+}
+
+func test8b<T: Barrable, U: Barrable>(_ t: T, u: U)
+  where U.Bar.Foo == X, // expected-warning{{redundant same-type constraint 'U.Bar.Foo' == 'X'}}
+        T.Bar == Y, // expected-note{{same-type constraint 'U.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
+        T.Bar == U.Bar {
 }
 
 // rdar://problem/19137463
