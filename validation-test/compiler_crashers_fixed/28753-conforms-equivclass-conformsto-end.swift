@@ -6,5 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{class a:P{{}typealias a:Self.a}protocol P{typealias a
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol A:A{{}class a{let ca{a{

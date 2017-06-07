@@ -414,6 +414,14 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           continue;
         }
       }
+
+      // Nominal type members of protocols cannot be accessed with an
+      // archetype base, because we have no way to recover the correct
+      // substitutions.
+      if (type->is<ArchetypeType>() &&
+          isa<NominalTypeDecl>(typeDecl)) {
+        continue;
+      }
     }
 
     // Substitute the base into the member's type.
@@ -451,6 +459,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // Use the type witness.
       auto concrete = conformance->getConcrete();
       Type memberType = concrete->getTypeWitness(assocType, this);
+
+      // This is the only case where NormalProtocolConformance::
+      // getTypeWitnessAndDecl() returns a null type.
+      if (concrete->getState() ==
+          ProtocolConformanceState::CheckingTypeWitnesses)
+        continue;
+
       assert(memberType && "Missing type witness?");
 
       // If we haven't seen this type result yet, add it to the result set.
