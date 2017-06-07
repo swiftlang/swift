@@ -134,10 +134,15 @@ namespace {
       }
       
     public:
-      explicit Space(Type T)
+      explicit
+      Space(Type T)
         : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(Identifier()),
           Spaces({}){}
       explicit Space(Type T, Identifier H, bool downgrade, SmallVectorImpl<Space> &SP)
+        : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
+          Spaces(SP.begin(), SP.end()) {}
+      explicit Space(Type T, Identifier H, bool downgrade,
+                     const std::forward_list<Space> &SP)
         : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
           Spaces(SP.begin(), SP.end()) {}
       explicit Space(SmallVectorImpl<Space> &SP)
@@ -1267,6 +1272,14 @@ namespace {
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
+        auto subSpace = projectPattern(TC, OSP->getSubPattern(), sawDowngradablePattern);
+        // To match patterns like (_, _, ...)?, we must rewrite the underlying
+        // tuple pattern to .some(_, _, ...) first.
+        if (subSpace.getKind() == SpaceKind::Constructor
+            && subSpace.getHead().empty()) {
+          return Space(item->getType(), TC.Context.getIdentifier("some"),
+                       /*canDowngrade*/false, subSpace.getSpaces());
+        }
         SmallVector<Space, 1> payload = {
           projectPattern(TC, OSP->getSubPattern(), sawDowngradablePattern)
         };
