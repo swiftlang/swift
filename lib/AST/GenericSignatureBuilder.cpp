@@ -3349,6 +3349,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Merge the equivalence classes.
   auto equivClass = T1->getOrCreateEquivalenceClass();
+  auto equivClass1Members = equivClass->members;
   auto equivClass2Members = T2->getEquivalenceClassMembers();
   for (auto equiv : equivClass2Members)
     equivClass->members.push_back(equiv);
@@ -3370,8 +3371,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Same-type-to-concrete requirements.
-  if (equivClass2 && equivClass2->concreteType) {
-    if (equivClass->concreteType) {
+  bool t1IsConcrete = !equivClass->concreteType.isNull();
+  bool t2IsConcrete = equivClass2 && !equivClass2->concreteType.isNull();
+  if (t2IsConcrete) {
+    if (t1IsConcrete) {
       (void)addSameTypeRequirement(equivClass->concreteType,
                                    equivClass2->concreteType, Source,
                                    UnresolvedHandlingKind::GenerateConstraints,
@@ -3422,6 +3425,14 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   auto dependentT1 = T1->getDependentType({ }, /*allowUnresolved=*/true);
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
+      // If T1 is concrete but T2 is not, concretize the nested types of T2.
+      if (t1IsConcrete && !t2IsConcrete) {
+        concretizeNestedTypeFromConcreteParent(T1, T2Nested.second.front(),
+                                               *this);
+        continue;
+      }
+
+      // Otherwise, make the nested types equivalent.
       Type nestedT1 = DependentMemberType::get(dependentT1, T2Nested.first);
       if (isErrorResult(
             addSameTypeRequirement(
@@ -3430,6 +3441,16 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
                                                       Source, T2Nested.first),
                UnresolvedHandlingKind::GenerateConstraints)))
         return ConstraintResult::Conflicting;
+    }
+  }
+
+  // If T2 is concrete but T1 was not, concretize the nested types of T1.
+  if (t2IsConcrete && !t1IsConcrete) {
+    for (auto equivT1 : equivClass1Members) {
+      for (auto T1Nested : equivT1->NestedTypes) {
+        concretizeNestedTypeFromConcreteParent(T2, T1Nested.second.front(),
+                                               *this);
+      }
     }
   }
 
