@@ -425,11 +425,8 @@ private:
 public:
   static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
-  void addNodeToList(SILBasicBlock *BB) {}
-
   void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
                              block_iterator First, block_iterator Last);
-
 private:
   static void createNode(const SILBasicBlock &);
 };
