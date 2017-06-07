@@ -2080,7 +2080,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
                 // conversion.
                 if (type1PointerKind != pointerKind)
-                  increaseScore(ScoreKind::SK_ScalarPointerConversion);
+                  increaseScore(ScoreKind::SK_ValueToPointerConversion);
                 conversionsOrFixes.push_back(
                   ConversionRestrictionKind::PointerToPointer);
               }
@@ -2088,7 +2088,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               else if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
                        pointerKind == PTK_UnsafeRawPointer) {
                 if (type1PointerKind != pointerKind)
-                  increaseScore(ScoreKind::SK_ScalarPointerConversion);
+                  increaseScore(ScoreKind::SK_ValueToPointerConversion);
                 conversionsOrFixes.push_back(
                   ConversionRestrictionKind::PointerToPointer);              
               }
@@ -4379,6 +4379,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false, false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
+    increaseScore(ScoreKind::SK_ValueToPointerConversion);
     return matchTypes(baseType1, baseType2,
                       ConstraintKind::BindToPointerType,
                       subflags, locator);
@@ -4398,7 +4399,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
       if (flags.contains(TMF_GenerateConstraints)) {
-        increaseScore(SK_StringToPointerConversion);
+        increaseScore(ScoreKind::SK_ValueToPointerConversion);
 
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                        baseType2, TC.getInt8Type(DC),
@@ -4422,7 +4423,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
     }
 
-    increaseScore(SK_StringToPointerConversion);
+    increaseScore(ScoreKind::SK_ValueToPointerConversion);
     return SolutionKind::Solved;
   }
       
@@ -4437,6 +4438,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     // Set up the disjunction for the array or scalar cases.
 
+    increaseScore(ScoreKind::SK_ValueToPointerConversion);
     return matchTypes(baseType1, baseType2,
                       ConstraintKind::BindToPointerType,
                       subflags, locator);

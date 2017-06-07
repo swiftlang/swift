@@ -70,22 +70,14 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_ValueToOptional:
       log << "value to optional";
       break;
-
-    case SK_ArrayPointerConversion:
-      log << "array-to-pointer conversion";
-      break;
-    case SK_ScalarPointerConversion:
-      log << "scalar-to-pointer conversion";
-      break;
     case SK_EmptyExistentialConversion:
       log << "empty-existential conversion";
       break;
     case SK_KeyPathSubscript:
       log << "key path subscript";
       break;
-
-    case SK_StringToPointerConversion:
-      log << "string-to-pointer conversion";
+    case SK_ValueToPointerConversion:
+      log << "value-to-pointer conversion";
       break;
     }
     log << ")\n";

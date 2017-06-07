@@ -408,18 +408,14 @@ enum ScoreKind {
   SK_CollectionUpcastConversion,
   /// A value-to-optional conversion.
   SK_ValueToOptional,
-  /// A conversion from an inout to a pointer of matching element type.
-  SK_ScalarPointerConversion,
-  /// A conversion from an array to a pointer of matching element type.
-  SK_ArrayPointerConversion,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
   SK_KeyPathSubscript,
-  // A conversion from a string to a pointer.
-  SK_StringToPointerConversion,
+  /// A conversion from a string, array, or inout to a pointer.
+  SK_ValueToPointerConversion,
 
-  SK_LastScoreKind = SK_StringToPointerConversion,
+  SK_LastScoreKind = SK_ValueToPointerConversion,
 };
 
 /// The number of score kinds.
