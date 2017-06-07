@@ -35,7 +35,7 @@ except ImportError:
     swift_exec = spawn.find_executable('swift')
     if swift_exec is not None:
         site_packages = os.path.join(os.path.dirname(swift_exec),
-            '../lib/python2.7/site-packages/')
+                                     '../lib/python2.7/site-packages/')
         import sys
         sys.path.append(site_packages)
         import lldb
@@ -67,6 +67,7 @@ def create_lldb_target(binary, memmap):
             lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
     return lldb_target
 
+
 def add_lldb_target_modules(lldb_target, memmap):
     for dynlib_path in memmap:
         module = lldb_target.AddModule(
@@ -75,6 +76,7 @@ def add_lldb_target_modules(lldb_target, memmap):
 
 lldb_target = None
 known_memmap = {}
+
 
 def process_stack(binary, dyn_libs, stack):
     global lldb_target
@@ -116,7 +118,7 @@ def process_stack(binary, dyn_libs, stack):
         full_stack.append(
             {"line": line, "framePC": framePC, "dynlib_fname": dynlib_fname})
 
-    if lldb_target == None:
+    if lldb_target is None:
         lldb_target = create_lldb_target(binary, memmap)
     else:
         add_lldb_target_modules(lldb_target, memmap)
@@ -159,7 +161,7 @@ def main():
         "binary", help="Executable which produced the log file")
     parser.add_argument(
         "log", nargs='?', type=argparse.FileType("rU"), default="-",
-        help="Log file containing the stack trace to symbolicate. Defaults to stdin.")
+        help="Log file for symbolication. Defaults to stdin.")
     args = parser.parse_args()
 
     binary = args.binary
