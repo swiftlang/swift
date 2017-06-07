@@ -543,9 +543,15 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
   %9999 = tuple ()
   return %9999 : $()
 }
-
-// CHECK-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject):
+sil @guaranteed_apply_callee_throw : $@convention(thin) (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> @error Error {
+bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), %1 : $Builtin.NativeObject, %2 : $Builtin.Int32, %3 : $Builtin.NativeObject, %4 : $Builtin.NativeObject, %5: $Error):
+  retain_value %3 : $Builtin.NativeObject
+  apply %0(%1, %2, %3, %4) : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  release_value %3 : $Builtin.NativeObject
+  throw %5 : $Error
+}
+// CHECK-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Error):
 // CHECK: [[OLD_CLOSURE_CALLEE1:%.*]] = function_ref @large_closure_callee
 // CHECK: [[OLD_CLOSURE_CALLEE2:%.*]] = function_ref @small_closure_callee
 // CHECK: retain_value [[ARG0]] : $Builtin.NativeObject
@@ -580,8 +586,8 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // CHECK-NEXT: release_value [[DEAD_CLOSURE_1]]
 // CHECK-NOT: release_value [[DEAD_CLOSURE_2]]
 
-// REMOVECLOSURES-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-// REMOVECLOSURES: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject):
+// REMOVECLOSURES-LABEL: sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
+// REMOVECLOSURES: bb0([[ARG0:%.*]] : $Builtin.NativeObject, [[ARG1:%.*]] : $Builtin.Int32, [[ARG2:%.*]] : $Builtin.NativeObject, [[ARG3:%.*]] : $Builtin.NativeObject, [[ARG4:%.*]] : $Error):
 // REMOVECLOSURES: [[OLD_CLOSURE_CALLEE1:%.*]] = function_ref @large_closure_callee
 // REMOVECLOSURES: [[OLD_CLOSURE_CALLEE2:%.*]] = function_ref @small_closure_callee
 // REMOVECLOSURES: retain_value [[ARG0]] : $Builtin.NativeObject
@@ -596,6 +602,7 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // REMOVECLOSURES-NEXT: retain_value [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: retain_value [[ARG3]] : $Builtin.NativeObject
 // REMOVECLOSURES-NOT: partial_apply [[OLD_CLOSURE_CALLEE1]]
+// REMOVECLOSURES: [[SPECFUN4:%.*]] = function_ref @_T029guaranteed_apply_callee_throw014small_closure_C0Tf1cnnnnn_n
 // REMOVECLOSURES: [[SPECFUN2:%.*]] = function_ref @_T023guaranteed_apply_callee014small_closure_C0Tf1cnnnn_n
 // REMOVECLOSURES: [[SPECFUN3:%.*]] = function_ref @_T018owned_apply_callee014small_closure_C0Tf1cnnnn_n
 // REMOVECLOSURES-NOT: thin_to_thick_function [[OLD_CLOSURE_CALLEE2]]
@@ -606,13 +613,14 @@ bb0(%0 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.Nat
 // REMOVECLOSURES-NEXT: strong_release [[ARG0]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: strong_release [[ARG2]] : $Builtin.NativeObject
 // REMOVECLOSURES-NEXT: strong_release [[ARG3]] : $Builtin.NativeObject
-
-sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+// REMOVECLOSURES-NEXT: try_apply [[SPECFUN4]](
+sil @thin_thick_and_partial_apply_test : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject, %11: $Error):
   %4 = function_ref @owned_apply_callee : $@convention(thin) (@owned @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
   %5 = function_ref @guaranteed_apply_callee : $@convention(thin) (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
   %6 = function_ref @large_closure_callee : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
   %7 = function_ref @small_closure_callee : $@convention(thin) (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  %10 = function_ref @guaranteed_apply_callee_throw : $@convention(thin) (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> @error Error
 
   retain_value %0 : $Builtin.NativeObject
   retain_value %2 : $Builtin.NativeObject
@@ -627,6 +635,15 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32, %2 : $Builtin.NativeObject,
   apply %5(%9, %0, %1, %2, %3) : $@convention(thin) (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 
   release_value %8 : $@callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+  try_apply %10(%9, %0, %1, %2, %3, %11) : $@convention(thin) (@guaranteed @callee_owned (Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> (), Builtin.NativeObject, Builtin.Int32, @owned Builtin.NativeObject, @guaranteed Builtin.NativeObject, @owned Error) -> @error Error, normal bb2, error bb3
+
+bb2(%n : $()):
+  br bb4
+
+bb3(%e : $Error):
+  br bb4
+
+bb4:
   %9999 = tuple()
   return %9999 : $()
 }
