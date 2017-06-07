@@ -895,7 +895,6 @@ void SILClosureSpecializerTransform::gatherCallSites(
         //
         // We need this to make sure that we insert a release in the appropriate
         // locations to balance the +1 from the creation of the partial apply.
-        //
         // However, thin_to_thick_function closures don't have a context and
         // don't need to be released.
         llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
