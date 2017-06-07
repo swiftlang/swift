@@ -36,6 +36,12 @@
 // PERSISTENT-YESPCHJOB: {{.*}}swift -frontend {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
 // PERSISTENT-YESPCHJOB: {{.*}}swift -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h -pch-output-dir {{.*}}/pch -pch-disable-validation
 
+// RUN: %swiftc_driver -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -serialize-diagnostics %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB-DIAG1
+// PERSISTENT-YESPCHJOB-DIAG1: {{.*}}swift -frontend {{.*}} -serialize-diagnostics-path {{.*}}bridging-header-{{.*}}.dia {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
+
+// RUN: %swiftc_driver -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch-out-dir -serialize-diagnostics %s -emit-module -emit-module-path /module-path-dir 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB-DIAG2
+// PERSISTENT-YESPCHJOB-DIAG2: {{.*}}swift -frontend {{.*}} -serialize-diagnostics-path {{.*}}/pch-out-dir/bridging-header-{{.*}}.dia {{.*}} -emit-pch -pch-output-dir {{.*}}/pch-out-dir
+
 // RUN: %swiftc_driver -typecheck -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -parseable-output -driver-skip-execution %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-OUTPUT
 // PERSISTENT-OUTPUT-NOT: "outputs": [
 
