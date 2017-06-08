@@ -91,7 +91,8 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
     return false;
 
   // Public declarations are OK.
-  if (D->getEffectiveAccess(/*forLinkage=*/false) >= Accessibility::Public)
+  if (D->getFormalAccessScope(/*useDC=*/nullptr,
+                              /*respectVersionedAttr=*/true).isPublic())
     return false;
 
   // Enum cases are handled as part of their containing enum.

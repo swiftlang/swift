@@ -1359,7 +1359,8 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
-  if (getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public)
+  if (!getFormalAccessScope(/*useDC=*/nullptr,
+                            /*respectVersionedAttr=*/true).isPublic())
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
@@ -1915,18 +1916,18 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being versioned.
-static bool isVersionedInternalDecl(const ValueDecl *VD) {
-  assert(VD->getFormalAccess() == Accessibility::Internal);
+bool ValueDecl::isVersionedInternalDecl() const {
+  assert(getFormalAccess() == Accessibility::Internal);
 
-  if (VD->getAttrs().hasAttribute<VersionedAttr>())
+  if (getAttrs().hasAttribute<VersionedAttr>())
     return true;
 
-  if (auto *FD = dyn_cast<FuncDecl>(VD))
+  if (auto *FD = dyn_cast<FuncDecl>(this))
     if (auto *ASD = FD->getAccessorStorageDecl())
       if (ASD->getAttrs().hasAttribute<VersionedAttr>())
         return true;
 
-  if (auto *EED = dyn_cast<EnumElementDecl>(VD))
+  if (auto *EED = dyn_cast<EnumElementDecl>(this))
     if (EED->getParentEnum()->getAttrs().hasAttribute<VersionedAttr>())
       return true;
 
@@ -1952,22 +1953,18 @@ static Accessibility getTestableAccess(const ValueDecl *decl) {
   return Accessibility::Public;
 }
 
-Accessibility ValueDecl::getEffectiveAccess(bool forLinkage) const {
-  Accessibility effectiveAccess = getFormalAccess();
+Accessibility ValueDecl::getEffectiveAccess() const {
+  auto effectiveAccess = getFormalAccess(/*useDC=*/nullptr,
+                                         /*respectVersionedAttr=*/true);
 
   // Handle @testable.
   switch (effectiveAccess) {
-  case Accessibility::Public:
-    if (forLinkage && getModuleContext()->isTestingEnabled())
-      effectiveAccess = getTestableAccess(this);
-    break;
   case Accessibility::Open:
     break;
+  case Accessibility::Public:
   case Accessibility::Internal:
-    if (forLinkage && getModuleContext()->isTestingEnabled())
+    if (getModuleContext()->isTestingEnabled())
       effectiveAccess = getTestableAccess(this);
-    else if (isVersionedInternalDecl(this))
-      effectiveAccess = Accessibility::Public;
     break;
   case Accessibility::FilePrivate:
     break;
@@ -1978,7 +1975,7 @@ Accessibility ValueDecl::getEffectiveAccess(bool forLinkage) const {
 
   if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(getDeclContext())) {
     effectiveAccess = std::min(effectiveAccess,
-                               enclosingNominal->getEffectiveAccess(forLinkage));
+                               enclosingNominal->getEffectiveAccess());
 
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
@@ -1986,7 +1983,7 @@ Accessibility ValueDecl::getEffectiveAccess(bool forLinkage) const {
     if (auto extendedTy = enclosingExt->getExtendedType()) {
       if (auto nominal = extendedTy->getAnyNominal()) {
         effectiveAccess = std::min(effectiveAccess,
-                                   nominal->getEffectiveAccess(forLinkage));
+                                   nominal->getEffectiveAccess());
       }
     }
 
@@ -2008,23 +2005,28 @@ Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
   return getFormalAccess();
 }
 
-AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
+AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
+                                            bool respectVersionedAttr) const {
   const DeclContext *result = getDeclContext();
-  Accessibility access = getFormalAccess(useDC);
+  Accessibility access = getFormalAccess(useDC, respectVersionedAttr);
 
   while (!result->isModuleScopeContext()) {
     if (result->isLocalContext() || access == Accessibility::Private)
       return AccessScope(result, true);
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
-      access = std::min(access, enclosingNominal->getFormalAccess(useDC));
+      access = std::min(access,
+                        enclosingNominal->getFormalAccess(useDC,
+                                                          respectVersionedAttr));
 
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
       if (auto extendedTy = enclosingExt->getExtendedType()) {
         if (auto nominal = extendedTy->getAnyNominal()) {
-          access = std::min(access, nominal->getFormalAccess(useDC));
+          access = std::min(access,
+                            nominal->getFormalAccess(useDC,
+                                                     respectVersionedAttr));
         }
       }
 
@@ -2117,7 +2119,8 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
-  if (getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public)
+  if (!getFormalAccessScope(/*useDC=*/nullptr,
+                            /*respectVersionedAttr=*/true).isPublic())
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
