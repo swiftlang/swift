@@ -175,6 +175,24 @@ namespace {
     llvm_unreachable("Invalid OptionalTypeKind.");
   }
 
+  static Type mapTypeIntoContext(const DeclContext *fromDC,
+                                 const DeclContext *toDC, Type type) {
+    if (fromDC == toDC)
+      return type;
+
+    // Replace fromDC's archetypes with interface types.
+    type = fromDC->mapTypeOutOfContext(type);
+
+    // Get the substitutions that we need to access a member of
+    // 'fromDC' on 'toDC'.
+    auto subs = toDC->getDeclaredTypeInContext()->getContextSubstitutionMap(
+                                              toDC->getParentModule(), fromDC);
+
+    // Apply them to the interface type to produce the final
+    // substituted type.
+    return type.subst(subs);
+  }
+
   class SwiftTypeConverter :
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
@@ -593,17 +611,13 @@ namespace {
       auto type = genericEnv->mapTypeIntoContext(paramDecl);
 
       // Check if parameter's declaration context is the same as
-      // current declaration context, otherwise we can't use this
+      // current declaration context, otherwise we can't use type
       // type without re-substituting it. This might happen when
       // Objective-C `typedef` is declarated inside of interface
       // and tries to use its generic parameters.
       if (auto *ownerDC = genericEnv->getOwningDeclContext()) {
-        if (DC && DC != ownerDC && !ownerDC->isChildContextOf(DC)) {
-          type = genericEnv->mapTypeOutOfContext(type);
-          auto subs = DC->getDeclaredTypeInContext()->getContextSubstitutionMap(
-              DC->getParentModule(), ownerDC);
-          type = type.subst(subs);
-        }
+        if (DC && DC != ownerDC && !ownerDC->isChildContextOf(DC))
+          type = mapTypeIntoContext(ownerDC, DC, type);
       }
 
       return ImportResult(type, ImportHint::ObjCPointer);
@@ -1909,22 +1923,6 @@ Type ClangImporter::Implementation::importMethodType(
   DeclContext *origDC = importDeclContextOf(clangDecl,
                                             clangDecl->getDeclContext());
   assert(origDC);
-  auto mapTypeIntoContext = [&](Type type) -> Type {
-    if (dc != origDC) {
-      // Replace origDC's archetypes with interface types.
-      type = origDC->mapTypeOutOfContext(type);
-
-      // Get the substitutions that we need to access a member of
-      // 'origDC' on 'dc'.
-      auto subs = dc->getDeclaredTypeInContext()
-          ->getContextSubstitutionMap(dc->getParentModule(), origDC);
-
-      // Apply them to the interface type to produce the final
-      // substituted type.
-      type = type.subst(subs);
-    }
-    return type;
-  };
 
   // Import the result type.
   CanType origSwiftResultTy;
@@ -1985,7 +1983,7 @@ Type ClangImporter::Implementation::importMethodType(
   }
   if (!swiftResultTy)
     return Type();
-  swiftResultTy = mapTypeIntoContext(swiftResultTy);
+  swiftResultTy = mapTypeIntoContext(origDC, dc, swiftResultTy);
 
   CanType errorParamType;
 
@@ -2112,7 +2110,7 @@ Type ClangImporter::Implementation::importMethodType(
 
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
-    swiftParamTy = mapTypeIntoContext(swiftParamTy);
+    swiftParamTy = mapTypeIntoContext(origDC, dc, swiftParamTy);
 
     // Set up the parameter info.
     auto paramInfo
@@ -2224,28 +2222,12 @@ Type ClangImporter::Implementation::importAccessorMethodType(
   DeclContext *origDC = importDeclContextOf(property,
                                             property->getDeclContext());
   assert(origDC);
-  auto mapTypeIntoContext = [&](Type type) -> Type {
-    if (dc != origDC) {
-      // Replace origDC's archetypes with interface types.
-      type = origDC->mapTypeOutOfContext(type);
-
-      // Get the substitutions that we need to access a member of
-      // 'origDC' on 'dc'.
-      auto subs = dc->getDeclaredTypeInContext()
-          ->getContextSubstitutionMap(dc->getParentModule(), origDC);
-
-      // Apply them to the interface type to produce the final
-      // substituted type.
-      type = type.subst(subs);
-    }
-    return type;
-  };
 
   // Import the property type, independent of what kind of accessor this is.
   Type propertyTy = importPropertyType(origDC, property, isFromSystemModule);
   if (!propertyTy)
     return Type();
-  propertyTy = mapTypeIntoContext(propertyTy);
+  propertyTy = mapTypeIntoContext(origDC, dc, propertyTy);
   Type propertyInterfaceTy = dc->mapTypeOutOfContext(propertyTy);
 
   // Now build up the resulting FunctionType and parameters.

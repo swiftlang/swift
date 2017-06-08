@@ -1658,7 +1658,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                            ClangImporter::Implementation &importer) {
   auto &C = importer.SwiftContext;
   auto swiftValueDecl = dyn_cast_or_null<ValueDecl>(
-      importer.importDecl(nullptr, errorDomainDecl, importer.CurrentVersion));
+      importer.importDecl(errorDomainDecl, importer.CurrentVersion));
   auto stringTy = C.getStringDecl()->getDeclaredType();
   assert(stringTy && "no string type available");
   if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isEqual(stringTy)) {
