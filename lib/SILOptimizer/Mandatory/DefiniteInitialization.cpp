@@ -2237,8 +2237,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       }
       case DIKind::Yes:
         // super.init() already called, just release the value.
-        Release->removeFromParent();
-        B.getInsertionBB()->insert(B.getInsertionPoint(), Release);
+        Release->moveBefore(&*B.getInsertionPoint());
         continue;
       }
     }
