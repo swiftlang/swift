@@ -4,4 +4,5 @@ add_swift_unittest(SwiftIDETests
   )
 target_link_libraries(SwiftIDETests
   swiftIDE
+  LLVMCoverage
 )
