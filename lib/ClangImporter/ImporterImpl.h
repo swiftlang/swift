@@ -894,6 +894,8 @@ public:
 
   /// \brief Import the given Clang type into Swift.
   ///
+  /// \param dc Current declaration context (if given).
+  ///
   /// \param type The Clang type to import.
   ///
   /// \param kind The kind of type import we're performing.
@@ -905,11 +907,11 @@ public:
   ///        This is an additional guarantee on top of the ImportTypeKind
   ///        cases that allow bridging, and applies to the entire type.
   ///
+  ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
-  Type importType(clang::QualType type,
-                  ImportTypeKind kind,
-                  bool allowNSUIntegerAsInt,
+  Type importType(const DeclContext *dc, clang::QualType type,
+                  ImportTypeKind kind, bool allowNSUIntegerAsInt,
                   bool canFullyBridgeTypes,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
                   bool resugarNSErrorPointer = true);
@@ -973,7 +975,8 @@ public:
                               bool isVariadic, bool allowNSUIntegerAsInt,
                               ArrayRef<Identifier> argNames);
 
-  Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
+  Type importPropertyType(const DeclContext *dc,
+                          const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
 
   /// Attempt to infer a default argument for a parameter with the

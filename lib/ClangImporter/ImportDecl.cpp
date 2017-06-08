@@ -2297,11 +2297,9 @@ namespace {
         // type. That matches how we want to use them in most cases. All other
         // types should be imported in a non-bridged way.
         clang::QualType ClangType = Decl->getUnderlyingType();
-        SwiftType = Impl.importType(ClangType,
-                                    ImportTypeKind::Typedef,
-                                    isInSystemModule(DC),
-                                    ClangType->isBlockPointerType(),
-                                    OTK_Optional);
+        SwiftType = Impl.importType(
+            DC, ClangType, ImportTypeKind::Typedef, isInSystemModule(DC),
+            ClangType->isBlockPointerType(), OTK_Optional);
       }
 
       if (!SwiftType)
@@ -2404,10 +2402,10 @@ namespace {
 
       case EnumKind::Unknown: {
         // Compute the underlying type of the enumeration.
-        auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Enum,
-                                              isInSystemModule(dc),
-                                              /*isFullyBridgeable*/false);
+        auto underlyingType =
+            Impl.importType(dc, decl->getIntegerType(), ImportTypeKind::Enum,
+                            isInSystemModule(dc),
+                            /*isFullyBridgeable*/ false);
         if (!underlyingType)
           return nullptr;
 
@@ -2442,9 +2440,10 @@ namespace {
           return nativeDecl;
 
         // Compute the underlying type.
-        auto underlyingType = Impl.importType(
-            decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
-            /*isFullyBridgeable*/ false);
+        auto underlyingType =
+            Impl.importType(dc, decl->getIntegerType(), ImportTypeKind::Enum,
+                            isInSystemModule(dc),
+                            /*isFullyBridgeable*/ false);
         if (!underlyingType)
           return nullptr;
 
@@ -3055,10 +3054,9 @@ namespace {
 
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
-        auto type = Impl.importType(clangContext.getTagDeclType(clangEnum),
-                                    ImportTypeKind::Value,
-                                    isInSystemModule(dc),
-                                    /*isFullyBridgeable*/false);
+        auto type = Impl.importType(dc, clangContext.getTagDeclType(clangEnum),
+                                    ImportTypeKind::Value, isInSystemModule(dc),
+                                    /*isFullyBridgeable*/ false);
         if (!type)
           return nullptr;
         // FIXME: Importing the type will recursively revisit this same
@@ -3093,10 +3091,9 @@ namespace {
 
         // Import the enumeration type.
         auto enumType = Impl.importType(
-                          Impl.getClangASTContext().getTagDeclType(clangEnum),
-                          ImportTypeKind::Value,
-                          isInSystemModule(dc),
-                          /*isFullyBridgeable*/false);
+            dc, Impl.getClangASTContext().getTagDeclType(clangEnum),
+            ImportTypeKind::Value, isInSystemModule(dc),
+            /*isFullyBridgeable*/ false);
         if (!enumType)
           return nullptr;
 
@@ -3154,10 +3151,9 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(),
-                                  ImportTypeKind::Variable,
+      auto type = Impl.importType(dc, decl->getType(), ImportTypeKind::Variable,
                                   isInSystemModule(dc),
-                                  /*isFullyBridgeable*/false);
+                                  /*isFullyBridgeable*/ false);
       if (!type)
         return nullptr;
 
@@ -3376,10 +3372,10 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(),
-                                  ImportTypeKind::RecordField,
-                                  isInSystemModule(dc),
-                                  /*isFullyBridgeable*/false);
+      auto type =
+          Impl.importType(dc, decl->getType(), ImportTypeKind::RecordField,
+                          isInSystemModule(dc),
+                          /*isFullyBridgeable*/ false);
       if (!type)
         return nullptr;
 
@@ -3443,11 +3439,11 @@ namespace {
                                                 Impl.CurrentVersion))
           declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
 
-      Type type = Impl.importType(declType,
+      Type type = Impl.importType(dc, declType,
                                   (isAudited ? ImportTypeKind::AuditedVariable
-                                   : ImportTypeKind::Variable),
+                                             : ImportTypeKind::Variable),
                                   isInSystemModule(dc),
-                                  /*isFullyBridgeable*/false);
+                                  /*isFullyBridgeable*/ false);
 
       if (!type)
         return nullptr;
@@ -4316,10 +4312,10 @@ namespace {
         auto clangSuperclassType =
           Impl.getClangASTContext().getObjCObjectPointerType(
               clang::QualType(decl->getSuperClassType(), 0));
-        superclassType = Impl.importType(clangSuperclassType,
-                                         ImportTypeKind::Abstract,
-                                         isInSystemModule(dc),
-                                         /*isFullyBridgeable*/false);
+        superclassType =
+            Impl.importType(dc, clangSuperclassType, ImportTypeKind::Abstract,
+                            isInSystemModule(dc),
+                            /*isFullyBridgeable*/ false);
         if (superclassType) {
           superclassType = result->mapTypeOutOfContext(superclassType);
           assert(superclassType->is<ClassType>() ||
@@ -4504,7 +4500,7 @@ namespace {
         }
       }
 
-      Type type = Impl.importPropertyType(decl, isInSystemModule(dc));
+      Type type = Impl.importPropertyType(dc, decl, isInSystemModule(dc));
       if (!type)
         return nullptr;
 
@@ -4925,8 +4921,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   // Import the type of the underlying storage
   auto storedUnderlyingType = Impl.importType(
-      decl->getUnderlyingType(), ImportTypeKind::Value, isInSystemModule(dc),
-      decl->getUnderlyingType()->isBlockPointerType(), OTK_None);
+      dc, decl->getUnderlyingType(), ImportTypeKind::Value,
+      isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
+      OTK_None);
   if (auto objTy = storedUnderlyingType->getAnyOptionalObjectType())
     storedUnderlyingType = objTy;
 
@@ -4942,8 +4939,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   // Find a bridged type, which may be different
   auto computedPropertyUnderlyingType = Impl.importType(
-      decl->getUnderlyingType(), ImportTypeKind::Property, isInSystemModule(dc),
-      decl->getUnderlyingType()->isBlockPointerType(), OTK_None);
+      dc, decl->getUnderlyingType(), ImportTypeKind::Property,
+      isInSystemModule(dc), decl->getUnderlyingType()->isBlockPointerType(),
+      OTK_None);
   if (auto objTy = computedPropertyUnderlyingType->getAnyOptionalObjectType())
     computedPropertyUnderlyingType = objTy;
 
@@ -5159,7 +5157,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
   // Compute the underlying type.
   auto underlyingType = Impl.importType(
-      decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
+      dc, decl->getIntegerType(), ImportTypeKind::Enum, isInSystemModule(dc),
       /*isFullyBridgeable*/ false);
   if (!underlyingType)
     return nullptr;
@@ -5463,9 +5461,9 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   // Compute the property type.
   bool isFromSystemModule = isInSystemModule(dc);
   Type swiftPropertyType = Impl.importType(
-      propertyType, ImportTypeKind::Property,
+      dc, propertyType, ImportTypeKind::Property,
       Impl.shouldAllowNSUIntegerAsInt(isFromSystemModule, getter),
-      /*isFullyBridgeable*/ true, OTK_ImplicitlyUnwrappedOptional);
+      /*isFullyBridgeable*/ true);
   if (!swiftPropertyType)
     return nullptr;
 
@@ -6376,7 +6374,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         auto unqualifiedClangBound =
             clangBound->stripObjCKindOfTypeAndQuals(Impl.getClangASTContext());
         Type superclassType =
-            Impl.importType(clang::QualType(unqualifiedClangBound, 0),
+            Impl.importType(dc, clang::QualType(unqualifiedClangBound, 0),
                             ImportTypeKind::Abstract, false, false);
         if (!superclassType) {
           return None;
