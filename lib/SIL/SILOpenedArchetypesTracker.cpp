@@ -21,6 +21,7 @@ void SILOpenedArchetypesTracker::addOpenedArchetypeDef(CanArchetypeType archetyp
     // It is a forward definition created during deserialization.
     // Replace it with the real definition now.
     OldDef->replaceAllUsesWith(Def);
+    getFunction().getModule().deallocateInst(cast<SILInstruction>(OldDef));
     OldDef = SILValue();
   }
   assert(!OldDef &&
