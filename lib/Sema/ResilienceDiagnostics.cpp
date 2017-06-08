@@ -91,7 +91,7 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
     return false;
 
   // Public declarations are OK.
-  if (D->getEffectiveAccess(/*forLinkage=*/false) >= Accessibility::Public)
+  if (D->getEffectiveAccess() >= Accessibility::Public)
     return false;
 
   // Enum cases are handled as part of their containing enum.
@@ -110,8 +110,7 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
 
   diagnose(loc, diag::resilience_decl_unavailable,
            D->getDescriptiveKind(), D->getFullName(),
-           D->getFormalAccessScope().accessibilityForDiagnostics(),
-           getFragileFunctionKind(DC));
+           D->getFormalAccess(), getFragileFunctionKind(DC));
   diagnose(D, diag::resilience_decl_declared_here,
            D->getDescriptiveKind(), D->getFullName());
   return true;

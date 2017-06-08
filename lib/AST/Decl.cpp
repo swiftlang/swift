@@ -1359,7 +1359,7 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
-  if (getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public)
+  if (getEffectiveAccess() < Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
@@ -1952,19 +1952,19 @@ static Accessibility getTestableAccess(const ValueDecl *decl) {
   return Accessibility::Public;
 }
 
-Accessibility ValueDecl::getEffectiveAccess(bool forLinkage) const {
+Accessibility ValueDecl::getEffectiveAccess() const {
   Accessibility effectiveAccess = getFormalAccess();
 
   // Handle @testable.
   switch (effectiveAccess) {
   case Accessibility::Public:
-    if (forLinkage && getModuleContext()->isTestingEnabled())
+    if (getModuleContext()->isTestingEnabled())
       effectiveAccess = getTestableAccess(this);
     break;
   case Accessibility::Open:
     break;
   case Accessibility::Internal:
-    if (forLinkage && getModuleContext()->isTestingEnabled())
+    if (getModuleContext()->isTestingEnabled())
       effectiveAccess = getTestableAccess(this);
     else if (isVersionedInternalDecl(this))
       effectiveAccess = Accessibility::Public;
@@ -1978,7 +1978,7 @@ Accessibility ValueDecl::getEffectiveAccess(bool forLinkage) const {
 
   if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(getDeclContext())) {
     effectiveAccess = std::min(effectiveAccess,
-                               enclosingNominal->getEffectiveAccess(forLinkage));
+                               enclosingNominal->getEffectiveAccess());
 
   } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(getDeclContext())) {
     // Just check the base type. If it's a constrained extension, Sema should
@@ -1986,7 +1986,7 @@ Accessibility ValueDecl::getEffectiveAccess(bool forLinkage) const {
     if (auto extendedTy = enclosingExt->getExtendedType()) {
       if (auto nominal = extendedTy->getAnyNominal()) {
         effectiveAccess = std::min(effectiveAccess,
-                                   nominal->getEffectiveAccess(forLinkage));
+                                   nominal->getEffectiveAccess());
       }
     }
 
@@ -2117,7 +2117,7 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
-  if (getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public)
+  if (getEffectiveAccess() < Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
