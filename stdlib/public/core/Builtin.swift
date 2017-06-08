@@ -291,16 +291,16 @@ internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
 
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
-@_semantics("fastpath")
+// @_semantics("fastpath")
 public func _fastPath(_ x: Bool) -> Bool {
-  return _branchHint(x, expected: true)
+  return x //Bool(Builtin.int_expect_Int1(x._value, true._value))
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
-@_semantics("slowpath")
+// @_semantics("slowpath")
 public func _slowPath(_ x: Bool) -> Bool {
-  return _branchHint(x, expected: false)
+  return x //Bool(Builtin.int_expect_Int1(x._value, false._value))
 }
 
 /// Optimizer hint that the code where this function is called is on the fast
