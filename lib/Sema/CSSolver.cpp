@@ -319,13 +319,87 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   return result;
 }
 
+bool ConstraintSystem::areProtocolConformancesConsistent(
+    SmallVectorImpl<Constraint *> &conformsToConstraints) {
+  // Examine the other constraints related to ecah of our ConformsTo
+  // constraints. If any fails, return false.
+  for (auto *conformsTo : conformsToConstraints) {
+    if (auto *conformingType =
+            conformsTo->getFirstType()->getAs<TypeVariableType>()) {
+      if (getFixedType(conformingType))
+        continue;
+
+      if (!conformsTo->getSecondType()->getAs<ProtocolType>())
+        continue;
+
+      SmallVector<Constraint *, 4> associated;
+      getConstraintGraph().gatherConstraints(
+          conformingType, associated,
+          ConstraintGraph::GatheringKind::EquivalenceClass);
+
+      // For now we're only looking at argument conversions that are
+      // set up by applies. We'll test the source type of the
+      // conversion against the conformance.
+      for (auto *argumentConstraint : associated) {
+        auto kind = argumentConstraint->getKind();
+        switch (kind) {
+        case ConstraintKind::ArgumentConversion:
+        case ConstraintKind::ArgumentTupleConversion:
+        case ConstraintKind::OperatorArgumentTupleConversion:
+        case ConstraintKind::OperatorArgumentConversion:
+          break;
+        default:
+          continue;
+        }
+
+        auto *convertedTo =
+            argumentConstraint->getSecondType()->getAs<TypeVariableType>();
+        if (!convertedTo || convertedTo != conformingType)
+          continue;
+
+        auto convertedTy = argumentConstraint->getFirstType();
+        if (auto *convertedTyvar = convertedTy->getAs<TypeVariableType>())
+          if (auto fixedTy = getFixedType(convertedTyvar))
+            convertedTy = fixedTy;
+
+        // Only test known types.
+        if (convertedTy->is<TypeVariableType>())
+          continue;
+
+        // We allow inout's to coerce to pointer types, and deal with
+        // that through disjunctions in the solver. We cannot easily
+        // handle that here, so we'll make the safe assumption that
+        // these conform and move on to the next constraint.
+        if (convertedTy->is<InOutType>())
+          continue;
+
+        auto ty = convertedTy->getRValueObjectType();
+
+        auto result = simplifyConformsToConstraint(
+            ty, conformsTo->getSecondType(), conformsTo->getKind(),
+            conformsTo->getLocator(), None);
+
+        if (result == SolutionKind::Error)
+          return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
+  SmallVector<Constraint *, 4> conformsToConstraints;
+
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
     // Grab the next constraint from the worklist.
     auto *constraint = &ActiveConstraints.front();
     ActiveConstraints.pop_front();
     assert(constraint->isActive() && "Worklist constraint is not active?");
+
+    if (constraint->getKind() == ConstraintKind::ConformsTo)
+      conformsToConstraints.push_back(constraint);
 
     // Simplify this constraint.
     switch (simplifyConstraint(*constraint)) {
@@ -376,7 +450,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
     }
   }
 
-  return false;
+  return !areProtocolConformancesConsistent(conformsToConstraints);
 }
 
 namespace {

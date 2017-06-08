@@ -446,3 +446,21 @@ func sr3525_3<T>(t: SR_3525<T>) {
 class testStdlibType {
   let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
 }
+
+infix operator =*= : ComparisonPrecedence
+func =*= <T : Equatable>(lhs: T, rhs: T) -> Bool {
+  return lhs == rhs
+}
+func =*= <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
+  return lhs == rhs
+}
+
+class C {}
+
+var ac = C()
+var umpc: UnsafeMutablePointer<C>? = nil
+
+// Ensure that we can typecheck this, and do not accidentially fail
+// because the inout C does not conform to Equatable (we coerce the
+// inout to the UnsafeMutablePointer type here.
+_ = umpc =*= &ac

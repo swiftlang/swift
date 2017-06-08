@@ -2385,6 +2385,14 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
+  /// \brief For each ConformsTo constraint passed in, see if the
+  /// other constraints related to the type we're testing conformance
+  /// to make sense with that conformance. If any conformance fails,
+  /// return false. Otherwise, return true. We use this to attempt to
+  /// fail earlier for generic functions.
+  bool areProtocolConformancesConsistent(
+      SmallVectorImpl<Constraint *> &conformsToConstraints);
+
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
       llvm::SetVector<Constraint *> &neighbors);
