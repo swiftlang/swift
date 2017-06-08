@@ -2201,7 +2201,10 @@ public:
   ///
   /// This is the access used when making optimization and code generation
   /// decisions. It should not be used at the AST or semantic level.
-  Accessibility getEffectiveAccess() const;
+  ///
+  /// If \p forLinkage is false, we ignore -enable-testing; only @_versioned
+  /// can increase visibility.
+  Accessibility getEffectiveAccess(bool forLinkage = true) const;
 
   void setAccessibility(Accessibility access) {
     assert(!hasAccessibility() && "accessibility already set");

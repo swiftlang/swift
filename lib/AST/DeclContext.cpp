@@ -550,7 +550,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (AFD->getEffectiveAccess() < Accessibility::Public)
+      if (AFD->getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public)
         break;
 
       // Bodies of public transparent and always-inline functions are
