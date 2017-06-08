@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
 
 @_inlineable struct TestInlineableStruct {}
 // expected-error@-1 {{@_inlineable cannot be applied to this declaration}}
