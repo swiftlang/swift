@@ -563,7 +563,7 @@ namespace {
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(
-            Impl.importDecl(category, Impl.CurrentVersion));
+            Impl.importDecl(DC, category, Impl.CurrentVersion));
         if (!ext)
           return ImportResult();
         genericSig = ext->getGenericSignature();
@@ -571,7 +571,7 @@ namespace {
       } else if (auto *interface =
           dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
         auto cls = castIgnoringCompatibilityAlias<ClassDecl>(
-            Impl.importDecl(interface, Impl.CurrentVersion));
+            Impl.importDecl(DC, interface, Impl.CurrentVersion));
         if (!cls)
           return ImportResult();
         genericSig = cls->getGenericSignature();
@@ -589,19 +589,24 @@ namespace {
         return ImportResult();
       }
 
+      auto *paramDecl = genericSig->getGenericParams()[index];
+      auto type = genericEnv->mapTypeIntoContext(paramDecl);
+
       // Check if parameter's declaration context is the same as
       // current declaration context, otherwise we can't use this
-      // type. This might happen when Objective-C `typedef` is
-      // declarated instead of interface and tries to use its
-      // generic parameters.
+      // type without re-substituting it. This might happen when
+      // Objective-C `typedef` is declarated inside of interface
+      // and tries to use its generic parameters.
       if (auto *ownerDC = genericEnv->getOwningDeclContext()) {
-        if (DC && ownerDC != DC)
-          return ImportResult();
+        if (DC && DC != ownerDC && !ownerDC->isChildContextOf(DC)) {
+          type = genericEnv->mapTypeOutOfContext(type);
+          auto subs = DC->getDeclaredTypeInContext()->getContextSubstitutionMap(
+              DC->getParentModule(), ownerDC);
+          type = type.subst(subs);
+        }
       }
 
-      auto *paramDecl = genericSig->getGenericParams()[index];
-      return ImportResult(genericEnv->mapTypeIntoContext(paramDecl),
-                          ImportHint::ObjCPointer);
+      return ImportResult(type, ImportHint::ObjCPointer);
     }
 
     ImportResult VisitObjCTypeParamType(const clang::ObjCTypeParamType *type) {
@@ -627,7 +632,7 @@ namespace {
 
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
+          Impl.importDecl(DC, type->getDecl(), Impl.CurrentVersion));
 
       // If that fails, fall back on importing the underlying type.
       if (!decl) return Visit(type->desugar());
@@ -746,7 +751,7 @@ namespace {
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
       auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
+          Impl.importDecl(DC, type->getDecl(), Impl.CurrentVersion));
       if (!decl)
         return nullptr;
 
@@ -809,7 +814,7 @@ namespace {
       case EnumKind::Unknown:
       case EnumKind::Options: {
         auto decl = dyn_cast_or_null<TypeDecl>(
-            Impl.importDecl(clangDecl, Impl.CurrentVersion));
+            Impl.importDecl(DC, clangDecl, Impl.CurrentVersion));
         if (!decl)
           return nullptr;
 
@@ -860,7 +865,7 @@ namespace {
       // qualified),
       if (auto objcClass = type->getInterfaceDecl()) {
         auto imported = castIgnoringCompatibilityAlias<ClassDecl>(
-            Impl.importDecl(objcClass, Impl.CurrentVersion));
+            Impl.importDecl(DC, objcClass, Impl.CurrentVersion));
         if (!imported)
           return nullptr;
 
@@ -1039,7 +1044,7 @@ namespace {
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
           auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
-            Impl.importDecl(*cp, Impl.CurrentVersion));
+              Impl.importDecl(DC, *cp, Impl.CurrentVersion));
           if (!proto)
             return Type();
 

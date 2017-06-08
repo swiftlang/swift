@@ -688,10 +688,12 @@ public:
   /// Otherwise, return nullptr.
   Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
 
-  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
-                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
+  Decl *importDeclImpl(const DeclContext *DC, const clang::NamedDecl *ClangDecl,
+                       Version version, bool &TypedefIsSuperfluous,
+                       bool &HadForwardDeclaration);
 
-  Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
+  Decl *importDeclAndCacheImpl(const DeclContext *DC,
+                               const clang::NamedDecl *ClangDecl,
                                Version version,
                                bool SuperfluousTypedefsAreTransparent);
 
@@ -702,7 +704,12 @@ public:
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
   Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
-    return importDeclAndCacheImpl(ClangDecl, version,
+    return importDecl(nullptr, ClangDecl, version);
+  }
+
+  Decl *importDecl(const DeclContext *DC, const clang::NamedDecl *ClangDecl,
+                   Version version) {
+    return importDeclAndCacheImpl(DC, ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true);
   }
 
@@ -713,7 +720,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
   Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
-    return importDeclAndCacheImpl(ClangDecl, version,
+    return importDeclAndCacheImpl(nullptr, ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
