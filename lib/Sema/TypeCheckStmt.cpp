@@ -1321,7 +1321,8 @@ static void checkDefaultArguments(TypeChecker &tc,
   // caller.
   auto expansion = func->getResilienceExpansion();
   if (!tc.Context.isSwiftVersion3() &&
-      func->getEffectiveAccess(/*forLinkage=*/false) == Accessibility::Public)
+      func->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*respectVersionedAttr=*/true).isPublic())
     expansion = ResilienceExpansion::Minimal;
 
   for (auto &param : *params) {

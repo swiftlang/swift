@@ -1827,11 +1827,13 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
-  if (VD->getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public) {
+  auto access = VD->getFormalAccess(/*useDC=*/nullptr,
+                                    /*respectVersionedAttr=*/true);
+  if (access < Accessibility::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
                 VD->getBaseName(),
-                VD->getFormalAccessScope().accessibilityForDiagnostics())
+                access)
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
@@ -1881,11 +1883,13 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
 
   // @_inlineable can only be applied to public or @_versioned
   // declarations.
-  if (VD->getEffectiveAccess(/*forLinkage=*/false) < Accessibility::Public) {
+  auto access = VD->getFormalAccess(/*useDC=*/nullptr,
+                                    /*respectVersionedAttr=*/true);
+  if (access < Accessibility::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::inlineable_decl_not_public,
                 VD->getBaseName(),
-                VD->getFormalAccessScope().accessibilityForDiagnostics())
+                access)
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
     return;
