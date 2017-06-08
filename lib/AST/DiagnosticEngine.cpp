@@ -429,9 +429,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::ValueDecl:
-    Out << '\'';
+    Out << FormatOpts.OpeningQuotationMark;
     Arg.getAsValueDecl()->getFullName().printPretty(Out);
-    Out << '\'';
+    Out << FormatOpts.ClosingQuotationMark;
     break;
 
   case DiagnosticArgumentKind::Type: {
