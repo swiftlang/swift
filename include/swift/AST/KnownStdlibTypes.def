@@ -78,4 +78,9 @@ KNOWN_STDLIB_TYPE_DECL(Decoder, ProtocolDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(KeyedEncodingContainer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(KeyedDecodingContainer, NominalTypeDecl, 1)
 
+
+KNOWN_STDLIB_TYPE_DECL(BinaryInteger, ProtocolDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(SignedInteger, ProtocolDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(UnsignedInteger, ProtocolDecl, 1)
+
 #undef KNOWN_STDLIB_TYPE_DECL

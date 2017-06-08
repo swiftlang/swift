@@ -52,6 +52,7 @@ namespace swift {
   enum class Associativity : unsigned char;
   class BoundGenericType;
   class ClangNode;
+  class ConstructorDecl;
   class Decl;
   class DeclContext;
   class DefaultArgumentInitializer;
@@ -468,6 +469,12 @@ public:
   /// Retrieve the declaration of
   /// Array.reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *getArrayReserveCapacityDecl() const;
+
+  /// Retrieve the declaration of SignedInteger.init
+  ConstructorDecl *getSignedIntegerInitDecl() const;
+
+  /// Retrieve the declaration of SignedInteger.init
+  ConstructorDecl *getUnsignedIntegerInitDecl() const;
 
   /// Retrieve the declaration of Swift._unimplementedInitializer.
   FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;

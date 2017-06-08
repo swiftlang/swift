@@ -184,6 +184,12 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
 
+  /// SignedInteger.init
+  ConstructorDecl *SignedIntegerInitDecl = nullptr;
+
+  /// UnsignedInteger.init
+  ConstructorDecl *UnsignedIntegerInitDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -1037,6 +1043,97 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
       return FnDecl;
     }
   }
+  return nullptr;
+}
+
+ConstructorDecl *ASTContext::getSignedIntegerInitDecl() const {
+  if (Impl.SignedIntegerInitDecl)
+    return Impl.SignedIntegerInitDecl;
+
+  if (!getSignedIntegerDecl())
+    return nullptr;
+
+  auto InitFunctions =
+      getSignedIntegerDecl()->lookupDirect(getIdentifier("init"));
+
+  for (auto CandidateFn : InitFunctions) {
+    auto FnDecl = dyn_cast<ConstructorDecl>(CandidateFn);
+    if (!FnDecl)
+      continue;
+    auto ParamLists = FnDecl->getParameterLists();
+    // The initializer should take just one parameter.
+    if (ParamLists.size() != 2)
+      continue;
+    // The type of the parameter should be a generic type.
+    auto ParamList = ParamLists[1];
+    if (ParamList->size() != 1)
+      continue;
+    GenericSignature *GenericSig = FnDecl->getGenericSignature();
+    if (GenericSig->getGenericParams().size() != 2)
+      continue;
+    auto Reqs = GenericSig->getRequirements();
+    for (auto Req : Reqs) {
+      // Skip Self requirements.
+      if (Req.getFirstType()->getCanonicalType() ==
+          GenericSig->getGenericParams()[0]->getCanonicalType())
+        continue;
+      if (Req.getKind() != RequirementKind::Conformance)
+        continue;
+      if (Req.getSecondType()->getCanonicalType() !=
+          getBinaryIntegerDecl()->getDeclaredType()->getCanonicalType())
+        continue;
+
+      Impl.SignedIntegerInitDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+  llvm_unreachable("Cannot find SignedInteger.init");
+  return nullptr;
+}
+
+ConstructorDecl *ASTContext::getUnsignedIntegerInitDecl() const {
+  if (Impl.UnsignedIntegerInitDecl)
+    return Impl.UnsignedIntegerInitDecl;
+
+  if (!getUnsignedIntegerDecl())
+    return nullptr;
+
+  auto InitFunctions =
+      getUnsignedIntegerDecl()->lookupDirect(getIdentifier("init"));
+
+  for (auto CandidateFn : InitFunctions) {
+    auto FnDecl = dyn_cast<ConstructorDecl>(CandidateFn);
+    if (!FnDecl)
+      continue;
+    auto ParamLists = FnDecl->getParameterLists();
+    // The initializer should take just one parameter.
+    if (ParamLists.size() != 2)
+      continue;
+    // The type of the parameter should be a generic type.
+    auto ParamList = ParamLists[1];
+    if (ParamList->size() != 1)
+      continue;
+    GenericSignature *GenericSig = FnDecl->getGenericSignature();
+    if (GenericSig->getGenericParams().size() != 2)
+      continue;
+    auto Reqs = GenericSig->getRequirements();
+    for (auto Req : Reqs) {
+      // Skip Self requirements.
+      if (Req.getFirstType()->getCanonicalType() ==
+          GenericSig->getGenericParams()[0]->getCanonicalType())
+        continue;
+      if (Req.getKind() != RequirementKind::Conformance)
+        continue;
+      if (Req.getSecondType()->getCanonicalType() !=
+          getBinaryIntegerDecl()->getDeclaredType()->getCanonicalType())
+        continue;
+
+      Impl.UnsignedIntegerInitDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+
+  llvm_unreachable("Cannot find UnsignedInteger.init");
   return nullptr;
 }
 

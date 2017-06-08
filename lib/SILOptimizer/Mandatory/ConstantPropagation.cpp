@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "constant-propagation"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -34,6 +35,44 @@ static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
+
+namespace {
+
+class ConstantPropagation : public SILFunctionTransform {
+  SILFunction *SignedIntegerInitFn;
+  SILFunction *UnsignedIntegerInitFn;
+  bool EnableDiagnostics;
+
+  bool checkIntegerInitializer(ApplyInst *AI,
+                               llvm::SetVector<SILInstruction *> &WorkList);
+  void prepare(SILFunction &F);
+  bool isApplyOfIntegerInit(SILInstruction &I);
+  void initializeWorklist(SILFunction &F, bool InstantiateAssertConfiguration,
+                          llvm::SetVector<SILInstruction *> &WorkList);
+
+  SILAnalysis::InvalidationKind processFunction(SILFunction &F,
+                                                bool EnableDiagnostics,
+                                                unsigned AssertConfiguration);
+
+public:
+  ConstantPropagation(bool EnableDiagnostics)
+      : SignedIntegerInitFn(nullptr), UnsignedIntegerInitFn(nullptr),
+        EnableDiagnostics(EnableDiagnostics) {}
+
+private:
+  /// The entry point to the transformation.
+  void run() override {
+    prepare(*getFunction());
+    auto Invalidation = processFunction(*getFunction(), EnableDiagnostics,
+                                        getOptions().AssertConfig);
+
+    if (Invalidation != SILAnalysis::InvalidationKind::Nothing) {
+      invalidateAnalysis(Invalidation);
+    }
+  }
+};
+
+} // end anonymous namespace
 
 /// \brief Construct (int, overflow) result tuple.
 static SILInstruction *constructResultWithOverflowTuple(BuiltinInst *BI,
@@ -939,6 +978,14 @@ static bool isApplyOfStringConcat(SILInstruction &I) {
   return false;
 }
 
+bool ConstantPropagation::isApplyOfIntegerInit(SILInstruction &I) {
+  if (auto *AI = dyn_cast<ApplyInst>(&I))
+    if (auto *Fn = AI->getReferencedFunction())
+      if (Fn == SignedIntegerInitFn || Fn == UnsignedIntegerInitFn)
+        return true;
+  return false;
+}
+
 static bool isFoldable(SILInstruction *I) {
   return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
 }
@@ -985,10 +1032,297 @@ constantFoldStringConcatenation(ApplyInst *AI,
   return true;
 }
 
+static IntegerLiteralInst *getIntegerLiteralFromConstructorCall(ApplyInst *AI) {
+  auto Op = AI->getArgument(1);
+  // This operand is suppsed to be an alloc_stack instruction.
+  if (!isa<AllocStackInst>(Op))
+    return nullptr;
+  // Check that this is an alloc_stack, which is assigned only once.
+  StoreInst *SI = nullptr;
+  for (auto U : getNonDebugUses(Op)) {
+    auto User = U->getUser();
+    if (isa<DeallocStackInst>(User))
+      continue;
+    if (User == AI)
+      continue;
+    if (!SI) {
+      // This is something we cannot handle.
+      SI = dyn_cast<StoreInst>(User);
+      if (SI && SI->getDest() == Op)
+        continue;
+    }
+    // This is something we cannot handle.
+    return nullptr;
+  }
+  // Bail if there was no assignment.
+  if (!SI)
+    return nullptr;
+  // Bail if it was not an assignment of an integer literal.
+  auto StructI = dyn_cast<StructInst>(SI->getSrc());
+  if (!StructI)
+    return nullptr;
+  return dyn_cast<IntegerLiteralInst>(StructI->getOperand(0));
+}
+
+static IntegerLiteralExpr *
+getIntegerLiteralExprFromConstructorCall(ApplyInst *AI) {
+  auto Loc = AI->getLoc();
+  const ApplyExpr *Apply = Loc.getAsASTNode<ApplyExpr>();
+  const Expr *ValueExpr = Apply->getArg();
+  if (auto *Paren = dyn_cast<ParenExpr>(ValueExpr))
+    ValueExpr = Paren->getSubExpr();
+  auto *CallExp = dyn_cast<CallExpr>(ValueExpr);
+  if (CallExp) {
+    auto Callee = CallExp->getFn();
+    if (isa<ConstructorRefCallExpr>(Callee) &&
+        CallExp->getNumArguments() == 1) {
+      // Check if takes an integer literal as parameter.
+      auto Arg = CallExp->getArg();
+      auto ArgLabels = CallExp->getArgumentLabels();
+      if (ArgLabels.size() == 1 &&
+          ArgLabels[0].str() == "_builtinIntegerLiteral") {
+        if (auto TupleExp = dyn_cast<TupleExpr>(Arg)) {
+          return dyn_cast<IntegerLiteralExpr>(TupleExp->getElement(0));
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+/// Special handling of the generic initializers provided by
+/// UnsignedInteger and SignedInteger protocols when they are
+/// invoked for fixed size builtin integer types and constant
+/// arguments.
+///
+/// Check a call of an initializer for one of the builtin integer types.
+/// Try to determine if the initializer takes an integer constant
+/// as an argument and if this constant overflows/underflows the values
+/// representable by this type.
+///
+/// The initializer in question is one of:
+/// UnsignedInteger.init<T : BinaryInteger>(_ source: T), or
+/// SignedInteger.init<T : BinaryInteger>(_ source: T)
+///
+/// A typical invocation of such an initializer looks in SIL like this:
+///
+///   // function_ref UnsignedInteger<A>.init<A>(_:)
+///   %init = function_ref @init_name: $@convention(method)
+///     <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+///     <τ_1_0 where τ_1_0 : BinaryInteger>
+///     (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
+///   %int_lit = integer_literal $Builtin.Int64, 400
+///   %int_val = struct $Int (%int_lit : $Builtin.Int64)
+///   %result = alloc_stack $UInt8
+///   %tmp = alloc_stack $Int
+///   %ty = metatype $@thick UInt8.Type
+///   store %int_val to %tmp : $*Int
+///   apply %init<UInt8, Int>(%result, %tmp, %ty) : ...
+///   dealloc_stack %tmp : $*Int
+bool ConstantPropagation::checkIntegerInitializer(
+    ApplyInst *AI, llvm::SetVector<SILInstruction *> &WorkList) {
+  auto &Ctx = AI->getModule().getASTContext();
+
+  assert(AI->getSubstitutions().size() == 2);
+
+
+  // First check source and destination types.
+  auto GetStdlibIntTypeInfo = [](CanType Ty, unsigned &TySize,
+                                 bool &TySigned) -> bool {
+    auto NominalTy = Ty->getAnyNominal();
+    if (!NominalTy)
+      return false;
+    // The DstTy should be from the standard library.
+    if (!NominalTy->getParentModule()->isStdlibModule())
+      return false;
+
+    StringRef TyName = NominalTy->getNameStr();
+    assert(TyName.startswith("Int") || TyName.startswith("UInt"));
+    TySigned = TyName.startswith("Int");
+
+    // Find the size of the target type.
+    StringRef SizeStr = TyName.drop_until(
+      [](char c) -> bool { return (c >= '0' && c <= '9'); });
+    unsigned long long Size = 0;
+    if (!SizeStr.empty() && llvm::getAsUnsignedInteger(SizeStr, 10, Size))
+      return false;
+    TySize = (unsigned)Size;
+    return true;
+  };
+
+  auto DstTy =
+      AI->getSubstitutions()[0].getReplacement()->getCanonicalType();
+  unsigned DstTySize = 0;
+  bool DstTySigned = false;
+  if (!GetStdlibIntTypeInfo(DstTy, DstTySize, DstTySigned) || !DstTySize)
+    return false;
+
+
+  auto SrcTy =
+    AI->getSubstitutions()[1].getReplacement()->getCanonicalType();
+  unsigned SrcTySize = 0;
+  bool SrcTySigned = false;
+  if (!GetStdlibIntTypeInfo(SrcTy, SrcTySize, SrcTySigned))
+    return false;
+
+  // Try to get the actual integer literal.
+  auto LI = getIntegerLiteralFromConstructorCall(AI);
+  if (!LI)
+    return false;
+  APInt V = LI->getValue();
+
+  // If no explicit size is known from the type, use the size
+  // of the constant value to determine it.
+  if (SrcTySize == 0)
+    SrcTySize = V.getBitWidth();
+
+  assert(SrcTySize == V.getBitWidth());
+
+  // If the source type is unsigned, extend the value of the literal,
+  // so that it becomes a non-negative in its APInt representation.
+  if (!SrcTySigned) {
+    V = V.zext(SrcTySize + 1);
+  }
+
+  // Try to find if the argument of the integer constructor is an integer
+  // literal or an expression.
+  auto *IntLitExp = getIntegerLiteralExprFromConstructorCall(AI);
+
+  // Conversion of negative values to unsigned types is not allowed.
+  if (!DstTySigned && V.isNegative()) {
+    SmallString<10> SrcAsString;
+    V.toString(SrcAsString, /*radix*/10, true);
+
+    if (IntLitExp && IntLitExp->getLoc().isValid()) {
+      diagnose(Ctx, IntLitExp->getLoc(),
+               diag::negative_integer_literal_overflow_unsigned,
+               AI->getSubstitutions()[0].getReplacement(), SrcAsString);
+      return false;
+    }
+
+    diagnose(Ctx, AI->getLoc().getSourceLoc(),
+             diag::integer_conversion_sign_error,
+             AI->getSubstitutions()[0].getReplacement());
+    return false;
+  }
+
+  // OK, now we know the literal value.
+  // Check if it is within a range allowed by the type.
+  if ((DstTySigned && !V.isSignedIntN(DstTySize)) ||
+      (!DstTySigned && !V.isIntN(DstTySize))) {
+
+    SmallString<10> SrcAsString;
+    V.toString(SrcAsString, /*radix*/10, true);
+
+    if (IntLitExp && IntLitExp->getLoc().isValid()) {
+      diagnose(Ctx, IntLitExp->getLoc(),
+               diag::integer_literal_overflow_builtin_types, DstTySigned,
+               AI->getSubstitutions()[0].getReplacement(), SrcAsString);
+      return false;
+    }
+
+    diagnose(Ctx, AI->getLoc().getSourceLoc(),
+             diag::integer_conversion_overflow,
+             SrcTy, AI->getSubstitutions()[0].getReplacement());
+    return false;
+  }
+
+  // The constant value is in a domain allowed by the DstTy.
+
+  // This is where the initialized value will be stored. This can
+  // be not only the alloc_stack but e.g. an element inside of the array, etc.
+  auto ResultAddr = AI->getArgument(0);
+
+  // Check that this memory location is assigned just once (as an @out parameter
+  // of this initializer call).
+  bool OptimizeLoadsOfConst = isa<AllocStackInst>(ResultAddr);
+  if (OptimizeLoadsOfConst) {
+    for (auto Use : ResultAddr->getUses()) {
+      auto User = Use->getUser();
+      if (User == AI)
+        continue;
+      if (isa<StoreInst>(User) || isa<ApplyInst>(User)) {
+        OptimizeLoadsOfConst = false;
+        break;
+      }
+    }
+  }
+
+  // Replace this generic constructor call with a simple integer literal of a
+  // proper size.
+  SILBuilderWithScope B(LI);
+  auto NewIL = B.createIntegerLiteral(
+      AI->getLoc(), SILType::getBuiltinIntegerType(
+                        DstTySize, AI->getModule().getASTContext()),
+      DstTySigned ? V.sextOrTrunc(DstTySize) : V.zextOrTrunc(DstTySize));
+  auto NewStructI = B.createStruct(
+      AI->getLoc(), SILType::getPrimitiveObjectType(DstTy), {NewIL});
+
+  // Store into the ResultAddr.
+  B.setInsertionPoint(AI);
+  B.createStore(AI->getLoc(), NewStructI, ResultAddr,
+                StoreOwnershipQualifier::Unqualified);
+
+  auto RemoveCallback = [&](SILInstruction *DeadI) { WorkList.remove(DeadI); };
+
+  if (OptimizeLoadsOfConst) {
+    // Replace all uses of the original result.
+    for (auto U = ResultAddr->use_begin(), E = ResultAddr->use_end(); U != E;) {
+      auto *User = U->getUser();
+      auto *LoadI = dyn_cast<LoadInst>(User);
+      ++U;
+      if (!LoadI)
+        continue;
+      LoadI->replaceAllUsesWith(NewStructI);
+      RemoveCallback(LoadI);
+      LoadI->eraseFromParent();
+    }
+  }
+
+  // Replace all instructions reading from the struct conatining the integer by
+  // the actual value.
+  for (auto U = NewStructI->use_begin(), E = NewStructI->use_end(); U != E;) {
+    auto *User = U->getUser();
+    ++U;
+    auto *SEI = dyn_cast<StructExtractInst>(User);
+    if (!SEI)
+      continue;
+    SEI->replaceAllUsesWith(NewIL);
+  }
+
+  // Schedule all uses of the new integer struct for re-scanning.
+  for (auto Use : NewStructI->getUses()) {
+    WorkList.insert(Use->getUser());
+  }
+
+  // Schedule all uses of the new constant for re-scanning.
+  for (auto Use : NewIL->getUses()) {
+    WorkList.insert(Use->getUser());
+  }
+
+  auto Op = AI->getArgument(1);
+
+  // Delete the old apply instruction and other unused instructions.
+  recursivelyDeleteTriviallyDeadInstructions(AI, /*force*/ true,
+                                             RemoveCallback);
+
+  // Delete any dead uses of the original constructor argument now.
+  for (auto U = Op->use_begin(), E = Op->use_end(); U != E;) {
+    auto *User = U->getUser();
+    ++U;
+    if (User == NewStructI)
+      continue;
+    recursivelyDeleteTriviallyDeadInstructions(User, /*force*/ true,
+                                               RemoveCallback);
+  }
+
+  return true;
+}
+
 /// Initialize the worklist to all of the constant instructions.
-static void initializeWorklist(SILFunction &F,
-                               bool InstantiateAssertConfiguration,
-                               llvm::SetVector<SILInstruction *> &WorkList) {
+void ConstantPropagation::initializeWorklist(
+    SILFunction &F, bool InstantiateAssertConfiguration,
+    llvm::SetVector<SILInstruction *> &WorkList) {
   for (auto &BB : F) {
     for (auto &I : BB) {
       if (isFoldable(&I) && !I.use_empty()) {
@@ -1011,7 +1345,7 @@ static void initializeWorklist(SILFunction &F,
         continue;
       }
 
-      if (!isApplyOfStringConcat(I)) {
+      if (!isApplyOfStringConcat(I) && !isApplyOfIntegerInit(I)) {
         continue;
       }
       WorkList.insert(&I);
@@ -1020,8 +1354,8 @@ static void initializeWorklist(SILFunction &F,
 }
 
 SILAnalysis::InvalidationKind
-processFunction(SILFunction &F, bool EnableDiagnostics,
-                unsigned AssertConfiguration) {
+ConstantPropagation::processFunction(SILFunction &F, bool EnableDiagnostics,
+                                     unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
 
@@ -1103,13 +1437,23 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       }
 
     if (auto *AI = dyn_cast<ApplyInst>(I)) {
-      // Apply may only come from a string.concat invocation.
-      if (constantFoldStringConcatenation(AI, WorkList)) {
-        // Invalidate all analysis that's related to the call graph.
-        InvalidateInstructions = true;
+      // An apply may come from a string.concat invocation or from integer
+      // initializer.
+      if (isApplyOfIntegerInit(*I)) {
+        if (checkIntegerInitializer(AI, WorkList)) {
+          // Invalidate all analysis that's related to the call graph.
+          InvalidateInstructions = true;
+        }
+        continue;
       }
 
-      continue;
+      if (isApplyOfStringConcat(*I)) {
+        if (constantFoldStringConcatenation(AI, WorkList)) {
+          // Invalidate all analysis that's related to the call graph.
+          InvalidateInstructions = true;
+        }
+        continue;
+      }
     }
 
     if (isa<CheckedCastBranchInst>(I) || isa<CheckedCastAddrBranchInst>(I) ||
@@ -1161,6 +1505,23 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       // Some constant users may indirectly cause folding of their users.
       if (isa<StructInst>(User) || isa<TupleInst>(User)) {
         WorkList.insert(User);
+        continue;
+      }
+
+      // Some initializers of integer types may need to be revisited.
+      if (isa<ApplyInst>(User) && isApplyOfIntegerInit(*User)) {
+        WorkList.insert(User);
+        continue;
+      }
+
+      // Stores of a constant into a memory slot may be
+      // used later to constant fold an integer type initializer.
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
+        if (SI->getSrc() != I)
+          continue;
+        auto Dest = dyn_cast<SILInstruction>(SI->getDest());
+        if (Dest)
+          WorkList.insert(Dest);
         continue;
       }
 
@@ -1257,33 +1618,31 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
   return InvalidationKind(Inv);
 }
 
+void ConstantPropagation::prepare(SILFunction &F) {
+  auto &M = F.getModule();
+  auto SignedIntegerInitDecl = F.getASTContext().getSignedIntegerInitDecl();
+  auto UnsignedIntegerInitDecl = F.getASTContext().getUnsignedIntegerInitDecl();
+
+  if (SignedIntegerInitDecl) {
+    auto SignedIntegerInitMangledName =
+        SILDeclRef(SignedIntegerInitDecl, SILDeclRef::Kind::Allocator).mangle();
+    SignedIntegerInitFn = M.findFunction(SignedIntegerInitMangledName,
+                                         SILLinkage::PublicExternal);
+    // assert(SignedIntegerInitFn);
+  }
+  if (UnsignedIntegerInitDecl) {
+    auto UnsignedIntegerInitMangledName =
+        SILDeclRef(UnsignedIntegerInitDecl, SILDeclRef::Kind::Allocator)
+            .mangle();
+    UnsignedIntegerInitFn = M.findFunction(UnsignedIntegerInitMangledName,
+                                           SILLinkage::PublicExternal);
+    // assert(UnsignedIntegerInitFn);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
-
-namespace {
-
-class ConstantPropagation : public SILFunctionTransform {
-  bool EnableDiagnostics;
-
-public:
-  ConstantPropagation(bool EnableDiagnostics) :
-    EnableDiagnostics(EnableDiagnostics) {}
-
-private:
-  /// The entry point to the transformation.
-  void run() override {
-
-    auto Invalidation = processFunction(*getFunction(), EnableDiagnostics,
-                                        getOptions().AssertConfig);
-
-    if (Invalidation != SILAnalysis::InvalidationKind::Nothing) {
-      invalidateAnalysis(Invalidation);
-    }
-  }
-};
-
-} // end anonymous namespace
 
 SILTransform *swift::createDiagnosticConstantPropagation() {
   return new ConstantPropagation(true /*enable diagnostics*/);
