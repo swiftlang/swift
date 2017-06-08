@@ -338,12 +338,64 @@ class AnotherGeneric<T> {}
 
 protocol P {
   associatedtype A
-  typealias G1<T> = MyType<Self, T>
-  typealias G2<T> = MyType<T, A>
+  typealias G1<T> = MyType<Self, T> // expected-note {{did you mean 'G1'?}}
+  typealias G2<T> = MyType<T, A> // expected-note {{did you mean 'G2'?}}
+  typealias G3<T> = () -> () // expected-note {{did you mean 'G3'?}}
+  typealias G4<T> = (T) -> () // expected-note {{did you mean 'G4'?}}
+
+  func firstRequirement(_: G1<Int>)
+  func secondRequirement(_: G2<Int>)
+  func thirdRequirement(_: G3<Int>)
+  func fourthRequirement(_: G4<Int>)
+
+  func firstRequirementGeneric<T>(_: G1<T>)
+  func secondRequirementGeneric<T>(_: G2<T>)
+  func thirdRequirementGeneric<T>(_: G3<T>, _: T)
+  func fourthRequirementGeneric<T>(_: G4<T>)
 }
 
 struct S : P {
   typealias A = Float
+
+  func shouldFail(fn: (Int) -> ()) {
+    thirdRequirement(fn)
+    // expected-error@-1 {{cannot convert value of type '(Int) -> ()' to expected argument type '() -> ()'}}
+  }
+
+  func firstRequirement(_: G1<Int>) {}
+  func secondRequirement(_: G2<Int>) {}
+  func thirdRequirement(_: G3<Int>) {}
+  func fourthRequirement(_: G4<Int>) {}
+
+  func firstRequirementGeneric<T>(_: G1<T>) {
+    _ = G1<T>.self // FIXME // expected-error {{use of unresolved identifier 'G1'}}
+  }
+
+  func secondRequirementGeneric<T>(_: G2<T>) {
+    _ = G2<T>.self // FIXME // expected-error {{use of unresolved identifier 'G2'}}
+  }
+
+  func thirdRequirementGeneric<T>(_: G3<T>, _: T) {
+    _ = G3<T>.self // FIXME // expected-error {{use of unresolved identifier 'G3'}}
+  }
+
+  func fourthRequirementGeneric<T>(_: G4<T>) {
+    _ = G4<T>.self // FIXME // expected-error {{use of unresolved identifier 'G4'}}
+  }
+
+  func expressionContext() {
+    let _: G1 = MyType<S, Int>(a: S(), b: 3)
+    let _: G1<Int> = MyType<S, Int>(a: S(), b: 3)
+
+    let _: S.G1 = MyType<S, Int>(a: S(), b: 3)
+    let _: S.G1<Int> = MyType<S, Int>(a: S(), b: 3)
+
+    let _: G2 = MyType<Int, Float>(a: 3, b: 1.0)
+    let _: G2<Int> = MyType<Int, Float>(a: 3, b: 1.0)
+
+    let _: S.G2 = MyType<Int, Float>(a: 3, b: 1.0)
+    let _: S.G2<Int> = MyType<Int, Float>(a: 3, b: 1.0)
+  }
 }
 
 func takesMyType(x: MyType<S, Int>) {}
