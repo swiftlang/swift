@@ -1662,8 +1662,12 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
         assocType = dyn_cast<AssociatedTypeDecl>(member);
 
       // FIXME: Filter out type declarations that aren't in the protocol itself?
-      if (!concreteDecl && !isa<AssociatedTypeDecl>(member))
-        concreteDecl = dyn_cast<TypeDecl>(member);
+      if (!concreteDecl && !isa<AssociatedTypeDecl>(member)) {
+        if (!member->hasInterfaceType())
+          builder.getLazyResolver()->resolveDeclSignature(member);
+        if (member->hasInterfaceType())
+          concreteDecl = dyn_cast<TypeDecl>(member);
+      }
     }
 
     if (assocType &&
@@ -1781,8 +1785,12 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
       assocType = dyn_cast<AssociatedTypeDecl>(member);
 
     // FIXME: Filter out concrete types that aren't in the protocol itself?
-    if (!concreteDecl && !isa<AssociatedTypeDecl>(member))
-      concreteDecl = dyn_cast<TypeDecl>(member);
+    if (!concreteDecl && !isa<AssociatedTypeDecl>(member)) {
+      if (!member->hasInterfaceType())
+        proto->getASTContext().getLazyResolver()->resolveDeclSignature(member);
+      if (member->hasInterfaceType())
+        concreteDecl = dyn_cast<TypeDecl>(member);
+    }
   }
 
   // There is no associated type or concrete type with this name in this
