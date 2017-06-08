@@ -1720,24 +1720,10 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
 }
 
 namespace {
-  /// Function object to diagnose a conflict in same-type constraints for a
-  /// given potential archetype.
-  struct DiagnoseSameTypeConflict {
-    DiagnosticEngine &diags;
-    const RequirementSource *source;
-    PotentialArchetype *pa;
-
-    void operator()(Type type1, Type type2) const {
-      // FIXME: Shouldn't need this!
-      if (pa->getParent() && pa->getConcreteTypeDecl() &&
-          source->getLoc().isInvalid()) {
-        diags.diagnose(pa->getConcreteTypeDecl()->getLoc(),
-                       diag::protocol_typealias_conflict,
-                       pa->getConcreteTypeDecl()->getName(),
-                       type1, type2);
-        return;
-      }
-    }
+  /// Function object used to suppress conflict diagnoses when we know we'll
+  /// see them again later.
+  struct SameTypeConflictCheckedLater {
+    void operator()(Type type1, Type type2) const { }
   };
 } // end anonymous namespace
 
@@ -1786,10 +1772,7 @@ static void concretizeNestedTypeFromConcreteParent(
   builder.addSameTypeRequirement(
          nestedPA, witnessType, source,
          GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints,
-         DiagnoseSameTypeConflict{
-           builder.getASTContext().Diags,
-           source, nestedPA
-         });
+         SameTypeConflictCheckedLater());
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
@@ -2855,7 +2838,20 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
           continue;
         }
 
-        // FIXME: this is a weird situation.
+        // We inherited a type; this associated type will be identical
+        // to that typealias.
+        if (Source->kind == RequirementSource::RequirementSignatureSelf) {
+          auto inheritedOwningDecl =
+            inheritedType->getDeclContext()
+              ->getAsNominalTypeOrNominalTypeExtensionContext();
+          Diags.diagnose(assocTypeDecl,
+                         diag::associated_type_override_typealias,
+                         assocTypeDecl->getFullName(),
+                         inheritedOwningDecl->getDescriptiveKind(),
+                         inheritedOwningDecl->getDeclaredInterfaceType());
+        }
+
+        addInferredSameTypeReq(assocTypeDecl, inheritedType);
       }
 
       inheritedTypeDecls.erase(knownInherited);
@@ -2898,7 +2894,8 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
           continue;
         }
 
-        // FIXME: More typealiases
+        // Two typealiases that should be the same.
+        addInferredSameTypeReq(inheritedType, typealias);
       }
 
       inheritedTypeDecls.erase(knownInherited);
@@ -3371,7 +3368,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       (void)addSameTypeRequirement(equivClass->concreteType,
                                    equivClass2->concreteType, Source,
                                    UnresolvedHandlingKind::GenerateConstraints,
-                                   DiagnoseSameTypeConflict{Diags, Source, T1});
+                                   SameTypeConflictCheckedLater());
     } else {
       equivClass->concreteType = equivClass2->concreteType;
     }
@@ -3466,7 +3463,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   if (equivClass->concreteType) {
     return addSameTypeRequirement(equivClass->concreteType, Concrete, Source,
                                   UnresolvedHandlingKind::GenerateConstraints,
-                                  DiagnoseSameTypeConflict{ Diags, Source, T});
+                                  SameTypeConflictCheckedLater());
 
   }
 
