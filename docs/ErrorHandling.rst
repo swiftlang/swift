@@ -570,11 +570,11 @@ the NSError back like they do today, and have to throw the result
 manually.
 
 For initializers, importing an initializer as throwing takes
-precedence over importing it as failable.  That is, an imported
+precedence over importing it as fallible.  That is, an imported
 initializer with a nullable result and an error parameter would be
 imported as throwing.  Throwing initializers have very similar
-constraints to failable initializers; in a way, it's just a new axis
-of failability.
+constraints to fallible initializers; in a way, it's just a new axis
+of fallibility.
 
 One limitation of this approach is that we need to be able to reconstruct
 the selector to use when an overload of a method is introduced.  For this
