@@ -412,6 +412,12 @@ enum OverlyLargeSpaceEnum {
   case case11
 }
 
+enum ContainsOverlyLargeEnum {
+  case one(OverlyLargeSpaceEnum)
+  case two(OverlyLargeSpaceEnum)
+  case three(OverlyLargeSpaceEnum, OverlyLargeSpaceEnum)
+}
+
 func quiteBigEnough() -> Bool {
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{do you want to add a default clause?}}
@@ -490,6 +496,13 @@ func quiteBigEnough() -> Bool {
   case (.case2, .case2): return true
   case (.case3, .case3): return true
   case _: return true
+  }
+  
+  // No diagnostic
+  switch ContainsOverlyLargeEnum.one(.case0) {
+  case .one: return true
+  case .two: return true
+  case .three: return true
   }
 }
 

@@ -680,7 +680,9 @@ func test_union_1(u: MaybePair) {
 
   // CHECK: [[IS_BOTH]]([[TUP:%.*]] : $(Int, String)):
   case .Both:
-  // CHECK:   destroy_value [[TUP]] : $(Int, String)
+  // CHECK:   tuple_extract [[TUP]] : $(Int, String), 0
+  // CHECK:   [[TUP_STR:%.*]] = tuple_extract [[TUP]] : $(Int, String), 1
+  // CHECK:   destroy_value [[TUP_STR]] : $String
   // CHECK:   function_ref @_T06switch1dyyF
   // CHECK:   br [[CONT]]
     d()
