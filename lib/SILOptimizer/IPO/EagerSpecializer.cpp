@@ -102,8 +102,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       // expects.
       auto *TupleI = cast<SILInstruction>(RetInst->getOperand(0));
       if (TupleI->hasOneUse()) {
-        TupleI->removeFromParent();
-        RetBB->insert(RetInst, TupleI);
+        TupleI->moveBefore(RetInst);
       } else {
         TupleI = TupleI->clone(RetInst);
         RetInst->setOperand(0, TupleI);
