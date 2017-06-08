@@ -423,7 +423,10 @@ public:
     return insert(new (F.getModule())
                       GlobalAddrInst(getSILDebugLocation(Loc), g));
   }
-
+  GlobalAddrInst *createGlobalAddr(SILLocation Loc, SILType Ty) {
+    return insert(new (F.getModule())
+                  GlobalAddrInst(getSILDebugLocation(Loc), Ty));
+  }
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
 
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
