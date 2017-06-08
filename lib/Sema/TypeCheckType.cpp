@@ -456,14 +456,11 @@ Type TypeChecker::resolveTypeInContext(
             ->castTo<GenericTypeParamType>());
   }
 
-  bool hasDependentType = typeDecl->getDeclaredInterfaceType()
-    ->hasTypeParameter();
-
   // Simple case -- the type is not nested inside of another type.
   // However, it might be nested inside another generic context, so
   // we do want to write the type in terms of interface types or
   // context archetypes, depending on the resolver given to us.
-  if (!selfType || !hasDependentType) {
+  if (!selfType) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       // For a generic typealias, return the unbound generic form of the type.
       if (aliasDecl->getGenericParams())
@@ -478,7 +475,7 @@ Type TypeChecker::resolveTypeInContext(
     if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl))
       return nominalDecl->getDeclaredType();
 
-    assert(!hasDependentType);
+    assert(isa<ModuleDecl>(typeDecl));
     return typeDecl->getDeclaredInterfaceType();
   }
 
@@ -662,12 +659,21 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
+  bool hasTypeParameterOrVariable = false;
+
   // Get the substitutions for outer generic parameters from the parent
-  // type, but skip the step if the result type does not contain any
-  // substitutable type parameters.
-  if (resultType->hasTypeParameter())
-    if (auto parentType = unboundType->getParent())
-      subs = parentType->getContextSubstitutions(decl->getDeclContext());
+  // type.
+  if (auto parentType = unboundType->getParent()) {
+    if (parentType->hasUnboundGenericType()) {
+      assert(!resultType->hasTypeParameter());
+      return resultType;
+    }
+
+    subs = parentType->getContextSubstitutions(decl->getDeclContext());
+
+    hasTypeParameterOrVariable |=
+      (parentType->hasTypeParameter() || parentType->hasTypeVariable());
+  }
 
   SourceLoc noteLoc = decl->getLoc();
   if (noteLoc.isInvalid())
@@ -675,7 +681,6 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Realize the types of the generic arguments and add them to the
   // substitution map.
-  bool hasTypeParameterOrVariable = false;
   for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
     auto &genericArg = genericArgs[i];
 

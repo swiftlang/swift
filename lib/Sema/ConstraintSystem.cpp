@@ -379,7 +379,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
 
   if (parentTy) {
     auto subs = parentTy->getContextSubstitutions(
-      parentTy->getAnyNominal());
+      unboundDecl->getDeclContext());
     for (auto pair : subs) {
       auto found = replacements.find(
         cast<GenericTypeParamType>(pair.first));
