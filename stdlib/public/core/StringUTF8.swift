@@ -174,6 +174,8 @@ extension String {
     internal let _startIndex: Index
     internal let _endIndex: Index
 
+    internal let _isSlice: Bool
+
     init(_ _core: _StringCore) {
       self._core = _core
       self._endIndex = Index(_coreIndex: _core.endIndex, Index._emptyBuffer)
@@ -183,12 +185,18 @@ extension String {
       } else {
         self._startIndex = self._endIndex
       }
+      self._isSlice = false
     }
 
     init(_ _core: _StringCore, _ s: Index, _ e: Index) {
       self._core = _core
       self._startIndex = s
       self._endIndex = e
+      self._isSlice = true
+    }
+
+    public var underestimatedCount: Int {
+      return self._isSlice ? count : _core.count
     }
 
     /// A position in a string's `UTF8View` instance.
