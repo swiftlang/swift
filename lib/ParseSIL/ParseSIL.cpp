@@ -354,7 +354,7 @@ namespace {
     bool parseScopeRef(SILDebugScope *&DS);
     bool parseSILDebugLocation(SILLocation &L, SILBuilder &B,
                                bool parsedComma = false);
-    bool parseSILInstruction(SILBasicBlock *BB, SILBuilder &B);
+    bool parseSILInstruction(SILBuilder &B);
     bool parseCallInstruction(SILLocation InstLoc,
                               ValueKind Opcode, SILBuilder &B,
                               SILInstruction *&ResultVal);
@@ -1798,7 +1798,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
 
 /// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 ///                         (',' sil-scope-ref)? (',' sil-loc)?
-bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
+bool SILParser::parseSILInstruction(SILBuilder &B) {
   // We require SIL instructions to be at the start of a line to assist
   // recovery.
   if (!P.Tok.isAtStartOfLine()) {
@@ -1826,7 +1826,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   if (parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
     return true;
 
-  B.setInsertionPoint(BB);
   SmallVector<SILValue, 4> OpList;
   SILValue Val;
   SILType Ty;
@@ -3607,7 +3606,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
 
     auto I1Ty =
-      SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
+      SILType::getBuiltinIntegerType(1, SILMod.getASTContext());
     SILValue CondVal = getLocalValue(Cond, I1Ty, InstLoc, B);
     ResultVal = B.createCondBranch(InstLoc, CondVal,
                                    getBBForReference(BBName, NameLoc),
@@ -4684,8 +4683,9 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   if (AssumeUnqualifiedOwnershipWhenParsing) {
     F->setUnqualifiedOwnership();
   }
+  B.setInsertionPoint(BB);
   do {
-    if (parseSILInstruction(BB, B))
+    if (parseSILInstruction(B))
       return true;
     // Evaluate how the just parsed instruction effects this functions Ownership
     // Qualification. For more details, see the comment on the
