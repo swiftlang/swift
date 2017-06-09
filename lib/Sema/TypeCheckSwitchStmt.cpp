@@ -322,26 +322,11 @@ namespace {
           if (this->Head.compare(other.Head) != 0) {
             return false;
           }
-
-          // Special Case: A constructor pattern may include the head but not
-          // the payload patterns.  In that case the space is covered.
-          // This also acts to short-circuit comparisons with payload-less
+          
+          // Special Case: Short-circuit comparisons with payload-less
           // constructors.
           if (other.getSpaces().empty()) {
             return true;
-          }
-
-          // If 'this' constructor pattern has no payload and the other space
-          // does, then 'this' covers more of the space only if the other
-          // constructor isn't the explicit form.
-          //
-          // .case <= .case(_, _, _, ...)
-          if (this->getSpaces().empty()) {
-            return std::accumulate(other.getSpaces().begin(),
-                                   other.getSpaces().end(),
-                                   true, [](bool acc, const Space sp){
-              return acc && sp.getKind() == SpaceKind::Type;
-            });
           }
 
           // H(a1, ..., an) <= H(b1, ..., bn) iff a1 <= b1 && ... && an <= bn
@@ -478,10 +463,9 @@ namespace {
           if (this->getHead().compare(other.Head) != 0) {
             return Space();
           }
-
-          // Special Case: A constructor pattern may include the head but not
-          // the payload patterns.  In that case, the intersection is the
-          // whole original space.
+          
+          // Special Case: Short circuit patterns without payloads.  Their
+          // intersection is the whole space.
           if (other.getSpaces().empty()) {
             return *this;
           }
@@ -626,13 +610,12 @@ namespace {
             return *this;
           }
 
-          // Special Case: A constructor pattern may include the head but not
-          // the payload patterns.  In that case, because the heads match, it
-          // covers the whole space.
+          // Special Case: Short circuit patterns without payloads.  Their
+          // difference is empty.
           if (other.getSpaces().empty()) {
             return Space();
           }
-
+          
           SmallVector<Space, 4> constrSpaces;
           bool foundBad = false;
           auto i = this->getSpaces().begin();
@@ -1326,6 +1309,8 @@ namespace {
           // Special Case: A constructor pattern may have all of its payload
           // matched by a single var pattern.  Project it like the tuple it
           // really is.
+          //
+          // FIXME: SE-0155 makes this case unreachable.
           if (SP->getKind() == PatternKind::Named
               || SP->getKind() == PatternKind::Any
               || SP->getKind() == PatternKind::Tuple) {
