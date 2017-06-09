@@ -3708,8 +3708,8 @@ static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
   if (CS->TC.getLangOpts().FixStringToSubstringConversions) {
     // String -> Substring conversion
     // Add '[]' void subscript call to turn the whole String into a Substring
-    if (fromType->getCanonicalType() == String->getCanonicalType()) {
-      if (toType->getCanonicalType() == Substring->getCanonicalType()) {
+    if (fromType->isEqual(String)) {
+      if (toType->isEqual(Substring)) {
         diag.fixItInsertAfter(expr->getEndLoc (), "[]");
         return true;
       }
@@ -3718,8 +3718,8 @@ static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
 
   // Substring -> String conversion
   // Wrap in String.init
-  if (fromType->getCanonicalType() == Substring->getCanonicalType()) {
-    if (toType->getCanonicalType() == String->getCanonicalType()) {
+  if (fromType->isEqual(Substring)) {
+    if (toType->isEqual(String)) {
       diag.fixItInsert(expr->getLoc(), "String(");
       diag.fixItInsertAfter(expr->getSourceRange().End, ")");
       return true;
