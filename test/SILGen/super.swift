@@ -82,21 +82,49 @@ public class GreatGrandchild : Grandchild {
 }
 
 public class ChildToResilientParent : ResilientOutsideParent {
+  // CHECK-LABEL: sil @_T05super22ChildToResilientParentC6methodyyF : $@convention(method) (@guaranteed ChildToResilientParent) -> ()
   public override func method() {
+    // CHECK: [[COPY:%.*]] = copy_value %0
+    // CHECK: super_method [[COPY]] : $ChildToResilientParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+    // CHECK: return
     super.method()
   }
 
+  // CHECK-LABEL: sil @_T05super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> ()
   public override class func classMethod() {
+    // CHECK: super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+    // CHECK: return
+    super.classMethod()
+  }
+
+  // CHECK-LABEL: sil @_T05super22ChildToResilientParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> @owned ChildToResilientParent
+  public class func returnsSelf() -> Self {
+    // CHECK: super_method %0 : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> ()
+    // CHECK: unreachable
     super.classMethod()
   }
 }
 
 public class ChildToFixedParent : OutsideParent {
+  // CHECK-LABEL: sil @_T05super18ChildToFixedParentC6methodyyF : $@convention(method) (@guaranteed ChildToFixedParent) -> ()
   public override func method() {
+    // CHECK: [[COPY:%.*]] = copy_value %0
+    // CHECK: super_method [[COPY]] : $ChildToFixedParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
+    // CHECK: return
     super.method()
   }
 
+  // CHECK-LABEL: sil @_T05super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> ()
   public override class func classMethod() {
+    // CHECK: super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
+    // CHECK: return
+    super.classMethod()
+  }
+
+  // CHECK-LABEL: sil @_T05super18ChildToFixedParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> @owned ChildToFixedParent
+  public class func returnsSelf() -> Self {
+    // CHECK: super_method %0 : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> ()
+    // CHECK: unreachable
     super.classMethod()
   }
 }

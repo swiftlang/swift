@@ -147,6 +147,19 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
   return false;
 }
 
+static SILValue getOriginalSelfValue(SILValue selfValue) {
+  if (auto *BBI = dyn_cast<BeginBorrowInst>(selfValue))
+    selfValue = BBI->getOperand();
+
+  while (auto *UI = dyn_cast<UpcastInst>(selfValue))
+    selfValue = UI->getOperand();
+
+  if (auto *UTBCI = dyn_cast<UncheckedTrivialBitCastInst>(selfValue))
+    selfValue = UTBCI->getOperand();
+
+  return selfValue;
+}
+
 namespace {
 
 /// Abstractly represents a callee, which may be a constant or function value,
@@ -290,9 +303,7 @@ public:
                                SILDeclRef c,
                                SubstitutionList subs,
                                SILLocation l) {
-    while (auto *UI = dyn_cast<UpcastInst>(selfValue))
-      selfValue = UI->getOperand();
-
+    selfValue = getOriginalSelfValue(selfValue);
     auto formalType = getConstantFormalInterfaceType(SGF, c);
     return Callee(Kind::SuperMethod, SGF, selfValue, c,
                   formalType, formalType, subs, l);
@@ -4480,12 +4491,8 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   auto loc = uncurriedLoc.getValue();
   auto subs = callee.getSubstitutions();
   auto upcastedSelf = uncurriedArgs.back();
-  SILValue upcastedSelfValue = upcastedSelf.getValue();
-  // Support stripping off a borrow.
-  if (auto *borrowedSelf = dyn_cast<BeginBorrowInst>(upcastedSelfValue)) {
-    upcastedSelfValue = borrowedSelf->getOperand();
-  }
-  SILValue self = cast<UpcastInst>(upcastedSelfValue)->getOperand();
+  auto upcastedSelfValue = upcastedSelf.getValue();
+  auto self = getOriginalSelfValue(upcastedSelfValue);
   auto constantInfo = SGF.getConstantInfo(callee.getMethodName());
   auto functionTy = constantInfo.getSILType();
   SILValue superMethodVal =
