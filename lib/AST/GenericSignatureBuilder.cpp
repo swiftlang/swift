@@ -4940,9 +4940,9 @@ void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
 namespace {
   /// Retrieve the best requirement source from a set of constraints.
   template<typename T>
-  const RequirementSource *getBestConstraintSource(
-                                  ArrayRef<Constraint<T>> constraints,
-                                  llvm::function_ref<bool(const T&)> matches) {
+  Optional<const RequirementSource *>
+  getBestConstraintSource(ArrayRef<Constraint<T>> constraints,
+                          llvm::function_ref<bool(const T&)> matches) {
     Optional<const RequirementSource *> bestSource;
     for (const auto &constraint : constraints) {
       if (!matches(constraint.value)) continue;
@@ -4950,7 +4950,8 @@ namespace {
       if (!bestSource || constraint.source->compare(*bestSource) < 0)
         bestSource = constraint.source;
     }
-    return *bestSource;
+
+    return bestSource;
   }
 } // end anonymous namespace
 
@@ -5054,22 +5055,30 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
 
     // If we have a superclass, produce a superclass requirement
     if (equivClass->superclass && !equivClass->recursiveSuperclassType) {
-      f(RequirementKind::Superclass, archetype, equivClass->superclass,
+      auto bestSource =
         getBestConstraintSource<Type>(equivClass->superclassConstraints,
-                        [&](const Type &type) {
-                          return type->isEqual(equivClass->superclass) ||
-                            equivClass->superclass->hasError();
-                        }));
+           [&](const Type &type) {
+             return type->isEqual(equivClass->superclass);
+          });
+
+      if (!bestSource)
+        bestSource = RequirementSource::forAbstract(archetype);
+
+      f(RequirementKind::Superclass, archetype, equivClass->superclass,
+        *bestSource);
     }
 
     // If we have a layout constraint, produce a layout requirement.
     if (equivClass->layout) {
-      f(RequirementKind::Layout, archetype, equivClass->layout,
-        getBestConstraintSource<LayoutConstraint>(
-                        equivClass->layoutConstraints,
-                                    [&](const LayoutConstraint &layout) {
-                                      return layout == equivClass->layout;
-                                    }));
+      auto bestSource = getBestConstraintSource<LayoutConstraint>(
+                          equivClass->layoutConstraints,
+                          [&](const LayoutConstraint &layout) {
+                            return layout == equivClass->layout;
+                          });
+      if (!bestSource)
+        bestSource = RequirementSource::forAbstract(archetype);
+
+      f(RequirementKind::Layout, archetype, equivClass->layout, *bestSource);
     }
 
     // Enumerate conformance requirements.
@@ -5083,7 +5092,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
 
         protocolSources.insert(
           {conforms.first,
-           getBestConstraintSource<ProtocolDecl *>(conforms.second,
+           *getBestConstraintSource<ProtocolDecl *>(conforms.second,
              [&](ProtocolDecl *proto) {
                return proto == conforms.first;
              })});
