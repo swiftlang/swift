@@ -42,7 +42,7 @@ struct OwnershipModelEliminatorVisitor
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   OwnershipModelEliminatorVisitor(SILBuilder &B)
-      : B(B), OpenedArchetypesTracker(B.getFunction()) {
+      : B(B), OpenedArchetypesTracker(&B.getFunction()) {
     B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 

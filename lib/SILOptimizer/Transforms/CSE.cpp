@@ -682,7 +682,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   }
   // Now process candidates.
   // TODO: Move it to CSE instance to avoid recreating it every time?
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*Inst->getFunction());
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(Inst->getFunction());
   // Register the new archetype to be used.
   OpenedArchetypesTracker.registerOpenedArchetypes(dyn_cast<SILInstruction>(V));
   // Use a cloner. It makes copying the instruction and remapping of
@@ -993,7 +993,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
 
   SILBuilder Builder(FromAI);
   // Make archetypes used by the ToAI available to the builder.
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*FromAI->getFunction());
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(FromAI->getFunction());
   OpenedArchetypesTracker.registerUsedOpenedArchetypes(ToAI);
   Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 

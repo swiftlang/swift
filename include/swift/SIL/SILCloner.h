@@ -49,8 +49,7 @@ public:
   }
 
   explicit SILCloner(SILFunction &F)
-      : Builder(F), InsertBeforeBB(nullptr),
-        OpenedArchetypesTracker(F) {
+      : Builder(F), InsertBeforeBB(nullptr), OpenedArchetypesTracker(&F) {
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 

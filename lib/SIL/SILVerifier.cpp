@@ -432,7 +432,7 @@ public:
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getLoweredFunctionType(), F.getModule()),
-        TC(F.getModule().Types), OpenedArchetypes(F), Dominance(nullptr),
+        TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
         DEBlocks(&F), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
@@ -4093,7 +4093,7 @@ public:
   }
 
   void verifyOpenedArchetypes(SILFunction *F) {
-    require(&OpenedArchetypes.getFunction() == F,
+    require(OpenedArchetypes.getFunction() == F,
            "Wrong SILFunction provided to verifyOpenedArchetypes");
     // Check that definitions of all opened archetypes from
     // OpenedArchetypesDefs are existing instructions

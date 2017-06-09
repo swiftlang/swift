@@ -4791,7 +4791,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
       // Parse the basic block list.
       FunctionState.OwnershipEvaluator.reset(FunctionState.F);
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(*FunctionState.F);
+      SILOpenedArchetypesTracker OpenedArchetypesTracker(FunctionState.F);
       SILBuilder B(*FunctionState.F, /*isParsing*/ true);
       // Track the archetypes just like SILGen. This
       // is required for adding typedef operands to instructions.

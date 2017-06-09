@@ -566,7 +566,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   LocalValues.clear();
   ForwardLocalValues.clear();
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(*fn);
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(fn);
   SILBuilder Builder(*fn);
   // Track the archetypes just like SILGen. This
   // is required for adding typedef operands to instructions.
