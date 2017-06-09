@@ -1462,6 +1462,35 @@ recur:
                      resolver))
         return true;
       EEP->setSubPattern(sub);
+    } else if (auto argType = elt->getArgumentInterfaceType()) {
+      // Else if the element pattern has no sub-pattern but the element type has
+      // associated values, expand it to be semantically equivalent to an
+      // element pattern of wildcards.
+      Type elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
+                                                 elt, argType);
+      SmallVector<TuplePatternElt, 8> elements;
+      if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
+        for (auto &elt : TTy->getElements()) {
+          auto *subPattern = new (Context) AnyPattern(SourceLoc());
+          elements.push_back(TuplePatternElt(elt.getName(), SourceLoc(),
+                                             subPattern));
+        }
+      } else {
+        auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
+        assert(parenTy && "Associated value type is neither paren nor tuple?");
+        
+        auto *subPattern = new (Context) AnyPattern(SourceLoc());
+        elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
+                                           subPattern));
+      }
+      Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
+                                                elements, SourceLoc(),
+                                                /*implicit*/true);
+      if (coercePatternToType(sub, dc, elementType,
+                              subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
+                              resolver))
+        return true;
+      EEP->setSubPattern(sub);
     }
 
     EEP->setElementDecl(elt);

@@ -6,6 +6,19 @@ func foo(a: Int?, b: Int?) -> Int {
   case (_, .none): return 2
   case (.some(_), .some(_)): return 3
   }
+    
+  switch (a, b) {
+  case (.none, _): return 1
+  case (_, .none): return 2
+  case (_?, _?): return 3
+  }
+  
+  switch Optional<(Int?, Int?)>.some((a, b)) {
+  case .none: return 1
+  case let (_, x?)?: return x
+  case let (x?, _)?: return x
+  case (.none, .none)?: return 0
+  }
 }
 
 func bar(a: Bool, b: Bool) -> Int {
@@ -46,6 +59,15 @@ func foo() {
     ()
   case (_, .B(_)):
     ()
+  }
+  
+  switch (Foo.A(1), Optional<(Int, Int)>.some((0, 0))) {
+  case (.A(_), _):
+    break
+  case (.B(_), (let q, _)?):
+    print(q)
+  case (.B(_), nil):
+    break
   }
 }
 
@@ -390,6 +412,12 @@ enum OverlyLargeSpaceEnum {
   case case11
 }
 
+enum ContainsOverlyLargeEnum {
+  case one(OverlyLargeSpaceEnum)
+  case two(OverlyLargeSpaceEnum)
+  case three(OverlyLargeSpaceEnum, OverlyLargeSpaceEnum)
+}
+
 func quiteBigEnough() -> Bool {
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{do you want to add a default clause?}}
@@ -468,6 +496,13 @@ func quiteBigEnough() -> Bool {
   case (.case2, .case2): return true
   case (.case3, .case3): return true
   case _: return true
+  }
+  
+  // No diagnostic
+  switch ContainsOverlyLargeEnum.one(.case0) {
+  case .one: return true
+  case .two: return true
+  case .three: return true
   }
 }
 
