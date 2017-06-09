@@ -6233,7 +6233,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       diag.highlight(rhsExpr->getSourceRange());
       if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
         if (lhsType->isEqual(optUnwrappedType)) {
-          diag.fixItInsert(lhsExpr->getEndLoc(), "?");
+          diag.fixItInsertAfter(lhsExpr->getEndLoc(), "?");
         }
       }
       return true;
