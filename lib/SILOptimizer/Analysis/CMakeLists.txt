@@ -8,6 +8,7 @@ set(ANALYSIS_SOURCES
   Analysis/CallerAnalysis.cpp
   Analysis/CFG.cpp
   Analysis/ClassHierarchyAnalysis.cpp
+  Analysis/ClosureScope.cpp
   Analysis/ColdBlockInfo.cpp
   Analysis/DestructorAnalysis.cpp
   Analysis/EscapeAnalysis.cpp
