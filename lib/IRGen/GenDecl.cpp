@@ -1352,9 +1352,8 @@ bool LinkEntity::isFragile(ForDefinition_t isDefinition) const {
     auto isCompletelySerialized = conformanceModule->getResilienceStrategy() ==
                                   ResilienceStrategy::Fragile;
 
-    // The conformance is fragile if it is in a -sil-serialize-all module, or
-    // has a fully publicly determined layout.
-    return isCompletelySerialized || conformance->hasFixedLayout();
+    // The conformance is fragile if it is in a -sil-serialize-all module.
+    return isCompletelySerialized;
   }
   return false;
 }
