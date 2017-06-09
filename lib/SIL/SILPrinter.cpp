@@ -2674,14 +2674,12 @@ SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
   OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
   DebugInfo(DebugInfo) { }
 
-SILPrintContext::SILPrintFunctionContext &
-SILPrintContext::getFuncContext(const SILFunction *F) {
-  if (F != FuncCtx.F) {
-    FuncCtx.BlocksToIDMap.clear();
-    FuncCtx.ValueToIDMap.clear();
-    FuncCtx.F = F;
+void SILPrintContext::setContext(const void *FunctionOrBlock) {
+  if (FunctionOrBlock != ContextFunctionOrBlock) {
+    BlocksToIDMap.clear();
+    ValueToIDMap.clear();
+    ContextFunctionOrBlock = FunctionOrBlock;
   }
-  return FuncCtx;
 }
 
 SILPrintContext::~SILPrintContext() {
@@ -2694,19 +2692,19 @@ void SILPrintContext::initBlockIDs(ArrayRef<const SILBasicBlock *> Blocks) {
   if (Blocks.empty())
     return;
 
-  auto funcCtx = getFuncContext(Blocks[0]->getParent());
+  setContext(Blocks[0]->getParent());
 
   // Initialize IDs so our IDs are in RPOT as well. This is a hack.
   for (unsigned Index : indices(Blocks))
-    funcCtx.BlocksToIDMap[Blocks[Index]] = Index;
+    BlocksToIDMap[Blocks[Index]] = Index;
 }
 
 ID SILPrintContext::getID(const SILBasicBlock *Block) {
-  auto funcCtx = getFuncContext(Block->getParent());
+  setContext(Block->getParent());
 
   // Lazily initialize the Blocks-to-IDs mapping.
   // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
-  if (funcCtx.BlocksToIDMap.empty()) {
+  if (BlocksToIDMap.empty()) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
@@ -2714,28 +2712,37 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
       for (unsigned Index : indices(RPOT))
-        funcCtx.BlocksToIDMap[RPOT[Index]] = Index;
+        BlocksToIDMap[RPOT[Index]] = Index;
     } else {
       unsigned idx = 0;
       for (const SILBasicBlock &B : *Block->getParent())
-        funcCtx.BlocksToIDMap[&B] = idx++;
+        BlocksToIDMap[&B] = idx++;
     }
   }
-  ID R = {ID::SILBasicBlock, funcCtx.BlocksToIDMap[Block]};
+  ID R = {ID::SILBasicBlock, BlocksToIDMap[Block]};
   return R;
 }
 
 ID SILPrintContext::getID(SILValue V) {
   if (isa<SILUndef>(V))
     return {ID::SILUndef, 0};
-
-  auto funcCtx = getFuncContext(V->getFunction());
-
-  // Lazily initialize the instruction -> ID mapping.
-  if (funcCtx.ValueToIDMap.empty()) {
-    V->getParentBlock()->getParent()->numberValues(funcCtx.ValueToIDMap);
+  
+  SILBasicBlock *BB = V->getParentBlock();
+  if (SILFunction *F = BB->getParent()) {
+    setContext(F);
+    // Lazily initialize the instruction -> ID mapping.
+    if (ValueToIDMap.empty())
+      F->numberValues(ValueToIDMap);
+  } else {
+    setContext(BB);
+    // Lazily initialize the instruction -> ID mapping.
+    if (ValueToIDMap.empty()) {
+      unsigned idx = 0;
+      for (auto &I : *BB) {
+        ValueToIDMap[&I] = idx++;
+      }
+    }
   }
-
-  ID R = {ID::SSAValue, funcCtx.ValueToIDMap[V]};
+  ID R = {ID::SSAValue, ValueToIDMap[V]};
   return R;
 }

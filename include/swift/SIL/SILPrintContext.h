@@ -48,16 +48,9 @@ protected:
   // Cache block and value identifiers for this function. This is useful in
   // general for identifying entities, not just emitting textual SIL.
   //
-  // TODO: It would be more disciplined for the caller to provide a function
-  // context. That way it would be impossible for IDs to change meaning within
-  // the caller's scope.
-  struct SILPrintFunctionContext {
-    const SILFunction *F = nullptr;
-    llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
-    llvm::DenseMap<const ValueBase *, unsigned> ValueToIDMap;
-  };
-
-  SILPrintFunctionContext FuncCtx;
+  const void *ContextFunctionOrBlock = nullptr;
+  llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
+  llvm::DenseMap<const ValueBase *, unsigned> ValueToIDMap;
 
   llvm::raw_ostream &OutStream;
 
@@ -84,7 +77,7 @@ public:
 
   virtual ~SILPrintContext();
 
-  SILPrintFunctionContext &getFuncContext(const SILFunction *F);
+  void setContext(const void *FunctionOrBlock);
 
   // Initialized block IDs from the order provided in `blocks`.
   void initBlockIDs(ArrayRef<const SILBasicBlock *> Blocks);
