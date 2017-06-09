@@ -152,3 +152,34 @@ class Classical : Elementary {
 }
 
 func genericFunc<T : Elementary, U : Classical>(_: T, _: U) where T.Element == U.Element {}
+
+// Lookup within superclass constraints.
+protocol P8 {
+  associatedtype B
+}
+
+class C8 {
+  struct A { }
+}
+
+func superclassLookup1<T: C8 & P8>(_: T) where T.A == T.B { }
+
+func superclassLookup2<T: P8>(_: T) where T.A == T.B, T: C8 { }
+
+func superclassLookup3<T>(_: T) where T.A == T.B, T: C8, T: P8 { }
+
+// SR-5165
+class C9 {}
+
+protocol P9 {}
+
+class C10 : C9, P9 { }
+
+protocol P10 {
+  associatedtype A: C9
+}
+
+// CHECK: superclass_constraint.(file).testP10
+// CHECK: Generic signature: <T where T : P10, T.A : C10>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0.A : C10>
+func testP10<T>(_: T) where T: P10, T.A: C10 { }
