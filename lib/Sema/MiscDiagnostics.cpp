@@ -2247,7 +2247,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
       SourceLoc FixItLoc;
-      
+
       // Try to find the location of the 'var' so we can produce a fixit.  If
       // this is a simple PatternBinding, use its location.
       if (auto *PBD = var->getParentPatternBinding()) {
@@ -2270,11 +2270,25 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (FixItLoc.isInvalid())
         Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
                        var->getName(), varKind);
-      else
-        Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                       var->getName(), varKind)
-          .fixItReplace(FixItLoc, "let");
-      continue;
+      else {
+        bool suggestLet = true;
+        if (auto *stmt = var->getParentPatternStmt()) {
+          // Don't try to suggest 'var' -> 'let' conversion
+          // in case of 'for' loop because it's an implicitly
+          // immutable context.
+          suggestLet = !isa<ForEachStmt>(stmt);
+        }
+
+        auto diag = Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+                                   var->getName(), varKind);
+
+        if (suggestLet)
+          diag.fixItReplace(FixItLoc, "let");
+        else
+          diag.fixItRemove(FixItLoc);
+
+        continue;
+      }
     }
     
     // If this is a variable that was only written to, emit a warning.

@@ -978,3 +978,8 @@ let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
 // expected-error@-1 {{type 'Int' has no member 'unknown'}}
 let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
 // expected-error@-1 {{type 'Int' has no member 'unknown'}}
+
+// rdar://problem/32390726 - Bad Diagnostic: Don't suggest `var` to `let` when binding inside for-statement
+for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{5-9=}}
+  _ = i + 1
+}

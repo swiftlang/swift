@@ -197,7 +197,7 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
     _ = b2
   }
   
-  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
+  for var b in [42] { // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-11=}}
     _ = b
   }
 
