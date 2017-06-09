@@ -1210,7 +1210,9 @@ Global Variables
 ::
 
   decl ::= sil-global-variable
+  static-initializer ::= '=' '{' sil-instruction-def* '}'
   sil-global-variable ::= 'sil_global' sil-linkage identifier ':' sil-type
+                             (static-initializer)?
 
 SIL representation of a global variable.
 
@@ -1220,6 +1222,19 @@ SIL instructions. Prior to performing any access on the global, the
 
 Once a global's storage has been initialized, ``global_addr`` is used to
 project the value.
+
+A global can also have a static initializer if it's initial value can be
+composed of literals. The static initializer is represented as a list of
+literal and aggregate instructions where the last instruction is the top-level
+value of the static initializer::
+
+  sil_global hidden @_T04test3varSiv : $Int {
+    %0 = integer_literal $Builtin.Int64, 27
+    %initval = struct $Int (%0 : $Builtin.Int64)
+  }
+
+In case a global has a static initializer, no ``alloc_global`` is needed before
+it can be accessed.
 
 Dataflow Errors
 ---------------

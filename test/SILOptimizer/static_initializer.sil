@@ -7,7 +7,10 @@ import Swift
 // CHECK-NOT: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
+// CHECK: sil_global @_Tv2ch1xSi : $Int32 = {
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:   %initval = struct $Int32 (%0 : $Builtin.Int32)
+// CHECK-NEXT: }
 sil_global @_Tv2ch1xSi : $Int32
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {

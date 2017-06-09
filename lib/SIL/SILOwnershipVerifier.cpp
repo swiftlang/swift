@@ -2116,6 +2116,9 @@ bool SILValueOwnershipChecker::checkDataflow() {
 
 void SILInstruction::verifyOperandOwnership() const {
 #ifndef NDEBUG
+  if (isStaticInitializerInst())
+    return;
+
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().EnableSILOwnership)
     return;

@@ -5076,7 +5076,8 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
 void IRGenModule::emitSILStaticInitializers() {
   SmallVector<SILFunction *, 8> StaticInitializers;
   for (SILGlobalVariable &Global : getSILModule().getSILGlobals()) {
-    if (!Global.getInitializer())
+    SILInstruction *InitValue = Global.getStaticInitializerValue();
+    if (!InitValue)
       continue;
 
     auto *IRGlobal =
@@ -5086,8 +5087,6 @@ void IRGenModule::emitSILStaticInitializers() {
     // global is defined and not only referenced (or not referenced at all).
     if (!IRGlobal || !IRGlobal->hasInitializer())
       continue;
-
-    auto *InitValue = Global.getValueOfStaticInitializer();
 
     // Set the IR global's initializer to the constant for this SIL
     // struct.

@@ -23,21 +23,23 @@ public struct S2 {
 // CHECK: %T18static_initializer2S2V = type <{ %Ts5Int32V, %Ts5Int32V, %T18static_initializer1SV }>
 // CHECK: %T18static_initializer1SV = type <{ %Ts5Int32V }>
 
-sil_global @_T02ch1xSiv : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
+sil_global @_T02ch1xSiv : $Int32 = {
+  %1 = integer_literal $Builtin.Int32, 2
+  %initval = struct $Int32 (%1 : $Builtin.Int32)
+}
 // CHECK: @_T02ch1xSiv = {{(protected )?}}global %Ts5Int32V <{ i32 2 }>, align 4
 
-sil_global @_T06nested1xAA2S2Vv : $S2, @globalinit_func1 : $@convention(thin) () -> ()
-// CHECK: @_T06nested1xAA2S2Vv = {{(protected )?}}global %T18static_initializer2S2V <{ %Ts5Int32V <{ i32 2 }>, %Ts5Int32V <{ i32 3 }>, %T18static_initializer1SV <{ %Ts5Int32V <{ i32 4 }> }> }>, align 4
-
-sil private @globalinit_func0 : $@convention(thin) () -> () {
-bb0:
-  %0 = global_addr @_T02ch1xSiv : $*Int32
+sil_global @_T06nested1xAA2S2Vv : $S2 = {
   %1 = integer_literal $Builtin.Int32, 2
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  store %2 to %0 : $*Int32
-  %4 = tuple ()
-  return %4 : $()
+  %3 = integer_literal $Builtin.Int32, 3
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = integer_literal $Builtin.Int32, 4
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %7 = struct $S (%6 : $Int32)
+  %initval = struct $S2 (%2 : $Int32, %4 : $Int32, %7 : $S)
 }
+// CHECK: @_T06nested1xAA2S2Vv = {{(protected )?}}global %T18static_initializer2S2V <{ %Ts5Int32V <{ i32 2 }>, %Ts5Int32V <{ i32 3 }>, %T18static_initializer1SV <{ %Ts5Int32V <{ i32 4 }> }> }>, align 4
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
@@ -58,22 +60,6 @@ bb0:
   %0 = global_addr @_T02ch1xSiv : $*Int32
   %1 = load %0 : $*Int32
   return %1 : $Int32
-}
-
-sil private @globalinit_func1 : $@convention(thin) () -> () {
-bb0:
-  %0 = global_addr @_T06nested1xAA2S2Vv : $*S2
-  %1 = integer_literal $Builtin.Int32, 2
-  %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = integer_literal $Builtin.Int32, 3
-  %4 = struct $Int32 (%3 : $Builtin.Int32)
-  %5 = integer_literal $Builtin.Int32, 4
-  %6 = struct $Int32 (%5 : $Builtin.Int32)
-  %7 = struct $S (%6 : $Int32)
-  %8 = struct $S2 (%2 : $Int32, %4 : $Int32, %7 : $S)
-  store %8 to %0 : $*S2
-  %10 = tuple ()
-  return %10 : $()
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF6nesteda1xVS_2S2() {{.*}} {

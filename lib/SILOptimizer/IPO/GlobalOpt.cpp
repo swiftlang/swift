@@ -103,6 +103,7 @@ protected:
                                 SILFunction *AddrF,
                                 SILFunction *InitF,
                                 SILGlobalVariable *SILG,
+                                SILInstruction *InitVal,
                                 GlobalInitCalls &Calls);
 };
 
@@ -607,10 +608,139 @@ static SILInstruction *convertLoadSequence(SILInstruction *I,
   return nullptr;
 }
 
+static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *InitFunc,
+                                                   SILInstruction *&InitVal) {
+  InitVal = nullptr;
+  SILGlobalVariable *GVar = nullptr;
+  // We only handle a single SILBasicBlock for now.
+  if (InitFunc->size() != 1)
+    return nullptr;
+
+  SILBasicBlock *BB = &InitFunc->front();
+  GlobalAddrInst *SGA = nullptr;
+  bool HasStore = false;
+  for (auto &I : *BB) {
+    // Make sure we have a single GlobalAddrInst and a single StoreInst.
+    // And the StoreInst writes to the GlobalAddrInst.
+    if (isa<AllocGlobalInst>(&I) || isa<ReturnInst>(&I)
+        || isa<DebugValueInst>(&I)) {
+      continue;
+    } else if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
+      if (SGA)
+        return nullptr;
+      SGA = sga;
+      GVar = SGA->getReferencedGlobal();
+    } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+      if (HasStore || SI->getDest() != SGA)
+        return nullptr;
+      HasStore = true;
+      InitVal = dyn_cast<SILInstruction>(SI->getSrc());
+
+      // We only handle StructInst and TupleInst being stored to a
+      // global variable for now.
+      if (!isa<StructInst>(InitVal) && !isa<TupleInst>(InitVal))
+        return nullptr;
+    } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I)) {
+      return nullptr;
+    }
+  }
+  if (!InitVal)
+    return nullptr;
+  return GVar;
+}
+
+namespace {
+
+/// Utility class for cloning init values into the static initializer of a
+/// SILGlobalVariable.
+class StaticInitCloner : public SILCloner<StaticInitCloner> {
+  friend class SILVisitor<StaticInitCloner>;
+  friend class SILCloner<StaticInitCloner>;
+
+  /// The number of not yet cloned operands for each instruction.
+  llvm::DenseMap<SILInstruction *, int> NumOpsToClone;
+
+  /// List of instructions for which all operands are already cloned (or which
+  /// don't have any operands).
+  llvm::SmallVector<SILInstruction *, 8> ReadyToClone;
+
+public:
+  StaticInitCloner(SILGlobalVariable *GVar)
+      : SILCloner<StaticInitCloner>(GVar) { }
+
+  /// Add \p InitVal and all its operands (transitively) for cloning.
+  ///
+  /// Note: all init values must are added, before calling clone().
+  void add(SILInstruction *InitVal);
+
+  /// Clone \p InitVal and all its operands into the initializer of the
+  /// SILGlobalVariable.
+  ///
+  /// \return Returns the cloned instruction in the SILGlobalVariable.
+  SILInstruction *clone(SILInstruction *InitVal);
+
+  /// Convenience function to clone a single \p InitVal.
+  static void appendToInitializer(SILGlobalVariable *GVar,
+                                  SILInstruction *InitVal) {
+    StaticInitCloner Cloner(GVar);
+    Cloner.add(InitVal);
+    Cloner.clone(InitVal);
+  }
+
+protected:
+  SILLocation remapLocation(SILLocation Loc) {
+    return ArtificialUnreachableLocation();
+  }
+};
+
+void StaticInitCloner::add(SILInstruction *InitVal) {
+  // Don't schedule an instruction twice for cloning.
+  if (NumOpsToClone.count(InitVal) != 0)
+    return;
+
+  ArrayRef<Operand> Ops = InitVal->getAllOperands();
+  NumOpsToClone[InitVal] = Ops.size();
+  if (Ops.empty()) {
+    // It's an instruction without operands, e.g. a literal. It's ready to be
+    // cloned first.
+    ReadyToClone.push_back(InitVal);
+  } else {
+    // Recursively add all operands.
+    for (const Operand &Op : Ops) {
+      add(cast<SILInstruction>(Op.get()));
+    }
+  }
+}
+
+SILInstruction *StaticInitCloner::clone(SILInstruction *InitVal) {
+  assert(NumOpsToClone.count(InitVal) != 0 && "InitVal was not added");
+  // Find the right order to clone: all operands of an instruction must be
+  // cloned before the instruction itself.
+  while (!ReadyToClone.empty()) {
+    SILInstruction *I = ReadyToClone.pop_back_val();
+
+    // Clone the instruction into the SILGlobalVariable
+    visit(I);
+
+    // Check if users of I can now be cloned.
+    for (Operand *Use : I->getUses()) {
+      SILInstruction *User = Use->getUser();
+      if (NumOpsToClone.count(User) != 0 && --NumOpsToClone[User] == 0)
+        ReadyToClone.push_back(User);
+    }
+  }
+  assert(InstructionMap.count(InitVal) != 0 &&
+         "Could not schedule all instructions for cloning");
+  return InstructionMap[InitVal];
+}
+
+} // end anonymous namespace
+
 /// Replace loads from a global variable by the known value.
 void SILGlobalOpt::
 replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
                          SILFunction *InitF, SILGlobalVariable *SILG,
+                         SILInstruction *InitVal,
                          GlobalInitCalls &Calls) {
   assert(isAssignedOnlyOnceInInitializer(SILG) &&
          "The value of the initializer should be known at compile-time");
@@ -672,7 +802,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   }
 
   Calls.clear();
-  SILG->setInitializer(InitF);
+  StaticInitCloner::appendToInitializer(SILG, InitVal);
 }
 
 /// We analyze the body of globalinit_func to see if it can be statically
@@ -695,8 +825,9 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
     return;
 
   // If the globalinit_func is trivial, continue; otherwise bail.
-  auto *SILG = SILGlobalVariable::getVariableOfStaticInitializer(InitF);
-  if (!SILG || !SILG->isDefinition())
+  SILInstruction *InitVal;
+  SILGlobalVariable *SILG = getVariableOfStaticInitializer(InitF, InitVal);
+  if (!SILG)
     return;
 
   DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
@@ -706,12 +837,12 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
     removeToken(CallToOnce->getOperand(0));
     CallToOnce->eraseFromParent();
-    SILG->setInitializer(InitF);
+    StaticInitCloner::appendToInitializer(SILG, InitVal);
     HasChanged = true;
     return;
   }
 
-  replaceLoadsByKnownValue(CallToOnce, AddrF, InitF, SILG, Calls);
+  replaceLoadsByKnownValue(CallToOnce, AddrF, InitF, SILG, InitVal, Calls);
   HasChanged = true;
 }
 
@@ -728,7 +859,8 @@ SILGlobalVariable *SILGlobalOpt::getVariableOfGlobalInit(SILFunction *AddrF) {
       return nullptr;
 
     // If the globalinit_func is trivial, continue; otherwise bail.
-    auto *SILG = SILGlobalVariable::getVariableOfStaticInitializer(InitF);
+    SILInstruction *dummyInitVal;
+    auto *SILG = getVariableOfStaticInitializer(InitF, dummyInitVal);
     if (!SILG || !SILG->isDefinition())
       return nullptr;
 

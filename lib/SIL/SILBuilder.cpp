@@ -12,12 +12,19 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILGlobalVariable.h"
 
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
+
+SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
+                       SmallVectorImpl<SILInstruction *> *InsertedInstrs)
+    : F(nullptr), Mod(GlobVar->getModule()), InsertedInstrs(InsertedInstrs) {
+  setInsertionPoint(&GlobVar->StaticInitializerBlock);
+}
 
 IntegerLiteralInst *SILBuilder::createIntegerLiteral(IntegerLiteralExpr *E) {
   return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E),

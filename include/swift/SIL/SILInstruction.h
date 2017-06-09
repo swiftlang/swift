@@ -138,6 +138,9 @@ public:
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
 
+  /// Is this instruction part of a static initializer of a SILGlobalVariable?
+  bool isStaticInitializerInst() const { return getFunction() == nullptr; }
+
   SILModule &getModule() const;
 
   /// This instruction's source location (AST node).

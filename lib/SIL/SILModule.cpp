@@ -91,8 +91,7 @@ SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.
   for (SILGlobalVariable &v : silGlobals)
-    if (v.getInitializer())
-      v.getInitializer()->decrementRefCount();
+    v.dropAllReferences();
 
   // Drop everything functions in this module reference.
   //

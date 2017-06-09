@@ -842,10 +842,16 @@ public:
 
     *this << "  ";
 
+    SILInstruction *I = dyn_cast<SILInstruction>(V);
+
     // Print result.
     if (V->hasValue()) {
-      ID Name = Ctx.getID(V);
-      *this << Name << " = ";
+      if (I && I->isStaticInitializerInst() && I == &I->getParent()->back()) {
+        *this << "%initval = ";
+      } else {
+        ID Name = Ctx.getID(V);
+        *this << Name << " = ";
+      }
     }
 
     // First if we have a SILInstruction, print the opcode.
@@ -856,8 +862,8 @@ public:
     visit(V);
 
     bool printedSlashes = false;
-    if (auto *I = dyn_cast<SILInstruction>(V)) {
-      if (Ctx.printDebugInfo()) {
+    if (I) {
+      if (Ctx.printDebugInfo() && !I->isStaticInitializerInst()) {
         auto &SM = I->getModule().getASTContext().SourceMgr;
         printDebugLocRef(I->getLoc(), SM);
         printDebugScopeRef(I->getDebugScope(), SM);
@@ -870,7 +876,7 @@ public:
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
-      if (auto *I = dyn_cast<SILInstruction>(V)) {
+      if (I) {
         printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope(),
                          printedSlashes);
       }
@@ -2149,10 +2155,16 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printName(OS);
   OS << " : " << LoweredType;
 
-  if (getInitializer()) {
-    OS << ", ";
-    getInitializer()->printName(OS);
-    OS << " : " << getInitializer()->getLoweredType();
+  if (!StaticInitializerBlock.empty()) {
+    OS << " = {\n";
+    {
+      SILPrintContext Ctx(OS);
+      SILPrinter Printer(Ctx);
+      for (const SILInstruction &I : StaticInitializerBlock) {
+        Printer.print(&I);
+      }
+    }
+    OS << "}\n";
   }
 
   OS << "\n\n";

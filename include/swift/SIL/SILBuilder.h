@@ -28,6 +28,7 @@ using Atomicity = RefCountingInst::Atomicity;
 class SILDebugScope;
 class IntegerLiteralExpr;
 class FloatLiteralExpr;
+class SILGlobalVariable;
 
 class SILBuilder {
   friend class SILBuilderWithScope;
@@ -91,6 +92,9 @@ public:
         InsertedInstrs(InsertedInstrs) {
     setInsertionPoint(BB);
   }
+
+  explicit SILBuilder(SILGlobalVariable *GlobVar,
+                      SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0);
 
   SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt,
              SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0)

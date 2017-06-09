@@ -53,6 +53,10 @@ public:
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
+  explicit SILCloner(SILGlobalVariable *GlobVar)
+      : Builder(GlobVar), InsertBeforeBB(nullptr),
+        OpenedArchetypesTracker(nullptr) { }
+
   /// Clients of SILCloner who want to know about any newly created
   /// instructions can install a SmallVector into the builder to collect them.
   void setTrackingList(SmallVectorImpl<SILInstruction*> *II) {

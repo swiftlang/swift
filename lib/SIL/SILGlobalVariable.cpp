@@ -52,16 +52,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
   setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(Decl ? Decl->isLet() : false);
-  InitializerF = nullptr;
   Module.silGlobals.push_back(this);
-}
-
-void SILGlobalVariable::setInitializer(SILFunction *InitF) {
-  if (InitializerF)
-    InitializerF->decrementRefCount();
-  // Increment the ref count to make sure it will not be eliminated.
-  InitF->incrementRefCount();
-  InitializerF = InitF;
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
@@ -77,104 +68,47 @@ void SILGlobalVariable::setSerialized(IsSerialized_t isSerialized) {
   Serialized = isSerialized ? 1 : 0;
 }
 
-// FIXME
-
-static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
-                                     SILGlobalVariable *&GVar) {
-  Val = nullptr;
-  GVar = nullptr;
-  // We only handle a single SILBasicBlock for now.
-  if (F->size() != 1)
-    return false;
-
-  SILBasicBlock *BB = &F->front();
-  GlobalAddrInst *SGA = nullptr;
-  bool HasStore = false;
-  for (auto &I : *BB) {
-    // Make sure we have a single GlobalAddrInst and a single StoreInst.
-    // And the StoreInst writes to the GlobalAddrInst.
-    if (isa<AllocGlobalInst>(&I)) {
-      continue;
-    } else if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
-      if (SGA)
-        return false;
-      SGA = sga;
-      GVar = SGA->getReferencedGlobal();
-    } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-      if (HasStore || SI->getDest() != SGA)
-        return false;
-      HasStore = true;
-      Val = dyn_cast<SILInstruction>(SI->getSrc());
-
-      // We only handle StructInst and TupleInst being stored to a
-      // global variable for now.
-      if (!isa<StructInst>(Val) && !isa<TupleInst>(Val))
-        return false;
-    } else {
-
-      if (auto *bi = dyn_cast<BuiltinInst>(&I)) {
-        switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::FPTrunc:
-          if (isa<LiteralInst>(bi->getArguments()[0]))
-            continue;
-          break;
-        default:
-          return false;
-        }
-      }
-
-      // Objective-C selector string literals cannot be used in static
-      // initializers.
-      if (auto *stringLit = dyn_cast<StringLiteralInst>(&I)) {
-        switch (stringLit->getEncoding()) {
-        case StringLiteralInst::Encoding::UTF8:
-        case StringLiteralInst::Encoding::UTF16:
-          continue;
-
-        case StringLiteralInst::Encoding::ObjCSelector:
-          return false;
-        }
-      }
-
-      if (I.getKind() != ValueKind::ReturnInst &&
-          I.getKind() != ValueKind::StructInst &&
-          I.getKind() != ValueKind::TupleInst &&
-          I.getKind() != ValueKind::DebugValueInst &&
-          I.getKind() != ValueKind::IntegerLiteralInst &&
-          I.getKind() != ValueKind::FloatLiteralInst)
-        return false;
-    }
-  }
-  return true;
-}
-
-bool SILGlobalVariable::canBeStaticInitializer(SILFunction *F) {
-  SILInstruction *dummySI;
-  SILGlobalVariable *dummyGV;
-  return analyzeStaticInitializer(F, dummySI, dummyGV);
-}
-
-/// Check if a given SILFunction can be a static initializer. If yes, return
-/// the SILGlobalVariable that it writes to.
-SILGlobalVariable *SILGlobalVariable::getVariableOfStaticInitializer(
-                     SILFunction *F) {
-  SILInstruction *dummySI;
-  SILGlobalVariable *GV;
-  if (analyzeStaticInitializer(F, dummySI, GV))
-    return GV;
-  return nullptr;
-}
-
 /// Return the value that is written into the global variable.
-SILInstruction *SILGlobalVariable::getValueOfStaticInitializer() {
-  if (!InitializerF)
+SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
+  if (StaticInitializerBlock.empty())
     return nullptr;
 
-  SILInstruction *SI;
-  SILGlobalVariable *dummyGV;
-  if (analyzeStaticInitializer(InitializerF, SI, dummyGV))
-    return SI;
-  return nullptr;
+  return &StaticInitializerBlock.back();
+}
+
+bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I) {
+  switch (I->getKind()) {
+    case ValueKind::BuiltinInst: {
+      auto *bi = cast<BuiltinInst>(I);
+      switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::FPTrunc:
+          if (isa<LiteralInst>(bi->getArguments()[0]))
+            return true;
+          break;
+        default:
+          break;
+      }
+      return false;
+    }
+    case ValueKind::StringLiteralInst:
+      switch (cast<StringLiteralInst>(I)->getEncoding()) {
+        case StringLiteralInst::Encoding::UTF8:
+        case StringLiteralInst::Encoding::UTF16:
+          return true;
+        case StringLiteralInst::Encoding::ObjCSelector:
+          // Objective-C selector string literals cannot be used in static
+          // initializers.
+          return false;
+      }
+      return false;
+    case ValueKind::StructInst:
+    case ValueKind::TupleInst:
+    case ValueKind::IntegerLiteralInst:
+    case ValueKind::FloatLiteralInst:
+      return true;
+    default:
+      return false;
+  }
 }
 
 /// Return whether this variable corresponds to a Clang node.
