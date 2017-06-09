@@ -185,9 +185,7 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
 
   for (const llvm::PassInfo *PassInfo : PassList) {
     llvm::Pass *P = nullptr;
-    if (PassInfo->getTargetMachineCtor())
-      P = PassInfo->getTargetMachineCtor()(TM);
-    else if (PassInfo->getNormalCtor())
+    if (PassInfo->getNormalCtor())
       P = PassInfo->getNormalCtor()();
     else
       errs() << Binary << ": cannot create pass: " << PassInfo->getPassName()
