@@ -56,6 +56,8 @@ PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
+PASS(AccessSummaryDumper, "access-summary-dump",
+     "Dump Address Parameter Access Summary")
 PASS(InactiveAccessMarkerElimination, "inactive-access-marker-elim",
      "Inactive Access Marker Elimination.")
 PASS(FullAccessMarkerElimination, "full-access-marker-elim",
