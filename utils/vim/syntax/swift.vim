@@ -52,6 +52,9 @@ syn keyword swiftDefinitionModifier
       \ static
       \ throws
 
+syn keyword swiftInOutKeyword skipwhite nextgroup=swiftTypeName
+      \ inout
+
 syn keyword swiftIdentifierKeyword
       \ Self
       \ metatype
@@ -130,7 +133,7 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
+syn match swiftTypeDeclaration skipwhite nextgroup=swiftType,swiftInOutKeyword
       \ /:/
 syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
       \ /->/
@@ -178,6 +181,7 @@ hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Define
+hi def link swiftInOutKeyword Define
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
 hi def link swiftVarDefinition Define
