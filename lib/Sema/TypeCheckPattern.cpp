@@ -1456,16 +1456,25 @@ recur:
 
     // If there is a subpattern, push the enum element type down onto it.
     if (EEP->hasSubPattern()) {
+      Pattern *sub = EEP->getSubPattern();
+      if (!Context.isSwiftVersion3() && !elt->hasAssociatedValues()) {
+        diagnose(EEP->getLoc(),
+                 diag::enum_element_pattern_assoc_values_mismatch,
+                 EEP->getName());
+        diagnose(EEP->getLoc(), diag::enum_element_pattern_assoc_values_remove)
+          .fixItRemove(sub->getSourceRange());
+        return true;
+      }
+      
       Type elementType;
       if (auto argType = elt->getArgumentInterfaceType())
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
-      Pattern *sub = EEP->getSubPattern();
       if (coercePatternToType(sub, dc, elementType,
-                     subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
-                     resolver))
+                              subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
+                              resolver))
         return true;
       EEP->setSubPattern(sub);
     } else if (auto argType = elt->getArgumentInterfaceType()) {
