@@ -22,13 +22,11 @@ syn keyword swiftKeyword
       \ guard
       \ if
       \ in
-      \ let
       \ repeat
       \ return
       \ switch
       \ throw
       \ try
-      \ var
       \ where
       \ while
 syn match swiftMultiwordKeyword
