@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-source-import
+// RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import
 
 import imported_enums
 
@@ -85,8 +85,12 @@ enum Voluntary<T> : Equatable {
       ()
 
     case .Naught,
-         .Naught(),
-         .Naught(_, _): // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+         .Naught(), // expected-error {{pattern with associated values does not match enum case 'Naught'}}
+                    // expected-note@-1 {{remove associated values to make the pattern match}} {{17-19=}}
+         .Naught(_), // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                     // expected-note@-1 {{remove associated values to make the pattern match}} {{17-20=}}
+         .Naught(_, _): // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                        // expected-note@-1 {{remove associated values to make the pattern match}} {{17-23=}}
       ()
 
     case .Mere,
@@ -112,13 +116,21 @@ enum Voluntary<T> : Equatable {
 }
 
 var n : Voluntary<Int> = .Naught
+if case let .Naught(value) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                                  // expected-note@-1 {{remove associated values to make the pattern match}} {{20-27=}}
+if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                                                   // expected-note@-1 {{remove associated values to make the pattern match}} {{20-44=}}
+
+
 
 switch n {
 case Foo.A: // expected-error{{enum case 'A' is not a member of type 'Voluntary<Int>'}}
   ()
 case Voluntary<Int>.Naught,
-     Voluntary<Int>.Naught(),
-     Voluntary<Int>.Naught(_, _), // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+     Voluntary<Int>.Naught(), // expected-error {{pattern with associated values does not match enum case 'Naught'}}
+                              // expected-note@-1 {{remove associated values to make the pattern match}} {{27-29=}}
+     Voluntary<Int>.Naught(_, _), // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                                  // expected-note@-1 {{remove associated values to make the pattern match}} {{27-33=}}
      Voluntary.Naught,
      .Naught:
   ()
