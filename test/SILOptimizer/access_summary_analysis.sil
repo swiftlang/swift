@@ -1,0 +1,282 @@
+// RUN: %target-sil-opt  %s -assume-parsing-unqualified-ownership-sil -access-summary-dump -o /dev/null | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct StructWithStoredProperties {
+  @sil_stored var f: Int
+  @sil_stored var g: Int
+}
+
+// CHECK-LABEL: @assignsToCapture
+// CHECK-NEXT: (modify, none)
+sil private @assignsToCapture : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1: $Int):
+  %2 = begin_access [modify] [unknown] %0 : $*Int
+  assign %1 to %2 : $*Int
+  end_access %2 : $*Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @readsAndModifiesSameCapture
+// CHECK-NEXT: (modify)
+sil private @readsAndModifiesSameCapture : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [read] [unknown] %0 : $*Int
+  end_access %1 : $*Int
+  %2 = begin_access [modify] [unknown] %0 : $*Int
+  end_access %2 : $*Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @readsAndModifiesSeparateCaptures
+// CHECK-NEXT: (read, modify)
+sil private @readsAndModifiesSeparateCaptures : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %2 = begin_access [read] [unknown] %0 : $*Int
+  end_access %2 : $*Int
+  %3 = begin_access [modify] [unknown] %1 : $*Int
+  end_access %3 : $*Int
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: @modifyInModifySubAccess
+// CHECK-NEXT: (modify)
+sil private @modifyInModifySubAccess : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [unknown] %0 : $*Int
+  %2 = begin_access [modify] [unknown] %1 : $*Int
+  end_access %2 : $*Int
+  end_access %1 : $*Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @readInModifySubAccess
+// CHECK-NEXT: (modify)
+sil private @readInModifySubAccess : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [unknown] %0 : $*Int
+  %2 = begin_access [read] [unknown] %1 : $*Int
+  end_access %2 : $*Int
+  end_access %1 : $*Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @addressToPointerOfStructElementAddr
+// CHECK-NEXT: (none)
+// This mirrors the code pattern for materializeForSet on a struct stored
+// property
+sil private @addressToPointerOfStructElementAddr : $@convention(method) (@inout StructWithStoredProperties) -> (Builtin.RawPointer) {
+bb0(%1 : $*StructWithStoredProperties):
+  %2 = struct_element_addr %1 : $*StructWithStoredProperties, #StructWithStoredProperties.f
+  %3 = address_to_pointer %2 : $*Int to $Builtin.RawPointer
+  return %3 : $(Builtin.RawPointer)
+}
+
+// CHECK-LABEL: @endUnpairedAccess
+// CHECK-NEXT: (none)
+sil private @endUnpairedAccess : $@convention(method) (@inout Builtin.UnsafeValueBuffer) -> () {
+bb0(%0 : $*Builtin.UnsafeValueBuffer):
+  end_unpaired_access [dynamic] %0 : $*Builtin.UnsafeValueBuffer
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: @tupleElementAddr
+// CHECK-NEXT: (modify)
+sil private @tupleElementAddr : $@convention(thin) (@inout_aliasable (Int, Int)) -> () {
+bb0(%0 : $*(Int, Int)):
+  %1 = tuple_element_addr %0 : $*(Int, Int), 1
+  %2 = begin_access [modify] [unknown] %1 : $*Int
+  end_access %2 : $*Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @callClosureThatModifiesCapture
+// CHECK-NEXT: (modify, none)
+sil private @callClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = function_ref @assignsToCapture : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: @throwingClosureThatModifesCapture
+// CHECK-NEXT: (modify)
+sil private @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [unknown] %0 : $*Int
+  end_access %1 : $*Int
+  %2 = tuple ()
+  return %2 : $()
+}
+// CHECK-LABEL: @callThrowingClosureThatModifiesCapture
+// CHECK-NEXT: (modify)
+sil private @callThrowingClosureThatModifiesCapture : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @throwingClosureThatModifesCapture : $@convention(thin) (@inout_aliasable Int) -> @error Error
+  %2 = try_apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> @error Error, normal bb1, error bb2
+bb1(%3 : $()):
+  %4 = tuple ()
+  return %4 : $()
+bb2(%5: $Error):
+  %6 = builtin "unexpectedError"(%5 : $Error) : $()
+  unreachable
+}
+
+sil @takesNoEscapeClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+
+// CHECK-LABEL: @partialApplyPassedOffToFunction
+// CHECK-NEXT: (modify, none)
+sil private @partialApplyPassedOffToFunction : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1: $Int):
+  %2 = function_ref @assignsToCapture : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %3 = partial_apply %2(%0, %1) : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %4 = function_ref @takesNoEscapeClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @takesNoEscapeClosureTakingArgument : $@convention(thin) (@owned @callee_owned (Int) -> ()) -> ()
+sil @takesNoEscapeClosureTakingArgumentThrowing : $@convention(thin) (@owned @callee_owned (Int) -> (@error Error)) -> ()
+
+// CHECK-LABEL: @hasThreeCapturesAndTakesArgument
+// CHECK-NEXT: (none, modify, none, read)
+sil private @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
+bb0(%0 : $Int, %1: $*Int, %2: $*Int, %3: $*Int):
+  %4 = begin_access [modify] [unknown] %1 : $*Int
+  end_access %4 : $*Int
+  %5 = begin_access [read] [unknown] %3 : $*Int
+  end_access %5 : $*Int
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @partialApplyOfClosureTakingArgumentPassedOffToFunction
+// CHECK-NEXT: (modify, none, read
+sil private @partialApplyOfClosureTakingArgumentPassedOffToFunction : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
+  %3 = function_ref @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %4 = partial_apply %3(%0, %1, %2) : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %5 = function_ref @takesNoEscapeClosureTakingArgument : $@convention(thin) (@owned @callee_owned (Int) -> ()) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@owned @callee_owned (Int) -> ()) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: @partialApplyFollowedByConvertFunction
+// CHECK-NEXT: (modify, none, read)
+sil private @partialApplyFollowedByConvertFunction : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
+  %3 = function_ref @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %4 = partial_apply %3(%0, %1, %2) : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %5 = convert_function %4 : $@callee_owned (Int) -> () to $@callee_owned (Int) -> @error Error
+  %6 = function_ref @takesNoEscapeClosureTakingArgumentThrowing : $@convention(thin) (@owned @callee_owned (Int) -> @error Error) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@owned @callee_owned (Int) -> @error Error) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @selfRecursion
+// CHECK-NEXT: (modify, none)
+sil private @selfRecursion : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = function_ref @selfRecursion : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %4 = begin_access [modify] [unknown] %0 : $*Int
+  end_access %4 : $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: @callsMutuallyRecursive
+// CHECK-NEXT: (modify, none)
+sil private @callsMutuallyRecursive : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = function_ref @mutualRecursion1 : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: @mutualRecursion1
+// CHECK-NEXT: (modify, none)
+sil private @mutualRecursion1 : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = function_ref @mutualRecursion2 : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %4 = begin_access [modify] [unknown] %0 : $*Int
+  end_access %4 : $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: @mutualRecursion2
+// CHECK-NEXT: (modify, none)
+sil private @mutualRecursion2 : $@convention(thin) (@inout_aliasable Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = function_ref @mutualRecursion1 : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout_aliasable Int, Int) -> ()
+  %4 = begin_access [read] [unknown] %0 : $*Int
+  end_access %4 : $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Multiple cycles. This requires two iterations of the edge propagation.
+// Once to propagate the modify from A to B and one to propagate from
+// B to C
+//
+//      A [Call B then later modify param]
+//    / |
+//    \ |
+//     B
+//    / |
+//    \ |
+//     C
+//
+// CHECK-LABEL: @multipleCycleA
+// CHECK-NEXT: (modify)
+sil private @multipleCycleA : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @multipleCycleB : $@convention(thin) (@inout_aliasable Int) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %3 = begin_access [modify] [unknown] %0 : $*Int
+  end_access %3 : $*Int
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: @multipleCycleB
+// CHECK-NEXT: (modify)
+sil private @multipleCycleB : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @multipleCycleA : $@convention(thin) (@inout_aliasable Int) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %3 = function_ref @multipleCycleC : $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: @multipleCycleC
+// CHECK-NEXT: (modify)
+sil private @multipleCycleC : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @multipleCycleB : $@convention(thin) (@inout_aliasable Int) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
