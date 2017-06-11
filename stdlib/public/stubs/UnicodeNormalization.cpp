@@ -36,6 +36,11 @@
 
 #pragma clang diagnostic pop
 
+// clang 4.0 under a recent linux has unicode with built-in char16_t support
+#if (defined(__CYGWIN__) || defined( _MSC_VER)) || defined(__linux__)
+#define __USE_UCHAR 1
+#endif
+
 static const UCollator *MakeRootCollator() {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   UCollator *root = ucol_open("", &ErrorCode);
@@ -87,7 +92,7 @@ private:
     for (unsigned char c = 0; c < 128; ++c) {
       UErrorCode ErrorCode = U_ZERO_ERROR;
       intptr_t NumCollationElts = 0;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__USE_UCHAR)
       UChar Buffer[1];
 #else
       uint16_t Buffer[1];
@@ -128,7 +133,7 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
                                                  int32_t LeftLength,
                                                  const uint16_t *RightString,
                                                  int32_t RightLength) {
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__USE_UCHAR)
   // ICU UChar type is platform dependent. In Cygwin, it is defined
   // as wchar_t which size is 2. It seems that the underlying binary
   // representation is same with swift utf16 representation.
@@ -157,7 +162,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
   uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__USE_UCHAR)
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
 #else
@@ -200,7 +205,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
 void *swift::_swift_stdlib_unicodeCollationIterator_create(
     const __swift_uint16_t *Str, __swift_uint32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__USE_UCHAR)
   UCollationElements *CollationIterator = ucol_openElements(
     GetRootCollator(), reinterpret_cast<const UChar *>(Str), Length,
     &ErrorCode);
@@ -245,7 +250,7 @@ swift::_swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                         const uint16_t *Source,
                                         int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__USE_UCHAR)
   uint32_t OutputLength = u_strToUpper(reinterpret_cast<UChar *>(Destination),
                                        DestinationCapacity,
                                        reinterpret_cast<const UChar *>(Source),
@@ -272,7 +277,7 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                         const uint16_t *Source,
                                         int32_t SourceLength) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__USE_UCHAR)
   uint32_t OutputLength = u_strToLower(reinterpret_cast<UChar *>(Destination),
                                        DestinationCapacity,
                                        reinterpret_cast<const UChar *>(Source),
@@ -330,10 +335,16 @@ void swift::__swift_stdlib_ubrk_close(
 
 swift::__swift_stdlib_UBreakIterator *swift::__swift_stdlib_ubrk_open(
     swift::__swift_stdlib_UBreakIteratorType type, const char *locale,
-    const UChar *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
+    const uint16_t *text, int32_t textLength, __swift_stdlib_UErrorCode *status) {
+#ifdef __USE_UCHAR
+  return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
+      ubrk_open(static_cast<UBreakIteratorType>(type), locale, reinterpret_cast<const UChar*>(text), textLength,
+                ptr_cast<UErrorCode>(status)));
+#else      
   return ptr_cast<swift::__swift_stdlib_UBreakIterator>(
       ubrk_open(static_cast<UBreakIteratorType>(type), locale, text, textLength,
                 ptr_cast<UErrorCode>(status)));
+#endif
 }
 
 int32_t
