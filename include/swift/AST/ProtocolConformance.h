@@ -189,6 +189,11 @@ public:
   ValueDecl *getWitnessDecl(ValueDecl *requirement,
                             LazyResolver *resolver) const;
 
+  /// Retrieve the witness corresponding to the given value requirement.
+  /// TODO: maybe this should return a Witness?
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
+
 private:
   /// Determine whether we have a witness for the given requirement.
   bool hasWitness(ValueDecl *requirement) const;
@@ -419,6 +424,8 @@ public:
 
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
@@ -577,6 +584,10 @@ public:
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
 
+  /// Retrieve the witness corresponding to the given value requirement.
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
+
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
@@ -674,6 +685,10 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
+
+  /// Retrieve the witness corresponding to the given value requirement.
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
+                                    LazyResolver *resolver) const;
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.

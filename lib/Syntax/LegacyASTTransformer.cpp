@@ -1105,6 +1105,30 @@ LegacyASTTransformer::visitInjectIntoOptionalExpr(
 }
 
 RC<SyntaxData>
+LegacyASTTransformer::visitConditionalBridgeFromObjCExpr(
+    ConditionalBridgeFromObjCExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitBridgeFromObjCExpr(
+    BridgeFromObjCExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData>
+LegacyASTTransformer::visitBridgeToObjCExpr(
+    BridgeToObjCExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
+RC<SyntaxData>
 LegacyASTTransformer::visitClassMetatypeToObjectExpr(
     ClassMetatypeToObjectExpr *E,
     const SyntaxData *Parent,

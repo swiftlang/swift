@@ -3047,7 +3047,8 @@ private:
     auto doBridge = [&](SILGenFunction &SGF,
                         SILLocation loc,
                         ManagedValue emittedArg,
-                        SILType loweredResultTy) -> ManagedValue {
+                        SILType loweredResultTy,
+                        SGFContext context) -> ManagedValue {
       // If the argument is not already a class instance, bridge it.
       if (!emittedArg.getType().getSwiftRValueType()->mayHaveSuperclass()
           && !emittedArg.getType().isClassExistentialType()) {
@@ -3090,14 +3091,15 @@ private:
     } else if (!nativeIsOptional && bridgedIsOptional) {
       auto paramObjTy = SGF.getSILType(param).getAnyOptionalObjectType();
       auto transformed = doBridge(SGF, argExpr, emittedArg,
-                                  paramObjTy);
+                                  paramObjTy, SGFContext());
       // Inject into optional.
       auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
                                   SGF.getASTContext().getOptionalSomeDecl(),
                                   SGF.getSILType(param));
       return ManagedValue(opt, transformed.getCleanup());
     } else {
-      return doBridge(SGF, argExpr, emittedArg, SGF.getSILType(param));
+      return doBridge(SGF, argExpr, emittedArg, SGF.getSILType(param),
+                      SGFContext());
     }
   }
   
@@ -4584,6 +4586,15 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   if (auto *genericSig = fn->getGenericSignature())
     genericSig->getSubstitutions(subMap, subs);
 
+  return emitApplyOfLibraryIntrinsic(loc, fn, subs, args, ctx);
+}
+
+RValue
+SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
+                                            FuncDecl *fn,
+                                            const SubstitutionList &subs,
+                                            ArrayRef<ManagedValue> args,
+                                            SGFContext ctx) {
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), subs, loc);
 
   auto origFormalType = callee.getOrigFormalType();
@@ -5198,7 +5209,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (!subscripts)
+  if (subscripts.isNull())
     subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
@@ -5236,7 +5247,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   }
 
   // (value)  or (value, indices)
-  if (subscripts) {
+  if (!subscripts.isNull()) {
     // If we have a value and index list, create a new rvalue to represent the
     // both of them together.  The value goes first.
     SmallVector<ManagedValue, 4> Elts;
@@ -5295,7 +5306,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
     elts.push_back(ManagedValue::forLValue(callbackStorage));
 
-    if (subscripts) {
+    if (!subscripts.isNull()) {
       std::move(subscripts).getAll(elts);
     }
     return RValue::withPreExplodedElements(elts, accessType.getInput());
@@ -5367,7 +5378,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (!subscripts)
+  if (subscripts.isNull())
     subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),

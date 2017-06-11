@@ -42,7 +42,15 @@ class RValue {
   
   /// Flag value used to mark an rvalue as invalid, because it was
   /// consumed or it was default-initialized.
-  enum : unsigned { Used = ~0U };
+  enum : unsigned {
+    Null = ~0U,
+    Used = Null - 1,
+    InContext = Used - 1,
+  };
+
+  bool isInSpecialState() const {
+    return elementsToBeAdded >= InContext;
+  }
   
   // Don't copy.
   RValue(const RValue &) = delete;
@@ -60,23 +68,26 @@ class RValue {
   /// ManagedValues. Used to implement the extractElement* methods.
   RValue(ArrayRef<ManagedValue> values, CanType type);
 
+  RValue(unsigned state) : elementsToBeAdded(state) {
+    assert(isInSpecialState());
+  }
+
 public:
-  /// Creates an invalid RValue object, in a "used" state.
-  RValue() : elementsToBeAdded(Used) {}
+  RValue() : elementsToBeAdded(Null) {}
   
   RValue(RValue &&rv)
     : values(std::move(rv.values)),
       type(rv.type),
       elementsToBeAdded(rv.elementsToBeAdded)
   {
-    assert((rv.isComplete() || rv.isUsed())
+    assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     rv.elementsToBeAdded = Used;
   }
   RValue &operator=(RValue &&rv) {
-    assert(isUsed() && "reassigning an unused rvalue?!");
+    assert((isNull() || isUsed()) && "reassigning an valid rvalue?!");
     
-    assert((rv.isComplete() || rv.isUsed())
+    assert((rv.isComplete() || rv.isInSpecialState())
            && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
     type = rv.type;
@@ -100,6 +111,11 @@ public:
   /// ManagedValues. Used to implement the extractElement* methods.
   static RValue withPreExplodedElements(ArrayRef<ManagedValue> values,
                                         CanType type);
+
+  /// Creates an invalid RValue object, in an "in-context" state.
+  static RValue forInContext() {
+    return RValue(InContext);
+  }
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
@@ -111,17 +127,19 @@ public:
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.
   explicit RValue(CanType type);
-  
+
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
   bool isComplete() const & { return elementsToBeAdded == 0; }
+
+  /// True if the rvalue was null-initialized.
+  bool isNull() const & { return elementsToBeAdded == Null; }
   
   /// True if this rvalue has been used.
   bool isUsed() const & { return elementsToBeAdded == Used; }
-  explicit operator bool() const & { return !isUsed(); }
 
   /// True if this rvalue was emitted into context.
-  bool isInContext() const & { return isUsed(); }
+  bool isInContext() const & { return elementsToBeAdded == InContext; }
   
   /// True if this represents an lvalue.
   bool isLValue() const & {

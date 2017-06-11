@@ -157,7 +157,7 @@ public:
   explicit operator bool() const & {
     switch (StoredKind) {
     case Kind::RValue:
-      return bool(asKnownRValue());
+      return !asKnownRValue().isNull();
     case Kind::LValue:
       return asKnownLValue().isValid();
     case Kind::Expr:
