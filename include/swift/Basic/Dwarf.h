@@ -17,7 +17,7 @@
 #ifndef SWIFT_BASIC_DWARF_H
 #define SWIFT_BASIC_DWARF_H
 
-#include "llvm/Support/Dwarf.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 
 namespace swift {
   /// The DWARF version emitted by the Swift compiler.
