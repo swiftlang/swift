@@ -2420,8 +2420,8 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   // Extract names of the tuple elements and preserve the structure
   // of the tuple (with any nested tuples inside) to be able to use
   // it in the fix-it without any type information provided by user.
-  std::function<StringRef(const TypeRepr *)> getTupleNames =
-      [&](const TypeRepr *typeRepr) -> StringRef {
+  std::function<std::string (const TypeRepr *)> getTupleNames =
+      [&](const TypeRepr *typeRepr) -> std::string  {
     if (!typeRepr)
       return "";
 
