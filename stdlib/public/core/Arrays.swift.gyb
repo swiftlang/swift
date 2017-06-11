@@ -1573,11 +1573,11 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   @_inlineable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(bufferPointer.baseAddress!, bufferPointer.count)
+      let r = try body(&bufferPointer)
       return r
     }
   }
