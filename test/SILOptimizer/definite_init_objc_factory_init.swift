@@ -52,3 +52,20 @@ extension SomeClass {
     self.init(value: double)
   }
 }
+
+class SubHive : Hive {
+  // CHECK-LABEL: sil hidden @_T0027definite_init_objc_factory_B07SubHiveCACyt20delegatesToInherited_tcfc : $@convention(method) (@owned SubHive) -> @owned SubHive
+  convenience init(delegatesToInherited: ()) {
+    // CHECK: [[UPCAST:%.*]] = upcast %0 : $SubHive to $Hive
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[UPCAST]] : $Hive
+    // CHECK: [[METHOD:%.*]] = class_method [volatile] [[METATYPE]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!
+    // CHECK: [[OBJC:%.*]] = thick_to_objc_metatype [[METATYPE]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+    // CHECK: apply [[METHOD]]({{.*}}, [[OBJC]])
+
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick SubHive.Type, %0 : $SubHive
+    // CHECK-NEXT: dealloc_partial_ref %0 : $SubHive, [[METATYPE]] : $@thick SubHive.Type
+
+    // CHECK: return {{%.*}} : $SubHive
+    self.init(queen: Bee())
+  }
+}
