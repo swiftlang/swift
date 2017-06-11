@@ -688,10 +688,12 @@ public:
   /// Otherwise, return nullptr.
   Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version);
 
-  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
-                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
+  Decl *importDeclImpl(const DeclContext *DC, const clang::NamedDecl *ClangDecl,
+                       Version version, bool &TypedefIsSuperfluous,
+                       bool &HadForwardDeclaration);
 
-  Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
+  Decl *importDeclAndCacheImpl(const DeclContext *DC,
+                               const clang::NamedDecl *ClangDecl,
                                Version version,
                                bool SuperfluousTypedefsAreTransparent);
 
@@ -702,7 +704,12 @@ public:
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
   Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version) {
-    return importDeclAndCacheImpl(ClangDecl, version,
+    return importDecl(nullptr, ClangDecl, version);
+  }
+
+  Decl *importDecl(const DeclContext *DC, const clang::NamedDecl *ClangDecl,
+                   Version version) {
+    return importDeclAndCacheImpl(DC, ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true);
   }
 
@@ -713,7 +720,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
   Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version) {
-    return importDeclAndCacheImpl(ClangDecl, version,
+    return importDeclAndCacheImpl(nullptr, ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false);
   }
 
@@ -894,6 +901,8 @@ public:
 
   /// \brief Import the given Clang type into Swift.
   ///
+  /// \param dc Current declaration context (if given).
+  ///
   /// \param type The Clang type to import.
   ///
   /// \param kind The kind of type import we're performing.
@@ -905,11 +914,11 @@ public:
   ///        This is an additional guarantee on top of the ImportTypeKind
   ///        cases that allow bridging, and applies to the entire type.
   ///
+  ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
-  Type importType(clang::QualType type,
-                  ImportTypeKind kind,
-                  bool allowNSUIntegerAsInt,
+  Type importType(const DeclContext *dc, clang::QualType type,
+                  ImportTypeKind kind, bool allowNSUIntegerAsInt,
                   bool canFullyBridgeTypes,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
                   bool resugarNSErrorPointer = true);
@@ -973,7 +982,8 @@ public:
                               bool isVariadic, bool allowNSUIntegerAsInt,
                               ArrayRef<Identifier> argNames);
 
-  Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
+  Type importPropertyType(const DeclContext *dc,
+                          const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
 
   /// Attempt to infer a default argument for a parameter with the
