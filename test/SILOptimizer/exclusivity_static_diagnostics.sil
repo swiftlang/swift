@@ -9,6 +9,8 @@ import Swift
 sil @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
 sil @takesOneInout : $@convention(thin) (@inout Int) -> ()
 sil @makesInt : $@convention(thin) () -> Int
+sil @takesInoutAndNoEscapeClosure : $@convention(thin) (@inout Int, @owned @callee_owned () -> ()) -> ()
+sil @takesInoutAndNoEscapeClosureTakingArgument : $@convention(thin) (@inout Int, @owned @callee_owned (Int) -> ()) -> ()
 
 // CHECK-LABEL: sil hidden @twoLocalInoutsDisaliased
 sil hidden @twoLocalInoutsDisaliased : $@convention(thin) (Int) -> () {
@@ -544,4 +546,81 @@ bb0(%0 : $Storage, %1 : $Builtin.Word):
   end_access %5 : $*Int
   end_access %3 : $*UInt
   return %8 : $Int
+}
+
+
+// Conflicts involving noescape closures.
+
+sil hidden @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note {{conflicting access is here}}
+  end_access %1 : $*Int
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil hidden @inProgressModifyModifyConflictWithCallToClosure
+sil hidden @inProgressModifyModifyConflictWithCallToClosure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %8 = apply %4(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+
+sil hidden @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+bb0(%0 : $Int, %1 : $*Int):
+  %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  end_access %2 : $*Int
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureArgument
+sil hidden @inProgressConflictWithNoEscapeClosureArgument : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesInoutAndNoEscapeClosureTakingArgument : $@convention(thin) (@inout Int, @owned @callee_owned (Int) -> ()) -> ()
+  %5 = function_ref @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %7 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %8 = apply %4(%3, %6) : $@convention(thin) (@inout Int, @owned @callee_owned (Int) -> ()) -> ()
+  end_access %7: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil hidden @closureThatModifiesCapture_2 : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  end_access %1 : $*Int
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil hidden @inProgressReadModifyConflictWithNoEscapeClosureArgument
+sil hidden @inProgressReadModifyConflictWithNoEscapeClosureArgument : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesInoutAndNoEscapeClosure : $@convention(thin) (@inout Int, @owned @callee_owned () -> ()) -> ()
+  %5 = function_ref @closureThatModifiesCapture_2 : $@convention(thin) (@inout_aliasable Int) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %7 = begin_access [read] [unknown] %3 : $*Int // expected-note {{conflicting access is here}}
+  %8 = apply %4(%3, %6) : $@convention(thin) (@inout Int, @owned @callee_owned () -> ()) -> ()
+  end_access %7: $*Int
+  destroy_value %2 : ${ var Int }
+  %9 = tuple ()
+  return %9 : $()
 }
