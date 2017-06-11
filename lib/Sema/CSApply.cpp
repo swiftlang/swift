@@ -1527,42 +1527,12 @@ namespace {
     Expr *bridgeErrorToObjectiveC(Expr *value) {
       auto &tc = cs.getTypeChecker();
 
-      // Use _bridgeErrorToNSError to convert to an NSError.
-      auto fn = tc.Context.getBridgeErrorToNSError(&tc);
-      SourceLoc loc = value->getLoc();
-      if (!fn) {
-        tc.diagnose(loc, diag::missing_nserror_bridging_function);
-        return nullptr;
-      }
-      tc.validateDecl(fn);
-
-      ConcreteDeclRef fnDeclRef(fn);
-      auto fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, DeclNameLoc(loc),
-                                                /*Implicit=*/true);
-      cs.setType(fnRef, fn->getInterfaceType());
-      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
-
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
-      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { },
-                                            getType);
-      cs.cacheSubExprTypes(call);
-      cs.setSubExprTypes(call);
-      if (tc.typeCheckExpressionShallow(call, dc))
-        return nullptr;
-
-      cs.cacheExprTypes(call);
-
-      // The return type of _bridgeErrorToNSError is formally
-      // 'AnyObject' to avoid stdlib-to-Foundation dependencies, but it's
-      // really NSError.  Abuse CovariantReturnConversionExpr to fix this.
       auto nsErrorDecl = tc.Context.getNSErrorDecl();
       assert(nsErrorDecl && "Missing NSError?");
       Type nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
-      return cs.cacheType(new (tc.Context)
-                              CovariantReturnConversionExpr(call, nsErrorType));
+
+      auto result = new (tc.Context) BridgeToObjCExpr(value, nsErrorType);
+      return cs.cacheType(result);
     }
 
     /// Bridge the given value to its corresponding Objective-C object
@@ -1571,80 +1541,11 @@ namespace {
     /// This routine should only be used for bridging value types.
     ///
     /// \param value The value to be bridged.
-    Expr *bridgeToObjectiveC(Expr *value) {
-      // TODO: It would be nicer to represent this as a special AST node
-      // instead of inlining the bridging calls in the AST. Doing so would
-      // simplify the AST and make it easier for SILGen to peephole bridging
-      // conversions.
+    Expr *bridgeToObjectiveC(Expr *value, Type objcType) {
       auto &tc = cs.getTypeChecker();
 
-      // Find the _ObjectiveCBridgeable protocol.
-      auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-
-      // Find the conformance of the value type to _ObjectiveCBridgeable.
-      Type valueType = cs.getType(value)->getRValueType();
-      if (auto conformance =
-            tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
-                                  (ConformanceCheckFlags::InExpression|
-                                   ConformanceCheckFlags::Used))) {
-        cs.setExprTypes(value);
-
-        // Form the call.
-        auto result =
-            tc.callWitness(value, cs.DC, bridgedProto, *conformance,
-                           tc.Context.Id_bridgeToObjectiveC,
-                           { }, diag::broken_bridged_to_objc_protocol);
-
-        if (result)
-          cs.cacheExprTypes(result);
-
-        return result;
-      }
-      
-      // If there is an Error conformance, try bridging as an error.
-      if (tc.isConvertibleTo(valueType,
-                             tc.Context.getProtocol(KnownProtocolKind::Error)
-                               ->getDeclaredType(),
-                             cs.DC))
-        return bridgeErrorToObjectiveC(value);
-
-      // Fall back to universal bridging.
-      auto bridgeAnything = tc.Context.getBridgeAnythingToObjectiveC(&tc);
-      value = cs.coerceToRValue(value);
-      auto valueSub = Substitution(valueType, {});
-      auto bridgeAnythingRef = ConcreteDeclRef(tc.Context, bridgeAnything,
-                                               valueSub);
-      auto valueParenTy = ParenType::get(tc.Context, cs.getType(value));
-      auto bridgeTy = tc.Context.getAnyObjectType();
-      auto bridgeFnTy = FunctionType::get(valueParenTy, bridgeTy);
-      // FIXME: Wrap in ParenExpr to prevent bogus "tuple passed as argument"
-      // errors.
-      auto valueParen = cs.cacheType(
-          new (tc.Context) ParenExpr(SourceLoc(),
-                                     value,
-                                     SourceLoc(),
-                                     /*trailing closure*/ false,
-                                     valueParenTy));
-
-      valueParen->setImplicit();
-      auto fnRef = cs.cacheType(
-          new (tc.Context) DeclRefExpr(bridgeAnythingRef,
-                                       DeclNameLoc(),
-                                       /*implicit*/ true,
-                                       AccessSemantics::Ordinary,
-                                       bridgeFnTy));
-
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
-      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
-      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, valueParen,
-                                            { Identifier() }, getType);
-      cs.setType(call, bridgeTy);
-      cs.cacheExprTypes(call);
-      return call;
+      auto result = new (tc.Context) BridgeToObjCExpr(value, objcType);
+      return cs.cacheType(result);
     }
 
     /// Bridge the given object from Objective-C to its value type.
@@ -1664,6 +1565,11 @@ namespace {
     /// conditional bridging fails.
     Expr *bridgeFromObjectiveC(Expr *object, Type valueType, bool conditional) {
       auto &tc = cs.getTypeChecker();
+
+      if (!conditional) {
+        auto result = new (tc.Context) BridgeFromObjCExpr(object, valueType);
+        return cs.cacheType(result);
+      }
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
@@ -1720,45 +1626,12 @@ namespace {
       genericSig->getSubstitutions(subMap, subs);
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, subs);
-      auto fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
-                                                DeclNameLoc(
-                                                  object->getStartLoc()),
-                                                /*Implicit=*/true);
-      fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-      cs.setType(fnRef,
-                 fn->getInterfaceType()->castTo<GenericFunctionType>()
-                   ->substGenericArgs(subMap));
+      auto resultType = OptionalType::get(valueType);
 
-      // Form the arguments.
-      Expr *args[2] = {
-        object,
-        cs.cacheType(
-            new (tc.Context) DotSelfExpr(
-                TypeExpr::createImplicitHack(object->getLoc(),
-                                             valueType,
-                                             tc.Context),
-                object->getLoc(), object->getLoc(),
-                MetatypeType::get(valueType)))
-      };
-      args[1]->setImplicit();
-
-      // Form the call and type-check it.
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
-      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, args,
-                                            { Identifier(), Identifier() },
-                                            getType);
-      cs.cacheSubExprTypes(call);
-      cs.setSubExprTypes(call);
-
-      if (tc.typeCheckExpressionShallow(call, dc))
-        return nullptr;
-
-      cs.cacheExprTypes(call);
-      return call;
+      auto result = new (tc.Context) ConditionalBridgeFromObjCExpr(object,
+                                                        resultType, fnSpecRef);
+      return cs.cacheType(result);
     }
 
     /// Bridge the given object from Objective-C to its value type.
@@ -2667,19 +2540,20 @@ namespace {
           baseTy = cs.getType(base)->getRValueType();
         }
 
-        if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
-          auto &tc = cs.getTypeChecker();
-          auto &ctx = tc.Context;
-          auto classTy = ctx.getBridgedToObjC(cs.DC,
-                                              baseMetaTy->getInstanceType());
-          
+        auto &tc = cs.getTypeChecker();
+        auto &ctx = tc.Context;
+        auto baseMetaTy = baseTy->getAs<MetatypeType>();
+        auto baseInstTy = (baseMetaTy ? baseMetaTy->getInstanceType() : baseTy);
+        auto classTy = ctx.getBridgedToObjC(cs.DC, baseInstTy);
+
+        if (baseMetaTy) {
           // FIXME: We're dropping side effects in the base here!
           base = TypeExpr::createImplicitHack(base->getLoc(), classTy,
                                               tc.Context);
           cs.cacheExprTypes(base);
         } else {
           // Bridge the base to its corresponding Objective-C object.
-          base = bridgeToObjectiveC(base);
+          base = bridgeToObjectiveC(base, classTy);
         }
 
         // Fall through to build the member reference.
@@ -5911,7 +5785,7 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
       (fromType->getRValueType()->isPotentiallyBridgedValueType() &&
        (toType->isBridgeableObjectType() || toType->isExistentialType()))) {
     // Bridging to Objective-C.
-    Expr *objcExpr = bridgeToObjectiveC(expr);
+    Expr *objcExpr = bridgeToObjectiveC(expr, toType);
     if (!objcExpr)
       return nullptr;
 

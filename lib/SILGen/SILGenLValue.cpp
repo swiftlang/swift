@@ -926,7 +926,7 @@ namespace {
         result.base = SGF.prepareAccessorBaseArg(loc, base, baseFormalType,
                                                  accessor);
 
-      if (subscripts)
+      if (!subscripts.isNull())
         result.subscripts = std::move(subscripts);
       
       return result;
@@ -1118,7 +1118,7 @@ namespace {
         // This is *amazingly* unprincipled.
         RValue borrowedSubscripts;
         RValue *optSubscripts = nullptr;
-        if (subscripts) {
+        if (!subscripts.isNull()) {
           CanType type = subscripts.getType();
           SmallVector<ManagedValue, 4> values;
           std::move(subscripts).getAll(values);
@@ -1344,7 +1344,7 @@ namespace {
         return;
 
       // If this is a simple property access, then we must have a conflict.
-      if (!subscripts) {
+      if (subscripts.isNull()) {
         assert(isa<VarDecl>(decl));
         SGF.SGM.diagnose(loc1, diag::writeback_overlap_property, decl->getBaseName())
            .highlight(loc1.getSourceRange());
@@ -1785,7 +1785,7 @@ void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 CanType formalRValueType,
                                 RValue &&indices) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    assert(!indices);
+    assert(indices.isNull());
     addMemberVarComponent(SGF, loc, var, subs, isSuper,
                           accessKind, accessSemantics, accessStrategy,
                           formalRValueType);

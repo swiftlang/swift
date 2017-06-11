@@ -331,7 +331,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   }
 
   RValue result = emitRValue(E, SGFContext(I));
-  if (result)
+  if (!result.isInContext())
     std::move(result).forwardInto(*this, E, I);
 }
 
@@ -391,6 +391,10 @@ namespace {
     RValue visitCollectionUpcastConversionExpr(
              CollectionUpcastConversionExpr *E,
              SGFContext C);
+    RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
+    RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
+    RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
+                                              SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
                                              SGFContext C);
@@ -1210,7 +1214,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
     // If we emitted into the provided context, we're done.
     if (usingProvidedContext)
-      return RValue();
+      return RValue::forInContext();
 
     return RValue(SGF, E, optTemp->getManagedAddress());
   }
@@ -1257,7 +1261,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   // If we emitted into the provided context, we're done.
   if (usingProvidedContext)
-    return RValue();
+    return RValue::forInContext();
 
   assert(optTemp);
   return RValue(SGF, E, optTemp->getManagedAddress());
@@ -1351,6 +1355,48 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 
   return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
                                       mv, C);
+}
+
+RValue
+RValueEmitter::visitConditionalBridgeFromObjCExpr(
+                              ConditionalBridgeFromObjCExpr *E, SGFContext C) {
+  // Get the sub expression argument as a managed value
+  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  auto conversionRef = E->getConversion();
+  auto conversion = cast<FuncDecl>(conversionRef.getDecl());
+  auto subs = conversionRef.getSubstitutions();
+
+  auto nativeType = subs[0].getReplacement();
+
+  auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
+  auto metatype =
+    ManagedValue::forUnmanaged(SGF.B.createMetatype(E, metatypeType));
+
+  return SGF.emitApplyOfLibraryIntrinsic(E, conversion, subs,
+                                         { mv, metatype }, C);
+}
+
+RValue
+RValueEmitter::visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C) {
+  // Emit the sub-expression.
+  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  CanType resultType = E->getType()->getCanonicalType();
+  auto repr = SILFunctionTypeRepresentation::CFunctionPointer;
+  auto result = SGF.emitBridgedToNativeValue(E, mv, repr, resultType, C);
+  return RValue(SGF, E, result);
+}
+
+RValue
+RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
+  // Emit the sub-expression.
+  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+  CanType resultType = E->getType()->getCanonicalType();
+  auto repr = SILFunctionTypeRepresentation::CFunctionPointer;
+  auto result = SGF.emitNativeToBridgedValue(E, mv, repr, resultType, C);
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -1643,7 +1689,8 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
 static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
                                          SILLocation loc,
                                          ManagedValue input,
-                                         SILType resultTy) {
+                                         SILType resultTy,
+                                         SGFContext context) {
   SILValue result = gen.B.createUncheckedRefCast(loc,
                                                  input.forward(gen),
                                                  resultTy);
@@ -1659,9 +1706,9 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   ManagedValue result;
   if (resultType.getSwiftRValueType().getAnyOptionalObjectType()) {
     result = SGF.emitOptionalToOptional(e, original, resultType,
-                                        createUnsafeDowncast);
+                                        createUnsafeDowncast, C);
   } else {
-    result = createUnsafeDowncast(SGF, e, original, resultType);
+    result = createUnsafeDowncast(SGF, e, original, resultType, C);
   }
 
   return RValue(SGF, e, result);
@@ -1921,7 +1968,7 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
       for (unsigned i = 0, size = subInitializations.size(); i < size; ++i)
         SGF.emitExprInto(E->getElement(i), subInitializations[i].get());
       I->finishInitialization(SGF);
-      return RValue();
+      return RValue::forInContext();
     }
   }
     
@@ -2215,7 +2262,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
         !(isa<ParenType>(E->getType().getPointer()) &&
           SGF.getASTContext().isSwiftVersion3())) {
       emitTupleShuffleExprInto(*this, E, I);
-      return RValue();
+      return RValue::forInContext();
     }
   }
 
@@ -3374,7 +3421,7 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
                                            SGF.getLoweredType(E->getType()),
                                            someDecl, C);
   if (result.isInContext())
-    return RValue();
+    return RValue::forInContext();
   return RValue(SGF, E, result);
 }
 
@@ -3759,7 +3806,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 
   assert(results.size() == 1);
   if (results[0].isInContext()) {
-    return RValue();
+    return RValue::forInContext();
   } else {
     return RValue(SGF, E, results[0]);
   }
@@ -4525,9 +4572,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 /// Emit the given expression as an r-value, then (if it is a tuple), combine
 /// it together into a single ManagedValue.
 ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
-  RValue &&rv = emitRValue(E, C);
-  if (rv.isUsed()) return ManagedValue::forInContext();
-  return std::move(rv).getAsSingleValue(*this, E);
+  return emitRValue(E, C).getAsSingleValue(*this, E);
 }
 
 RValue SILGenFunction::emitUndefRValue(SILLocation loc, Type type) {

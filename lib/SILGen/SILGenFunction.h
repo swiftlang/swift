@@ -915,13 +915,15 @@ public:
   typedef llvm::function_ref<ManagedValue(SILGenFunction &gen,
                                     SILLocation loc,
                                     ManagedValue input,
-                                    SILType loweredResultTy)> ValueTransformRef;
+                                    SILType loweredResultTy,
+                                    SGFContext context)> ValueTransformRef;
 
   /// Emit a transformation on the value of an optional type.
   ManagedValue emitOptionalToOptional(SILLocation loc,
                                       ManagedValue input,
                                       SILType loweredResultTy,
-                                      ValueTransformRef transform);
+                                      ValueTransformRef transform,
+                                      SGFContext C = SGFContext());
 
   /// Emit a reinterpret-cast from one pointer type to another, using a library
   /// intrinsic.
@@ -1357,10 +1359,15 @@ public:
                     Optional<SILFunctionTypeRepresentation> overrideRep,
                     const Optional<ForeignErrorConvention> &foreignError);
 
-
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
                                      const SubstitutionMap &subMap,
+                                     ArrayRef<ManagedValue> args,
+                                     SGFContext ctx);
+
+  RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
+                                     FuncDecl *fn,
+                                     const SubstitutionList &subs,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
@@ -1540,13 +1547,15 @@ public:
   /// convention.
   ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
                                         SILFunctionTypeRepresentation destRep,
-                                        CanType bridgedTy);
+                                        CanType bridgedTy,
+                                        SGFContext C = SGFContext());
   
   /// Convert a value received as the result or argument of a function with
   /// the given calling convention to a native Swift value of the given type.
   ManagedValue emitBridgedToNativeValue(SILLocation loc, ManagedValue v,
                                         SILFunctionTypeRepresentation srcRep,
-                                        CanType nativeTy);
+                                        CanType nativeTy,
+                                        SGFContext C = SGFContext());
 
   /// Convert a bridged error type to the native Swift Error
   /// representation.  The value may be optional.

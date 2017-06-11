@@ -17,6 +17,7 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
@@ -28,6 +29,58 @@
 using namespace swift;
 using namespace Lowering;
 
+/// Convert to the given formal type, assuming that the lowered type of
+/// the source type is the same as its formal type.  This is a reasonable
+/// assumption for a wide variety of types.
+static ManagedValue emitUnabstractedCast(SILGenFunction &SGF, SILLocation loc,
+                                         ManagedValue value,
+                                         CanType targetFormalType) {
+  if (value.getType().getSwiftRValueType() == targetFormalType)
+    return value;
+
+  CanType sourceFormalType = value.getType().getSwiftRValueType();
+  return SGF.emitTransformedValue(loc, value,
+                                  AbstractionPattern(sourceFormalType),
+                                  sourceFormalType,
+                                  AbstractionPattern(targetFormalType),
+                                  targetFormalType);
+}
+
+static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
+                                     CanType targetType) {
+  // Never use this logic if the target type is AnyObject.
+  if (targetType->isEqual(SGM.getASTContext().getAnyObjectType()))
+    return false;
+
+  auto errorProtocol = SGM.getASTContext().getErrorDecl();
+  if (!errorProtocol) return false;
+
+  // Existential types are convertible to Error if they are, or imply, Error.
+  if (type.isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+    for (auto proto : layout.getProtocols()) {
+      if (proto->getDecl() == errorProtocol ||
+          proto->getDecl()->inheritsFrom(errorProtocol)) {
+        return true;
+      }
+    }
+
+    // They're also convertible to Error if they have a class bound that
+    // conforms to Error.
+    if (auto cls = layout.superclass) {
+      type = cls->getCanonicalType();
+
+    // Otherwise, they are not convertible to Error.
+    } else {
+      return false;
+    }
+  }
+
+  auto optConf = SGM.SwiftModule->lookupConformance(type, errorProtocol,
+                                                    /*lazy resolver*/ nullptr);
+  return optConf.hasValue();
+}
+
 /// Bridge the given Swift value to its corresponding Objective-C
 /// object, using the appropriate witness for the
 /// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
@@ -35,6 +88,7 @@ static Optional<ManagedValue>
 emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
                              SILLocation loc,
                              ManagedValue swiftValue,
+                             SILType bridgedTy,
                              ProtocolConformance *conformance) {
   // Dig out the nominal type we're bridging from.
   Type swiftValueType = swiftValue.getType().getSwiftRValueType();
@@ -101,7 +155,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   SILValue bridgedValue =
       SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, subs,
                         swiftValue.borrow(SGF, loc).getValue());
-  return SGF.emitManagedRValueWithCleanup(bridgedValue);
+
+  auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
+
+  // The Objective-C value doesn't necessarily match the desired type.
+  bridgedMV = emitUnabstractedCast(SGF, loc, bridgedMV,
+                                   bridgedTy.getSwiftRValueType());
+
+  return bridgedMV;
 }
 
 /// Bridge the given Objective-C object to its corresponding Swift
@@ -117,58 +178,57 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
     SGF.SGM.getUnconditionallyBridgeFromObjectiveCRequirement(loc);
   if (!requirement) return None;
 
+  // Find the _ObjectiveCType requirement.
+  auto objcTypeRequirement = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
+  if (!objcTypeRequirement) return None;
+
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitnessDecl(requirement, nullptr);
+  auto witness = conformance->getWitnessDeclRef(requirement, nullptr);
   assert(witness);
 
+  // Retrieve the _ObjectiveCType witness.
+  auto objcType = conformance->getTypeWitness(objcTypeRequirement, nullptr);
+  assert(objcType);
+
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness);
+  SILDeclRef witnessConstant(witness.getDecl());
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
-  Type swiftValueType = conformance->getType();
-  auto *decl = swiftValueType->getAnyNominal();
-  auto *genericSig = decl->getGenericSignature();
-  auto typeSubMap = swiftValueType->getContextSubstitutionMap(
-    SGF.SGM.SwiftModule, decl);
+  CanType swiftValueType = conformance->getType()->getCanonicalType();
+  auto genericSig = witnessFnTy->getGenericSignature();
+  SubstitutionMap typeSubMap;
+  if (genericSig)
+    typeSubMap = genericSig->getSubstitutionMap(witness.getSubstitutions());
 
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy->substGenericArgs(SGF.SGM.M, typeSubMap);
 
-  // If the Objective-C value isn't optional, wrap it in an optional.
-  Type objcValueType = objcValue.getType().getSwiftRValueType();
-  if (!objcValueType->getOptionalObjectType()) {
-    SILType loweredOptTy =
-        SGF.SGM.getLoweredType(OptionalType::get(objcValueType));
-    auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
-    auto *enumInst = SGF.B.createEnum(loc, objcValue.getValue(), someDecl,
-                                      loweredOptTy);
-    objcValue = ManagedValue(enumInst, objcValue.getCleanup());
-  }
+  // The witness takes an _ObjectiveCType?, so convert to that type.
+  CanType desiredValueType = OptionalType::get(objcType)->getCanonicalType();
+  objcValue = emitUnabstractedCast(SGF, loc, objcValue, desiredValueType);
 
   // Call the witness.
-  Type metatype = MetatypeType::get(swiftValueType);
-  SILValue metatypeValue = SGF.B.createMetatype(loc,
-                                                SGF.getLoweredType(metatype));
+  auto metatypeParam = witnessFnTy->getParameters()[1];
+  assert(isa<MetatypeType>(metatypeParam.getType()) &&
+         cast<MetatypeType>(metatypeParam.getType()).getInstanceType()
+           == swiftValueType);
+  SILValue metatypeValue =
+    SGF.B.createMetatype(loc, metatypeParam.getSILStorageType());
 
   auto witnessCI = SGF.getConstantInfo(witnessConstant);
   CanType formalResultTy = witnessCI.LoweredInterfaceType.getResult();
 
-  SmallVector<Substitution, 4> subs;
-  if (genericSig)
-    genericSig->getSubstitutions(typeSubMap, subs);
+  auto subs = witness.getSubstitutions();
 
   // Set up the generic signature, since formalResultTy is an interface type.
-  CanGenericSignature canGenericSig;
-  if (genericSig)
-    canGenericSig = genericSig->getCanonicalSignature();
-  GenericContextScope genericContextScope(SGF.SGM.Types,
-                                          canGenericSig);
+  GenericContextScope genericContextScope(SGF.SGM.Types, genericSig);
   CalleeTypeInfo calleeTypeInfo(
-      witnessFnTy, AbstractionPattern(canGenericSig, formalResultTy),
-      swiftValueType->getCanonicalType());
+      witnessFnTy,
+      AbstractionPattern(genericSig, formalResultTy),
+      swiftValueType);
   SGFContext context;
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
@@ -430,7 +490,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
                                                          SILLocation loc,
                                                          ManagedValue v,
-                                                         SILType bridgedTy) {
+                                                         SILType bridgedTy,
+                                                         SGFContext C) {
   CanType loweredBridgedTy = bridgedTy.getSwiftRValueType();
   CanType loweredNativeTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
@@ -471,7 +532,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // _bridgeToObjectiveC witness.
   if (auto conformance =
           SGF.SGM.getConformanceToObjectiveCBridgeable(loc, loweredNativeTy)) {
-    if (auto result = emitBridgeNativeToObjectiveC(SGF, loc, v, conformance))
+    if (auto result = emitBridgeNativeToObjectiveC(SGF, loc, v, bridgedTy,
+                                                   conformance))
       return *result;
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
@@ -479,9 +541,14 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
     return SGF.emitUndef(loc, bridgedTy);
   }
 
-  // Bridge Error to NSError.
-  if (loweredBridgedTy == SGF.SGM.Types.getNSErrorType()) {
-    return SGF.emitNativeToBridgedError(loc, v, loweredBridgedTy);
+  // Bridge Error, or types that conform to it, to NSError.
+  if (shouldBridgeThroughError(SGF.SGM, loweredNativeTy, loweredBridgedTy)) {
+    auto errorTy = SGF.SGM.Types.getNSErrorType();
+    auto error = SGF.emitNativeToBridgedError(loc, v, errorTy);
+    if (errorTy != loweredBridgedTy) {
+      error = emitUnabstractedCast(SGF, loc, error, loweredBridgedTy);
+    }
+    return error;
   }
 
   // Fall back to dynamic Any-to-id bridging.
@@ -517,9 +584,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       v.forwardInto(SGF, loc, tmp);
       v = SGF.emitManagedBufferWithCleanup(tmp);
     }
-    return SGF.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, subMap, v,
-                                           SGFContext())
-      .getAsSingleValue(SGF, loc);
+    return SGF.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, subMap, v, C)
+              .getAsSingleValue(SGF, loc);
   }
   
   // Shouldn't get here unless the standard library is busted.
@@ -529,7 +595,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
                                               SILLocation loc,
                                               ManagedValue v,
-                                              SILType bridgedTy) {
+                                              SILType bridgedTy,
+                                              SGFContext C = SGFContext()) {
   CanType loweredBridgedTy = bridgedTy.getSwiftRValueType();
   CanType loweredNativeTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
@@ -538,32 +605,35 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
   if (loweredBridgedTy.getAnyOptionalObjectType()
       && loweredNativeTy.getAnyOptionalObjectType()) {
     return SGF.emitOptionalToOptional(loc, v, bridgedTy,
-                                      emitNativeToCBridgedValue);
+                                      emitNativeToCBridgedValue, C);
   }
   
   // Check if we need to wrap the bridged result in an optional.
   if (SILType bridgedObjectType = bridgedTy.getAnyOptionalObjectType()) {
     auto bridgedPayload
-      = emitNativeToCBridgedNonoptionalValue(SGF, loc, v, bridgedObjectType);
+      = emitNativeToCBridgedNonoptionalValue(SGF, loc, v, bridgedObjectType,
+                                             SGFContext());
     
     return SGF.getOptionalSomeValue(loc, bridgedPayload,
                                     SGF.getTypeLowering(bridgedTy));
   }
   
-  return emitNativeToCBridgedNonoptionalValue(SGF, loc, v, bridgedTy);
+  return emitNativeToCBridgedNonoptionalValue(SGF, loc, v, bridgedTy, C);
 }
 
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                           ManagedValue v,
                                           SILFunctionTypeRepresentation destRep,
-                                          CanType loweredBridgedTy){
+                                          CanType loweredBridgedTy,
+                                          SGFContext C) {
   switch (getSILFunctionLanguage(destRep)) {
   case SILFunctionLanguage::Swift:
     // No additional bridging needed for native functions.
     return v;
   case SILFunctionLanguage::C:
     return emitNativeToCBridgedValue(*this, loc, v,
-                           SILType::getPrimitiveObjectType(loweredBridgedTy));
+                           SILType::getPrimitiveObjectType(loweredBridgedTy),
+                                     C);
   }
   llvm_unreachable("bad CC");
 }
@@ -694,7 +764,8 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
                                               SILLocation loc,
                                               ManagedValue v,
-                                              SILType nativeTy) {
+                                              SILType nativeTy,
+                                              SGFContext C) {
   CanType loweredNativeTy = nativeTy.getSwiftRValueType();
   CanType loweredBridgedTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
@@ -702,7 +773,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
   if (loweredNativeTy.getAnyOptionalObjectType()) {
     return SGF.emitOptionalToOptional(loc, v, nativeTy,
-                                      emitCBridgedToNativeValue);
+                                      emitCBridgedToNativeValue, C);
   }
 
   // Bridge Bool to ObjCBool or DarwinBoolean when requested.
@@ -776,8 +847,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     auto optionalMV = ManagedValue(optionalV, v.getCleanup());
     return SGF.emitApplyOfLibraryIntrinsic(loc,
                            SGF.getASTContext().getBridgeAnyObjectToAny(nullptr),
-                           SubstitutionMap(), optionalMV, SGFContext())
-      .getAsSingleValue(SGF, loc);
+                           SubstitutionMap(), optionalMV, C)
+              .getAsSingleValue(SGF, loc);
   }
 
   return v;
@@ -786,14 +857,15 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
                                           ManagedValue v,
                                           SILFunctionTypeRepresentation srcRep,
-                                          CanType nativeTy) {
+                                          CanType nativeTy,
+                                          SGFContext C) {
   switch (getSILFunctionLanguage(srcRep)) {
   case SILFunctionLanguage::Swift:
     // No additional bridging needed for native functions.
     return v;
 
   case SILFunctionLanguage::C:
-    return emitCBridgedToNativeValue(*this, loc, v, getLoweredType(nativeTy));
+    return emitCBridgedToNativeValue(*this, loc, v, getLoweredType(nativeTy), C);
   }
   llvm_unreachable("bad CC");
 }
@@ -843,6 +915,14 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
                                                   CanType bridgedErrorProto) {
   assert(bridgedErrorProto == SGM.Types.getNSErrorType() &&
          "only handling NSError for now");
+
+  // The native error might just be a value of a type that conforms to
+  // Error.  This should be a subtyping or erasure conversion of the sort
+  // that we can do automatically.
+  // FIXME: maybe we should use a different entrypoint for this case, to
+  // avoid the code size and performance overhead?
+  nativeError = emitUnabstractedCast(*this, loc, nativeError,
+                                     getASTContext().getExceptionType());
 
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorToNSErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();

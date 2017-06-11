@@ -316,7 +316,7 @@ RValue Transform::transform(RValue &&input,
   // If we emitted into context, be sure to finish the overall initialization.
   if (tupleInit) {
     tupleInit->finishInitialization(SGF);
-    return RValue();
+    return RValue::forInContext();
   }
 
   return RValue::withPreExplodedElements(outputExpansion, outputTupleType);
@@ -416,13 +416,14 @@ ManagedValue Transform::transform(ManagedValue v,
     auto transformOptionalPayload = [&](SILGenFunction &gen,
                                         SILLocation loc,
                                         ManagedValue input,
-                                        SILType loweredResultTy) -> ManagedValue {
+                                        SILType loweredResultTy,
+                                        SGFContext context) -> ManagedValue {
       return transform(input,
                        inputOrigType.getAnyOptionalObjectType(),
                        inputObjectType,
                        outputOrigType.getAnyOptionalObjectType(),
                        outputObjectType,
-                       SGFContext());
+                       context);
     };
 
     return SGF.emitOptionalToOptional(Loc, v, loweredResultTy,
