@@ -6824,6 +6824,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   
   auto fn = apply->getFn();
 
+  bool hasTrailingClosure =
+    isa<CallExpr>(apply) && cast<CallExpr>(apply)->hasTrailingClosure();
+
   auto finishApplyOfDeclWithSpecialTypeCheckingSemantics
     = [&](ApplyExpr *apply,
           ValueDecl *decl,
@@ -6832,9 +6835,26 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       case DeclTypeCheckingSemantics::TypeOf: {
         // Resolve into a DynamicTypeExpr.
         auto arg = apply->getArg();
+
+        SmallVector<Identifier, 2> argLabelsScratch;
+
+        auto fnType = cs.getType(fn)->getAs<FunctionType>();
+        arg = coerceCallArguments(arg, fnType->getInput(),
+                                  apply,
+                                  apply->getArgumentLabels(argLabelsScratch),
+                                  hasTrailingClosure,
+                                  locator.withPathElement(
+                                    ConstraintLocator::ApplyArgument));
+        if (!arg) {
+          return nullptr;
+        }
+
+        if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
+          arg = shuffle->getSubExpr();
+
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
-        arg = cs.coerceToRValue(arg);
+
         auto replacement = new (tc.Context)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),
@@ -6998,8 +7018,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    bool hasTrailingClosure =
-      isa<CallExpr>(apply) && cast<CallExpr>(apply)->hasTrailingClosure();
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
