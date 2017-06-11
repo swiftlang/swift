@@ -159,8 +159,7 @@ namespace {
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
       return llvm::make_unique<HeaderParsingASTConsumer>(Impl);
     }
-    bool BeginSourceFileAction(clang::CompilerInstance &CI,
-                               StringRef Filename) override {
+    bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
       // Prefer frameworks over plain headers.
       // We add search paths here instead of when building the initial invocation
       // so that (a) we use the same code as search paths for imported modules,
