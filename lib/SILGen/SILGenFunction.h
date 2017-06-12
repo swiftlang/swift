@@ -470,12 +470,6 @@ public:
   /// function is valid.
   bool allowsVoidReturn() const { return ReturnDest.getBlock()->args_empty(); }
 
-  /// This location, when set, is used as an override location for magic
-  /// identifier expansion (e.g. #file).  This allows default argument
-  /// expansion to report the location of the call, instead of the location
-  /// of the original expr.
-  Optional<SourceLoc> overrideLocationForMagicIdentifiers;
-
   /// Emit code to increment a counter for profiling.
   void emitProfilerIncrement(ASTNode N) {
     if (SGM.Profiler && SGM.Profiler->hasRegionCounters())
