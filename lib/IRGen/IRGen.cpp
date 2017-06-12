@@ -120,7 +120,8 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
       BuilderWrapper.IRGOpts.SanitizeCoverage));
 }
 
-std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
+           std::string>
 swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
@@ -134,7 +135,7 @@ swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
-  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features);
+  return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
 void setModuleFlags(IRGenModule &IGM) {
@@ -482,11 +483,10 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
 
 std::unique_ptr<llvm::TargetMachine>
 swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
-  const llvm::Triple &Triple = Ctx.LangOpts.Target;
   std::string Error;
-  const Target *Target = TargetRegistry::lookupTarget(Triple.str(), Error);
+  const Target *Target = TargetRegistry::lookupTarget(Ctx.LangOpts.Target.str(), Error);
   if (!Target) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, Triple.str(), Error);
+    Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, Ctx.LangOpts.Target.str(), Error);
     return nullptr;
   }
 
@@ -496,9 +496,11 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
   std::string CPU;
+  std::string ClangTriple;
   std::vector<std::string> targetFeaturesArray;
-  std::tie(TargetOpts, CPU, targetFeaturesArray)
+  std::tie(TargetOpts, CPU, targetFeaturesArray, ClangTriple)
     = getIRTargetOptions(Opts, Ctx);
+  const llvm::Triple &Triple = llvm::Triple(ClangTriple);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {
     llvm::SubtargetFeatures features;

@@ -127,11 +127,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
-      DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
+      DataLayout(target->createDataLayout()),
+      Triple(static_cast<ClangImporter *>(
+                 &*irgen.SIL.getASTContext().getClangModuleLoader())
+                 ->getTargetInfo()
+                 .getTargetOpts()
+                 .Triple),
       TargetMachine(std::move(target)), silConv(irgen.SIL),
-      OutputFilename(OutputFilename),
-      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
-      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      OutputFilename(OutputFilename), TargetInfo(SwiftTargetInfo::get(*this)),
+      DebugInfo(nullptr), ModuleHash(nullptr),
+      ObjCInterop(Context.LangOpts.EnableObjCInterop),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 

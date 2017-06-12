@@ -360,8 +360,9 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
   std::string CPU;
+  std::string Triple;
   std::vector<std::string> Features;
-  std::tie(TargetOpt, CPU, Features)
+  std::tie(TargetOpt, CPU, Features, Triple)
     = getIRTargetOptions(IRGenOpts, swiftModule->getASTContext());
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
