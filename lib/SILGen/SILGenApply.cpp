@@ -4758,14 +4758,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     init = stringLiteral->getInitializer();
   } else {
     ASTContext &ctx = getASTContext();
-    SourceLoc loc;
-  
-    // If "overrideLocationForMagicIdentifiers" is set, then we use it as the
-    // location point for these magic identifiers.
-    if (overrideLocationForMagicIdentifiers)
-      loc = overrideLocationForMagicIdentifiers.getValue();
-    else
-      loc = literal->getStartLoc();
+    SourceLoc loc = literal->getStartLoc();
 
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {

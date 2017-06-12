@@ -943,10 +943,6 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
     preEmitFunction(constant, arg, f, arg);
     PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
     SILGenFunction SGF(*this, *f);
-    // Override location for #file, #line etc. to an invalid one so that we
-    // don't put extra strings into the default argument generator function that
-    // is not going to be ever used anyway.
-    SGF.overrideLocationForMagicIdentifiers = SourceLoc();
     SGF.emitGeneratorFunction(constant, arg);
     postEmitFunction(constant, f);
   });
