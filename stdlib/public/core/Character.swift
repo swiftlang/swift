@@ -179,13 +179,8 @@ public struct Character :
     default:
       _representation = Character(
         _largeRepresentationString: String(
-          _StringCore(
-            baseAddress: UnsafeMutableRawPointer(start), 
-            count: utf16.count,
-            elementShift: 1,
-            hasCocoaBuffer: false,
-            owner: nil)
-        ))._representation
+          _builtinUTF16StringLiteral: start,
+          utf16CodeUnitCount: utf16CodeUnitCount))._representation
     }
   }
   

@@ -39,8 +39,9 @@ func _stdlib_binary_CFStringGetLength(
 public // @testable
 func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
-) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
+) -> UnsafeMutablePointer<Unicode.UTF16.CodeUnit>? {
+  return UnsafeMutablePointer(
+    mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
 /// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII
@@ -52,13 +53,17 @@ func _cocoaStringToSwiftString_NonASCII(
   let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
   let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
   let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
-
-  return String(_StringCore(
-    baseAddress: start,
-    count: length,
-    elementShift: 1,
-    hasCocoaBuffer: true,
-    owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self)))
+  
+  return String(
+    _StringCore(
+      baseAddress: start,
+      count: length,
+      elementShift: 1,
+      hasCocoaBuffer: true,
+      hasNulTerminator: false, // FIXME: Use _swift_stdlib_CFStringGetCStringPtr
+                               // to set this properly.  Note: elementWidth is
+                               // currently always 2!
+      owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self)))
 }
 
 /// Loading Foundation initializes these function variables
@@ -155,9 +160,6 @@ extension String {
     let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 
     // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
     let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
       cfImmutableValue, kCFStringEncodingASCII)
 
@@ -177,6 +179,7 @@ extension String {
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
+      hasNulTerminator: nulTerminatedASCII != nil,
       owner: cfImmutableValue)
   }
 }

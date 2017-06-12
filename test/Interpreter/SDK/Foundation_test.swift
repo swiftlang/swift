@@ -236,6 +236,7 @@ FoundationTestSuite.test("rdar://17584531") {
   var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"] as NSDictionary] as NSDictionary] as NSArray]
   var dict2 = dict["people"].flatMap { $0 as? NSArray }?[0] as! NSDictionary
   expectEqual("Optional(255)", String(describing: dict2["id" as NSString]))
+
 }
 
 FoundationTestSuite.test("DarwinBoolean smoke test") {

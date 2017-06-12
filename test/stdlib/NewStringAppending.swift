@@ -65,26 +65,30 @@ print("--- Appending ---")
 
 var s = "⓪" // start non-empty
 
-// To make this test independent of the memory allocator implementation,
-// explicitly request initial capacity.
-s.reserveCapacity(8)
-
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 8)) = "⓪1"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer0:[x0-9a-f]+]][0...2], capacity = [[cap0:[0-9]+]])) = "⓪1"
 s += "1"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer1:[x0-9a-f]+]][0...8], capacity = 8)) = "⓪1234567"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer1:[x0-9a-f]+]][0...8], capacity = [[cap1:[0-9]+]])) = "⓪1234567"
 s += "234567"
+print("\(repr(s))")
+
+while s._core.count < s._core.nativeBuffer!.capacity {
+  s += "x"
+}
+
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer1:[x0-9a-f]+]][0...[[cap1]]], capacity = [[cap1]])) = "⓪1234567[[xs:x*]]"
 print("\(repr(s))")
 
 // -- expect a reallocation here
 
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer2:[x0-9a-f]+]][0...9], capacity = 16)) = "⓪12345678"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer2:[x0-9a-f]+]][0...{{[0-9]+}}], capacity = [[cap2:[0-9]+]])) = "⓪1234567[[xs]]8"
 // CHECK-NOT: .native@[[buffer1]]
+// CHECK-NOT: capacity = [[cap1]])
 s += "8"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer2]][0...16], capacity = 16)) = "⓪123456789012345"
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer2]][0...{{[0-9]+}}], capacity = [[cap2]])) = "⓪1234567[[xs]]89012345"
 s += "9012345"
 print("\(repr(s))")
 
@@ -98,21 +102,23 @@ print("\(repr(s))")
 // more capacity.  It might be better to always grow to a multiple of
 // the current capacity when the capacity is exceeded.
 
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer3:[x0-9a-f]+]][0...48], capacity = 48))
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer3:[x0-9a-f]+]][0...{{[0-9]+}}], capacity = [[cap3:[0-9]+]]))
 // CHECK-NOT: .native@[[buffer2]]
+// CHECK-NOT: capacity = [[cap2]])
 s += s + s
 print("\(repr(s))")
 
 // -- expect a reallocation here
 
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4:[x0-9a-f]+]][0...49], capacity = 96))
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4:[x0-9a-f]+]][0...{{[0-9]+}}], capacity = [[cap4:[0-9]+]]))
 // CHECK-NOT: .native@[[buffer3]]
+// CHECK-NOT: capacity = [[cap3]])
 s += "C"
 print("\(repr(s))")
 
 var s1 = s
 
-// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4]][0...49], capacity = 96))
+// CHECK-NEXT: String(Contiguous(owner: .native@[[buffer4]][0...{{[0-9]+}}], capacity = [[cap4]]))
 print("\(repr(s1))")
 
 /// The use of later buffer capacity by another string forces

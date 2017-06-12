@@ -669,7 +669,7 @@ StringTests.test("COW/replaceSubrange/end") {
     let literalIdentity = str.bufferID
 
     // Move the string to the heap.
-    str.reserveCapacity(32)
+    str.reserveCapacity(str._core.nativeBuffer?.capacity ?? str._core.count + 1)
     expectNotEqual(literalIdentity, str.bufferID)
     let heapStrIdentity1 = str.bufferID
 
