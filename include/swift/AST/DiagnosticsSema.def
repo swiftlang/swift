@@ -1228,27 +1228,19 @@ ERROR(pattern_binds_no_variables,none,
       (unsigned))
 
 ERROR(nscoding_unstable_mangled_name,none,
-      "%select{private|fileprivate|nested|local|generic}0 class %1 has an "
+      "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
       (unsigned, Type))
 WARNING(nscoding_unstable_mangled_name_warn,none,
-        "%select{private|fileprivate|nested|local|generic}0 class %1 has an "
+        "%select{private|fileprivate|nested|local}0 class %1 has an "
         "unstable name when archiving via 'NSCoding'",
         (unsigned, Type))
-NOTE(unstable_mangled_name_add_objc,none,
-     "for new classes, add '@objc' to specify a unique, prefixed Objective-C "
+NOTE(unstable_mangled_name_add_objc_new,none,
+     "for new classes, use '@objc' to specify a unique, prefixed Objective-C "
      "runtime name", ())
-NOTE(unstable_mangled_name_add_NSKeyedArchiverClassName,none,
-     "for compatibility with existing archives, use '@NSKeyedArchiverClassName' "
-     "to record the Swift 3 mangled name", ())
-NOTE(add_NSKeyedArchiverEncodeNonGenericSubclassesOnly_attr,none,
-     "generic class %0 should not be archived directly; "
-     "add @NSKeyedArchiverEncodeNonGenericSubclassesOnly "
-     "and only archive specific subclasses of this class", (Type))
-
-ERROR(attr_NSKeyedArchiverClassName_generic,none,
-      "'@NSKeyedArchiverClassName' cannot be applied to generic class %0",
-      (Type))
+NOTE(unstable_mangled_name_add_objc,none,
+     "for compatibility with existing archives, use '@objc' "
+     "to record the Swift 3 runtime name", ())
 
 // Generic types
 ERROR(unsupported_type_nested_in_generic_function,none,

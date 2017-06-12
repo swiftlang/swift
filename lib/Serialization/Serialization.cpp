@@ -1955,11 +1955,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_SetterAccessibility:
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
-  case DAK_Count:
   case DAK_Implements:
-  case DAK_NSKeyedArchiverClassName:
+  case DAK_ObjCRuntimeName:
     llvm_unreachable("cannot serialize attribute");
-    return;
+
+  case DAK_Count:
+    llvm_unreachable("not a real attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)\
   case DAK_##CLASS: { \
