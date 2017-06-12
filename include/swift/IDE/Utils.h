@@ -304,7 +304,7 @@ struct ResolvedRangeInfo {
 
 class RangeResolver : public SourceEntityWalker {
   struct Implementation;
-  Implementation *Impl;
+  std::unique_ptr<Implementation> Impl;
   bool walkToExprPre(Expr *E) override;
   bool walkToExprPost(Expr *E) override;
   bool walkToStmtPre(Stmt *S) override;
@@ -317,8 +317,8 @@ class RangeResolver : public SourceEntityWalker {
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
   RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);
-  ResolvedRangeInfo resolve();
   ~RangeResolver();
+  ResolvedRangeInfo resolve();
 };
 
 /// This provides a utility to view a printed name by parsing the components
