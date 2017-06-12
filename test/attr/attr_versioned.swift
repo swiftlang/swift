@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-testing
 
 @_versioned private func privateVersioned() {}
 // expected-error@-1 {{'@_versioned' attribute can only be applied to internal declarations, but 'privateVersioned' is private}}
