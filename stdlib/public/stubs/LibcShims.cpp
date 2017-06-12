@@ -22,6 +22,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 #include <string.h>
 #include "swift/Basic/Lazy.h"
 #include "../SwiftShims/LibcShims.h"
@@ -50,7 +53,11 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_size_t swift::_swift_stdlib_fwrite_stdout(const void *ptr,
                                                   __swift_size_t size,
                                                   __swift_size_t nitems) {
+#if defined(__ANDROID__)
+  return __android_log_write(ANDROID_LOG_DEBUG, "SwiftRuntime", static_cast<const char *>(ptr));
+#else
   return fwrite(ptr, size, nitems, stdout);
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
