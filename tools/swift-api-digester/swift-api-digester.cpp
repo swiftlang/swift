@@ -1637,6 +1637,8 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
         } else {
           return false;
         }
+        R->annotate(NodeAnnotation::PropertyName);
+        R->addAnnotateComment(NodeAnnotation::PropertyName, A->getPrintedName());
         foundMatch(R, A);
         return true;
       }
@@ -1867,7 +1869,8 @@ class SameNameNodeMatcher : public NodeMatcher {
       return FuncPriority;
     } else {
       static NameMatchKind OtherPriority[] = { NameMatchKind::PrintedNameAndUSR,
-                                               NameMatchKind::PrintedName };
+                                               NameMatchKind::PrintedName,
+                                               NameMatchKind::USR };
       return OtherPriority;
     }
   }
@@ -2455,6 +2458,9 @@ class DiffItemEmitter : public SDKNodeVisitor {
         return Node->getAnnotateComment(NodeAnnotation::ModernizeEnum);
       case NodeAnnotation::Rename:
         return Node->getAnnotateComment(NodeAnnotation::RenameNewName);
+      case NodeAnnotation::GetterToProperty:
+      case NodeAnnotation::SetterToProperty:
+        return Node->getAnnotateComment(NodeAnnotation::PropertyName);
       default:
         return StringRef();
     }

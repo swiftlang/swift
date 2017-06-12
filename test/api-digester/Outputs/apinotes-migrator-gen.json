@@ -1,5 +1,27 @@
 [
   {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)TypeWithMethod(im)getPropertyA",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "propertyA",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)TypeWithMethod",
+    "LeftComment": "SwiftTypeWithMethodLeft",
+    "RightUsr": "",
+    "RightComment": "SwiftTypeWithMethodRight",
+    "ModuleName": "APINotesTest"
+  },
+  {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@ANTGlobalValue",
     "OldPrintedName": "oldMember",
