@@ -1494,6 +1494,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
       } else if (auto OEE = dyn_cast<OptionalEvaluationExpr>(expr)) {
         // Do nothing: this is implied to exist as the last expression, by the
         // BindOptionalExprs, but is irrelevant to the components.
+        (void)outermostExpr;
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
       } else {
