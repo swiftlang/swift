@@ -916,15 +916,33 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
+                                           DefaultArgumentKind kind) {
+  switch (kind) {
+  case DefaultArgumentKind::None:
+    llvm_unreachable("No default argument here?");
+
+  case DefaultArgumentKind::Normal:
+    break;
+
+  case DefaultArgumentKind::Inherited:
+    return;
+
+  case DefaultArgumentKind::Column:
+  case DefaultArgumentKind::File:
+  case DefaultArgumentKind::Line:
+  case DefaultArgumentKind::Function:
+  case DefaultArgumentKind::DSOHandle:
+  case DefaultArgumentKind::Nil:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    return;
+  }
+
   emitOrDelayFunction(*this, constant, [this,constant,arg](SILFunction *f) {
     preEmitFunction(constant, arg, f, arg);
     PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
     SILGenFunction SGF(*this, *f);
-    // Override location for #file, #line etc. to an invalid one so that we
-    // don't put extra strings into the default argument generator function that
-    // is not going to be ever used anyway.
-    SGF.overrideLocationForMagicIdentifiers = SourceLoc();
     SGF.emitGeneratorFunction(constant, arg);
     postEmitFunction(constant, f);
   });
@@ -1004,7 +1022,7 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
     for (auto param : *paramList) {
       if (auto defaultArg = param->getDefaultValue())
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                                defaultArg);
+                                defaultArg, param->getDefaultArgumentKind());
       ++index;
     }
   }
