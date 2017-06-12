@@ -2602,9 +2602,10 @@ public struct ${Self}
 
 %   if Self in ['Int32', 'Int64']:
 %     Floating = {32 : 'Float', 64 : 'Double'}[bits]
-  @_transparent
+  @available(*, unavailable,
+    message: "Please use ${Self}(bitPattern: ${OtherSelf}) in combination with ${Floating}.bitPattern property.")
   public init(bitPattern x: ${Floating}) {
-    _value = Builtin.bitcast_FPIEEE${bits}_Int${bits}(x._value)
+    Builtin.unreachable()
   }
 %   end
 
