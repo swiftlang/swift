@@ -53,13 +53,7 @@ struct Test {
   let name: String
   let index: Int
   let f: (Int) -> ()
-  var run: Bool
-  init(name: String, n: Int, f: @escaping (Int) -> ()) {
-    self.name = name
-    self.index = n
-    self.f = f
-    run = true
-  }
+  let run: Bool
 }
 
 public var precommitTests: [String : (Int) -> ()] = [:]
@@ -117,9 +111,7 @@ struct TestConfig {
     }
     let benchArgs = maybeBenchArgs!
 
-    if let _ = benchArgs.optionalArgsMap["--list"] {
-      return .ListTests
-    }
+    filters = benchArgs.positionalArgs
 
     if let x = benchArgs.optionalArgsMap["--iter-scale"] {
       if x.isEmpty { return .Fail("--iter-scale requires a value") }
@@ -161,34 +153,30 @@ struct TestConfig {
       afterRunSleep = v!
     }
 
-    filters = benchArgs.positionalArgs
+    if let _ = benchArgs.optionalArgsMap["--list"] {
+      return .ListTests
+    }
 
     return .Run
   }
 
   mutating func findTestsToRun() {
-    var i = 1
-    for benchName in precommitTests.keys.sorted() {
-      tests.append(Test(name: benchName, n: i, f: precommitTests[benchName]!))
-      i += 1
-    }
-    for benchName in otherTests.keys.sorted() {
-      tests.append(Test(name: benchName, n: i, f: otherTests[benchName]!))
-      i += 1
-    }
-    for benchName in stringTests.keys.sorted() {
-      tests.append(Test(name: benchName, n: i, f: stringTests[benchName]!))
-      i += 1
-    }
-    for i in 0..<tests.count {
-      if onlyPrecommit && precommitTests[tests[i].name] == nil {
-        tests[i].run = false
-      }
-      if !filters.isEmpty &&
-         !filters.contains(String(tests[i].index)) &&
-         !filters.contains(tests[i].name) {
-        tests[i].run = false
-      }
+    let allTests = [precommitTests, otherTests, stringTests]
+      .map { dictionary -> [(key: String, value: (Int)-> ())] in
+        Array(dictionary).sorted { $0.key < $1.key } } // by name
+      .joined()
+
+    let included =
+      !filters.isEmpty ? Set(filters)
+      : onlyPrecommit ? Set(precommitTests.keys)
+      : Set(allTests.map { $0.key })
+
+    tests = zip(1...allTests.count, allTests).map {
+      t -> Test in
+      let (ordinal, (key: name, value: function)) = t
+      return Test(name: name, index: ordinal, f: function,
+                  run: included.contains(name)
+                    || included.contains(String(ordinal)))
     }
   }
 }
@@ -410,7 +398,7 @@ public func main() {
     case .ListTests:
       config.findTestsToRun()
       print("Enabled Tests:")
-      for t in config.tests {
+      for t in config.tests where t.run == true {
         print("    \(t.name)")
       }
     case .Run:
