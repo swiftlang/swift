@@ -1671,8 +1671,8 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
     auto parentAnchor = parent->getArchetypeAnchor(builder);
     assert(parentAnchor->getNestingDepth() <= parent->getNestingDepth());
     anchor = parentAnchor->getNestedArchetypeAnchor(
-                                          getNestedName(), builder,
-                                          ArchetypeResolutionKind::AlreadyKnown);
+                                      getNestedName(), builder,
+                                      ArchetypeResolutionKind::AlwaysPartial);
 
     // FIXME: Hack for cases where we couldn't resolve the nested type.
     if (!anchor)
