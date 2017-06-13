@@ -122,8 +122,18 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
                            !getTypeLowering(var->getType()).isAddressOnly()))
         return CaptureKind::Constant;
 
+      // In-out parameters are captured by address.
       if (var->getType()->is<InOutType>()) {
         return CaptureKind::StorageAddress;
+      }
+
+      // Reference storage types can appear in a capture list, which means
+      // we might allocate boxes to store the captures. However, those boxes
+      // have the same lifetime as the closure itself, so we must capture
+      // the box itself and not the payload, even if the closure is noescape,
+      // otherwise they will be destroyed when the closure is formed.
+      if (var->getType()->is<ReferenceStorageType>()) {
+        return CaptureKind::Box;
       }
 
       // If we're capturing into a non-escaping closure, we can generally just
