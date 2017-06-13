@@ -57,8 +57,6 @@ public struct UnsafeBufferPointerIterator<Element>
 /// instances stored in the underlying memory. However, initializing another
 /// collection with an `${Self}` instance copies the instances out of the
 /// referenced memory and into the new collection.
-///
-/// - SeeAlso: `Unsafe${Mutable}Pointer`, `Unsafe${Mutable}RawBufferPointer`
 @_fixed_layout
 public struct Unsafe${Mutable}BufferPointer<Element>
   : _${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {

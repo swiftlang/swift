@@ -41,8 +41,6 @@ internal func _abstract(
 /// This iterator forwards its `next()` method to an arbitrary underlying
 /// iterator having the same `Element` type, hiding the specifics of the
 /// underlying `IteratorProtocol`.
-///
-/// - SeeAlso: `AnySequence`
 @_fixed_layout
 public struct AnyIterator<Element> : IteratorProtocol {
   /// Creates an iterator that wraps a base iterator but whose type depends
@@ -731,8 +729,6 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 /// An instance of `AnySequence` forwards its operations to an underlying base
 /// sequence having the same `Element` type, hiding the specifics of the
 /// underlying sequence.
-///
-/// - SeeAlso: `AnyIterator`
 //@_versioned
 @_fixed_layout
 public struct AnySequence<Element> : Sequence {
@@ -940,8 +936,6 @@ internal final class _IndexBox<
 }
 
 /// A wrapper over an underlying index that hides the specific underlying type.
-///
-/// - SeeAlso: `AnyCollection`
 @_fixed_layout
 public struct AnyIndex {
   /// Creates a new index wrapping `base`.
@@ -1015,8 +1009,6 @@ protocol _AnyCollectionProtocol : Collection {
 /// An `${Self}` instance forwards its operations to a base collection having the
 /// same `Element` type, hiding the specifics of the underlying
 /// collection.
-///
-/// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 @_fixed_layout
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {

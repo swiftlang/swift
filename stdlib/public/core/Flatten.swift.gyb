@@ -121,8 +121,6 @@ extension Sequence where Element : Sequence {
   ///
   /// - Returns: A flattened view of the elements of this
   ///   sequence of sequences.
-  ///
-  /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
   public func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
   }
@@ -397,8 +395,6 @@ extension ${collectionForTraversal(traversal)}
   ///
   /// - Returns: A flattened view of the elements of this
   ///   collection of collections.
-  ///
-  /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
   public func joined() -> ${Collection}<Self> {
     return ${Collection}(self)
   }

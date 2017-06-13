@@ -427,8 +427,6 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///     bytes.
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
-  ///
-  /// - SeeAlso: `UnsafeMutablePointer`
   @_inlineable
   public static func allocate(
     bytes size: Int, alignedTo: Int
@@ -509,8 +507,6 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  ///
-  /// - SeeAlso: `bindMemory(to:capacity:)`
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)

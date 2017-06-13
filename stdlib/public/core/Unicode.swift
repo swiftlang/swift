@@ -20,8 +20,6 @@ import SwiftShims
 /// Each `UnicodeDecodingResult` instance can represent a Unicode scalar value,
 /// an indication that no more Unicode scalars are available, or an indication
 /// of a decoding error.
-/// 
-/// - SeeAlso: `UnicodeCodec.decode(next:)`
 @_fixed_layout
 public enum UnicodeDecodingResult : Equatable {
   /// A decoded Unicode scalar value.
@@ -59,8 +57,6 @@ public enum UnicodeDecodingResult : Equatable {
 /// UTF-8, UTF-16, and UTF-32 encoding schemes as the `UTF8`, `UTF16`, and
 /// `UTF32` types, respectively. Use the `Unicode.Scalar` type to work with
 /// decoded Unicode scalar values.
-///
-/// - SeeAlso: `UTF8`, `UTF16`, `UTF32`, `Unicode.Scalar`
 public protocol UnicodeCodec : Unicode.Encoding {
 
   /// Creates an instance of the codec.
@@ -764,8 +760,6 @@ extension UTF16 {
   ///   surrogate pair when encoded in UTF-16. To check whether `x` is
   ///   represented by a surrogate pair, use `UTF16.width(x) == 2`.
   /// - Returns: The leading surrogate code unit of `x` when encoded in UTF-16.
-  ///
-  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.trailSurrogate(_:)`
   public static func leadSurrogate(_ x: Unicode.Scalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return 0xD800 + UTF16.CodeUnit(extendingOrTruncating:
@@ -789,8 +783,6 @@ extension UTF16 {
   ///   surrogate pair when encoded in UTF-16. To check whether `x` is
   ///   represented by a surrogate pair, use `UTF16.width(x) == 2`.
   /// - Returns: The trailing surrogate code unit of `x` when encoded in UTF-16.
-  ///
-  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func trailSurrogate(_ x: Unicode.Scalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return 0xDC00 + UTF16.CodeUnit(extendingOrTruncating:
@@ -818,8 +810,6 @@ extension UTF16 {
   /// - Parameter x: A UTF-16 code unit.
   /// - Returns: `true` if `x` is a high-surrogate code unit; otherwise,
   ///   `false`.
-  ///
-  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func isLeadSurrogate(_ x: CodeUnit) -> Bool {
     return 0xD800...0xDBFF ~= x
   }
@@ -846,8 +836,6 @@ extension UTF16 {
   /// - Parameter x: A UTF-16 code unit.
   /// - Returns: `true` if `x` is a low-surrogate code unit; otherwise,
   ///   `false`.
-  ///
-  /// - SeeAlso: `UTF16.width(_:)`, `UTF16.leadSurrogate(_:)`
   public static func isTrailSurrogate(_ x: CodeUnit) -> Bool {
     return 0xDC00...0xDFFF ~= x
   }
