@@ -29,7 +29,7 @@
 }
 {
   key.offset: 1,
-  key.length: 36,
+  key.length: 34,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
     {
