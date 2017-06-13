@@ -128,15 +128,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(target->createDataLayout()),
-      Triple(static_cast<ClangImporter *>(
-                 &*irgen.SIL.getASTContext().getClangModuleLoader())
-                 ->getTargetInfo()
-                 .getTargetOpts()
-                 .Triple),
-      TargetMachine(std::move(target)), silConv(irgen.SIL),
-      OutputFilename(OutputFilename), TargetInfo(SwiftTargetInfo::get(*this)),
-      DebugInfo(nullptr), ModuleHash(nullptr),
-      ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
+      silConv(irgen.SIL), OutputFilename(OutputFilename),
+      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
+      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
 
@@ -1187,4 +1182,11 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return IGM;
 
   return getPrimaryIGM();
+}
+
+llvm::Triple IRGenerator::getEffectiveClangTriple() {
+  auto CI = static_cast<ClangImporter *>(
+      &*SIL.getASTContext().getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }
