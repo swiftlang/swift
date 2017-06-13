@@ -3705,6 +3705,9 @@ WARNING(debug_long_function_body, none,
 WARNING(debug_long_closure_body, none,
         "closure took %0ms to type-check (limit: %1ms)",
         (unsigned, unsigned))
+WARNING(debug_long_expression, none,
+        "expression took %0ms to type-check (limit: %1ms)",
+        (unsigned, unsigned))
 
 //------------------------------------------------------------------------------
 // Pattern match diagnostics
