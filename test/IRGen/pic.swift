@@ -23,26 +23,26 @@ public func use_global() -> Int {
 // Check for the runtime memory enforcement call. The global address may be
 // materialized in a different register prior to that call.
 // armv7:         bl _swift_beginAccess
-// armv7:         movw [[R_ADR:r.*]], :lower16:(__T04main6globalSiv-([[PIC_0:L.*]]+8))
-// armv7:         movt [[R_ADR]], :upper16:(__T04main6globalSiv-([[PIC_0]]+8))
+// armv7:         movw [[R_ADR:r.*]], :lower16:(__T04main6globalSiv-([[PIC_0:L.*]]+4))
+// armv7:         movt [[R_ADR]], :upper16:(__T04main6globalSiv-([[PIC_0]]+4))
 // armv7:       [[PIC_0]]:{{$}}
-// armv7:         add [[R_ADR]], pc, [[R_ADR]]
+// armv7:         add [[R_ADR]], pc
 // armv7:         ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
 
 // armv7s-LABEL: __T04main10use_globalSiyF:
 // armv7s:         bl _swift_beginAccess
-// armv7s:         movw [[R_ADR:r.*]], :lower16:(__T04main6globalSiv-([[PIC_0:L.*]]+8))
-// armv7s:         movt [[R_ADR]], :upper16:(__T04main6globalSiv-([[PIC_0]]+8))
+// armv7s:         movw [[R_ADR:r.*]], :lower16:(__T04main6globalSiv-([[PIC_0:L.*]]+4))
+// armv7s:         movt [[R_ADR]], :upper16:(__T04main6globalSiv-([[PIC_0]]+4))
 // armv7s:       [[PIC_0]]:{{$}}
-// armv7s:         add [[R_ADR]], pc, [[R_ADR]]
+// armv7s:         add [[R_ADR]], pc
 // armv7s:         ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
 
 // armv7k-LABEL: __T04main10use_globalSiyF:
 // armv7k:         bl _swift_beginAccess
-// armv7k:        movw [[R_ADR:r.*]], :lower16:(__T04main6globalSiv-([[PIC_0:L.*]]+8))
-// armv7k:        movt [[R_ADR]], :upper16:(__T04main6globalSiv-([[PIC_0]]+8))
+// armv7k:        movw [[R_ADR:r.*]], :lower16:(__T04main6globalSiv-([[PIC_0:L.*]]+4))
+// armv7k:        movt [[R_ADR]], :upper16:(__T04main6globalSiv-([[PIC_0]]+4))
 // armv7k:      [[PIC_0]]:{{$}}
-// armv7k:        add [[R_ADR]], pc, [[R_ADR]]
+// armv7k:        add [[R_ADR]], pc
 // armv7k:        ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
 
 // arm64-LABEL: __T04main10use_globalSiyF:
