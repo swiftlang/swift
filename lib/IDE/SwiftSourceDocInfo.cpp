@@ -700,6 +700,8 @@ public:
   }
 
   OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {
+    if (Nodes.empty())
+      return OrphanKind::None;
 
     // Prepare the entire range.
     SourceRange WholeRange(Nodes.front().getStartLoc(),
