@@ -1,5 +1,6 @@
 set(UTILITYPASSES_SOURCES
   UtilityPasses/AADumper.cpp
+  UtilityPasses/AccessSummaryDumper.cpp
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/BasicInstructionPropertyDumper.cpp
   UtilityPasses/BugReducerTester.cpp

@@ -24,17 +24,18 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "static-exclusivity"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/Projection.h"
+#include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -179,7 +180,7 @@ class AccessInfo {
 public:
   // Returns true when beginning an access of the given Kind will
   // result in a conflict with a previous access.
-  bool conflictsWithAccess(SILAccessKind Kind) {
+  bool conflictsWithAccess(SILAccessKind Kind) const {
     if (Kind == SILAccessKind::Read) {
       // A read conflicts with any non-read accesses.
       return NonReads > 0;
@@ -192,12 +193,12 @@ public:
   /// Returns true when there must have already been a conflict diagnosed
   /// for an in-progress access. Used to suppress multiple diagnostics for
   /// the same underlying access violation.
-  bool alreadyHadConflict() {
+  bool alreadyHadConflict() const {
     return (NonReads > 0 && Reads > 0) || (NonReads > 1);
   }
 
   /// Returns true when there are any accesses to this location in progress.
-  bool hasAccessesInProgress() { return Reads > 0 || NonReads > 0; }
+  bool hasAccessesInProgress() const { return Reads > 0 || NonReads > 0; }
 
   /// Increment the count for given access.
   void beginAccess(const BeginAccessInst *BAI) {
@@ -226,7 +227,7 @@ public:
   }
 
   /// Returns the instruction that began the first in-progress access.
-  const BeginAccessInst *getFirstAccess() { return FirstAccess; }
+  const BeginAccessInst *getFirstAccess() const { return FirstAccess; }
 };
 
 /// Indicates whether a 'begin_access' requires exclusive access
@@ -242,11 +243,104 @@ enum class ExclusiveOrShared_t : unsigned {
 /// Tracks the in-progress accesses on per-storage-location basis.
 using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
-/// A pair of 'begin_access' instructions that conflict.
+/// The kind of conflicting access.
+enum class ConflictKind {
+  /// A conflict between two begin_access instructions.
+  SimultaneousAccess,
+
+  /// A conflict between an in-progress begin_access and
+  /// a use of a noescape closure that accesses a captured address.
+  NoescapeClosureCapture
+};
+
+/// Represents two accesses that conflict and the underlying storage.
+/// Can be either two begin_access instructions (for conflicts within the
+/// same function) or a begin_access instruction and an AccessKind (for
+/// a conflict between an in-progress access and a call/use of a noescape
+/// closure that accesses the same storage.
 struct ConflictingAccess {
+public:
+  /// Create a conflict for two begin_access instructions in the same function.
+  ConflictingAccess(const AccessedStorage &Storage,
+                    const BeginAccessInst *FirstAccess,
+                    const BeginAccessInst *SecondAccess)
+      : Kind(ConflictKind::SimultaneousAccess), Storage(Storage),
+        FirstAccess(FirstAccess), SecondAccess(SecondAccess) {}
+
+  /// Create a conflict for a begin_access instruction and an access in
+  /// a noescape closure.
+  ConflictingAccess(const AccessedStorage &Storage,
+                    const BeginAccessInst *FirstAccess,
+                    SILAccessKind ClosureAccessKind,
+                    SILLocation ClosureAccessLoc)
+      : Kind(ConflictKind::NoescapeClosureCapture), Storage(Storage),
+        FirstAccess(FirstAccess), ClosureAccessKind(ClosureAccessKind),
+        ClosureAccessLoc(ClosureAccessLoc) {}
+
+  ConflictKind getKind() const { return Kind; }
+
+  const AccessedStorage &getStorage() const { return Storage; }
+
+  const BeginAccessInst *getFirstAccess() const { return FirstAccess; }
+
+  SILAccessKind getFirstAccessKind() const {
+    return FirstAccess->getAccessKind();
+  }
+
+  SILLocation getFirstAccessLocation() const { return FirstAccess->getLoc(); }
+
+  const BeginAccessInst *getSecondAccess() const {
+    assert(Kind == ConflictKind::SimultaneousAccess);
+    return SecondAccess;
+  }
+
+  SILAccessKind getSecondAccessKind() const {
+    switch (getKind()) {
+    case ConflictKind::SimultaneousAccess:
+      return getSecondAccess()->getAccessKind();
+    case ConflictKind::NoescapeClosureCapture:
+      return getClosureAccessKind();
+    };
+  }
+
+  SILLocation getSecondAccessLoc() const {
+    switch (getKind()) {
+    case ConflictKind::SimultaneousAccess:
+      return getSecondAccess()->getLoc();
+    case ConflictKind::NoescapeClosureCapture:
+      return getClosureAccessLoc();
+    };
+  }
+
+  SILAccessKind getClosureAccessKind() const {
+    assert(Kind == ConflictKind::NoescapeClosureCapture);
+    return ClosureAccessKind;
+  }
+
+  SILLocation getClosureAccessLoc() const {
+    assert(Kind == ConflictKind::NoescapeClosureCapture);
+    return ClosureAccessLoc;
+  }
+
+private:
+  ConflictKind Kind;
+
   AccessedStorage Storage;
   const BeginAccessInst *FirstAccess;
-  const BeginAccessInst *SecondAccess;
+
+  union {
+    /// When Kind is SimultaneousAccess, SecondAccess stores the instruction
+    /// of the second access.
+    const BeginAccessInst *SecondAccess;
+
+    /// When Kind is NoescapeClosureCapture, this struct stores the
+    /// kind of access in the closure and a location for diagnostic
+    /// reporting inside the closure.
+    struct {
+      SILAccessKind ClosureAccessKind;
+      SILLocation ClosureAccessLoc;
+    };
+  };
 };
 
 } // end anonymous namespace
@@ -299,8 +393,8 @@ template <> struct DenseMapInfo<AccessedStorage> {
 
 /// Returns whether a 'begin_access' requires exclusive or shared access
 /// to its storage.
-static ExclusiveOrShared_t getRequiredAccess(const BeginAccessInst *BAI) {
-  if (BAI->getAccessKind() == SILAccessKind::Read)
+static ExclusiveOrShared_t getRequiredAccess(SILAccessKind Kind) {
+  if (Kind == SILAccessKind::Read)
     return ExclusiveOrShared_t::SharedAccess;
 
   return ExclusiveOrShared_t::ExclusiveAccess;
@@ -464,60 +558,70 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
 /// Emits a diagnostic if beginning an access with the given in-progress
 /// accesses violates the law of exclusivity. Returns true when a
 /// diagnostic was emitted.
-static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
-                                         const BeginAccessInst *PriorAccess,
-                                         const BeginAccessInst *NewAccess,
+static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
                                          ArrayRef<ApplyInst *> CallsToSwap,
                                          ASTContext &Ctx) {
 
-  DEBUG(llvm::dbgs() << "Conflict on " << *PriorAccess
-        << "\n  vs " << *NewAccess
-        << "\n  in function " << *PriorAccess->getFunction());
+  const AccessedStorage &Storage = Violation.getStorage();
 
-  // Can't have a conflict if both accesses are reads.
-  assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
-           NewAccess->getAccessKind() == SILAccessKind::Read));
-
-  ExclusiveOrShared_t PriorRequires = getRequiredAccess(PriorAccess);
-
-  // Diagnose on the first access that requires exclusivity.
-  const BeginAccessInst *AccessForMainDiagnostic = PriorAccess;
-  const BeginAccessInst *AccessForNote = NewAccess;
-  if (PriorRequires != ExclusiveOrShared_t::ExclusiveAccess) {
-    AccessForMainDiagnostic = NewAccess;
-    AccessForNote = PriorAccess;
+  if (Violation.getKind() == ConflictKind::SimultaneousAccess) {
+    DEBUG(llvm::dbgs() << "Conflict on " << *Violation.getFirstAccess()
+                       << "\n  vs " << *Violation.getSecondAccess()
+                       << "\n  in function "
+                       << *Violation.getFirstAccess()->getFunction());
+  } else {
+    DEBUG(llvm::dbgs() << "Conflict on " << *Violation.getFirstAccess()
+                       << "\n  vs "
+                       << getSILAccessKindName(Violation.getSecondAccessKind())
+                       << "\n  in function "
+                       << *Violation.getFirstAccess()->getFunction());
   }
 
-  SourceRange rangeForMain =
-    AccessForMainDiagnostic->getLoc().getSourceRange();
-  unsigned AccessKindForMain =
-      static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind());
+  // Can't have a conflict if both accesses are reads.
+  assert(!(Violation.getFirstAccessKind() == SILAccessKind::Read &&
+           Violation.getSecondAccessKind() == SILAccessKind::Read));
+
+  ExclusiveOrShared_t PriorRequires =
+      getRequiredAccess(Violation.getFirstAccessKind());
+
+  // Diagnose on the first access that requires exclusivity.
+  SILLocation LocForMainDiagnostic = Violation.getFirstAccessLocation();
+  SILAccessKind KindForMainDiagnostic = Violation.getFirstAccessKind();
+  SILLocation LocForNote = Violation.getSecondAccessLoc();
+  SILAccessKind KindForNote = Violation.getSecondAccessKind();
+
+  if (PriorRequires != ExclusiveOrShared_t::ExclusiveAccess) {
+    std::swap(LocForMainDiagnostic, LocForNote);
+    std::swap(KindForMainDiagnostic, KindForNote);
+  }
+
+  SourceRange rangeForMain = LocForMainDiagnostic.getSourceRange();
+  unsigned AccessKindForMain = static_cast<unsigned>(KindForMainDiagnostic);
 
   if (const ValueDecl *VD = Storage.getStorageDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_swift3 :
                          diag::exclusivity_access_required);
-    auto D = diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-                       DiagnosticID,
-                       VD->getDescriptiveKind(),
-                       VD->getBaseName(),
-                       AccessKindForMain);
+    auto D = diagnose(Ctx, LocForMainDiagnostic.getSourceLoc(), DiagnosticID,
+                      VD->getDescriptiveKind(), VD->getBaseName(),
+                      AccessKindForMain);
     D.highlight(rangeForMain);
-    tryFixItWithCallToCollectionSwapAt(PriorAccess, NewAccess,
-                                       CallsToSwap, Ctx, D);
+    if (Violation.getKind() == ConflictKind::SimultaneousAccess) {
+      tryFixItWithCallToCollectionSwapAt(Violation.getFirstAccess(),
+                                         Violation.getSecondAccess(),
+                                         CallsToSwap, Ctx, D);
+    }
   } else {
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_unknown_decl_swift3 :
                          diag::exclusivity_access_required_unknown_decl);
-    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-             DiagnosticID,
+    diagnose(Ctx, LocForMainDiagnostic.getSourceLoc(), DiagnosticID,
              AccessKindForMain)
         .highlight(rangeForMain);
   }
-  diagnose(Ctx, AccessForNote->getLoc().getSourceLoc(),
-           diag::exclusivity_conflicting_access)
-      .highlight(AccessForNote->getLoc().getSourceRange());
+  diagnose(Ctx, LocForNote.getSourceLoc(), diag::exclusivity_conflicting_access)
+      .highlight(LocForNote.getSourceRange());
 }
 
 /// Make a best effort to find the underlying object for the purpose
@@ -626,7 +730,101 @@ bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   return FD == Ctx.getSwap(nullptr);
 }
 
-static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
+bool shouldReportAccess(const AccessInfo &Info, swift::SILAccessKind Kind) {
+  return Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict();
+}
+
+/// Use the summary analysis to check whether a call to the given
+/// function would conflict with any in progress accesses. The starting
+/// index indicates what index into the the callee's parameters the
+/// arguments array starts at -- this is useful for partial_apply functions,
+/// which pass only a suffix of the callee's arguments at the apply site.
+static void checkForViolationWithCall(
+    const StorageMap &Accesses, SILFunction *Callee, unsigned StartingAtIndex,
+    OperandValueArrayRef Arguments, AccessSummaryAnalysis *ASA,
+    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
+  const AccessSummaryAnalysis::FunctionSummary &FS =
+      ASA->getOrCreateSummary(Callee);
+
+  // For each argument in the suffix of the callee parameters being passed
+  // at this call site, determine whether the parameters will be accessed
+  // in a way that conflicts with any currently in progress accesses.
+  // If so, diagnose.
+  for (unsigned ArgumentIndex : indices(Arguments)) {
+    unsigned CalleeIndex = StartingAtIndex + ArgumentIndex;
+
+    const AccessSummaryAnalysis::ParameterSummary &PS =
+        FS.getAccessForParameter(CalleeIndex);
+    Optional<SILAccessKind> Kind = PS.getAccessKind();
+    if (!Kind)
+      continue;
+
+    SILValue Argument = Arguments[ArgumentIndex];
+    assert(Argument->getType().isAddress());
+
+    const AccessedStorage &Storage = findAccessedStorage(Argument);
+    auto AccessIt = Accesses.find(Storage);
+    if (AccessIt == Accesses.end())
+      continue;
+    const AccessInfo &Info = AccessIt->getSecond();
+
+    if (shouldReportAccess(Info, *Kind)) {
+      const BeginAccessInst *Conflict = Info.getFirstAccess();
+      SILLocation AccessLoc = PS.getAccessLoc();
+      ConflictingAccesses.emplace_back(Storage, Conflict, *Kind, AccessLoc);
+    }
+  }
+}
+
+static PartialApplyInst *lookThroughForPartialApply(SILValue V) {
+  while (true) {
+    if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {
+      V = CFI->getOperand();
+      continue;
+    }
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V))
+      return PAI;
+
+    return nullptr;
+  }
+}
+
+/// Checks whether any of the arguments to the apply are closures and diagnoses
+/// if any of the @inout_aliasable captures passed to those closures have
+/// in-progress accesses that would conflict with any access the summary
+/// says the closure would perform.
+static void checkForViolationsInNoEscapeClosures(
+    const StorageMap &Accesses, FullApplySite FAS, AccessSummaryAnalysis *ASA,
+    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
+
+  SILFunction *Callee = FAS.getCalleeFunction();
+  if (Callee && !Callee->empty()) {
+    // Check for violation with directly called closure
+    checkForViolationWithCall(Accesses, Callee, 0, FAS.getArguments(), ASA,
+                              ConflictingAccesses);
+  }
+
+  // Check for violation with closures passed as arguments
+  for (SILValue Argument : FAS.getArguments()) {
+    auto *PAI = lookThroughForPartialApply(Argument);
+    if (!PAI)
+      continue;
+
+    SILFunction *Closure = PAI->getCalleeFunction();
+    if (!Closure || Closure->empty())
+      continue;
+
+    // Check the closure's captures, which are a suffix of the closure's
+    // parameters.
+    unsigned StartIndex =
+        Closure->getArguments().size() - PAI->getNumCallArguments();
+    checkForViolationWithCall(Accesses, Closure, StartIndex,
+                              PAI->getArguments(), ASA, ConflictingAccesses);
+  }
+}
+static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
+                                   AccessSummaryAnalysis *ASA) {
   // The implementation relies on the following SIL invariants:
   //    - All incoming edges to a block must have the same in-progress
   //      accesses. This enables the analysis to not perform a data flow merge
@@ -692,10 +890,10 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         SILAccessKind Kind = BAI->getAccessKind();
         const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
         AccessInfo &Info = Accesses[Storage];
-        if (Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict()) {
+        if (shouldReportAccess(Info, Kind)) {
           const BeginAccessInst *Conflict = Info.getFirstAccess();
           assert(Conflict && "Must already have had access to conflict!");
-          ConflictingAccesses.push_back({ Storage, Conflict, BAI });
+          ConflictingAccesses.emplace_back(Storage, Conflict, BAI);
         }
 
         Info.beginAccess(BAI);
@@ -718,6 +916,12 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         // Record calls to swap() for potential Fix-Its.
         if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
           CallsToSwap.push_back(AI);
+        else
+          checkForViolationsInNoEscapeClosures(Accesses, AI, ASA,
+                                               ConflictingAccesses);
+      } else if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
+        checkForViolationsInNoEscapeClosures(Accesses, TAI, ASA,
+                                             ConflictingAccesses);
       }
 
       // Sanity check to make sure entries are properly removed.
@@ -729,11 +933,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   // Now that we've collected violations and suppressed calls, emit
   // diagnostics.
   for (auto &Violation : ConflictingAccesses) {
-    const BeginAccessInst *PriorAccess = Violation.FirstAccess;
-    const BeginAccessInst *NewAccess = Violation.SecondAccess;
-
-    diagnoseExclusivityViolation(Violation.Storage, PriorAccess, NewAccess,
-                                 CallsToSwap, Fn.getASTContext());
+    diagnoseExclusivityViolation(Violation, CallsToSwap, Fn.getASTContext());
   }
 }
 
@@ -752,7 +952,13 @@ private:
       return;
 
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(Fn);
-    checkStaticExclusivity(*Fn, PO);
+    auto *ASA = getAnalysis<AccessSummaryAnalysis>();
+
+    // TODO: DO NOT COMMIT: For compatibility test purposes only
+    const AccessSummaryAnalysis::FunctionSummary &summary =
+        ASA->getOrCreateSummary(Fn);
+    (void)summary;
+    checkStaticExclusivity(*Fn, PO, ASA);
   }
 };
 
