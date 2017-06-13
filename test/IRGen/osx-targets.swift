@@ -5,7 +5,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK: target triple = "x86_64-apple-macosx10.
-// CHECK-SPECIFIC: target triple = "x86_64-apple-macosx10.12
+// CHECK-SPECIFIC: target triple = "x86_64-apple-macosx10.12.0"
 
 public func anchor() {}
 anchor()
