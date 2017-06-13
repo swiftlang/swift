@@ -42,22 +42,30 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     let s1 = Switch.off
     _testEncodeFailure(of: s1, in: .binary)
     _testEncodeFailure(of: s1, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(s1), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(s1), in: .xml)
 
     let s2 = Switch.on
     _testEncodeFailure(of: s2, in: .binary)
     _testEncodeFailure(of: s2, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(s2), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(s2), in: .xml)
   }
 
   func testEncodingTopLevelSingleValueStruct() {
     let t = Timestamp(3141592653)
     _testEncodeFailure(of: t, in: .binary)
     _testEncodeFailure(of: t, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(t), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(t), in: .xml)
   }
 
   func testEncodingTopLevelSingleValueClass() {
     let c = Counter()
     _testEncodeFailure(of: c, in: .binary)
     _testEncodeFailure(of: c, in: .xml)
+    _testRoundTrip(of: TopLevelWrapper(c), in: .binary)
+    _testRoundTrip(of: TopLevelWrapper(c), in: .xml)
   }
 
   // MARK: - Encoding Top-Level Structured Types
@@ -73,6 +81,20 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     let person = Person.testValue
     _testRoundTrip(of: person, in: .binary)
     _testRoundTrip(of: person, in: .xml)
+  }
+
+  func testEncodingTopLevelStructuredSingleStruct() {
+    // Numbers is a struct which encodes as an array through a single value container.
+    let numbers = Numbers.testValue
+    _testRoundTrip(of: numbers, in: .binary)
+    _testRoundTrip(of: numbers, in: .xml)
+  }
+
+  func testEncodingTopLevelStructuredSingleClass() {
+    // Mapping is a class which encodes as a dictionary through a single value container.
+    let mapping = Mapping.testValue
+    _testRoundTrip(of: mapping, in: .binary)
+    _testRoundTrip(of: mapping, in: .xml)
   }
 
   func testEncodingTopLevelDeepStructuredType() {
@@ -126,7 +148,7 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
       encoder.outputFormat = format
       payload = try encoder.encode(value)
     } catch {
-      expectUnreachable("Failed to encode \(T.self) to plist.")
+      expectUnreachable("Failed to encode \(T.self) to plist: \(error)")
     }
 
     if let expectedPlist = plist {
@@ -139,7 +161,7 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
       expectEqual(format, decodedFormat, "Encountered plist format differed from requested format.")
       expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
     } catch {
-      expectUnreachable("Failed to decode \(T.self) from plist.")
+      expectUnreachable("Failed to decode \(T.self) from plist: \(error)")
     }
   }
 }
@@ -227,7 +249,7 @@ fileprivate enum Switch : Codable {
 }
 
 /// A simple timestamp type that encodes as a single Double value.
-fileprivate struct Timestamp : Codable {
+fileprivate struct Timestamp : Codable, Equatable {
   let value: Double
 
   init(_ value: Double) {
@@ -243,10 +265,14 @@ fileprivate struct Timestamp : Codable {
     var container = encoder.singleValueContainer()
     try container.encode(self.value)
   }
+
+  static func ==(_ lhs: Timestamp, _ rhs: Timestamp) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 /// A simple referential counter type that encodes as a single Int value.
-fileprivate final class Counter : Codable {
+fileprivate final class Counter : Codable, Equatable {
   var count: Int = 0
 
   init() {}
@@ -259,6 +285,10 @@ fileprivate final class Counter : Codable {
   func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.count)
+  }
+
+  static func ==(_ lhs: Counter, _ rhs: Counter) -> Bool {
+    return lhs === rhs || lhs.count == rhs.count
   }
 }
 
@@ -331,6 +361,62 @@ fileprivate struct Company : Codable, Equatable {
 
   static var testValue: Company {
     return Company(address: Address.testValue, employees: [Person.testValue])
+  }
+}
+
+/// A type which encodes as an array directly through a single value container.
+struct Numbers : Codable, Equatable {
+  let values = [4, 8, 15, 16, 23, 42]
+
+  init() {}
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let decodedValues = try container.decode([Int].self)
+    guard decodedValues == values else {
+      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "The Numbers are wrong!"))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Numbers, _ rhs: Numbers) -> Bool {
+    return lhs.values == rhs.values
+  }
+
+  static var testValue: Numbers {
+    return Numbers()
+  }
+}
+
+/// A type which encodes as a dictionary directly through a single value container.
+fileprivate final class Mapping : Codable, Equatable {
+  let values: [String : URL]
+
+  init(values: [String : URL]) {
+    self.values = values
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    values = try container.decode([String : URL].self)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Mapping, _ rhs: Mapping) -> Bool {
+    return lhs === rhs || lhs.values == rhs.values
+  }
+
+  static var testValue: Mapping {
+    return Mapping(values: ["Apple": URL(string: "http://apple.com")!,
+                            "localhost": URL(string: "http://127.0.0.1")!])
   }
 }
 
@@ -424,20 +510,47 @@ struct NestedContainersTestType : Encodable {
   }
 }
 
+// MARK: - Helper Types
+
+/// Wraps a type T so that it can be encoded at the top level of a payload.
+fileprivate struct TopLevelWrapper<T> : Codable, Equatable where T : Codable, T : Equatable {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(value)
+  }
+
+  init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    value = try container.decode(T.self)
+    assert(container.isAtEnd)
+  }
+
+  static func ==(_ lhs: TopLevelWrapper<T>, _ rhs: TopLevelWrapper<T>) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
 var PropertyListEncoderTests = TestSuite("TestPropertyListEncoder")
-PropertyListEncoderTests.test("testEncodingTopLevelEmptyStruct")        { TestPropertyListEncoder().testEncodingTopLevelEmptyStruct()        }
-PropertyListEncoderTests.test("testEncodingTopLevelEmptyClass")         { TestPropertyListEncoder().testEncodingTopLevelEmptyClass()         }
-PropertyListEncoderTests.test("testEncodingTopLevelSingleValueEnum")    { TestPropertyListEncoder().testEncodingTopLevelSingleValueEnum()    }
-PropertyListEncoderTests.test("testEncodingTopLevelSingleValueStruct")  { TestPropertyListEncoder().testEncodingTopLevelSingleValueStruct()  }
-PropertyListEncoderTests.test("testEncodingTopLevelSingleValueClass")   { TestPropertyListEncoder().testEncodingTopLevelSingleValueClass()   }
-PropertyListEncoderTests.test("testEncodingTopLevelStructuredStruct")   { TestPropertyListEncoder().testEncodingTopLevelStructuredStruct()   }
-PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass")    { TestPropertyListEncoder().testEncodingTopLevelStructuredClass()    }
-PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass")    { TestPropertyListEncoder().testEncodingTopLevelStructuredClass()    }
+PropertyListEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestPropertyListEncoder().testEncodingTopLevelEmptyStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelEmptyClass") { TestPropertyListEncoder().testEncodingTopLevelEmptyClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueEnum") { TestPropertyListEncoder().testEncodingTopLevelSingleValueEnum() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueStruct") { TestPropertyListEncoder().testEncodingTopLevelSingleValueStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelSingleValueClass") { TestPropertyListEncoder().testEncodingTopLevelSingleValueClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestPropertyListEncoder().testEncodingTopLevelStructuredStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredClass() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleStruct() }
+PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestPropertyListEncoder().testEncodingTopLevelStructuredSingleClass() }
 PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPropertyListEncoder().testEncodingTopLevelDeepStructuredType() }
-PropertyListEncoderTests.test("testNestedContainerCodingPaths")         { TestPropertyListEncoder().testNestedContainerCodingPaths()         }
-PropertyListEncoderTests.test("testSuperEncoderCodingPaths")            { TestPropertyListEncoder().testSuperEncoderCodingPaths()            }
+PropertyListEncoderTests.test("testNestedContainerCodingPaths") { TestPropertyListEncoder().testNestedContainerCodingPaths() }
+PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListEncoder().testSuperEncoderCodingPaths() }
 runAllTests()
 #endif
