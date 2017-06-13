@@ -1,6 +1,14 @@
 #import <Foundation/Foundation.h>
 
+#include <objc/runtime.h>
+
 #include "swift/Runtime/Metadata.h"
+
+// Aliases for Objective-C runtime entry points.
+static const char *class_getName(const swift::ClassMetadata* type) {
+  return class_getName(
+    reinterpret_cast<Class>(const_cast<swift::ClassMetadata*>(type)));
+}
 
 @interface NSKeyedUnarchiver (SwiftAdditions)
 + (int)_swift_checkClassAndWarnForKeyedArchiving:(Class)cls
@@ -35,9 +43,8 @@
   if (theClass->getFlags() & swift::ClassFlags::HasCustomObjCName)
     return 0;
 
-  const char *className = [NSStringFromClass(cls) UTF8String];
-
   // Is it a mangled name?
+  const char *className = class_getName(theClass);
   if (!(className[0] == '_' && className[1] == 'T'))
     return 0;
   // Is it a name in the form <module>.<class>? Note: the module name could
