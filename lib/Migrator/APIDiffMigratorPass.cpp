@@ -692,7 +692,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     switch (DiffItem->DiffKind) {
     case NodeAnnotation::GetterToProperty: {
       auto FuncLoc = FD->getFuncLoc();
-      auto ReturnTyLoc = FD->getBodyResultTypeLoc().getLoc();
+      auto ReturnTyLoc = FD->getBodyResultTypeLoc().getSourceRange().Start;
       auto NameLoc = FD->getNameLoc();
       if (FuncLoc.isInvalid() || ReturnTyLoc.isInvalid() || NameLoc.isInvalid())
         break;

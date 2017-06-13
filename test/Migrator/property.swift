@@ -11,4 +11,5 @@ func foo(_ a : PropertyUserInterface) {
 
 class C: PropertyUserInterface {
   public override func field() -> Int32 { return 1 }
+  public override func field2() -> UnsafeMutablePointer<Int32>? { return nil }
 }
