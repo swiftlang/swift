@@ -256,7 +256,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::Destructor:
     case DeclKind::EnumElement:
     case DeclKind::MissingMember:
-      llvm_unreachable("cannot appear at the top level of a file");
+      // These can occur in malformed ASTs.
+      break;
     }
   }
 
