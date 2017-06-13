@@ -1675,10 +1675,10 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
   ///   points to the contiguous storage for the array. ${contiguousCaveat} If
-  ///   `body` has a return value, it is used as the return value for the
-  ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid
-  ///   only for the duration of the method's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   `body` has a return value, that value is also used as the return value
+  ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
+  ///   valid only for the duration of the method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1717,11 +1717,11 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeMutableBufferPointer(_:)` method. The
-  ///   pointer argument is valid only for the duration of the method's
-  ///   execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
@@ -2248,10 +2248,11 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeMutableBytes(_:)` method. The argument
-  ///   is valid only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBytes(_:)` method.
+  ///   The argument is valid only for the duration of the closure's
+  ///   execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
@@ -2282,10 +2283,10 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
   ///   that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeBytes(_:)` method. The argument is
-  ///   valid only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeBytes(_:)` method. The
+  ///   argument is valid only for the duration of the closure's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R

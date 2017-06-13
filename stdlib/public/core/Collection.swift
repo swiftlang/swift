@@ -420,20 +420,18 @@ public struct IndexingIterator<
 }
 
 /// A sequence whose elements can be traversed multiple times,
-/// nondestructively, and accessed by indexed subscript.
+/// nondestructively, and accessed by an indexed subscript.
 ///
 /// Collections are used extensively throughout the standard library. When you
-/// use arrays, dictionaries, views of a string's contents and other types,
-/// you benefit from the operations that the `Collection` protocol declares
-/// and implements.
-///
-/// In addition to the methods that collections inherit from the `Sequence`
+/// use arrays, dictionaries, and other collections, you benefit from the
+/// operations that the `Collection` protocol declares and implements. In
+/// addition to the operations that collections inherit from the `Sequence`
 /// protocol, you gain access to methods that depend on accessing an element
-/// at a specific position when using a collection.
+/// at a specific position in a collection.
 ///
-/// For example, if you want to print only the first word in a string, search
-/// for the index of the first space, and then create a subsequence up to that
-/// position.
+/// For example, if you want to print only the first word in a string, you can
+/// search for the index of the first space, and then create a substring up to
+/// that position.
 ///
 ///     let text = "Buffalo buffalo buffalo buffalo."
 ///     if let firstSpace = text.index(of: " ") {
@@ -454,7 +452,7 @@ public struct IndexingIterator<
 /// such as the `startIndex` property of a different collection, are invalid
 /// indices for this collection.
 ///
-/// Saved indices may become invalid as a result of mutating operations; for
+/// Saved indices may become invalid as a result of mutating operations. For
 /// more information about index invalidation in mutable collections, see the
 /// reference for the `MutableCollection` and `RangeReplaceableCollection`
 /// protocols, as well as for the specific type you're using.
@@ -462,9 +460,10 @@ public struct IndexingIterator<
 /// Accessing Individual Elements
 /// =============================
 ///
-/// You can access an element of a collection through its subscript with any
-/// valid index except the collection's `endIndex` property, a "past the end"
-/// index that does not correspond with any element of the collection.
+/// You can access an element of a collection through its subscript by using
+/// any valid index except the collection's `endIndex` property. This property
+/// is a "past the end" index that does not correspond with any element of the
+/// collection.
 ///
 /// Here's an example of accessing the first character in a string through its
 /// subscript:
@@ -545,7 +544,7 @@ public struct IndexingIterator<
 /// A slice inherits the value or reference semantics of its base collection.
 /// That is, when working with a slice of a mutable collection that has value
 /// semantics, such as an array, mutating the original collection triggers a
-/// copy of that collection, and does not affect the contents of the slice.
+/// copy of that collection and does not affect the contents of the slice.
 ///
 /// For example, if you update the last element of the `absences` array from
 /// `0` to `2`, the `secondHalf` slice is unchanged.
@@ -560,11 +559,12 @@ public struct IndexingIterator<
 /// =======================
 ///
 /// Although a sequence can be consumed as it is traversed, a collection is
-/// guaranteed to be multipass: Any element may be repeatedly accessed by
+/// guaranteed to be *multipass*: Any element can be repeatedly accessed by
 /// saving its index. Moreover, a collection's indices form a finite range of
-/// the positions of the collection's elements. This guarantees the safety of
-/// operations that depend on a sequence being finite, such as checking to see
-/// whether a collection contains an element.
+/// the positions of the collection's elements. The fact that all collections
+/// are finite guarantees the safety of many sequence operations, such as
+/// using the `contains(_:)` method to test whether a collection includes an
+/// element.
 ///
 /// Iterating over the elements of a collection by their positions yields the
 /// same elements in the same order as iterating over that collection using
@@ -598,31 +598,31 @@ public struct IndexingIterator<
 /// elements, make sure that its type conforms to the `Collection` protocol in
 /// order to give a more useful and more efficient interface for sequence and
 /// collection operations. To add `Collection` conformance to your type, you
-/// must declare at least the four following requirements:
+/// must declare at least the following requirements:
 ///
-/// - the `startIndex` and `endIndex` properties,
-/// - a subscript that provides at least read-only access to your type's
-///   elements, and
-/// - the `index(after:)` method for advancing an index into your collection.
+/// - The `startIndex` and `endIndex` properties
+/// - A subscript that provides at least read-only access to your type's
+///   elements
+/// - The `index(after:)` method for advancing an index into your collection
 ///
 /// Expected Performance
 /// ====================
 ///
 /// Types that conform to `Collection` are expected to provide the `startIndex`
 /// and `endIndex` properties and subscript access to elements as O(1)
-/// operations. Types that are not able to guarantee that expected performance
-/// must document the departure, because many collection operations depend on
-/// O(1) subscripting performance for their own performance guarantees.
+/// operations. Types that are not able to guarantee this performance must
+/// document the departure, because many collection operations depend on O(1)
+/// subscripting performance for their own performance guarantees.
 ///
 /// The performance of some collection operations depends on the type of index
 /// that the collection provides. For example, a random-access collection,
-/// which can measure the distance between two indices in O(1) time, will be
-/// able to calculate its `count` property in O(1) time. Conversely, because a
-/// forward or bidirectional collection must traverse the entire collection to
-/// count the number of contained elements, accessing its `count` property is
-/// an O(*n*) operation.
-public protocol Collection : _Indexable, Sequence 
-// FIXME(ABI) (Revert Where Clauses): Restore these 
+/// which can measure the distance between two indices in O(1) time, can
+/// calculate its `count` property in O(1) time. Conversely, because a forward
+/// or bidirectional collection must traverse the entire collection to count
+/// the number of contained elements, accessing its `count` property is an
+/// O(*n*) operation.
+public protocol Collection : _Indexable, Sequence
+// FIXME(ABI) (Revert Where Clauses): Restore these
 // where SubSequence: Collection, Indices: Collection,
 {
   /// A type that represents the number of steps between a pair of

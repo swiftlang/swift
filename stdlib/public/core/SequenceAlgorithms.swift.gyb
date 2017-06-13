@@ -61,16 +61,16 @@ extension Sequence {
   ///     // Prints "3: 'f'"
   ///     // Prints "4: 't'"
   ///
-  /// When enumerating a collection, the integer part of each pair is a counter
-  /// for the enumeration, not necessarily the index of the paired value.
-  /// These counters can only be used as indices in instances of zero-based,
+  /// When you enumerate a collection, the integer part of each pair is a counter
+  /// for the enumeration, but is not necessarily the index of the paired value.
+  /// These counters can be used as indices only in instances of zero-based,
   /// integer-indexed collections, such as `Array` and `ContiguousArray`. For
   /// other collections the counters may be out of range or of the wrong type
   /// to use as an index. To iterate over the elements of a collection with its
   /// indices, use the `zip(_:_:)` function.
   ///
   /// This example iterates over the indices and elements of a set, building a
-  /// list of indices of names with five or fewer letters.
+  /// list consisting of indices of names with five or fewer letters.
   ///
   ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
   ///     var shorterIndices: [SetIndex<String>] = []

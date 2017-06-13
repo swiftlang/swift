@@ -159,8 +159,8 @@ extension Bool : Equatable, Hashable {
 extension Bool : LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
-  /// If `description` is any string other than `"true"` or `"false"`, the
-  /// result is `nil`. This initializer is case sensitive.
+  /// If the `description` value is any string other than `"true"` or
+  /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
   public init?(_ description: String) {

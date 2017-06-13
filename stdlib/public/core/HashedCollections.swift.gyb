@@ -1752,8 +1752,9 @@ public struct Dictionary<Key : Hashable, Value> :
   /// of key-value tuples that might have duplicate keys. As the dictionary is
   /// built, the initializer calls the `combine` closure with the current and
   /// new values for any duplicate keys. Pass a closure as `combine` that
-  /// selects which value to use in the returned dictionary, or to combine the
-  /// values as the dictionary is initialized.
+  /// returns the value to use in the resulting dictionary: The closure can
+  /// choose between the two values, combine them to produce a new value, or
+  /// even throw an error.
   ///
   /// The following example shows how to choose the first and last values for
   /// any duplicate keys:
@@ -1782,16 +1783,16 @@ public struct Dictionary<Key : Hashable, Value> :
     try _variantBuffer.merge(keysAndValues, uniquingKeysWith: combine)
   }
 
-  /// Creates a new dictionary where the keys are the groupings returned by the
-  /// given closure and the values are arrays of the elements that returned
-  /// each specific key.
+  /// Creates a new dictionary whose keys are the groupings returned by the
+  /// given closure and whose values are arrays of the elements that returned
+  /// each key.
   ///
   /// The arrays in the "values" position of the new dictionary each contain at
   /// least one element, with the elements in the same order as the source
   /// sequence.
   ///
   /// The following example declares an array of names, and then creates a
-  /// dictionary from that array by grouping the names by their first letter:
+  /// dictionary from that array by grouping the names by first letter:
   ///
   ///     let students = ["Kofi", "Abena", "Efua", "Kweku", "Akosua"]
   ///     let studentsByLetter = Dictionary(grouping: students, by: { $0.first! })
@@ -2077,7 +2078,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Merges the key-value pairs in the given sequence into the dictionary,
   /// using a combining closure to determine the value for any duplicate keys.
   ///
-  /// Use the `combine` closure to select which value to use in the updated
+  /// Use the `combine` closure to select a value to use in the updated
   /// dictionary, or to combine existing and new values. As the key-value
   /// pairs are merged with the dictionary, the `combine` closure is called
   /// with the current and new values for any duplicate keys that are
@@ -2111,7 +2112,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Merges the given dictionary into this dictionary, using a combining
   /// closure to determine the value for any duplicate keys.
   ///
-  /// Use the `combine` closure to select which value to use in the updated
+  /// Use the `combine` closure to select a value to use in the updated
   /// dictionary, or to combine existing and new values. As the key-values
   /// pairs in `other` are merged with this dictionary, the `combine` closure
   /// is called with the current and new values for any duplicate keys that
@@ -2143,11 +2144,11 @@ public struct Dictionary<Key : Hashable, Value> :
       other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
   }
 
-  /// Returns a new dictionary created by merging the key-value pairs in the
-  /// given sequence into the dictionary, using a combining closure to
-  /// determine the value for any duplicate keys.
+  /// Creates a dictionary by merging key-value pairs in a sequence into the
+  /// dictionary, using a combining closure to determine the value for
+  /// duplicate keys.
   ///
-  /// Use the `combine` closure to select which value to use in the returned
+  /// Use the `combine` closure to select a value to use in the returned
   /// dictionary, or to combine existing and new values. As the key-value
   /// pairs are merged with the dictionary, the `combine` closure is called
   /// with the current and new values for any duplicate keys that are
@@ -2180,11 +2181,11 @@ public struct Dictionary<Key : Hashable, Value> :
     return result
   }
 
-  /// Returns a new dictionary created by merging the given dictionary into
-  /// this dictionary, using a combining closure to determine the value for
-  /// any duplicate keys.
+  /// Creates a dictionary by merging the given dictionary into this
+  /// dictionary, using a combining closure to determine the value for
+  /// duplicate keys.
   ///
-  /// Use the `combine` closure to select which value to use in the returned
+  /// Use the `combine` closure to select a value to use in the returned
   /// dictionary, or to combine existing and new values. As the key-value
   /// pairs in `other` are merged with this dictionary, the `combine` closure
   /// is called with the current and new values for any duplicate keys that

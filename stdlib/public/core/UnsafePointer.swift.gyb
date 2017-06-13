@@ -739,9 +739,9 @@ public struct ${Self}<Pointee>
   ///   - body: A closure that takes a ${Mutable.lower()} typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
-  ///     execution. If `body` has a return value, it is used as the return
-  ///     value for the `withMemoryRebound(to:capacity:_:)` method.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
     _ body: (${Self}<T>) throws -> Result
