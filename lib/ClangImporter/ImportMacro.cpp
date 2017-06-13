@@ -190,10 +190,6 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
                                       const clang::Token &tok,
                                       MappedStringLiteralKind kind,
                                       const clang::MacroInfo *ClangN) {
-  DeclContext *dc = Impl.getClangModuleForMacro(MI);
-  if (!dc)
-    return nullptr;
-
   assert(isStringToken(tok));
 
   clang::ActionResult<clang::Expr*> result =
@@ -209,7 +205,7 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!importTy)
     return nullptr;
 
-  return Impl.createConstant(name, dc, importTy, parsed->getString(),
+  return Impl.createConstant(name, DC, importTy, parsed->getString(),
                              ConstantConvertKind::Coerce, /*static*/ false,
                              ClangN);
 }
