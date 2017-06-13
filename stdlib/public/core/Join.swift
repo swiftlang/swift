@@ -166,8 +166,6 @@ extension Sequence where Element : Sequence {
   /// - Parameter separator: A sequence to insert between each of this
   ///   sequence's elements.
   /// - Returns: The joined sequence of elements.
-  ///
-  /// - SeeAlso: `joined()`
   public func joined<Separator : Sequence>(
     separator: Separator
   ) -> JoinedSequence<Self>

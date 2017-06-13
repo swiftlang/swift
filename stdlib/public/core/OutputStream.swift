@@ -144,8 +144,6 @@ typealias Streamable = TextOutputStreamable
 ///
 ///     print(p)
 ///     // Prints "(21, 30)"
-///
-/// - SeeAlso: `String.init<T>(T)`, `CustomDebugStringConvertible`
 public protocol CustomStringConvertible {
   /// A textual representation of this instance.
   ///
@@ -232,8 +230,6 @@ public protocol LosslessStringConvertible : CustomStringConvertible {
 ///
 ///     print(String(reflecting: p))
 ///     // Prints "Point(x: 21, y: 30)"
-///
-/// - SeeAlso: `String.init<T>(reflecting: T)`, `CustomStringConvertible`
 public protocol CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   var debugDescription: String { get }

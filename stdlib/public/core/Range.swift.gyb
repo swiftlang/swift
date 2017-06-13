@@ -104,8 +104,6 @@ public enum _DisabledRangeIndex_ {}
 ///     }
 ///     print(brackets(-99..<100, 0))
 ///     // Prints "0"
-///
-/// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
 @_fixed_layout
 public struct CountableRange<Bound> : RandomAccessCollection
   where
@@ -342,8 +340,6 @@ extension CountableRange
 ///     let empty = 0.0..<0.0
 ///     print(empty.contains(0.0))          // Prints "false"
 ///     print(empty.isEmpty)                // Prints "true"
-///
-/// - SeeAlso: `CountableRange`, `ClosedRange`, `CountableClosedRange`
 @_fixed_layout
 public struct Range<
   Bound : Comparable
@@ -855,21 +851,22 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
   }
 }
 
-/// A partial interval extending upward from a lower bound.
+/// A partial interval extending upward from a lower bound that forms a
+/// sequence of increasing values.
 ///
-/// You create `PartialRangeFrom` instances by using the postfix range operator
-/// (postfix `...`).
+/// You create `CountablePartialRangeFrom` instances by using the postfix range
+/// operator (postfix `...`).
 ///
 ///     let atLeastFive = 5.0...
 ///
-/// You can use a `PartialRangeFrom` instance to quickly check if a value is
+/// You can use a countable partial range to quickly check if a value is
 /// contained in a particular range of values. For example:
 ///
 ///     atLeastFive.contains(4.0)     // false
 ///     atLeastFive.contains(5.0)     // true
 ///     atLeastFive.contains(6.0)     // true
 ///
-/// You can use a `PartialRangeFrom` instance of a collection's indices to
+/// You can use a countable partial range of a collection's indices to
 /// represent the range from the partial range's lower bound up to the end of
 /// the collection.
 ///
@@ -885,9 +882,8 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
 /// Using a Partial Range as a Sequence
 /// ===================================
 ///
-/// You can iterate over a `PartialRangeFrom` instance using a `for`-`in` loop,
-/// or call any sequence method that doesn't require that the sequence is
-/// finite.
+/// You can iterate over a countable partial range using a `for`-`in` loop, or
+/// call any sequence method that doesn't require that the sequence is finite.
 ///
 ///     func isTheMagicNumber(_ x: Int) -> Bool {
 ///         return x == 3
@@ -906,8 +902,8 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
 ///     // "3 is the magic number!"
 ///
 /// Because a `CountablePartialRangeFrom` sequence counts upward indefinitely,
-/// do not use one with methods such as `map(_:)`, `filter(_:)`, or
-/// `suffix(_:)` that read the entire sequence before returning. It is safe to
+/// do not use one with methods that read the entire sequence before
+/// returning, such as `map(_:)`, `filter(_:)`, or `suffix(_:)`. It is safe to
 /// use operations that put an upper limit on the number of elements they
 /// access, such as `prefix(_:)` or `dropFirst(_:)`, and operations that you
 /// can guarantee will terminate, such as passing a closure you know will

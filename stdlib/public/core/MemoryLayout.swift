@@ -48,8 +48,6 @@ public enum MemoryLayout<T> {
   ///
   /// When allocating memory for multiple instances of `T` using an unsafe
   /// pointer, use a multiple of the type's stride instead of its size.
-  ///
-  /// - SeeAlso: `stride`
   @_transparent
   public static var size: Int {
     return Int(Builtin.sizeof(T.self))
@@ -100,8 +98,6 @@ extension MemoryLayout {
   ///
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The size, in bytes, of the given value's type.
-  ///
-  /// - SeeAlso: `MemoryLayout.size`
   @_transparent
   public static func size(ofValue value: T) -> Int {
     return MemoryLayout.size
@@ -130,8 +126,6 @@ extension MemoryLayout {
   ///
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The stride, in bytes, of the given value's type.
-  ///
-  /// - SeeAlso: `MemoryLayout.stride`
   @_transparent
   public static func stride(ofValue value: T) -> Int {
     return MemoryLayout.stride
@@ -157,8 +151,6 @@ extension MemoryLayout {
   /// - Parameter value: A value representative of the type to describe.
   /// - Returns: The default memory alignment, in bytes, of the given value's
   ///   type. This value is always positive.
-  ///
-  /// - SeeAlso: `MemoryLayout.alignment`
   @_transparent
   public static func alignment(ofValue value: T) -> Int {
     return MemoryLayout.alignment

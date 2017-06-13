@@ -117,10 +117,10 @@ extension String {
   ///     // Prints "this happened, more or less."
   ///
   /// - Parameter body: A closure that takes a character view as its argument.
-  ///   The `CharacterView` argument is valid only for the duration of the
-  ///   closure's execution.
-  /// - Returns: The return value of the `body` closure, if any, is the return
-  ///   value of this method.
+  ///   If `body` has a return value, that value is also used as the return
+  ///   value for the `withMutableCharacters(_:)` method. The `CharacterView`
+  ///   argument is valid only for the duration of the closure's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   public mutating func withMutableCharacters<R>(
     _ body: (inout CharacterView) -> R
   ) -> R {

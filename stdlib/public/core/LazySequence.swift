@@ -182,8 +182,6 @@ extension Sequence {
   /// A sequence containing the same elements as this sequence,
   /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
-  ///
-  /// - SeeAlso: `LazySequenceProtocol`, `LazySequence`
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
   }

@@ -92,8 +92,6 @@
 ///
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
-///
-/// - SeeAlso: `Unsafe${Mutable}RawPointer`, `Unsafe${Mutable}BufferPointer`
 @_fixed_layout
 public struct Unsafe${Mutable}RawBufferPointer
   : ${Mutable}Collection, RandomAccessCollection {
@@ -596,13 +594,11 @@ extension ${Self} {
 ///   - arg: An instance to temporarily access through a mutable raw buffer
 ///     pointer.
 ///   - body: A closure that takes a raw buffer pointer to the bytes of `arg`
-///     as its sole argument. If the closure has a return value, it is used as
-///     the return value of the `withUnsafeMutableBytes(of:_:)` function. The
-///     buffer pointer argument is valid only for the duration of the
-///     closure's execution.
-/// - Returns: The return value of the `body` closure, if any.
-///
-/// - SeeAlso: `withUnsafeMutablePointer(to:_:)`, `withUnsafeBytes(of:_:)`
+///     as its sole argument. If the closure has a return value, that value is
+///     also used as the return value of the `withUnsafeMutableBytes(of:_:)`
+///     function. The buffer pointer argument is valid only for the duration
+///     of the closure's execution.
+/// - Returns: The return value, if any, of the `body` closure.
 @_inlineable
 public func withUnsafeMutableBytes<T, Result>(
   of arg: inout T,
@@ -625,13 +621,11 @@ public func withUnsafeMutableBytes<T, Result>(
 /// - Parameters:
 ///   - arg: An instance to temporarily access through a raw buffer pointer.
 ///   - body: A closure that takes a raw buffer pointer to the bytes of `arg`
-///     as its sole argument. If the closure has a return value, it is used as
-///     the return value of the `withUnsafeBytes(of:_:)` function. The buffer
-///     pointer argument is valid only for the duration of the closure's
-///     execution.
-/// - Returns: The return value of the `body` closure, if any.
-///
-/// - SeeAlso: `withUnsafePointer(to:_:)`, `withUnsafeMutableBytes(of:_:)`
+///     as its sole argument. If the closure has a return value, that value is
+///     also used as the return value of the `withUnsafeBytes(of:_:)`
+///     function. The buffer pointer argument is valid only for the duration
+///     of the closure's execution.
+/// - Returns: The return value, if any, of the `body` closure.
 @_inlineable
 public func withUnsafeBytes<T, Result>(
   of arg: inout T,

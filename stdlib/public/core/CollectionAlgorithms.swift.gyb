@@ -53,8 +53,6 @@ extension Collection where Element : Equatable {
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The first index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
-  ///
-  /// - SeeAlso: `index(where:)`
   @_inlineable
   public func index(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
@@ -93,8 +91,6 @@ extension Collection {
   /// - Returns: The index of the first element for which `predicate` returns
   ///   `true`. If no elements in the collection satisfy the given predicate,
   ///   returns `nil`.
-  ///
-  /// - SeeAlso: `index(of:)`
   @_inlineable
   public func index(
     where predicate: (Element) throws -> Bool
@@ -252,8 +248,6 @@ extension ${Self} where Element : Comparable {
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
-  ///
-  /// - SeeAlso: `sorted(by:)`, `sort()`
   @_inlineable
   public func sorted() -> [Element] {
     var result = ContiguousArray(self)
@@ -326,8 +320,6 @@ ${orderingExplanation}
   ///   argument should be ordered before its second argument; otherwise,
   ///   `false`.
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
-  ///
-  /// - SeeAlso: `sorted()`, `sort(by:)`
   @_inlineable
   public func sorted(
     by areInIncreasingOrder:

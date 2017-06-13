@@ -169,7 +169,7 @@ if True:
 ///   specific values.
 """
   elif Self == 'Array':
-    SelfDocComment = '''\
+    SelfDocComment = """\
 /// An ordered, random-access collection.
 ///
 /// Arrays are one of the most commonly used data types in an app. You use
@@ -447,9 +447,7 @@ if True:
 ///
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
-///   their storage.
-/// - SeeAlso: `ContiguousArray`, `ArraySlice`, `Sequence`, `Collection`,
-///   `RangeReplaceableCollection`'''
+///   their storage."""
   # FIXME: Write about Array up/down-casting.
   else:
     raise ValueError('Unhandled case: ' + Self)
@@ -620,8 +618,6 @@ public struct ${Self}<Element>
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
-  ///
-  /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
   @_inlineable
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
@@ -736,10 +732,6 @@ public struct ${Self}<Element>
   ///
   /// - Parameter bounds: A range of integers. The bounds of the range must be
   ///   valid indices of the array.
-%if Self != 'ArraySlice':
-  ///
-  /// - SeeAlso: `ArraySlice`
-%end
   @_inlineable
   public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
     get {
@@ -1683,12 +1675,10 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
   ///   points to the contiguous storage for the array. ${contiguousCaveat} If
-  ///   `body` has a return value, it is used as the return value for the
-  ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid
-  ///   only for the duration of the method's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeMutableBufferPointer`, `UnsafeBufferPointer`
+  ///   `body` has a return value, that value is also used as the return value
+  ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
+  ///   valid only for the duration of the method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1727,13 +1717,11 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeMutableBufferPointer(_:)` method. The
-  ///   pointer argument is valid only for the duration of the method's
-  ///   execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeBufferPointer`, `UnsafeMutableBufferPointer`
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
+  ///   method. The pointer argument is valid only for the duration of the
+  ///   method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
@@ -2260,12 +2248,11 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeMutableBytes(_:)` method. The argument
-  ///   is valid only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeBytes`, `UnsafeMutableRawBufferPointer`
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBytes(_:)` method.
+  ///   The argument is valid only for the duration of the closure's
+  ///   execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
@@ -2296,12 +2283,10 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
   ///   that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, it is used as the
-  ///   return value for the `withUnsafeBytes(_:)` method. The argument is
-  ///   valid only for the duration of the closure's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
-  ///
-  /// - SeeAlso: `withUnsafeMutableBytes`, `UnsafeRawBufferPointer`
+  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeBytes(_:)` method. The
+  ///   argument is valid only for the duration of the closure's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   @_inlineable
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
@@ -2360,7 +2345,6 @@ extension Array {
   ///
   /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
   ///   of the array; otherwise, O(1).
-  /// - SeeAlso: `removeLast()`
   @_inlineable
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
@@ -2375,7 +2359,6 @@ extension ContiguousArray {
   ///   otherwise, `nil`.
   ///
   /// - Complexity: O(1)
-  /// - SeeAlso: `removeLast()`
   @_inlineable
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
