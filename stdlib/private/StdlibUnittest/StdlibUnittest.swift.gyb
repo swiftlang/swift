@@ -376,14 +376,7 @@ public func expectSequenceType<X : Sequence>(_ x: X) -> X
 % for Mutable in ['', 'Mutable']:
 public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
   _ x: X.Type
-) where
-  // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-%   if Mutable == '':
-  X.SubSequence : Collection,
-%   end
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : Collection {}
+) {}
 % end
 
 /// A slice is a `Collection` that when sliced returns an instance of
@@ -421,12 +414,11 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
+)
   // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : Collection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : Collection {}
+  // where X.SubSequence.Indices == X.Indices
+  {}
 
 /// Check that all associated types of a `BidirectionalCollection` are what we
 /// expect them to be.
@@ -437,12 +429,8 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : BidirectionalCollection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : BidirectionalCollection {}
+) // where X.SubSequence.Indices == X.Indices FIXME(ABI)
+  {}
 
 /// Check that all associated types of a `RandomAccessCollection` are what we
 /// expect them to be.
@@ -453,12 +441,8 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexType: X.Index.Type,
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
-) where
-  // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
-  // the 'where' clause, all of these should be required by the protocol.
-  X.SubSequence : RandomAccessCollection,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
-  X.Indices : RandomAccessCollection {}
+) // where X.SubSequence.Indices == X.Indices FIXME (ABI)
+  {}
 
 public struct AssertionResult : CustomStringConvertible {
   init(isPass: Bool) {

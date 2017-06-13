@@ -630,8 +630,8 @@ public struct IndexingIterator<
 /// count the number of contained elements, accessing its `count` property is
 /// an O(*n*) operation.
 public protocol Collection : _Indexable, Sequence 
-// FIXME(ABI) (Revert Where Clauses): Restore these 
-// where SubSequence: Collection, Indices: Collection,
+where SubSequence: Collection, Indices: Collection,
+      SubSequence.Index == Index
 {
   /// A type that represents the number of steps between a pair of
   /// indices.
@@ -657,15 +657,10 @@ public protocol Collection : _Indexable, Sequence
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence
-  // FIXME(ABI) (Revert Where Clauses): remove these conformances:
-  : _IndexableBase, Sequence
-     = Slice<Self>
-      where SubSequence.SubSequence == SubSequence
-  // FIXME(ABI) (Revert Where Clauses): and this where clause:
-          , Element == SubSequence.Element
-          , SubSequence.Index == Index
-            
+  associatedtype SubSequence = Slice<Self>
+      where Iterator.Element == SubSequence.Iterator.Element,
+            SubSequence.SubSequence == SubSequence
+
   // FIXME(ABI)#98 (Recursive Protocol Constraints):
   // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
@@ -726,15 +721,10 @@ public protocol Collection : _Indexable, Sequence
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices
-  // FIXME(ABI) (Revert Where Clauses): Remove these two conformances 
-  : _Indexable, Sequence
-    = DefaultIndices<Self>
-    where Indices.Element == Index, 
+  associatedtype Indices = DefaultIndices<Self>
+    where Indices.Iterator.Element == Index,
           Indices.Index == Index
-  // FIXME(ABI) (Revert Where Clauses): Remove this where clause
-        , Indices.SubSequence == Indices
-        
+
   // FIXME(ABI)#100 (Recursive Protocol Constraints):
   // associatedtype Indices : Collection
   //   where

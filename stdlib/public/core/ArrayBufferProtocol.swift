@@ -16,10 +16,7 @@
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
-  associatedtype Indices 
-  // FIXME(ABI) (Revert Where Clauses): Remove this conformance
-  : RandomAccessCollection 
-    = CountableRange<Int>
+  associatedtype Indices = CountableRange<Int>
 
   /// Create an empty buffer.
   init()
