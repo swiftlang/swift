@@ -1600,8 +1600,8 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
     // For a nested type, retrieve the parent archetype anchor first.
     auto parentAnchor = parent->getArchetypeAnchor(builder);
     anchor = parentAnchor->getNestedArchetypeAnchor(
-                                          getNestedName(), builder,
-                                          ArchetypeResolutionKind::AlreadyKnown);
+                                      getNestedName(), builder,
+                                      ArchetypeResolutionKind::AlwaysPartial);
 
     // FIXME: Hack for cases where we couldn't resolve the nested type.
     if (!anchor)
