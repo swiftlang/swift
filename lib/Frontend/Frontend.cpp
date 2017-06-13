@@ -519,7 +519,8 @@ void CompilerInstance::performSema() {
       if (mainIsPrimary) {
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             TypeCheckOptions, CurTUElem,
-                            options.WarnLongFunctionBodies);
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking);
       }
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
@@ -546,8 +547,9 @@ void CompilerInstance::performSema() {
     if (auto SF = dyn_cast<SourceFile>(File))
       if (PrimaryBufferID == NO_SUCH_BUFFER || SF == PrimarySourceFile)
         performTypeChecking(*SF, PersistentState.getTopLevelContext(),
-                            TypeCheckOptions, /*curElem*/0,
-                            options.WarnLongFunctionBodies);
+                            TypeCheckOptions, /*curElem*/ 0,
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking);
 
   // Even if there were no source files, we should still record known
   // protocols.

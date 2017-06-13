@@ -1773,22 +1773,35 @@ namespace {
 
   class ExpressionTimer {
     Expr* E;
+    unsigned WarnLimit;
+    bool ShouldDump;
     ASTContext &Context;
     llvm::TimeRecord StartTime = llvm::TimeRecord::getCurrentTime();
 
   public:
-    ExpressionTimer(Expr *E, ASTContext &Context) : E(E), Context(Context) {}
+    ExpressionTimer(Expr *E, bool shouldDump, unsigned warnLimit,
+                    ASTContext &Context)
+        : E(E), WarnLimit(warnLimit), ShouldDump(shouldDump), Context(Context) {
+    }
 
     ~ExpressionTimer() {
       llvm::TimeRecord endTime = llvm::TimeRecord::getCurrentTime(false);
 
       auto elapsed = endTime.getProcessTime() - StartTime.getProcessTime();
+      unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
 
-      // Round up to the nearest 100th of a millisecond.
-      llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
-                   << "ms\t";
-      E->getLoc().print(llvm::errs(), Context.SourceMgr);
-      llvm::errs() << "\n";
+      if (ShouldDump) {
+        // Round up to the nearest 100th of a millisecond.
+        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
+                     << "ms\t";
+        E->getLoc().print(llvm::errs(), Context.SourceMgr);
+        llvm::errs() << "\n";
+      }
+
+      if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
+        Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
+                               elapsedMS, WarnLimit)
+          .highlight(E->getSourceRange());
     }
   };
 
@@ -1802,8 +1815,9 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
   Optional<ExpressionTimer> timer;
-  if (DebugTimeExpressions)
-    timer.emplace(expr, Context);
+  if (DebugTimeExpressions || WarnLongExpressionTypeChecking)
+    timer.emplace(expr, DebugTimeExpressions, WarnLongExpressionTypeChecking,
+                  Context);
 
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
