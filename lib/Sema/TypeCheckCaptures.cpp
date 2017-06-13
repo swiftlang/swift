@@ -207,7 +207,7 @@ public:
 
       TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use
                               : diag::closure_noescape_use,
-                  VD->getBaseName());
+                  VD->getBaseName().getIdentifier());
 
       // If we're a parameter, emit a helpful fixit to add @escaping
       auto paramDecl = dyn_cast<ParamDecl>(VD);
@@ -221,7 +221,7 @@ public:
       } else if (isAutoClosure) {
         // TODO: add in a fixit for autoclosure
         TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
-                    VD->getBaseName());
+                    paramDecl->getName());
       }
     }
   }
@@ -259,7 +259,7 @@ public:
           if (DC->isLocalContext()) {
             TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
                         NTD->getDescriptiveKind(),
-                        D->getBaseName());
+                        D->getBaseName().getIdentifier());
 
             TC.diagnose(NTD->getLoc(), diag::type_declared_here);
 
@@ -326,18 +326,18 @@ public:
       if (Diagnosed.insert(capturedDecl).second) {
         if (capturedDecl == DRE->getDecl()) {
           TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
-                      capturedDecl->getBaseName());
+                      capturedDecl->getBaseName().getIdentifier());
         } else {
           TC.diagnose(DRE->getLoc(),
                       diag::transitive_capture_before_declaration,
-                      DRE->getDecl()->getBaseName(),
-                      capturedDecl->getBaseName());
+                      DRE->getDecl()->getBaseName().getIdentifier(),
+                      capturedDecl->getBaseName().getIdentifier());
           ValueDecl *prevDecl = capturedDecl;
           for (auto path : reversed(capturePath)) {
             TC.diagnose(path->getLoc(),
                         diag::transitive_capture_through_here,
                         path->getName(),
-                        prevDecl->getBaseName());
+                        prevDecl->getBaseName().getIdentifier());
             prevDecl = path;
           }
         }
