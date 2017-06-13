@@ -268,8 +268,9 @@ namespace swift {
   void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
                  const SILModule *M = nullptr);
 
-  /// Get the CPU and subtarget feature options to use when emitting code.
-  std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>>
+  /// Get the CPU, subtarget feature options, and triple to use when emitting code.
+  std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
+             std::string>
   getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx);
 
   /// Turn the given Swift module into either LLVM IR or native code
