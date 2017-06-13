@@ -3,9 +3,6 @@
 
 // NOTE: Clang used to miscompile GLKit functions on i386. rdar://problem/19184403
 
-// On i386, it seems to work optimized mode, but fails in non-optimized.
-// rdar://problem/26392402
-// UNSUPPORTED: CPU=i386
 // REQUIRES: objc_interop
 
 // GLKit is not available on watchOS.
