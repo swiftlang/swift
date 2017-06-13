@@ -35,6 +35,7 @@
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
@@ -1828,7 +1829,8 @@ static StringRef getOutputFilename(Compilation &C,
 
 static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
                                types::ID outputType, const OutputInfo &OI,
-                               const TypeToPathMap *outputMap) {
+                               const TypeToPathMap *outputMap,
+                               StringRef outputPath = StringRef()) {
   StringRef outputMapPath;
   if (outputMap) {
     auto iter = outputMap->find(outputType);
@@ -1839,6 +1841,8 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
   if (!outputMapPath.empty()) {
     // Prefer a path from the OutputMap.
     output.setAdditionalOutputForType(outputType, outputMapPath);
+  } else if (!outputPath.empty()) {
+    output.setAdditionalOutputForType(outputType, outputPath);
   } else {
     // Put the auxiliary output file next to the primary output file.
     llvm::SmallString<128> path;
@@ -1855,6 +1859,58 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     output.setAdditionalOutputForType(outputType, path);
     if (isTempFile)
       C.addTemporaryFile(path);
+  }
+}
+
+static void addDiagFileOutputForPersistentPCHAction(Compilation &C,
+                                                 const GeneratePCHJobAction *JA,
+                                                    CommandOutput &output,
+                                                    const OutputInfo &OI,
+                                                 const TypeToPathMap *outputMap,
+                                                    DiagnosticEngine &diags) {
+  assert(JA->isPersistentPCH());
+
+  // For a persistent PCH we don't use an output, the frontend determines
+  // the filename to use for the PCH. For the diagnostics file, try to
+  // determine an invocation-specific path inside the directory where the
+  // PCH is going to be written, and fallback to a temporary file if we
+  // cannot determine such a path.
+
+  StringRef pchOutDir = JA->getPersistentPCHDir();
+  StringRef headerPath = output.getBaseInput(JA->getInputIndex());
+  StringRef stem = llvm::sys::path::stem(headerPath);
+  StringRef suffix = types::getTypeTempSuffix(types::TY_SerializedDiagnostics);
+  SmallString<256> outPathBuf;
+
+  if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
+    // The module file path is unique for a specific module and architecture
+    // (it won't be concurrently written to) so we can use the path as hash
+    // for determining the filename to use for the diagnostic file.
+    StringRef ModuleOutPath = A->getValue();
+    outPathBuf = pchOutDir;
+    llvm::sys::path::append(outPathBuf, stem);
+    outPathBuf += '-';
+    auto code = llvm::hash_value(ModuleOutPath);
+    outPathBuf += llvm::APInt(64, code).toString(36, /*Signed=*/false);
+    llvm::sys::path::replace_extension(outPathBuf, suffix);
+  }
+
+  if (outPathBuf.empty()) {
+    // Fallback to creating a temporary file.
+    std::error_code EC =
+    llvm::sys::fs::createTemporaryFile(stem, suffix, outPathBuf);
+    if (EC) {
+      diags.diagnose(SourceLoc(),
+                     diag::error_unable_to_make_temporary_file,
+                     EC.message());
+      return;
+    }
+    C.addTemporaryFile(outPathBuf.str());
+  }
+
+  if (!outPathBuf.empty()) {
+    addAuxiliaryOutput(C, output, types::TY_SerializedDiagnostics, OI,
+                       outputMap, outPathBuf.str());
   }
 }
 
@@ -2092,8 +2148,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
-      addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
-                         OutputMap);
+      auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
+      if (pchJA && pchJA->isPersistentPCH()) {
+        addDiagFileOutputForPersistentPCHAction(C, pchJA, *Output, OI,
+                                                OutputMap, Diags);
+      } else {
+        addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
+                           OutputMap);
+      }
 
       // Remove any existing diagnostics files so that clients can detect their
       // presence to determine if a command was run.
