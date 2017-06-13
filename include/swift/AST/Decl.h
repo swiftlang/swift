@@ -2169,6 +2169,8 @@ public:
   /// \see getFormalAccess
   Accessibility getFormalAccessImpl(const DeclContext *useDC) const;
 
+  bool isVersionedInternalDecl() const;
+
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
@@ -2178,9 +2180,16 @@ public:
   /// taken into account.
   ///
   /// \sa getFormalAccessScope
-  Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const {
+  Accessibility getFormalAccess(const DeclContext *useDC = nullptr,
+                                bool respectVersionedAttr = false) const {
     assert(hasAccessibility() && "accessibility not computed yet");
     Accessibility result = TypeAndAccess.getInt().getValue();
+    if (respectVersionedAttr &&
+        result == Accessibility::Internal &&
+        isVersionedInternalDecl()) {
+      assert(!useDC);
+      return Accessibility::Public;
+    }
     if (useDC && (result == Accessibility::Internal ||
                   result == Accessibility::Public))
       return getFormalAccessImpl(useDC);
@@ -2201,7 +2210,8 @@ public:
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
   AccessScope
-  getFormalAccessScope(const DeclContext *useDC = nullptr) const;
+  getFormalAccessScope(const DeclContext *useDC = nullptr,
+                       bool respectVersionedAttr = false) const;
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
