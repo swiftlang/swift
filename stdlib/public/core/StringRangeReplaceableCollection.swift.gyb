@@ -97,7 +97,6 @@ extension String : StringProtocol {
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:limitedBy:)`
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return characters.index(i, offsetBy: n)
@@ -139,7 +138,6 @@ extension String : StringProtocol {
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - SeeAlso: `index(_:offsetBy:)`
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index

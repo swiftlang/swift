@@ -50,8 +50,6 @@
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
-/// 
-/// - SeeAlso: `OptionSet`, `Set`
 public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   // FIXME: write tests for SetAlgebra
   

@@ -304,8 +304,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///     // Prints "false"
   ///     print(y.isNaN)
   ///     // Prints "true"
-  ///
-  /// - SeeAlso: `isNaN`, `signalingNaN`
   static var nan: Self { get }
 
   /// A signaling NaN ("not a number").
@@ -323,8 +321,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// Other than these signaling operations, a signaling NaN behaves in the
   /// same manner as a quiet NaN.
-  ///
-  /// - SeeAlso: `nan`
   static var signalingNaN: Self { get }
 
   /// Positive infinity.
@@ -664,9 +660,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  ///
-  /// - SeeAlso: `formRemainder(dividingBy:)`,
-  ///   `truncatingRemainder(dividingBy:)`
   func remainder(dividingBy other: Self) -> Self
 
   /// Replaces this value with the remainder of itself divided by the given
@@ -698,9 +691,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// `remainder(dividingBy:)` method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
-  ///
-  /// - SeeAlso: `remainder(dividingBy:)`,
-  ///   `formTruncatingRemainder(dividingBy:)`
   mutating func formRemainder(dividingBy other: Self)
 
   /// Returns the remainder of this value divided by the given value using
@@ -734,9 +724,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  ///
-  /// - SeeAlso: `formTruncatingRemainder(dividingBy:)`,
-  ///   `remainder(dividingBy:)`
   func truncatingRemainder(dividingBy other: Self) -> Self
 
   /// Replaces this value with the remainder of itself divided by the given
@@ -768,9 +755,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   /// method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
-  ///
-  /// - SeeAlso: `truncatingRemainder(dividingBy:)`,
-  ///   `formRemainder(dividingBy:)`
   mutating func formTruncatingRemainder(dividingBy other: Self)
 
   /// Returns the square root of the value, rounded to a representable value.
@@ -787,14 +771,10 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///     // distance == 5.0
   ///
   /// - Returns: The square root of the value.
-  ///
-  /// - SeeAlso: `sqrt(_:)`, `formSquareRoot()`
   func squareRoot() -> Self
 
   /// Replaces this value with its square root, rounded to a representable
   /// value.
-  ///
-  /// - SeeAlso: `sqrt(_:)`, `squareRoot()`
   mutating func formSquareRoot()
 
   /// Returns the result of adding the product of the two given values to this
@@ -973,8 +953,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  ///
-  /// - SeeAlso: `rounded()`, `round(_:)`, `FloatingPointRoundingRule`
   func rounded(_ rule: FloatingPointRoundingRule) -> Self
 
   /// Rounds the value to an integral value using the specified rounding rule.
@@ -1011,8 +989,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///     // w1 == 7.0
   ///
   /// - Parameter rule: The rounding rule to use.
-  ///
-  /// - SeeAlso: `round()`, `rounded(_:)`, `FloatingPointRoundingRule`
   mutating func round(_ rule: FloatingPointRoundingRule)
 
   /// The least representable value that compares greater than this value.
@@ -1266,14 +1242,10 @@ public enum FloatingPointClassification {
   case negativeInfinity
 
   /// A negative value that uses the full precision of the floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isNormal`
   case negativeNormal
 
   /// A negative, nonzero number that does not use the full precision of the
   /// floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isSubnormal`
   case negativeSubnormal
 
   /// A value equal to zero with a negative sign.
@@ -1284,13 +1256,9 @@ public enum FloatingPointClassification {
 
   /// A positive, nonzero number that does not use the full precision of the
   /// floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isSubnormal`
   case positiveSubnormal
 
   /// A positive value that uses the full precision of the floating-point type.
-  ///
-  /// - SeeAlso: `FloatingPoint.isNormal`
   case positiveNormal
 
   /// A value equal to `+infinity`.
@@ -1568,8 +1536,6 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// The raw encoding of the value's exponent field.
   ///
   /// This value is unadjusted by the type's exponent bias.
-  ///
-  /// - SeeAlso: `exponentBitCount`
   var exponentBitPattern: RawExponent { get }
 
   /// The raw encoding of the value's significand field.
@@ -1663,8 +1629,6 @@ extension FloatingPoint {
   ///
   /// - Returns: The nearest integral value, or, if two integral values are
   ///   equally close, the integral value with greater magnitude.
-  ///
-  /// - SeeAlso: `rounded(_:)`, `round()`, `FloatingPointRoundingRule`
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
@@ -1689,8 +1653,6 @@ extension FloatingPoint {
   ///
   /// To specify an alternative rule for rounding, use the `round(_:)` method
   /// instead.
-  ///
-  /// - SeeAlso: `round(_:)`, `rounded()`, `FloatingPointRoundingRule`
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)

@@ -260,8 +260,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  ///
-  /// - SeeAlso: `+`
 """,
         '&-': """\
   /// Returns the difference of the two given values, discarding any overflow.
@@ -279,8 +277,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  ///
-  /// - SeeAlso: `-`
 """,
         '&*': """\
   /// Returns the product of the two given values, discarding any overflow.
@@ -375,8 +371,6 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `>>`, `&<<`
 """,
         '&<<': """\
   /// Returns the result of shifting a value's binary representation the
@@ -406,8 +400,6 @@ def operatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `<<`, `&>>`
 """,
         '>>': """\
   /// Returns the result of shifting a value's binary representation the
@@ -459,8 +451,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  ///
-  /// - SeeAlso: `<<`
 """,
         '<<': """\
   /// Returns the result of shifting a value's binary representation the
@@ -501,8 +491,6 @@ def operatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  ///
-  /// - SeeAlso: `>>`
 """,
   }
     return comments[operator]
@@ -681,8 +669,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `>>=`, `&<<=`
 """,
         '&<<': """\
   /// Returns the result of shifting a value's binary representation the
@@ -713,8 +699,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  ///
-  /// - SeeAlso: `<<=`, `&>>=`
 """,
         '>>': """\
   /// Stores the result of shifting a value's binary representation the
@@ -771,8 +755,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  ///
-  /// - SeeAlso: `<<=`
 """,
         '<<': """\
   /// Stores the result of shifting a value's binary representation the
@@ -817,8 +799,6 @@ def assignmentOperatorComment(operator, fixedWidth):
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  ///
-  /// - SeeAlso: `>>=`
 """,
   }
     return comments[operator]
@@ -867,8 +847,6 @@ def overflowOperationComment(operator):
   ///   product. If the `overflow` component is `.overflow`, an overflow
   ///   occurred and the `partialValue` component contains the truncated
   ///   product of this value and `rhs`.
-  ///
-  /// - SeeAlso: `multipliedFullWidth(by:)`
 """,
         '/': """\
   /// Returns the quotient of dividing this value by the given value along with
@@ -883,8 +861,6 @@ def overflowOperationComment(operator):
   ///   is `.none`, the `partialValue` component contains the entire quotient.
   ///   If the `overflow` component is `.overflow`, an overflow occurred and
   ///   the `partialValue` component contains the truncated quotient.
-  ///
-  /// - SeeAlso: `doubleWidthDivide(_:_:)`
 """,
         '%': """\
   // FIXME(integers): the comment is for division instead of remainder
@@ -900,8 +876,6 @@ def overflowOperationComment(operator):
   ///   is `.none`, the `partialValue` component contains the entire quotient.
   ///   If the `overflow` component is `.overflow`, an overflow occurred and
   ///   the `partialValue` component contains the truncated quotient.
-  ///
-  /// - SeeAlso: `doubleWidthDivide(_:_:)`
 """,
     }
     return comments[operator]
@@ -1040,8 +1014,6 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
-  ///
-  /// - SeeAlso: `abs(_:)`
   var magnitude: Magnitude { get }
 
 % for x in binaryArithmetic['Numeric']:
@@ -1112,8 +1084,6 @@ public protocol SignedNumeric : Numeric {
   ///     // Overflow error
   ///
   /// - Returns: The additive inverse of this value.
-  ///
-  /// - SeeAlso: `negate()`
   static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
@@ -1124,8 +1094,6 @@ public protocol SignedNumeric : Numeric {
   ///     var x = 21
   ///     x.negate()
   ///     // x == -21
-  ///
-  /// - SeeAlso: The unary minus operator (`-`).
   mutating func negate()
 }
 
@@ -2086,8 +2054,6 @@ ${overflowOperationComment(x.operator)}
   ///   - other: A value to multiply `self` by.
   /// - Returns: A tuple containing the high and low parts of the result of
   ///   multiplying `self` and `other`.
-  ///
-  /// - SeeAlso: `multipliedReportingOverflow(by:)`
   // FIXME(integers): figure out how to return DoubleWidth<Self> or correct the
   // doc comment
   func multipliedFullWidth(by other: Self) -> (high: Self, low: Self.Magnitude)
@@ -2149,8 +2115,6 @@ ${overflowOperationComment(x.operator)}
   /// If necessary, the byte order of this value is reversed from the typical
   /// byte order of this integer type. On a big-endian platform, for any
   /// integer `x`, `x == x.bigEndian`.
-  ///
-  /// - SeeAlso: `littleEndian`
   var bigEndian: Self { get }
 
   /// The little-endian representation of this integer.
@@ -2158,8 +2122,6 @@ ${overflowOperationComment(x.operator)}
   /// If necessary, the byte order of this value is reversed from the typical
   /// byte order of this integer type. On a little-endian platform, for any
   /// integer `x`, `x == x.littleEndian`.
-  ///
-  /// - SeeAlso: `bigEndian`
   var littleEndian: Self { get }
 
   /// A representation of this integer with the byte order swapped.
@@ -2408,8 +2370,6 @@ extension UnsignedInteger {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
-  ///
-  /// - SeeAlso: `abs(_:)`
   @_transparent
   public var magnitude: Self { return self }
 

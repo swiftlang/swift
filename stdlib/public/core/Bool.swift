@@ -145,7 +145,6 @@ extension Bool : Equatable, Hashable {
   /// - Note: The hash value is not guaranteed to be stable across different
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
-  /// - SeeAlso: `Hashable`
   @_transparent
   public var hashValue: Int {
     return self ? 1 : 0
@@ -160,8 +159,8 @@ extension Bool : Equatable, Hashable {
 extension Bool : LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
-  /// If `description` is any string other than `"true"` or `"false"`, the
-  /// result is `nil`. This initializer is case sensitive.
+  /// If the `description` value is any string other than `"true"` or
+  /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
   public init?(_ description: String) {
