@@ -710,7 +710,8 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 }
 
 SmallVector<CallArgParam, 4>
-swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
+swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels,
+                        bool inAnyFunctionType) {
   SmallVector<CallArgParam, 4> result;
   switch (type->getKind()) {
   case TypeKind::Tuple: {
@@ -727,9 +728,11 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
 
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert(elt.getParameterFlags().isNone() &&
-             "Vararg, autoclosure, or escaping argument tuple"
-             "doesn't make sense");
+      if (!inAnyFunctionType) {
+        assert(elt.getParameterFlags().isNone() &&
+               "Vararg, autoclosure, or escaping argument tuple"
+               "doesn't make sense");
+      }
       CallArgParam argParam;
       argParam.Ty = elt.getType();
       argParam.Label = argumentLabels[i];

@@ -3136,6 +3136,16 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   return properties;
 }
 
+AnyFunctionType::AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
+                ArrayRef<CallArgParam> Input, Type RawInput, Type Output,
+                RecursiveTypeProperties properties,
+                const ExtInfo &Info)
+: TypeBase(Kind, CanTypeContext, properties),
+  Input((CanTypeContext ?: &RawInput->getASTContext())->AllocateCopy(Input)),
+  RawInput(RawInput), Output(Output) {
+  AnyFunctionTypeBits.ExtInfo = Info.Bits;
+}
+
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);
@@ -3167,6 +3177,17 @@ FunctionType *FunctionType::get(Type Input, Type Result,
                                              Info);
 }
 
+static SmallVector<CallArgParam, 4> decomposeInput(Type ty) {
+  if (auto *TTy = dyn_cast<TupleType>(ty.getPointer())) {
+    SmallVector<Identifier, 4> labels;
+    for (auto &ttyElt : TTy->getElements()) {
+      labels.push_back(ttyElt.getName());
+    }
+    return decomposeArgType(TTy, labels, /*inAnyFunctionType*/true);
+  }
+  return decomposeArgType(ty, { Identifier() }, /*inAnyFunctionType*/true);
+}
+
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(Type input, Type output,
                            RecursiveTypeProperties properties,
@@ -3175,7 +3196,7 @@ FunctionType::FunctionType(Type input, Type output,
                       (input->isCanonical() && output->isCanonical())
                           ? &input->getASTContext()
                           : nullptr,
-                      input, output, properties, Info) {}
+                      decomposeInput(input), input, output, properties, Info) {}
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,
@@ -3242,8 +3263,8 @@ GenericFunctionType::GenericFunctionType(
                        const ExtInfo &info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
-  : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
-                    properties, info),
+  : AnyFunctionType(TypeKind::GenericFunction, ctx, decomposeInput(input),
+                    input, result, properties, info),
     Signature(sig)
 {}
 
