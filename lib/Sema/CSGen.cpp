@@ -2716,8 +2716,7 @@ namespace {
     }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-      // Should already be type-checked.
-      return expr->getType();
+      return CS.getASTContext().getBoolDecl()->getDeclaredType();
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
