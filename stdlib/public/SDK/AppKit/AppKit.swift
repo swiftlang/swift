@@ -70,6 +70,13 @@ public func NSApplicationMain(
   }
 }
 
+extension NSApplication {
+  @available(swift 4)
+  public static func loadApplication() {
+    NSApplicationLoad()
+  }
+}
+
 extension NSColor : _ExpressibleByColorLiteral {
   @nonobjc
   public required convenience init(colorLiteralRed red: Float, green: Float,

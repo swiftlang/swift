@@ -25,7 +25,7 @@ is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
 if(swift_build_ios_simulator)
   configure_sdk_darwin(
       IOS_SIMULATOR "iOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
-      iphonesimulator ios-simulator ios "i386;x86_64")
+      iphonesimulator ios-simulator ios "x86_64")
   configure_target_variant(
       IOS_SIMULATOR-DA "iOS Debug+Asserts"   IOS_SIMULATOR DA "Debug+Asserts")
   configure_target_variant(
