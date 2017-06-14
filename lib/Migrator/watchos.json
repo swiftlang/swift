@@ -13,6 +13,39 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)INImage(cm)imageWithURL:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Intents"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)INPersonHandle(im)initWithValue:type:label:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Intents"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)INPersonHandle(im)initWithValue:type:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Intents"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "3:0",
     "LeftUsr": "c:objc(cs)NSTextTab(im)initWithTextAlignment:location:options:",
@@ -86,6 +119,28 @@
     "RightUsr": "",
     "RightComment": "UIFontDescriptor.AttributeName",
     "ModuleName": "UIKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CKFetchShareMetadataOperation(im)initWithShareURLs:",
+    "LeftComment": "init(share:)",
+    "RightUsr": "",
+    "RightComment": "init(shareURLs:)",
+    "ModuleName": "CloudKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CKShare(im)initWithRootRecord:shareID:",
+    "LeftComment": "init(rootRecord:share:)",
+    "RightUsr": "",
+    "RightComment": "init(rootRecord:shareID:)",
+    "ModuleName": "CloudKit"
   },
   {
     "DiffItemKind": "CommonDiffItem",
@@ -239,6 +294,17 @@
     "LeftComment": "",
     "RightUsr": "",
     "RightComment": "",
+    "ModuleName": "AVFoundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@AVMusicSequenceLoadOptions@AVMusicSequenceLoadSMF_ChannelsToTracks",
+    "LeftComment": "smf_ChannelsToTracks",
+    "RightUsr": "",
+    "RightComment": "smfChannelsToTracks",
     "ModuleName": "AVFoundation"
   },
   {
@@ -557,7 +623,7 @@
     "LeftUsr": "c:objc(cs)NSDecimalNumberHandler(cm)defaultDecimalNumberHandler",
     "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "default",
     "ModuleName": "Foundation"
   },
   {
@@ -1024,6 +1090,50 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSTextCheckingResult(cm)addressCheckingResultWithRange:components:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSTextCheckingKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0",
+    "LeftUsr": "c:objc(cs)NSTextCheckingResult(cm)transitInformationCheckingResultWithRange:components:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSTextCheckingKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSTextCheckingResult(im)rangeAtIndex:",
+    "LeftComment": "rangeAt(_:)",
+    "RightUsr": "",
+    "RightComment": "range(at:)",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSTextCheckingResult(im)resultByAdjustingRangesWithOffset:",
+    "LeftComment": "resultByAdjustingRangesWithOffset(_:)",
+    "RightUsr": "",
+    "RightComment": "adjustingRanges(offset:)",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Constructor",
     "NodeAnnotation": "ImplicitOptionalToOptional",
     "ChildIndex": "1",
@@ -1278,34 +1388,12 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(cs)CNContactStore(im)defaultContainerIdentifier",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Contacts"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "0",
-    "LeftUsr": "c:objc(cs)CNPhoneNumber(im)initWithStringValue:",
-    "LeftComment": "",
-    "RightUsr": "",
-    "RightComment": "",
-    "ModuleName": "Contacts"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(cs)WCSession(cm)defaultSession",
     "LeftComment": "",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "default",
     "ModuleName": "WatchConnectivity"
   },
   {
@@ -2435,6 +2523,94 @@
   },
   {
     "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingNameKey",
+    "OldPrintedName": "NSTextCheckingNameKey",
+    "OldTypeName": "",
+    "NewPrintedName": "name",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingJobTitleKey",
+    "OldPrintedName": "NSTextCheckingJobTitleKey",
+    "OldTypeName": "",
+    "NewPrintedName": "jobTitle",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingOrganizationKey",
+    "OldPrintedName": "NSTextCheckingOrganizationKey",
+    "OldTypeName": "",
+    "NewPrintedName": "organization",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingStreetKey",
+    "OldPrintedName": "NSTextCheckingStreetKey",
+    "OldTypeName": "",
+    "NewPrintedName": "street",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingCityKey",
+    "OldPrintedName": "NSTextCheckingCityKey",
+    "OldTypeName": "",
+    "NewPrintedName": "city",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingStateKey",
+    "OldPrintedName": "NSTextCheckingStateKey",
+    "OldTypeName": "",
+    "NewPrintedName": "state",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingZIPKey",
+    "OldPrintedName": "NSTextCheckingZIPKey",
+    "OldTypeName": "",
+    "NewPrintedName": "zip",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingCountryKey",
+    "OldPrintedName": "NSTextCheckingCountryKey",
+    "OldTypeName": "",
+    "NewPrintedName": "country",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingPhoneKey",
+    "OldPrintedName": "NSTextCheckingPhoneKey",
+    "OldTypeName": "",
+    "NewPrintedName": "phone",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingAirlineKey",
+    "OldPrintedName": "NSTextCheckingAirlineKey",
+    "OldTypeName": "",
+    "NewPrintedName": "airline",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSTextCheckingFlightKey",
+    "OldPrintedName": "NSTextCheckingFlightKey",
+    "OldTypeName": "",
+    "NewPrintedName": "flight",
+    "NewTypeName": "NSTextCheckingKey"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:objc(pl)NSObject(im)respondsToSelector:",
     "OldPrintedName": "responds(to:)",
     "OldTypeName": "NSObjectProtocol",
@@ -2495,6 +2671,11 @@
     "DiffItemKind": "NoEscapeFuncParam",
     "Usr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
     "Index": 5
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(pl)NSXPCProxyCreating(im)synchronousRemoteObjectProxyWithErrorHandler:",
+    "Index": 1
   },
   {
     "DiffItemKind": "NoEscapeFuncParam",
@@ -2632,6 +2813,14 @@
   {
     "DiffItemKind": "OverloadedFuncInfo",
     "Usr": "c:objc(cs)NSMutableAttributedString(im)readFromData:options:documentAttributes:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSTextCheckingResult(im)rangeAtIndex:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSTextCheckingResult(im)rangeWithName:"
   },
   {
     "DiffItemKind": "OverloadedFuncInfo",
