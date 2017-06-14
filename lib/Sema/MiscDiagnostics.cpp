@@ -253,7 +253,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Note that in Swift 4 mode, this is rejected much earlier in
         // the constraint solver; this check only exists to preserve the
         // behavior of the earlier, incomplete implementation of SE-0110.
-        if (TC.Context.isSwiftVersion3())
+        if (!TC.Context.LangOpts.EnableExperimentalSE0110)
           checkTupleSplat(Call);
 
         // Check the callee, looking through implicit conversions.

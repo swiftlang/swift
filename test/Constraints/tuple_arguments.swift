@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-experimental-se-0110
 
 // See test/Compatibility/tuple_arguments.swift for the Swift 3 behavior.
 

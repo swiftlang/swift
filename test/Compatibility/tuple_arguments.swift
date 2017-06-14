@@ -1,7 +1,12 @@
 // RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
-// Tests for tuple argument behavior in Swift 3, which was broken.
-// The Swift 4 test is in test/Constraints/tuple_arguments.swift.
+// Tests for tuple argument behavior pre-SE0110, which was broken.
+// The SE-0110 test is in test/Constraints/tuple_arguments.swift.
+//
+// Note that SE-0110 is currently off by default, so the compatibility
+// test is run in both Swift 3 and 4 mode, and the new test is run with
+// the experimental flag enabled.
 
 // Key:
 // - "Crashes in actual Swift 3" -- snippets which crashed in Swift 3.0.1.
@@ -1384,27 +1389,6 @@ do {
 
   let _: (Int, Int) -> () = { _ = ($0, $1) }
   let _: (Int, Int) -> () = { t, u in _ = (t, u) }
-}
-
-// rdar://problem/28952837 - argument labels ignored when calling function
-// with single 'Any' parameter
-func takesAny(_: Any) {}
-
-enum HasAnyCase {
-  case any(_: Any)
-}
-
-do {
-  let fn: (Any) -> () = { _ in }
-
-  fn(123)
-  fn(data: 123)
-
-  takesAny(123)
-  takesAny(data: 123)
-
-  _ = HasAnyCase.any(123)
-  _ = HasAnyCase.any(data: 123)
 }
 
 // rdar://problem/29739905 - protocol extension methods on Array had

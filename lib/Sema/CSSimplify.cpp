@@ -656,8 +656,9 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
   auto params = decomposeParamType(paramType, callee, calleeLevel);
 
-  if (callee && cs.getASTContext().isSwiftVersion3()
-      && argType->is<TupleType>()) {
+  if (callee &&
+      !cs.getASTContext().LangOpts.EnableExperimentalSE0110 &&
+      argType->is<TupleType>()) {
     // Hack: In Swift 3 mode, accept `foo(x, y)` for `foo((x, y))` when the
     // callee is a function-typed property or an enum constructor whose
     // argument is a single unlabeled type parameter.
@@ -1331,10 +1332,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // types of two function types, we have to be careful to preserve
   // ParenType sugar.
   bool isArgumentTupleMatch = isArgumentTupleConversion;
-  bool isSwiftVersion3 = getASTContext().isSwiftVersion3();
+  bool isSE0110Enabled = getASTContext().LangOpts.EnableExperimentalSE0110;
 
-  // ... but not in Swift 3 mode, where this behavior was broken.
-  if (!isSwiftVersion3)
+  if (isSE0110Enabled)
     if (auto elt = locator.last())
       if (elt->getKind() == ConstraintLocator::FunctionArgument)
         isArgumentTupleMatch = true;
@@ -1350,7 +1350,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar2 = type2->getDesugaredType();
   TypeVariableType *typeVar1, *typeVar2;
   if (isArgumentTupleMatch &&
-      !isSwiftVersion3) {
+      isSE0110Enabled) {
     typeVar1 = dyn_cast<TypeVariableType>(type1.getPointer());
     typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
@@ -1631,7 +1631,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (isArgumentTupleMatch &&
-      !isSwiftVersion3) {
+      isSE0110Enabled) {
     if (!typeVar1 && !typeVar2) {
       if (isa<ParenType>(type1.getPointer()) !=
           isa<ParenType>(type2.getPointer())) {

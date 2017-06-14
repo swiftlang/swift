@@ -5204,14 +5204,16 @@ Expr *ExprRewriter::coerceCallArguments(
     matchCanFail = true;
 
   // If you value your sanity, ignore the body of this 'if' statement.
-  if (cs.getASTContext().isSwiftVersion3()) {
+  if (!cs.getASTContext().LangOpts.EnableExperimentalSE0110) {
     // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
     // loss of ParenType sugar.
     if (isa<TupleExpr>(arg))
       if (auto *parenType = dyn_cast<ParenType>(paramType.getPointer()))
         if (isa<TupleType>(parenType->getUnderlyingType().getPointer()))
           paramType = parenType->getUnderlyingType();
+  }
 
+  if (cs.getASTContext().isSwiftVersion3()) {
     // Total hack: In Swift 3 mode, argument labels are ignored when calling
     // function type with a single Any parameter.
     if (paramType->isAny()) {
