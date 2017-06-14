@@ -39,6 +39,10 @@ typedef struct {
 
 typedef SomeItemSet SomeEnvironment;
 
+@protocol WillOverrideWithTypeChange
+- (SomeItemSet)doThing:(SomeItemSet)thing;
+@end
+
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 
