@@ -694,6 +694,13 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
   return Entry.getArgument(Index);
 }
 
+static bool isNonMutatingLoad(SILInstruction *I) {
+  auto *LI = dyn_cast<LoadInst>(I);
+  if (!LI)
+    return false;
+  return LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
+}
+
 /// \brief Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
@@ -726,16 +733,15 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // function that mirrors isNonEscapingUse.
   auto checkAddrUse = [](SILInstruction *AddrInst) {
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(AddrInst)) {
-      for (auto *UseOper : SEAI->getUses()) {
-        if (isa<LoadInst>(UseOper->getUser()))
-          return true;
-      }
-    } else if (isa<LoadInst>(AddrInst) || isa<DebugValueAddrInst>(AddrInst)
-               || isa<MarkFunctionEscapeInst>(AddrInst)
-               || isa<EndAccessInst>(AddrInst)) {
-      return true;
+      return all_of(SEAI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isNonMutatingLoad(Op->getUser());
+                    });
     }
-    return false;
+
+    return isNonMutatingLoad(AddrInst) || isa<DebugValueAddrInst>(AddrInst)
+           || isa<MarkFunctionEscapeInst>(AddrInst)
+           || isa<EndAccessInst>(AddrInst);
   };
   for (auto *Projection : Projections) {
     for (auto *UseOper : Projection->getUses()) {
@@ -744,7 +750,10 @@ isNonMutatingCapture(SILArgument *BoxArg) {
           if (!checkAddrUse(AccessUseOper->getUser()))
             return false;
         }
-      } else if (!checkAddrUse(UseOper->getUser()))
+        continue;
+      }
+
+      if (!checkAddrUse(UseOper->getUser()))
         return false;
     }
   }
