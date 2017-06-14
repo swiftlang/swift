@@ -162,8 +162,32 @@ public:
   }
 };
 
-/// Models the in-progress accesses for a single storage location.
-class AccessInfo {
+/// Records an access to an address and the single subpath of projections
+/// that was performed on the address, if such a single subpath exists.
+class RecordedAccess {
+private:
+  BeginAccessInst *Inst;
+  ProjectionPath SubPath;
+
+public:
+  RecordedAccess(BeginAccessInst *BAI, const ProjectionPath &SubPath)
+      : Inst(BAI), SubPath(SubPath) {}
+
+  BeginAccessInst *getInstruction() const { return Inst; }
+
+  SILAccessKind getAccessKind() const { return Inst->getAccessKind(); }
+
+  SILLocation getAccessLoc() const { return Inst->getLoc(); }
+
+  const ProjectionPath &getSubPath() const { return SubPath; }
+};
+
+/// Records the in-progress accesses to a given sub path.
+class SubAccessInfo {
+public:
+  SubAccessInfo(const ProjectionPath &P) : Path(P) {}
+
+  ProjectionPath Path;
 
   /// The number of in-progress 'read' accesses (that is 'begin_access [read]'
   /// instructions that have not yet had the corresponding 'end_access').
@@ -174,36 +198,14 @@ class AccessInfo {
 
   /// The instruction that began the first in-progress access to the storage
   /// location. Used for diagnostic purposes.
-  const BeginAccessInst *FirstAccess = nullptr;
+  Optional<RecordedAccess> FirstAccess = None;
 
 public:
-  // Returns true when beginning an access of the given Kind will
-  // result in a conflict with a previous access.
-  bool conflictsWithAccess(SILAccessKind Kind) {
-    if (Kind == SILAccessKind::Read) {
-      // A read conflicts with any non-read accesses.
-      return NonReads > 0;
-    }
-
-    // A non-read access conflicts with any other access.
-    return NonReads > 0 || Reads > 0;
-  }
-
-  /// Returns true when there must have already been a conflict diagnosed
-  /// for an in-progress access. Used to suppress multiple diagnostics for
-  /// the same underlying access violation.
-  bool alreadyHadConflict() {
-    return (NonReads > 0 && Reads > 0) || (NonReads > 1);
-  }
-
-  /// Returns true when there are any accesses to this location in progress.
-  bool hasAccessesInProgress() { return Reads > 0 || NonReads > 0; }
-
   /// Increment the count for given access.
-  void beginAccess(const BeginAccessInst *BAI) {
+  void beginAccess(BeginAccessInst *BAI, const ProjectionPath &SubPath) {
     if (!FirstAccess) {
       assert(Reads == 0 && NonReads == 0);
-      FirstAccess = BAI;
+      FirstAccess = RecordedAccess(BAI, SubPath);
     }
 
     if (BAI->getAccessKind() == SILAccessKind::Read)
@@ -213,7 +215,7 @@ public:
   }
 
   /// Decrement the count for given access.
-  void endAccess(const EndAccessInst *EAI) {
+  void endAccess(EndAccessInst *EAI) {
     if (EAI->getBeginAccess()->getAccessKind() == SILAccessKind::Read)
       Reads--;
     else
@@ -222,11 +224,118 @@ public:
     // If all open accesses are now ended, forget the location of the
     // first access.
     if (Reads == 0 && NonReads == 0)
-      FirstAccess = nullptr;
+      FirstAccess = None;
   }
 
-  /// Returns the instruction that began the first in-progress access.
-  const BeginAccessInst *getFirstAccess() { return FirstAccess; }
+  /// Returns true when there are any accesses to this location in progress.
+  bool hasAccessesInProgress() const { return Reads > 0 || NonReads > 0; }
+
+  /// Returns true when there must have already been a conflict diagnosed
+  /// for an in-progress access. Used to suppress multiple diagnostics for
+  /// the same underlying access violation.
+  bool alreadyHadConflict() const {
+    return (NonReads > 0 && Reads > 0) || (NonReads > 1);
+  }
+
+  // Returns true when beginning an access of the given Kind can
+  // result in a conflict with a previous access.
+  bool canConflictWithAccessOfKind(SILAccessKind Kind) const {
+    if (Kind == SILAccessKind::Read) {
+      // A read conflicts with any non-read accesses.
+      return NonReads > 0;
+    }
+
+    // A non-read access conflicts with any other access.
+    return NonReads > 0 || Reads > 0;
+  }
+
+  bool conflictsWithAccess(SILAccessKind Kind,
+                           const ProjectionPath &SubPath) const {
+    if (!canConflictWithAccessOfKind(Kind))
+      return false;
+
+    SubSeqRelation_t Relation = Path.computeSubSeqRelation(SubPath);
+    // If the one path is a subsequence of the other (or they are the same)
+    // then access the same storage.
+    return (Relation != SubSeqRelation_t::Unknown);
+  }
+};
+
+/// Models the in-progress accesses for an address on which access has begun
+/// with a begin_access instruction. For a given address, tracks the
+/// count and kinds of accesses as well as the subpaths (i.e., projections) that
+/// were accessed.
+class AccessInfo {
+  using SubAccessVector = SmallVector<SubAccessInfo, 4>;
+
+  SubAccessVector SubAccesses;
+
+  /// Returns the SubAccess info for accessing at the given SubPath.
+  SubAccessInfo &findOrCreateSubAccessInfo(const ProjectionPath &SubPath) {
+    for (auto &Info : SubAccesses) {
+      if (Info.Path == SubPath)
+        return Info;
+    }
+
+    SubAccesses.emplace_back(SubPath);
+    return SubAccesses.back();
+  }
+
+  SubAccessVector::const_iterator
+  findFirstSubPathWithConflict(SILAccessKind OtherKind,
+                               const ProjectionPath &OtherSubPath) const {
+    // Note this iteration requires deterministic ordering for repeatable
+    // diagnostics.
+    for (auto I = SubAccesses.begin(), E = SubAccesses.end(); I != E; ++I) {
+      const SubAccessInfo &Access = *I;
+      if (Access.conflictsWithAccess(OtherKind, OtherSubPath))
+        return I;
+    }
+
+    return SubAccesses.end();
+  }
+
+public:
+  // Returns the previous access when beginning an access of the given Kind will
+  // result in a conflict with a previous access.
+  Optional<RecordedAccess>
+  conflictsWithAccess(SILAccessKind Kind, const ProjectionPath &SubPath) const {
+    auto I = findFirstSubPathWithConflict(Kind, SubPath);
+    if (I == SubAccesses.end())
+      return None;
+
+    return I->FirstAccess;
+  }
+
+  /// Returns true if any subpath of has already had a conflict.
+  bool alreadyHadConflict() const {
+    for (const auto &SubAccess : SubAccesses) {
+      if (SubAccess.alreadyHadConflict())
+        return true;
+    }
+    return false;
+  }
+
+  /// Returns true when there are any accesses to this location in progress.
+  bool hasAccessesInProgress() const {
+    for (const auto &SubAccess : SubAccesses) {
+      if (SubAccess.hasAccessesInProgress())
+        return true;
+    }
+    return false;
+  }
+
+  /// Increment the count for given access.
+  void beginAccess(BeginAccessInst *BAI, const ProjectionPath &SubPath) {
+    SubAccessInfo &SubAccess = findOrCreateSubAccessInfo(SubPath);
+    SubAccess.beginAccess(BAI, SubPath);
+  }
+
+  /// Decrement the count for given access.
+  void endAccess(EndAccessInst *EAI, const ProjectionPath &SubPath) {
+    SubAccessInfo &SubAccess = findOrCreateSubAccessInfo(SubPath);
+    SubAccess.endAccess(EAI);
+  }
 };
 
 /// Indicates whether a 'begin_access' requires exclusive access
@@ -242,11 +351,17 @@ enum class ExclusiveOrShared_t : unsigned {
 /// Tracks the in-progress accesses on per-storage-location basis.
 using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
-/// A pair of 'begin_access' instructions that conflict.
+/// Represents two accesses that conflict and their underlying storage.
 struct ConflictingAccess {
-  AccessedStorage Storage;
-  const BeginAccessInst *FirstAccess;
-  const BeginAccessInst *SecondAccess;
+public:
+  /// Create a conflict for two begin_access instructions in the same function.
+  ConflictingAccess(const AccessedStorage &Storage, const RecordedAccess &First,
+                    const RecordedAccess &Second)
+      : Storage(Storage), FirstAccess(First), SecondAccess(Second) {}
+
+  const AccessedStorage Storage;
+  const RecordedAccess FirstAccess;
+  const RecordedAccess SecondAccess;
 };
 
 } // end anonymous namespace
@@ -296,11 +411,10 @@ template <> struct DenseMapInfo<AccessedStorage> {
 
 } // end namespace llvm
 
-
-/// Returns whether a 'begin_access' requires exclusive or shared access
-/// to its storage.
-static ExclusiveOrShared_t getRequiredAccess(const BeginAccessInst *BAI) {
-  if (BAI->getAccessKind() == SILAccessKind::Read)
+/// Returns whether an access of the given kind requires exclusive or shared
+/// access to its storage.
+static ExclusiveOrShared_t getRequiredAccess(SILAccessKind Kind) {
+  if (Kind == SILAccessKind::Read)
     return ExclusiveOrShared_t::SharedAccess;
 
   return ExclusiveOrShared_t::ExclusiveAccess;
@@ -461,63 +575,107 @@ tryFixItWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   Diag.fixItReplace(FoundCall->getSourceRange(), FixItText);
 }
 
+/// Returns a string representation of the BaseName and the SubPath
+/// suitable for use in diagnostic text. Only supports the Projections
+/// that stored-property relaxation supports: struct stored properties
+/// and tuple elements.
+static std::string getPathDescription(DeclName BaseName, SILType BaseType,
+                                      ProjectionPath SubPath, SILModule &M) {
+  std::string sbuf;
+  llvm::raw_string_ostream os(sbuf);
+
+  os << "'" << BaseName;
+
+  SILType ContainingType = BaseType;
+  for (auto &P : SubPath) {
+    os << ".";
+    switch (P.getKind()) {
+    case ProjectionKind::Struct:
+      os << P.getVarDecl(ContainingType)->getBaseName();
+      break;
+    case ProjectionKind::Tuple: {
+      // Use the tuple element's name if present, otherwise use its index.
+      Type SwiftTy = ContainingType.getSwiftRValueType();
+      TupleType *TupleTy = SwiftTy->getAs<TupleType>();
+      assert(TupleTy && "Tuple projection on non-tuple type!?");
+
+      Identifier ElementName = TupleTy->getElement(P.getIndex()).getName();
+      if (ElementName.empty())
+        os << P.getIndex();
+      else
+        os << ElementName;
+      break;
+    }
+    default:
+      llvm_unreachable("Unexpected projection kind in SubPath!");
+    }
+    ContainingType = P.getType(ContainingType, M);
+  }
+
+  os << "'";
+
+  return os.str();
+}
+
 /// Emits a diagnostic if beginning an access with the given in-progress
 /// accesses violates the law of exclusivity. Returns true when a
 /// diagnostic was emitted.
-static void diagnoseExclusivityViolation(const AccessedStorage &Storage,
-                                         const BeginAccessInst *PriorAccess,
-                                         const BeginAccessInst *NewAccess,
+static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
                                          ArrayRef<ApplyInst *> CallsToSwap,
                                          ASTContext &Ctx) {
 
-  DEBUG(llvm::dbgs() << "Conflict on " << *PriorAccess
-        << "\n  vs " << *NewAccess
-        << "\n  in function " << *PriorAccess->getFunction());
+  const AccessedStorage &Storage = Violation.Storage;
+  const RecordedAccess &FirstAccess = Violation.FirstAccess;
+  const RecordedAccess &SecondAccess = Violation.SecondAccess;
+
+  DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
+                     << "\n  vs " << *SecondAccess.getInstruction()
+                     << "\n  in function "
+                     << *FirstAccess.getInstruction()->getFunction());
 
   // Can't have a conflict if both accesses are reads.
-  assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
-           NewAccess->getAccessKind() == SILAccessKind::Read));
+  assert(!(FirstAccess.getAccessKind() == SILAccessKind::Read &&
+           SecondAccess.getAccessKind() == SILAccessKind::Read));
 
-  ExclusiveOrShared_t PriorRequires = getRequiredAccess(PriorAccess);
+  ExclusiveOrShared_t FirstRequires =
+      getRequiredAccess(FirstAccess.getAccessKind());
 
   // Diagnose on the first access that requires exclusivity.
-  const BeginAccessInst *AccessForMainDiagnostic = PriorAccess;
-  const BeginAccessInst *AccessForNote = NewAccess;
-  if (PriorRequires != ExclusiveOrShared_t::ExclusiveAccess) {
-    AccessForMainDiagnostic = NewAccess;
-    AccessForNote = PriorAccess;
-  }
+  bool FirstIsMain = (FirstRequires == ExclusiveOrShared_t::ExclusiveAccess);
+  const RecordedAccess &MainAccess = (FirstIsMain ? FirstAccess : SecondAccess);
+  const RecordedAccess &NoteAccess = (FirstIsMain ? SecondAccess : FirstAccess);
 
-  SourceRange rangeForMain =
-    AccessForMainDiagnostic->getLoc().getSourceRange();
+  SourceRange RangeForMain = MainAccess.getAccessLoc().getSourceRange();
   unsigned AccessKindForMain =
-      static_cast<unsigned>(AccessForMainDiagnostic->getAccessKind());
+      static_cast<unsigned>(MainAccess.getAccessKind());
 
   if (const ValueDecl *VD = Storage.getStorageDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_swift3 :
                          diag::exclusivity_access_required);
-    auto D = diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-                       DiagnosticID,
-                       VD->getDescriptiveKind(),
-                       VD->getBaseName().getIdentifier(),
-                       AccessKindForMain);
-    D.highlight(rangeForMain);
-    tryFixItWithCallToCollectionSwapAt(PriorAccess, NewAccess,
+    SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
+    SILModule &M = FirstAccess.getInstruction()->getModule();
+    std::string PathDescription = getPathDescription(
+        VD->getBaseName(), BaseType, MainAccess.getSubPath(), M);
+    auto D =
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
+                 VD->getDescriptiveKind(), PathDescription, AccessKindForMain);
+    D.highlight(RangeForMain);
+    tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
+                                       SecondAccess.getInstruction(),
                                        CallsToSwap, Ctx, D);
   } else {
     auto DiagnosticID = (Ctx.LangOpts.isSwiftVersion3() ?
                          diag::exclusivity_access_required_unknown_decl_swift3 :
                          diag::exclusivity_access_required_unknown_decl);
-    diagnose(Ctx, AccessForMainDiagnostic->getLoc().getSourceLoc(),
-             DiagnosticID,
+    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
              AccessKindForMain)
-        .highlight(rangeForMain);
+        .highlight(RangeForMain);
   }
-  diagnose(Ctx, AccessForNote->getLoc().getSourceLoc(),
+  diagnose(Ctx, NoteAccess.getAccessLoc().getSourceLoc(),
            diag::exclusivity_conflicting_access)
-      .highlight(AccessForNote->getLoc().getSourceRange());
+      .highlight(NoteAccess.getAccessLoc().getSourceRange());
 }
 
 /// Make a best effort to find the underlying object for the purpose
@@ -626,6 +784,55 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   return FD == Ctx.getSwap(nullptr);
 }
 
+static SILInstruction *getSingleAddressProjectionUser(SILInstruction *I) {
+  SILInstruction *SingleUser = nullptr;
+
+  for (Operand *Use : I->getUses()) {
+    SILInstruction *User = Use->getUser();
+    if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
+      continue;
+
+    // We have more than a single user so bail.
+    if (SingleUser)
+      return nullptr;
+
+    switch (User->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+      SingleUser = User;
+      break;
+    default:
+      return nullptr;
+    }
+  }
+
+  return SingleUser;
+}
+
+static ProjectionPath findSubPathAccessed(BeginAccessInst *BAI) {
+  ProjectionPath SubPath(BAI->getType(), BAI->getType());
+
+  SILInstruction *Iter = BAI;
+
+  while ((Iter = getSingleAddressProjectionUser(Iter))) {
+    SubPath.push_back(Projection(Iter));
+  }
+
+  return SubPath;
+}
+
+/// If making an access of the given kind at the given subpath would
+/// would conflict, returns the first recorded access it would conflict
+/// with. Otherwise, returns None.
+Optional<RecordedAccess> shouldReportAccess(const AccessInfo &Info,
+                                            swift::SILAccessKind Kind,
+                                            const ProjectionPath &SubPath) {
+  if (Info.alreadyHadConflict())
+    return None;
+
+  return Info.conflictsWithAccess(Kind, SubPath);
+}
+
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   // The implementation relies on the following SIL invariants:
   //    - All incoming edges to a block must have the same in-progress
@@ -692,20 +899,23 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         SILAccessKind Kind = BAI->getAccessKind();
         const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
         AccessInfo &Info = Accesses[Storage];
-        if (Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict()) {
-          const BeginAccessInst *Conflict = Info.getFirstAccess();
-          assert(Conflict && "Must already have had access to conflict!");
-          ConflictingAccesses.push_back({ Storage, Conflict, BAI });
+        ProjectionPath SubPath = findSubPathAccessed(BAI);
+        if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
+          ConflictingAccesses.emplace_back(Storage, *Conflict,
+                                           RecordedAccess(BAI, SubPath));
         }
 
-        Info.beginAccess(BAI);
+        Info.beginAccess(BAI, SubPath);
         continue;
       }
 
       if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
         auto It = Accesses.find(findAccessedStorage(EAI->getSource()));
         AccessInfo &Info = It->getSecond();
-        Info.endAccess(EAI);
+
+        BeginAccessInst *BAI = EAI->getBeginAccess();
+        const ProjectionPath &SubPath = findSubPathAccessed(BAI);
+        Info.endAccess(EAI, SubPath);
 
         // If the storage location has no more in-progress accesses, remove
         // it to keep the StorageMap lean.
@@ -729,11 +939,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   // Now that we've collected violations and suppressed calls, emit
   // diagnostics.
   for (auto &Violation : ConflictingAccesses) {
-    const BeginAccessInst *PriorAccess = Violation.FirstAccess;
-    const BeginAccessInst *NewAccess = Violation.SecondAccess;
-
-    diagnoseExclusivityViolation(Violation.Storage, PriorAccess, NewAccess,
-                                 CallsToSwap, Fn.getASTContext());
+    diagnoseExclusivityViolation(Violation, CallsToSwap, Fn.getASTContext());
   }
 }
 
