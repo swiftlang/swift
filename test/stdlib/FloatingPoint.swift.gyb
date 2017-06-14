@@ -289,17 +289,6 @@ FloatingPoint.test("${Self}.round") {
     for value in [${Self}(), 1, 1/${Self}.ulpOfOne,
                   .greatestFiniteMagnitude, .infinity] {
       expectBitwiseEqual(value, value.rounded(rule))
-
-      // FIXME: rdar://27347596
-      // Double -0 rounded toNearestOrEven is wrong on watchos armv7k
-% if Self == 'Double':
-#if os(watchOS) && arch(arm)
-      if (value == 0  &&  rule == .toNearestOrEven) {
-        continue
-      }
-#endif
-% end
-
       expectBitwiseEqual(-value, (-value).rounded(rule))
     }
 

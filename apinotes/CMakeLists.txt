@@ -1,4 +1,5 @@
 set(SWIFT_API_NOTES_INPUTS
+  Accelerate
   AVFoundation
   AVKit
   AppKit

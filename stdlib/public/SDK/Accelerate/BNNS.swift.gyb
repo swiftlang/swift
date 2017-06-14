@@ -1,0 +1,291 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import Swift
+@_exported import Accelerate
+@_exported import Accelerate.vecLib.BNNS
+
+%{
+bnns2016 = [
+  ('OSX','10.12'), ('iOS','10.0'), ('tvOS','10.0'), ('watchOS','3.0')
+]
+
+bnns2017 = [
+  ('OSX','10.13'), ('iOS','11.0'), ('tvOS','11.0'), ('watchOS','4.0')
+]
+
+def available(releases):
+  return '@available(' + ', '.join([
+    r[0] + ' ' + r[1] for r in releases
+  ]) + ', *)'
+
+def renamed(name):
+  return '\n'.join([
+    '@available(*, deprecated, renamed: "' + name + '")'
+  ])
+
+def newEnumValue(base, new, old, rel):
+  decl = '  public static var ' + new + ': ' + base + ' {\n'
+  impl = '    return __' + base + old + '\n  }'
+  return '  ' + available(rel) + '\n' + decl + impl
+
+def oldEnumValue(base, new, old):
+  return renamed(base + '.' + new) + '\n' + \
+  'public var ' + base + old + ' = __' + base + old
+
+def renameEnumMembers(base, names):
+  return 'extension ' + base + ' {\n' + \
+  '\n'.join([newEnumValue(base, new, old, rel) for new, old, rel in names]) + '\n}\n' + \
+  '\n'.join([oldEnumValue(base, new, old) for new, old, rel in names if rel != bnns2017])
+}%
+
+${renameEnumMembers('BNNSDataType', [
+  ('float16', 'Float16', bnns2016),
+  ('float',   'Float32', bnns2016),
+  ('int8',    'Int8',    bnns2016),
+  ('int16',   'Int16',   bnns2016),
+  ('int32',   'Int32',   bnns2016),
+  ('uint8',   'UInt8',   bnns2017),
+  ('uint16',  'UInt16',  bnns2017),
+  ('uint32',  'UInt32',  bnns2017),
+  ('indexed8','Indexed8',bnns2016),
+])}
+
+${renameEnumMembers('BNNSPoolingFunction', [
+  ('max',     'Max',     bnns2016),
+  ('average', 'Average', bnns2016),
+])}
+
+${renameEnumMembers('BNNSActivationFunction', [
+  ('identity', 'Identity', bnns2016),
+  ('rectifiedLinear', 'RectifiedLinear', bnns2016),
+  ('leakyRectifiedLinear', 'LeakyRectifiedLinear', bnns2016),
+  ('sigmoid', 'Sigmoid', bnns2016),
+  ('tanh', 'Tanh', bnns2016),
+  ('scaledTanh', 'ScaledTanh', bnns2016),
+  ('abs', 'Abs', bnns2016),
+  ('linear', 'Linear', bnns2017),
+  ('clamp', 'Clamp', bnns2017),
+  ('integerLinearSaturate', 'IntegerLinearSaturate', bnns2017),
+  ('integerLinearSaturatePerChannel', 'IntegerLinearSaturatePerChannel', bnns2017),
+  ('softmax', 'Softmax', bnns2017),
+])}
+
+${renameEnumMembers('BNNSFlags', [('useClientPointer', 'UseClientPtr', bnns2016)])}
+
+extension BNNSImageStackDescriptor {
+  ${available(bnns2016)}
+  public init(width: Int,
+              height: Int,
+              channels: Int,
+              row_stride: Int,
+              image_stride: Int,
+              data_type: BNNSDataType,
+              data_scale: Float = 1,
+              data_bias: Float = 0) {
+
+    _precondition(data_type != .indexed8,
+                  "Image stacks cannot use the indexed8 data type.")
+
+    self.width = width
+    self.height = height
+    self.channels = channels
+    self.row_stride = row_stride
+    self.image_stride = image_stride
+    self.data_type = data_type
+    self.data_scale = data_scale
+    self.data_bias = data_bias
+  }
+}
+
+extension BNNSVectorDescriptor {
+  ${available(bnns2016)}
+  public init(size: Int,
+              data_type: BNNSDataType,
+              data_scale: Float = 1,
+              data_bias: Float = 0) {
+
+    _precondition(data_type != .indexed8,
+                  "Vectors cannot use the indexed8 data type.")
+
+    self.size = size
+    self.data_type = data_type
+    self.data_scale = data_scale
+    self.data_bias = data_bias
+  }
+}
+
+extension BNNSLayerData {
+  ${available(bnns2016)}
+  public init(data: UnsafeRawPointer?,
+              data_type: BNNSDataType,
+              data_scale: Float = 1,
+              data_bias: Float = 0,
+              data_table: UnsafePointer<Float>? = nil) {
+
+    if data_type == .indexed8 {
+      _precondition(data_table != nil,
+                    "data_table cannot be nil if data_type is .indexed8.")
+    }
+
+    self.data = data
+    self.data_type = data_type
+    self.data_scale = data_scale
+    self.data_bias = data_bias
+    self.data_table = data_table
+  }
+
+  ${available(bnns2016)}
+  public static var zero: BNNSLayerData {
+    return BNNSLayerData()
+  }
+}
+
+extension BNNSActivation {
+
+  ${available(bnns2016)}
+  public init(function: BNNSActivationFunction,
+              alpha: Float = .nan,
+              beta: Float = .nan) {
+    if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+      _precondition(function != .integerLinearSaturate,
+                    "This initializer cannot be used with the integerLinearSaturate activation function; use BNNSActivation.integerLinearSaturate(scale:Int32, offset:Int32, shift:Int32) instead.")
+      _precondition(function != .integerLinearSaturatePerChannel,
+                    "This initializer cannot be used with the integerLinearSaturatePerChannel activation function; use BNNSActivation.integerLinearSaturatePerChannel(scale:UnsafePointer<Int32>, offset:UnsafePointer<Int32>, shift:UnsafePointer<Int32>) instead.")
+    }
+    self.function = function
+    self.alpha = alpha
+    self.beta = beta
+    iscale = 1                // unused
+    ioffset = 0               // unused
+    ishift = 0                // unused
+    iscale_per_channel = nil  // unused
+    ioffset_per_channel = nil // unused
+    ishift_per_channel = nil  // unused
+  }
+
+  /// A BNNSActivation object that uses the identity activation function.
+  ${available(bnns2016)}
+  public static var identity: BNNSActivation {
+    return BNNSActivation(function: .identity)
+  }
+
+  /// A BNNSActivation object that uses the integerLinearSaturate
+  /// activation function.
+  ${available(bnns2017)}
+  public static func integerLinearSaturate(
+    scale: Int32 = 1,
+    offset: Int32 = 0,
+    shift: Int32 = 0)
+    -> BNNSActivation {
+    return BNNSActivation(function: .integerLinearSaturate,
+                          alpha: .nan,     // unused
+                          beta: .nan,      // unused
+                          iscale: scale,
+                          ioffset: offset,
+                          ishift: shift,
+                          iscale_per_channel: nil, // unused
+                          ioffset_per_channel: nil,// unused
+                          ishift_per_channel: nil) // unused
+  }
+
+  /// A BNNSActivation object that uses the integerLinearSaturatePerChannel
+  /// activation function.
+  ///
+  /// `scale`, `offset`, and `shift` must each point to a buffer with count
+  /// equal to the number of channels on which this activation object operates.
+  ${available(bnns2017)}
+  public static func integerLinearSaturatePerChannel(
+    scale:  UnsafePointer<Int32>,
+    offset: UnsafePointer<Int32>,
+    shift:  UnsafePointer<Int32>)
+    -> BNNSActivation {
+    return BNNSActivation(function: .integerLinearSaturatePerChannel,
+                          alpha: .nan,     // unused
+                          beta: .nan,      // unused
+                          iscale: 1,       // unused
+                          ioffset: 0,      // unused
+                          ishift: 0,       // unused
+                          iscale_per_channel: scale,
+                          ioffset_per_channel: offset,
+                          ishift_per_channel: shift)
+  }
+}
+
+extension BNNSConvolutionLayerParameters {
+  ${available(bnns2016)}
+  public init(x_stride: Int,
+              y_stride: Int,
+              x_padding: Int,
+              y_padding: Int,
+              k_width: Int,
+              k_height: Int,
+              in_channels: Int,
+              out_channels: Int,
+              weights: BNNSLayerData,
+              bias: BNNSLayerData = .zero,
+              activation: BNNSActivation = .identity) {
+    self.x_stride = x_stride
+    self.y_stride = y_stride
+    self.x_padding = x_padding
+    self.y_padding = y_padding
+    self.k_width = k_width
+    self.k_height = k_height
+    self.in_channels = in_channels
+    self.out_channels = out_channels
+    self.weights = weights
+    self.bias = bias
+    self.activation = activation
+  }
+}
+
+extension BNNSPoolingLayerParameters {
+  ${available(bnns2016)}
+  public init(x_stride: Int,
+              y_stride: Int,
+              x_padding: Int,
+              y_padding: Int,
+              k_width: Int,
+              k_height: Int,
+              in_channels: Int,
+              out_channels: Int,
+              pooling_function: BNNSPoolingFunction,
+              bias: BNNSLayerData = .zero,
+              activation: BNNSActivation = .identity) {
+    self.x_stride = x_stride
+    self.y_stride = y_stride
+    self.x_padding = x_padding
+    self.y_padding = y_padding
+    self.k_width = k_width
+    self.k_height = k_height
+    self.in_channels = in_channels
+    self.out_channels = out_channels
+    self.pooling_function = pooling_function
+    self.bias = bias
+    self.activation = activation
+  }
+}
+
+extension BNNSFullyConnectedLayerParameters {
+  ${available(bnns2016)}
+  public init(in_size: Int,
+              out_size: Int,
+              weights: BNNSLayerData,
+              bias: BNNSLayerData = .zero,
+              activation: BNNSActivation = .identity) {
+    self.in_size = in_size
+    self.out_size = out_size
+    self.weights = weights
+    self.bias = bias
+    self.activation = activation
+  }
+}

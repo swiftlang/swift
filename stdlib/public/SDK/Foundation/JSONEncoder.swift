@@ -19,12 +19,21 @@ open class JSONEncoder {
     // MARK: Options
 
     /// The formatting of the output JSON data.
-    public enum OutputFormatting {
-        /// Produce JSON compacted by removing whitespace. This is the default formatting.
-        case compact
+    public struct OutputFormatting : OptionSet {
+        /// The format's default value.
+        public let rawValue: UInt
+
+        /// Creates an OutputFormatting value with the given raw value.
+        public init(rawValue: UInt) {
+            self.rawValue = rawValue
+        }
 
         /// Produce human-readable JSON with indented output.
-        case prettyPrinted
+        public static let prettyPrinted = OutputFormatting(rawValue: 1 << 0)
+
+        /// Produce JSON with dictionary keys sorted in lexicographic order.
+        @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+        public static let sortedKeys    = OutputFormatting(rawValue: 1 << 1)
     }
 
     /// The strategy to use for encoding `Date` values.
@@ -71,8 +80,8 @@ open class JSONEncoder {
         case convertToString(positiveInfinity: String, negativeInfinity: String, nan: String)
     }
 
-    /// The output format to produce. Defaults to `.compact`.
-    open var outputFormatting: OutputFormatting = .compact
+    /// The output format to produce. Defaults to `[]`.
+    open var outputFormatting: OutputFormatting = []
 
     /// The strategy to use in encoding dates. Defaults to `.deferredToDate`.
     open var dateEncodingStrategy: DateEncodingStrategy = .deferredToDate
@@ -132,7 +141,8 @@ open class JSONEncoder {
             throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as string JSON fragment."))
         }
 
-        return try JSONSerialization.data(withJSONObject: topLevel, options: outputFormatting == .prettyPrinted ? .prettyPrinted : [])
+        var writingOptions = JSONSerialization.WritingOptions(rawValue: self.outputFormatting.rawValue)
+        return try JSONSerialization.data(withJSONObject: topLevel, options: writingOptions)
     }
 }
 
