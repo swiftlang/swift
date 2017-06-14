@@ -544,7 +544,6 @@ public struct _StringCore {
       _sanityCheck(newStorage.elementShift == 1)
       let start = newStorage.start.assumingMemoryBound(to: UTF16.CodeUnit.self)
       _cocoaStringReadAll(cocoaBuffer!, start)
-      start[newSize] = 0
 #else
       _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
 #endif
@@ -626,7 +625,6 @@ public struct _StringCore {
       _sanityCheck(elementWidth == 2)
       let start = destination.assumingMemoryBound(to: UTF16.CodeUnit.self)
       _cocoaStringReadAll(rhs.cocoaBuffer!, start)
-      start[count + rhs.count] = 0
       hasNulTerminator = true
 #else
       _sanityCheckFailure("subscript: non-native string without objc runtime")
