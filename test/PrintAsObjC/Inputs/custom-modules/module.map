@@ -38,7 +38,7 @@ module CompatibilityAlias {
   export *
 }
 
-module NestedClass {
-  header "NestedClass.h"
+module VersionedFMWK {
+  header "VersionedFMWK.h"
   export *
 }
