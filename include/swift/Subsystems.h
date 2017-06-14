@@ -191,7 +191,8 @@ namespace swift {
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            OptionSet<TypeCheckingFlags> Options,
                            unsigned StartElem = 0,
-                           unsigned WarnLongFunctionBodies = 0);
+                           unsigned WarnLongFunctionBodies = 0,
+                           unsigned WarnLongExpressionTypeChecking = 0);
 
   /// Once type checking is complete, this walks protocol requirements
   /// to resolve default witnesses.

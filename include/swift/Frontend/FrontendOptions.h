@@ -138,6 +138,12 @@ public:
   /// Intended for debugging purposes only.
   unsigned WarnLongFunctionBodies = 0;
 
+  /// If non-zero, warn when type-checking an expression takes longer
+  /// than this many milliseconds.
+  ///
+  /// Intended for debugging purposes only.
+  unsigned WarnLongExpressionTypeChecking = 0;
+
   enum ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse only

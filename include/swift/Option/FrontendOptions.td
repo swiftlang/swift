@@ -320,6 +320,12 @@ def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
 def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
   Alias<warn_long_function_bodies>;
 
+def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-type-checking">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking a function takes longer than <n> ms">;
+def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
+  Alias<warn_long_expression_type_checking>;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
