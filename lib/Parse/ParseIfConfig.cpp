@@ -321,6 +321,8 @@ public:
                    diag::unsupported_platform_runtime_condition_argument);
         return nullptr;
       }
+
+      // Just a warning for other unsupported arguments.
       StringRef DiagName;
       switch (*Kind) {
       case PlatformConditionKind::OS:
@@ -338,7 +340,6 @@ public:
       for (auto suggestion : suggestions)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
-      return nullptr;
     }
 
     return E;
