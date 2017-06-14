@@ -93,13 +93,13 @@ WARNING(exclusivity_access_required_swift3,none,
         "simultaneous accesses to %0 %1, but "
         "%select{initialization|read|modification|deinitialization}2 requires "
         "exclusive access; consider copying to a local variable",
-        (DescriptiveDeclKind, Identifier, unsigned))
+        (DescriptiveDeclKind, StringRef, unsigned))
 
 ERROR(exclusivity_access_required,none,
       "simultaneous accesses to %0 %1, but "
       "%select{initialization|read|modification|deinitialization}2 requires "
       "exclusive access; consider copying to a local variable",
-      (DescriptiveDeclKind, Identifier, unsigned))
+      (DescriptiveDeclKind, StringRef, unsigned))
 
 ERROR(exclusivity_access_required_unknown_decl,none,
         "simultaneous accesses, but "
