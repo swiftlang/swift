@@ -1622,11 +1622,12 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
         param->setInterfaceType(CE->mapTypeOutOfContext(ty));
       }
     }
-
-    if (!ty->isMaterializable()) {
-      if (ty->is<InOutType>()) {
-        param->setLet(false);
-      } else if (param->hasName()) {
+    
+    assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
+    if (ty->is<InOutType>()) {
+      param->setLet(false);
+    } else if (auto *TTy = ty->getAs<TupleType>()) {
+      if (param->hasName() && TTy->hasInOutElement()) {
         diagnose(param->getStartLoc(),
                  diag::param_type_non_materializable_tuple, ty);
       }

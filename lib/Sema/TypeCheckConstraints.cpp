@@ -2856,21 +2856,26 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
   return true;
 }
 
-Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
+Expr *TypeChecker::coerceToRValue(Expr *expr) {
   // If expr has no type, just assume it's the right expr.
+  if (!expr->getType())
+    return expr;
+  
+  Type exprTy = expr->getType();
+  
   // If the type is already materializable, then we're already done.
-  if (!expr->getType() || expr->getType()->isMaterializable())
+  if (!exprTy->hasLValueType())
     return expr;
   
   // Load lvalues.
-  if (auto lvalue = expr->getType()->getAs<LValueType>()) {
+  if (auto lvalue = exprTy->getAs<LValueType>()) {
     expr->propagateLValueAccessKind(AccessKind::Read);
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
   }
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
-    auto sub = coerceToMaterializable(paren->getSubExpr());
+    auto sub = coerceToRValue(paren->getSubExpr());
     paren->setSubExpr(sub);
     paren->setType(sub->getType());
     return paren;
@@ -2878,7 +2883,7 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
 
   // Walk into 'try' and 'try!' expressions to update the subexpression.
   if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
-    auto sub = coerceToMaterializable(tryExpr->getSubExpr());
+    auto sub = coerceToRValue(tryExpr->getSubExpr());
     tryExpr->setSubExpr(sub);
     if (isa<OptionalTryExpr>(tryExpr) && !sub->getType()->hasError())
       tryExpr->setType(OptionalType::get(sub->getType()));
@@ -2893,7 +2898,7 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
     for (auto &elt : tuple->getElements()) {
       // Materialize the element.
       auto oldType = elt->getType();
-      elt = coerceToMaterializable(elt);
+      elt = coerceToRValue(elt);
 
       // If the type changed at all, make a note of it.
       if (elt->getType().getPointer() != oldType.getPointer()) {

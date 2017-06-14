@@ -261,16 +261,16 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     }
 
     void visitMemberRefExpr(MemberRefExpr *E, AccessKind accessKind) {
-      if (!GetType(E->getBase())->isLValueType()) return;
+      if (!GetType(E->getBase())->hasLValueType()) return;
       visit(E->getBase(), getBaseAccessKind(E->getMember(), accessKind));
     }
     void visitSubscriptExpr(SubscriptExpr *E, AccessKind accessKind) {
-      if (!GetType(E->getBase())->isLValueType()) return;
+      if (!GetType(E->getBase())->hasLValueType()) return;
       visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
     }
     void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E,
                                      AccessKind accessKind) {
-      if (!GetType(E->getBase())->isLValueType()) return;
+      if (!GetType(E->getBase())->hasLValueType()) return;
       auto kpDecl = GetType(E->getKeyPath())->castTo<BoundGenericType>()
         ->getDecl();
       AccessKind baseAccess;

@@ -861,7 +861,7 @@ public:
       ReferencedDecls.emplace_back(VD, Ty);
     } else {
       // LValue type should take precedence.
-      if (!It->Ty->isLValueType() && Ty->isLValueType()) {
+      if (!It->Ty->hasLValueType() && Ty->hasLValueType()) {
         It->Ty = Ty;
       }
     }

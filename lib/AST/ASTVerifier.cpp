@@ -532,7 +532,7 @@ public:
       // Require an access kind to be set on every l-value expression.
       // Note that the empty tuple type is assignable but usually isn't
       // an l-value, so we have to be conservative there.
-      if (E->getType()->isLValueType() != E->hasLValueAccessKind() &&
+      if (E->getType()->hasLValueType() != E->hasLValueAccessKind() &&
           !(E->hasLValueAccessKind() && E->getType()->isAssignableType())) {
         Out << "l-value expression does not have l-value access kind set\n";
         E->print(Out);
@@ -1669,7 +1669,7 @@ public:
     }
 
     void verifyChecked(OptionalEvaluationExpr *E) {
-      if (E->getType()->isLValueType()) {
+      if (E->getType()->hasLValueType()) {
         Out << "Optional evaluation should not produce an lvalue";
         E->print(Out);
         abort();

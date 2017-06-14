@@ -79,3 +79,7 @@ func negativeShift(_ u8: UInt8) {
   _ = (u8 << -1)
 }
 #endif
+
+func sr5176(description: String = "unambiguous Int32.init(bitPattern:)") {
+  _ = Int32(bitPattern: 0) // should compile without ambiguity
+}

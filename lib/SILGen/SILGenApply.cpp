@@ -868,13 +868,17 @@ public:
 
     auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
 
+    CaptureInfo captureInfo;
+
     // Otherwise, we have a statically-dispatched call.
-    SubstitutionList subs;
-    if (e->getDeclRef().isSpecialized() &&
-        (!afd ||
-         !afd->getDeclContext()->isLocalContext() ||
-         afd->getCaptureInfo().hasGenericParamCaptures()))
-      subs = e->getDeclRef().getSubstitutions();
+    SubstitutionList subs = e->getDeclRef().getSubstitutions();
+
+    if (afd) {
+      captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
+      if (afd->getDeclContext()->isLocalContext() &&
+          !captureInfo.hasGenericParamCaptures())
+        subs = SubstitutionList();
+    }
 
     // Enum case constructor references are open-coded.
     if (isa<EnumElementDecl>(e->getDecl()))
@@ -884,7 +888,7 @@ public:
     
     // If the decl ref requires captures, emit the capture params.
     if (afd) {
-      if (SGF.SGM.M.Types.hasLoweredLocalCaptures(afd)) {
+      if (!captureInfo.getCaptures().empty()) {
         SmallVector<ManagedValue, 4> captures;
         SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
                          captures);
@@ -2569,7 +2573,7 @@ private:
 
   bool isUnmaterializableTupleType(CanType type) {
     if (auto tuple = dyn_cast<TupleType>(type))
-      if (!tuple->isMaterializable())
+      if (tuple->hasInOutElement())
         return true;
     return false;
   }
@@ -4899,6 +4903,15 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          bool isDirectUse,
                                          SubstitutionList subs) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
+
+  // The accessor might be a local function that does not capture any
+  // generic parameters, in which case we don't want to pass in any
+  // substitutions.
+  auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(decl);
+  if (decl->getDeclContext()->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures()) {
+    subs = SubstitutionList();
+  }
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {

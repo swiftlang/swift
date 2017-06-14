@@ -2713,6 +2713,7 @@ public:
         "# pragma clang diagnostic ignored \"-Wpragma-clang-attribute\"\n"
         "#endif\n"
         "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
+        "#pragma clang diagnostic ignored \"-Wnullability\"\n"
         "\n"
         "SWIFT_MODULE_NAMESPACE_PUSH(\"" << M.getNameStr() << "\")\n"
       << os.str()
