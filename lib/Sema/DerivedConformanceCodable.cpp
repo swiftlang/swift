@@ -1133,21 +1133,41 @@ ValueDecl *DerivedConformance::deriveEncodable(TypeChecker &tc,
         return nullptr;
     }
 
-    // Check other preconditions for synthesized conformance.
-    // This synthesizes a CodingKeys enum if possible.
-    if (canSynthesize(tc, target, encodableProto))
-        return deriveEncodable_encode(tc, parentDecl, target);
-
-    // Known protocol requirement but could not synthesize.
-    // FIXME: We have to output at least one error diagnostic here because we
-    // returned true from NominalTypeDecl::derivesProtocolConformance; if we
-    // don't, we expect to return a witness here later and crash on an
-    // assertion.  Producing an error stops compilation before then.
+    // We're about to try to synthesize Encodable. If something goes wrong,
+    // we'll have to output at least one error diagnostic because we returned
+    // true from NominalTypeDecl::derivesProtocolConformance; if we don't, we're
+    // expected to return a witness here later (and we crash on an assertion).
+    // Producing a diagnostic stops compilation before then.
+    //
+    // A synthesis attempt will produce NOTE diagnostics throughout, but we'll
+    // want to collect them before displaying -- we want NOTEs to display
+    // _after_ a main diagnostic so we don't get a NOTE before the error it
+    // relates to.
+    //
+    // We can do this with a diagnostic transaction -- first collect failure
+    // diagnostics, then potentially collect notes. If we succeed in
+    // synthesizing Encodable, we can cancel the transaction and get rid of the
+    // fake failures.
+    auto diagnosticTransaction = DiagnosticTransaction(tc.Context.Diags);
     tc.diagnose(target, diag::type_does_not_conform, target->getDeclaredType(),
                 encodableType);
-    tc.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
-                requirement->getFullName(), encodableType, /*AddFixIt=*/false);
-    return nullptr;
+
+    // Check other preconditions for synthesized conformance.
+    // This synthesizes a CodingKeys enum if possible.
+    ValueDecl *witness = nullptr;
+    if (canSynthesize(tc, target, encodableProto))
+        witness = deriveEncodable_encode(tc, parentDecl, target);
+
+    if (witness == nullptr) {
+      // We didn't end up synthesizing encode(to:).
+      tc.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
+                  requirement->getFullName(), encodableType, /*AddFixIt=*/false);
+    } else {
+      // We succeeded -- no need to output the false error generated above.
+      diagnosticTransaction.abort();
+    }
+
+    return witness;
 }
 
 ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
@@ -1173,20 +1193,30 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
         return nullptr;
     }
 
-    // Check other preconditions for synthesized conformance.
-    // This synthesizes a CodingKeys enum if possible.
-    if (canSynthesize(tc, target, decodableProto))
-        return deriveDecodable_init(tc, parentDecl, target);
-
-    // Known protocol requirement but could not synthesize.
-    // FIXME: We have to output at least one error diagnostic here because we
-    // returned true from NominalTypeDecl::derivesProtocolConformance; if we
-    // don't, we expect to return a witness here later and crash on an
-    // assertion.  Producing an error stops compilation before then.
+    // We're about to try to synthesize Decodable. If something goes wrong,
+    // we'll have to output at least one error diagnostic. We need to collate
+    // diagnostics produced by canSynthesize and deriveDecodable_init to produce
+    // them in the right order -- see the comment in deriveEncodable for
+    // background on this transaction.
+    auto diagnosticTransaction = DiagnosticTransaction(tc.Context.Diags);
     tc.diagnose(target, diag::type_does_not_conform, target->getDeclaredType(),
                 decodableType);
-    tc.diagnose(requirement, diag::no_witnesses,
-                diag::RequirementKind::Constructor, requirement->getFullName(),
-                decodableType, /*AddFixIt=*/false);
-    return nullptr;
+
+    // Check other preconditions for synthesized conformance.
+    // This synthesizes a CodingKeys enum if possible.
+    ValueDecl *witness = nullptr;
+    if (canSynthesize(tc, target, decodableProto))
+        witness = deriveDecodable_init(tc, parentDecl, target);
+
+    if (witness == nullptr) {
+      // We didn't end up synthesizing init(from:).
+      tc.diagnose(requirement, diag::no_witnesses,
+                  diag::RequirementKind::Constructor, requirement->getFullName(),
+                  decodableType, /*AddFixIt=*/false);
+    } else {
+      // We succeeded -- no need to output the false error generated above.
+      diagnosticTransaction.abort();
+    }
+
+    return witness;
 }
