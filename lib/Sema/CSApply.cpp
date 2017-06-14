@@ -3046,7 +3046,7 @@ namespace {
       // If we have an imbalance of optionals or a collection
       // downcast, handle this as a checked cast followed by a
       // a 'hasValue' check.
-      if (fromOptionals.size() != toOptionals.size() ||
+      if (fromOptionals.size() < toOptionals.size() ||
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
           castKind == CheckedCastKind::SetDowncast) {
