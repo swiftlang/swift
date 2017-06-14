@@ -15,6 +15,11 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// FIXME: rdar://problem/31207060
+// UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=watchos
+
 import Foundation
 import FoundationBridgeObjC
 

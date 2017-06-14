@@ -86,6 +86,35 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTrip(of: company)
   }
 
+  // MARK: - Output Formatting Tests
+  func testEncodingOutputFormattingDefault() {
+    let expectedJSON = "{\"name\":\"Johnny Appleseed\",\"email\":\"appleseed@apple.com\"}".data(using: .utf8)!
+    let person = Person.testValue
+    _testRoundTrip(of: person, expectedJSON: expectedJSON)
+  }
+
+  func testEncodingOutputFormattingPrettyPrinted() {
+    let expectedJSON = "{\n  \"name\" : \"Johnny Appleseed\",\n  \"email\" : \"appleseed@apple.com\"\n}".data(using: .utf8)!
+    let person = Person.testValue
+    _testRoundTrip(of: person, expectedJSON: expectedJSON, outputFormatting: [.prettyPrinted])
+  }
+
+  func testEncodingOutputFormattingSortedKeys() {
+    if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+      let expectedJSON = "{\"email\":\"appleseed@apple.com\",\"name\":\"Johnny Appleseed\"}".data(using: .utf8)!
+      let person = Person.testValue
+      _testRoundTrip(of: person, expectedJSON: expectedJSON, outputFormatting: [.sortedKeys])
+    }
+  }
+
+  func testEncodingOutputFormattingPrettyPrintedSortedKeys() {
+    if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+      let expectedJSON = "{\n  \"email\" : \"appleseed@apple.com\",\n  \"name\" : \"Johnny Appleseed\"\n}".data(using: .utf8)!
+      let person = Person.testValue
+      _testRoundTrip(of: person, expectedJSON: expectedJSON, outputFormatting: [.prettyPrinted, .sortedKeys])
+    }
+  }
+
   // MARK: - Date Strategy Tests
   func testEncodingDate() {
     // We can't encode a top-level Date, so it'll be wrapped in an array.
@@ -298,6 +327,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
 
   private func _testRoundTrip<T>(of value: T,
                                  expectedJSON json: Data? = nil,
+                                 outputFormatting: JSONEncoder.OutputFormatting = [],
                                  dateEncodingStrategy: JSONEncoder.DateEncodingStrategy = .deferredToDate,
                                  dateDecodingStrategy: JSONDecoder.DateDecodingStrategy = .deferredToDate,
                                  dataEncodingStrategy: JSONEncoder.DataEncodingStrategy = .base64Encode,
@@ -307,6 +337,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     var payload: Data! = nil
     do {
       let encoder = JSONEncoder()
+      encoder.outputFormatting = outputFormatting
       encoder.dateEncodingStrategy = dateEncodingStrategy
       encoder.dataEncodingStrategy = dataEncodingStrategy
       encoder.nonConformingFloatEncodingStrategy = nonConformingFloatEncodingStrategy
@@ -766,6 +797,10 @@ JSONEncoderTests.test("testEncodingTopLevelStructuredClass") { TestJSONEncoder()
 JSONEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestJSONEncoder().testEncodingTopLevelStructuredSingleStruct() }
 JSONEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestJSONEncoder().testEncodingTopLevelStructuredSingleClass() }
 JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncoder().testEncodingTopLevelDeepStructuredType()}
+JSONEncoderTests.test("testEncodingOutputFormattingDefault") { TestJSONEncoder().testEncodingOutputFormattingDefault() }
+JSONEncoderTests.test("testEncodingOutputFormattingPrettyPrinted") { TestJSONEncoder().testEncodingOutputFormattingPrettyPrinted() }
+JSONEncoderTests.test("testEncodingOutputFormattingSortedKeys") { TestJSONEncoder().testEncodingOutputFormattingSortedKeys() }
+JSONEncoderTests.test("testEncodingOutputFormattingPrettyPrintedSortedKeys") { TestJSONEncoder().testEncodingOutputFormattingPrettyPrintedSortedKeys() }
 JSONEncoderTests.test("testEncodingDate") { TestJSONEncoder().testEncodingDate() }
 JSONEncoderTests.test("testEncodingDateSecondsSince1970") { TestJSONEncoder().testEncodingDateSecondsSince1970() }
 JSONEncoderTests.test("testEncodingDateMillisecondsSince1970") { TestJSONEncoder().testEncodingDateMillisecondsSince1970() }

@@ -39,4 +39,22 @@ coreMedia.test("NSValue bridging") {
                         equal: equalCMTimeMappings)
 }
 
+
+var AVFoundationTests = TestSuite("AVFoundation")
+
+#if os(iOS)
+
+if #available(iOS 11, *) {
+  AVFoundationTests.test("AVCaptureSynchronizedDataCollection/iteration") {
+    func f(c: AVCaptureSynchronizedDataCollection) {
+      for element in c {
+        var element = element
+        expectType(AVCaptureSynchronizedData.self, &element)
+      }
+    }
+  }
+}
+
+#endif
+
 runAllTests()

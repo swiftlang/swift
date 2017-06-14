@@ -452,6 +452,9 @@ var nsStringCanaryCount = 0
   required init(coder: NSCoder) {
     fatalError("don't call this initializer")
   }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
+  }
   deinit {
     nsStringCanaryCount -= 1
   }
