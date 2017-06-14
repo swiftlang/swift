@@ -1,13 +1,5 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=thread -o %t_tsan-binary
-// RUN: not env TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
-// REQUIRES: executable_test
-// REQUIRES: objc_interop
-// REQUIRES: CPU=x86_64
-// REQUIRES: tsan_runtime
-// XFAIL: linux
-
-// Make sure we can handle swifterror and don't bail during the LLVM
-// threadsanitizer pass.
+// This module is used by tsan_macos.swift.
+// RUN: true
 
 enum MyError : Error {
     case A
@@ -51,4 +43,3 @@ for t in threads {
   pthread_join(t!, nil)
 }
 
-// CHECK: ThreadSanitizer: data race

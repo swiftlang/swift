@@ -149,3 +149,11 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
 types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return types::lookupTypeForExtension(Ext);
 }
+
+bool
+ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
+                                     StringRef sanitizerName) const {
+  // Lookup is currently only supported for Darwin,
+  // this method should be overriden by a subclass.
+  return false;
+}

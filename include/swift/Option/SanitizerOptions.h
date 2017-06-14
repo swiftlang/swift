@@ -26,10 +26,14 @@ class DiagnosticEngine;
 /// \brief Parses a -sanitize= argument's values.
 ///
 /// \param Diag If non null, the argument is used to diagnose invalid values.
+/// \param sanitizerRuntimeLibExists Function which checks for existance of a
+//         sanitizer dylib with a given name.
 /// \return Returns a SanitizerKind.
-SanitizerKind parseSanitizerArgValues(const llvm::opt::Arg *A,
-                                      const llvm::Triple &Triple,
-                                      DiagnosticEngine &Diag);
+SanitizerKind parseSanitizerArgValues(
+       const llvm::opt::Arg *A,
+       const llvm::Triple &Triple,
+       DiagnosticEngine &Diag,
+       std::function<bool(std::string)> sanitizerRuntimeLibExists);
 
 /// \brief Parses a -sanitize-coverage= argument's value.
 llvm::SanitizerCoverageOptions

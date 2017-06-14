@@ -19,7 +19,12 @@
 #include "swift/Basic/Platform.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Triple.h"
+
+#include<functional>
+
 using namespace swift;
 
 static StringRef toStringRef(const SanitizerKind kind) {
@@ -95,9 +100,17 @@ llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
   return opts;
 }
 
+static bool isTsanSupported(
+    const llvm::Triple &Triple,
+    std::function<bool(std::string)> sanitizerRuntimeLibExists) {
+
+  return Triple.isArch64Bit() && sanitizerRuntimeLibExists("tsan");
+}
+
 SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
-                                      const llvm::Triple &Triple,
-                                      DiagnosticEngine &Diags) {
+                  const llvm::Triple &Triple,
+                  DiagnosticEngine &Diags,
+                  std::function<bool(std::string)> sanitizerRuntimeLibExists) {
   SanitizerKind kind = SanitizerKind::None;
 
   // Find the sanitizer kind.
@@ -137,11 +150,8 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
       (A->getOption().getPrefixedName() + toStringRef(kind)).toStringRef(b),
       Triple.getTriple());
   }
-  // Thread Sanitizer only works on OS X and the simulators. It's only supported
-  // on 64 bit architectures.
-  if (kind == SanitizerKind::Thread &&
-      (!(Triple.isMacOSX() || tripleIsAnySimulator(Triple)) ||
-       !Triple.isArch64Bit())) {
+  if (kind == SanitizerKind::Thread
+        && !isTsanSupported(Triple, sanitizerRuntimeLibExists)) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() + toStringRef(kind)).toStringRef(b),
