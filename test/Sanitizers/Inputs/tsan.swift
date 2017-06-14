@@ -1,5 +1,4 @@
 // This module is used by tsan_macos.swift.
-// RUN: true
 
 enum MyError : Error {
     case A
