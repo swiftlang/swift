@@ -68,6 +68,7 @@ public struct _StringCore {
         "Opaque cocoa strings should have an elementWidth of 2")
     }
     else if _baseAddress == _emptyStringBase {
+      _sanityCheck(nativeBuffer == nil)
       _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(count == 0, "Empty string storage with non-zero count")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
@@ -615,6 +616,7 @@ public struct _StringCore {
       count + rhs.count, minElementWidth: minElementWidth)
 
     if _fastPath(rhs.hasContiguousStorage) {
+      _sanityCheck(nativeBuffer != nil)
       _StringCore._appendElements(
         rhs._baseAddress!, srcElementWidth: rhs.elementWidth,
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
@@ -788,6 +790,7 @@ extension _StringCore : RangeReplaceableCollection {
         for i in 0..<growth {
           destination8[i] = UTF8.CodeUnit(iter.next()!)
         }
+        _sanityCheck(nativeBuffer != nil)
         startASCII[growth] = 0
       }
       else {
@@ -796,6 +799,7 @@ extension _StringCore : RangeReplaceableCollection {
         for i in 0..<growth {
           destination16[i] = iter.next()!
         }
+        _sanityCheck(nativeBuffer != nil)
         startUTF16[growth] = 0
       }
     }
