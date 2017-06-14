@@ -733,18 +733,6 @@ fileprivate class _PlistDecoder : Decoder {
     }
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
-        guard !(self.storage.topContainer is [String : Any]) else {
-            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self,
-                                             DecodingError.Context(codingPath: self.codingPath,
-                                                     debugDescription: "Cannot get single value decoding container -- found keyed container instead."))
-        }
-
-        guard !(self.storage.topContainer is [Any]) else {
-            throw DecodingError.typeMismatch(SingleValueDecodingContainer.self,
-                                             DecodingError.Context(codingPath: self.codingPath,
-                                                     debugDescription: "Cannot get single value decoding container -- found unkeyed container instead."))
-        }
-
         return self
     }
 }
