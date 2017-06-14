@@ -184,6 +184,30 @@ XCTestTestSuite.test("XCTAssertEqual/Dictionary<T, U>") {
   expectFalse(failingTestRun.hasSucceeded)
 }
 
+XCTestTestSuite.test("XCTAssertEqual/XCTAssertNotEqual + accuracy") {
+    class AssertEqualTestCase: XCTestCase {
+        dynamic func test_whenEqual_passes() {
+            XCTAssertEqual(1, 1.09, accuracy: 0.1)
+            XCTAssertNotEqual(1, 1.11, accuracy: 0.1)
+        }
+
+        dynamic func test_whenNotEqual_fails() {
+            XCTAssertEqual(1, 1.11, accuracy: 0.1)
+            XCTAssertNotEqual(1, 1.09, accuracy: 0.1)
+        }
+    }
+
+    let passingTestCase = AssertEqualTestCase(selector: #selector(AssertEqualTestCase.test_whenEqual_passes))
+    execute(passingTestCase.run)
+    expectTrue(passingTestCase.testRun!.hasSucceeded)
+
+    let failingTestCase = AssertEqualTestCase(selector: #selector(AssertEqualTestCase.test_whenNotEqual_fails))
+    execute(failingTestCase.run)
+    let failingTestRun = failingTestCase.testRun!
+    expectEqual(2, failingTestRun.failureCount)
+    expectEqual(0, failingTestRun.unexpectedExceptionCount)
+}
+
 XCTestTestSuite.test("XCTAssertThrowsError") {
     class ErrorTestCase: XCTestCase {
         var doThrow = true
@@ -406,6 +430,35 @@ XCTestTestSuite.test("Test methods that wind up throwing") {
     }
     
 }
+
+XCTestTestSuite.test("XCTContext/runActivity(named:block:)") {
+  class RunActivityTestCase: XCTestCase {
+
+    dynamic func test_noThrow() {
+      var blockCalled = false
+      XCTContext.runActivity(named: "noThrow") { activity in
+        blockCalled = true
+      }
+      expectTrue(blockCalled)
+    }
+
+    dynamic func test_throwing() {
+      var blockCalled = false
+      var catchCalled = false
+      do {
+        try XCTContext.runActivity(named: "throwing") { activity in
+          blockCalled = true
+          throw NSError(domain: "MyDomain", code: -1, userInfo: nil)
+        }
+      } catch {
+        catchCalled = true
+      }
+      expectTrue(blockCalled)
+      expectTrue(catchCalled)
+    }
+  }
+}
+
 
 runAllTests()
 

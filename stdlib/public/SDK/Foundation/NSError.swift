@@ -640,6 +640,16 @@ public extension CocoaError {
   }
 }
 
+public extension CocoaError {
+    public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable : Any]? = nil, url: URL? = nil) -> Error {
+        var info: [AnyHashable : Any] = userInfo ?? [:]
+        if let url = url {
+            info[NSURLErrorKey] = url
+        }
+        return NSError(domain: NSCocoaErrorDomain, code: code.rawValue, userInfo: info)
+    }
+}
+
 extension CocoaError.Code {
   public static var fileNoSuchFile: CocoaError.Code {
     return CocoaError.Code(rawValue: 4)

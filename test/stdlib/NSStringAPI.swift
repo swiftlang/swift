@@ -3,6 +3,11 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: rdar://problem/31311598
+// UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=watchos
+
 //
 // Tests for the NSString APIs as exposed by String
 //
@@ -18,6 +23,9 @@ import StdlibUnittestFoundationExtras
 class NonContiguousNSString : NSString {
   required init(coder aDecoder: NSCoder) {
     fatalError("don't call this initializer")
+  }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")    
   }
 
   override init() { 

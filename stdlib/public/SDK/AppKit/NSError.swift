@@ -39,6 +39,10 @@ extension CocoaError.Code {
   public static var sharingServiceNotConfigured: CocoaError.Code {
     return CocoaError.Code(rawValue: 67072)
   }
+  @available(macOS 10.13, *)
+  public static var fontAssetDownloadError: CocoaError.Code {
+    return CocoaError.Code(rawValue: 66304)
+  }
 }
 
 // Names deprecated late in Swift 3
@@ -109,6 +113,10 @@ extension CocoaError {
   public static var sharingServiceNotConfigured: CocoaError.Code {
     return CocoaError.Code(rawValue: 67072)
   }
+  @available(macOS 10.13, *)
+  public static var fontAssetDownloadError: CocoaError.Code {
+    return CocoaError.Code(rawValue: 66304)
+  }
 }
 
 // Names deprecated late in Swift 3
@@ -162,6 +170,11 @@ extension CocoaError {
 
   public var isTextReadWriteError: Bool {
     return code.rawValue >= 65792 && code.rawValue <= 66303
+  }
+
+  @available(macOS 10.13, *)
+  public var isFontError: Bool {
+    return code.rawValue >= 66304 && code.rawValue <= 66335
   }
 }
 
