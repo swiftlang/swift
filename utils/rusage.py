@@ -91,9 +91,13 @@ parser.add_argument("--csv",
                     action='store_true',
                     default=False,
                     help="write results as CSV")
+parser.add_argument("--csv-header",
+                    action='store_true',
+                    default=False,
+                    help="Emit CSV header")
 parser.add_argument("--csv-output", default="-",
-                    type=argparse.FileType('ab', 0),
-                    help="Append CSV output to file")
+                    type=argparse.FileType('wb', 0),
+                    help="Write CSV output to file")
 parser.add_argument("--csv-name", type=str,
                     default=str(datetime.datetime.now()),
                     help="Label row in CSV with name")
@@ -147,7 +151,7 @@ if over_time:
 if args.csv:
     fieldnames = ["time", "mem", "run"]
     out = csv.DictWriter(args.csv_output, fieldnames, dialect='excel-tab')
-    if args.csv_output.tell() == 0:
+    if args.csv_header:
         out.writeheader()
     out.writerow(dict(time=used.ru_utime,
                       mem=used.ru_maxrss,
