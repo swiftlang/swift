@@ -1474,7 +1474,7 @@ static bool nameContainsUnsigned(StringRef name) {
 
 bool ClangImporter::Implementation::shouldAllowNSUIntegerAsInt(
     bool isFromSystemModule, const clang::NamedDecl *decl) {
-  if (isFromSystemModule)
+//  if (isFromSystemModule)
     if (auto identInfo = decl->getIdentifier())
       return !nameContainsUnsigned(identInfo->getName());
   return false;
