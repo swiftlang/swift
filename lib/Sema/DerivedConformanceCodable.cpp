@@ -88,8 +88,13 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
                                                     ProtocolDecl *proto) {
   // Some generic types need to be introspected to get at their "true" Codable
   // conformance.
-  auto canType = target->getCanonicalType();
-  if (auto genericType = dyn_cast<BoundGenericType>(canType)) {
+  if (auto referenceType = target->getAs<ReferenceStorageType>()) {
+    // This is a weak/unowned/unmanaged var. Get the inner type before checking
+    // conformance.
+    target = referenceType->getReferentType();
+  }
+
+  if (auto genericType = target->getAs<BoundGenericType>()) {
     auto *nominalTypeDecl = genericType->getAnyNominal();
 
     // Implicitly unwrapped optionals need to be unwrapped;
@@ -622,6 +627,12 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
     auto methodName = C.Id_encode;
     auto varType = cast<VarDecl>(matchingVars[0])->getType();
+    if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
+      // This is a weak/unowned/unmanaged var. Get the inner type before
+      // checking optionality.
+      varType = referenceType->getReferentType();
+    }
+
     if (varType->getAnyNominal() == C.getOptionalDecl() ||
         varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
       methodName = C.Id_encodeIfPresent;
@@ -883,6 +894,12 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       // This is also true if the type is an ImplicitlyUnwrappedOptional.
       auto varType = varDecl->getType();
       auto methodName = C.Id_decode;
+      if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
+        // This is a weak/unowned/unmanaged var. Get the inner type before
+        // checking optionality.
+        varType = referenceType->getReferentType();
+      }
+
       if (varType->getAnyNominal() == C.getOptionalDecl() ||
           varType->getAnyNominal() == C.getImplicitlyUnwrappedOptionalDecl()) {
         methodName = C.Id_decodeIfPresent;
