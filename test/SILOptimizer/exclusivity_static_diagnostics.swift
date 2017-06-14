@@ -92,8 +92,8 @@ func violationWithGenericType<T>(_ p: T) {
 
 // Helper.
 struct StructWithTwoStoredProp {
-  var f1: Int
-  var f2: Int
+  var f1: Int = 7
+  var f2: Int = 8
 }
 
 // Take an unsafe pointer to a stored property while accessing another stored property.
@@ -181,4 +181,42 @@ struct StructWithFixits {
     // expected-note@+1{{conflicting access is here}}
     mySwap(&array1[i], &array1[j])
   }
+}
+
+func inoutSeparateStructStoredProperties() {
+  var s = StructWithTwoStoredProp()
+  takesTwoInouts(&s.f1, &s.f2) // no-error
+}
+
+func inoutSameStoredProperty() {
+  var s = StructWithTwoStoredProp()
+  takesTwoInouts(&s.f1, &s.f1)
+  // expected-error@-1{{simultaneous accesses to var 's.f1', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2{{conflicting access is here}}
+}
+
+func inoutSeparateTupleElements() {
+  var t = (1, 4)
+  takesTwoInouts(&t.0, &t.1) // no-error
+}
+
+func inoutSameTupleElement() {
+  var t = (1, 4)
+  takesTwoInouts(&t.0, &t.0) // no-error
+  // expected-error@-1{{simultaneous accesses to var 't.0', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2{{conflicting access is here}}
+}
+
+func inoutSameTupleNamedElement() {
+  var t = (name1: 1, name2: 4)
+  takesTwoInouts(&t.name2, &t.name2) // no-error
+  // expected-error@-1{{simultaneous accesses to var 't.name2', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2{{conflicting access is here}}
+}
+
+func inoutSamePropertyInSameTuple() {
+  var t = (name1: 1, name2: StructWithTwoStoredProp())
+  takesTwoInouts(&t.name2.f1, &t.name2.f1) // no-error
+  // expected-error@-1{{simultaneous accesses to var 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2{{conflicting access is here}}
 }
