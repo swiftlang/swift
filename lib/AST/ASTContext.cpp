@@ -3101,18 +3101,11 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   return result;
 }
 
-static void checkFunctionRecursiveProperties(Type Input,
-                                             Type Result) {
-  // TODO: Would be nice to be able to assert these, but they trip during
-  // constraint solving:
-  //assert(!Input->getRecursiveProperties().isLValue()
-  //       && "function should not take lvalues directly as parameters");
-}
-
 static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
                                                               Type Result) {
-  checkFunctionRecursiveProperties(Input, Result);
-
+//  assert(!Input->hasLValueType()
+//         && "function should not take lvalues directly as parameters");
+  
   auto properties = Input->getRecursiveProperties()
                   | Result->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsLValue;
@@ -3124,8 +3117,9 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
 // always materializable.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(Type Input, Type Result) {
-  checkFunctionRecursiveProperties(Input, Result);
-
+//  assert(!Input->hasLValueType()
+//         && "function should not take lvalues directly as parameters");
+  
   static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;

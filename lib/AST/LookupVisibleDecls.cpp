@@ -488,7 +488,7 @@ static void lookupVisibleMemberDeclsImpl(
     VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   assert(BaseTy && "lookup into null type");
-  assert(!BaseTy->isLValueType());
+  assert(!BaseTy->hasLValueType());
 
   // Handle metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
@@ -694,7 +694,7 @@ public:
   OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
                             LazyResolver *resolver)
       : BaseTy(BaseTy), DC(DC), TypeResolver(resolver) {
-    assert(!BaseTy->isLValueType());
+    assert(!BaseTy->hasLValueType());
     if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>())
       BaseTy = MetaTy->getInstanceType();
     assert(DC && BaseTy);

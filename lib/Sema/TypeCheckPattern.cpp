@@ -1623,7 +1623,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       }
     }
     
-    assert(!ty->isLValueType() && "Bound param type to @lvalue?");
+    assert(!ty->hasLValueType() && "Bound param type to @lvalue?");
     if (ty->is<InOutType>()) {
       param->setLet(false);
     } else if (auto *TTy = ty->getAs<TupleType>()) {

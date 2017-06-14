@@ -217,7 +217,7 @@ namespace {
 /// description of the pattern involved.
 void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Always print rvalues, not lvalues.
-  E = TC.coerceToMaterializable(E);
+  E = TC.coerceToRValue(E);
 
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
@@ -304,7 +304,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   // going to reparent it.
   auto TLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
 
-  E = TC.coerceToMaterializable(E);
+  E = TC.coerceToRValue(E);
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
@@ -408,7 +408,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     // Replace the initializer of PBD with a reference to our repl temporary.
     Expr *E = TC.buildCheckedRefExpr(vd, &SF, DeclNameLoc(vd->getStartLoc()),
                                      /*Implicit=*/true);
-    E = TC.coerceToMaterializable(E);
+    E = TC.coerceToRValue(E);
     PBD->setInit(entryIdx, E);
     SF.Decls.push_back(PBTLCD);
     

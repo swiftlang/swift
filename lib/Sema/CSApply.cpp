@@ -1351,7 +1351,7 @@ namespace {
               base = cs.coerceToRValue(base);
             } else if (keyPathBGT->getDecl() ==
                          cs.getASTContext().getWritableKeyPathDecl()) {
-              resultIsLValue = cs.getType(base)->isLValueType();
+              resultIsLValue = cs.getType(base)->hasLValueType();
             } else if (keyPathBGT->getDecl() ==
                        cs.getASTContext().getReferenceWritableKeyPathDecl()) {
               resultIsLValue = true;
@@ -2594,7 +2594,7 @@ namespace {
         // tuple coercion to properly load & set access kind on all underlying elements
         // before taking a single element.
         baseTy = cs.getType(base);
-        if (!toType->isLValueType() && baseTy->isLValueType())
+        if (!toType->hasLValueType() && baseTy->hasLValueType())
           base = coerceToType(base, baseTy->getRValueType(), cs.getConstraintLocator(base));
 
         return cs.cacheType(new (cs.getASTContext())
@@ -3785,7 +3785,7 @@ namespace {
           return E;
         }
 
-        if (cs.getType(subExpr)->isLValueType()) {
+        if (cs.getType(subExpr)->hasLValueType()) {
           // Treat this like a read of the property.
           cs.propagateLValueAccessKind(subExpr, AccessKind::Read);
         }
@@ -5006,7 +5006,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
-    if (tupleType->isLValueType()) {
+    if (tupleType->hasLValueType()) {
       auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
@@ -7545,7 +7545,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                    getConstraintLocator(expr));
     if (!result)
       return nullptr;
-  } else if (getType(result)->isLValueType() && !discardedExpr) {
+  } else if (getType(result)->hasLValueType() && !discardedExpr) {
     // We referenced an lvalue. Load it.
     result = rewriter.coerceToType(result, getType(result)->getRValueType(),
                                    getConstraintLocator(expr));

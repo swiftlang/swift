@@ -1747,7 +1747,7 @@ public:
 
   /// \brief Coerce the given expression to materializable type, if it
   /// isn't already.
-  Expr *coerceToMaterializable(Expr *expr);
+  Expr *coerceToRValue(Expr *expr);
 
   /// Require that the library intrinsics for working with Optional<T>
   /// exist.

@@ -3545,7 +3545,7 @@ namespace {
     // If the destination is a tuple, recursively destructure.
     void visitTupleExpr(TupleExpr *E) {
       auto *TTy = E->getType()->castTo<TupleType>();
-      assert(TTy->isLValueType() || TTy->isVoid());
+      assert(TTy->hasLValueType() || TTy->isVoid());
       for (auto &elt : E->getElements()) {
         visit(elt);
       }
@@ -4507,7 +4507,7 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
-  assert(!E->getType()->isLValueType() &&
+  assert(!E->getType()->hasLValueType() &&
          "l-values must be emitted with emitLValue");
   return RValueEmitter(*this).visit(E, C);
 }
@@ -4527,7 +4527,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // arguments.
   
   FullExpr scope(Cleanups, CleanupLocation(E));
-  if (E->getType()->isLValueType()) {
+  if (E->getType()->hasLValueType()) {
     // Emit the l-value, but don't perform an access.
     FormalEvaluationScope scope(*this);
     emitLValue(E, AccessKind::Read);
