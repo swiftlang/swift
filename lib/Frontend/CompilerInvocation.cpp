@@ -1424,7 +1424,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
         A, Triple, Diags,
         /* sanitizerRuntimeLibExists= */[&](const StringRef libName) {
 
-          // The driver has checked the existance of the library
+          // The driver has checked the existence of the library
           // already.
           return true;
         });

@@ -20,10 +20,11 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
 
-#include<functional>
+#include <functional>
 
 using namespace swift;
 
@@ -100,7 +101,7 @@ llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
   return opts;
 }
 
-static bool isTsanSupported(
+static bool isTSanSupported(
     const llvm::Triple &Triple,
     std::function<bool(std::string)> sanitizerRuntimeLibExists) {
 
@@ -108,9 +109,9 @@ static bool isTsanSupported(
 }
 
 SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
-                  const llvm::Triple &Triple,
-                  DiagnosticEngine &Diags,
-                  std::function<bool(std::string)> sanitizerRuntimeLibExists) {
+    const llvm::Triple &Triple,
+    DiagnosticEngine &Diags,
+    llvm::function_ref<bool(std::string)> sanitizerRuntimeLibExists) {
   SanitizerKind kind = SanitizerKind::None;
 
   // Find the sanitizer kind.
@@ -151,7 +152,7 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
       Triple.getTriple());
   }
   if (kind == SanitizerKind::Thread
-        && !isTsanSupported(Triple, sanitizerRuntimeLibExists)) {
+      && !isTSanSupported(Triple, sanitizerRuntimeLibExists)) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() + toStringRef(kind)).toStringRef(b),

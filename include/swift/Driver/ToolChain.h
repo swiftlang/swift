@@ -174,7 +174,7 @@ public:
   /// \param args Invocation arguments.
   /// \param sanitizer Sanitizer name.
   virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                              StringRef sanitizer) const;
+                                         StringRef sanitizer) const;
 
 };
 } // end namespace driver

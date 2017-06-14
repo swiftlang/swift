@@ -153,7 +153,7 @@ types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
 bool
 ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
                                      StringRef sanitizerName) const {
-  // Lookup is currently only supported for Darwin,
-  // this method should be overriden by a subclass.
+  // Assume no sanitizers are supported by default.
+  // This method should be overriden by an platform-specific subclass.
   return false;
 }
