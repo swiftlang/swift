@@ -545,3 +545,146 @@ bb0(%0 : $Storage, %1 : $Builtin.Word):
   end_access %3 : $*UInt
   return %8 : $Int
 }
+
+// Stored property relaxation.
+
+struct NestedStructWithStoredProps {
+  var a: Int
+  var b: Int
+}
+
+struct StructWithStoredProps {
+  var x: Int
+  var y: Int
+
+  var n: NestedStructWithStoredProps
+}
+
+sil @takesInoutIntAndStructWithStoredProps : $@convention(thin) (@inout Int, @inout StructWithStoredProps) -> ()
+
+// CHECK-LABEL: sil hidden @twoSeparateStoredProperties
+sil hidden @twoSeparateStoredProperties : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var StructWithStoredProps }
+  %3 = project_box %2 : ${ var StructWithStoredProps }, 0
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps
+  %6 = struct_element_addr %5 : $*StructWithStoredProps, #StructWithStoredProps.x
+  %7 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // no-error
+  %8 = struct_element_addr %7 : $*StructWithStoredProps, #StructWithStoredProps.y
+  %9 = apply %4(%6, %8) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*StructWithStoredProps
+  end_access %5: $*StructWithStoredProps
+  destroy_value %2 : ${ var StructWithStoredProps }
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil hidden @twoSeparateNestedStoredProperties
+sil hidden @twoSeparateNestedStoredProperties : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var StructWithStoredProps }
+  %3 = project_box %2 : ${ var StructWithStoredProps }, 0
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps
+  %6 = struct_element_addr %5 : $*StructWithStoredProps, #StructWithStoredProps.n
+  %7 = struct_element_addr %6 : $*NestedStructWithStoredProps, #NestedStructWithStoredProps.a
+  %8 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // no-error
+  %9 = struct_element_addr %8 : $*StructWithStoredProps, #StructWithStoredProps.n
+  %10 = struct_element_addr %9 : $*NestedStructWithStoredProps, #NestedStructWithStoredProps.b
+  %11 = apply %4(%7, %10) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %8 : $*StructWithStoredProps
+  end_access %5: $*StructWithStoredProps
+  destroy_value %2 : ${ var StructWithStoredProps }
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil hidden @theSameStoredProperty
+sil hidden @theSameStoredProperty : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var StructWithStoredProps }
+  %3 = project_box %2 : ${ var StructWithStoredProps }, 0
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = struct_element_addr %5 : $*StructWithStoredProps, #StructWithStoredProps.x
+  %7 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // expected-note {{conflicting access is here}}
+  %8 = struct_element_addr %7 : $*StructWithStoredProps, #StructWithStoredProps.x
+  %9 = apply %4(%6, %8) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*StructWithStoredProps
+  end_access %5: $*StructWithStoredProps
+  destroy_value %2 : ${ var StructWithStoredProps }
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil hidden @storedPropertyAndAggregate
+sil hidden @storedPropertyAndAggregate : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var StructWithStoredProps }
+  %3 = project_box %2 : ${ var StructWithStoredProps }, 0
+  %4 = function_ref @takesInoutIntAndStructWithStoredProps : $@convention(thin) (@inout Int, @inout StructWithStoredProps) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = struct_element_addr %5 : $*StructWithStoredProps, #StructWithStoredProps.x
+  %7 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // expected-note {{conflicting access is here}}
+  %8 = apply %4(%6, %7) : $@convention(thin) (@inout Int, @inout StructWithStoredProps) -> ()
+  end_access %7 : $*StructWithStoredProps
+  end_access %5: $*StructWithStoredProps
+  destroy_value %2 : ${ var StructWithStoredProps }
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil hidden @nestedStoredPropertyAndAggregate
+sil hidden @nestedStoredPropertyAndAggregate : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var StructWithStoredProps }
+  %3 = project_box %2 : ${ var StructWithStoredProps }, 0
+  %4 = function_ref @takesInoutIntAndStructWithStoredProps : $@convention(thin) (@inout Int, @inout StructWithStoredProps) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = struct_element_addr %5 : $*StructWithStoredProps, #StructWithStoredProps.n
+  %7 = struct_element_addr %6 : $*NestedStructWithStoredProps, #NestedStructWithStoredProps.a
+  %8 = begin_access [modify] [unknown] %3 : $*StructWithStoredProps // expected-note {{conflicting access is here}}
+  %9 = struct_element_addr %8 : $*StructWithStoredProps, #StructWithStoredProps.n
+  end_access %8 : $*StructWithStoredProps
+  end_access %5: $*StructWithStoredProps
+  destroy_value %2 : ${ var StructWithStoredProps }
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil hidden @twoSeparateTupleElements
+sil hidden @twoSeparateTupleElements : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var (Int, Int) }
+  %3 = project_box %2 : ${ var (Int, Int) }, 0
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*(Int, Int)
+  %6 = tuple_element_addr %5 : $*(Int, Int), 0
+  %7 = begin_access [modify] [unknown] %3 : $*(Int, Int) // no-error
+  %8 = tuple_element_addr %7 : $*(Int, Int), 1
+  %9 = apply %4(%6, %8) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*(Int, Int)
+  end_access %5: $*(Int, Int)
+  destroy_value %2 : ${ var (Int, Int) }
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil hidden @sameTupleElement
+sil hidden @sameTupleElement : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var (Int, Int) }
+  %3 = project_box %2 : ${ var (Int, Int) }, 0
+  %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
+  %5 = begin_access [modify] [unknown] %3 : $*(Int, Int) // expected-error {{simultaneous accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %6 = tuple_element_addr %5 : $*(Int, Int), 0
+  %7 = begin_access [modify] [unknown] %3 : $*(Int, Int) // expected-note {{conflicting access is here}}
+  %8 = tuple_element_addr %7 : $*(Int, Int), 0
+  %9 = apply %4(%6, %8) : $@convention(thin) (@inout Int, @inout Int) -> ()
+  end_access %7 : $*(Int, Int)
+  end_access %5: $*(Int, Int)
+  destroy_value %2 : ${ var (Int, Int) }
+  %10 = tuple ()
+  return %10 : $()
+}

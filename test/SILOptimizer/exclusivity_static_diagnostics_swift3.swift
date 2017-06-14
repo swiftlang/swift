@@ -24,7 +24,7 @@ struct X {
 func diagnoseOnSameField() {
   var x = X()
 
-  // expected-warning@+2{{simultaneous accesses to var 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-warning@+2{{simultaneous accesses to var 'x.f', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&x.f, &x.f)
 }
