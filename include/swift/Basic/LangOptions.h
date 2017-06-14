@@ -181,6 +181,9 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
+    /// \brief Enable SE-0110.
+    bool EnableExperimentalSE0110 = false;
+
     /// \brief Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
