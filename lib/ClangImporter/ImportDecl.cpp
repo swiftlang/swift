@@ -3768,8 +3768,11 @@ namespace {
                                  methodTy->getExtInfo());
       }
 
-      // Add the 'self' parameter to the function type.
-      type = FunctionType::get(selfInterfaceType, type);
+      // Add the 'self' parameter to the function type. NB. a method's formal
+      // type should be (Type) -> (Args...) -> Ret, not Type -> (Args...) ->
+      // Ret.
+      auto parenSelfType = ParenType::get(Impl.SwiftContext, selfInterfaceType);
+      type = FunctionType::get(parenSelfType, type);
 
       auto interfaceType = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
       result->setInterfaceType(interfaceType);
