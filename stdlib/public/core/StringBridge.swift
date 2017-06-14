@@ -179,7 +179,7 @@ extension String {
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
-      hasNulTerminator: nulTerminatedASCII != nil,
+      hasNulTerminator: false,
       owner: cfImmutableValue)
   }
 }

@@ -719,7 +719,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
         count: Int(utf16CodeUnitCount),
         elementShift: 1,
         hasCocoaBuffer: false,
-        hasNulTerminator: true,
+        hasNulTerminator: false,
         owner: nil))
   }
 }
@@ -739,7 +739,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
           count: Int(utf8CodeUnitCount),
           elementShift: 0,
           hasCocoaBuffer: false,
-          hasNulTerminator: true,
+          hasNulTerminator: false,
           owner: nil))
     }
     else {

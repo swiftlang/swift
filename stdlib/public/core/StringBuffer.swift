@@ -74,7 +74,6 @@ public struct _StringBuffer {
       
       let p = start.bindMemory(
         to: UTF8.CodeUnit.self, capacity: nulTerminatedUTF8Capacity)
-      p[initialSize] = 0
       
       self.usedEnd = UnsafeMutableRawPointer(p + initialSize)
     }
@@ -86,7 +85,6 @@ public struct _StringBuffer {
       
       let p = start.bindMemory(
         to: UTF16.CodeUnit.self, capacity: nulTerminatedUTF16Capacity)
-      p[initialSize] = 0
       
       self.usedEnd = UnsafeMutableRawPointer(p + initialSize)
     }

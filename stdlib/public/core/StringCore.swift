@@ -123,9 +123,6 @@ public struct _StringCore {
       let byteCount = count &<< (srcElementWidth &- 1)
       // No change in storage width; we can use memcpy
       _memcpy(dest: dstStart, src: srcStart, size: UInt(byteCount))
-      _memcpy(dest: dstStart + byteCount,
-        src: &_emptyStringStorage,
-        size: UInt(extendingOrTruncating: srcElementWidth))
     }
     else if srcElementWidth < dstElementWidth {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
@@ -137,7 +134,6 @@ public struct _StringCore {
         dest += 1
         src += 1
       }
-      dest[0] = 0
     }
     else {
       // Narrowing UTF-16 to ASCII; we need to copy the bytes manually
@@ -149,7 +145,6 @@ public struct _StringCore {
         dest += 1
         src += 1
       }
-      dest[0] = 0
     }
   }
 
@@ -185,7 +180,7 @@ public struct _StringCore {
       count: buffer.usedCount,
       elementShift: buffer.elementShift,
       hasCocoaBuffer: false,
-      hasNulTerminator: true,
+      hasNulTerminator: false,
       owner: buffer._anyObject
     )
   }
@@ -534,7 +529,7 @@ public struct _StringCore {
         _baseAddress!, srcElementWidth: elementWidth,
         dstStart: UnsafeMutableRawPointer(newStorage.start),
         dstElementWidth: newElementWidth, count: oldCount)
-      hasNulTerminator = true
+      hasNulTerminator = false
     }
     else {
 #if _runtime(_ObjC)
@@ -584,19 +579,16 @@ public struct _StringCore {
 
       var d = destination.assumingMemoryBound(to: UTF8.CodeUnit.self)
       d[0] = UTF8.CodeUnit(u0)
-      d[1] = 0
     }
     else {
       let destination16
       = destination.assumingMemoryBound(to: UTF16.CodeUnit.self)
 
       destination16[0] = u0
-      destination16[1] = u1 ?? 0
       if u1 != nil {
-        destination16[2] = 0
+        destination16[1] = u1!
       }
     }
-    hasNulTerminator = true
     _invariantCheck()
   }
 
@@ -620,14 +612,12 @@ public struct _StringCore {
       _StringCore._appendElements(
         rhs._baseAddress!, srcElementWidth: rhs.elementWidth,
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
-      hasNulTerminator = true
     }
     else {
 #if _runtime(_ObjC)
       _sanityCheck(elementWidth == 2)
       let start = destination.assumingMemoryBound(to: UTF16.CodeUnit.self)
       _cocoaStringReadAll(rhs.cocoaBuffer!, start)
-      hasNulTerminator = true
 #else
       _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
@@ -805,19 +795,9 @@ extension _StringCore : RangeReplaceableCollection {
     }
     
     // Append any remaining elements
-    for u in IteratorSequence(iter) { self.append(u) }
-    
-    // Make sure we don't inadvertently NUL-terminate memory we don't own
-    guard nativeBuffer != nil else { return }
-    
-    // NUL termination
-    if let b = asciiBuffer {
-      b.baseAddress![count] = 0
+    for u in IteratorSequence(iter) {
+      self.append(u)
     }
-    else {
-      startUTF16[count] = 0
-    }
-    hasNulTerminator = true
   }
 }
 
