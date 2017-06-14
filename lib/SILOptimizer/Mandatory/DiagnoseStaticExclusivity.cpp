@@ -660,7 +660,7 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
         VD->getBaseName(), BaseType, MainAccess.getSubPath(), M);
     auto D =
         diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
-                 VD->getDescriptiveKind(), PathDescription, AccessKindForMain);
+                 PathDescription, AccessKindForMain);
     D.highlight(RangeForMain);
     tryFixItWithCallToCollectionSwapAt(FirstAccess.getInstruction(),
                                        SecondAccess.getInstruction(),
