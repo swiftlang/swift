@@ -451,8 +451,24 @@ extension Float : _ObjectiveCBridgeable {
     }
     
     public static func _conditionallyBridgeFromObjectiveC(_ x: NSNumber, result: inout Float?) -> Bool {
-        guard let value = Float(exactly: x) else { return false }
-        result = value
+        guard let value = Double(exactly: x) else { return false }
+        guard !value.isNaN else {
+            result = Float.nan
+            return true
+        }
+        guard !value.isInfinite else {
+            if value.sign == .minus {
+                result = -Float.infinity
+            } else {
+                result = Float.infinity
+            }
+            return true
+        }
+        guard Swift.abs(value) <= Double(Float.greatestFiniteMagnitude) else {
+            return false
+        }
+        
+        result = Float(value)
         return true
     }
     
