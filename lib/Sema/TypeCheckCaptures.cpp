@@ -229,10 +229,14 @@ public:
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
-    // Capture the generic parameters of the decl.
-    if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
-      for (auto sub : DRE->getDeclRef().getSubstitutions()) {
-        checkType(sub.getReplacement(), DRE->getLoc());
+    // Capture the generic parameters of the decl, unless it's a
+    // local declaration in which case we will pick up generic
+    // parameter references transitively.
+    if (!D->getDeclContext()->isLocalContext()) {
+      if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
+        for (auto sub : DRE->getDeclRef().getSubstitutions()) {
+          checkType(sub.getReplacement(), DRE->getLoc());
+        }
       }
     }
 

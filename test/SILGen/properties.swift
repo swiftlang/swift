@@ -325,6 +325,25 @@ func logical_local_get(_ x: Int) -> Int {
 // CHECK-: sil private [[PROP_GET_CLOSURE]]
 // CHECK: bb0(%{{[0-9]+}} : $Int):
 
+func logical_generic_local_get<T>(_ x: Int, _: T) {
+  var prop1: Int {
+    get {
+      return x
+    }
+  }
+
+  _ = prop1
+
+  var prop2: Int {
+    get {
+      _ = T.self
+      return x
+    }
+  }
+
+  _ = prop2
+}
+
 // CHECK-LABEL: sil hidden @_T010properties26logical_local_captured_get{{[_0-9a-zA-Z]*}}F
 func logical_local_captured_get(_ x: Int) -> Int {
   var prop : Int {
@@ -654,7 +673,26 @@ func local_observing_property(_ arg: Int) {
 // CHECK: [[PB:%.*]] = project_box [[BOX]]
 // CHECK: store [[ARG]] to [trivial] [[PB]]
 
+func local_generic_observing_property<T>(_ arg: Int, _: T) {
+  var localproperty1: Int = arg {
+    didSet {
+      takeInt(localproperty1)
+    }
+  }
+  
+  takeInt(localproperty1)
+  localproperty1 = arg
 
+  var localproperty2: Int = arg {
+    didSet {
+      _ = T.self
+      takeInt(localproperty2)
+    }
+  }
+  
+  takeInt(localproperty2)
+  localproperty2 = arg
+}
 
 
 // <rdar://problem/16006333> observing properties don't work in @objc classes
