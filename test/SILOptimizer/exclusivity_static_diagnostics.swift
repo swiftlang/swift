@@ -11,7 +11,7 @@ func simpleInoutDiagnostic() {
   // turned on by default.
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{simultaneous accesses to var 'i', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&i, &i)
 }
@@ -19,7 +19,7 @@ func simpleInoutDiagnostic() {
 func inoutOnInoutParameter(p: inout Int) {
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{simultaneous accesses to parameter 'p', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'p', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&p, &p)
 }
@@ -27,7 +27,7 @@ func inoutOnInoutParameter(p: inout Int) {
 func swapNoSuppression(_ i: Int, _ j: Int) {
   var a: [Int] = [1, 2, 3]
 
-  // expected-error@+2{{simultaneous accesses to var 'a', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'a', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   swap(&a[i], &a[j]) // no-warning
 }
@@ -42,13 +42,13 @@ struct StructWithMutatingMethodThatTakesSelfInout {
   mutating func callMutatingMethodThatTakesSelfInout() {
     // expected-error@+4{{inout arguments are not allowed to alias each other}}
     // expected-note@+3{{previous aliasing argument}}
-    // expected-error@+2{{simultaneous accesses to parameter 'self', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@+2{{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     mutate(&self)
   }
 
   mutating func callMutatingMethodThatTakesSelfStoredPropInout() {
-    // expected-error@+2{{simultaneous accesses to parameter 'self', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@+2{{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     mutate(&self.f)
   }
@@ -56,7 +56,7 @@ struct StructWithMutatingMethodThatTakesSelfInout {
 
 var globalStruct1 = StructWithMutatingMethodThatTakesSelfInout()
 func callMutatingMethodThatTakesGlobalStoredPropInout() {
-  // expected-error@+2{{simultaneous accesses to var 'globalStruct1', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'globalStruct1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   globalStruct1.mutate(&globalStruct1.f)
 }
@@ -68,13 +68,13 @@ class ClassWithFinalStoredProp {
   func callMutatingMethodThatTakesClassStoredPropInout() {
     s1.mutate(&s2.f) // no-warning
 
-    // expected-error@+2{{simultaneous accesses to var 's1', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@+2{{overlapping accesses to 's1', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     s1.mutate(&s1.f)
 
     let local1 = self
 
-    // expected-error@+2{{simultaneous accesses to var 's1', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@+2{{overlapping accesses to 's1', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     local1.s1.mutate(&local1.s1.f)
   }
@@ -84,7 +84,7 @@ func violationWithGenericType<T>(_ p: T) {
   var local = p
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{simultaneous accesses to var 'local', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&local, &local)
 }
@@ -121,20 +121,20 @@ struct StructWithFixits {
   mutating
   func shouldHaveFixIts<T>(_ i: Int, _ j: Int, _ param: T, _ paramIndex: T.Index) where T : MutableCollection {
     var array1 = [1, 2, 3]
-    // expected-error@+2{{simultaneous accesses}}{{5-41=array1.swapAt(i + 5, j - 2)}}
+    // expected-error@+2{{overlapping accesses}}{{5-41=array1.swapAt(i + 5, j - 2)}}
     // expected-note@+1{{conflicting access is here}}
     swap(&array1[i + 5], &array1[j - 2])
 
-    // expected-error@+2{{simultaneous accesses}}{{5-49=self.arrayProp.swapAt(i, j)}}
+    // expected-error@+2{{overlapping accesses}}{{5-49=self.arrayProp.swapAt(i, j)}}
     // expected-note@+1{{conflicting access is here}}
     swap(&self.arrayProp[i], &self.arrayProp[j])
 
     var localOfGenericType = param
-    // expected-error@+2{{simultaneous accesses}}{{5-75=localOfGenericType.swapAt(paramIndex, paramIndex)}}
+    // expected-error@+2{{overlapping accesses}}{{5-75=localOfGenericType.swapAt(paramIndex, paramIndex)}}
     // expected-note@+1{{conflicting access is here}}
     swap(&localOfGenericType[paramIndex], &localOfGenericType[paramIndex])
 
-    // expected-error@+2{{simultaneous accesses}}{{5-39=array1.swapAt(i, j)}}
+    // expected-error@+2{{overlapping accesses}}{{5-39=array1.swapAt(i, j)}}
     // expected-note@+1{{conflicting access is here}}
     Swift.swap(&array1[i], &array1[j]) // no-crash
   }
@@ -142,7 +142,7 @@ struct StructWithFixits {
   mutating
   func shouldHaveNoFixIts(_ i: Int, _ j: Int) {
     var s = StructWithField()
-    // expected-error@+2{{simultaneous accesses}}{{none}}
+    // expected-error@+2{{overlapping accesses}}{{none}}
     // expected-note@+1{{conflicting access is here}}
     swap(&s.f, &s.f)
 
@@ -155,13 +155,13 @@ struct StructWithFixits {
     swap(&array1[i], &self.arrayProp[j]) // no-warning no-fixit
 
     // Dictionaries aren't MutableCollections so don't support swapAt().
-    // expected-error@+2{{simultaneous accesses}}{{none}}
+    // expected-error@+2{{overlapping accesses}}{{none}}
     // expected-note@+1{{conflicting access is here}}
     swap(&dictionaryProp[i], &dictionaryProp[j])
 
     // We could safely Fix-It this but don't now because the left and
     // right bases are not textually identical.
-    // expected-error@+2{{simultaneous accesses}}{{none}}
+    // expected-error@+2{{overlapping accesses}}{{none}}
     // expected-note@+1{{conflicting access is here}}
     swap(&self.arrayProp[i], &arrayProp[j])
 
@@ -169,7 +169,7 @@ struct StructWithFixits {
     // We don't suppress when swap() is used as a value
     let mySwap: (inout Int, inout Int) -> () = swap
 
-    // expected-error@+2{{simultaneous accesses}}{{none}}
+    // expected-error@+2{{overlapping accesses}}{{none}}
     // expected-note@+1{{conflicting access is here}}
     mySwap(&array1[i], &array1[j])
 
@@ -177,7 +177,7 @@ struct StructWithFixits {
       swap(&a, &b) // no-warning
     }
 
-    // expected-error@+2{{simultaneous accesses}}{{none}}
+    // expected-error@+2{{overlapping accesses}}{{none}}
     // expected-note@+1{{conflicting access is here}}
     mySwap(&array1[i], &array1[j])
   }
@@ -191,7 +191,7 @@ func inoutSeparateStructStoredProperties() {
 func inoutSameStoredProperty() {
   var s = StructWithTwoStoredProp()
   takesTwoInouts(&s.f1, &s.f1)
-  // expected-error@-1{{simultaneous accesses to var 's.f1', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@-1{{overlapping accesses to 's.f1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
 
@@ -203,20 +203,20 @@ func inoutSeparateTupleElements() {
 func inoutSameTupleElement() {
   var t = (1, 4)
   takesTwoInouts(&t.0, &t.0) // no-error
-  // expected-error@-1{{simultaneous accesses to var 't.0', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@-1{{overlapping accesses to 't.0', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
 
 func inoutSameTupleNamedElement() {
   var t = (name1: 1, name2: 4)
   takesTwoInouts(&t.name2, &t.name2) // no-error
-  // expected-error@-1{{simultaneous accesses to var 't.name2', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@-1{{overlapping accesses to 't.name2', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
 
 func inoutSamePropertyInSameTuple() {
   var t = (name1: 1, name2: StructWithTwoStoredProp())
   takesTwoInouts(&t.name2.f1, &t.name2.f1) // no-error
-  // expected-error@-1{{simultaneous accesses to var 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@-1{{overlapping accesses to 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
