@@ -316,9 +316,9 @@ static StringRef extractExprText(const Expr *E, SourceManager &SM) {
 /// Returns true when the call expression is a call to swap() in the Standard
 /// Library.
 /// This is a helper function that is only used in an assertion, which is why
-/// it is in a namespace rather than 'static'.
-namespace {
-bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
+/// it is in the ifndef.
+#ifndef NDEBUG
+static bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
   if (CE->getCalledValue() == Ctx.getSwap(nullptr))
     return true;
 
@@ -331,7 +331,7 @@ bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
 
   return false;
 }
-} // end anonymous namespace
+#endif
 
 /// Do a sytactic pattern match to try to safely suggest a Fix-It to rewrite
 /// calls like swap(&collection[index1], &collection[index2]) to
@@ -611,7 +611,7 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
 /// Returns true when the apply calls the Standard Library swap().
 /// Used for fix-its to suggest replacing with Collection.swapAt()
 /// on exclusivity violations.
-bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
+static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   SILFunction *SF = AI->getReferencedFunction();
   if (!SF)
     return false;
