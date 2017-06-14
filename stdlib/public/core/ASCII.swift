@@ -55,8 +55,9 @@ extension Unicode.ASCII : Unicode.Encoding {
     }
     else if _fastPath(FromEncoding.self == UTF8.self) {
       let c = _identityCast(content, to: UTF8.EncodedScalar.self)
-      guard (c._storage & 0x80 == 0) else { return nil }
-      return EncodedScalar(CodeUnit(c._storage & 0x7f))
+      let first = c.first.unsafelyUnwrapped
+      guard (first < 0x80) else { return nil }
+      return EncodedScalar(CodeUnit(first))
     }
     return encode(FromEncoding.decode(content))
   }

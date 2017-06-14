@@ -254,21 +254,22 @@ extension Unicode.UTF8 : UnicodeCodec {
   ///   - input: The Unicode scalar value to encode.
   ///   - processCodeUnit: A closure that processes one code unit argument at a
   ///     time.
+  @inline(__always)
   public static func encode(
     _ input: Unicode.Scalar,
     into processCodeUnit: (CodeUnit) -> Void
   ) {
-    var s = encode(input)!._storage
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    var s = encode(input)!._biasedBits
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
     s &>>= 8
     if _fastPath(s == 0) { return }
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
     s &>>= 8
     if _fastPath(s == 0) { return }
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
     s &>>= 8
     if _fastPath(s == 0) { return }
-    processCodeUnit(UInt8(extendingOrTruncating: s))
+    processCodeUnit(UInt8(extendingOrTruncating: s) &- 0x01)
   }
 
   /// Returns a Boolean value indicating whether the specified code unit is a
@@ -903,22 +904,43 @@ extension UTF16 {
   ) -> (count: Int, isASCII: Bool)?
     where Encoding.CodeUnit == Input.Element {
 
+    var utf16Count = 0
     var i = input
-    var isASCII = true
-    var count = 0
-    let errorCount = Encoding.ForwardParser._parse(
-      &i, repairingIllFormedSequences: repairingIllFormedSequences
-    ) {
-      if isASCII {
-        isASCII = Unicode.ASCII.transcode($0, from: Encoding.self) != nil
+    var d = Encoding.ForwardParser()
+
+    // Fast path for ASCII in a UTF8 buffer
+    if sourceEncoding == Unicode.UTF8.self {
+      var peek: Encoding.CodeUnit = 0
+      while let u = i.next() {
+        peek = u
+        guard _fastPath(peek < 0x80) else { break }
+        utf16Count = utf16Count + 1
       }
-      count += numericCast(self._transcode($0, from: Encoding.self).count)
+      if _fastPath(peek < 0x80) { return (utf16Count, true) }
+      
+      var d1 = UTF8.ForwardParser()
+      d1._buffer.append(numericCast(peek))
+      d = _identityCast(d1, to: Encoding.ForwardParser.self)
     }
     
-    if _fastPath(errorCount == 0 || repairingIllFormedSequences) {
-      return (count: count, isASCII: isASCII)
+    var utf16BitUnion: CodeUnit = 0
+    while true {
+      let s = d.parseScalar(from: &i)
+      if _fastPath(s._valid != nil), let scalarContent = s._valid {
+        let utf16 = transcode(scalarContent, from: sourceEncoding)
+          ._unsafelyUnwrappedUnchecked
+        utf16Count += utf16.count
+        for x in utf16 { utf16BitUnion |= x }
+      }
+      else if let _ = s._error {
+        guard _fastPath(repairingIllFormedSequences) else { return nil }
+        utf16Count += 1
+        utf16BitUnion |= 0xFFFD
+      }
+      else {
+        return (utf16Count, utf16BitUnion < 0x80)
+      }
     }
-    else { return nil }
   }
 }
 

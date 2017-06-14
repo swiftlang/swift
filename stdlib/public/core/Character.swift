@@ -338,10 +338,16 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
 }
 
 extension Character : Equatable {
+  @_inlineable
+  @inline(__always)
   public static func == (lhs: Character, rhs: Character) -> Bool {
-    if let l = lhs._smallUTF16?._storage, let r = rhs._smallUTF16?._storage {
-      if l == r { return true }
-      if l < 0x300 && r < 0x300 { return l == r }
+    let l0 = lhs._smallUTF16
+    if _fastPath(l0 != nil), let l = l0?._storage {
+      let r0 = rhs._smallUTF16
+      if _fastPath(r0 != nil), let r = r0?._storage {
+        if (l | r) < 0x300 { return l == r }
+        if l == r { return true }
+      }
     }
     
     // FIXME(performance): constructing two temporary strings is extremely
@@ -351,10 +357,16 @@ extension Character : Equatable {
 }
 
 extension Character : Comparable {
+  @_inlineable
+  @inline(__always)
   public static func < (lhs: Character, rhs: Character) -> Bool {
-    if let l = lhs._smallUTF16?._storage, let r = rhs._smallUTF16?._storage {
-      if l == r { return false }
-      if l < 0x80 && r < 0x80 { return l < r }
+    let l0 = lhs._smallUTF16
+    if _fastPath(l0 != nil), let l = l0?._storage {
+      let r0 = rhs._smallUTF16
+      if _fastPath(r0 != nil), let r = r0?._storage {
+        if (l | r) < 0x80 { return l < r }
+        if l == r { return false }
+      }
     }
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
