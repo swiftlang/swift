@@ -6573,7 +6573,7 @@ public:
 
     // Require the carried type to be materializable.
     if (auto argTy = EED->getArgumentInterfaceType()) {
-      assert(!argTy->isLValueType() && "enum element cannot carry @lvalue");
+      assert(!argTy->hasLValueType() && "enum element cannot carry @lvalue");
       
       if (!argTy->isMaterializable()) {
         TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);

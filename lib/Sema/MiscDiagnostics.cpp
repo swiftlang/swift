@@ -2306,7 +2306,7 @@ void VarDeclUsageChecker::
 markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
   // If the base is a class or an rvalue, then this store just loads the base.
   if (base->getType()->isAnyClassReferenceType() ||
-      !(base->getType()->isLValueType() || base->getType()->is<InOutType>())) {
+      !(base->getType()->hasLValueType() || base->getType()->is<InOutType>())) {
     base->walk(*this);
     return;
   }

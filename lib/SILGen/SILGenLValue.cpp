@@ -2993,7 +2993,7 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
                                           CanArchetypeType openedArchetype,
                                           CanType formalRValueType,
                                           AccessKind accessKind) {
-  assert(!formalRValueType->isLValueType());
+  assert(!formalRValueType->hasLValueType());
   LValueTypeData typeData = {
     AbstractionPattern::getOpaque(), formalRValueType,
     getLoweredType(formalRValueType).getObjectType()

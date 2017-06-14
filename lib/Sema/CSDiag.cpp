@@ -1438,7 +1438,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
   Type firstArg = actualArgs[0].Ty;
-  if (candArgs[0].Ty->is<InOutType>() && !(firstArg->isLValueType() || firstArg->is<InOutType>()))
+  if (candArgs[0].Ty->is<InOutType>() && !(firstArg->hasLValueType() || firstArg->is<InOutType>()))
     return { CC_NonLValueInOut, {}};
   
   // If we have exactly one argument mismatching, classify it specially, so that
@@ -4115,7 +4115,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                contextDecl == CS->TC.Context.getUnsafeRawPointerDecl() ||
                contextDecl == CS->TC.Context.getUnsafeMutableRawPointerDecl()) {
       for (Type arg : genericType->getGenericArgs()) {
-        if (arg->isEqual(exprType) && CS->getType(expr)->isLValueType()) {
+        if (arg->isEqual(exprType) && CS->getType(expr)->hasLValueType()) {
           diagnose(expr->getLoc(), diagID, exprType, contextualType).
             fixItInsert(expr->getStartLoc(), "&");
           return true;
@@ -6413,7 +6413,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
-  if (!destType->isLValueType()) {
+  if (!destType->hasLValueType()) {
     CS->diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
     return true;
   }
@@ -6506,7 +6506,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   auto subExprType = CS->getType(subExpr);
 
   // The common cause is that the operand is not an lvalue.
-  if (!subExprType->isLValueType()) {
+  if (!subExprType->hasLValueType()) {
     diagnoseSubElementFailure(subExpr, IOE->getLoc(), *CS,
                               diag::cannot_pass_rvalue_inout_subelement,
                               diag::cannot_pass_rvalue_inout);

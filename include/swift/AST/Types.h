@@ -539,7 +539,7 @@ public:
 
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
-  bool isLValueType() {
+  bool hasLValueType() {
     return getRecursiveProperties().isLValue();
   }
   
@@ -569,7 +569,7 @@ public:
   }
 
   /// \brief Check if this type is a valid type for the LHS of an assignment.
-  /// This mainly means isLValueType(), but empty tuples and tuples of empty
+  /// This mainly means hasLValueType(), but empty tuples and tuples of empty
   /// tuples also qualify.
   bool isAssignableType();
 
@@ -4388,7 +4388,7 @@ inline bool TypeBase::isTypeParameter() {
 }
 
 inline bool TypeBase::isMaterializable() {
-  if (isLValueType())
+  if (hasLValueType())
     return false;
   
   if (is<InOutType>())
