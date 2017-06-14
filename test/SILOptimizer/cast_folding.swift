@@ -7,6 +7,7 @@
 // which returns either true or false, i.e. all type checks should folded statically.
 
 public protocol P {}
+public protocol R {}
 
 protocol Q: P {}
 
@@ -948,6 +949,87 @@ public func test41() -> Bool {
 @inline(never)
 public func test42(_ p: P) -> Bool {
     return cast42(p)
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}test43{{.*}}
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test43() -> Bool {
+  return P.self is Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}test44{{.*}}
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test44() -> Bool {
+  return Any.self is Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}test45{{.*}}
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test45() -> Bool {
+  return (P & R).self is Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}test46{{.*}}
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test46() -> Bool {
+  return AnyObject.self is Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}test47{{.*}}
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test47() -> Bool {
+  return Any.Type.self is Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}test48{{.*}}
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test48() -> Bool {
+  return Any.Type.self is Any.Type.Type
+}
+
+func cast<U, V>(_ u: U.Type) -> V? {
+  return u as? V
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectProtocolTo{{.*}}Type
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
+@inline(never)
+public func testCastAnyObjectProtocolToAnyObjectType() -> AnyObject.Type? {
+  return cast(AnyObject.self)
+}
+
+// CHECK-LABEL: // testCastProtocolTypeProtocolToProtocolTypeType
+// CHECK: sil [noinline] @{{.*}}testCastProtocol{{.*}}$@convention(thin) () -> Optional<@thick P.Type.Type>
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
+@inline(never)
+public func testCastProtocolTypeProtocolToProtocolTypeType() -> P.Type.Type? {
+  return P.Type.self as? P.Type.Type
 }
 
 print("test0=\(test0())")

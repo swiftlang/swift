@@ -196,6 +196,38 @@ public func testCastEveryToNonClassType<T>(_ o: T) -> Int.Type {
   return o as! Int.Type
 }
 
+func cast<U, V>(_ u: U.Type) -> V? {
+  return u as? V
+}
+
+public protocol P {
+}
+
+// Any casts from P.Protocol to P.Type should fail.
+@inline(never)
+public func testCastPProtocolToPType() -> ObjCP.Type? {
+  return cast(ObjCP.self)
+}
+
+@objc
+public protocol ObjCP {
+}
+
+@inline(never)
+public func testCastObjCPProtocolToObjCPType() -> ObjCP.Type? {
+  return cast(ObjCP.self)
+}
+
+@inline(never)
+public func testCastProtocolCompositionProtocolToProtocolCompositionType() -> (P & ObjCP).Type? {
+  return cast((P & ObjCP).self)
+}
+
+@inline(never)
+public func testCastProtocolCompositionProtocolToProtocolType () -> P.Type? {
+  return (P & ObjCP).self as? P.Type
+}
+
 print("test0=\(test0())")
 
 
@@ -241,7 +273,17 @@ print("test0=\(test0())")
 // CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToNonClassType
 // CHECK:         unconditional_checked_cast_addr
 
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastPProtocolToPType
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
 
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastObjCPProtocolTo{{.*}}PType
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastProtocolComposition{{.*}}Type
+// CHECK: %0 = enum $Optional{{.*}}, #Optional.none!enumelt
+// CHECK-NEXT: return %0
 
 // Check that compiler understands that this cast always succeeds.
 // Since it is can be statically proven that NSString is bridgeable to String,
