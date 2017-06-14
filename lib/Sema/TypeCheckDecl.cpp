@@ -6570,11 +6570,14 @@ public:
       return;
 
     // Require the carried type to be materializable.
-    auto IFacTy = EED->getArgumentInterfaceType();
-    if (IFacTy && !IFacTy->isMaterializable()) {
-      TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable, IFacTy);
-      EED->setInterfaceType(ErrorType::get(TC.Context));
-      EED->setInvalid();
+    if (auto argTy = EED->getArgumentInterfaceType()) {
+      assert(!argTy->isLValueType() && "enum element cannot carry @lvalue");
+      
+      if (!argTy->isMaterializable()) {
+        TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);
+        EED->setInterfaceType(ErrorType::get(TC.Context));
+        EED->setInvalid();
+      }
     }
     TC.checkDeclAttributes(EED);
   }
