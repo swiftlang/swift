@@ -124,6 +124,7 @@ def get_tests(driver_path, args):
     if args.benchmarks or args.filters:
         driver.append('--run-all')
     tests = subprocess.check_output(driver).split()[2:]
+    tests.extend(map(str, range(1, len(tests) + 1)))  # ordinal numbers
     if args.filters:
         regexes = [re.compile(pattern) for pattern in args.filters]
         return sorted(list(set([name for pattern in regexes
