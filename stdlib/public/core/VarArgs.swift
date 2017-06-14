@@ -450,7 +450,9 @@ final internal class _VaListBuilder {
       }
       sseRegistersUsed += 1
     }
-    else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
+    else if encoded.count == 1
+      && !(arg is _CVarArgPassedAsDouble)
+      && gpRegistersUsed < _x86_64CountGPRegisters {
       storage[gpRegistersUsed] = encoded[0]
       gpRegistersUsed += 1
     }
