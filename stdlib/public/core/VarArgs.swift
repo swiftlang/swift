@@ -59,6 +59,19 @@ protocol _CVarArgAligned : CVarArg {
 #if arch(x86_64)
 @_versioned
 let _x86_64CountGPRegisters = 6
+// Note to future visitors concerning the following SSE register count.
+//
+// AMD64-ABI section 3.5.7 says -- as recently as v0.99.7, Nov 2014 -- to make
+// room in the va_list register-save area for 16 SSE registers (XMM0..15). This
+// may seem surprising, because the calling convention of that ABI only uses the
+// first 8 SSE registers for argument-passing; why save the other 8?
+//
+// According to a comment in X86_64ABIInfo::EmitVAArg, in clang's TargetInfo,
+// the AMD64-ABI spec is itself in error on this point ("NOTE: 304 is a typo").
+// This comment (and calculation) in clang has been there since varargs support
+// was added in 2009, in rev be9eb093; so if you're about to change this value
+// from 8 to 16 based on reading the spec, probably the bug you're looking for
+// is elsewhere.
 @_versioned
 let _x86_64CountSSERegisters = 8
 @_versioned
