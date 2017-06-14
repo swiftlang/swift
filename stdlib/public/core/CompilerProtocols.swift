@@ -98,8 +98,6 @@
 ///     // Prints "false"
 ///     print(allowedMoves.rawValue & Directions.right.rawValue)
 ///     // Prints "0"
-///
-/// - SeeAlso: `OptionSet`, `FixedWidthInteger`
 public protocol RawRepresentable {
   /// The raw type that can be used to represent all values of the conforming
   /// type.
@@ -183,8 +181,6 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
 /// `Optional` type conforms to `ExpressibleByNilLiteral`.
 /// `ExpressibleByNilLiteral` conformance for types that use `nil` for other
 /// purposes is discouraged.
-///
-/// - SeeAlso: `Optional`
 public protocol ExpressibleByNilLiteral {
   /// Creates an instance initialized with `nil`.
   init(nilLiteral: ())

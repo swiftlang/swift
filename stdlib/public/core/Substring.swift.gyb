@@ -70,12 +70,12 @@ extension String {
 /// Calling this initializer copies the contents of the substring to a new
 /// string.
 ///
-/// - Important: Don't store substrings longer than you need to perform a
+/// - Important: Don't store substrings longer than you need them to perform a
 ///   specific operation. A substring holds a reference to the entire storage
-///   of the string it came from, not just to the portion it presents, even
+///   of the string it comes from, not just to the portion it presents, even
 ///   when there is no other reference to the original string. Storing
-///   substrings may therefore prolong the lifetime of string data that is no
-///   longer otherwise accessible, which can appear to be memory leakage.
+///   substrings may, therefore, prolong the lifetime of string data that is
+///   no longer otherwise accessible, which can appear to be memory leakage.
 public struct Substring : StringProtocol {
   public typealias Index = String.Index
   public typealias IndexDistance = String.IndexDistance
@@ -221,10 +221,10 @@ public struct Substring : StringProtocol {
   ///
   /// - Parameter body: A closure with a pointer parameter that points to a
   ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, it is used as the return value for the `withCString(_:)`
-  ///   method. The pointer argument is valid only for the duration of the
-  ///   method's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   value, that value is also used as the return value for the
+  ///   `withCString(_:)` method. The pointer argument is valid only for the
+  ///   duration of the method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     return try _slice._base._core._withCSubstringAndLength(
@@ -246,11 +246,12 @@ public struct Substring : StringProtocol {
   /// - Parameters:
   ///   - body: A closure with a pointer parameter that points to a
   ///     null-terminated sequence of code units. If `body` has a return
-  ///     value, it is used as the return value for the
+  ///     value, that value is also used as the return value for the
   ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
   ///     only for the duration of the method's execution.
-  ///   - targetEncoding: The encoding in which the code units should be interpreted.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   - targetEncoding: The encoding in which the code units should be
+  ///     interpreted.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   public func withCString<Result, TargetEncoding: _UnicodeEncoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result

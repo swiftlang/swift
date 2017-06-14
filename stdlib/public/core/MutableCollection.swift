@@ -291,7 +291,7 @@ public protocol MutableCollection : _MutableIndexable, Collection
 
   /// Exchanges the values at the specified indices of the collection.
   ///
-  /// Both parameters must be valid indices of the collection that are not
+  /// Both parameters must be valid indices of the collection and not
   /// equal to `endIndex`. Passing the same index as both `i` and `j` has no
   /// effect.
   ///

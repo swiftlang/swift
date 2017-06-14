@@ -81,10 +81,10 @@ public protocol StringProtocol
   ///
   /// - Parameter body: A closure with a pointer parameter that points to a
   ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, it is used as the return value for the `withCString(_:)`
-  ///   method. The pointer argument is valid only for the duration of the
-  ///   method's execution.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///   value, that value is also used as the return value for the
+  ///   `withCString(_:)` method. The pointer argument is valid only for the
+  ///   duration of the method's execution.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result
 
@@ -98,12 +98,12 @@ public protocol StringProtocol
   /// - Parameters:
   ///   - body: A closure with a pointer parameter that points to a
   ///     null-terminated sequence of code units. If `body` has a return
-  ///     value, it is used as the return value for the
+  ///     value, that value is also used as the return value for the
   ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
   ///     only for the duration of the method's execution.
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   func withCString<Result, Encoding: Unicode.Encoding>(
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
@@ -294,12 +294,12 @@ extension String {
   /// - Parameters:
   ///   - body: A closure with a pointer parameter that points to a
   ///     null-terminated sequence of code units. If `body` has a return
-  ///     value, it is used as the return value for the
+  ///     value, that value is also used as the return value for the
   ///     `withCString(encodedAs:_:)` method. The pointer argument is valid
   ///     only for the duration of the method's execution.
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
-  /// - Returns: The return value of the `body` closure parameter, if any.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
   public func withCString<Result, TargetEncoding: Unicode.Encoding>(
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
@@ -313,39 +313,41 @@ extension String {
 
 /// A Unicode string value that is a collection of characters.
 ///
-/// A string is a series of characters, such as `"Swift"`. Strings in Swift are
-/// Unicode correct, locale insensitive, and designed to be efficient. The
-/// `String` type bridges with the Objective-C class `NSString` and offers
-/// interoperability with C functions that works with strings.
+/// A string is a series of characters, such as `"Swift"`, that forms a
+/// collection. Strings in Swift are Unicode correct and locale insensitive,
+/// and are designed to be efficient. The `String` type bridges with the
+/// Objective-C class `NSString` and offers interoperability with C functions
+/// that works with strings.
 ///
 /// You can create new strings using string literals or string interpolations.
-/// A string literal is a series of characters enclosed in quotes.
+/// A *string literal* is a series of characters enclosed in quotes.
 ///
 ///     let greeting = "Welcome!"
 ///
-/// String interpolations are string literals that evaluate any included
+/// *String interpolations* are string literals that evaluate any included
 /// expressions and convert the results to string form. String interpolations
-/// are an easy way to build a string from multiple pieces. Wrap each
+/// give you an easy way to build a string from multiple pieces. Wrap each
 /// expression in a string interpolation in parentheses, prefixed by a
 /// backslash.
 ///
 ///     let name = "Rosa"
 ///     let personalizedGreeting = "Welcome, \(name)!"
+///     // personalizedGreeting == "Welcome, Rosa!"
 ///
 ///     let price = 2
 ///     let number = 3
 ///     let cookiePrice = "\(number) cookies: $\(price * number)."
+///     // cookiePrice == "3 cookies: $6."
 ///
 /// Combine strings using the concatenation operator (`+`).
 ///
 ///     let longerGreeting = greeting + " We're glad you're here!"
-///     print(longerGreeting)
-///     // Prints "Welcome! We're glad you're here!"
+///     // longerGreeting == "Welcome! We're glad you're here!"
 ///
-/// Multiline string literals are enclosed in three double quotes (`"""`), with
-/// each delimiter on its own line. Indentation is stripped from each line of
-/// a multiline string literal to match the indentation of the closing
-/// delimiter.
+/// Multiline string literals are enclosed in three double quotation marks
+/// (`"""`), with each delimiter on its own line. Indentation is stripped from
+/// each line of a multiline string literal to match the indentation of the
+/// closing delimiter.
 ///
 ///     let banner = """
 ///               __,
@@ -364,16 +366,15 @@ extension String {
 ///
 ///     var otherGreeting = greeting
 ///     otherGreeting += " Have a nice time!"
-///     print(otherGreeting)
-///     // Prints "Welcome! Have a nice time!"
+///     // otherGreeting == "Welcome! Have a nice time!"
 ///
 ///     print(greeting)
 ///     // Prints "Welcome!"
 ///
 /// Comparing strings for equality using the equal-to operator (`==`) or a
-/// relational operator (like `<` and `>=`) is always performed using the
-/// Unicode canonical representation. This means that different
-/// representations of a string compare as being equal.
+/// relational operator (like `<` or `>=`) is always performed using Unicode
+/// canonical representation. As a result, different representations of a
+/// string compare as being equal.
 ///
 ///     let cafe1 = "Cafe\u{301}"
 ///     let cafe2 = "Café"
@@ -384,8 +385,8 @@ extension String {
 /// include an accent, so `"e\u{301}"` has the same canonical representation
 /// as the single Unicode code point `"é"`.
 ///
-/// Basic string operations are not sensitive to locale settings. This ensures
-/// that string comparisons and other operations always have a single, stable
+/// Basic string operations are not sensitive to locale settings, ensuring that
+/// string comparisons and other operations always have a single, stable
 /// result, allowing strings to be used as keys in `Dictionary` instances and
 /// for other purposes.
 ///
@@ -396,7 +397,7 @@ extension String {
 /// human-readable characters. Many individual characters, such as "é", "김",
 /// and "🇮🇳", can be made up of multiple Unicode code points. These code points
 /// are combined by Unicode's boundary algorithms into extended grapheme
-/// clusters, represented by Swift's `Character` type. Each element of a
+/// clusters, represented by the Swift `Character` type. Each element of a
 /// string is represented by a `Character` instance.
 ///
 /// For example, to retrieve the first word of a longer string, you can search
@@ -421,8 +422,7 @@ extension String {
 /// If you need to access the contents of a string as encoded in different
 /// Unicode encodings, use one of the string's `unicodeScalars`, `utf16`, or
 /// `utf8` properties. Each property provides access to a view of the string
-/// as a series of code units, each encoded in a different Unicode
-/// representation.
+/// as a series of code units, each encoded in a different Unicode encoding.
 ///
 /// To demonstrate the different views available for every string, the
 /// following examples use this `String` instance:
@@ -432,7 +432,7 @@ extension String {
 ///     // Prints "Café du 🌍"
 ///
 /// The `cafe` string is a collection of the nine characters that are visible
-/// in the printed string above.
+/// when the string is displayed.
 ///
 ///     print(cafe.count)
 ///     // Prints "9"
@@ -473,9 +473,7 @@ extension String {
 ///     // Prints "[67, 97, 102, 101, 769, 32, 100, 117, 32, 55356, 57101]"
 ///
 /// The elements of the `utf16` view are the code units for the string when
-/// encoded in UTF-16.
-///
-/// The elements of this collection match those accessed through indexed
+/// encoded in UTF-16. These elements match those accessed through indexed
 /// `NSString` APIs.
 ///
 ///     let nscafe = cafe as NSString
@@ -529,7 +527,7 @@ extension String {
 ///     // Prints "1"
 ///
 /// On the other hand, an emoji flag character is constructed from a pair of
-/// Unicode scalars values, like `"\u{1F1F5}"` and `"\u{1F1F7}"`. Each of
+/// Unicode scalar values, like `"\u{1F1F5}"` and `"\u{1F1F7}"`. Each of
 /// these scalar values, in turn, is too large to fit into a single UTF-16 or
 /// UTF-8 code unit. As a result, each view of the string `"🇵🇷"` reports a
 /// different length.
@@ -545,7 +543,7 @@ extension String {
 ///     // Prints "8"
 ///
 /// To check whether a string is empty, use its `isEmpty` property instead of
-/// comparing the length of one of the views to `0`. Unlike `isEmpty`,
+/// comparing the length of one of the views to `0`. Unlike with `isEmpty`,
 /// calculating a view's `count` property requires iterating through the
 /// elements of the string.
 ///
@@ -585,7 +583,7 @@ extension String {
 /// exponential growth strategy that makes appending to a string a constant
 /// time operation when averaged over many append operations.
 ///
-/// Bridging between String and NSString
+/// Bridging Between String and NSString
 /// ====================================
 ///
 /// Any `String` instance can be bridged to `NSString` using the type-cast
@@ -594,7 +592,7 @@ extension String {
 /// subclass of `NSString` can become a `String` instance, there are no
 /// guarantees about representation or efficiency when a `String` instance is
 /// backed by `NSString` storage. Because `NSString` is immutable, it is just
-/// as though the storage was shared by a copy: The first in any sequence of
+/// as though the storage was shared by a copy. The first in any sequence of
 /// mutating operations causes elements to be copied into unique, contiguous
 /// storage which may cost O(*n*) time and space, where *n* is the length of
 /// the string's encoded representation (or more, if the underlying `NSString`
@@ -609,9 +607,6 @@ extension String {
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
-///
-/// - SeeAlso: `String.CharacterView`, `String.UnicodeScalarView`,
-///   `String.UTF16View`, `String.UTF8View`
 @_fixed_layout
 public struct String {
   /// Creates an empty string.

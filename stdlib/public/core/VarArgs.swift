@@ -77,12 +77,11 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 /// - Parameters:
 ///   - args: An array of arguments to convert to a C `va_list` pointer.
 ///   - body: A closure with a `CVaListPointer` parameter that references the
-///     arguments passed as `args`. If `body` has a return value, it is used
-///     as the return value for the `withVaList(_:)` function. The pointer
-///     argument is valid only for the duration of the function's execution.
-/// - Returns: The return value of the `body` closure parameter, if any.
-///
-/// - SeeAlso: `getVaList(_:)`
+///     arguments passed as `args`. If `body` has a return value, that value
+///     is also used as the return value for the `withVaList(_:)` function.
+///     The pointer argument is valid only for the duration of the function's
+///     execution.
+/// - Returns: The return value, if any, of the `body` closure parameter.
 public func withVaList<R>(_ args: [CVarArg],
   _ body: (CVaListPointer) -> R) -> R {
   let builder = _VaListBuilder()
@@ -111,14 +110,13 @@ internal func _withVaList<R>(
 /// from the given array of arguments.
 ///
 /// You should prefer `withVaList(_:_:)` instead of this function. In some
-/// uses, such as in a `class` initializer, you may find that the
-/// language rules do not allow you to use `withVaList(_:_:)` as intended.
+/// uses, such as in a `class` initializer, you may find that the language
+/// rules do not allow you to use `withVaList(_:_:)` as intended.
 ///
 /// - Parameters args: An array of arguments to convert to a C `va_list`
 ///   pointer.
-/// - Returns: The return value of the `body` closure parameter, if any.
-///
-/// - SeeAlso: `withVaList(_:_:)`
+/// - Returns: A pointer that can be used with C functions that take a
+///   `va_list` argument.
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
   let builder = _VaListBuilder()
   for a in args {
