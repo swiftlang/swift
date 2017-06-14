@@ -14,9 +14,16 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/versioned.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/versioned.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 3
 // RUN: %FileCheck %s < %t/versioned.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/versioned.h
-// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/versioned.h -include Foundation.h -include NestedClass.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/versioned.h -include Foundation.h -include VersionedFMWK.h
 
-import NestedClass
+import VersionedFMWK
+
+// CHECK-LABEL: @interface NullabilitySub
+@objc class NullabilitySub: NullabilityBase {
+  // CHECK-NEXT: - (void)processNowNullableArgument:(NSObject * _Nonnull)object;
+  override func processNowNullableArgument(_ object: NSObject) {}
+  // CHECK-NEXT: - (nullable instancetype)initFormerlyFailableValue:(NSInteger)value OBJC_DESIGNATED_INITIALIZER;
+} // CHECK-NEXT: @end
 
 // CHECK-LABEL: @interface UsesNestedClass
 @objc class UsesNestedClass : NSObject {

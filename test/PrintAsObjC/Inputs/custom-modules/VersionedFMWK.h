@@ -19,3 +19,8 @@ typedef struct {
 
 typedef int InnerAlias __attribute__((swift_name("Outer.InnerA")));
 
+
+@interface NullabilityBase : NSObject
+- (nonnull instancetype)initFormerlyFailableValue:(NSInteger)value __attribute__((objc_designated_initializer));
+- (void)processNowNullableArgument:(nullable NSObject *)object;
+@end
