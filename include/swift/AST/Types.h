@@ -76,12 +76,12 @@ namespace swift {
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
   };
-
+  
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 11 };
+  enum { BitWidth = 10 };
 
   /// A single property.
   ///
@@ -99,31 +99,25 @@ public:
 
     /// This type expression contains an UnresolvedType.
     HasUnresolvedType    = 0x08,
-   
-    /// This type expression contains an InOutType other than as a
-    /// function input.
-    HasInOut             = 0x10,
-
+    
     /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x20,
+    HasUnboundGeneric    = 0x10,
 
     /// This type expression contains an LValueType other than as a
     /// function input, and can be loaded to convert to an rvalue.
-    IsLValue             = 0x40,
+    IsLValue             = 0x20,
 
     /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x80,
+    HasOpenedExistential = 0x40,
 
     /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf       = 0x100,
+    HasDynamicSelf       = 0x80,
 
     /// This type contains an Error type.
-    HasError             = 0x200,
+    HasError             = 0x100,
 
     /// This type contains a DependentMemberType.
-    HasDependentMember   = 0x400,
-
-    IsNotMaterializable  = (HasInOut | IsLValue)
+    HasDependentMember   = 0x200,
   };
 
 private:
@@ -150,10 +144,6 @@ public:
 
   /// Does a type with these properties have an unresolved type somewhere in it?
   bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
-
-  /// Does a type with these properties structurally contain an
-  /// inout, except as the parameter of a function?
-  bool hasInOut() const { return Bits & HasInOut; }
   
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
@@ -164,10 +154,6 @@ public:
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
   bool hasDependentMember() const { return Bits & HasDependentMember; }
-
-  /// Is a type with these properties materializable: that is, is it a
-  /// first-class value type?
-  bool isMaterializable() const { return !(Bits & IsNotMaterializable); }
 
   /// Does a type with these properties structurally contain an
   /// archetype?
@@ -349,6 +335,14 @@ protected:
   };
   enum { NumProtocolCompositionTypeBits = NumTypeBaseBits + 1 };
   static_assert(NumProtocolCompositionTypeBits <= 32, "fits in an unsigned");
+  struct TupleTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    
+    /// Whether an element of the tuple is inout.
+    unsigned HasInOutElement : 1;
+  };
+  enum { NumTupleTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumTupleTypeBits <= 32, "fits in an unsigned");
   
   union {
     TypeBaseBitfields TypeBaseBits;
@@ -359,6 +353,7 @@ protected:
     SILFunctionTypeBitfields SILFunctionTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
     ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
+    TupleTypeBitfields TupleTypeBits;
   };
 
 protected:
@@ -444,13 +439,6 @@ public:
     return RecursiveTypeProperties(TypeBaseBits.Properties);
   }
 
-  /// isMaterializable - Is this type 'materializable' according to
-  /// the rules of the language?  Basically, does it not contain any
-  /// l-value types?
-  bool isMaterializable() const {
-    return getRecursiveProperties().isMaterializable();
-  }
-
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
@@ -489,13 +477,7 @@ public:
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
   }
-
-  /// \brief Determine whether the type involves an inout type, except
-  /// as a function input.
-  bool hasInOut() const {
-    return getRecursiveProperties().hasInOut();
-  }
-
+  
   /// \brief Determine whether the type involves an archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
@@ -560,6 +542,10 @@ public:
   bool isLValueType() {
     return getRecursiveProperties().isLValue();
   }
+  
+  /// Is a type with these properties materializable: that is, is it a
+  /// first-class value type?
+  bool isMaterializable();
 
   /// Determine whether the type is dependent on DynamicSelf.
   bool hasDynamicSelfType() const {
@@ -1583,7 +1569,12 @@ public:
   /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
   /// Otherwise, this returns Type().
   Type getVarArgsBaseType() const;
-
+  
+  /// Returns true if this tuple has inout elements.
+  bool hasInOutElement() const {
+    return static_cast<bool>(TupleTypeBits.HasInOutElement);
+  }
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Tuple;
@@ -1597,8 +1588,10 @@ public:
   
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
-            RecursiveTypeProperties properties)
+            RecursiveTypeProperties properties,
+            bool hasInOut)
      : TypeBase(TypeKind::Tuple, CanCtx, properties), Elements(elements) {
+     TupleTypeBits.HasInOutElement = hasInOut;
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -4392,6 +4385,19 @@ inline bool TypeBase::isTypeParameter() {
     return depMemTy->getBase()->isTypeParameter();
 
   return false;
+}
+
+inline bool TypeBase::isMaterializable() {
+  if (isLValueType())
+    return false;
+  
+  if (is<InOutType>())
+    return false;
+  
+  if (auto *TTy = getAs<TupleType>())
+    return !TTy->hasInOutElement();
+  
+  return true;
 }
 
 inline GenericTypeParamType *TypeBase::getRootGenericParam() {

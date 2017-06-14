@@ -547,9 +547,10 @@ enum class ConventionsKind : uint8_t {
       // the tuple type is materializable -- if it doesn't contain an
       // l-value type -- then it's a valid target for substitution and
       // we should not expand it.
-      if (isa<TupleType>(substType) &&
+      CanTupleType substTupleTy = dyn_cast<TupleType>(substType);
+      if (substTupleTy &&
           (!origType.isTypeParameter() ||
-           !substType->isMaterializable())) {
+           substTupleTy->hasInOutElement())) {
         auto substTuple = cast<TupleType>(substType);
         assert(origType.isTypeParameter() ||
                origType.getNumTupleElements() == substTuple->getNumElements());

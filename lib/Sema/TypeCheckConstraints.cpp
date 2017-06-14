@@ -2858,12 +2858,17 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   // If expr has no type, just assume it's the right expr.
+  if (!expr->getType())
+    return expr;
+  
+  Type exprTy = expr->getType();
+  
   // If the type is already materializable, then we're already done.
-  if (!expr->getType() || expr->getType()->isMaterializable())
+  if (!exprTy->isLValueType())
     return expr;
   
   // Load lvalues.
-  if (auto lvalue = expr->getType()->getAs<LValueType>()) {
+  if (auto lvalue = exprTy->getAs<LValueType>()) {
     expr->propagateLValueAccessKind(AccessKind::Read);
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
   }

@@ -136,9 +136,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       unsigned kind =
         fn->isInstanceMember() ? PartialApplication::MutatingMethod
                                : PartialApplication::Function;
-
+      
       // Functions with inout parameters cannot be partially applied.
-      if (expr->getArg()->getType()->hasInOut()) {
+      if (!expr->getArg()->getType()->isMaterializable()) {
         // We need to apply all argument clauses.
         InvalidPartialApplications.insert({
           fnExpr, {fn->getNumParameterLists(), kind}
