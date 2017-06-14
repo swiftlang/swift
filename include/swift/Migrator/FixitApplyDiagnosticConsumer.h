@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
+#include "swift/Migrator/Replacement.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/DenseSet.h"
 
@@ -31,6 +32,8 @@ struct MigratorOptions;
 class SourceManager;
 
 namespace migrator {
+
+struct Replacement;
 
 class FixitApplyDiagnosticConsumer final
   : public DiagnosticConsumer, public FixitFilter {
