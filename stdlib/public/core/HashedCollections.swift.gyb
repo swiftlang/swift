@@ -1813,9 +1813,7 @@ public struct Dictionary<Key : Hashable, Value> :
     by keyForValue: (S.Element) throws -> Key
   ) rethrows where Value == [S.Element] {
     self = [:]
-    for value in values {
-      self[try keyForValue(value), default: []].append(value)
-    }
+    try _variantBuffer.nativeGroup(values, by: keyForValue)
   }
 
   internal init(_nativeBuffer: _NativeDictionaryBuffer<Key, Value>) {
@@ -5056,6 +5054,32 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
+    }
+  }
+
+  internal mutating func nativeGroup<S: Sequence>(
+    _ values: S,
+    by keyForValue: (S.Element) throws -> Key
+  ) rethrows where Value == [S.Element] {
+    defer { _fixLifetime(asNative) }
+    for value in values {
+      let key = try keyForValue(value)
+      var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+      if found {
+        asNative.values[i.offset].append(value)
+      } else {
+        let minCapacity = NativeBuffer.minimumCapacity(
+          minimumCount: asNative.count + 1,
+          maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+        let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
+        if capacityChanged {
+          i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+        }
+
+        asNative.initializeKey(key, value: [value], at: i.offset)
+        asNative.count += 1
+      }
     }
   }
 %end
