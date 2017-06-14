@@ -289,39 +289,44 @@ def compare(args):
     log_dir = args.log_dir
     swift_repo = args.swift_repo
     compare_script = args.compare_script
+    baseline_branch = args.baseline_branch
     current_branch = get_current_git_branch(swift_repo)
     current_branch_dir = os.path.join(log_dir, current_branch)
-    master_branch_dir = os.path.join(log_dir, 'master')
+    baseline_branch_dir = os.path.join(log_dir, baseline_branch)
 
-    if current_branch != 'master' and not os.path.isdir(master_branch_dir):
-        print('Unable to find benchmark logs for master branch. Set a ' +
-              'baseline benchmark log by passing --benchmark to ' +
-              'build-script while on master branch.')
+    if current_branch != baseline_branch and \
+       not os.path.isdir(baseline_branch_dir):
+        print(('Unable to find benchmark logs for {baseline_branch} branch. ' +
+               'Set a baseline benchmark log by passing --benchmark to ' +
+               'build-script while on {baseline_branch} branch.')
+              .format(baseline_branch=baseline_branch))
         return 1
 
     recent_logs = {}
-    for branch_dir in [current_branch_dir, master_branch_dir]:
+    for branch_dir in [current_branch_dir, baseline_branch_dir]:
         for opt in ['O', 'Onone']:
             recent_logs[os.path.basename(branch_dir) + '_' + opt] = sorted(
                 glob.glob(os.path.join(
                     branch_dir, 'Benchmark_' + opt + '-*.log')),
                 key=os.path.getctime, reverse=True)
 
-    if current_branch == 'master':
-        if len(recent_logs['master_O']) > 1 and \
-           len(recent_logs['master_Onone']) > 1:
+    if current_branch == baseline_branch:
+        if len(recent_logs[baseline_branch + '_O']) > 1 and \
+           len(recent_logs[baseline_branch + '_Onone']) > 1:
             compare_logs(compare_script,
-                         recent_logs['master_O'][0],
-                         recent_logs['master_O'][1],
+                         recent_logs[baseline_branch + '_O'][0],
+                         recent_logs[baseline_branch + '_O'][1],
                          log_dir, 'O')
             compare_logs(compare_script,
-                         recent_logs['master_Onone'][0],
-                         recent_logs['master_Onone'][1],
+                         recent_logs[baseline_branch + '_Onone'][0],
+                         recent_logs[baseline_branch + '_Onone'][1],
                          log_dir, 'Onone')
         else:
-            print('master/master comparison skipped: no previous master logs')
+            print(('{baseline_branch}/{baseline_branch} comparison ' +
+                   'skipped: no previous {baseline_branch} logs')
+                  .format(baseline_branch=baseline_branch))
     else:
-        # TODO: Check for outdated master branch log
+        # TODO: Check for outdated baseline branch log
         if len(recent_logs[current_branch + '_O']) == 0 or \
            len(recent_logs[current_branch + '_Onone']) == 0:
             print('branch sanity failure: missing branch logs')
@@ -340,18 +345,20 @@ def compare(args):
                          recent_logs[current_branch + '_Onone'][1],
                          log_dir, 'Onone')
 
-        if len(recent_logs['master_O']) == 0 or \
-           len(recent_logs['master_Onone']) == 0:
-            print('branch/master failure: no master logs')
+        if len(recent_logs[baseline_branch + '_O']) == 0 or \
+           len(recent_logs[baseline_branch + '_Onone']) == 0:
+            print(('branch/{baseline_branch} failure: no {baseline_branch} ' +
+                   'logs')
+                  .format(baseline_branch=baseline_branch))
             return 1
         else:
             compare_logs(compare_script,
                          recent_logs[current_branch + '_O'][0],
-                         recent_logs['master_O'][0],
+                         recent_logs[baseline_branch + '_O'][0],
                          log_dir, 'O')
             compare_logs(compare_script,
                          recent_logs[current_branch + '_Onone'][0],
-                         recent_logs['master_Onone'][0],
+                         recent_logs[baseline_branch + '_Onone'][0],
                          log_dir, 'Onone')
 
         # TODO: Fail on large regressions
@@ -447,6 +454,10 @@ def main():
     compare_parser.add_argument(
         '--compare-script', required=True,
         help='absolute path to compare script')
+    compare_parser.add_argument(
+        '--baseline-branch', default='master',
+        help='attempt to compare results to baseline results for specified '
+             'branch (default: master)')
     compare_parser.set_defaults(func=compare)
 
     args = parser.parse_args()
