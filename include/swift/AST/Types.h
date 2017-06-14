@@ -2475,7 +2475,8 @@ protected:
                   const ExtInfo &Info);
 
 public:
-
+  
+  const ArrayRef<CallArgParam> getParams() const { return Input; }
   Type getInput() const { return RawInput; }
   Type getResult() const { return Output; }
 
