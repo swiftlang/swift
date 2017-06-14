@@ -665,23 +665,13 @@ function set_build_options_for_host() {
                 done
             fi
 
-            for os in IOS WATCHOS TVOS; do
-                local devicecheck="SKIP_BUILD_${os}_DEVICE"
-                local simulatorcheck="SKIP_BUILD_${os}_SIMULATOR"
-                if [[ ${!devicecheck} && ${!simulatorcheck} ]] ; then
-                    local COMPILER_RT_ENABLE_$os="FALSE"
-                else
-                    local COMPILER_RT_ENABLE_$os="TRUE"
-                fi
-            done
-
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DCOMPILER_RT_ENABLE_IOS:BOOL="${COMPILER_RT_ENABLE_IOS}"
-                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL="${COMPILER_RT_ENABLE_WATCHOS}"
-                -DCOMPILER_RT_ENABLE_TVOS:BOOL="${COMPILER_RT_ENABLE_TVOS}"
+                -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
                 -DLLVM_ENABLE_MODULES:BOOL="$(is_llvm_module_build_enabled)"
             )
