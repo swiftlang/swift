@@ -194,6 +194,14 @@ ERROR(symbol_in_ir_not_in_tbd,none,
       "symbol '%0' (%1) is in generated IR file, but not in TBD file",
       (StringRef, StringRef))
 
+ERROR(invalid_conditional_compilation_flag,none,
+      "conditional compilation flags must be valid Swift identifiers (rather than '%0')",
+      (StringRef))
+
+ERROR(cannot_assign_value_to_conditional_compilation_flag,none,
+      "conditional compilation flags do not have values in Swift; they are either present or absent"
+      " (rather than '%0')", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
