@@ -45,15 +45,15 @@ static const char *skipParenExpression(const char *p, const char *End) {
       case ')':
         done = --ParenCount == 0;
         break;
-                  
+
       case '(':
         ++ParenCount;
         break;
-              
+
       case '"':
         e = skipStringInCode (e, End);
         break;
-              
+
       default:
         break;
       }
@@ -76,7 +76,7 @@ static const char *skipStringInCode(const char *p, const char *End) {
       case '"':
         done = true;
         break;
-                  
+
       case '\\':
         ++e;
         if (e >= End)
@@ -84,7 +84,7 @@ static const char *skipStringInCode(const char *p, const char *End) {
         else if (*e == '(')
           e = skipParenExpression (e, End);
         break;
-              
+
       default:
         break;
       }
@@ -113,8 +113,8 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
 
   SourceCompleteResult SCR;
   SCR.IsComplete = !P.isInputIncomplete();
-    
-  // Use the same code that was in the REPL code to track the indent level 
+
+  // Use the same code that was in the REPL code to track the indent level
   // for now. In the future we should get this from the Parser if possible.
 
   CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
@@ -167,7 +167,7 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
       if (!IndentInfos.empty())
         IndentInfos.pop_back();
       break;
-  
+
     default:
       if (LineSourceStart == nullptr && !isspace(*p))
         LineSourceStart = p;

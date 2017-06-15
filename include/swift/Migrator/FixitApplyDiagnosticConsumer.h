@@ -19,6 +19,8 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
+#include "swift/Migrator/Migrator.h"
+#include "swift/Migrator/Replacement.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/DenseSet.h"
 
@@ -30,6 +32,8 @@ struct MigratorOptions;
 class SourceManager;
 
 namespace migrator {
+
+struct Replacement;
 
 class FixitApplyDiagnosticConsumer final
   : public DiagnosticConsumer, public FixitFilter {
@@ -46,8 +50,9 @@ class FixitApplyDiagnosticConsumer final
   /// determine whether to call `printResult`.
   unsigned NumFixitsApplied;
 
-  /// Tracks whether a SourceLoc already got an `@objc` insertion.
-  llvm::SmallPtrSet<const void *, 32> AddedObjC;
+  /// Tracks previous replacements so we don't pump the rewrite buffer with
+  /// multiple equivalent replacements, which can result in weird behavior.
+  llvm::SmallSet<Replacement, 32> Replacements;
 
 public:
   FixitApplyDiagnosticConsumer(const StringRef Text,

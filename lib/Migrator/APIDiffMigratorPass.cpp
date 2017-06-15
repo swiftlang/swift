@@ -446,6 +446,59 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       // Swift.abs(1.0)
       Editor.replace(Call->getFn()->getSourceRange(), "Swift.abs");
       return true;
+    case SpecialCaseId::ToUIntMax:
+      if (const auto *DotCall = dyn_cast<DotSyntaxCallExpr>(Call->getFn())) {
+        Editor.insert(DotCall->getStartLoc(), "UInt64(");
+        Editor.replace({ DotCall->getDotLoc(), Call->getEndLoc() }, ")");
+        return true;
+      }
+      return false;
+    case SpecialCaseId::ToIntMax:
+      if (const auto *DotCall = dyn_cast<DotSyntaxCallExpr>(Call->getFn())) {
+        Editor.insert(DotCall->getStartLoc(), "Int64(");
+        Editor.replace({ DotCall->getDotLoc(), Call->getEndLoc() }, ")");
+        return true;
+      }
+      return false;
+    case SpecialCaseId::NSOpenGLGetVersion: {
+      if (const auto *Tuple = dyn_cast<TupleExpr>(Arg)) {
+        if (Tuple->getNumElements() != 2) {
+          return false;
+        }
+
+        auto extractArg = [](const Expr *Arg) -> const DeclRefExpr * {
+          while (const auto *ICE = dyn_cast<ImplicitConversionExpr>(Arg)) {
+            Arg = ICE->getSubExpr();
+          }
+          if (const auto *IOE = dyn_cast<InOutExpr>(Arg)) {
+            return dyn_cast<DeclRefExpr>(IOE->getSubExpr());
+          }
+          return nullptr;
+        };
+
+        const auto *Arg0 = extractArg(Tuple->getElement(0));
+        const auto *Arg1 = extractArg(Tuple->getElement(1));
+
+        if (!(Arg0 && Arg1)) {
+          return false;
+        }
+        SmallString<256> Scratch;
+        llvm::raw_svector_ostream OS(Scratch);
+        auto StartLoc = Call->getStartLoc();
+        Editor.insert(StartLoc, "(");
+        Editor.insert(StartLoc,
+          SM.extractText(Lexer::getCharSourceRangeFromSourceRange(SM,
+            Arg0->getSourceRange())));
+        Editor.insert(StartLoc, ", ");
+        Editor.insert(StartLoc,
+          SM.extractText(Lexer::getCharSourceRangeFromSourceRange(SM,
+            Arg1->getSourceRange())));
+        Editor.insert(StartLoc, ") = ");
+        Editor.replace(Call->getSourceRange(), "NSOpenGLContext.openGLVersion");
+        return true;
+      }
+      return false;
+    }
     }
   }
 
