@@ -7285,32 +7285,15 @@ namespace {
 } // end anonymous namespace
 
 Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
-  // Can't load from an inout value.
-  if (auto *iot = getType(expr)->getAs<InOutType>()) {
-    // Emit a fixit if we can find the & expression that turned this into an
-    // inout.
-    auto &tc = getTypeChecker();
-    if (auto addrOf =
-        dyn_cast<InOutExpr>(expr->getSemanticsProvidingExpr())) {
-      tc.diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-                  iot->getObjectType())
-        .fixItRemove(SourceRange(addrOf->getLoc()));
-      return coerceToRValue(addrOf->getSubExpr());
-    } else {
-      tc.diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-                  iot->getObjectType());
-      return expr;
-    }
-  }
-
-  // If we already have an rvalue, we're done, otherwise emit a load.
-  if (auto lvalueTy = getType(expr)->getAs<LValueType>()) {
-    propagateLValueAccessKind(expr, AccessKind::Read);
-    return cacheType(new (getASTContext())
-                         LoadExpr(expr, lvalueTy->getObjectType()));
-  }
-
-  return expr;
+  auto &tc = getTypeChecker();
+  return tc.coerceToRValue(expr,
+                           [&](Expr *expr) {
+                             return getType(expr);
+                           },
+                           [&](Expr *expr, Type type) {
+                             expr->setType(type);
+                             cacheType(expr);
+                           });
 }
 
 /// Emit the fixes computed as part of the solution, returning true if we were
