@@ -160,3 +160,24 @@ _ = """
 // CHECK: "hello"
 // CHECK: "world"
 // CHECK: "\nabc"
+
+_ = "hello\("""
+            "world'
+            """)abc"
+// CHECK: "hello"
+// CHECK: "\"world'"
+// CHECK: "abc"
+
+_ = """
+    welcome
+    \(
+      "to\("""
+           Swift
+           """)"
+    )
+    !
+    """
+// CHECK: "welcome\n"
+// CHECK: "to"
+// CHECK: "Swift"
+// CHECK: "\n!"

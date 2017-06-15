@@ -106,3 +106,17 @@ Three B
           // expected-error@-14{{unexpected space in indentation of next 4 lines in multi-line string literal}}
           // expected-note@-7{{should match tab here}}
           // expected-note@-16{{change indentation of these lines to match closing delimiter}} {{1-1=		}} {{1-1=		}} {{1-1=		}} {{1-1=		}}
+
+_ = "hello\("""
+            world
+            """
+            )!"
+            // expected-error@-4 {{unterminated string literal}}
+            // expected-error@-2 {{unterminated string literal}}
+
+_ = "hello\(
+            """
+            world
+            """)!"
+            // expected-error@-4 {{unterminated string literal}}
+            // expected-error@-2 {{unterminated string literal}}
