@@ -169,6 +169,7 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
     encodedAs: sourceEncoding) { p, _ in try body(p) }
 }
 
+@_semantics("optimize.sil.specialize.generic.partial.never")
 internal func _withCStringAndLength<
   Source : Collection,
   SourceEncoding : Unicode.Encoding, 
