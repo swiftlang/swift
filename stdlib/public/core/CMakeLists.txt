@@ -38,6 +38,7 @@ set(SWIFTLIB_ESSENTIAL
   CharacterUnicodeScalars.swift
   CocoaArray.swift
   Codable.swift
+  Counted.swift.gyb
   Collection.swift
   CollectionAlgorithms.swift.gyb
   Comparable.swift
@@ -60,6 +61,8 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
+  ForwardingWrapper.swift.gyb
+  Function.swift
   Hashable.swift
   HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because

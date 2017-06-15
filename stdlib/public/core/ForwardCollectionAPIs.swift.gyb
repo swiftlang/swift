@@ -1,0 +1,171 @@
+//===--- ForwardCollectionAPIs.swift.gyb ----------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%{
+# Not meant as a standalone gyb file, but to be expanded inline in others.
+# Usage as follows:
+#   % import gyb
+#   ...
+#   extension SomeBidirectionalCollectionWrapper {
+#    ${gyb.expand(
+#       'CollectionForwarding.swift.gyb', Element='Base.Iterator.Element')}
+#    func _wrap(_ i: BaseIndex)->Index { ... }
+#    func _unwrap(_ i: Index)->BaseIndex { ... }
+#   }
+#
+#
+# Compute defaults for optional arguments
+bidirectional = locals().get('bidirectional', True)
+element_only = locals().get('element_only', False)
+wrap_index = locals().get('wrap_index', '_wrap')
+unwrap_index = locals().get('unwrap_index', '_unwrap')
+forward = locals().get('forward', lambda x: x)
+bounds_check_access = locals().get('bounds_check_access', False)
+nonmutating = locals().get('nonmutating', False)
+Element = locals().get('Element')
+bindings = locals()
+def fwd(s):
+  return forward(s % bindings)
+}%
+
+% if not element_only:
+
+public var startIndex: Index { ${fwd('''
+  return %(wrap_index)s(%(base)s.startIndex)
+''')} }
+
+public var endIndex: Index { ${fwd('''
+  return %(wrap_index)s(%(base)s.endIndex)
+''')} }
+
+public func index(after i: Index) -> Index { ${fwd('''
+  return %(wrap_index)s(%(base)s.index(after: %(unwrap_index)s(i)))
+''')} }
+
+public func formIndex(after i: inout Index) { ${fwd('''
+  var i1 = %(unwrap_index)s(i)
+  %(base)s.formIndex(after: &i1)
+  i = %(wrap_index)s(i1)
+''')} }
+
+% if bidirectional:
+
+public func index(before i: Index) -> Index { ${fwd('''
+  return %(wrap_index)s(%(base)s.index(before: %(unwrap_index)s(i)))
+''')} }
+
+public func formIndex(before i: inout Index) { ${fwd('''
+  var i1 = %(unwrap_index)s(i)
+  %(base)s.formIndex(before: &i1)
+  i = %(wrap_index)s(i1)
+''')} }
+
+% end
+
+public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) { ${fwd('''
+  var i1 = %(unwrap_index)s(i)
+  %(base)s.formIndex(&i1, offsetBy: numericCast(n))
+  i = %(wrap_index)s(i1)
+''')} }
+
+public func index(_ i: Index, offsetBy n: IndexDistance) -> Index { ${fwd('''
+  return %(wrap_index)s(%(base)s.index(%(unwrap_index)s(i),
+      offsetBy: numericCast(n)))
+''')} }
+
+public func index(
+  _ i: Index,
+  offsetBy n: IndexDistance,
+  limitedBy limit: Index
+) -> Index? { ${fwd('''
+  guard let r = %(base)s.index(
+    %(unwrap_index)s(i),
+    offsetBy: numericCast(n),
+    limitedBy: %(unwrap_index)s(limit)
+  ) else { return nil }
+  return %(wrap_index)s(r)
+''')} }
+
+public func distance(from i: Index, to j: Index) -> IndexDistance { ${fwd('''
+  return numericCast(
+    %(base)s.distance(from: %(unwrap_index)s(i), to: %(unwrap_index)s(j)))
+''')} }
+
+public var count: IndexDistance { ${fwd('''
+  return numericCast(%(base)s.count)
+''')} }
+
+public var underestimatedCount: Int { ${fwd('''
+  return %(base)s.underestimatedCount
+''')} }
+
+% end
+
+% if Element is not None:
+
+public subscript(i: Index) -> ${Element} {
+% if bounds_check_access:
+  _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+% end
+${fwd('''
+  return %(base)s[%(unwrap_index)s(i)]
+''')} }
+
+public func withExistingUnsafeBuffer<R>(
+  _ body: (UnsafeBufferPointer<${Element}>) throws -> R
+) rethrows -> R? { ${fwd('''
+  return try %(base)s.withExistingUnsafeBuffer(body)
+''')} }
+
+/*
+% if not nonmutating:
+public mutating func _tryToReplaceSubrange<C: Collection>(
+  _ target: Range<Index>, with replacement: C
+) -> Bool
+where C.Iterator.Element == ${Element} { ${fwd('''
+  return %(base)s._tryToReplaceSubrange(
+    %(unwrap_index)s(target.lowerBound)
+    ..< %(unwrap_index)s(target.upperBound), with: replacement)
+''')} }
+% end
+*/
+
+public var first: ${Element}? { ${fwd('''
+  return %(base)s.first 
+''')} }
+
+% if bidirectional:
+
+public var last: ${Element}? { ${fwd('''
+  return %(base)s.last 
+''')} }
+
+% end
+
+public func map<T>(_ transform: (${Element}) throws -> T) rethrows -> [T] { ${fwd('''
+  return try %(base)s.map(transform)
+''')} }
+
+public func filter(
+  _ includedInResult: (${Element}) throws -> Bool
+) rethrows -> [${Element}] { ${fwd('''
+  return try %(base)s.filter(includedInResult)
+''')} }
+
+public func forEach(_ body: (${Element}) throws -> Void) rethrows { ${fwd('''
+  try %(base)s.forEach(body)
+''')} }
+
+public func _copyToContiguousArray() -> ContiguousArray<${Element}> { ${fwd('''
+  return %(base)s._copyToContiguousArray()
+''')} }
+
+% end

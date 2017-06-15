@@ -297,6 +297,10 @@ public protocol _Indexable : _IndexableBase {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<_Element>) throws -> R
+  ) rethrows -> R?
 }
 
 /// A type that iterates over a collection using its indices.
@@ -992,6 +996,10 @@ public protocol Collection : _Indexable, Sequence
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
 }
 
 /// Default implementation for forward collections.

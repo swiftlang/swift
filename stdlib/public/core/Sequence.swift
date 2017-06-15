@@ -354,6 +354,19 @@ public protocol Sequence {
   /// - Complexity: O(1)
   var underestimatedCount: Int { get }
 
+  /// If there exists a contiguous memory buffer containing all elements in this
+  /// `Collection`, returns the result of calling `body` on that buffer.
+  ///
+  /// - Returns: the result of calling `body`, or `nil` if no such buffer
+  ///   exists.
+  ///
+  /// - Note: implementors should ensure that the lifetime of the memory
+  ///   persists throughout this call, typically by using
+  ///   `withExtendedLifetime(self)`.
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
+  
   /// Returns an array containing the results of mapping the given closure
   /// over the sequence's elements.
   ///
@@ -1041,6 +1054,13 @@ extension Sequence {
     return 0
   }
 
+  @_inlineable
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R? {
+    return nil // by default, sequences have no contiguous storage.
+  }
+  
   @_inlineable
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R

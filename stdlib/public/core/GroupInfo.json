@@ -42,6 +42,8 @@
   ],
   "Collection": [
     "Collection.swift",
+    "ContiguouslyStored.swift",
+    "Counted.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
@@ -149,6 +151,7 @@
   ],
   "Misc": [
     "AnyHashable.swift",
+    "Function.swift",
     "Interval.swift",
     "Hashing.swift",
     "SipHash.swift",
@@ -175,6 +178,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Hashable.swift",
-    "Codable.swift"
+    "Codable.swift",
+    "ForwardingWrapper.swift"
   ]
 }
