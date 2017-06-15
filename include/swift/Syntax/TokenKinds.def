@@ -24,6 +24,8 @@
 ///   POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
 ///   POUND_CONFIG(kw)
 /// PUNCTUATOR(name, str)
+/// LITERAL(name)
+/// MISC(name)
 ///
 //===----------------------------------------------------------------------===//
 
@@ -106,6 +108,18 @@
 ///                such as '"("' or '"->"'.
 #ifndef PUNCTUATOR
 #define PUNCTUATOR(name, str)
+#endif
+
+/// LITERAL(name)
+///   Tokens representing literal values, e.g. 'integer_literal'.
+#ifndef LITERAL
+#define LITERAL(name)
+#endif
+
+/// MISC(name)
+///   Miscellaneous tokens, e.g. 'eof' and 'unknown'.
+#ifndef MISC
+#define MISC(name)
 #endif
 
 // Keywords that start decls.
@@ -253,6 +267,23 @@ POUND_KEYWORD(column)
 POUND_KEYWORD(function)
 POUND_KEYWORD(dsohandle)
 
+// Single-token literals
+LITERAL(integer_literal)
+LITERAL(floating_literal)
+LITERAL(string_literal)
+
+// Miscellaneous tokens.
+MISC(unknown)
+MISC(eof)
+MISC(code_complete)
+MISC(identifier)
+MISC(oper_binary_unspaced)   // "x+y"
+MISC(oper_binary_spaced)     // "x + y"
+MISC(oper_postfix)
+MISC(oper_prefix)
+MISC(dollarident)
+MISC(sil_local_name)       // %42 in SIL mode.
+MISC(comment)
 
 #undef KEYWORD
 #undef SWIFT_KEYWORD
@@ -266,3 +297,5 @@ POUND_KEYWORD(dsohandle)
 #undef POUND_OLD_OBJECT_LITERAL
 #undef POUND_CONFIG
 #undef PUNCTUATOR
+#undef LITERAL
+#undef MISC
