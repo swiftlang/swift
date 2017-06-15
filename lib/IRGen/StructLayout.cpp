@@ -189,6 +189,13 @@ void StructLayoutBuilder::addHeapHeader() {
   StructFields.push_back(IGM.RefCountedStructTy);
 }
 
+void StructLayoutBuilder::addNSObjectHeader() {
+  assert(StructFields.empty() && "adding heap header at a non-zero offset");
+  CurSize = IGM.getPointerSize();
+  CurAlignment = IGM.getPointerAlignment();
+  StructFields.push_back(IGM.ObjCClassPtrTy);
+}
+
 bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
                                     LayoutStrategy strategy) {
   // Track whether we've added any storage to our layout.
