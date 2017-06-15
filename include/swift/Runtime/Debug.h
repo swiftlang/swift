@@ -134,6 +134,56 @@ void dumpStackTraceEntry(unsigned index, void *framePC,
 LLVM_ATTRIBUTE_NOINLINE
 void printCurrentBacktrace(unsigned framesToSkip = 1);
 
+/// Debugger breakpoint ABI. This structure is passed to the debugger (and needs
+/// to be stable) and describes extra information about a fatal error or a
+/// non-fatal warning, which should be logged as a runtime issue. Please keep
+/// all integer values pointer-sized.
+struct _RuntimeErrorDetails {
+  // ABI version, needs to be "1" currently.
+  uintptr_t version;
+
+  // A short hyphenated string describing the type of the issue, e.g.
+  // "precondition-failed" or "exclusivity-violation".
+  const char *errorType;
+
+  // Description of the current thread's stack position.
+  const char *currentStackDescription;
+
+  // Address of some associated object (if there's any).
+  void *memoryAddress;
+
+  // A structure describing an extra thread (and its stack) that is related.
+  struct Thread {
+    const char *description;
+    uint64_t threadID;
+    uintptr_t numFrames;
+    void **frames;
+  };
+
+  // Number of extra threads (excluding the current thread) that are related,
+  // and the pointer to the array of extra threads.
+  uintptr_t numExtraThreads;
+  Thread *threads;
+
+  // Description of a related object (other than 'memoryAddress').
+  struct RelatedObject {
+    const char *description;
+    const char *filename;
+    uintptr_t line;
+    uintptr_t column;
+  };
+
+  // Number of extra source locations that are related, and the pointer to the
+  // array of them.
+  uintptr_t numRelatedObjects;
+  RelatedObject *relatedObjects;
+};
+
+/// Debugger hook. Calling this stops the debugger with a message and details
+/// about the issues.
+void _reportToDebugger(bool isFatal, const char *message,
+                      _RuntimeErrorDetails *details = nullptr);
+
 // namespace swift
 }
 

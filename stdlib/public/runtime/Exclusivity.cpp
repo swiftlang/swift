@@ -65,23 +65,6 @@ static const char *getAccessName(ExclusivityFlags flags) {
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void printConflictDetails(const char *oldAccessName, void *oldPC,
-                                 const char *newAccessName, void *newPC) {
-  fprintf(stderr, "Previous access (a %s) started at ", oldAccessName);
-  if (oldPC) {
-    dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
-    fprintf(stderr, " (0x%lx).\n", (uintptr_t)oldPC);
-  } else {
-    fprintf(stderr, "<unknown>.\n");
-  }
-
-  fprintf(stderr, "Current access (a %s) started at:\n", newAccessName);
-  // The top frame is in swift_beginAccess, don't print it.
-  constexpr unsigned framesToSkip = 2;
-  printCurrentBacktrace(framesToSkip);
-}
-
-LLVM_ATTRIBUTE_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
@@ -94,14 +77,52 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     return;
   }
 
-  fprintf(stderr,
-          "Simultaneous accesses to 0x%lx, but modification requires exclusive "
-          "access.\n",
-          (uintptr_t)pointer);
-  printConflictDetails(getAccessName(oldAction), oldPC,
-                       getAccessName(getAccessAction(newFlags)), newPC);
+  constexpr unsigned maxMessageLength = 100;
+  constexpr unsigned maxAccessDescriptionLength = 50;
+  char message[maxMessageLength];
+  snprintf(message, sizeof(message),
+           "Simultaneous accesses to 0x%lx, but modification requires "
+           "exclusive access",
+           (uintptr_t)pointer);
+  fprintf(stderr, "%s.\n", message);
 
-  if (isWarningOnly(newFlags)) {
+  char oldAccess[maxAccessDescriptionLength];
+  snprintf(oldAccess, sizeof(oldAccess),
+           "Previous access (a %s) started at", getAccessName(oldAction));
+  fprintf(stderr, "%s ", oldAccess);
+  if (oldPC) {
+    dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
+    fprintf(stderr, " (0x%lx).\n", (uintptr_t)oldPC);
+  } else {
+    fprintf(stderr, "<unknown>.\n");
+  }
+
+  char newAccess[maxAccessDescriptionLength];
+  snprintf(newAccess, sizeof(newAccess), "Current access (a %s) started at",
+           getAccessName(getAccessAction(newFlags)));
+  fprintf(stderr, "%s:\n", newAccess);
+  // The top frame is in swift_beginAccess, don't print it.
+  constexpr unsigned framesToSkip = 1;
+  printCurrentBacktrace(framesToSkip);
+
+  bool keepGoing = isWarningOnly(newFlags);
+
+  _RuntimeErrorDetails::Thread secondaryThread = {
+      .description = oldAccess,
+      .numFrames = 1,
+      .frames = &oldPC
+  };
+  _RuntimeErrorDetails details = {
+    .version = 1,
+    .errorType = "exclusivity-violation",
+    .currentStackDescription = newAccess,
+    .memoryAddress = pointer,
+    .numExtraThreads = 1,
+    .threads = &secondaryThread
+  };
+  _reportToDebugger(!keepGoing, message, &details);
+
+  if (keepGoing) {
     return;
   }
 
