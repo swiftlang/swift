@@ -14,28 +14,123 @@
 import Foundation
 
 #if os(iOS)
+@nonobjc
 @available(iOS 10.0, *)
 extension INSetProfileInCarIntent {
-  @nonobjc
-  public convenience init(
-    profileNumber: Int? = nil,
-    profileLabel: String? = nil,
-    defaultProfile: Int? = nil
-  ) {
-    self.init(
-      __profileNumber: profileNumber.map { NSNumber(value: $0) },
-      profileLabel: profileLabel,
-      defaultProfile: defaultProfile.map { NSNumber(value: $0) })
-  }
 
-  @nonobjc  
-  public final var profileNumber: Int? {
-    return __profileNumber?.intValue
-  }
+    @available(iOS 11.0, *)
+    public convenience init(profileNumber: Int? = nil, profileName: String? = nil, isDefaultProfile: Bool? = nil) {
+        self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileName, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) })
+    }
 
-  @nonobjc  
-  public final var defaultProfile: Int? {
-    return __defaultProfile?.intValue
-  }
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(defaultProfile: Int?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: nil, profileName: nil, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: nil, profileLabel: nil, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileLabel: String?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: nil, profileName: profileLabel, defaultProfile: nil)
+        }
+        else {
+            self.init(__profileNumber: nil, profileLabel: profileLabel, defaultProfile: nil)
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileLabel: String?, defaultProfile: Int?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: nil, profileName: profileLabel, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: nil, profileLabel: profileLabel, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileLabel: String?, isDefaultProfile: Bool?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: nil, profileName: profileLabel, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: nil, profileLabel: profileLabel, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileName: String?, defaultProfile: Int?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: nil, profileName: profileName, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: nil, profileLabel: profileName, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileNumber: Int?, defaultProfile: Int?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: nil, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileLabel: nil, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileNumber: Int?, profileLabel: String?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileLabel, defaultProfile: nil)
+        }
+        else {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileLabel: profileLabel, defaultProfile: nil)
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileNumber: Int?, profileLabel: String?, defaultProfile: Int?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileLabel, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileLabel: profileLabel, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileNumber: Int?, profileLabel: String?, isDefaultProfile: Bool?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileLabel, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileLabel: profileLabel, defaultProfile: isDefaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS, deprecated: 11.0, renamed: "init(profileNumber:profileName:isDefaultProfile:)")
+    public convenience init(profileNumber: Int?, profileName: String?, defaultProfile: Int?) {
+        if #available(iOS 10.3, *) {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileName: profileName, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+        else {
+            self.init(__profileNumber: profileNumber.map { NSNumber(value: $0) }, profileLabel: profileName, defaultProfile: defaultProfile.map { NSNumber(value: $0) })
+        }
+    }
+
+    @available(iOS 11.0, *)
+    public final var isDefaultProfile: Bool? {
+        return __defaultProfile?.boolValue
+    }
+
+    @available(iOS 10.0, *)
+    public final var profileNumber: Int? {
+        return __profileNumber?.intValue
+    }
 }
 #endif
