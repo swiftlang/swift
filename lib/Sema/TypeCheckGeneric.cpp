@@ -45,11 +45,6 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
   return DependentMemberType::get(baseTy, ref->getIdentifier());
 }
 
-Type DependentGenericTypeResolver::resolveSelfAssociatedType(
-       Type selfTy, AssociatedTypeDecl *assocType) {
-  return DependentMemberType::get(selfTy, assocType);
-}
-
 Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return dc->getSelfInterfaceType();
 }
@@ -81,11 +76,6 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   SourceRange baseRange,
                                   ComponentIdentTypeRepr *ref) {
   llvm_unreachable("Dependent type after archetype substitution");
-}
-
-Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
-       Type selfTy, AssociatedTypeDecl *assocType) {
-  llvm_unreachable("Dependent type after archetype substitution");  
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -127,13 +117,6 @@ Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
     Type baseTy, DeclContext *DC, SourceRange baseRange,
     ComponentIdentTypeRepr *ref) {
   return DependentMemberType::get(baseTy, ref->getIdentifier());
-}
-
-Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
-    Type selfTy, AssociatedTypeDecl *assocType) {
-  assert(selfTy->isEqual(Proto->getSelfInterfaceType()));
-  (void)Proto;
-  return assocType->getDeclaredInterfaceType();
 }
 
 Type ProtocolRequirementTypeResolver::resolveTypeOfContext(DeclContext *dc) {
@@ -243,14 +226,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
     .highlight(baseRange);
   return ErrorType::get(TC.Context);
-}
-
-Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
-       Type selfTy, AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy,
-                                  ArchetypeResolutionKind::CompleteWellFormed)
-           ->getNestedType(assocType, Builder)
-           ->getDependentType(GenericParams, /*allowUnresolved=*/false);
 }
 
 Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {

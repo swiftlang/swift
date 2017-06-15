@@ -479,14 +479,6 @@ Type TypeChecker::resolveTypeInContext(
     return typeDecl->getDeclaredInterfaceType();
   }
 
-  // If we started from a protocol and found an associated type member
-  // of a (possibly inherited) protocol, resolve it via the resolver.
-  if (auto *assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-    if (selfType->isTypeParameter())
-      return resolver->resolveSelfAssociatedType(
-          selfType, assocType);
-  }
-
   // Finally, substitute the base type into the member type.
   return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
                                  selfType);

@@ -60,17 +60,6 @@ public:
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref) = 0;
 
-  /// Resolve an unqualified reference to an associated type of the 'Self' type
-  /// of a protocol.
-  ///
-  /// \param selfTy The base of the member access.
-  /// \param assocType The associated type.
-  ///
-  /// \returns A type that refers to the dependent member type, or an error
-  /// type if such a reference is ill-formed.
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType) = 0;
-
   /// Resolve the self type within the given context.
   ///
   /// \param dc A context in which type checking occurs, which must be a type
@@ -108,9 +97,6 @@ public:
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
 
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
-
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
@@ -141,9 +127,6 @@ public:
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
 
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
-
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
@@ -170,9 +153,6 @@ public:
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
@@ -206,9 +186,6 @@ public:
                                           DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
-
-  virtual Type resolveSelfAssociatedType(Type selfTy,
-                                         AssociatedTypeDecl *assocType);
 
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
