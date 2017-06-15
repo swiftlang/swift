@@ -614,8 +614,11 @@ internal struct RawKeyPathComponent {
     static var outOfLineOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
     }
-    static var unresolvedOffsetPayload: UInt32 {
-      return _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload
+    static var unresolvedFieldOffsetPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
+    }
+    static var unresolvedIndirectOffsetPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
     }
     static var computedMutatingFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
@@ -1613,9 +1616,12 @@ internal func _getKeyPathClassAndInstanceSize(
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
     func popOffset() {
-      if header.payload == RawKeyPathComponent.Header.unresolvedOffsetPayload
+      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
         || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
         _ = buffer.pop(UInt32.self)
+      }
+      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+        _ = buffer.pop(Int.self)
       }
     }
 
@@ -1712,6 +1718,12 @@ internal func _instantiateKeyPathBuffer(
     count: origDestData.count - MemoryLayout<KeyPathBuffer.Header>.size)
 
   func pushDest<T>(_ value: T) {
+    // TODO: If key path patterns were better optimized to try to be constant-
+    // memory objects, then it might become profitable to try to avoid writes
+    // here in the case when the dest memory contains the value we want to write
+    // here so that we don't dirty memory. (In practice the current
+    // implementation will always dirty the page when the key path is
+    // instantiated.)
     _sanityCheck(_isPOD(T.self))
     var value2 = value
     let size = MemoryLayout<T>.size
@@ -1729,12 +1741,15 @@ internal func _instantiateKeyPathBuffer(
 
   // Instantiate components that need it.
   var base: Any.Type = rootType
+  // Some pattern forms are pessimistically larger than what we need in the
+  // instantiated key path. Keep track of this.
+  var shrinkage = 0
   while true {
     let componentAddr = destData.baseAddress.unsafelyUnwrapped
     let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
 
     func tryToResolveOffset() {
-      if header.payload == RawKeyPathComponent.Header.unresolvedOffsetPayload {
+      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
         // Look up offset in type metadata. The value in the pattern is the
         // offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
@@ -1746,6 +1761,21 @@ internal func _instantiateKeyPathBuffer(
         newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offset)
+        return
+      }
+
+      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+        // Look up offset in the indirectly-referenced variable we have a
+        // pointer.
+        let offsetVar = patternBuffer.pop(UnsafeRawPointer.self)
+        let offsetValue = UInt32(offsetVar.load(as: UInt.self))
+        // Rewrite the header for a resolved offset.
+        var newHeader = header
+        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        pushDest(newHeader)
+        pushDest(offsetValue)
+        shrinkage += MemoryLayout<UnsafeRawPointer>.size
+                   - MemoryLayout<UInt32>.size
         return
       }
 
@@ -1846,10 +1876,11 @@ internal func _instantiateKeyPathBuffer(
   }
 
   // We should have traversed both buffers.
-  _sanityCheck(patternBuffer.data.isEmpty && destData.isEmpty)
+  _sanityCheck(patternBuffer.data.isEmpty && destData.count == shrinkage)
 
   // Write out the header.
-  let destHeader = KeyPathBuffer.Header(size: origPatternBuffer.data.count,
+  let destHeader = KeyPathBuffer.Header(
+    size: origPatternBuffer.data.count - shrinkage,
     trivial: true, // TODO: nontrivial indexes
     hasReferencePrefix: endOfReferencePrefixComponent != nil)
 

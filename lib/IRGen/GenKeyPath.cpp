@@ -25,6 +25,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "ProtocolInfo.h"
+#include "StructLayout.h"
 #include "llvm/ADT/SetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
@@ -209,18 +210,10 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     auto &component = pattern->getComponents()[i];
     switch (auto kind = component.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
-      // Try to get a constant offset if we can.
       auto property = cast<VarDecl>(component.getStoredPropertyDecl());
-      llvm::Constant *offset;
-      bool isResolved;
-      std::tie(offset, isResolved)
-        = getPropertyOffsetOrIndirectOffset(loweredBaseTy, property);
-      offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
-      bool isStruct = (bool)loweredBaseTy.getStructOrBoundGenericStruct();
       
-      // If the projection is a statically known integer, try to pack it into
-      // the key path payload.
-      if (isResolved) {
+      auto addFixedOffset = [&](bool isStruct, llvm::Constant *offset) {
+        offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
         if (auto offsetInt = dyn_cast_or_null<llvm::ConstantInt>(offset)) {
           auto offsetValue = offsetInt->getValue().getZExtValue();
           if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
@@ -228,28 +221,87 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
               ? KeyPathComponentHeader::forStructComponentWithInlineOffset(offsetValue)
               : KeyPathComponentHeader::forClassComponentWithInlineOffset(offsetValue);
             fields.addInt32(header.getData());
-            break;
+            return;
           }
         }
-      
         auto header = isStruct
           ? KeyPathComponentHeader::forStructComponentWithOutOfLineOffset()
           : KeyPathComponentHeader::forClassComponentWithOutOfLineOffset();
         fields.addInt32(header.getData());
+        fields.add(offset);
+      };
+      
+      // For a struct stored property, we may know the fixed offset of the field,
+      // or we may need to fetch it out of the type's metadata at instantiation
+      // time.
+      if (loweredBaseTy.getStructOrBoundGenericStruct()) {
+        if (auto offset = emitPhysicalStructMemberFixedOffset(*this,
+                                                              loweredBaseTy,
+                                                              property)) {
+          // We have a known constant fixed offset.
+          addFixedOffset(/*struct*/ true, offset);
+          break;
+        }
         
-        fields.add(offset);
-      } else {
-        // Otherwise, stash the offset of the field offset within the metadata
-        // object, so we can pull it out at instantiation time.
-        // TODO: We'll also need a way to handle resilient field offsets, once
-        // field offset vectors no longer cover all fields in the type.
-        KeyPathComponentHeader header = isStruct
-          ? KeyPathComponentHeader::forStructComponentWithUnresolvedOffset()
-          : KeyPathComponentHeader::forClassComponentWithUnresolvedOffset();
+        // If the offset isn't fixed, try instead to get the field offset out
+        // of the type metadata at instantiation time.
+        auto fieldOffset = emitPhysicalStructMemberOffsetOfFieldOffset(
+                                                *this, loweredBaseTy, property);
+        fieldOffset = llvm::ConstantExpr::getTruncOrBitCast(fieldOffset,
+                                                            Int32Ty);
+        auto header = KeyPathComponentHeader::forStructComponentWithUnresolvedFieldOffset();
         fields.addInt32(header.getData());
-        fields.add(offset);
+        fields.add(fieldOffset);
+        break;
       }
-      break;
+      
+      // For a class, we may know the fixed offset of a field at compile time,
+      // or we may need to fetch it at instantiation time. Depending on the
+      // ObjC-ness and resilience of the class hierarchy, there might be a few
+      // different ways we need to go about this.
+      if (loweredBaseTy.getClassOrBoundGenericClass()) {
+        switch (getClassFieldAccess(*this, loweredBaseTy, property)) {
+        case FieldAccess::ConstantDirect: {
+          // Known constant fixed offset.
+          auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(*this,
+                                                                  loweredBaseTy,
+                                                                  property);
+          assert(offset && "no constant offset for ConstantDirect field?!");
+          addFixedOffset(/*struct*/ false, offset);
+          break;
+        }
+        case FieldAccess::NonConstantDirect: {
+          // A constant offset that's determined at class realization time.
+          // We have to load the offset from a global ivar.
+          auto header =
+            KeyPathComponentHeader::forClassComponentWithUnresolvedIndirectOffset();
+          fields.addInt32(header.getData());
+          auto offsetVar = getAddrOfFieldOffset(property, /*indirect*/ false,
+                                                NotForDefinition);
+          fields.add(cast<llvm::Constant>(offsetVar.getAddress()));
+          break;
+        }
+        case FieldAccess::ConstantIndirect: {
+          // An offset that depends on the instance's generic parameterization,
+          // but whose field offset is at a known vtable offset.
+          auto header =
+            KeyPathComponentHeader::forClassComponentWithUnresolvedFieldOffset();
+          fields.addInt32(header.getData());
+          auto fieldOffset =
+            getClassFieldOffset(*this, loweredBaseTy.getClassOrBoundGenericClass(),
+                                property);
+          fields.addInt32(fieldOffset.getValue());
+          break;
+        }
+        case FieldAccess::NonConstantIndirect:
+          // An offset that depends on the instance's generic parameterization,
+          // whose vtable offset is also unknown.
+          // TODO: This doesn't happen until class resilience is enabled.
+          llvm_unreachable("not implemented");
+        }
+        break;
+      }
+      llvm_unreachable("not struct or class");
     }
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty: {
