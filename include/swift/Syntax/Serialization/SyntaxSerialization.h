@@ -28,7 +28,6 @@ namespace swift {
 namespace json {
 
 /// Serialization traits for SourcePresence.
-/// This maps
 template <>
 struct ScalarEnumerationTraits<syntax::SourcePresence> {
   static void enumeration(json::Output &out, syntax::SourcePresence &value) {
