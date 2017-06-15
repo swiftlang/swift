@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -diagnostics-editor-mode
 
 protocol P1 {
+  @available(iOS, unavailable)
   func foo1()
   func foo2()
 }
