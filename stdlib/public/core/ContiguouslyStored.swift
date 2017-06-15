@@ -9,31 +9,31 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-public protocol ContiguouslyStoredCollection : RandomAccessCollection {
+public protocol _ContiguouslyStoredCollection : RandomAccessCollection {
   func withUnsafeBufferPointer<R>(
     _: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R
 }
 
-extension ContiguouslyStoredCollection {
+extension _ContiguouslyStoredCollection {
   @inline(__always)
-  public func withExistingUnsafeBuffer<R>(
+  public func _withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeBufferPointer(body)
   }
 }
 
-public protocol ContiguouslyStoredMutableCollection
-  : ContiguouslyStoredCollection, MutableCollection {
+public protocol _ContiguouslyStoredMutableCollection
+  : _ContiguouslyStoredCollection, MutableCollection {
   mutating func withUnsafeMutableBufferPointer<R>(
     _: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R
 }
 
-extension ContiguouslyStoredMutableCollection {
+extension _ContiguouslyStoredMutableCollection {
   @inline(__always)
-  public mutating func withExistingUnsafeMutableBuffer<R>(
+  public mutating func _withExistingUnsafeMutableBuffer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer(body)
@@ -52,7 +52,7 @@ extension ContiguouslyStoredMutableCollection {
   }
 }
 
-extension UnsafeBufferPointer : ContiguouslyStoredCollection {
+extension UnsafeBufferPointer : _ContiguouslyStoredCollection {
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer) throws -> R
   ) rethrows -> R {
@@ -60,12 +60,12 @@ extension UnsafeBufferPointer : ContiguouslyStoredCollection {
   }
 }
 
-extension UnsafeMutableBufferPointer : ContiguouslyStoredMutableCollection {
+extension UnsafeMutableBufferPointer : _ContiguouslyStoredMutableCollection {
   public mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer) throws -> R
   ) rethrows -> R {
     return try body(&self)
   }
 }
-extension Array : ContiguouslyStoredMutableCollection {  }
-extension ArraySlice : ContiguouslyStoredMutableCollection {  }
+extension Array : _ContiguouslyStoredMutableCollection {  }
+extension ArraySlice : _ContiguouslyStoredMutableCollection {  }

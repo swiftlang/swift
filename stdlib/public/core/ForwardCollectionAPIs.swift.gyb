@@ -119,10 +119,10 @@ ${fwd('''
   return %(base)s[%(unwrap_index)s(i)]
 ''')} }
 
-public func withExistingUnsafeBuffer<R>(
+public func _withExistingUnsafeBuffer<R>(
   _ body: (UnsafeBufferPointer<${Element}>) throws -> R
 ) rethrows -> R? { ${fwd('''
-  return try %(base)s.withExistingUnsafeBuffer(body)
+  return try %(base)s._withExistingUnsafeBuffer(body)
 ''')} }
 
 /*
