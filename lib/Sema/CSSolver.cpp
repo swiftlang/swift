@@ -2069,7 +2069,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // If there is more than one viable system, attempt to pick the best
   // solution.
   auto size = solutions.size();
-  if (size > 1) {
+  if (size > 1 &&
+      !Options.contains(ConstraintSystemFlags::ReturnAllDiscoveredSolutions)) {
     if (auto best = findBestSolution(solutions, /*minimize=*/false)) {
       if (*best != 0)
         solutions[0] = std::move(solutions[*best]);
