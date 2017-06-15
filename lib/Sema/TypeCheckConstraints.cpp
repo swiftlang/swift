@@ -2896,14 +2896,6 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
     return tryExpr;
   }
 
-  // Can't load from an inout value.
-  if (auto inoutExpr = dyn_cast<InOutExpr>(expr)) {
-    diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
-             exprTy->castTo<InOutType>()->getObjectType())
-      .fixItRemove(SourceRange(inoutExpr->getLoc()));
-    return coerceToRValue(inoutExpr->getSubExpr(), getType, setType);
-  }
-
   // Walk into tuples to update the subexpressions.
   if (auto tuple = dyn_cast<TupleExpr>(expr)) {
     bool anyChanged = false;
