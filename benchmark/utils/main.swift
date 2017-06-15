@@ -45,6 +45,7 @@ import DictTest
 import DictTest2
 import DictTest3
 import DictionaryBridge
+import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
 import DictionarySwap
@@ -181,6 +182,8 @@ addTo(&precommitTests, "Dictionary2OfObjects", run_Dictionary2OfObjects)
 addTo(&precommitTests, "Dictionary3", run_Dictionary3)
 addTo(&precommitTests, "Dictionary3OfObjects", run_Dictionary3OfObjects)
 addTo(&precommitTests, "DictionaryBridge", run_DictionaryBridge)
+addTo(&precommitTests, "DictionaryGroup", run_DictionaryGroup)
+addTo(&precommitTests, "DictionaryGroupOfObjects", run_DictionaryGroupOfObjects)
 addTo(&precommitTests, "DictionaryLiteral", run_DictionaryLiteral)
 addTo(&precommitTests, "DictionaryOfObjects", run_DictionaryOfObjects)
 addTo(&precommitTests, "DictionaryRemove", run_DictionaryRemove)
