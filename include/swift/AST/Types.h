@@ -2282,7 +2282,35 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
-
+  
+/// A call argument or parameter.
+struct CallArgParam {
+  /// The type of the argument or parameter. For a variadic parameter,
+  /// this is the element type.
+  Type Ty;
+  
+  // The label associated with the argument or parameter, if any.
+  Identifier Label;
+  
+  /// Whether the parameter has a default argument.  Not valid for arguments.
+  bool HasDefaultArgument = false;
+  
+  /// Parameter specific flags, not valid for arguments
+  ParameterTypeFlags parameterFlags = {};
+  
+  /// Whether the argument or parameter has a label.
+  bool hasLabel() const { return !Label.empty(); }
+  
+  /// Whether the parameter is varargs
+  bool isVariadic() const { return parameterFlags.isVariadic(); }
+  
+  /// Whether the parameter is autoclosure
+  bool isAutoClosure() const { return parameterFlags.isAutoClosure(); }
+  
+  /// Whether the parameter is escaping
+  bool isEscaping() const { return parameterFlags.isEscaping(); }
+};
+  
 /// AnyFunctionType - A function type has a single input and result, but
 /// these types may be tuples, for example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
@@ -2295,7 +2323,8 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
-  const Type Input;
+  const ArrayRef<CallArgParam> Input;
+  const Type RawInput;
   const Type Output;
 
 public:
@@ -2441,15 +2470,14 @@ public:
 
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Input, Type Output, RecursiveTypeProperties properties,
-                  const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
-    AnyFunctionTypeBits.ExtInfo = Info.Bits;
-  }
+                  ArrayRef<CallArgParam> Input, Type RawInput, Type Output,
+                  RecursiveTypeProperties properties,
+                  const ExtInfo &Info);
 
 public:
-
-  Type getInput() const { return Input; }
+  
+  const ArrayRef<CallArgParam> getParams() const { return Input; }
+  Type getInput() const { return RawInput; }
   Type getResult() const { return Output; }
 
   ExtInfo getExtInfo() const {
@@ -2533,41 +2561,14 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-
-/// A call argument or parameter.
-struct CallArgParam {
-  /// The type of the argument or parameter. For a variadic parameter,
-  /// this is the element type.
-  Type Ty;
-
-  // The label associated with the argument or parameter, if any.
-  Identifier Label;
-
-  /// Whether the parameter has a default argument.  Not valid for arguments.
-  bool HasDefaultArgument = false;
-
-  /// Parameter specific flags, not valid for arguments
-  ParameterTypeFlags parameterFlags = {};
-
-  /// Whether the argument or parameter has a label.
-  bool hasLabel() const { return !Label.empty(); }
-
-  /// Whether the parameter is varargs
-  bool isVariadic() const { return parameterFlags.isVariadic(); }
-
-  /// Whether the parameter is autoclosure
-  bool isAutoClosure() const { return parameterFlags.isAutoClosure(); }
-
-  /// Whether the parameter is escaping
-  bool isEscaping() const { return parameterFlags.isEscaping(); }
-};
-
+  
 /// Break an argument type into an array of \c CallArgParams.
 ///
 /// \param type The type to decompose.
 /// \param argumentLabels The argument labels to use.
 SmallVector<CallArgParam, 4>
-decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
+decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels,
+                 bool inAnyFunctionType = false);
 
 /// Break a parameter type into an array of \c CallArgParams.
 ///

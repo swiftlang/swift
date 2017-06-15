@@ -690,25 +690,34 @@ namespace {
     return nOperands;
   }
   
-  /// Return a pair, containing the total parameter count of a function, coupled
-  /// with the number of non-default parameters.
-  std::pair<size_t, size_t> getParamCount(ValueDecl *VD) {
-    auto fTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
-    assert(fTy && "attempting to count parameters of a non-function type");
+  /// Return a pair, containing the total parameter count of a function and
+  /// the number of non-default parameters.
+  std::pair<size_t, size_t> getParamCount(AnyFunctionType *fTy) {
+    auto inputTy = fTy->getParams();
+    size_t nOperands = 0;
+    if (inputTy.size() == 1
+        && !inputTy.front().hasLabel()
+        && inputTy.front().Ty->isTypeVariableOrMember()) {
+      nOperands = 1;
+    } else {
+      nOperands = inputTy.size();
+    }
     
-    auto inputTy = fTy->getInput();
-    size_t nOperands = getOperandCount(inputTy);
     size_t nNoDefault = 0;
-    
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      for (auto params : AFD->getParameterLists()) {
-        for (auto param : *params) {
-          if (!param->isDefaultArgument())
-            nNoDefault++;
+  
+    ArrayRef<CallArgParam> params = fTy->getParams();
+    while (true) {
+      for (auto &param : params) {
+        if (!param.HasDefaultArgument) {
+          nNoDefault++;
         }
       }
-    } else {
-      nNoDefault = nOperands;
+      
+      if (auto *nextFn = fTy->getResult()->getAs<AnyFunctionType>()) {
+        params = nextFn->getParams();
+      } else {
+        break;
+      }
     }
     
     return { nOperands, nNoDefault };
@@ -759,27 +768,27 @@ namespace {
       bool haveMultipleApplicableOverloads = false;
       
       for (auto VD : ODR->getDecls()) {
-        if (VD->getInterfaceType()->is<AnyFunctionType>()) {
-          auto nParams = getParamCount(VD);
-          
-          if (nArgs == nParams.first) {
-            if (haveMultipleApplicableOverloads) {
-              return;
-            } else {
-              haveMultipleApplicableOverloads = true;
-            }
+        auto *vTy = VD->getInterfaceType()->getAs<AnyFunctionType>();
+        if (!vTy) continue;
+        
+        auto nParams = getParamCount(vTy);
+        if (nArgs == nParams.first) {
+          if (haveMultipleApplicableOverloads) {
+            return;
+          } else {
+            haveMultipleApplicableOverloads = true;
           }
         }
       }
       
       // Determine whether the given declaration is favored.
       auto isFavoredDecl = [&](ValueDecl *value) -> bool {
-        auto valueTy = value->getInterfaceType();
+        auto valueTy = value->getInterfaceType()->getAs<AnyFunctionType>();
         
-        if (!valueTy->is<AnyFunctionType>())
+        if (!valueTy)
           return false;
 
-        auto paramCount = getParamCount(value);
+        auto paramCount = getParamCount(valueTy);
         
         return nArgs == paramCount.first ||
                nArgs == paramCount.second;
