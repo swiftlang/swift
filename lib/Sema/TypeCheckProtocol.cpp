@@ -2654,6 +2654,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.PrintDocumentationComments = false;
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
+    Options.ExcludeAttrList.push_back(DAK_Available);
     Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
