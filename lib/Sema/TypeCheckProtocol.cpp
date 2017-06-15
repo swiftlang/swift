@@ -5453,20 +5453,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   }
 
   // If we're using this conformance, note that.
-  if (options.contains(ConformanceCheckFlags::Used) &&
-      lookupResult->isConcrete()) {
-    auto concrete = lookupResult->getConcrete();
-    auto normalConf = concrete->getRootNormalConformance();
-
-    // If the conformance is incomplete, queue it for completion.
-    if (normalConf->isIncomplete())
-      UsedConformances.insert(normalConf);
-
-    // Record the usage of this conformance in the enclosing source
-    // file.
-    if (auto sf = DC->getParentSourceFile()) {
-      sf->addUsedConformance(normalConf);
-    }
+  if (options.contains(ConformanceCheckFlags::Used)) {
+    markConformanceUsed(*lookupResult, DC);
   }
 
   // When requested, print the conformance access path used to find this
@@ -5527,6 +5515,24 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   auto conformance = conformsToProtocol(T, Proto, DC, options, ComplainLoc);
   return conformance ? ConformsToProtocolResult::success(*conformance)
                      : ConformsToProtocolResult::failure();
+}
+
+void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
+                                      DeclContext *dc) {
+  if (conformance.isAbstract()) return;
+
+  auto normalConformance =
+    conformance.getConcrete()->getRootNormalConformance();
+
+  if (normalConformance->isComplete()) return;
+
+  UsedConformances.insert(normalConformance);
+
+  // Record the usage of this conformance in the enclosing source
+  // file.
+  if (auto sf = dc->getParentSourceFile()) {
+    sf->addUsedConformance(normalConformance);
+  }
 }
 
 Optional<ProtocolConformanceRef>
