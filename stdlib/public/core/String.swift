@@ -130,10 +130,13 @@ extension _SwiftStringView {
 
 extension StringProtocol {
   internal var _ephemeralString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._ephemeralContent
+    @inline(__always)
+    get {
+      if _fastPath(self is _SwiftStringView) {
+        return (self as! _SwiftStringView)._ephemeralContent
+      }
+      return String(String.CharacterView(self))
     }
-    return String(String.CharacterView(self))
   }
 
   internal var _persistentString : String {
