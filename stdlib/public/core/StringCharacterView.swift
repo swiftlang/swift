@@ -344,6 +344,14 @@ extension String.CharacterView : BidirectionalCollection {
       //   0xAC00–0xD7AF
       case 0xac00...0xd7af: return true
 
+      // Common general use punctuation, excluding extenders:
+      //   0x2010-0x2029
+      case 0x2010...0x2029: return true
+
+      // CJK punctuation characters, excluding extenders:
+      //   0x3000-0x3029
+      case 0x3000...0x3029: return true
+
       default: return false
       }
     }
