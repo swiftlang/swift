@@ -1747,7 +1747,13 @@ public:
 
   /// \brief Coerce the given expression to materializable type, if it
   /// isn't already.
-  Expr *coerceToMaterializable(Expr *expr);
+  Expr *coerceToMaterializable(Expr *expr,
+                               llvm::function_ref<Type(Expr *)> getType
+                                 = [](Expr *expr) { return expr->getType(); },
+                               llvm::function_ref<void(Expr *, Type)> setType
+                                 = [](Expr *expr, Type type) {
+                                     expr->setType(type);
+                               });
 
   /// Require that the library intrinsics for working with Optional<T>
   /// exist.
