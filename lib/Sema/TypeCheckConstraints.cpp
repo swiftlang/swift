@@ -2856,13 +2856,15 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
   return true;
 }
 
-Expr *TypeChecker::coerceToRValue(Expr *expr) {
+Expr *TypeChecker::coerceToRValue(Expr *expr,
+                               llvm::function_ref<Type(Expr *)> getType,
+                               llvm::function_ref<void(Expr *, Type)> setType) {
+  Type exprTy = getType(expr);
+
   // If expr has no type, just assume it's the right expr.
-  if (!expr->getType())
+  if (!exprTy)
     return expr;
-  
-  Type exprTy = expr->getType();
-  
+
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())
     return expr;
@@ -2870,25 +2872,27 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
   // Load lvalues.
   if (auto lvalue = exprTy->getAs<LValueType>()) {
     expr->propagateLValueAccessKind(AccessKind::Read);
-    return new (Context) LoadExpr(expr, lvalue->getObjectType());
+    auto result = new (Context) LoadExpr(expr, lvalue->getObjectType());
+    setType(result, lvalue->getObjectType());
+    return result;
   }
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
-    auto sub = coerceToRValue(paren->getSubExpr());
+    auto sub =  coerceToRValue(paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    paren->setType(sub->getType());
+    setType(paren, getType(sub));
     return paren;
   }
 
   // Walk into 'try' and 'try!' expressions to update the subexpression.
   if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
-    auto sub = coerceToRValue(tryExpr->getSubExpr());
+    auto sub = coerceToRValue(tryExpr->getSubExpr(), getType, setType);
     tryExpr->setSubExpr(sub);
-    if (isa<OptionalTryExpr>(tryExpr) && !sub->getType()->hasError())
-      tryExpr->setType(OptionalType::get(sub->getType()));
+    if (isa<OptionalTryExpr>(tryExpr) && !getType(sub)->hasError())
+      setType(tryExpr, OptionalType::get(getType(sub)));
     else
-      tryExpr->setType(sub->getType());
+      setType(tryExpr, getType(sub));
     return tryExpr;
   }
 
@@ -2897,11 +2901,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
     bool anyChanged = false;
     for (auto &elt : tuple->getElements()) {
       // Materialize the element.
-      auto oldType = elt->getType();
-      elt = coerceToRValue(elt);
+      auto oldType = getType(elt);
+      elt = coerceToRValue(elt, getType, setType);
 
       // If the type changed at all, make a note of it.
-      if (elt->getType().getPointer() != oldType.getPointer()) {
+      if (getType(elt).getPointer() != oldType.getPointer()) {
         anyChanged = true;
       }
     }
@@ -2911,11 +2915,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(tuple->getElements().size());
       for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-        Type type = tuple->getElement(i)->getType();
+        Type type = getType(tuple->getElement(i));
         Identifier name = tuple->getElementName(i);
         elements.push_back(TupleTypeElt(type, name));
       }
-      tuple->setType(TupleType::get(elements, Context));
+      setType(tuple, TupleType::get(elements, Context));
     }
 
     return tuple;

@@ -733,8 +733,6 @@ NOTE(previous_precedence_group_decl,none,
 
 ERROR(tuple_conversion_not_expressible,none,
       "cannot express tuple conversion %0 to %1", (Type, Type))
-ERROR(load_of_explicit_lvalue,none,
-      "%0 variable is not being passed by reference", (Type))
 
 //------------------------------------------------------------------------------
 // Expression Type Checking Errors
