@@ -188,9 +188,8 @@ int doDumpTokenSyntax(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-
   std::vector<std::pair<RC<syntax::TokenSyntax>,
-  syntax::AbsolutePosition>> Tokens;
+                        syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
     return EXIT_FAILURE;
@@ -210,7 +209,7 @@ int doFullParseRoundTrip(const StringRef InputFilename) {
 
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
   std::vector<std::pair<RC<syntax::TokenSyntax>,
-              syntax::AbsolutePosition>> Tokens;
+                        syntax::AbsolutePosition>> Tokens;
 
   getSyntaxTree(InputFilename, TopLevelDecls, Tokens);
 
@@ -229,7 +228,7 @@ int doSerializeRawTree(const StringRef InputFilename) {
 
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
   std::vector<std::pair<RC<syntax::TokenSyntax>,
-  syntax::AbsolutePosition>> Tokens;
+                        syntax::AbsolutePosition>> Tokens;
 
   getSyntaxTree(InputFilename, TopLevelDecls, Tokens);
 
