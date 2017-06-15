@@ -676,13 +676,21 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
   if (SILValue Val = getProjectBoxMappedVal(SEAI->getOperand())) {
     // Loads of a struct_element_addr of an argument get replaced with a
     // struct_extract of the new passed in value. The value should be borrowed
-    // already.
+    // already, so we can just extract the value.
     SILBuilderWithPostProcess<ClosureCloner, 1> B(this, LI);
     assert(B.getFunction().hasUnqualifiedOwnership() ||
            Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
-    SILValue V =
+    Val =
         B.emitStructExtract(LI->getLoc(), Val, SEAI->getField(), LI->getType());
-    ValueMap.insert(std::make_pair(LI, V));
+
+    // If we were performing a load [copy], then we need to a perform a copy
+    // here since when cloning, we do not eliminate the destroy on the copied
+    // value.
+    if (LI->getFunction()->hasQualifiedOwnership()
+        && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      Val = getBuilder().createCopyValue(LI->getLoc(), Val);
+    }
+    ValueMap.insert(std::make_pair(LI, Val));
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);
@@ -708,7 +716,7 @@ static bool isNonMutatingLoad(SILInstruction *I) {
 static bool
 isNonMutatingCapture(SILArgument *BoxArg) {
   SmallVector<ProjectBoxInst*, 2> Projections;
-  
+
   // Conservatively do not allow any use of the box argument other than a
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
@@ -731,7 +739,7 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // TODO: This seems overly limited.  Why not projections of tuples and other
   // stuff?  Also, why not recursive struct elements?  This should be a helper
   // function that mirrors isNonEscapingUse.
-  auto checkAddrUse = [](SILInstruction *AddrInst) {
+  auto isAddrUseMutating = [](SILInstruction *AddrInst) {
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(AddrInst)) {
       return all_of(SEAI->getUses(),
                     [](Operand *Op) -> bool {
@@ -743,17 +751,18 @@ isNonMutatingCapture(SILArgument *BoxArg) {
            || isa<MarkFunctionEscapeInst>(AddrInst)
            || isa<EndAccessInst>(AddrInst);
   };
+
   for (auto *Projection : Projections) {
     for (auto *UseOper : Projection->getUses()) {
       if (auto *Access = dyn_cast<BeginAccessInst>(UseOper->getUser())) {
         for (auto *AccessUseOper : Access->getUses()) {
-          if (!checkAddrUse(AccessUseOper->getUser()))
+          if (!isAddrUseMutating(AccessUseOper->getUser()))
             return false;
         }
         continue;
       }
 
-      if (!checkAddrUse(UseOper->getUser()))
+      if (!isAddrUseMutating(UseOper->getUser()))
         return false;
     }
   }
