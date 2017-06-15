@@ -48,6 +48,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_CLOSURESCOPE_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_CLOSURESCOPE_H
 
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "llvm/ADT/SmallSet.h"
@@ -120,6 +121,8 @@ public:
     return S->getKind() == AnalysisKind::ClosureScope;
   }
 
+  SILModule *getModule() const { return M; }
+
   // Return true if the given function is the parent scope for any closures.
   bool isClosureScope(SILFunction *scopeFunc);
 
@@ -155,6 +158,24 @@ public:
 
 protected:
   ClosureScopeData *getOrComputeScopeData();
+};
+
+// ClosureScopeAnalysis utility for visiting functions top down in closure scope
+// order.
+class TopDownClosureFunctionOrder {
+  ClosureScopeAnalysis *CSA;
+
+  llvm::SmallSet<SILFunction *, 16> visited;
+
+  BlotSetVector<SILFunction *> closureWorklist;
+
+public:
+  TopDownClosureFunctionOrder(ClosureScopeAnalysis *CSA) : CSA(CSA) {}
+
+  // Visit all functions in a module, visiting each closure scope function
+  // before
+  // the closure function itself.
+  void visitFunctions(std::function<void(SILFunction *)> visitor);
 };
 
 } // end namespace swift
