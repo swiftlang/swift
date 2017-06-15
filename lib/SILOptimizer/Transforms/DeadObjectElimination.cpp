@@ -36,6 +36,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Utils/IndexTrie.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -276,50 +277,6 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users) {
 //===----------------------------------------------------------------------===//
 //                     NonTrivial DeadObject Elimination
 //===----------------------------------------------------------------------===//
-
-namespace {
-// Trie node representing a sequence of unsigned integer indices.
-class IndexTrieNode {
-  static const unsigned RootIdx = ~0U;
-  unsigned Index;
-  llvm::SmallVector<IndexTrieNode*, 8> Children;
-
-public:
-  IndexTrieNode(): Index(RootIdx) {}
-
-  explicit IndexTrieNode(unsigned V): Index(V) {}
-
-  IndexTrieNode(IndexTrieNode &) =delete;
-  IndexTrieNode &operator=(const IndexTrieNode&) =delete;
-
-  ~IndexTrieNode() {
-    for (auto *N : Children)
-      delete N;
-  }
-
-  bool isRoot() const { return Index == RootIdx; }
-
-  bool isLeaf() const { return Children.empty(); }
-
-  unsigned getIndex() const { return Index; }
-
-  IndexTrieNode *getChild(unsigned Idx) {
-    assert(Idx != RootIdx);
-
-    auto I = std::lower_bound(Children.begin(), Children.end(), Idx,
-                              [](IndexTrieNode *a, unsigned i) {
-                                return a->Index < i;
-                              });
-    if (I != Children.end() && (*I)->Index == Idx)
-      return *I;
-    auto *N = new IndexTrieNode(Idx);
-    Children.insert(I, N);
-    return N;
-  }
-
-  ArrayRef<IndexTrieNode*> getChildren() const { return Children; }
-};
-} // end anonymous namespace
 
 namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
