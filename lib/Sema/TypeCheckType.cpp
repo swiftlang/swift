@@ -252,12 +252,13 @@ findDeclContextForType(TypeChecker &TC,
     // protocol extension, always use the nominal type and
     // not the protocol 'Self' type.
     if (isa<NominalTypeDecl>(typeDecl))
-      return resolver->resolveTypeOfDecl(
-        DC->getAsNominalTypeOrNominalTypeExtensionContext());
+      return resolver->mapTypeIntoContext(
+        DC->getDeclaredInterfaceType());
 
     // Otherwise, we want the protocol 'Self' type for
     // substituting into alias types and associated types.
-    return resolver->resolveTypeOfContext(DC);
+    return resolver->mapTypeIntoContext(
+      DC->getSelfInterfaceType());
   };
 
   // First, check for direct containment in one of our parent contexts.
@@ -357,7 +358,8 @@ findDeclContextForType(TypeChecker &TC,
       }
     } else {
       // Get the substituted superclass type, if any.
-      superclass = resolver->resolveTypeOfContext(parentDC)->getSuperclass();
+      superclass = resolver->mapTypeIntoContext(
+        parentDC->getSelfInterfaceType())->getSuperclass();
 
       // Start with the type of the current context.
       auto fromNominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -435,12 +437,14 @@ Type TypeChecker::resolveTypeInContext(
         auto *parentNominal =
           parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
         if (parentNominal == nominalType)
-          return resolver->resolveTypeOfContext(parentDC);
+          return resolver->mapTypeIntoContext(
+            parentDC->getSelfInterfaceType());
         if (isa<ExtensionDecl>(parentDC)) {
           auto *extendedType = parentNominal;
           while (extendedType != nullptr) {
             if (extendedType == nominalType)
-              return resolver->resolveTypeOfDecl(extendedType);
+              return resolver->mapTypeIntoContext(
+                extendedType->getDeclaredInterfaceType());
             extendedType = extendedType->getParent()
               ->getAsNominalTypeOrNominalTypeExtensionContext();
           }
@@ -451,9 +455,9 @@ Type TypeChecker::resolveTypeInContext(
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-    return resolver->resolveGenericTypeParamType(
-        genericParam->getDeclaredInterfaceType()
-            ->castTo<GenericTypeParamType>());
+    assert(!selfType);
+    return resolver->mapTypeIntoContext(
+      genericParam->getDeclaredInterfaceType());
   }
 
   // Simple case -- the type is not nested inside of another type.
@@ -467,7 +471,8 @@ Type TypeChecker::resolveTypeInContext(
         return aliasDecl->getUnboundGenericType();
 
       // Otherwise, simply return the underlying type.
-      return resolver->resolveTypeOfDecl(aliasDecl);
+      return resolver->mapTypeIntoContext(
+        aliasDecl->getDeclaredInterfaceType());
     }
 
     // When a nominal type used outside its context, return the unbound
@@ -860,7 +865,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
         // Retrieve the nominal type and resolve it within this context.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-        auto type = resolver->resolveTypeOfContext(dc->getInnermostTypeContext());
+        auto type = resolver->mapTypeIntoContext(
+          dc->getInnermostTypeContext()->getSelfInterfaceType());
         if (type->hasError())
           return type;
 
@@ -1155,7 +1161,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
     // while the 'Self' type is more than just a reference to a TypeDecl.
 
-    auto selfType = resolver->resolveTypeOfContext(func->getDeclContext());
+    auto selfType = resolver->mapTypeIntoContext(
+      func->getDeclContext()->getSelfInterfaceType());
     return DynamicSelfType::get(selfType, TC.Context);
   }
 
