@@ -7513,38 +7513,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     return nullptr;
   }
 
-  for (auto &e : solution.Conformances) {
-    const auto &conformance = e.second;
-
-    auto anchor = expr;
-    if (auto *locator = e.first)
-      anchor = locator->getAnchor();
-
-    if (conformance.isAbstract())
-      continue;
-
-    auto *concrete = conformance.getConcrete();
-    // If conformance check is not yet complete let's re-check using 'Used'
-    // to require conformance check to happen.
-    if (concrete->getState() != ProtocolConformanceState::Complete) {
-      if (auto conformance = TC.conformsToProtocol(
-              concrete->getType(), concrete->getProtocol(), DC,
-              ConformanceCheckFlags::InExpression |
-                  ConformanceCheckFlags::Used)) {
-        if (conformance->isAbstract())
-          continue;
-
-        concrete = conformance->getConcrete();
-      }
-    }
-
-    if (concrete->isComplete() && concrete->isInvalid()) {
-      TC.diagnose(anchor->getLoc(), diag::type_does_not_conform,
-                  concrete->getType(),
-                  concrete->getProtocol()->getDeclaredType());
-      return nullptr;
-    }
-  }
+  // Mark any normal conformances used in this solution as "used".
+  for (auto &e : solution.Conformances)
+    TC.markConformanceUsed(e.second, DC);
 
   ExprRewriter rewriter(*this, solution, suppressDiagnostics, skipClosures);
   ExprWalker walker(rewriter);

@@ -1854,6 +1854,11 @@ public:
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
+  /// Mark the given protocol conformance as "used" from the given declaration
+  /// context.
+  void markConformanceUsed(ProtocolConformanceRef conformance,
+                           DeclContext *dc);
+
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
   /// type checker.

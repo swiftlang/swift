@@ -2473,19 +2473,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol:
-    if (TC.containsProtocol(type, protocol, DC,
-                            ConformanceCheckFlags::InExpression))
+    if (auto conformance =
+          TC.containsProtocol(type, protocol, DC,
+                              ConformanceCheckFlags::InExpression)) {
+      CheckedConformances.push_back({getConstraintLocator(locator),
+                                     *conformance});
       return SolutionKind::Solved;
+    }
     break;
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
-    auto conformance = TC.conformsToProtocol(
-        type, protocol, DC, ConformanceCheckFlags::InExpression);
-
-    if (conformance) {
-      CheckedConformances.push_back(
-          {getConstraintLocator(locator), std::move(*conformance)});
+    if (auto conformance =
+          TC.conformsToProtocol(type, protocol, DC,
+                                ConformanceCheckFlags::InExpression)) {
+      CheckedConformances.push_back({getConstraintLocator(locator),
+                                     *conformance});
       return SolutionKind::Solved;
     }
     break;
