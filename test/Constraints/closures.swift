@@ -366,8 +366,7 @@ func rdar20868864(_ s: String) {
 func r22058555() {
   var firstChar: UInt8 = 0
   "abc".withCString { chars in
-    // FIXME https://bugs.swift.org/browse/SR-4836: was {{cannot assign value of type 'Int8' to type 'UInt8'}}
-    firstChar = chars[0]  // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
+    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
   }
 }
 

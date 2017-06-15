@@ -55,7 +55,9 @@ func badDiagnostic1() {
 
   _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
       leftovers: Pizzas<ChiliFlakes>.NewYork(),
-      transformation: { _ in HotDog() }) // expected-error {{cannot convert value of type 'HotDog' to closure result type '_'}}
+      // FIXME: Quality of this diagnostic is related to the fact that failure analyzer
+      //        doesn't take advantage of informantion in constraint system such as failed constraint.
+      transformation: { _ in HotDog() }) // expected-error {{cannot convert value of type '(_) -> HotDog' to expected argument type '(_) -> _'}}
 }
 
 func badDiagnostic2() {
