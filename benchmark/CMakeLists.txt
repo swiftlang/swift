@@ -40,6 +40,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest2
     single-source/DictTest3
     single-source/DictionaryBridge
+    single-source/DictionaryGroup
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySwap
