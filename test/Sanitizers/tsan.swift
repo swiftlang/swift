@@ -5,6 +5,9 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: tsan_runtime
 
+// Make sure we can handle swifterror and don't bail during the LLVM
+// threadsanitizer pass.
+
 enum MyError : Error {
     case A
 }

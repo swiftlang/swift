@@ -21,10 +21,9 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
-
-#include <functional>
 
 using namespace swift;
 
@@ -103,7 +102,7 @@ llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
 
 static bool isTSanSupported(
     const llvm::Triple &Triple,
-    std::function<bool(std::string)> sanitizerRuntimeLibExists) {
+    llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists) {
 
   return Triple.isArch64Bit() && sanitizerRuntimeLibExists("tsan");
 }
@@ -111,7 +110,7 @@ static bool isTSanSupported(
 SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
     const llvm::Triple &Triple,
     DiagnosticEngine &Diags,
-    llvm::function_ref<bool(std::string)> sanitizerRuntimeLibExists) {
+    llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists) {
   SanitizerKind kind = SanitizerKind::None;
 
   // Find the sanitizer kind.

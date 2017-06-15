@@ -154,6 +154,6 @@ bool
 ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
                                      StringRef sanitizerName) const {
   // Assume no sanitizers are supported by default.
-  // This method should be overriden by an platform-specific subclass.
+  // This method should be overriden by a platform-specific subclass.
   return false;
 }

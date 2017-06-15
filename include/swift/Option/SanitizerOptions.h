@@ -14,8 +14,9 @@
 #define SWIFT_OPTIONS_SANITIZER_OPTIONS_H
 
 #include "swift/Basic/Sanitizers.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
@@ -34,7 +35,7 @@ SanitizerKind parseSanitizerArgValues(
        const llvm::opt::Arg *A,
        const llvm::Triple &Triple,
        DiagnosticEngine &Diag,
-       llvm::function_ref<bool(std::string)> sanitizerRuntimeLibExists);
+       llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists);
 
 /// \brief Parses a -sanitize-coverage= argument's value.
 llvm::SanitizerCoverageOptions
