@@ -202,21 +202,21 @@ func inoutSeparateTupleElements() {
 
 func inoutSameTupleElement() {
   var t = (1, 4)
-  takesTwoInouts(&t.0, &t.0) // no-error
+  takesTwoInouts(&t.0, &t.0)
   // expected-error@-1{{overlapping accesses to 't.0', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
 
 func inoutSameTupleNamedElement() {
   var t = (name1: 1, name2: 4)
-  takesTwoInouts(&t.name2, &t.name2) // no-error
+  takesTwoInouts(&t.name2, &t.name2)
   // expected-error@-1{{overlapping accesses to 't.name2', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
 
 func inoutSamePropertyInSameTuple() {
   var t = (name1: 1, name2: StructWithTwoStoredProp())
-  takesTwoInouts(&t.name2.f1, &t.name2.f1) // no-error
+  takesTwoInouts(&t.name2.f1, &t.name2.f1)
   // expected-error@-1{{overlapping accesses to 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}
 }
