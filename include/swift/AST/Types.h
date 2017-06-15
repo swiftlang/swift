@@ -2297,9 +2297,43 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 class AnyFunctionType : public TypeBase {
   const Type Input;
   const Type Output;
-
+  const unsigned NumParams;
+  
 public:
   using Representation = FunctionTypeRepresentation;
+  
+  class Param {
+  public:
+    explicit Param(Type t) : Ty(t), Label(Identifier()), Flags() {}
+    explicit Param(const TupleTypeElt &tte)
+      : Ty(tte.getType()), Label(tte.getName()),
+        Flags(tte.getParameterFlags()) {}
+    
+  private:
+    /// The type of the parameter. For a variadic parameter, this is the
+    /// element type.
+    Type Ty;
+    
+    // The label associated with the parameter, if any.
+    Identifier Label;
+    
+    /// Parameter specific flags.
+    ParameterTypeFlags Flags = {};
+    
+  public:
+    Type getType() const { return Ty; }
+    
+    Identifier getLabel() const { return Label; }
+    
+    /// Whether the parameter is varargs
+    bool isVariadic() const { return Flags.isVariadic(); }
+    
+    /// Whether the parameter is marked '@autoclosure'
+    bool isAutoClosure() const { return Flags.isAutoClosure(); }
+    
+    /// Whether the parameter is marked '@escaping'
+    bool isEscaping() const { return Flags.isEscaping(); }
+  };
   
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
@@ -2442,16 +2476,18 @@ public:
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, RecursiveTypeProperties properties,
-                  const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
+                  unsigned NumParams, const ExtInfo &Info)
+  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
+    NumParams(NumParams) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
   }
 
 public:
-
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
-
+  ArrayRef<AnyFunctionType::Param> getParams() const;
+  unsigned getNumParams() const { return NumParams; }
+  
   ExtInfo getExtInfo() const {
     return ExtInfo(AnyFunctionTypeBits.ExtInfo);
   }
@@ -2501,7 +2537,10 @@ END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 ///
 /// For example:
 ///   let x : (Float, Int) -> Int
-class FunctionType : public AnyFunctionType {
+class FunctionType final : public AnyFunctionType,
+    private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param> {
+  friend TrailingObjects;
+      
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result) {
@@ -2509,14 +2548,21 @@ public:
   }
 
   static FunctionType *get(Type Input, Type Result, const ExtInfo &Info);
-
+      
+      
+  // Retrieve the input parameters of this function type.
+  ArrayRef<AnyFunctionType::Param> getParams() const {
+    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  }
+      
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
   }
-  
+      
 private:
-  FunctionType(Type Input, Type Result,
+  FunctionType(ArrayRef<AnyFunctionType::Param> params,
+               Type Input, Type Result,
                RecursiveTypeProperties properties,
                const ExtInfo &Info);
 };
@@ -2587,25 +2633,34 @@ std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
 /// on those parameters and dependent member types thereof. The input and
 /// output types of the generic function can be expressed in terms of those
 /// generic parameters.
-class GenericFunctionType : public AnyFunctionType,
-                            public llvm::FoldingSetNode
-{
+class GenericFunctionType final : public AnyFunctionType,
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param> {
+  friend TrailingObjects;
+      
   GenericSignature *Signature;
 
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature *sig,
+                      ArrayRef<AnyFunctionType::Param> params,
                       Type input,
                       Type result,
                       const ExtInfo &info,
                       const ASTContext *ctx,
                       RecursiveTypeProperties properties);
+      
 public:
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
                                   Type input,
                                   Type result,
                                   const ExtInfo &info);
-
+      
+  // Retrieve the input parameters of this function type.
+  ArrayRef<AnyFunctionType::Param> getParams() const {
+    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  }
+      
   /// Retrieve the generic signature of this function type.
   GenericSignature *getGenericSignature() const {
     return Signature;
