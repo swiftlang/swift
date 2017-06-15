@@ -329,7 +329,7 @@ public protocol MutableCollection : _MutableIndexable, Collection
   /// - Note: implementors should ensure that the lifetime of the memory
   ///   persists throughout this call, typically by using
   ///   `withExtendedLifetime(self)`.
-  func withExistingUnsafeMutableBuffer<R>(
+  func _withExistingUnsafeMutableBuffer<R>(
     _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R?
 }
@@ -340,13 +340,13 @@ extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R? {
-    return try withExistingUnsafeMutableBuffer { buffer in
+    return try _withExistingUnsafeMutableBuffer { buffer in
       // FIXME: audit force unwrap
       try body(buffer.baseAddress!, buffer.count)
     }
   }
 
-  public func withExistingUnsafeMutableBuffer<R>(
+  public func _withExistingUnsafeMutableBuffer<R>(
     _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return nil

@@ -298,7 +298,7 @@ public protocol _Indexable : _IndexableBase {
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
 
-  func withExistingUnsafeBuffer<R>(
+  func _withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<_Element>) throws -> R
   ) rethrows -> R?
 }
@@ -997,7 +997,7 @@ public protocol Collection : _Indexable, Sequence
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
 
-  func withExistingUnsafeBuffer<R>(
+  func _withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R?
 }
