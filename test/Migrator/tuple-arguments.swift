@@ -56,3 +56,6 @@ extension Dictionary {
     dictionary.forEach { updateValue($1, forKey: $0) }
   }
 }
+
+let dictionary: [String: String] = [:]
+_ = dictionary.first { (column, value) in true }!.value

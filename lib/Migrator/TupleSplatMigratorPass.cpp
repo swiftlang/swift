@@ -192,8 +192,17 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
       if (!fnTy)
         return false;
       auto fnTy2 = fnTy->getInput()->getAs<FunctionType>();
-      if (!fnTy2)
+      if (!fnTy2) {
+        // This may have been a tuple type of one element.
+        if (auto tuple = fnTy->getInput()->getAs<TupleType>()) {
+          if (tuple->getNumElements() == 1) {
+            fnTy2 = tuple->getElement(0).getType()->getAs<FunctionType>();
+          }
+        }
+      }
+      if (!fnTy2) {
         return false;
+      }
       auto parenT = dyn_cast<ParenType>(fnTy2->getInput().getPointer());
       if (!parenT)
         return false;
@@ -207,6 +216,11 @@ struct TupleSplatMigratorPass : public ASTMigratorPass,
         argE = ICE->getSubExpr();
       argE = argE->getSemanticsProvidingExpr();
       auto closureE = dyn_cast<ClosureExpr>(argE);
+      if (!closureE) {
+        if (auto *FCE = dyn_cast<FunctionConversionExpr>(argE)) {
+          closureE = dyn_cast<ClosureExpr>(FCE->getSubExpr());
+        }
+      }
       if (!closureE)
         return false;
       if (closureE->getInLoc().isInvalid())
