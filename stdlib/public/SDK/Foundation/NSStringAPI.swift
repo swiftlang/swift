@@ -58,64 +58,7 @@ extension Optional {
   }
 }
 
-
 extension String {
-
-  //===--- Bridging Helpers -----------------------------------------------===//
-  //===--------------------------------------------------------------------===//
-
-  /// The corresponding `NSString` - a convenience for bridging code.
-  var _ns: NSString {
-    return self as NSString
-  }
-
-  /// Return an `Index` corresponding to the given offset in our UTF-16
-  /// representation.
-  func _index(_ utf16Index: Int) -> Index {
-    return Index(encodedOffset: utf16Index)
-  }
-
-  /// Return a `Range<Index>` corresponding to the given `NSRange` of
-  /// our UTF-16 representation.
-  func _range(_ r: NSRange) -> Range<Index> {
-    return _index(r.location)..<_index(r.location + r.length)
-  }
-
-  /// Return a `Range<Index>?` corresponding to the given `NSRange` of
-  /// our UTF-16 representation.
-  func _optionalRange(_ r: NSRange) -> Range<Index>? {
-    if r.location == NSNotFound {
-      return nil
-    }
-    return _range(r)
-  }
-
-  /// Invoke `body` on an `Int` buffer.  If `index` was converted from
-  /// non-`nil`, convert the buffer to an `Index` and write it into the
-  /// memory referred to by `index`
-  func _withOptionalOutParameter<Result>(
-    _ index: UnsafeMutablePointer<Index>?,
-    _ body: (UnsafeMutablePointer<Int>?) -> Result
-  ) -> Result {
-    var utf16Index: Int = 0
-    let result = (index != nil ? body(&utf16Index) : body(nil))
-    index?.pointee = self._index(utf16Index)
-    return result
-  }
-
-  /// Invoke `body` on an `NSRange` buffer.  If `range` was converted
-  /// from non-`nil`, convert the buffer to a `Range<Index>` and write
-  /// it into the memory referred to by `range`
-  func _withOptionalOutParameter<Result>(
-    _ range: UnsafeMutablePointer<Range<Index>>?,
-    _ body: (UnsafeMutablePointer<NSRange>?) -> Result
-  ) -> Result {
-    var nsRange = NSRange(location: 0, length: 0)
-    let result = (range != nil ? body(&nsRange) : body(nil))
-    range?.pointee = self._range(nsRange)
-    return result
-  }
-
   //===--- Class Methods --------------------------------------------------===//
   //===--------------------------------------------------------------------===//
 
@@ -226,6 +169,64 @@ extension String {
     } else {
       return nil
     }
+  }
+}
+
+extension String {
+
+  //===--- Bridging Helpers -----------------------------------------------===//
+  //===--------------------------------------------------------------------===//
+
+  /// The corresponding `NSString` - a convenience for bridging code.
+  var _ns: NSString {
+    return self as NSString
+  }
+
+  /// Return an `Index` corresponding to the given offset in our UTF-16
+  /// representation.
+  func _index(_ utf16Index: Int) -> Index {
+    return Index(encodedOffset: utf16Index)
+  }
+
+  /// Return a `Range<Index>` corresponding to the given `NSRange` of
+  /// our UTF-16 representation.
+  func _range(_ r: NSRange) -> Range<Index> {
+    return _index(r.location)..<_index(r.location + r.length)
+  }
+
+  /// Return a `Range<Index>?` corresponding to the given `NSRange` of
+  /// our UTF-16 representation.
+  func _optionalRange(_ r: NSRange) -> Range<Index>? {
+    if r.location == NSNotFound {
+      return nil
+    }
+    return _range(r)
+  }
+
+  /// Invoke `body` on an `Int` buffer.  If `index` was converted from
+  /// non-`nil`, convert the buffer to an `Index` and write it into the
+  /// memory referred to by `index`
+  func _withOptionalOutParameter<Result>(
+    _ index: UnsafeMutablePointer<Index>?,
+    _ body: (UnsafeMutablePointer<Int>?) -> Result
+  ) -> Result {
+    var utf16Index: Int = 0
+    let result = (index != nil ? body(&utf16Index) : body(nil))
+    index?.pointee = self._index(utf16Index)
+    return result
+  }
+
+  /// Invoke `body` on an `NSRange` buffer.  If `range` was converted
+  /// from non-`nil`, convert the buffer to a `Range<Index>` and write
+  /// it into the memory referred to by `range`
+  func _withOptionalOutParameter<Result>(
+    _ range: UnsafeMutablePointer<Range<Index>>?,
+    _ body: (UnsafeMutablePointer<NSRange>?) -> Result
+  ) -> Result {
+    var nsRange = NSRange(location: 0, length: 0)
+    let result = (range != nil ? body(&nsRange) : body(nil))
+    range?.pointee = self._range(nsRange)
+    return result
   }
 
   //===--- Instance Methods/Properties-------------------------------------===//
