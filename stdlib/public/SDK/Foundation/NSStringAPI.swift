@@ -1729,11 +1729,11 @@ extension String {
 }
 
 // Pre-Swift-3 method names
-extension String {
+extension StringProtocol {
 
   @available(*, unavailable, renamed: "localizedName(of:)")
   public static func localizedNameOfStringEncoding(
-    _ encoding: Encoding
+    _ encoding: String.Encoding
   ) -> String {
     fatalError("unavailable function can't be called")
   }
@@ -1744,7 +1744,7 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "canBeConverted(to:)")
-  public func canBeConvertedToEncoding(_ encoding: Encoding) -> Bool {
+  public func canBeConvertedToEncoding(_ encoding: String.Encoding) -> Bool {
     fatalError("unavailable function can't be called")
   }
 
@@ -1755,7 +1755,7 @@ extension String {
 
   @available(*, unavailable, renamed: "commonPrefix(with:options:)")
   public func commonPrefixWith(
-    _ aString: String, options: CompareOptions) -> String {
+    _ aString: String, options: String.CompareOptions) -> String {
     fatalError("unavailable function can't be called")
   }
 
@@ -1782,13 +1782,13 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "cString(usingEncoding:)")
-  public func cStringUsingEncoding(_ encoding: Encoding) -> [CChar]? {
+  public func cStringUsingEncoding(_ encoding: String.Encoding) -> [CChar]? {
     fatalError("unavailable function can't be called")
   }
 
   @available(*, unavailable, renamed: "data(usingEncoding:allowLossyConversion:)")
   public func dataUsingEncoding(
-    _ encoding: Encoding,
+    _ encoding: String.Encoding,
     allowLossyConversion: Bool = false
   ) -> Data? {
     fatalError("unavailable function can't be called")
@@ -1809,7 +1809,7 @@ extension String {
   @available(*, unavailable, renamed: "enumerateSubstrings(in:options:_:)")
   public func enumerateSubstringsIn(
     _ range: Range<Index>,
-    options opts: EnumerationOptions = [],
+    options opts: String.EnumerationOptions = [],
     _ body: (
       _ substring: String?, _ substringRange: Range<Index>,
       _ enclosingRange: Range<Index>, inout Bool
@@ -1823,8 +1823,8 @@ extension String {
     _ buffer: inout [UInt8],
     maxLength maxBufferCount: Int,
     usedLength usedBufferCount: UnsafeMutablePointer<Int>,
-    encoding: Encoding,
-    options: EncodingConversionOptions = [],
+    encoding: String.Encoding,
+    options: String.EncodingConversionOptions = [],
     range: Range<Index>,
     remainingRange leftover: UnsafeMutablePointer<Range<Index>>
   ) -> Bool {
@@ -1852,7 +1852,7 @@ extension String {
   }
 
   @available(*, unavailable, renamed: "lengthOfBytes(using:)")
-  public func lengthOfBytesUsingEncoding(_ encoding: Encoding) -> Int {
+  public func lengthOfBytesUsingEncoding(_ encoding: String.Encoding) -> Int {
     fatalError("unavailable function can't be called")
   }
 
@@ -1879,7 +1879,7 @@ extension String {
 
   @available(*, unavailable, renamed: "maximumLengthOfBytes(using:)")
   public
-  func maximumLengthOfBytesUsingEncoding(_ encoding: Encoding) -> Int {
+  func maximumLengthOfBytesUsingEncoding(_ encoding: String.Encoding) -> Int {
     fatalError("unavailable function can't be called")
   }
 
@@ -1891,7 +1891,7 @@ extension String {
   @available(*, unavailable, renamed: "rangeOfCharacter(from:options:range:)")
   public func rangeOfCharacterFrom(
     _ aSet: CharacterSet,
-    options mask: CompareOptions = [],
+    options mask: String.CompareOptions = [],
     range aRange: Range<Index>? = nil
   ) -> Range<Index>? {
     fatalError("unavailable function can't be called")
@@ -1913,7 +1913,7 @@ extension String {
   @available(*, unavailable, renamed: "range(of:options:range:locale:)")
   public func rangeOf(
     _ aString: String,
-    options mask: CompareOptions = [],
+    options mask: String.CompareOptions = [],
     range searchRange: Range<Index>? = nil,
     locale: Locale? = nil
   ) -> Range<Index>? {
@@ -1934,7 +1934,7 @@ extension String {
 
   @available(*, unavailable, renamed: "addingPercentEscapes(using:)")
   public func addingPercentEscapesUsingEncoding(
-    _ encoding: Encoding
+    _ encoding: String.Encoding
   ) -> String? {
     fatalError("unavailable function can't be called")
   }
@@ -1964,7 +1964,7 @@ extension String {
   public func replacingOccurrencesOf(
     _ target: String,
     withString replacement: String,
-    options: CompareOptions = [],
+    options: String.CompareOptions = [],
     range searchRange: Range<Index>? = nil
   ) -> String {
     fatalError("unavailable function can't be called")
@@ -1972,7 +1972,7 @@ extension String {
 
   @available(*, unavailable, renamed: "replacingPercentEscapes(usingEncoding:)")
   public func replacingPercentEscapesUsingEncoding(
-    _ encoding: Encoding
+    _ encoding: String.Encoding
   ) -> String? {
     fatalError("unavailable function can't be called")
   }
@@ -2010,7 +2010,7 @@ extension String {
   @available(*, unavailable, renamed: "write(toFile:atomically:encoding:)")
   public func writeToFile(
     _ path: String, atomically useAuxiliaryFile:Bool,
-    encoding enc: Encoding
+    encoding enc: String.Encoding
   ) throws {
     fatalError("unavailable function can't be called")
   }
@@ -2018,7 +2018,7 @@ extension String {
   @available(*, unavailable, renamed: "write(to:atomically:encoding:)")
   public func writeToURL(
     _ url: URL, atomically useAuxiliaryFile: Bool,
-    encoding enc: Encoding
+    encoding enc: String.Encoding
   ) throws {
     fatalError("unavailable function can't be called")
   }
