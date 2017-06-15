@@ -23,6 +23,7 @@
 #define ANALYSIS(NAME)
 #endif
 
+ANALYSIS(AccessSummary)
 ANALYSIS(Alias)
 ANALYSIS(BasicCallee)
 ANALYSIS(Caller)
