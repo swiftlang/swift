@@ -48,7 +48,7 @@ struct ScalarEnumerationTraits<syntax::SyntaxKind> {
   }
 };
 
-/// Serialization traits for TokenKind.
+/// Serialization traits for swift::tok.
 template <>
 struct ScalarEnumerationTraits<tok> {
   static void enumeration(Output &out, tok &value) {
