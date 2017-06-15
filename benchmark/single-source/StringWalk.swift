@@ -16,15 +16,11 @@
 // scripts/generate_harness/generate_harness.py to regenerate this file.
 ////////////////////////////////////////////////////////////////////////////////
 
-
-// Test String subscript performance.
 //
-// Subscript has a slow path that initializes a global variable:
-// Swift._cocoaStringSubscript.addressor.  Global optimization would
-// normally hoist the initializer outside the inner loop (over
-// unicodeScalars), forcing the initializer to be called on each
-// lap. However, no that the cocoa code is properly marked "slowPath",
-// no hoisting should occur.
+// Test String iteration performance over a variety of workloads, languages,
+// and symbols.
+//
+
 import TestsUtils
 
 var count: Int = 0
@@ -70,6 +66,8 @@ let japanese = "今回のアップデートでSwiftに大幅な改良が施さ�
 let chinese = "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。"
 let korean = "이번 업데이트에서는 강력하면서도 직관적인 Apple 플랫폼용 프로그래밍 언어인 Swift를 완벽히 개선하였습니다."
 let russian = "в чащах юга жил-был цитрус? да, но фальшивый экземпляр"
+let punctuated = "\u{201c}Hello\u{2010}world\u{2026}\u{201d}"
+let punctuatedJapanese = "\u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}"
 
 // A workload that's mostly Latin characters, with occasional emoji
 // interspersed. Common for tweets.
@@ -297,6 +295,66 @@ public func run_StringWalk_russian_characters(_ N: Int) {
 public func run_StringWalk_russian_characters_Backwards(_ N: Int) {
   for _ in 1...charactersMultiplier*N {
     count_characters_rev(russian.characters.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_punctuated_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    count_unicodeScalars(punctuated.unicodeScalars)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_punctuated_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    count_unicodeScalars_rev(punctuated.unicodeScalars.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_punctuated_characters(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    count_characters(punctuated.characters)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_punctuated_characters_Backwards(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    count_characters_rev(punctuated.characters.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_punctuatedJapanese_unicodeScalars(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    count_unicodeScalars(punctuatedJapanese.unicodeScalars)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards(_ N: Int) {
+  for _ in 1...unicodeScalarsMultiplier*N {
+    count_unicodeScalars_rev(punctuatedJapanese.unicodeScalars.reversed())
+  }
+}
+
+
+@inline(never)
+public func run_StringWalk_punctuatedJapanese_characters(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    count_characters(punctuatedJapanese.characters)
+  }
+}
+
+@inline(never)
+public func run_StringWalk_punctuatedJapanese_characters_Backwards(_ N: Int) {
+  for _ in 1...charactersMultiplier*N {
+    count_characters_rev(punctuatedJapanese.characters.reversed())
   }
 }
 
