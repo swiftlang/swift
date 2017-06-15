@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "closure-scope"
 
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 
 namespace swift {
@@ -152,6 +153,44 @@ ClosureScopeData *ClosureScopeAnalysis::getOrComputeScopeData() {
 
 SILAnalysis *createClosureScopeAnalysis(SILModule *M) {
   return new ClosureScopeAnalysis(M);
+}
+
+void TopDownClosureFunctionOrder::visitFunctions(
+    std::function<void(SILFunction *)> visitor) {
+  auto markVisited = [&](SILFunction *F) {
+    bool visitOnce = visited.insert(F).second;
+    assert(visitOnce);
+    (void)visitOnce;
+  };
+  auto allScopesVisited = [&](SILFunction *closureF) {
+    return llvm::all_of(CSA->getClosureScopes(closureF),
+                        [this](SILFunction *F) { return visited.count(F); });
+  };
+  for (auto &F : *CSA->getModule()) {
+    if (!allScopesVisited(&F)) {
+      closureWorklist.insert(&F);
+      continue;
+    }
+    markVisited(&F);
+    visitor(&F);
+  }
+  unsigned numClosures = closureWorklist.size();
+  while (numClosures) {
+    for (auto &closureNode : closureWorklist) {
+      // skip erased closures.
+      if (!closureNode)
+        continue;
+
+      auto closureF = closureNode.getValue();
+      if (!allScopesVisited(closureF))
+        continue;
+
+      markVisited(closureF);
+      visitor(closureF);
+      closureWorklist.erase(closureF);
+      --numClosures;
+    }
+  }
 }
 
 } // namespace swift
