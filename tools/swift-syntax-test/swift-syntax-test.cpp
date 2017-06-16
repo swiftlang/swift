@@ -238,6 +238,8 @@ int doSerializeRawTree(const StringRef InputFilename) {
     out << Raw;
   }
 
+  llvm::outs() << "\n";
+
   return EXIT_SUCCESS;
 }
 
