@@ -123,6 +123,7 @@ static LazySKDUID KindKeyword("source.codecompletion.keyword");
 static LazySKDUID KindLiteral("source.codecompletion.literal");
 static LazySKDUID KindCustom("source.codecompletion.custom");
 static LazySKDUID KindIdentifier("source.codecompletion.identifier");
+static LazySKDUID KindDescription("source.codecompletion.description");
 
 static UIdent DiagKindNote("source.diagnostic.severity.note");
 static UIdent DiagKindWarning("source.diagnostic.severity.warning");
@@ -1719,6 +1720,8 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
         rule.kind = FilterRule::CustomCompletion;
       } else if (kind == KindIdentifier) {
         rule.kind = FilterRule::Identifier;
+      } else if (kind == KindDescription) {
+        rule.kind = FilterRule::Description;
       } else {
         // Warning: unknown
       }
@@ -1737,6 +1740,16 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
         break;
       case FilterRule::Module:
       case FilterRule::Identifier: {
+        SmallVector<const char *, 8> names;
+        if (dict.getStringArray(KeyNames, names, false)) {
+          failed = true;
+          CCC.failed("filter rule missing required key 'key.names'");
+          return true;
+        }
+        rule.names.assign(names.begin(), names.end());
+        break;
+      }
+      case FilterRule::Description: {
         SmallVector<const char *, 8> names;
         if (dict.getStringArray(KeyNames, names, false)) {
           failed = true;
