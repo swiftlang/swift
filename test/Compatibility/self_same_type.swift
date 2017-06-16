@@ -1,5 +1,10 @@
 // RUN: %target-typecheck-verify-swift -swift-version 3
 
+// Note: while Swift 3.2 originally intended to provide backward
+// compatibility here, the type-soundness issue was considered so severe
+// (due to it breaking the optimizer) that that we escalated it to an
+// error.
+
 protocol P {
   associatedtype T
 }
@@ -9,7 +14,7 @@ protocol Q {
 }
 
 class C1: Q {
-  func foo<T: P>(_: T, _: C1) where T.T == C1 {} // expected-warning{{instance method 'foo' in non-final class 'C1' cannot be used to satisfy requirement instance method 'foo' (in protocol 'Q') due to same-type requirement involving 'Self'}}}}
+  func foo<T: P>(_: T, _: C1) where T.T == C1 {} // expected-error{{instance method 'foo' in non-final class 'C1' cannot be used to satisfy requirement instance method 'foo' (in protocol 'Q') due to same-type requirement involving 'Self'}}}}
     // expected-note@-1{{consider weakening the same-type requirement 'T.T' == 'C1' to a superclass requirement}}{{41-43=:}}
 }
 
