@@ -6954,18 +6954,6 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
   return DeclChecker::checkOverrides(TC, decl);
 }
 
-/// Determine whether the given type contains an unresolved dependent member
-/// type.
-static bool hasUnresolvedDependentMemberType(Type type) {
-  return type.findIf([](Type type) {
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
-      if (!depMemTy->getAssocType()) return true;
-    }
-
-    return false;
-  });
-}
-
 bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
                                                 ValueDecl *base) {
   // API availability ranges are contravariant: make sure the version range
@@ -7270,8 +7258,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           // FIXME: We never should have recorded such a type in the first
           // place.
           if (!aliasDecl->getUnderlyingTypeLoc().getType() ||
-              hasUnresolvedDependentMemberType(
-                aliasDecl->getUnderlyingTypeLoc().getType())) {
+              aliasDecl->getUnderlyingTypeLoc().getType()
+                ->findUnresolvedDependentMemberType()) {
             aliasDecl->getUnderlyingTypeLoc().setType(Type(),
                                                       /*validated=*/false);
             validateAccessibility(aliasDecl);
