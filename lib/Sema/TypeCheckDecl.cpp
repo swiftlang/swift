@@ -1751,11 +1751,12 @@ static void checkTypeAccessibility(
 
   AccessScope contextAccessScope = context->getFormalAccessScope();
   checkTypeAccessibilityImpl(TC, TL, contextAccessScope, DC,
-                             [=](AccessScope requiredAccessScope,
-                                 const TypeRepr *offendingTR,
-                                 DowngradeToWarning downgradeToWarning) {
+                             [=, &TC](AccessScope requiredAccessScope,
+                                      const TypeRepr *offendingTR,
+                                      DowngradeToWarning downgradeToWarning) {
     if (!contextAccessScope.isPublic() &&
-        !isa<ModuleDecl>(contextAccessScope.getDeclContext())) {
+        !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
+        TC.getLangOpts().isSwiftVersion3()) {
       // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
       // access scope represented a private or fileprivate level.
       downgradeToWarning = DowngradeToWarning::Yes;
@@ -1868,10 +1869,10 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
 
   // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
   // scope represented a private or fileprivate level.
-  // FIXME: Conditionalize this on Swift 3 mode.
   if (downgradeToWarning == DowngradeToWarning::No) {
     if (!accessScope.isPublic() &&
-        !isa<ModuleDecl>(accessScope.getDeclContext())) {
+        !isa<ModuleDecl>(accessScope.getDeclContext()) &&
+        TC.getLangOpts().isSwiftVersion3()) {
       downgradeToWarning = DowngradeToWarning::Yes;
     }
   }
