@@ -3122,9 +3122,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto proto = Conformance->getProtocol();
           auto &diags = proto->getASTContext().Diags;
           diags.diagnose(witness->getLoc(),
-                         proto->getASTContext().LangOpts.isSwiftVersion3()
-                           ? diag::witness_self_same_type_warn
-                           : diag::witness_self_same_type,
+                         diag::witness_self_same_type,
                          witness->getDescriptiveKind(),
                          witness->getFullName(),
                          Conformance->getType(),
