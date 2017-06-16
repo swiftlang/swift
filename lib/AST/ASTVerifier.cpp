@@ -2562,18 +2562,8 @@ public:
       // dependent member types.
       // FIXME: This is a general property of the type system.
       auto interfaceTy = AFD->getInterfaceType();
-      Type unresolvedDependentTy;
-      interfaceTy.findIf([&](Type type) -> bool {
-        if (auto dependent = type->getAs<DependentMemberType>()) {
-          if (dependent->getAssocType() == nullptr) {
-            unresolvedDependentTy = dependent;
-            return true;
-          }
-        }
-        return false;
-      });
-
-      if (unresolvedDependentTy) {
+      if (auto unresolvedDependentTy
+            = interfaceTy->findUnresolvedDependentMemberType()) {
         Out << "Unresolved dependent member type ";
         unresolvedDependentTy->print(Out);
         abort();
