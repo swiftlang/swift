@@ -41,7 +41,10 @@ func bar_3<T, U>(_: (T) -> G_E<U>) {}
 
 bar_1(E.foo) // Ok
 bar_1(E.bar) // Ok
-bar_1(E.two) // expected-error {{cannot convert value of type '(Int, Int) -> E' to expected argument type '(_) -> E'}}
+// SE-0110: We reverted to allowing this for the time being, but this
+// test is valuable in case we end up disallowing it again in the
+// future.
+bar_1(E.two) // Ok since we backed off on this aspect of SE-0110 for the moment.
 bar_1(E.tuple) // Ok - it's going to be ((x: Int, y: Int))
 
 bar_2(G_E<String>.foo) // Ok
