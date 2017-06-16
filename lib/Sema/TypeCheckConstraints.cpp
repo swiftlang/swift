@@ -3123,6 +3123,19 @@ void Solution::dump(raw_ostream &out) const {
       out << "\n";
     }
   }
+
+  if (!Conformances.empty()) {
+    out << "\nConformances:\n";
+    auto &cs = getConstraintSystem();
+    for (auto &e : Conformances) {
+      out.indent(2);
+      out << "At ";
+      e.first->dump(&cs.getASTContext().SourceMgr, out);
+      out << "\n";
+      e.second.dump(out);
+      out << "\n";
+    }
+  }
 }
 
 void ConstraintSystem::dump() {
