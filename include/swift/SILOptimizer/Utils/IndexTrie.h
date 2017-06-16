@@ -24,11 +24,12 @@ class IndexTrieNode {
   static const unsigned RootIdx = ~0U;
   unsigned Index;
   llvm::SmallVector<IndexTrieNode*, 8> Children;
+  IndexTrieNode *Parent;
 
 public:
-  IndexTrieNode(): Index(RootIdx) {}
+  IndexTrieNode(): Index(RootIdx), Parent(nullptr) {}
 
-  explicit IndexTrieNode(unsigned V): Index(V) {}
+  explicit IndexTrieNode(unsigned V, IndexTrieNode *P): Index(V), Parent(P) {}
 
   IndexTrieNode(IndexTrieNode &) =delete;
   IndexTrieNode &operator=(const IndexTrieNode&) =delete;
@@ -53,12 +54,29 @@ public:
                               });
     if (I != Children.end() && (*I)->Index == Idx)
       return *I;
-    auto *N = new IndexTrieNode(Idx);
+    auto *N = new IndexTrieNode(Idx, this);
     Children.insert(I, N);
     return N;
   }
 
   ArrayRef<IndexTrieNode*> getChildren() const { return Children; }
+
+  IndexTrieNode *getParent() const { return Parent; }
+
+  /// Returns true when the sequence of indices represented by this
+  /// node is a prefix of the sequence represented by the passed-in node.
+  bool isPrefixOf(const IndexTrieNode *Other) const {
+    const IndexTrieNode *I = Other;
+
+    do {
+      if (this == I)
+        return true;
+
+      I = I->getParent();
+    } while (I);
+
+    return false;
+  }
 };
 
 } // end namespace swift
