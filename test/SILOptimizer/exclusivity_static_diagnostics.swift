@@ -183,6 +183,90 @@ struct StructWithFixits {
   }
 }
 
+func takesInoutAndNoEscapeClosure<T>(_ p: inout T, _ c: () -> ()) { }
+
+func callsTakesInoutAndNoEscapeClosure() {
+  var local = 5
+  takesInoutAndNoEscapeClosure(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    local = 8  // expected-note {{conflicting access is here}}
+  }
+}
+
+func takesInoutAndNoEscapeClosureThatThrows<T>(_ p: inout T, _ c: () throws -> ()) { }
+
+func callsTakesInoutAndNoEscapeClosureThatThrowsWithNonThrowingClosure() {
+  var local = 5
+  takesInoutAndNoEscapeClosureThatThrows(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    local = 8  // expected-note {{conflicting access is here}}
+  }
+}
+
+func takesInoutAndNoEscapeClosureAndThrows<T>(_ p: inout T, _ c: () -> ()) throws { }
+
+func callsTakesInoutAndNoEscapeClosureAndThrows() {
+  var local = 5
+  try! takesInoutAndNoEscapeClosureAndThrows(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+    local = 8  // expected-note {{conflicting access is here}}
+  }
+}
+
+func takesTwoNoEscapeClosures(_ c1: () -> (), _ c2: () -> ()) { }
+
+func callsTakesTwoNoEscapeClosures() {
+  var local = 7
+  takesTwoNoEscapeClosures({local = 8}, {local = 9}) // no-error
+  _ = local
+}
+
+func takesInoutAndEscapingClosure<T>(_ p: inout T, _ c: @escaping () -> ()) { }
+
+func callsTakesInoutAndEscapingClosure() {
+  var local = 5
+  takesInoutAndEscapingClosure(&local) { // no-error
+    local = 8
+  }
+}
+
+func takesUnsafePointerAndNoEscapeClosure<T>(_ p: UnsafePointer<T>, _ c: () -> ()) { }
+
+func callsTakesUnsafePointerAndNoEscapeClosure() {
+  var local = 1
+  takesUnsafePointerAndNoEscapeClosure(&local) { // expected-note {{conflicting access is here}}
+     local = 2 // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
+  }
+}
+
+func takesThrowingAutoClosureReturningGeneric<T: Equatable>(_ : @autoclosure () throws -> T) { }
+func takesInoutAndClosure(_: inout Int, _ : () -> ()) { }
+
+func callsTakesThrowingAutoClosureReturningGeneric() {
+  var i = 0
+  takesInoutAndClosure(&i) { // expected-error {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    takesThrowingAutoClosureReturningGeneric(i) // expected-note {{conflicting access is here}}
+  }
+}
+
+struct StructWithMutatingMethodThatTakesAutoclosure {
+  var f = 2
+  mutating func takesAutoclosure(_ p: @autoclosure () throws -> ()) rethrows { }
+}
+
+func conflictOnSubPathInNoEscapeAutoclosure() {
+  var s = StructWithMutatingMethodThatTakesAutoclosure()
+  s.takesAutoclosure(s.f = 2)
+  // expected-error@-1 {{overlapping accesses to 's', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2 {{conflicting access is here}}
+}
+
+func conflictOnWholeInNoEscapeAutoclosure() {
+  var s = StructWithMutatingMethodThatTakesAutoclosure()
+  takesInoutAndNoEscapeClosure(&s.f) {
+    // expected-error@-1 {{overlapping accesses to 's.f', but modification requires exclusive access; consider copying to a local variable}}
+    s = StructWithMutatingMethodThatTakesAutoclosure()
+    // expected-note@-1 {{conflicting access is here}}
+  }
+}
+
 func inoutSeparateStructStoredProperties() {
   var s = StructWithTwoStoredProp()
   takesTwoInouts(&s.f1, &s.f2) // no-error
