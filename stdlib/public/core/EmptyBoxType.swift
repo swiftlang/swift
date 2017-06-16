@@ -16,4 +16,7 @@
 @_versioned
 @objc_non_lazy_realization
 internal final class _EmptyBoxStorage {
+  init() {
+    _sanityCheckFailure("creating instance of _EmptyBoxStorage")
+  }
 }
