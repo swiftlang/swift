@@ -104,11 +104,11 @@ public:
   }
 
   constexpr static KeyPathComponentHeader
-  forStructComponentWithUnresolvedOffset() {
+  forStructComponentWithUnresolvedFieldOffset() {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_StructTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
-      | _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload);
+      | _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload);
   }
   
   constexpr static KeyPathComponentHeader
@@ -128,11 +128,19 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forClassComponentWithUnresolvedOffset() {
+  forClassComponentWithUnresolvedFieldOffset() {
     return KeyPathComponentHeader(
-      (_SwiftKeyPathComponentHeader_StructTag
+      (_SwiftKeyPathComponentHeader_ClassTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
-      | _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload);
+      | _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload);
+  }
+  
+  constexpr static KeyPathComponentHeader
+  forClassComponentWithUnresolvedIndirectOffset() {
+    return KeyPathComponentHeader(
+      (_SwiftKeyPathComponentHeader_ClassTag
+      << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+      | _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload);
   }
   
   constexpr static KeyPathComponentHeader
