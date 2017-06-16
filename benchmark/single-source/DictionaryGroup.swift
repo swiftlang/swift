@@ -12,13 +12,16 @@
 
 import TestsUtils
 
+let count = 10_000
+let result = count / 10
+
 @inline(never)
 public func run_DictionaryGroup(_ N: Int) {
-    let count = 100 * N
-    let result = count / 10
+  for _ in 1...N {
     let dict = Dictionary(grouping: 0..<count, by: { $0 % 10 })
     CheckResults(dict.count == 10)
     CheckResults(dict[0]!.count == result)
+  }
 }
 
 class Box<T : Hashable> : Hashable {
@@ -39,9 +42,10 @@ class Box<T : Hashable> : Hashable {
 
 @inline(never)
 public func run_DictionaryGroupOfObjects(_ N: Int) {
-    let count = 20 * N
-    let result = count / 10
-    let dict = Dictionary(grouping: (0..<count).map { Box($0) }, by: { Box($0.value % 10) })
+  let objects = (0..<count).map { Box($0) }
+  for _ in 1...N {
+    let dict = Dictionary(grouping: objects, by: { Box($0.value % 10) })
     CheckResults(dict.count == 10)
     CheckResults(dict[Box(0)]!.count == result)
+  }
 }
