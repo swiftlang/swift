@@ -2005,6 +2005,11 @@ public:
     if (isa<TypeDecl>(D))
       return false;
       
+    // The body of #if clauses are not walked into, we need custom processing
+    // for them.
+    if (auto *ICD = dyn_cast<IfConfigDecl>(D))
+      handleIfConfig(ICD);
+      
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D))
       if (shouldTrackVarDecl(vd)) {
@@ -2075,15 +2080,10 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
 
   /// handle #if directives.
-  void handleIfConfig(IfConfigStmt *ICS);
+  void handleIfConfig(IfConfigDecl *ICD);
 
   /// Custom handling for statements.
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    // The body of #if statements are not walked into, we need custom processing
-    // for them.
-    if (auto *ICS = dyn_cast<IfConfigStmt>(S))
-      handleIfConfig(ICS);
-      
     // Keep track of an association between vardecls and the StmtCondition that
     // they are bound in for IfStmt, GuardStmt, WhileStmt, etc.
     if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
@@ -2451,7 +2451,7 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
 /// handle #if directives.  All of the active clauses are already walked by the
 /// AST walker, but we also want to handle the inactive ones to avoid false
 /// positives.
-void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
+void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
   struct ConservativeDeclMarker : public ASTWalker {
     VarDeclUsageChecker &VDUC;
     ConservativeDeclMarker(VarDeclUsageChecker &VDUC) : VDUC(VDUC) {}
@@ -2466,7 +2466,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
     }
   };
 
-  for (auto &clause : ICS->getClauses()) {
+  for (auto &clause : ICD->getClauses()) {
     // Active clauses are handled by the normal AST walk.
     if (clause.isActive) continue;
 

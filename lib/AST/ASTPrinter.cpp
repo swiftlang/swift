@@ -2360,7 +2360,21 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
 }
 
 void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // FIXME: Pretty print #if decls
+  if (!Options.PrintIfConfig)
+    return;
+
+  for (auto &Clause : ICD->getClauses()) {
+    if (&Clause == &*ICD->getClauses().begin())
+      Printer << tok::pound_if << " /* condition */"; // FIXME: print condition
+    else if (Clause.Cond)
+      Printer << tok::pound_elseif << " /* condition */"; // FIXME: print condition
+    else
+      Printer << tok::pound_else;
+    printASTNodes(Clause.Elements);
+    Printer.printNewline();
+    indent();
+  }
+  Printer << tok::pound_endif;
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
@@ -3265,27 +3279,6 @@ void PrintAST::visitGuardStmt(GuardStmt *stmt) {
   // FIXME: print condition
   Printer << " ";
   visit(stmt->getBody());
-}
-
-void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
-  if (!Options.PrintIfConfig)
-    return;
-
-  for (auto &Clause : stmt->getClauses()) {
-    if (&Clause == &*stmt->getClauses().begin())
-      Printer << tok::pound_if << " "; // FIXME: print condition
-    else if (Clause.Cond)
-      Printer << tok::pound_elseif << ""; // FIXME: print condition
-    else
-      Printer << tok::pound_else;
-    Printer.printNewline();
-    if (printASTNodes(Clause.Elements)) {
-      Printer.printNewline();
-      indent();
-    }
-  }
-  Printer.printNewline();
-  Printer << tok::pound_endif;
 }
 
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {

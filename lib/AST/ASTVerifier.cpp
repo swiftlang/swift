@@ -2996,23 +2996,23 @@ public:
                         [&]{ S->print(Out); });
     }
 
-    void checkSourceRanges(IfConfigStmt *S) {
-      checkSourceRangesBase(S);
+    void checkSourceRanges(IfConfigDecl *ICD) {
+      checkSourceRangesBase(ICD);
 
-      SourceLoc Location = S->getStartLoc();
-      for (auto &Clause : S->getClauses()) {
+      SourceLoc Location = ICD->getStartLoc();
+      for (auto &Clause : ICD->getClauses()) {
         // Clause start, note that the first clause start location is the
         // same as that of the whole statement
-        if (Location == S->getStartLoc()) {
+        if (Location == ICD->getStartLoc()) {
           if (Location != Clause.Loc) {
-            Out << "bad start location of IfConfigStmt first clause\n";
-            S->print(Out);
+            Out << "bad start location of IfConfigDecl first clause\n";
+            ICD->print(Out);
             abort();
           }
         } else {
           if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Clause.Loc)) {
-            Out << "bad start location of IfConfigStmt clause\n";
-            S->print(Out);
+            Out << "bad start location of IfConfigDecl clause\n";
+            ICD->print(Out);
             abort();
           }
         }
@@ -3022,8 +3022,8 @@ public:
         Expr *Cond = Clause.Cond;
         if (Cond) {
           if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Cond->getStartLoc())) {
-            Out << "invalid IfConfigStmt clause condition start location\n";
-            S->print(Out);
+            Out << "invalid IfConfigDecl clause condition start location\n";
+            ICD->print(Out);
             abort();
           }
           Location = Cond->getEndLoc();
@@ -3038,8 +3038,8 @@ public:
           }
           
           if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, StartLocation)) {
-            Out << "invalid IfConfigStmt clause element start location\n";
-            S->print(Out);
+            Out << "invalid IfConfigDecl clause element start location\n";
+            ICD->print(Out);
             abort();
           }
           
@@ -3051,9 +3051,9 @@ public:
         }
       }
 
-      if (Ctx.SourceMgr.isBeforeInBuffer(S->getEndLoc(), Location)) {
-        Out << "invalid IfConfigStmt end location\n";
-        S->print(Out);
+      if (Ctx.SourceMgr.isBeforeInBuffer(ICD->getEndLoc(), Location)) {
+        Out << "invalid IfConfigDecl end location\n";
+        ICD->print(Out);
         abort();
       }
     }

@@ -200,8 +200,8 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   
   for (auto &ESD : S->getElements()) {
     
-    if (auto S = ESD.dyn_cast<Stmt*>())
-      if (isa<IfConfigStmt>(S))
+    if (auto D = ESD.dyn_cast<Decl*>())
+      if (isa<IfConfigDecl>(D))
         continue;
     
     // If we ever reach an unreachable point, stop emitting statements and issue
@@ -539,12 +539,6 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
   // Emit the condition bindings, branching to the bodyBB if they fail.  Since
   // we didn't push a scope, the bound variables are live after this statement.
   SGF.emitStmtCondition(S->getCond(), bodyBB, S);
-}
-
-
-void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
-  // Active members are attached to the enclosing declaration, so there's no
-  // need to walk anything within.
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {

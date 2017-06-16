@@ -1036,33 +1036,41 @@ namespace {
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+    
+    void printASTNodes(const ArrayRef<ASTNode> &Elements, StringRef Name) {
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << "(";
+      PrintWithColorRAII(OS, ASTNodeColor) << Name;
+      for (auto Elt : Elements) {
+        OS << '\n';
+        if (auto *SubExpr = Elt.dyn_cast<Expr*>())
+          printRec(SubExpr);
+        else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
+          printRec(SubStmt);
+        else
+          printRec(Elt.get<Decl*>());
+      }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void visitIfConfigDecl(IfConfigDecl *ICD) {
-      OS.indent(Indent);
-      PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      OS << "#if_decl\n";
+      printCommon(ICD, "if_config_decl");
       Indent += 2;
       for (auto &Clause : ICD->getClauses()) {
+        OS << '\n';
+        OS.indent(Indent);
+        PrintWithColorRAII(OS, StmtColor) << (Clause.Cond ? "#if:" : "#else:");
+        if (Clause.isActive)
+          PrintWithColorRAII(OS, DeclModifierColor) << " active";
         if (Clause.Cond) {
-          PrintWithColorRAII(OS, ParenthesisColor) << '(';
-          OS << "#if:";
-          if (Clause.isActive) OS << " active";
           OS << "\n";
           printRec(Clause.Cond);
-        } else {
-          OS << '\n';
-          PrintWithColorRAII(OS, ParenthesisColor) << '(';
-          OS << "#else:";
-          if (Clause.isActive) OS << " active";
-          OS << "\n";
         }
 
-        for (auto D : Clause.Elements) {
-          OS << '\n';
-          printRec(D);
-        }
-
-        PrintWithColorRAII(OS, ParenthesisColor) << ')';
+        OS << '\n';
+        Indent += 2;
+        printASTNodes(Clause.Elements, "elements");
+        Indent -= 2;
       }
 
       Indent -= 2;
@@ -1419,35 +1427,6 @@ public:
       printRec(elt);
     OS << '\n';
     printRec(S->getBody());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitIfConfigStmt(IfConfigStmt *S) {
-    printCommon(S, "#if_stmt");
-    Indent += 2;
-    for (auto &Clause : S->getClauses()) {
-      OS << '\n';
-      OS.indent(Indent);
-      if (Clause.Cond) {
-        PrintWithColorRAII(OS, ParenthesisColor) << '(';
-        PrintWithColorRAII(OS, StmtColor) << "#if:";
-        if (Clause.isActive)
-          PrintWithColorRAII(OS, DeclModifierColor) << " active";
-        OS << '\n';
-        printRec(Clause.Cond);
-      } else {
-        PrintWithColorRAII(OS, StmtColor) << "#else";
-        if (Clause.isActive)
-          PrintWithColorRAII(OS, DeclModifierColor) << " active";
-      }
-
-      OS << '\n';
-      Indent += 2;
-      printASTNodes(Clause.Elements, "elements");
-      Indent -= 2;
-    }
-
-    Indent -= 2;
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

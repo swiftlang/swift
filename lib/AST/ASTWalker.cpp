@@ -177,7 +177,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitIfConfigDecl(IfConfigDecl *ICD) {
-    // By default, just visit the declarations that are actually
+    // By default, just visit the elements that are actually
     // injected into the enclosing context.
     return false;
   }
@@ -1283,14 +1283,6 @@ Stmt *Traversal::visitGuardStmt(GuardStmt *US) {
   else
     return nullptr;
   return US;
-}
-
-
-Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
-  // Active members are attached to the enclosing declaration, so there's no
-  // need to walk anything within.
-  
-  return ICS;
 }
 
 Stmt *Traversal::visitDoStmt(DoStmt *DS) {

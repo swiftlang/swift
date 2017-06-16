@@ -44,6 +44,7 @@ namespace swift {
   class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
+  struct ASTNode;
   class ASTPrinter;
   class ASTWalker;
   class ConstructorDecl;
@@ -2027,34 +2028,33 @@ public:
   }
 };
 
-/// IfConfigDecl - This class represents the declaration-side representation of
-/// #if/#else/#endif blocks. Active and inactive block members are stored
-/// separately, with the intention being that active members will be handed
-/// back to the enclosing declaration.
+/// IfConfigDecl - This class represents #if/#else/#endif blocks.
+/// Active and inactive block members are stored separately, with the intention
+/// being that active members will be handed back to the enclosing context.
 class IfConfigDecl : public Decl {
   /// An array of clauses controlling each of the #if/#elseif/#else conditions.
   /// The array is ASTContext allocated.
-  ArrayRef<IfConfigClause<Decl *>> Clauses;
+  ArrayRef<IfConfigClause> Clauses;
   SourceLoc EndLoc;
 public:
   
-  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause<Decl *>> Clauses,
+  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
     : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
   {
     IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
   }
 
-  ArrayRef<IfConfigClause<Decl *>> getClauses() const { return Clauses; }
+  ArrayRef<IfConfigClause> getClauses() const { return Clauses; }
 
   /// Return the active clause, or null if there is no active one.
-  const IfConfigClause<Decl *> *getActiveClause() const {
+  const IfConfigClause *getActiveClause() const {
     for (auto &Clause : Clauses)
       if (Clause.isActive) return &Clause;
     return nullptr;
   }
 
-  const ArrayRef<Decl*> getActiveMembers() const {
+  const ArrayRef<ASTNode> getActiveClauseElements() const {
     if (auto *Clause = getActiveClause())
       return Clause->Elements;
     return {};
