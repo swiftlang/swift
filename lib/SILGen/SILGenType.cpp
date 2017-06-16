@@ -314,8 +314,17 @@ public:
     Serialized = IsNotSerialized;
 
     // Serialize the witness table if we're serializing everything with
-    // -sil-serialize-all, or if the conformance itself thinks it should be.
-    if (SGM.isMakeModuleFragile() || Conformance->isSerialized())
+    // -sil-serialize-all.
+    if (SGM.isMakeModuleFragile())
+      Serialized = IsSerialized;
+
+    // Serialize the witness table if the conformance itself thinks it should be
+    // and resilience is explicitly enabled for this compilaiton or if we serialize
+    // all eligible witness tables.
+    if ((SGM.M.getSwiftModule()->getResilienceStrategy() ==
+             ResilienceStrategy::Resilient ||
+         SGM.M.getOptions().SILSerializeWitnessTables) &&
+        Conformance->isSerialized())
       Serialized = IsSerialized;
 
     // Not all protocols use witness tables; in this case we just skip
