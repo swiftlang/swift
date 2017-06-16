@@ -532,3 +532,26 @@ r32432145 { _,_ in
 // rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
 [1, 2].first { $0.foo = 3 }
 // expected-error@-1 {{value of type 'Int' has no member 'foo'}}
+
+// rdar://problem/32433193, SR-5030 - Higher-order function diagnostic mentions the wrong contextual type conversion problem
+protocol A_SR_5030 {
+  associatedtype Value
+  func map<U>(_ t : @escaping (Self.Value) -> U) -> B_SR_5030<U>
+}
+
+struct B_SR_5030<T> : A_SR_5030 {
+  typealias Value = T
+  func map<U>(_ t : @escaping (T) -> U) -> B_SR_5030<U> { fatalError() }
+}
+
+func sr5030_exFalso<T>() -> T {
+  fatalError()
+}
+
+extension A_SR_5030 {
+  func foo() -> B_SR_5030<Int> {
+    let tt : B_SR_5030<Int> = sr5030_exFalso()
+    return tt.map { x in (idx: x) }
+    // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
+  }
+}
