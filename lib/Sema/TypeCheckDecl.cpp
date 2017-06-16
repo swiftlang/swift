@@ -6950,6 +6950,18 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
   return DeclChecker::checkOverrides(TC, decl);
 }
 
+/// Determine whether the given type contains an unresolved dependent member
+/// type.
+static bool hasUnresolvedDependentMemberType(Type type) {
+  return type.findIf([](Type type) {
+    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      if (!depMemTy->getAssocType()) return true;
+    }
+
+    return false;
+  });
+}
+
 bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
                                                 ValueDecl *base) {
   // API availability ranges are contravariant: make sure the version range
@@ -7048,6 +7060,27 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
     return ObjCReason::ImplicitlyObjC;
 
   return None;
+}
+
+/// Validate the underlying type of the given typealias.
+static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
+  TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
+  if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
+    options |= TR_KnownNonCascadingDependency;
+
+  if (typeAlias->getDeclContext()->isModuleScopeContext() &&
+      typeAlias->getGenericParams() == nullptr) {
+    IterativeTypeChecker ITC(tc);
+    ITC.satisfy(requestResolveTypeDecl(typeAlias));
+  } else {
+    if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
+                        typeAlias, options)) {
+      typeAlias->setInvalid();
+      typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
+    }
+
+    typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
+  }
 }
 
 void TypeChecker::validateDecl(ValueDecl *D) {
@@ -7157,25 +7190,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };
 
     validateGenericTypeSignature(typeAlias);
-
-    TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
-    if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
-      options |= TR_KnownNonCascadingDependency;
-
-    if (typeAlias->getDeclContext()->isModuleScopeContext() &&
-        typeAlias->getGenericParams() == nullptr) {
-      IterativeTypeChecker ITC(*this);
-      ITC.satisfy(requestResolveTypeDecl(typeAlias));
-    } else {
-      if (validateType(typeAlias->getUnderlyingTypeLoc(),
-                       typeAlias, options)) {
-        typeAlias->setInvalid();
-        typeAlias->getUnderlyingTypeLoc().setInvalidType(Context);
-      }
-
-      typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
-    }
-
+    validateTypealiasType(*this, typeAlias);
     break;
   }
 
@@ -7242,8 +7257,28 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // FIXME: Hopefully this can all go away with the ITC.
     for (auto member : proto->getMembers()) {
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
-        if (!aliasDecl->isGeneric())
+        if (!aliasDecl->isGeneric()) {
           aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+
+          // If the underlying alias declaration has a type parameter,
+          // we have unresolved dependent member types we will need to deal
+          // with. Wipe out the types and validate them again.
+          // FIXME: We never should have recorded such a type in the first
+          // place.
+          if (!aliasDecl->getUnderlyingTypeLoc().getType() ||
+              hasUnresolvedDependentMemberType(
+                aliasDecl->getUnderlyingTypeLoc().getType())) {
+            aliasDecl->getUnderlyingTypeLoc().setType(Type(),
+                                                      /*validated=*/false);
+            validateAccessibility(aliasDecl);
+
+            // Check generic parameters, if needed.
+            aliasDecl->setIsBeingValidated();
+            SWIFT_DEFER { aliasDecl->setIsBeingValidated(false); };
+
+            validateTypealiasType(*this, aliasDecl);
+          }
+        }
       }
     }
 
