@@ -1227,9 +1227,7 @@ namespace {
     Expr *coerceToType(Expr *expr, Type toType,
                        ConstraintLocatorBuilder locator,
                        Optional<Pattern*> typeFromPattern = None);
-
-    using LevelTy = llvm::PointerEmbeddedInt<unsigned, 2>;
-
+    
     /// \brief Coerce the given expression (which is the argument to a call) to
     /// the given parameter type.
     ///
@@ -1237,9 +1235,7 @@ namespace {
     ///
     /// \param arg The argument expression.
     /// \param paramType The parameter type.
-    /// \param applyOrLevel For function applications, the ApplyExpr that forms
-    /// the call. Otherwise, a specific level describing which parameter level
-    /// we're applying.
+    /// \param apply The ApplyExpr that forms the call.
     /// \param argLabels The argument labels provided for the call.
     /// \param hasTrailingClosure Whether the last argument is a trailing
     /// closure.
@@ -1248,7 +1244,7 @@ namespace {
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *
     coerceCallArguments(Expr *arg, Type paramType,
-                        llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+                        ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
                         bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
@@ -1406,10 +1402,9 @@ namespace {
       }
 
       // Coerce the index argument.
-      index = coerceCallArguments(
-          index, indexTy, LevelTy(1), argLabels,
-          hasTrailingClosure,
-          locator.withPathElement(ConstraintLocator::SubscriptIndex));
+      index = coerceToType(index, indexTy,
+                           locator.withPathElement(
+                             ConstraintLocator::SubscriptIndex));
       if (!index)
         return nullptr;
 
@@ -5140,23 +5135,12 @@ static bool isReferenceToMetatypeMember(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-static unsigned computeCallLevel(
-    ConstraintSystem &cs, ConcreteDeclRef callee,
-    llvm::PointerUnion<ApplyExpr *, ExprRewriter::LevelTy> applyOrLevel) {
-  using LevelTy = ExprRewriter::LevelTy;
-
-  if (applyOrLevel.is<LevelTy>()) {
-    // Level specified by caller.
-    return applyOrLevel.get<LevelTy>();
-  }
-
+static unsigned computeCallLevel(ConstraintSystem &cs, ConcreteDeclRef callee,
+                                 ApplyExpr *apply) {
   // If we do not have a callee, return a level of 0.
   if (!callee) {
     return 0;
   }
-
-  // Determine the level based on the application itself.
-  auto *apply = applyOrLevel.get<ApplyExpr *>();
 
   // Only calls to members of types can have level > 0.
   auto calleeDecl = callee.getDecl();
@@ -5185,7 +5169,7 @@ static unsigned computeCallLevel(
 
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
-    llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
+    ApplyExpr *apply,
     ArrayRef<Identifier> argLabels,
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
@@ -5230,7 +5214,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine the level,
-  unsigned level = computeCallLevel(cs, callee, applyOrLevel);
+  unsigned level = computeCallLevel(cs, callee, apply);
 
   // Determine the parameter bindings.
   auto params = decomposeParamType(paramType, callee.getDecl(), level);
