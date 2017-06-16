@@ -2351,6 +2351,17 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     return;
   }
   
+  // Likewise for key path applications. An application of a WritableKeyPath
+  // reads and writes its base.
+  if (auto *KPA = dyn_cast<KeyPathApplicationExpr>(E)) {
+    auto &C = KPA->getType()->getASTContext();
+    KPA->getKeyPath()->walk(*this);
+    if (KPA->getKeyPath()->getType()->getAnyNominal()
+          == C.getWritableKeyPathDecl())
+      markStoredOrInOutExpr(KPA->getBase(), RK_Written|RK_Read);
+    return;
+  }
+  
   if (auto *ioe = dyn_cast<InOutExpr>(E))
     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
   
