@@ -859,7 +859,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_serialize_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
@@ -1330,6 +1329,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.MergePartialModules = true;
 
   Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
+  Opts.SILSerializeWitnessTables |=
+    Args.hasArg(OPT_sil_serialize_witness_tables);
+
   // Parse the optimization level.
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {

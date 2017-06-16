@@ -366,6 +366,9 @@ def sil_link_all : Flag<["-"], "sil-link-all">,
 def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
   HelpText<"Serialize all generated SIL">;
 
+def sil_serialize_witness_tables : Flag<["-"], "sil-serialize-witness-tables">,
+  HelpText<"Serialize SIL witness tables">;
+
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
 
