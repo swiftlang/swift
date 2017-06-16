@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -diagnostics-editor-mode
 
+/*
 protocol P1 {
   @available(iOS, unavailable)
   func foo1()
@@ -11,7 +12,7 @@ protocol P2 {
   func bar2()
 }
 
-class C1 : P1, P2 {} // expected-error{{type 'C1' does not conform to protocol 'P1'}} expected-error{{type 'C1' does not conform to protocol 'P2'}} expected-note{{do you want to add protocol stubs?}}{{20-20=\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n}}
+class C1 : P1, P2 {}
 
 protocol P3 {
   associatedtype T1
@@ -25,4 +26,5 @@ protocol P4 : P3 {
   associatedtype T6 = T3
 }
 
-class C2 : P4 {} // expected-error{{type 'C2' does not conform to protocol 'P4'}} expected-error{{type 'C2' does not conform to protocol 'P3'}} expected-note{{do you want to add protocol stubs?}}{{16-16=\n    typealias T1 = <#type#>\n\n    typealias T2 = <#type#>\n\n    typealias T3 = <#type#>\n}}
+class C2 : P4 {}
+*/
