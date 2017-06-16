@@ -3156,6 +3156,24 @@ Type Type::substDependentTypesWithErrorTypes() const {
                     SubstFlags::UseErrorType));
 }
 
+const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
+  if (!hasTypeParameter()) return nullptr;
+
+  const DependentMemberType *unresolvedDepMemTy = nullptr;
+  Type(this).findIf([&](Type type) -> bool {
+    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      if (depMemTy->getAssocType() == nullptr) {
+        unresolvedDepMemTy = depMemTy;
+        return true;
+      }
+    }
+    return false;
+  });
+
+  return unresolvedDepMemTy;
+}
+
+
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
   Type t(this);
   while (t) {

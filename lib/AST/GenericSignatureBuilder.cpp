@@ -5258,14 +5258,8 @@ static void collectRequirements(GenericSignatureBuilder &builder,
 
       // Drop requirements involving concrete types containing
       // unresolved associated types.
-      if (repTy.findIf([](Type t) -> bool {
-            if (auto *depTy = dyn_cast<DependentMemberType>(t.getPointer()))
-              if (depTy->getAssocType() == nullptr)
-                return true;
-            return false;
-          })) {
+      if (repTy->findUnresolvedDependentMemberType())
         return;
-      }
     } else if (auto layoutConstraint = type.dyn_cast<LayoutConstraint>()) {
       requirements.push_back(Requirement(kind, depTy, layoutConstraint));
       return;
