@@ -7707,7 +7707,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
     auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
+      GenericSignatureBuilder::FloatingRequirementSource::forInferred(
+                                          nullptr, /*quietly=*/false);
 
     builder.inferRequirements(*ext->getModuleContext(),
                               TypeLoc::withoutLoc(extInterfaceType),
