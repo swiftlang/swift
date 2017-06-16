@@ -209,9 +209,6 @@ private:
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
 
-  /// True if this SILModule is being completely serialized.
-  bool WholeModuleSerialized;
-
   /// The options passed into this SILModule.
   SILOptions &Options;
 
@@ -222,7 +219,7 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule, bool wholeModuleSerialized);
+            bool wholeModule);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -285,23 +282,18 @@ public:
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file, starting from the specified element number.
-  ///
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as serialized. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
                Optional<unsigned> startElem = None,
-               bool makeModuleFragile = false,
                bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
-                    bool WholeModule = false,
-                    bool WholeModuleSerialized = false) {
+                    bool WholeModule = false) {
     return std::unique_ptr<SILModule>(
-        new SILModule(M, Options, M, WholeModule, WholeModuleSerialized));
+        new SILModule(M, Options, M, WholeModule));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -330,7 +322,7 @@ public:
   }
 
   /// Returns true if everything in this SILModule is being serialized.
-  bool isWholeModuleSerialized() const { return WholeModuleSerialized; }
+  bool isWholeModuleSerialized() const { return Options.SILSerializeAll; }
 
   SILOptions &getOptions() const { return Options; }
 
