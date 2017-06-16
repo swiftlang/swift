@@ -314,12 +314,18 @@ public:
     Serialized = IsNotSerialized;
 
     // Serialize the witness table if we're serializing everything with
-    // -sil-serialize-all, or if the conformance itself thinks it should be.
+    // -sil-serialize-all.
     if (SGM.isMakeModuleFragile())
       Serialized = IsSerialized;
 
     auto *nominal = Conformance->getType()->getAnyNominal();
-    if (nominal->hasFixedLayout() &&
+    // Serialize the witness table if the conformance itself thinks it should be
+    // and resilience is explicitly enabled for this compilaiton or if we serialize
+    // all eligible witness tables.
+    if ((SGM.M.getSwiftModule()->getResilienceStrategy() ==
+             ResilienceStrategy::Resilient ||
+         SGM.M.getOptions().SILSerializeWitnessTables) &&
+        nominal->hasFixedLayout() &&
         proto->getEffectiveAccess() >= Accessibility::Public &&
         nominal->getEffectiveAccess() >= Accessibility::Public)
       Serialized = IsSerialized;
