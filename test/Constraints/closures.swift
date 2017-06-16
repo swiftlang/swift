@@ -528,3 +528,7 @@ r32432145 { _,_ in
   // expected-error@-1 {{contextual closure type '() -> ()' expects 0 arguments, but 2 were used in closure body}} {{13-19=}}
   print("answer is 42")
 }
+
+// rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
+[1, 2].first { $0.foo = 3 }
+// expected-error@-1 {{value of type 'Int' has no member 'foo'}}
