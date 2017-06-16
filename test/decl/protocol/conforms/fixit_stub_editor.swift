@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -diagnostics-editor-mode
 
 protocol P1 {
+  @available(*, introduced: 999)
   func foo1()
   func foo2()
 }
