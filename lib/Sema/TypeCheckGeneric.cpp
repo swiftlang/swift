@@ -218,6 +218,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       if (auto proto =
             concrete->getDeclContext()
               ->getAsProtocolOrProtocolExtensionContext()) {
+        TC.validateDecl(proto);
         auto subMap = SubstitutionMap::getProtocolSubstitutions(
                         proto, baseTy, ProtocolConformanceRef(proto));
         return concrete->getDeclaredInterfaceType().subst(subMap);

@@ -3623,6 +3623,9 @@ case TypeKind::Id:
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(base);
     auto underlyingTy = Type(alias->getSinglyDesugaredType());
+    if (!underlyingTy)
+      return Type();
+
     auto transformedTy = underlyingTy.transformRec(fn);
     if (!transformedTy)
       return Type();
