@@ -1416,11 +1416,6 @@ ERROR(witness_self_same_type,none,
       " (in protocol %5) due to same-type requirement involving 'Self'",
       (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
        DeclName, Type))
-WARNING(witness_self_same_type_warn,none,
-      "%0 %1 in non-final class %2 cannot be used to satisfy requirement %3 %4"
-      " (in protocol %5) due to same-type requirement involving 'Self'",
-      (DescriptiveDeclKind, DeclName, Type, DescriptiveDeclKind,
-       DeclName, Type))
 NOTE(witness_self_weaken_same_type,none,
       "consider weakening the same-type requirement %0 == %1 to a superclass "
       "requirement", (Type, Type))
