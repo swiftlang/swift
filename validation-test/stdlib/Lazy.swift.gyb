@@ -12,6 +12,8 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+// REQUIRES: radar_31897334
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 
