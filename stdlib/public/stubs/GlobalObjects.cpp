@@ -131,11 +131,14 @@ void swift::_swift_instantiateInertHeapObject(void *address,
   ::new (address) HeapObject{metadata};
 }
 
+swift::HeapLocalVariableMetadata _emptyBoxStorageMetadata;
+
 /// The signleton empty box storage object.
 swift::_SwiftEmptyBoxStorage swift::_EmptyBoxStorage = {
  // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s16_EmptyBoxStorage), // isa pointer
+    &_emptyBoxStorageMetadata,
+    //&swift::CLASS_METADATA_SYM(s16_EmptyBoxStorage), // isa pointer
   }
 };
 
