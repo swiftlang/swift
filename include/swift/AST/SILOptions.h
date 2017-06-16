@@ -152,6 +152,11 @@ public:
   /// \brief Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = false;
 
+  /// Enables the "fully fragile" resilience strategy.
+  ///
+  /// \see ResilienceStrategy::Fragile
+  bool SILSerializeAll = false;
+
   SILOptions() : Sanitize(SanitizerKind::None) {}
 
   /// Return a hash code of any components from these options that should
