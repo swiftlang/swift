@@ -257,7 +257,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     }
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0):
+                    case (0, 0): fallthrough
+                    case (1, 1):
                         return .empty
                     case (0, 1):
                         return .single(index)
