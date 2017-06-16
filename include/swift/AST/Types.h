@@ -45,6 +45,7 @@ namespace swift {
   class AssociatedTypeDecl;
   class ASTContext;
   class ClassDecl;
+  class DependentMemberType;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class GenericParamList;
@@ -533,6 +534,12 @@ public:
   bool hasTypeParameter() {
     return getRecursiveProperties().hasTypeParameter();
   }
+
+  /// Find any unresolved dependent member type within this type.
+  ///
+  /// "Unresolved" dependent member types have no known associated type,
+  /// and are only used transiently in the type checker.
+  const DependentMemberType *findUnresolvedDependentMemberType();
 
   /// Return the root generic parameter of this type parameter type.
   GenericTypeParamType *getRootGenericParam();
