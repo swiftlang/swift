@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -diagnostics-editor-mode
+// REQUIRES: rdar32804941
 
 protocol P1 {
   @available(iOS, unavailable)
