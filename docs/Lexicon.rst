@@ -65,6 +65,9 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   bitcode
     Serialized LLVM `IR`.
 
+  build czar
+    Apple term for "the person assigned to watch CI this week".
+
   canonical SIL
     SIL after the
     `mandatory passes <mandatory passes / mandatory optimizations>` have run.
