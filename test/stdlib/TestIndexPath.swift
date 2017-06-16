@@ -711,6 +711,15 @@ class TestIndexPath: TestIndexPathSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(IndexPath(), IndexPath._unconditionallyBridgeFromObjectiveC(nil))
     }
+
+    func test_slice_1ary() {
+        let indexPath: IndexPath = [0]
+        let res = indexPath.dropFirst()
+        expectEqual(0, res.count)
+
+        let slice = indexPath[1..<1]
+        expectEqual(0, slice.count)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -762,5 +771,6 @@ IndexPathTests.test("testObjcBridgeType") { TestIndexPath().testObjcBridgeType()
 IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().test_AnyHashableContainingIndexPath() }
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
 IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
+IndexPathTests.test("test_slice_1ary") { TestIndexPath().test_slice_1ary() }
 runAllTests()
 #endif
