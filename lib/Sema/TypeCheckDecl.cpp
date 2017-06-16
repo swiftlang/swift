@@ -243,7 +243,7 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
 }
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
-  ProtocolRequirementTypeResolver resolver(protocol);
+  ProtocolRequirementTypeResolver resolver;
   TypeResolutionOptions options;
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
@@ -7520,9 +7520,9 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       return;
 
     // Perform earlier validation of typealiases in protocols.
-    if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+    if (isa<ProtocolDecl>(dc)) {
       if (!typealias->getGenericParams()) {
-        ProtocolRequirementTypeResolver resolver(proto);
+        ProtocolRequirementTypeResolver resolver;
         TypeResolutionOptions options;
 
         if (typealias->isBeingValidated()) return;

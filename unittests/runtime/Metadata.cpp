@@ -839,9 +839,6 @@ TEST(MetadataTest, getExistentialTypeMetadata_subclass) {
     });
 }
 
-static const void *AllocatedBuffer = nullptr;
-static const void *DeallocatedBuffer = nullptr;
-
 namespace swift {
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
 } // namespace swift

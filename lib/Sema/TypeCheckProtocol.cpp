@@ -3291,17 +3291,17 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
   auto *moduleDecl = dc->getParentModule();
-  auto *reqtSig = assocType->getProtocol()->getRequirementSignature();
+  auto *genericSig = proto->getGenericSignature();
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 
-  if (auto superclass = reqtSig->getSuperclassBound(depTy, *moduleDecl)) {
+  if (auto superclass = genericSig->getSuperclassBound(depTy, *moduleDecl)) {
     if (!superclass->isExactSuperclassOf(type))
       return superclass->getAnyNominal();
   }
 
   // Check protocol conformances.
-  for (auto reqProto : reqtSig->getConformsTo(depTy, *moduleDecl)) {
+  for (auto reqProto : genericSig->getConformsTo(depTy, *moduleDecl)) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
 

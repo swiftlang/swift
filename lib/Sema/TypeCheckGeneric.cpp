@@ -29,12 +29,8 @@ using namespace swift;
 /// GenericTypeResolver implementations
 ///
 
-Type DependentGenericTypeResolver::resolveGenericTypeParamType(
-                                     GenericTypeParamType *gp) {
-  assert(gp->getDecl() && "Missing generic parameter declaration");
-
-  // Don't resolve generic parameters.
-  return gp;
+Type DependentGenericTypeResolver::mapTypeIntoContext(Type type) {
+  return type;
 }
 
 Type DependentGenericTypeResolver::resolveDependentMemberType(
@@ -43,19 +39,6 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
   return DependentMemberType::get(baseTy, ref->getIdentifier());
-}
-
-Type DependentGenericTypeResolver::resolveSelfAssociatedType(
-       Type selfTy, AssociatedTypeDecl *assocType) {
-  return DependentMemberType::get(selfTy, assocType);
-}
-
-Type DependentGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  return dc->getSelfInterfaceType();
-}
-
-Type DependentGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
-  return decl->getDeclaredInterfaceType();
 }
 
 bool DependentGenericTypeResolver::areSameType(Type type1, Type type2) {
@@ -70,9 +53,8 @@ void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
   // Do nothing
 }
 
-Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
-                                       GenericTypeParamType *gp) {
-  return GenericEnv->mapTypeIntoContext(gp);
+Type GenericTypeToArchetypeResolver::mapTypeIntoContext(Type type) {
+  return GenericEnvironment::mapTypeIntoContext(GenericEnv, type);
 }
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
@@ -81,21 +63,6 @@ Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
                                   SourceRange baseRange,
                                   ComponentIdentTypeRepr *ref) {
   llvm_unreachable("Dependent type after archetype substitution");
-}
-
-Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
-       Type selfTy, AssociatedTypeDecl *assocType) {
-  llvm_unreachable("Dependent type after archetype substitution");  
-}
-
-Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  return GenericEnvironment::mapTypeIntoContext(
-      GenericEnv, dc->getSelfInterfaceType());
-}
-
-Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
-  return GenericEnvironment::mapTypeIntoContext(
-      GenericEnv, decl->getDeclaredInterfaceType());
 }
 
 bool GenericTypeToArchetypeResolver::areSameType(Type type1, Type type2) {
@@ -116,32 +83,14 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
         GenericEnv, type));
 }
 
-Type ProtocolRequirementTypeResolver::resolveGenericTypeParamType(
-    GenericTypeParamType *gp) {
-  assert(gp->isEqual(Proto->getSelfInterfaceType()) &&
-         "found non-Self-shaped GTPT when resolving protocol requirement");
-  return gp;
+Type ProtocolRequirementTypeResolver::mapTypeIntoContext(Type type) {
+  return type;
 }
 
 Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
     Type baseTy, DeclContext *DC, SourceRange baseRange,
     ComponentIdentTypeRepr *ref) {
   return DependentMemberType::get(baseTy, ref->getIdentifier());
-}
-
-Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
-    Type selfTy, AssociatedTypeDecl *assocType) {
-  assert(selfTy->isEqual(Proto->getSelfInterfaceType()));
-  (void)Proto;
-  return assocType->getDeclaredInterfaceType();
-}
-
-Type ProtocolRequirementTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  return dc->getSelfInterfaceType();
-}
-
-Type ProtocolRequirementTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
-  return decl->getDeclaredInterfaceType();
 }
 
 bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
@@ -167,12 +116,9 @@ void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
       "recording a param type of a protocol requirement doesn't make sense");
 }
 
-Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
-                                              GenericTypeParamType *gp) {
-  assert(gp->getDecl() && "Missing generic parameter declaration");
-  return gp;
+Type CompleteGenericTypeResolver::mapTypeIntoContext(Type type) {
+  return type;
 }
-
 
 Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     Type baseTy,
@@ -244,22 +190,6 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   TC.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
     .highlight(baseRange);
   return ErrorType::get(TC.Context);
-}
-
-Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
-       Type selfTy, AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy,
-                                  ArchetypeResolutionKind::CompleteWellFormed)
-           ->getNestedType(assocType, Builder)
-           ->getDependentType(GenericParams, /*allowUnresolved=*/false);
-}
-
-Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
-  return dc->getSelfInterfaceType();
-}
-
-Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
-  return decl->getDeclaredInterfaceType();
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {

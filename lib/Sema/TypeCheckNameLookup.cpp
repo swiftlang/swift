@@ -187,24 +187,19 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   for (const auto &found : lookup.Results) {
     // Determine which type we looked through to find this result.
     Type foundInType;
+
     if (!found.getBaseDecl()) {
       // Not found within a type.
-    } else if (auto baseParam = dyn_cast<ParamDecl>(found.getBaseDecl())) {
-      auto baseDC = baseParam->getDeclContext();
-      if (isa<AbstractFunctionDecl>(baseDC))
-        baseDC = baseDC->getParent();
-      if (isa<PatternBindingInitializer>(baseDC))
-        baseDC = baseDC->getParent();
-      foundInType = baseDC->getDeclaredTypeInContext();
-      assert(foundInType && "bogus base declaration?");
     } else {
-      auto baseNominal = cast<NominalTypeDecl>(found.getBaseDecl());
-      for (auto currentDC = dc; currentDC; currentDC = currentDC->getParent()) {
-        if (currentDC->getAsNominalTypeOrNominalTypeExtensionContext()
-              == baseNominal) {
-          foundInType = currentDC->getDeclaredTypeInContext();
-        }
+      DeclContext *baseDC = nullptr;
+      if (auto baseParam = dyn_cast<ParamDecl>(found.getBaseDecl())) {
+        baseDC = baseParam->getDeclContext()->getParent();
+      } else {
+        baseDC = cast<NominalTypeDecl>(found.getBaseDecl());
       }
+
+      foundInType = dc->mapTypeIntoContext(
+        baseDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
     }
 
