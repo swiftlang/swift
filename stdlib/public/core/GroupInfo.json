@@ -175,7 +175,6 @@
     "Equatable.swift",
     "Comparable.swift",
     "Hashable.swift",
-    "Codable.swift",
-    "EmptyBoxType.swift"
+    "Codable.swift"
   ]
 }

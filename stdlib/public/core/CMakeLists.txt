@@ -50,7 +50,6 @@ set(SWIFTLIB_ESSENTIAL
   DoubleWidth.swift.gyb
   DropWhile.swift.gyb
   Dump.swift
-  EmptyBoxType.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
