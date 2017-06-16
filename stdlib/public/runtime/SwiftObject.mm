@@ -1435,20 +1435,20 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
            sel_getName(selector));
   asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
 
-  _RuntimeErrorDetails::RelatedObject methodDeclaration = {
+  RuntimeErrorDetails::RelatedObject methodDeclaration = {
     .description = "Method declaration",
     .filename = nullTerminatedFilename,
     .line = line,
     .column = column
   };
-  _RuntimeErrorDetails details = {
+  RuntimeErrorDetails details = {
     .version = 1,
     .errorType = "implicit-objc-entrypoint",
     .numRelatedObjects = 1,
     .relatedObjects = &methodDeclaration
   };
   bool isFatal = reporter == swift::fatalError;
-  _reportToDebugger(isFatal, message, &details);
+  reportToDebugger(isFatal, message, &details);
 
   reporter(flags,
            "*** %s:%zu:%zu: %s; add explicit '@objc' to the declaration to "

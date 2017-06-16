@@ -138,7 +138,7 @@ void printCurrentBacktrace(unsigned framesToSkip = 1);
 /// to be stable) and describes extra information about a fatal error or a
 /// non-fatal warning, which should be logged as a runtime issue. Please keep
 /// all integer values pointer-sized.
-struct _RuntimeErrorDetails {
+struct RuntimeErrorDetails {
   // ABI version, needs to be "1" currently.
   uintptr_t version;
 
@@ -181,8 +181,8 @@ struct _RuntimeErrorDetails {
 
 /// Debugger hook. Calling this stops the debugger with a message and details
 /// about the issues.
-void _reportToDebugger(bool isFatal, const char *message,
-                      _RuntimeErrorDetails *details = nullptr);
+void reportToDebugger(bool isFatal, const char *message,
+                      RuntimeErrorDetails *details = nullptr);
 
 // namespace swift
 }

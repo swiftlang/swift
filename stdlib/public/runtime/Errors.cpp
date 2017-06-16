@@ -244,17 +244,17 @@ reportNow(uint32_t flags, const char *message)
 }
 
 LLVM_ATTRIBUTE_NOINLINE SWIFT_RUNTIME_EXPORT
-void __swift_runtime_on_report(bool isFatal, const char *message,
-                               _RuntimeErrorDetails *details) {
+void _swift_runtime_on_report(bool isFatal, const char *message,
+                              RuntimeErrorDetails *details) {
   // Do nothing. This function is meant to be used by the debugger.
 
   // The following is necessary to avoid calls from being optimized out.
   asm volatile("" ::: "memory");
 }
 
-void swift::_reportToDebugger(bool isFatal, const char *message,
-                              _RuntimeErrorDetails *details) {
-  __swift_runtime_on_report(isFatal, message, details);
+void swift::reportToDebugger(bool isFatal, const char *message,
+                             RuntimeErrorDetails *details) {
+  _swift_runtime_on_report(isFatal, message, details);
 }
 
 /// Report a fatal error to system console, stderr, and crash logs.

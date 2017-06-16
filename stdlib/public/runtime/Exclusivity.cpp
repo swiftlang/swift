@@ -107,12 +107,12 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
 
   bool keepGoing = isWarningOnly(newFlags);
 
-  _RuntimeErrorDetails::Thread secondaryThread = {
-      .description = oldAccess,
-      .numFrames = 1,
-      .frames = &oldPC
+  RuntimeErrorDetails::Thread secondaryThread = {
+    .description = oldAccess,
+    .numFrames = 1,
+    .frames = &oldPC
   };
-  _RuntimeErrorDetails details = {
+  RuntimeErrorDetails details = {
     .version = 1,
     .errorType = "exclusivity-violation",
     .currentStackDescription = newAccess,
@@ -120,7 +120,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .numExtraThreads = 1,
     .threads = &secondaryThread
   };
-  _reportToDebugger(!keepGoing, message, &details);
+  reportToDebugger(!keepGoing, message, &details);
 
   if (keepGoing) {
     return;
