@@ -22,6 +22,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
+#include "swift/SILOptimizer/Utils/IndexTrie.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -129,11 +130,26 @@ private:
   llvm::DenseMap<SILFunction *, FunctionInfo *> FunctionInfos;
 
   llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
+
+  /// A trie of integer indices that gives pointer identity to a path of
+  /// projections. This is shared between all functions in the module.
+  IndexTrieNode *SubPathTrie;
+
 public:
-  AccessSummaryAnalysis() : BottomUpIPAnalysis(AnalysisKind::AccessSummary) {}
+  AccessSummaryAnalysis() : BottomUpIPAnalysis(AnalysisKind::AccessSummary) {
+    SubPathTrie = new IndexTrieNode();
+  }
+
+  ~AccessSummaryAnalysis() {
+    delete SubPathTrie;
+  }
 
   /// Returns a summary of the accesses performed by the given function.
   const FunctionSummary &getOrCreateSummary(SILFunction *Fn);
+
+  IndexTrieNode *getSubPathTrieRoot() {
+    return SubPathTrie;
+  }
 
   virtual void initialize(SILPassManager *PM) override {}
   virtual void invalidate() override;
