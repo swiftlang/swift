@@ -83,12 +83,10 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
-                     const DeclContext *associatedDC, bool wholeModule,
-                     bool wholeModuleSerialized)
+                     const DeclContext *associatedDC, bool wholeModule)
     : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
-      wholeModule(wholeModule), WholeModuleSerialized(wholeModuleSerialized),
-      Options(Options), Types(*this) {}
+      wholeModule(wholeModule), Options(Options), Types(*this) {}
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.

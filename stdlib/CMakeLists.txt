@@ -93,11 +93,14 @@ add_custom_target(swift-test-stdlib ALL
 
 if(SWIFT_STDLIB_ENABLE_RESILIENCE)
   set(STDLIB_SIL_SERIALIZE_ALL)
+  set(STDLIB_SIL_SERIALIZE_WITNESS_TABLES)
 else()
   if(SWIFT_STDLIB_SIL_SERIALIZE_ALL)
     set(STDLIB_SIL_SERIALIZE_ALL "-Xfrontend" "-sil-serialize-all")
+    set(STDLIB_SIL_SERIALIZE_WITNESS_TABLES "-Xfrontend" "-sil-serialize-witness-tables")
   else()
     set(STDLIB_SIL_SERIALIZE_ALL)
+    set(STDLIB_SIL_SERIALIZE_WITNESS_TABLES)
   endif()
 endif()
 

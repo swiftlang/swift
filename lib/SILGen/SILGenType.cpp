@@ -315,11 +315,14 @@ public:
 
     // Serialize the witness table if we're serializing everything with
     // -sil-serialize-all, or if the conformance itself thinks it should be.
-    if (SGM.makeModuleFragile)
+    if (SGM.isMakeModuleFragile() ||
+        SGM.M.getOptions().SILSerializeWitnessTables)
       Serialized = IsSerialized;
 
     auto *nominal = Conformance->getType()->getAnyNominal();
-    if (nominal->hasFixedLayout() &&
+    if (SGM.M.getSwiftModule()->getResilienceStrategy() ==
+            ResilienceStrategy::Resilient &&
+        nominal->hasFixedLayout() &&
         proto->getEffectiveAccess() >= Accessibility::Public &&
         nominal->getEffectiveAccess() >= Accessibility::Public)
       Serialized = IsSerialized;
@@ -431,7 +434,7 @@ public:
       // then SILGen gives the member private linkage, ignoring the more
       // visible accessibility it was given in the AST.
       witnessLinkage = SILLinkage::Public;
-      witnessSerialized = (SGM.makeModuleFragile
+      witnessSerialized = (SGM.isMakeModuleFragile()
                            ? IsSerialized
                            : IsNotSerialized);
     } else {
