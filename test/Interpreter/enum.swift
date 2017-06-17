@@ -553,5 +553,50 @@ presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: (), u: "foo")
 
+// SR-5148
+enum Payload {
+    case email
+}
+enum Test {
+    case a
+    indirect case b(Payload)
+}
+
+@inline(never)
+func printA() {
+    print("an a")
+}
+
+@inline(never)
+func printB() {
+    print("an b")
+}
+
+@inline(never)
+func testCase(_ testEmail: Test) {
+  switch testEmail {
+    case .a:
+      printA()
+    case .b:
+      printB()
+  }
+}
+
+@inline(never)
+func createTestB() -> Test  {
+  return Test.b(.email)
+}
+
+@inline(never)
+func createTestA() -> Test  {
+  return Test.a
+}
+
+// CHECK-NEXT: an b
+testCase(createTestB())
+// CHECK-NEXT: b(a.Payload.email)
+print(createTestB())
+// CHECK-NEXT: a
+print(createTestA())
 // CHECK-NEXT: done
 print("done")

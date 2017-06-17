@@ -188,6 +188,8 @@ public:
 
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
+  llvm::Value *emitAllocEmptyBoxCall();
+
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
   // abstraction difference, the metadata contains the layout information for

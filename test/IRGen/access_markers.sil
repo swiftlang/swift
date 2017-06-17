@@ -114,8 +114,7 @@ sil @testPairedBox : $(@guaranteed { var () }) -> () {
 bb0(%0 : ${ var () }):
   // CHECK: entry:
   %2 = project_box %0 : ${ var () }, 0
-
-  // CHECK-NEXT: call {{.*}}void @writeEmptyTuple(%swift.opaque* nocapture undef)
+  //  CHECK-NEXT: call {{.*}}void @writeEmptyTuple(%swift.opaque* nocapture undef)
   %3 = begin_access [modify] [dynamic] %2 : $*()
   %write_fn = function_ref @writeEmptyTuple : $@convention(thin) (@inout ()) -> ()
   apply %write_fn(%3) : $@convention(thin) (@inout ()) -> ()
