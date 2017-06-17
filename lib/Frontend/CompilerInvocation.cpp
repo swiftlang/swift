@@ -1420,7 +1420,14 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
-    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
+    Opts.Sanitize = parseSanitizerArgValues(
+        A, Triple, Diags,
+        /* sanitizerRuntimeLibExists= */[](StringRef libName) {
+
+          // The driver has checked the existence of the library
+          // already.
+          return true;
+        });
     IRGenOpts.Sanitize = Opts.Sanitize;
   }
 

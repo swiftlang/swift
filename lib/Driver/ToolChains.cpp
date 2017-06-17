@@ -965,6 +965,15 @@ static void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));
 }
 
+static void getClangLibraryPathOnDarwin(SmallVectorImpl<char> &libPath,
+                                        const ArgList &args,
+                                        const ToolChain &TC) {
+  getRuntimeLibraryPath(libPath, args, TC);
+  // Remove platform name.
+  llvm::sys::path::remove_filename(libPath);
+  llvm::sys::path::append(libPath, "clang", "lib", "darwin");
+}
+
 /// Get the runtime library link path for static linking,
 /// which is platform-specific and found relative to the compiler.
 static void getRuntimeStaticLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
@@ -1025,16 +1034,31 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
   llvm_unreachable("Unsupported Darwin platform");
 }
 
+static std::string
+getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer, const llvm::Triple &Triple) {
+  return (Twine("libclang_rt.")
+      + Sanitizer + "_"
+      + getDarwinLibraryNameSuffixForTriple(Triple) + "_dynamic.dylib").str();
+}
+
+bool toolchains::Darwin::sanitizerRuntimeLibExists(
+    const ArgList &args, StringRef sanitizer) const {
+  SmallString<128> sanitizerLibPath;
+  getClangLibraryPathOnDarwin(sanitizerLibPath, args, *this);
+  llvm::sys::path::append(sanitizerLibPath,
+      getSanitizerRuntimeLibNameForDarwin(sanitizer, this->getTriple()));
+  return llvm::sys::fs::exists(sanitizerLibPath.str());
+}
+
+
 static void
 addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
                            StringRef DarwinLibName, bool AddRPath,
                            const ToolChain &TC) {
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC);
-  // Remove platform name.
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "clang", "lib", "darwin");
-  SmallString<128> P(Dir);
+  SmallString<128> ClangLibraryPath;
+  getClangLibraryPathOnDarwin(ClangLibraryPath, Args, TC);
+
+  SmallString<128> P(ClangLibraryPath);
   llvm::sys::path::append(P, DarwinLibName);
   Arguments.push_back(Args.MakeArgString(P));
 
@@ -1053,7 +1077,7 @@ addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
     // Add the path to the resource dir to rpath to support using the dylib
     // from the default location without copying.
     Arguments.push_back("-rpath");
-    Arguments.push_back(Args.MakeArgString(Dir));
+    Arguments.push_back(Args.MakeArgString(ClangLibraryPath));
   }
 }
 
@@ -1068,10 +1092,8 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
   Arguments.push_back("-lc++abi");
 
   addLinkRuntimeLibForDarwin(Args, Arguments,
-                    (Twine("libclang_rt.") + Sanitizer + "_" +
-                     getDarwinLibraryNameSuffixForTriple(TC.getTriple()) +
-                     "_dynamic.dylib").str(),
-                     /*AddRPath*/ true, TC);
+      getSanitizerRuntimeLibNameForDarwin(Sanitizer, TC.getTriple()),
+      /*AddRPath=*/ true, TC);
 }
 
 ToolChain::InvocationInfo

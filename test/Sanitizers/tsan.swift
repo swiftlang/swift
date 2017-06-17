@@ -4,7 +4,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
 // REQUIRES: tsan_runtime
-// XFAIL: linux
 
 // Make sure we can handle swifterror and don't bail during the LLVM
 // threadsanitizer pass.

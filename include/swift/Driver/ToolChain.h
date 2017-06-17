@@ -168,6 +168,14 @@ public:
 
   /// Return the default language type to use for the given extension.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
+
+  /// Check whether a clang library with a given name exists.
+  ///
+  /// \param args Invocation arguments.
+  /// \param sanitizer Sanitizer name.
+  virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
+                                         StringRef sanitizer) const;
+
 };
 } // end namespace driver
 } // end namespace swift
