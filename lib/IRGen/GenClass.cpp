@@ -181,14 +181,30 @@ namespace {
     // If not, we can have to access stored properties through the field
     // offset vector in the instantiated type metadata.
     bool ClassHasConcreteLayout = true;
-
+    
   public:
-    ClassLayoutBuilder(IRGenModule &IGM, SILType classType)
+    ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
+                       ReferenceCounting refcounting)
       : StructLayoutBuilder(IGM)
     {
       // Start by adding a heap header.
-      addHeapHeader();
-
+      switch (refcounting) {
+      case swift::irgen::ReferenceCounting::Native:
+        // For native classes, place a full object header.
+        addHeapHeader();
+        break;
+      case swift::irgen::ReferenceCounting::ObjC:
+        // For ObjC-inheriting classes, we don't reliably know the size of the
+        // base class, but NSObject only has an `isa` pointer at most.
+        addNSObjectHeader();
+        break;
+      case swift::irgen::ReferenceCounting::Block:
+      case swift::irgen::ReferenceCounting::Unknown:
+      case swift::irgen::ReferenceCounting::Bridge:
+      case swift::irgen::ReferenceCounting::Error:
+        llvm_unreachable("not a class refcounting kind");
+      }
+      
       // Next, add the fields for the given class.
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
@@ -382,7 +398,7 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
          "already generated layout");
 
   // Add the heap header.
-  ClassLayoutBuilder builder(IGM, classType);
+  ClassLayoutBuilder builder(IGM, classType, Refcount);
 
   // generateLayout can call itself recursively in order to compute a layout
   // for the abstract type.  If classType shares an exemplar types with the
@@ -409,7 +425,8 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
 const StructLayout &
 ClassTypeInfo::getLayout(IRGenModule &IGM, SILType classType) const {
   // Return the cached layout if available.
-  if (Layout) return *Layout;
+  if (Layout)
+    return *Layout;
 
   generateLayout(IGM, classType);
   return *Layout;
@@ -489,7 +506,13 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
   }
 }
 
-
+FieldAccess
+irgen::getClassFieldAccess(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
+  unsigned fieldIndex = classLayout.getFieldIndex(field);
+  return classLayout.AllFieldAccesses[fieldIndex];
+}
 
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
