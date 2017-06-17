@@ -1840,6 +1840,9 @@ struct TargetHeapLocalVariableMetadata
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::HeapLocalVariable;
   }
+  constexpr TargetHeapLocalVariableMetadata()
+      : TargetHeapMetadata<Runtime>(MetadataKind::HeapLocalVariable),
+        OffsetToFirstCapture(0), CaptureDescription(nullptr) {}
 };
 using HeapLocalVariableMetadata
   = TargetHeapLocalVariableMetadata<InProcess>;
