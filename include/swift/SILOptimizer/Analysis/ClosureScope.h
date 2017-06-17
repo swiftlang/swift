@@ -36,7 +36,7 @@
 ///
 /// NOTE: a non-escaping function can be passed as an escaping function via
 /// withoutActuallyEscaping. However, using that API to introduce recursion is
-/// disallowed according to exclusivity semantics. This is, non-escaping
+/// disallowed according to exclusivity semantics. That is, non-escaping
 /// function types cannot be reentrant (SE-0176). In this analysis, we assert
 /// that closure scopes are acyclic. Although the language does not currently
 /// enforce non-reentrant, non-escaping closures, the scope graph cannot be
