@@ -1391,7 +1391,7 @@ bool WitnessChecker::findBestWitness(
 
       auto lookupOptions = defaultUnqualifiedLookupOptions;
       lookupOptions |= NameLookupFlags::KnownPrivate;
-      auto lookup = TC.lookupUnqualified(overlay, requirement->getName(),
+      auto lookup = TC.lookupUnqualified(overlay, requirement->getBaseName(),
                                          SourceLoc(), lookupOptions);
       for (auto candidate : lookup)
         witnesses.push_back(candidate.Decl);
