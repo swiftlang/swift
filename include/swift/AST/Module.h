@@ -209,9 +209,6 @@ private:
     unsigned ResilienceStrategy : 2;
   } Flags;
 
-  /// The magic __dso_handle variable.
-  VarDecl *DSOHandle;
-
   ModuleDecl(Identifier name, ASTContext &ctx);
 
 public:

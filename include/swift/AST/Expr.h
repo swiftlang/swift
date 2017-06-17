@@ -1076,10 +1076,6 @@ public:
     llvm_unreachable("bad Kind");
   }
 
-  bool isDSOHandle() const {
-    return getKind() == DSOHandle;
-  }
-
   SourceRange getSourceRange() const { return Loc; }
 
   // For a magic identifier that produces a string literal, retrieve the
