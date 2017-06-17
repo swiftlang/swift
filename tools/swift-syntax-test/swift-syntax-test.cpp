@@ -100,12 +100,20 @@ getTokensFromFile(const StringRef InputFilename,
   return getTokensFromFile(BufferID, LangOpts, SourceMgr, Diags, Tokens);
 }
 
-int getSyntaxTree(const StringRef InputFilename,
+void anchorForGetMainExecutable() {}
+
+int getSyntaxTree(const char *MainExecutablePath,
+                  const StringRef InputFilename,
                   llvm::SmallVectorImpl<syntax::Syntax> &TopLevelDecls,
                   std::vector<std::pair<RC<syntax::TokenSyntax>,
                               syntax::AbsolutePosition>> &Tokens) {
   CompilerInvocation Invocation;
   Invocation.addInputFilename(InputFilename);
+
+  Invocation.setMainExecutablePath(
+    llvm::sys::fs::getMainExecutable(MainExecutablePath,
+      reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+
   Invocation.setModuleName("Test");
   CompilerInstance Instance;
 
@@ -205,13 +213,14 @@ int doDumpTokenSyntax(const StringRef InputFilename) {
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-int doFullParseRoundTrip(const StringRef InputFilename) {
+int doFullParseRoundTrip(const char *MainExecutablePath,
+                         const StringRef InputFilename) {
 
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
   std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
 
-  getSyntaxTree(InputFilename, TopLevelDecls, Tokens);
+  getSyntaxTree(MainExecutablePath, InputFilename, TopLevelDecls, Tokens);
 
   for (auto &Node : TopLevelDecls) {
     Node.print(llvm::outs());
@@ -224,13 +233,14 @@ int doFullParseRoundTrip(const StringRef InputFilename) {
   return EXIT_SUCCESS;
 }
 
-int doSerializeRawTree(const StringRef InputFilename) {
+int doSerializeRawTree(const char *MainExecutablePath,
+                       const StringRef InputFilename) {
 
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
   std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
 
-  getSyntaxTree(InputFilename, TopLevelDecls, Tokens);
+  getSyntaxTree(MainExecutablePath, InputFilename, TopLevelDecls, Tokens);
 
   for (auto &Node : TopLevelDecls) {
     swift::json::Output out(llvm::outs());
@@ -266,10 +276,10 @@ int main(int argc, char *argv[]) {
     ExitCode = doFullLexRoundTrip(options::InputSourceFilename);
     break;
   case ActionType::FullParseRoundTrip:
-    ExitCode = doFullParseRoundTrip(options::InputSourceFilename);
+    ExitCode = doFullParseRoundTrip(argv[0], options::InputSourceFilename);
     break;
   case ActionType::SerializeRawTree:
-    ExitCode = doSerializeRawTree(options::InputSourceFilename);
+    ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
     break;
   case ActionType::None:
     llvm::errs() << "an action is required\n";
