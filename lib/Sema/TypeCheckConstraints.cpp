@@ -1041,7 +1041,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   if (!UDE->getName().isSimpleName())
     return nullptr;
 
-  auto Name = UDE->getName().getBaseName();
+  auto Name = UDE->getName().getBaseIdentifier();
   auto NameLoc = UDE->getNameLoc().getBaseNameLoc();
 
   // Qualified type lookup with a module base is represented as a DeclRefExpr

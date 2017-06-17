@@ -7141,7 +7141,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem *CS, KeyPathExpr *KPE,
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::UnresolvedProperty: {
       auto componentFullName = component.getUnresolvedDeclName();
-      componentName = componentFullName.getBaseName();
+      componentName = componentFullName.getBaseIdentifier();
       break;
     }
 
