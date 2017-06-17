@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
-// CHECK: sil_global hidden_external [[DSO:@__dso_handle]] : $Builtin.RawPointer
+// CHECK: sil_global [[DSO:@__dso_handle]] : $Builtin.RawPointer
 
 // CHECK-LABEL: sil @main : $@convention(c)
 // CHECK: bb0
@@ -11,6 +11,14 @@
 func printDSOHandle(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
   print(dso)
   return dso
+}
+
+@_inlineable public func printDSOHandleInlineable(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
+  return dso
+}
+
+@_inlineable public func callsPrintDSOHandleInlineable() {
+  printDSOHandleInlineable()
 }
 
 _ = printDSOHandle()

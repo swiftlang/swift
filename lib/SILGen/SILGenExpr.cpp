@@ -2927,7 +2927,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     auto DSOGlobal = SGF.SGM.M.lookUpGlobalVariable("__dso_handle");
     if (!DSOGlobal)
       DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
-                                            SILLinkage::HiddenExternal,
+                                            SILLinkage::PublicExternal,
                                             IsNotSerialized, "__dso_handle",
                                             BuiltinRawPtrTy);
     auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);
