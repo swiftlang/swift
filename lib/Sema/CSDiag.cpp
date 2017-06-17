@@ -6367,6 +6367,23 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
 
+  // If there is a failing constraint associated with current constraint
+  // system which points to the argument/parameter mismatch, let's use
+  // that information while re-typechecking argument expression, this
+  // makes it a lot easier to determine contextual mismatch.
+  if (CS->failedConstraint && !hasTrailingClosure) {
+    auto *constraint = CS->failedConstraint;
+    if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion) {
+      if (auto *locator = constraint->getLocator()) {
+        if (locator->getAnchor() == callExpr) {
+          argType = constraint->getSecondType();
+          if (auto *typeVar = argType->getAs<TypeVariableType>())
+            argType = CS->getFixedType(typeVar);
+        }
+      }
+    }
+  }
+
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //

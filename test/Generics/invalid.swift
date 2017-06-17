@@ -54,10 +54,8 @@ func eatDinnerConcrete(d: Pizzas<Pepper>.DeepDish,
 func badDiagnostic1() {
 
   _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
-      leftovers: Pizzas<ChiliFlakes>.NewYork(),
-      // FIXME: Quality of this diagnostic is related to the fact that failure analyzer
-      //        doesn't take advantage of informantion in constraint system such as failed constraint.
-      transformation: { _ in HotDog() }) // expected-error {{cannot convert value of type '(_) -> HotDog' to expected argument type '(_) -> _'}}
+      leftovers: Pizzas<ChiliFlakes>.NewYork(),  // expected-error {{cannot convert value of type 'Pizzas<ChiliFlakes>.NewYork' to expected argument type 'Pizzas<Pepper>.NewYork'}}
+      transformation: { _ in HotDog() })
 }
 
 func badDiagnostic2() {
