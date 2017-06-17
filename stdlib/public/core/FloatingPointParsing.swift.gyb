@@ -38,7 +38,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 %   Self = floatName(bits)
 
 % if bits == 80:
-#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
