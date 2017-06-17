@@ -161,7 +161,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownDecl(Decl *D) {
   std::copy(ComprisingTokens.begin(),
             ComprisingTokens.end(),
             std::back_inserter(Layout));
-  auto Raw = RawSyntax::make(SyntaxKind::UnknownExpr,
+  auto Raw = RawSyntax::make(SyntaxKind::UnknownDecl,
                              Layout,
                              SourcePresence::Present);
   return UnknownDeclSyntaxData::make(Raw);
@@ -175,7 +175,7 @@ RC<SyntaxData> LegacyASTTransformer::getUnknownStmt(Stmt *S) {
   std::copy(ComprisingTokens.begin(),
             ComprisingTokens.end(),
             std::back_inserter(Layout));
-  auto Raw = RawSyntax::make(SyntaxKind::UnknownExpr,
+  auto Raw = RawSyntax::make(SyntaxKind::UnknownStmt,
                              Layout,
                              SourcePresence::Present);
   return UnknownStmtSyntaxData::make(Raw);
