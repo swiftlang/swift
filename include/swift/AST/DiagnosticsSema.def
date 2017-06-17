@@ -3601,6 +3601,9 @@ ERROR(resilience_decl_unavailable,
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here,
+     none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
+
+NOTE(resilience_decl_declared_here_versioned,
      none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
 
 ERROR(designated_init_in_extension_resilient,none,

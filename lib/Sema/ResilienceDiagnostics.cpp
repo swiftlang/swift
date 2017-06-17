@@ -113,8 +113,25 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
            D->getDescriptiveKind(), D->getFullName(),
            D->getFormalAccessScope().accessibilityForDiagnostics(),
            getFragileFunctionKind(DC));
-  diagnose(D, diag::resilience_decl_declared_here,
-           D->getDescriptiveKind(), D->getFullName());
+
+  bool isDefaultArgument = false;
+  while (DC->isLocalContext()) {
+    if (isa<DefaultArgumentInitializer>(DC)) {
+      isDefaultArgument = true;
+      break;
+    }
+
+    DC = DC->getParent();
+  }
+
+  if (isDefaultArgument) {
+    diagnose(D, diag::resilience_decl_declared_here,
+             D->getDescriptiveKind(), D->getFullName());
+  } else {
+    diagnose(D, diag::resilience_decl_declared_here_versioned,
+             D->getDescriptiveKind(), D->getFullName());
+  }
+
   return true;
 }
 

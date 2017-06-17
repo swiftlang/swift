@@ -5,16 +5,13 @@
 // expected-error@-1 {{@_inlineable cannot be applied to this declaration}}
 
 private func privateFunction() {}
-// expected-note@-1 5{{global function 'privateFunction()' is not '@_versioned' or public}}
+// expected-note@-1{{global function 'privateFunction()' is not '@_versioned' or public}}
 fileprivate func fileprivateFunction() {}
-// expected-note@-1 5{{global function 'fileprivateFunction()' is not '@_versioned' or public}}
+// expected-note@-1{{global function 'fileprivateFunction()' is not '@_versioned' or public}}
 func internalFunction() {}
-// expected-note@-1 5{{global function 'internalFunction()' is not '@_versioned' or public}}
+// expected-note@-1{{global function 'internalFunction()' is not '@_versioned' or public}}
 @_versioned func versionedFunction() {}
 public func publicFunction() {}
-
-func internalIntFunction() -> Int {}
-// expected-note@-1 2{{global function 'internalIntFunction()' is not '@_versioned' or public}}
 
 private struct PrivateStruct {}
 // expected-note@-1 3{{struct 'PrivateStruct' is not '@_versioned' or public}}
@@ -135,72 +132,6 @@ public struct Struct {
     // OK
   }
 }
-
-func internalFunctionWithDefaultValue(
-    x: Int = {
-      struct Nested {}
-      // OK
-
-      publicFunction()
-      // OK
-      versionedFunction()
-      // OK
-      internalFunction()
-      // OK
-      fileprivateFunction()
-      // OK
-      privateFunction()
-      // OK
-
-      return 0
-    }(),
-    y: Int = internalIntFunction()) {}
-
-@_versioned func versionedFunctionWithDefaultValue(
-    x: Int = {
-      struct Nested {}
-      // expected-error@-1 {{type 'Nested' cannot be nested inside a default argument value}}
-
-      // FIXME: Some errors below are diagnosed twice
-
-      publicFunction()
-      // OK
-      versionedFunction()
-      // OK
-      internalFunction()
-      // expected-error@-1 2{{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
-      fileprivateFunction()
-      // expected-error@-1 2{{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from a default argument value}}
-      privateFunction()
-      // expected-error@-1 2{{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
-
-      return 0
-    }(),
-    y: Int = internalIntFunction()) {}
-    // expected-error@-1 {{global function 'internalIntFunction()' is internal and cannot be referenced from a default argument value}}
-
-public func publicFunctionWithDefaultValue(
-    x: Int = {
-      struct Nested {}
-      // expected-error@-1 {{type 'Nested' cannot be nested inside a default argument value}}
-
-      // FIXME: Some errors below are diagnosed twice
-
-      publicFunction()
-      // OK
-      versionedFunction()
-      // OK
-      internalFunction()
-      // expected-error@-1 2{{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
-      fileprivateFunction()
-      // expected-error@-1 2{{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from a default argument value}}
-      privateFunction()
-      // expected-error@-1 2{{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
-
-      return 0
-    }(),
-    y: Int = internalIntFunction()) {}
-    // expected-error@-1 {{global function 'internalIntFunction()' is internal and cannot be referenced from a default argument value}}
 
 // Make sure protocol extension members can reference protocol requirements
 // (which do not inherit the @_versioned attribute).
