@@ -5530,7 +5530,7 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
     // It could be that the argument doesn't conform to an archetype.
     if (CCI.diagnoseGenericParameterErrors(badArgExpr))
       return true;
-    
+
     // Re-type-check the argument with the expected type of the candidate set.
     // This should produce a specific and tailored diagnostic saying that the
     // type mismatches with expectations.
@@ -6862,12 +6862,16 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   return false;
 }
 
+static bool isInvalidClosureResultType(Type resultType) {
+  return !resultType || resultType->hasUnresolvedType() ||
+          resultType->hasTypeVariable() || resultType->hasArchetype();
+}
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   return diagnoseClosureExpr(
       CE, CS->getContextualType(),
       [&](Type resultType, Type expectedResultType) -> bool {
-        if (!expectedResultType)
+        if (isInvalidClosureResultType(expectedResultType))
           return false;
 
         // Following situations are possible:
@@ -7168,7 +7172,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   if (!CE->hasSingleExpressionBody())
     return false;
 
-  if (expectedResultType && isUnresolvedOrTypeVarType(expectedResultType))
+  if (isInvalidClosureResultType(expectedResultType))
     expectedResultType = Type();
 
   // When we're type checking a single-expression closure, we need to reset the
@@ -7230,7 +7234,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     auto contextualResultType = fnType->getResult();
     // If the result type was unknown, it doesn't really make
     // sense to diagnose from expected to unknown here.
-    if (isUnresolvedOrTypeVarType(contextualResultType))
+    if (isInvalidClosureResultType(contextualResultType))
       return false;
 
     // If the closure had an explicitly written return type incompatible with
