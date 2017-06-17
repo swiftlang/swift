@@ -39,14 +39,19 @@ class TestJSONEncoder : TestJSONEncoderSuper {
   func testEncodingTopLevelSingleValueEnum() {
     _testEncodeFailure(of: Switch.off)
     _testEncodeFailure(of: Switch.on)
+
+    _testRoundTrip(of: TopLevelWrapper(Switch.off))
+    _testRoundTrip(of: TopLevelWrapper(Switch.on))
   }
 
   func testEncodingTopLevelSingleValueStruct() {
     _testEncodeFailure(of: Timestamp(3141592653))
+    _testRoundTrip(of: TopLevelWrapper(Timestamp(3141592653)))
   }
 
   func testEncodingTopLevelSingleValueClass() {
     _testEncodeFailure(of: Counter())
+    _testRoundTrip(of: TopLevelWrapper(Counter()))
   }
 
   // MARK: - Encoding Top-Level Structured Types
@@ -61,6 +66,18 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let expectedJSON = "{\"name\":\"Johnny Appleseed\",\"email\":\"appleseed@apple.com\"}".data(using: .utf8)!
     let person = Person.testValue
     _testRoundTrip(of: person, expectedJSON: expectedJSON)
+  }
+
+  func testEncodingTopLevelStructuredSingleStruct() {
+    // Numbers is a struct which encodes as an array through a single value container.
+    let numbers = Numbers.testValue
+    _testRoundTrip(of: numbers)
+  }
+
+  func testEncodingTopLevelStructuredSingleClass() {
+    // Mapping is a class which encodes as a dictionary through a single value container.
+    let mapping = Mapping.testValue
+    _testRoundTrip(of: mapping)
   }
 
   func testEncodingTopLevelDeepStructuredType() {
@@ -326,7 +343,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       encoder.nonConformingFloatEncodingStrategy = nonConformingFloatEncodingStrategy
       payload = try encoder.encode(value)
     } catch {
-      expectUnreachable("Failed to encode \(T.self) to JSON.")
+      expectUnreachable("Failed to encode \(T.self) to JSON: \(error)")
     }
 
     if let expectedJSON = json {
@@ -341,7 +358,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       let decoded = try decoder.decode(T.self, from: payload)
       expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
     } catch {
-      expectUnreachable("Failed to decode \(T.self) from JSON.")
+      expectUnreachable("Failed to decode \(T.self) from JSON: \(error)")
     }
   }
 }
@@ -429,7 +446,7 @@ fileprivate enum Switch : Codable {
 }
 
 /// A simple timestamp type that encodes as a single Double value.
-fileprivate struct Timestamp : Codable {
+fileprivate struct Timestamp : Codable, Equatable {
   let value: Double
 
   init(_ value: Double) {
@@ -445,10 +462,14 @@ fileprivate struct Timestamp : Codable {
     var container = encoder.singleValueContainer()
     try container.encode(self.value)
   }
+
+  static func ==(_ lhs: Timestamp, _ rhs: Timestamp) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 /// A simple referential counter type that encodes as a single Int value.
-fileprivate final class Counter : Codable {
+fileprivate final class Counter : Codable, Equatable {
   var count: Int = 0
 
   init() {}
@@ -461,6 +482,10 @@ fileprivate final class Counter : Codable {
   func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.count)
+  }
+
+  static func ==(_ lhs: Counter, _ rhs: Counter) -> Bool {
+    return lhs === rhs || lhs.count == rhs.count
   }
 }
 
@@ -612,6 +637,62 @@ fileprivate struct DoubleNaNPlaceholder : Codable, Equatable {
   }
 }
 
+/// A type which encodes as an array directly through a single value container.
+struct Numbers : Codable, Equatable {
+  let values = [4, 8, 15, 16, 23, 42]
+
+  init() {}
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let decodedValues = try container.decode([Int].self)
+    guard decodedValues == values else {
+      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "The Numbers are wrong!"))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Numbers, _ rhs: Numbers) -> Bool {
+    return lhs.values == rhs.values
+  }
+
+  static var testValue: Numbers {
+    return Numbers()
+  }
+}
+
+/// A type which encodes as a dictionary directly through a single value container.
+fileprivate final class Mapping : Codable, Equatable {
+  let values: [String : URL]
+
+  init(values: [String : URL]) {
+    self.values = values
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    values = try container.decode([String : URL].self)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Mapping, _ rhs: Mapping) -> Bool {
+    return lhs === rhs || lhs.values == rhs.values
+  }
+
+  static var testValue: Mapping {
+    return Mapping(values: ["Apple": URL(string: "http://apple.com")!,
+                            "localhost": URL(string: "http://127.0.0.1")!])
+  }
+}
+
 struct NestedContainersTestType : Encodable {
   let testSuperEncoder: Bool
 
@@ -713,6 +794,9 @@ JSONEncoderTests.test("testEncodingTopLevelSingleValueStruct") { TestJSONEncoder
 JSONEncoderTests.test("testEncodingTopLevelSingleValueClass") { TestJSONEncoder().testEncodingTopLevelSingleValueClass() }
 JSONEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestJSONEncoder().testEncodingTopLevelStructuredStruct() }
 JSONEncoderTests.test("testEncodingTopLevelStructuredClass") { TestJSONEncoder().testEncodingTopLevelStructuredClass() }
+JSONEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestJSONEncoder().testEncodingTopLevelStructuredSingleStruct() }
+JSONEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestJSONEncoder().testEncodingTopLevelStructuredSingleClass() }
+JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncoder().testEncodingTopLevelDeepStructuredType()}
 JSONEncoderTests.test("testEncodingTopLevelStructuredClass") { TestJSONEncoder().testEncodingTopLevelStructuredClass() }
 JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncoder().testEncodingTopLevelDeepStructuredType()}
 JSONEncoderTests.test("testEncodingOutputFormattingDefault") { TestJSONEncoder().testEncodingOutputFormattingDefault() }
