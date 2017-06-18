@@ -6116,7 +6116,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     case TypeKind::Tuple: {
       auto tuple = paramType->getAs<TupleType>();
       if (tuple->getNumElements() != 1)
-        return false;
+        continue;
 
       paramType = tuple->getElement(0).getType();
       break;

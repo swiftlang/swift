@@ -13,3 +13,8 @@ func foo(options: [AVMediaSelectionOption]) {
     // expected-error@-1 {{type 'NSViewController' has no member 'respondToMediaOptionSelection(from:)'}}
   }
 }
+
+func rdar28004686(a: [IndexPath]) {
+  _ = a.sorted { (lhs: NSIndexPath, rhs: NSIndexPath) -> Bool in true }
+  // expected-error@-1 {{'NSIndexPath' is not convertible to 'IndexPath'}}
+}
