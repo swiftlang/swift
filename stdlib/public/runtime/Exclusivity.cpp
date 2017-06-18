@@ -116,6 +116,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .version = 1,
     .errorType = "exclusivity-violation",
     .currentStackDescription = newAccess,
+    .framesToSkip = framesToSkip,
     .memoryAddress = pointer,
     .numExtraThreads = 1,
     .threads = &secondaryThread

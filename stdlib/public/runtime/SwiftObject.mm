@@ -1436,7 +1436,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
 
   RuntimeErrorDetails::RelatedObject methodDeclaration = {
-    .description = "Method declaration",
+    .description = "Method declaration; add @objc here",
     .filename = nullTerminatedFilename,
     .line = line,
     .column = column
@@ -1444,6 +1444,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails details = {
     .version = 1,
     .errorType = "implicit-objc-entrypoint",
+    .framesToSkip = 1,
     .numRelatedObjects = 1,
     .relatedObjects = &methodDeclaration
   };
