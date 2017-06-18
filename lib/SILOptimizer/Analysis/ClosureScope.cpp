@@ -178,6 +178,7 @@ void TopDownClosureFunctionOrder::visitFunctions(
   }
   unsigned numClosures = closureWorklist.size();
   while (numClosures) {
+    unsigned prevNumClosures = numClosures;
     for (auto &closureNode : closureWorklist) {
       // skip erased closures.
       if (!closureNode)
@@ -192,6 +193,8 @@ void TopDownClosureFunctionOrder::visitFunctions(
       closureWorklist.erase(closureF);
       --numClosures;
     }
+    assert(numClosures < prevNumClosures && "Cyclic closures scopes");
+    (void)prevNumClosures;
   }
 }
 
