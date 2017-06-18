@@ -996,9 +996,7 @@ class ApplyInstBase;
 // partial specialization for full applies inherits from this.
 template <class Impl, class Base>
 class ApplyInstBase<Impl, Base, false> : public Base {
-  enum {
-    Callee
-  };
+  enum { Callee, NumStaticOperands };
 
   /// The type of the callee with our substitutions applied.
   SILType SubstCalleeType;
@@ -1015,7 +1013,7 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   unsigned NumCallArguments;
 
   /// The fixed operand is the callee;  the rest are arguments.
-  TailAllocatedOperandList<1> Operands;
+  TailAllocatedOperandList<NumStaticOperands> Operands;
 
   Substitution *getSubstitutionsStorage() {
     return reinterpret_cast<Substitution*>(Operands.asArray().end());
@@ -1116,6 +1114,8 @@ public:
   SubstitutionList getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
+
+  static unsigned getOperandIndexOfFirstArgument() { return NumStaticOperands; }
 
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
@@ -6371,6 +6371,12 @@ public:
     FOREACH_IMPL_RETURN(getNumCallArguments());
   }
 
+  unsigned getOperandIndexOfFirstArgument() {
+    FOREACH_IMPL_RETURN(getOperandIndexOfFirstArgument());
+  }
+
+#undef FOREACH_IMPL_RETURN
+
   /// The arguments passed to this instruction, without self.
   OperandValueArrayRef getArgumentsWithoutSelf() const {
     switch (Inst->getKind()) {
@@ -6398,6 +6404,16 @@ public:
     default:
       llvm_unreachable("not implemented for this instruction!");
     }
+  }
+
+  unsigned getCalleeArgIndex(Operand &oper) {
+    assert(oper.getUser() == Inst);
+    assert(oper.getOperandNumber() >= getOperandIndexOfFirstArgument());
+
+    unsigned appliedArgIdx =
+        oper.getOperandNumber() - getOperandIndexOfFirstArgument();
+
+    return getCalleeArgIndexOfFirstAppliedArg() + appliedArgIdx;
   }
 
   Operand &getArgumentRef(unsigned i) const { return getArgumentOperands()[i]; }
@@ -6445,8 +6461,6 @@ public:
       llvm_unreachable("not implemented for this instruction!");
     }
   }
-
-#undef FOREACH_IMPL_RETURN
 
   SILArgumentConvention getArgumentConvention(unsigned index) const {
     return getSubstCalleeConv().getSILArgumentConvention(index);
