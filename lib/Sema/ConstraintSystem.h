@@ -752,7 +752,7 @@ enum class ConstraintSystemFlags {
   PreferForceUnwrapToOptional = 0x02,
 
   /// If set, this is going to prevent constraint system from erasing all
-  /// discovered solutions expect the best one.
+  /// discovered solutions except the best one.
   ReturnAllDiscoveredSolutions = 0x04,
 };
 

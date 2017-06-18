@@ -6098,10 +6098,17 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   // let's try to re-typecheck it to see if we can get some
   // more information about what is going on.
   if (currentType->hasTypeVariable() || currentType->hasUnresolvedType()) {
-    CallResultListener listener(CS->getContextualType());
+    auto contextualType = CS->getContextualType();
+    CallResultListener listener(contextualType);
     CS->TC.getPossibleTypesOfExpressionWithoutApplying(
         fnExpr, CS->DC, possibleTypes, FreeTypeVariableBinding::UnresolvedType,
         &listener);
+
+    // Looks like there is there a contextual mismatch
+    // related to function type, let's try to diagnose it.
+    if (possibleTypes.empty() && contextualType &&
+        !contextualType->hasUnresolvedType())
+      return diagnoseContextualConversionError();
   } else {
     possibleTypes.push_back(currentType);
   }
