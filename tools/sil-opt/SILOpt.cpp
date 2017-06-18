@@ -95,7 +95,7 @@ enum EnforceExclusivityMode {
 static cl::opt<EnforceExclusivityMode> EnforceExclusivity(
   "enforce-exclusivity", cl::desc("Enforce law of exclusivity "
                                   "(and support memory access markers)."),
-    cl::init(EnforceExclusivityMode::None),
+    cl::init(EnforceExclusivityMode::Checked),
     cl::values(clEnumValN(EnforceExclusivityMode::Unchecked, "unchecked",
                           "Static checking only."),
                clEnumValN(EnforceExclusivityMode::Checked, "checked",
@@ -289,12 +289,7 @@ int main(int argc, char **argv) {
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
 
-  if (EnforceExclusivity.getNumOccurrences() == 0) {
-    if (SILOpts.Optimization > SILOptions::SILOptMode::None) {
-      SILOpts.EnforceExclusivityStatic = false;
-      SILOpts.EnforceExclusivityDynamic = false;
-    }
-  } else {
+  if (EnforceExclusivity.getNumOccurrences() != 0) {
     switch (EnforceExclusivity) {
     case EnforceExclusivityMode::Unchecked:
       // This option is analogous to the -Ounchecked optimization setting.
