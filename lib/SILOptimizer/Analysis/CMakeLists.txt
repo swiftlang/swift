@@ -1,5 +1,6 @@
 set(ANALYSIS_SOURCES
   Analysis/ARCAnalysis.cpp
+  Analysis/AccessSummaryAnalysis.cpp
   Analysis/AliasAnalysis.cpp
   Analysis/Analysis.cpp
   Analysis/ArraySemantic.cpp
