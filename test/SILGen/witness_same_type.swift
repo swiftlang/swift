@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sil-serialize-witness-tables %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
 protocol Fooable {
