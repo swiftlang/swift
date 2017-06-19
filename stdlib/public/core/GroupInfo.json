@@ -21,6 +21,7 @@
     "StringInterpolation.swift",
     "StringLegacy.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringStorage.swift",
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
@@ -65,6 +66,7 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "BoundedBufferReference.swift",
     "UIntBuffer.swift",
     {
       "Type-erased": [

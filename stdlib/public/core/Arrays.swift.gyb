@@ -1826,6 +1826,20 @@ internal struct _InitializeMemoryFromCollection<
   var newValues: C
 }
 
+// Just a quick little thing to abstract over _ContiguousArrayBuffer 
+// and String's native buffer
+@_versioned
+internal protocol _ContiguousBufferProtocol {
+  associatedtype Element
+
+  var count: Int { get nonmutating set }
+  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+
+  init(_uninitializedCount: Int, minimumCapacity: Int)
+}
+
+extension _ContiguousArrayBuffer: _ContiguousBufferProtocol { }
+
 extension _ArrayBufferProtocol {
   @_inlineable
   @_versioned

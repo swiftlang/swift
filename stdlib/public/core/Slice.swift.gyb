@@ -182,7 +182,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 % if Traversal == 'RandomAccess':
   @inline(__always)
   public func _withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Base._Element>) throws -> R
+    _ body: (UnsafeBufferPointer<Base.Element>) throws -> R
   ) rethrows -> R? {
     return try base._withExistingUnsafeBuffer {
       try body(
