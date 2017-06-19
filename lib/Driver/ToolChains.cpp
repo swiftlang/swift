@@ -1245,6 +1245,10 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-force_load_swift_libs");
   } else {
     Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+    // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+    // of time the standard library won't be copied. SR-1967
+    Arguments.push_back("-rpath");
+    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
@@ -1282,11 +1286,6 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
   }
-
-  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-  // of time the standard library won't be copied.
-  Arguments.push_back("-rpath");
-  Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
 
   // FIXME: Properly handle deployment targets.
   assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
