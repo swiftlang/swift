@@ -108,14 +108,6 @@ bool SemaLocResolver::tryResolve(Stmt *St) {
   return false;
 }
 
-bool SemaLocResolver::tryResolve(Expr *Exp) {
-  if (Exp->getStartLoc() == LocToResolve) {
-    SemaTok = { Exp };
-    return true;
-  }
-  return false;
-}
-
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
@@ -195,12 +187,6 @@ bool SemaLocResolver::walkToExprPre(Expr *E) {
     }
   }
   return true;
-}
-
-bool SemaLocResolver::walkToExprPost(Expr *E) {
-  if (isDone())
-    return false;
-  return !tryResolve(E);
 }
 
 bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,

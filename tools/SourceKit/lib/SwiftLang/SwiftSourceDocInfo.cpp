@@ -1181,7 +1181,6 @@ static void resolveCursor(SwiftLangSupport &Lang,
         }
         return;
       }
-      case SemaTokenKind::ExprStart:
       case SemaTokenKind::StmtStart: {
         Receiver({});
         return;
