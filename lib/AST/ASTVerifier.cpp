@@ -451,6 +451,28 @@ public:
     bool shouldVerifyChecked(Pattern *S) { return S->hasType(); }
     bool shouldVerifyChecked(Decl *S) { return true; }
 
+    // Only verify functions if they have bodies we can safely walk.
+    // FIXME: This is a bit of a hack; we should be able to check the
+    // invariants of a parsed body as well.
+    bool shouldVerify(AbstractFunctionDecl *afd) {
+      switch (afd->getBodyKind()) {
+      case AbstractFunctionDecl::BodyKind::None:
+      case AbstractFunctionDecl::BodyKind::TypeChecked:
+      case AbstractFunctionDecl::BodyKind::Skipped:
+      case AbstractFunctionDecl::BodyKind::MemberwiseInitializer:
+        return true;
+
+      case AbstractFunctionDecl::BodyKind::Unparsed:
+      case AbstractFunctionDecl::BodyKind::Parsed:
+      case AbstractFunctionDecl::BodyKind::Synthesize:
+        if (auto SF = dyn_cast<SourceFile>(afd->getModuleScopeContext())) {
+          return SF->ASTStage < SourceFile::TypeChecked;
+        }
+
+        return false;
+      }
+    }
+
     // Default cases for cleaning up as we exit a node.
     void cleanup(Expr *E) { }
     void cleanup(Stmt *S) { }
