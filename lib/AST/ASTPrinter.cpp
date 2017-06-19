@@ -897,7 +897,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
+      T = T.subst(subMap,
+                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
     }
 
     printType(T);
