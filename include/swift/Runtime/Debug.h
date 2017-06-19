@@ -169,19 +169,6 @@ struct RuntimeErrorDetails {
   // and the pointer to the array of extra threads.
   uintptr_t numExtraThreads;
   Thread *threads;
-
-  // Description of a related object (other than 'memoryAddress').
-  struct RelatedObject {
-    const char *description;
-    const char *filename;
-    uintptr_t line;
-    uintptr_t column;
-  };
-
-  // Number of extra source locations that are related, and the pointer to the
-  // array of them.
-  uintptr_t numRelatedObjects;
-  RelatedObject *relatedObjects;
 };
 
 /// Debugger hook. Calling this stops the debugger with a message and details
