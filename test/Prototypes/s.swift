@@ -151,6 +151,12 @@ extension String._XContent._Unowned {
 }
 
 extension String._XContent {
+
+  @inline(__always)
+  init() {
+    self = .inline16(_Inline<UInt16>(EmptyCollection<UInt16>())!)
+  }
+  
   @inline(__always)
   func _withExistingLatin1Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R
@@ -164,6 +170,15 @@ extension String._XContent {
       return x.withUnsafeBufferPointer(body)
     case .unowned8(let x):
       return x.withUnsafeBufferPointer(body)
+    case .inline16(let x):
+      guard x.count == 0 else { return nil }
+      return x.withUnsafeBufferPointer {
+        $0.baseAddress!.withMemoryRebound(
+          to: UInt8.self, capacity: 1
+        ) {
+          body(UnsafeBufferPointer(start: $0, count: 0))
+        }
+      }
     default:
       return nil
     }
@@ -360,6 +375,51 @@ extension String._XContent.UTF16View : BidirectionalCollection {
 
   func index(after i: Int) -> Int { return i + 1 }
   func index(before i: Int) -> Int { return i - 1 }
+}
+
+extension String._XContent.UTF16View /* : RangeReplaceableCollection */ {
+  public init() {
+    _content = String._XContent()
+  }
+
+  internal var _rangeReplaceableStorageID: ObjectIdentifier? {
+    switch self._content {
+    case .latin1(let x):
+      return ObjectIdentifier(x)
+    case .utf16(let x):
+      return ObjectIdentifier(x)
+    default:
+      return nil
+    }
+  }
+
+  mutating func replaceSubrange<C : Collection>(
+    _ subrange: Range<Index>,
+    with newElements: C
+  ) where C.Element == Element {
+    defer { _fixLifetime(self) }
+    
+    if _rangeReplaceableStorageID?._liveObjectIsUniquelyReferenced()
+    ?? false {
+      switch self._content {
+      case .inline8(let x):
+      case .latin1(let x):
+        if newElements.max() ?? 0 <= 0xFF
+        && x._tryToReplaceSubrange(
+          subrange,
+          with: _MapCollection(newElements, through: _TruncExt)) {
+          return
+        }
+      case .utf16(let x):
+        if x._tryToReplaceSubrange(subrange, with: newElements) {
+          return
+        }
+      default: break
+      }
+    }
+    
+    
+  }
 }
 
 extension String._XContent.UTF16View {
