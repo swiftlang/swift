@@ -109,7 +109,7 @@ bool SemaLocResolver::tryResolve(Stmt *St) {
 }
 
 bool SemaLocResolver::tryResolve(Expr *Exp) {
-  if (!Exp->isImplicit() && Exp->getStartLoc() == LocToResolve) {
+  if (Exp->getStartLoc() == LocToResolve) {
     SemaTok = { Exp };
     return true;
   }
