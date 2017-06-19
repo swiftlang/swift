@@ -246,11 +246,13 @@ int doSerializeRawTree(const char *MainExecutablePath,
   getSyntaxTree(MainExecutablePath, InputFilename, Instance,
                 TopLevelDecls, Tokens);
 
-  for (auto &Node : TopLevelDecls) {
-    swift::json::Output out(llvm::outs());
-    auto Raw = Node.getRaw();
-    out << Raw;
+  std::vector<RC<syntax::RawSyntax>> RawTopLevelDecls;
+  for (auto &Decl : TopLevelDecls) {
+    RawTopLevelDecls.push_back(Decl.getRaw());
   }
+
+  swift::json::Output out(llvm::outs());
+  out << RawTopLevelDecls;
 
   llvm::outs() << "\n";
 
