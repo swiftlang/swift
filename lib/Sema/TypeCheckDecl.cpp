@@ -5037,6 +5037,12 @@ public:
     else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
       FD->setMutating(false);
 
+    if (FD->isMutating()) {
+      Type contextTy = FD->getDeclContext()->getDeclaredInterfaceType();
+      if (contextTy->hasReferenceSemantics())
+        FD->setMutating(false);
+    }
+
     // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
       FD->setInvalid();

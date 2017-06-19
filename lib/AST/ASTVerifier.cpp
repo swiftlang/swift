@@ -2700,6 +2700,28 @@ public:
         }
       }
 
+      if (FD->isMutating()) {
+        if (!FD->isInstanceMember()) {
+          Out << "mutating function is not an instance member\n";
+          abort();
+        }
+        if (FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+          Out << "mutating function in a class\n";
+          abort();
+        }
+        const ParamDecl *selfParam = FD->getImplicitSelfDecl();
+        if (!selfParam->getInterfaceType()->is<InOutType>()) {
+          Out << "mutating function does not have inout 'self'\n";
+          abort();
+        }
+      } else {
+        const ParamDecl *selfParam = FD->getImplicitSelfDecl();
+        if (selfParam && selfParam->getInterfaceType()->is<InOutType>()) {
+          Out << "non-mutating function has inout 'self'\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(FD);
     }
 
