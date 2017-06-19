@@ -3432,6 +3432,28 @@ FuncDecl *AbstractStorageDecl::getAccessorFunction(AccessorKind kind) const {
   llvm_unreachable("bad accessor kind!");
 }
 
+void AbstractStorageDecl::getAllAccessorFunctions(
+    SmallVectorImpl<Decl *> &decls) const {
+  auto tryPush = [&](Decl *decl) {
+    if (decl)
+      decls.push_back(decl);
+  };
+
+  tryPush(getGetter());
+  tryPush(getSetter());
+  tryPush(getMaterializeForSetFunc());
+
+  if (hasObservers()) {
+    tryPush(getDidSetFunc());
+    tryPush(getWillSetFunc());
+  }
+
+  if (hasAddressors()) {
+    tryPush(getAddressor());
+    tryPush(getMutableAddressor());
+  }
+}
+
 void AbstractStorageDecl::configureGetSetRecord(GetSetRecord *getSetInfo,
                                                 FuncDecl *getter,
                                                 FuncDecl *setter,
