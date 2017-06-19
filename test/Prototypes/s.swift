@@ -209,9 +209,16 @@ extension String._XContent {
   }
 }
 
+struct _TruncExt<Input: BinaryInteger, Output: FixedWidthInteger>
+: _Function {
+  func apply(_ input: Input) -> Output {
+    return Output(extendingOrTruncating: input)
+  }
+}
+
 extension String._XContent.UTF16View : BidirectionalCollection {
   @inline(__always)
-  init<C : Collection>(_ c: C, isASCII: Bool? = nil)
+  init<C : Collection>(_ c: C, maxElement: UInt16? = nil)
   where C.Element == UInt16 {
     if let x = String._XContent._Inline<UInt8>(c) {
       _content = .inline8(x)
@@ -219,20 +226,20 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     else if let x = String._XContent._Inline<UInt16>(c) {
       _content = .inline16(x)
     }
-    else {
-      let maxCodeUnit = isASCII == true ? 0 : c.max() ?? 0
-      if maxCodeUnit < 0xFF {
+    else  {
+      let maxCodeUnit = maxElement ?? c.max() ?? 0
+      if maxCodeUnit <= 0xFF {
         _content = .latin1(
           unsafeDowncast(
             _mkLatin1(
-              c.lazy.map { UInt8(extendingOrTruncating: $0) },
-              isKnownASCII: maxCodeUnit < 0x80),
+              _MapCollection(c, through: _TruncExt()),
+              isKnownASCII: maxCodeUnit <= 0x7f),
             to: String._Latin1Storage.self))
       }
       else {
         _content = .utf16(//.init(c)
           unsafeDowncast(
-            _mkUTF16(c, isKnownASCII: false),
+            _mkUTF16(c, maxElement: maxCodeUnit),
             to: String._UTF16Storage.self))
       }
     }
@@ -295,15 +302,14 @@ extension String._XContent.UTF16View : BidirectionalCollection {
       _content = .latin1(
         unsafeDowncast(
           _mkLatin1(
-            source.lazy.map { UInt8(extendingOrTruncating: $0) },
+            _MapCollection(source, through: _TruncExt()),
             isKnownASCII: true),
           to: String._Latin1Storage.self))
     }
     else {
       _content = .utf16(//.init(c)            
         unsafeDowncast(
-          _mkUTF16(source, isKnownASCII: isASCII ?? false),
-          to: String._UTF16Storage.self))
+          _mkUTF16(source), to: String._UTF16Storage.self))
     }
   }
   
@@ -398,7 +404,7 @@ extension String._XContent.UTF16View {
     
     if isASCII == true || !source.contains { $0 > 0xff } {
       self = String._XContent.UTF16View(
-        source.lazy.map { UInt8(extendingOrTruncating: $0) },
+        _MapCollection(source, through: _TruncExt()),
         isASCII: isASCII ?? false
       )
     }
@@ -462,7 +468,7 @@ func testme2() {
       }
     }
   }
-//  lex_new()
+  lex_new()
 
   func lex_old() {
     time {
@@ -475,7 +481,7 @@ func testme2() {
       }
     }
   }
-//  lex_old()
+  lex_old()
 
   func init_new() {
     time {

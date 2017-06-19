@@ -187,6 +187,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
   ///   initialized.
+  @inline(__always)
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
