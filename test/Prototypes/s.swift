@@ -1,9 +1,15 @@
+import Swift
+
 extension String {
   internal enum _XContent {
     internal struct _Inline<CodeUnit : FixedWidthInteger> {
-      typealias _Storage = (UInt64, UInt32, UInt16)
+      typealias _Storage = (UInt64, UInt32, UInt16, UInt8)
       var _storage: _Storage
-      var _count: UInt8
+#if arch(i386) || arch(arm)
+      var _count: Builtin.Int4 = Builtin.trunc_Int32_Int4(0._value)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)      
+      var _count: Builtin.Int4 = Builtin.trunc_Int64_Int4(0._value)
+#endif
     }
   case inline8(_Inline<UInt8>)
   case inline16(_Inline<UInt16>)
@@ -11,7 +17,7 @@ extension String {
     internal struct _Unowned<CodeUnit : FixedWidthInteger> {
       var _start: UnsafePointer<CodeUnit>
       var _count: UInt32
-      var isKnownASCII: Bool
+      var isASCII: Bool?
       var isNULTerminated: Bool
     }
     
@@ -26,20 +32,39 @@ extension String {
 extension String._XContent._Inline {
   public var capacity: Int {
     return MemoryLayout.size(ofValue: _storage)
-      / MemoryLayout<UInt8>.stride
+      / MemoryLayout<CodeUnit>.stride
   }
 
+  public var count : Int {
+    @inline(__always)
+    get {
+#if arch(i386) || arch(arm)
+      return Int(Builtin.zext_Int4_Int32(_count))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)      
+      return Int(Builtin.zext_Int4_Int64(_count))
+#endif
+    }
+    
+    @inline(__always)
+    set {
+#if arch(i386) || arch(arm)
+      _count = Builtin.trunc_Int32_Int4(newValue._value)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)      
+      _count = Builtin.trunc_Int64_Int4(newValue._value)
+#endif
+    }
+  }
+  
   @inline(__always)
   public init?<S: Sequence>(_ s: S) where S.Element : BinaryInteger {
-    _storage = (0,0,0)
-    _count = 0
+    _storage = (0,0,0,0)
     let failed: Bool = withUnsafeMutableBufferPointer {
       let start = $0.baseAddress._unsafelyUnwrappedUnchecked
       for i in s {
-        guard _count < capacity, let u = CodeUnit(exactly: i)
+        guard count < capacity, let u = CodeUnit(exactly: i)
         else { return true }
-        start[Int(_count)] = u
-        _count += 1
+        start[count] = u
+        count = count &+ 1
       }
       return false
     }
@@ -56,7 +81,7 @@ extension String._XContent._Inline {
         capacity: capacity
       )
       return body(
-        UnsafeMutableBufferPointer(start: start, count: Int(_count)))
+        UnsafeMutableBufferPointer(start: start, count: count))
     }
   }
 
@@ -64,38 +89,35 @@ extension String._XContent._Inline {
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<CodeUnit>)->R
   ) -> R {
-    var storage = (_storage, 0 as CodeUnit)
-    _sanityCheck(
-      MemoryLayout<_Storage>.size + MemoryLayout<CodeUnit>.size
-      == MemoryLayout.size(ofValue: storage)
-    )
+    var storage = (_storage, 0 as UInt8)
     return withUnsafePointer(to: &storage) {
       let start = UnsafeRawPointer($0).bindMemory(
         to: CodeUnit.self,
         capacity: capacity
       )
+      _sanityCheck(start[count] == 0)
       return body(
-        UnsafeBufferPointer(start: start, count: Int(_count)))
+        UnsafeBufferPointer(start: start, count: count))
     }
   }
 }
 
 extension String._XContent._Inline where CodeUnit == UInt8 {
-  internal var isKnownASCII : Bool {
-    return (_storage.0 | UInt64(_storage.1) | UInt64(_storage.2))
+  internal var isASCII : Bool {
+    return (UInt64(_storage.0) | UInt64(_storage.1) | UInt64(_storage.2))
       & (0x8080_8080__8080_8080 as UInt64).littleEndian == 0
   }
 }
 
 extension String._XContent._Inline where CodeUnit == UInt16 {
   
-  internal var isKnownASCII : Bool {
-    return (_storage.0 | UInt64(_storage.1) | UInt64(_storage.2))
+  internal var isASCII : Bool {
+    return (UInt64(_storage.0) | UInt64(_storage.1) | UInt64(_storage.2))
       & (0xFF80_FF80__FF80_FF80 as UInt64).littleEndian == 0
   }
   
-  internal var isKnownLatin1 : Bool {
-    return (_storage.0 | UInt64(_storage.1) | UInt64(_storage.2))
+  internal var isLatin1 : Bool {
+    return (UInt64(_storage.0) | UInt64(_storage.1) | UInt64(_storage.2))
       & (0xFF00_FF00__FF00_FF00 as UInt64).littleEndian == 0
   }
   
@@ -105,7 +127,7 @@ extension String._XContent._Unowned {
   @inline(__always)
   init?(
     _ source: UnsafeBufferPointer<CodeUnit>,
-    isKnownASCII: Bool,
+    isASCII: Bool?,
     isNULTerminated: Bool
   ) {
     guard
@@ -115,7 +137,7 @@ extension String._XContent._Unowned {
 
     self._count = count
     self._start = start
-    self.isKnownASCII = isKnownASCII
+    self.isASCII = isASCII
     self.isNULTerminated = isNULTerminated
   }
 
@@ -188,51 +210,73 @@ extension String._XContent {
 }
 
 extension String._XContent.UTF16View : BidirectionalCollection {
-  init<C : Collection>(_ c: C) where C.Element == UInt16 {
-    if let x = String._XContent._Inline<UInt16>(c) {
+  @inline(__always)
+  init<C : Collection>(_ c: C, isASCII: Bool? = nil)
+  where C.Element == UInt16 {
+    if let x = String._XContent._Inline<UInt8>(c) {
+      _content = .inline8(x)
+    }
+    else if let x = String._XContent._Inline<UInt16>(c) {
       _content = .inline16(x)
     }
     else {
-      _content = .utf16(//.init(c)
-        _mkUTF16(c) as! String._UTF16Storage
-      )
+      let maxCodeUnit = isASCII == true ? 0 : c.max() ?? 0
+      if maxCodeUnit < 0xFF {
+        _content = .latin1(
+          unsafeDowncast(
+            _mkLatin1(
+              c.lazy.map { UInt8(extendingOrTruncating: $0) },
+              isKnownASCII: maxCodeUnit < 0x80),
+            to: String._Latin1Storage.self))
+      }
+      else {
+        _content = .utf16(//.init(c)
+          unsafeDowncast(
+            _mkUTF16(c, isKnownASCII: false),
+            to: String._UTF16Storage.self))
+      }
     }
   }
   
-  init<C : Collection>(_ c: C) where C.Element == UInt8 {
+  @inline(__always)
+  init<C : Collection>(_ c: C, isASCII: Bool? = nil)
+  where C.Element == UInt8 {
     if let x = String._XContent._Inline<UInt8>(c) {
       _content = .inline8(x)
     }
     else {
       _content = .latin1(//.init(c)
-        _mkLatin1(c) as! String._Latin1Storage)
+        unsafeDowncast(
+          _mkLatin1(c, isKnownASCII: isASCII ?? false),
+          to: String._Latin1Storage.self))
     }
   }
   
   init(
     unowned source: UnsafeBufferPointer<UInt8>,
-    isKnownASCII: Bool,
+    isASCII: Bool?,
     isNULTerminated: Bool
   ) {
     if let x = String._XContent._Inline<UInt8>(source) {
       _content = .inline8(x)
     }
     else if let x = String._XContent._Unowned<UInt8>(
-      source, isKnownASCII: isKnownASCII,
+      source, isASCII: isASCII,
       isNULTerminated: isNULTerminated
     ) {
       _content = .unowned8(x)
     }
     else {
       _content = .latin1(//.init(c)
-      _mkLatin1(source, isKnownASCII: isKnownASCII)
-        as! String._Latin1Storage)
+        unsafeDowncast(
+          _mkLatin1(source, isKnownASCII: isASCII ?? false)
+          , to: String._Latin1Storage.self))
     }
   }
   
   init(
     unowned source: UnsafeBufferPointer<UInt16>,
-    isKnownASCII: Bool,
+    isASCII: Bool?,
     isNULTerminated: Bool
   ) {
     if let x = String._XContent._Inline<UInt8>(source) {
@@ -242,21 +286,24 @@ extension String._XContent.UTF16View : BidirectionalCollection {
       _content = .inline16(x)
     }
     else if let x = String._XContent._Unowned<UInt16>(
-      source, isKnownASCII: isKnownASCII,
+      source, isASCII: isASCII,
       isNULTerminated: isNULTerminated
     ) {
       _content = .unowned16(x)
     }
-    else if isKnownASCII {
+    else if isASCII == true || !source.contains { $0 > 0xFF } {
       _content = .latin1(
-        _mkLatin1(
-          source.lazy.map { UInt8(extendingOrTruncating: $0) },
-          isKnownASCII: true) as! String._Latin1Storage)
+        unsafeDowncast(
+          _mkLatin1(
+            source.lazy.map { UInt8(extendingOrTruncating: $0) },
+            isKnownASCII: true),
+          to: String._Latin1Storage.self))
     }
     else {
-      _content = .utf16(//.init(c)
-        _mkUTF16(source, isKnownASCII: isKnownASCII)
-        as! String._UTF16Storage)
+      _content = .utf16(//.init(c)            
+        unsafeDowncast(
+          _mkUTF16(source, isKnownASCII: isASCII ?? false),
+          to: String._UTF16Storage.self))
     }
   }
   
@@ -266,8 +313,8 @@ extension String._XContent.UTF16View : BidirectionalCollection {
     @inline(__always)
     get {
       switch self._content {
-      case .inline8(let x): return Int(x._count) 
-      case .inline16(let x): return Int(x._count) 
+      case .inline8(let x): return x.count
+      case .inline16(let x): return x.count 
       case .unowned8(let x): return Int(x._count) 
       case .unowned16(let x): return Int(x._count) 
       case .latin1(let x):  return x.count 
@@ -311,8 +358,9 @@ extension String._XContent.UTF16View : BidirectionalCollection {
 
 extension String._XContent.UTF16View {
   init(legacy source: _StringCore) {
+    var isASCII: Bool? = nil
+    
     defer { _fixLifetime(source) }
-    let isASCII = !source.contains { $0 >= 0x80 }
     if let x = String._XContent._Inline<UInt8>(source) {
       _content = .inline8(x)
       return
@@ -325,26 +373,34 @@ extension String._XContent.UTF16View {
       if let a = source.asciiBuffer {
         let base = a.baseAddress
         if let me = String._XContent._Unowned<UInt8>(
-            UnsafeBufferPointer<UInt8>(start: base, count: source.count),
-            isKnownASCII: isASCII,
-          isNULTerminated: true) {
+          UnsafeBufferPointer<UInt8>(
+            start: base, count: source.count),
+          isASCII: true,
+          isNULTerminated: true
+        ) {
           _content = .unowned8(me)
           return
         }
       }
-      else if let me = String._XContent._Unowned<UInt16>(
-        UnsafeBufferPointer(start: source.startUTF16, count: source.count),
-        isKnownASCII: isASCII,
+      else {
+        isASCII = source.contains { $0 > 0x7f }
+        if let me = String._XContent._Unowned<UInt16>(
+          UnsafeBufferPointer(
+            start: source.startUTF16, count: source.count),
+        isASCII: isASCII,
         isNULTerminated: true
-      ) {
-        _content = .unowned16(me)
-        return
+        ) {
+          _content = .unowned16(me)
+          return
+        }
       }
     }
     
-    if isASCII {
+    if isASCII == true || !source.contains { $0 > 0xff } {
       self = String._XContent.UTF16View(
-        source.lazy.map { UInt8(extendingOrTruncating: $0) })
+        source.lazy.map { UInt8(extendingOrTruncating: $0) },
+        isASCII: isASCII ?? false
+      )
     }
     else {
       self = String._XContent.UTF16View(source)
@@ -353,8 +409,9 @@ extension String._XContent.UTF16View {
 }
 
 let testers: [String] = [
-  "foo", "foobar", "foobarbaz", "the quick brown fox",
-  "ƒoo", "ƒoobar", "ƒoobarba", "the quick brown ƒox"
+  "foo", "foobar", "foobarbaz", "foobarbazniz", "foobarbaznizman", "the quick brown fox",
+  "f\u{f6}o", "f\u{f6}obar", "f\u{f6}obarbaz", "f\u{f6}obarbazniz", "f\u{f6}obarbaznizman", "the quick br\u{f6}wn fox",
+  "ƒoo", "ƒoobar", "ƒoobarba", "ƒoobarbazniz", "ƒoobarbaznizman", "the quick brown ƒox"
 ]
 
 import Dispatch
@@ -374,45 +431,79 @@ func testme2() {
   let cores
   = testers.map { $0._core } + testers.map { ($0 + "X")._core }
 
+  let arrays = cores.map(Array.init)
+  
   let contents = cores.map {
     String._XContent.UTF16View(legacy: $0)
   }
 
-
-  /*
+  var N = 10000
   for (x, y) in zip(cores, contents) {
-    assert(x.elementsEqual(y))
-    debugPrint(String(x))
-    dump(y)
-    print()
+    if !x.elementsEqual(y) { fatalError("unequal") }
+    _sanityCheck(
+      {
+        N = 1
+        debugPrint(String(x))
+        dump(y)
+        print()
+        return true
+      }())
   }
-  */
-  
+
   var total = 0
-  time {
-    for x in 0...100000 {
-      for a in contents {
-        for b in contents {
-          if a.lexicographicallyPrecedes(b) { total = total &+ 1 }
+  func lex_new() {
+    time {
+      for _ in 0...N {
+        for a in contents {
+          for b in contents {
+            if a.lexicographicallyPrecedes(b) { total = total &+ 1 }
+          }
         }
       }
     }
   }
+//  lex_new()
 
-  time {
-    for x in 0...100000 {
-      for a in cores {
-        for b in cores {
-          if a.lexicographicallyPrecedes(b) { total = total &+ 1 }
+  func lex_old() {
+    time {
+      for _ in 0...N {
+        for a in cores {
+          for b in cores {
+            if a.lexicographicallyPrecedes(b) { total = total &+ 1 }
+          }
         }
       }
     }
   }
+//  lex_old()
 
+  func init_new() {
+    time {
+      for _ in 0...10*N {
+        for a in arrays {
+          total = total &+ String._XContent.UTF16View(a).count
+        }
+      }
+    }
+  }
+  init_new()
+  
+  func init_old() {
+    time {
+      for _ in 0...10*N {
+        for a in arrays {
+          total = total &+ _StringCore(a).count
+        }
+      }
+    }
+  }
+  init_old()
+  
   if total == 0 { print() }
 }
 
-assert(MemoryLayout<String._XContent>.size == 16)
+print(MemoryLayout<String._XContent>.size)
+assert(MemoryLayout<String._XContent>.size <= 16)
 testme2()
 
 
