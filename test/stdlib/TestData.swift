@@ -1072,6 +1072,50 @@ class TestData : TestDataSuper {
         let actual = d2.map { $0 }
         expectEqual(expected, actual)
     }
+
+    func test_dropFirst() {
+        var data = Data([0, 1, 2, 3, 4, 5])
+        let sliced = data.dropFirst()
+        expectEqual(data.count - 1, sliced.count)
+        expectEqual(UInt8(1), sliced[1])
+        expectEqual(UInt8(2), sliced[2])
+        expectEqual(UInt8(3), sliced[3])
+        expectEqual(UInt8(4), sliced[4])
+        expectEqual(UInt8(5), sliced[5])
+    }
+
+    func test_dropFirst2() {
+        var data = Data([0, 1, 2, 3, 4, 5])
+        let sliced = data.dropFirst(2)
+        expectEqual(data.count - 2, sliced.count)
+        expectEqual(UInt8(2), sliced[2])
+        expectEqual(UInt8(3), sliced[3])
+        expectEqual(UInt8(4), sliced[4])
+        expectEqual(UInt8(5), sliced[5])
+    }
+
+    func test_copyBytes1() {
+        var array: [UInt8] = [0, 1, 2, 3]
+        var data = Data(bytes: array)
+        
+        array.withUnsafeMutableBufferPointer {
+            data[1..<3].copyBytes(to: $0.baseAddress!, from: 1..<3)
+        }
+        expectEqual([UInt8(1), UInt8(2), UInt8(2), UInt8(3)], array)
+    }
+    
+    func test_copyBytes2() {
+        let array: [UInt8] = [0, 1, 2, 3]
+        var data = Data(bytes: array)
+        
+        let expectedSlice = array[1..<3]
+        
+        let start = data.index(after: data.startIndex)
+        let end = data.index(before: data.endIndex)
+        let slice = data[start..<end]
+        
+        expectEqual(expectedSlice[expectedSlice.startIndex], slice[slice.startIndex])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1128,6 +1172,10 @@ DataTests.test("test_sliceEquality") { TestData().test_sliceEquality() }
 DataTests.test("test_sliceEquality2") { TestData().test_sliceEquality2() }
 DataTests.test("test_splittingHttp") { TestData().test_splittingHttp() }
 DataTests.test("test_map") { TestData().test_map() }
+DataTests.test("test_dropFirst") { TestData().test_dropFirst() }
+DataTests.test("test_dropFirst2") { TestData().test_dropFirst2() }
+DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
+DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
