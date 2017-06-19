@@ -228,6 +228,24 @@ OpaqueValue *swift::swift_projectBox(HeapObject *o) {
   return metadata->project(o);
 }
 
+namespace { // Begin anonymous namespace.
+
+struct _SwiftEmptyBoxStorage {
+  HeapObject header;
+};
+
+swift::HeapLocalVariableMetadata _emptyBoxStorageMetadata;
+
+/// The singleton empty box storage object.
+_SwiftEmptyBoxStorage _EmptyBoxStorage = {
+ // HeapObject header;
+  {
+    &_emptyBoxStorageMetadata,
+  }
+};
+
+} // End anonymous namespace.
+
 HeapObject *swift::swift_allocEmptyBox() {
   auto heapObject = reinterpret_cast<HeapObject*>(&_EmptyBoxStorage);
   SWIFT_RT_ENTRY_CALL(swift_retain)(heapObject);

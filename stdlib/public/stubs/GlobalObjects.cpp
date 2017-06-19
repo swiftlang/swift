@@ -127,17 +127,6 @@ void swift::_swift_instantiateInertHeapObject(void *address,
   ::new (address) HeapObject{metadata};
 }
 
-swift::HeapLocalVariableMetadata _emptyBoxStorageMetadata;
-
-/// The signleton empty box storage object.
-swift::_SwiftEmptyBoxStorage swift::_EmptyBoxStorage = {
- // HeapObject header;
-  {
-    &_emptyBoxStorageMetadata,
-  }
-};
-
-
 namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any
   // LLVM libs into the runtime, so define this here.
