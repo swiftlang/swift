@@ -13,15 +13,6 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims // for _swift_stdlib_malloc_size
 
-// This is a hack to work around the inability to assign to self in a class init
-public protocol _FactoryInitializable {}
-extension _FactoryInitializable {
-  @nonobjc
-  public init(_ me: Self) {
-    self = me
-  }
-}
-
 /// Stores (at least) the count and capacity of a growable buffer class
 public // @testable
 protocol _BoundedBufferHeader {
@@ -36,7 +27,6 @@ protocol _BoundedBufferHeader {
 public // @testable
 protocol _BoundedBufferReference
 : class, _ContiguouslyStoredMutableCollection,
-    _FactoryInitializable,  // Allows us to code init in terms of Builtin.allocWithTailElems_1
     RangeReplaceableCollection {
 
   associatedtype Header : _BoundedBufferHeader
@@ -50,8 +40,7 @@ protocol _BoundedBufferReference
   @nonobjc
   var _baseAddress: UnsafeMutablePointer<Iterator.Element> { get }
 
-  @nonobjc
-  init(uninitializedWithMinimumCapacity: Int)
+  static func make(uninitializedWithMinimumCapacity: Int) -> Self
 
   /// A number of extra elements to allocate for
   ///
@@ -75,18 +64,24 @@ extension _BoundedBufferReference {
 
   public static var extraCapacity: Int { return 0 }
   
-  public init(
+  public static func make(
     minimumCapacity: Int = 0,
-    makeInitialHeader: (_ allocatedCapacity: Int)->Header) {
+    makeInitialHeader: (_ allocatedCapacity: Int)->Header
+  ) -> Self {
     let extra = Self.extraCapacity
-    self.init(uninitializedWithMinimumCapacity: minimumCapacity + extra)
-    withUnsafeMutablePointer(to: &_header) {
-      $0.initialize(to: makeInitialHeader(allocatedCapacity() - extra))
+    let r = make(uninitializedWithMinimumCapacity: minimumCapacity + extra)
+    withUnsafeMutablePointer(to: &r._header) {
+      $0.initialize(to: makeInitialHeader(r.allocatedCapacity() - extra))
     }
+    return r
   }
 
-  public init(_uninitializedCount: Int, minimumCapacity: Int = 0) {
-    self.init(minimumCapacity: Swift.max(_uninitializedCount, minimumCapacity)) {
+  public static func make(
+    _uninitializedCount: Int, minimumCapacity: Int = 0
+  ) -> Self {
+    return make(
+      minimumCapacity: Swift.max(_uninitializedCount, minimumCapacity)
+    ) {
       Header(count: _uninitializedCount, capacity: $0)
     }
   }
@@ -134,19 +129,18 @@ extension _BoundedBufferReference {
 
 /// Fulfills the RangeReplaceableCollection requirements
 extension _BoundedBufferReference {
-  @nonobjc
-  public init<S : Sequence>(_ elements: S)
+  public static func make<S : Sequence>(_ elements: S) -> Self
     where S.Iterator.Element == Iterator.Element {
-    self.init(Array(elements))
+    return make(Array(elements))
   }
   
-  @nonobjc
-  public init<C : Collection>(_ elements: C)
+  public static func make<C : Collection>(_ elements: C) -> Self
     where C.Iterator.Element == Iterator.Element {
-    self.init(_uninitializedCount: numericCast(elements.count))
-    withUnsafeMutableBufferPointer {
+    let r = make(_uninitializedCount: numericCast(elements.count))
+    _ = r.withUnsafeMutableBufferPointer {
       elements._copyCompleteContents(initializing: $0)
     }
+    return r
   }
   
   public func replaceSubrange<C>(
@@ -250,10 +244,11 @@ extension _BoundedBufferReference {
 
 extension _BoundedBufferReference {
   /// Construct the concatenation of head, middle, and tail
-  @nonobjc
-  public init<Head : Collection, Middle : Collection, Tail : Collection>(
+  public static func make<
+    Head : Collection, Middle : Collection, Tail : Collection
+  >(
     joining head: Head, _ middle: Middle, _ tail: Tail, minimumCapacity: Int = 0
-  )
+  ) -> Self
   where
     Head.Iterator.Element == Iterator.Element,
     Middle.Iterator.Element == Iterator.Element,
@@ -263,11 +258,11 @@ extension _BoundedBufferReference {
       + numericCast(middle.count) as IndexDistance
       + numericCast(tail.count) as IndexDistance
 
-    self.init(
+    let r = self.make(
       _uninitializedCount: numericCast(newCount),
       minimumCapacity: minimumCapacity)
     
-    self.withUnsafeMutableBufferPointer { b0 in
+    r.withUnsafeMutableBufferPointer { b0 in
 
       let (_, i0) = head._copyContents(initializing: b0)
       
@@ -281,6 +276,7 @@ extension _BoundedBufferReference {
       
       assert(i2 == b2.endIndex, "Failed to consume input")
     }
+    return r
   }
 }
 

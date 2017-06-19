@@ -65,13 +65,11 @@ extension String {
   }  
 }
 
-extension String._StorageBase : _FactoryInitializable {
-  @nonobjc
+extension String._StorageBase {
   @inline(__always)
-  public convenience init(uninitializedWithMinimumCapacity n: Int) {
-    self.init(
-      Builtin.allocWithTailElems_1(
-        type(of: self), n._builtinWordValue, Element.self))
+  public static func make(uninitializedWithMinimumCapacity n: Int) -> Self {
+    return Builtin.allocWithTailElems_1(
+        self, n._builtinWordValue, Element.self)
   }
 }
 
@@ -207,27 +205,26 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
     }
   }
   
-  @nonobjc
   @inline(__always)
-  public convenience init<Source : Collection>(
+  public static func make<Source : Collection>(
     _ source: Source,
     maxElement: UInt16? = nil
-  )
+  ) -> String._UTF16Storage
   where Source.Iterator.Element == UInt16 {
-    self.init(count: numericCast(source.count))
-    withUnsafeMutableBufferPointer {
+    let r = make(count: numericCast(source.count))
+    _ = r.withUnsafeMutableBufferPointer {
       source._copyCompleteContents(initializing: $0)
     }
-    _setMaxStored(maxElement ?? source.max() ?? 0)
+    r._setMaxStored(maxElement ?? source.max() ?? 0)
+    return r
   }
 
-  @nonobjc
   @inline(__always)
-  public convenience init(
+  public static func make(
     count: Int,
     minimumCapacity: Int = 0
-  ) {
-    self.init(minimumCapacity: Swift.max(count, minimumCapacity)) {
+  ) -> String._UTF16Storage {
+    return make(minimumCapacity: Swift.max(count, minimumCapacity)) {
       _SwiftUTF16StringHeader(
         count: UInt32(count), capacity: UInt32($0), flags: 0)
     }
@@ -290,16 +287,15 @@ extension String._Latin1Storage : _BoundedBufferReference {
   
   @nonobjc
   public static func _emptyInstance() -> String._Latin1Storage {
-    return String._Latin1Storage(uninitializedWithMinimumCapacity: 0)
+    return String._Latin1Storage.make(uninitializedWithMinimumCapacity: 0)
   }
   
-  @nonobjc
   @inline(__always)
-  public convenience init(
+  public static func make(
     count: Int,
     minimumCapacity: Int = 0
-  ) {
-    self.init(minimumCapacity: Swift.max(count, minimumCapacity)) {
+  ) -> String._Latin1Storage {
+    return make(minimumCapacity: Swift.max(count, minimumCapacity)) {
       _SwiftLatin1StringHeader(
         count: UInt32(count), capacity: UInt32($0), flags: 0)
     }
@@ -319,17 +315,17 @@ extension String._Latin1Storage {
     }
   }
 
-  @nonobjc
-  public convenience init<Source : Collection>(
+  public static func make<Source : Collection>(
     _ source: Source,
     isKnownASCII: Bool = false
-  )
+  ) -> String._Latin1Storage
   where Source.Iterator.Element == UInt8 {
-    self.init(count: numericCast(source.count))
-    withUnsafeMutableBufferPointer {
+    let r = make(count: numericCast(source.count))
+    _ = r.withUnsafeMutableBufferPointer {
       source._copyCompleteContents(initializing: $0)
     }
-    self.isKnownASCII = isKnownASCII || (source.max() ?? 0) < 0x80
+    r.isKnownASCII = isKnownASCII || (source.max() ?? 0) < 0x80
+    return r
   }
 }
 
@@ -339,14 +335,14 @@ extension String._Latin1Storage {
 public func _mkLatin1<C: Collection>(_ x: C, isKnownASCII: Bool = false) -> AnyObject
 where C.Element == UInt8
 {
-  return String._Latin1Storage(x, isKnownASCII: isKnownASCII)
+  return String._Latin1Storage.make(x, isKnownASCII: isKnownASCII)
 }
 
 @inline(__always)
 public func _mkUTF16<C: Collection>(_ x: C, maxElement: UInt16? = nil) -> AnyObject
 where C.Element == UInt16
 {
-  return String._UTF16Storage(x, maxElement: maxElement)
+  return String._UTF16Storage.make(x, maxElement: maxElement)
 }
 
 extension String {
