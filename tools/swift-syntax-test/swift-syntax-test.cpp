@@ -104,6 +104,7 @@ void anchorForGetMainExecutable() {}
 
 int getSyntaxTree(const char *MainExecutablePath,
                   const StringRef InputFilename,
+                  CompilerInstance &Instance,
                   llvm::SmallVectorImpl<syntax::Syntax> &TopLevelDecls,
                   std::vector<std::pair<RC<syntax::TokenSyntax>,
                               syntax::AbsolutePosition>> &Tokens) {
@@ -115,7 +116,6 @@ int getSyntaxTree(const char *MainExecutablePath,
       reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   Invocation.setModuleName("Test");
-  CompilerInstance Instance;
 
   auto &SourceMgr = Instance.getSourceMgr();
 
@@ -219,8 +219,10 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
   std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
+  CompilerInstance Instance;
 
-  getSyntaxTree(MainExecutablePath, InputFilename, TopLevelDecls, Tokens);
+  getSyntaxTree(MainExecutablePath, InputFilename, Instance,
+                TopLevelDecls, Tokens);
 
   for (auto &Node : TopLevelDecls) {
     Node.print(llvm::outs());
@@ -239,8 +241,10 @@ int doSerializeRawTree(const char *MainExecutablePath,
   llvm::SmallVector<syntax::Syntax, 10> TopLevelDecls;
   std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
+  CompilerInstance Instance;
 
-  getSyntaxTree(MainExecutablePath, InputFilename, TopLevelDecls, Tokens);
+  getSyntaxTree(MainExecutablePath, InputFilename, Instance,
+                TopLevelDecls, Tokens);
 
   for (auto &Node : TopLevelDecls) {
     swift::json::Output out(llvm::outs());
