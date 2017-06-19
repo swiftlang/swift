@@ -30,6 +30,7 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
+  BoundedBufferReference.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -43,6 +44,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift.gyb
   Comparable.swift
   CompilerProtocols.swift
+  ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
@@ -155,6 +157,7 @@ set(SWIFTLIB_ESSENTIAL
   UTF16.swift
   UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
+  StringStorage.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
   )

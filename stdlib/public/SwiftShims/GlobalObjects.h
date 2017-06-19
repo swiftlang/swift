@@ -39,6 +39,34 @@ struct _SwiftEmptyArrayStorage {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
+struct _SwiftUTF16StringHeader {
+  __swift_uint32_t count;
+  __swift_uint32_t capacity;
+  __swift_uint16_t flags;
+};
+
+// FIXME: possible optimizations
+//
+// * use uint8_t for count and capacity
+// * add a "LongLatin1Header" to accomodate longer strings that can be encoded
+//   with bytes?  
+// * drop flags / compress the ASCII flag into count and capacity
+struct _SwiftLatin1StringHeader {
+  __swift_uint32_t count;
+  __swift_uint32_t capacity;
+  __swift_uint8_t flags;
+};
+
+struct _SwiftEmptyStringStorage {
+  struct HeapObject header;
+  struct _SwiftUTF16StringHeader body;
+};
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptyStringStorage _swiftEmptyStringStorage;
+
+
+
 struct _SwiftUnsafeBitMap {
   __swift_uintptr_t *values;
   __swift_intptr_t bitCount;

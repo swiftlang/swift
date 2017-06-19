@@ -757,6 +757,39 @@ internal struct _PrefixSequence<Base : IteratorProtocol>
   }
 }
 
+extension Sequence {
+  /// Initializes `memory` with a copy of this `Sequence`'s elements.
+  ///
+  /// - Precondition: the elements of this sequence exactly fill the given
+  ///   memory.
+  public func _copyCompleteContents(
+    initializing memory: UnsafeMutableBufferPointer<Iterator.Element>
+  ) {
+    var (excessElements, endOfCopy) = self._copyContents(initializing: memory)
+    _precondition(
+      excessElements.next() == nil,
+      "_copyCompleteContents: source not completely copied (under-reported count?)")
+    _precondition(
+      endOfCopy == memory.endIndex,
+      "_copyCompleteContents: target not completely filled (over-reported count?)")
+  }
+
+  /// Assigns this `Sequence`'s elements to the elements of `target`
+  ///
+  /// - Precondition: the elements of this sequence exactly fill `target`.
+  public func _copyCompleteContents(
+    assigning target: UnsafeMutableBufferPointer<Iterator.Element>
+  ) {
+    var (excessElements, endOfCopy) = self._copyContents(assigning: target)
+    _precondition(
+      excessElements.next() == nil,
+      "_copyCompleteContents: source not completely copied (under-reported count?)")
+    _precondition(
+      endOfCopy == target.endIndex,
+      "_copyCompleteContents: target not completely filled (over-reported count?)")
+  }
+}
+
 /// A sequence that lazily consumes and drops `n` elements from an underlying
 /// `Base` iterator before possibly returning the first available element.
 ///
@@ -1432,28 +1465,47 @@ extension Sequence {
 }
 
 extension Sequence {
-  /// Copies `self` into the supplied buffer.
+  /// Initializes the memory at `buffer.baseAddress` with elements of `self`,
+  /// stopping when either `self` or `buffer` is exhausted.
   ///
-  /// - Precondition: The memory in `self` is uninitialized. The buffer must
-  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
-  ///
-  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
-  ///   initialized.
+  /// - Returns: an iterator over any remaining elements of `self` and the index
+  ///   just beyond the newly-uninitialized memory.
   @_inlineable
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-      var it = self.makeIterator()
-      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
-      for idx in buffer.startIndex..<buffer.count {
-        guard let x = it.next() else {
-          return (it, idx)
-        }
-        ptr.initialize(to: x)
-        ptr += 1
-      }
-      return (it,buffer.endIndex)
+    var it = self.makeIterator()
+    guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+    for idx in buffer.startIndex..<buffer.count {
+      guard let x = it.next() else {
+        return (it, idx)
+       }
+      ptr.initialize(to: x)
+      ptr += 1
     }
+    return (it,buffer.endIndex)
+  }
+  
+  /// Assigns elements of `self` over the elements of `buffer`, stopping when
+  /// either `self` or `buffer` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the index
+  ///   just beyond the assigned memory.
+  @_inlineable
+  public func _copyContents(
+    assigning buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    var it = self.makeIterator()
+    guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+    for idx in buffer.startIndex..<buffer.count {
+      guard let x = it.next() else {
+        return (it, idx)
+      }
+      ptr.pointee = x
+      ptr += 1
+    }
+    return (it,buffer.endIndex)
+  }
 }
 
 // FIXME(ABI)#182

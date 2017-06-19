@@ -54,7 +54,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 extension _SequenceWrapper where Element == Base.Element {
   public func map<T>(
     _ transform: (Element) throws -> T
-) rethrows -> [T] {
+  ) rethrows -> [T] {
     return try _base.map(transform)
   }
   
