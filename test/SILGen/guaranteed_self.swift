@@ -188,12 +188,16 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 nonmutating materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015guaranteed_self1SVAA7FooableA2aDP5prop3SifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015guaranteed_self1SVAA7FooableA2aDP5prop3SifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-// CHECK:         [[SELF:%.*]] = load [copy] [[SELF_ADDR]]
+// CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
+// CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
+// CHECK:         [[SELF:%.*]] = load [take] [[SELF_COPY]]
 // CHECK:         destroy_value [[SELF]]
 // CHECK-NOT:     destroy_value [[SELF]]
-// CHECK:       }
+// CHECK-NOT:     destroy_addr [[SELF_COPY]]
+// CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+// CHECK:       } // end sil function '_T015guaranteed_self1SVAA7FooableA2aDP5prop3SifmTW'
 
 //
 // TODO: Expected output for the other cases

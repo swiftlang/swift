@@ -3398,7 +3398,9 @@ bool AbstractStorageDecl::isSetterNonMutating() const {
   switch (getStorageKind()) {
   case AbstractStorageDecl::Stored:
   case AbstractStorageDecl::StoredWithTrivialAccessors:
-    return false;
+    // Instance member setters are mutating; static property setters and
+    // top-level setters are not.
+    return !isInstanceMember();
     
   case AbstractStorageDecl::StoredWithObservers:
   case AbstractStorageDecl::InheritedWithObservers:

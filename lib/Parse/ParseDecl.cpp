@@ -3445,29 +3445,28 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
   // default to mutating.  get/address default to
   // non-mutating.
-  if (!D->isStatic()) {
-    switch (Kind) {
-    case AccessorKind::IsAddressor:
-      D->setAddressorKind(addressorKind);
-      break;
+  switch (Kind) {
+  case AccessorKind::IsAddressor:
+    D->setAddressorKind(addressorKind);
+    break;
 
-    case AccessorKind::IsGetter:
-      break;
+  case AccessorKind::IsGetter:
+    break;
 
-    case AccessorKind::IsMutableAddressor:
-      D->setAddressorKind(addressorKind);
-      LLVM_FALLTHROUGH;
+  case AccessorKind::IsMutableAddressor:
+    D->setAddressorKind(addressorKind);
+    LLVM_FALLTHROUGH;
 
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
+  case AccessorKind::IsSetter:
+  case AccessorKind::IsWillSet:
+  case AccessorKind::IsDidSet:
+    if (D->isInstanceMember())
       D->setMutating();
-      break;
+    break;
 
-    case AccessorKind::IsMaterializeForSet:
-    case AccessorKind::NotAccessor:
-      llvm_unreachable("not parseable accessors");
-    }
+  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::NotAccessor:
+    llvm_unreachable("not parseable accessors");
   }
 
   return D;

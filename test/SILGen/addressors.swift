@@ -22,6 +22,13 @@ struct A {
       return base
     }
   }
+
+  static var staticProp: Int32 {
+    unsafeAddress {
+      // Just don't trip up the verifier.
+      fatalError()
+    }
+  }
 }
 
 // CHECK-LABEL: sil hidden @_T010addressors1AV9subscripts5Int32VAFcflu : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
