@@ -1188,9 +1188,7 @@ DataTests.test("bounding failure append absurd length") {
     data.append("hello", count: Int.min)
 }
 
-DataTests.test("bounding failure subscript")
-        .skip(.always("fails with resilient stdlib (rdar://problem/30560514)"))
-        .code {
+DataTests.test("bounding failure subscript") {
     var data = "Hello World".data(using: .utf8)!
     expectCrashLater()
     data[100] = 4
