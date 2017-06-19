@@ -1457,6 +1457,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
            "message\n",
            nullTerminatedFilename, line, column, message);
   free(message);
+  free(nullTerminatedFilename);
 }
 
 #endif
