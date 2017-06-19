@@ -1209,9 +1209,25 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
                                    FloatingRequirementSource source,
                                    UnresolvedHandlingKind unresolvedHandling) {
   switch (unresolvedHandling) {
-  case UnresolvedHandlingKind::GenerateConstraints:
-    Impl->DelayedRequirements.push_back({kind, lhs, rhs, source});
+  case UnresolvedHandlingKind::GenerateConstraints: {
+    DelayedRequirement::Kind delayedKind;
+    switch (kind) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      delayedKind = DelayedRequirement::Type;
+      break;
+
+    case RequirementKind::Layout:
+      delayedKind = DelayedRequirement::Layout;
+      break;
+
+    case RequirementKind::SameType:
+      delayedKind = DelayedRequirement::SameType;
+      break;
+    }
+    Impl->DelayedRequirements.push_back({delayedKind, lhs, rhs, source});
     return ConstraintResult::Resolved;
+  }
 
   case UnresolvedHandlingKind::ReturnUnresolved:
     return ConstraintResult::Unresolved;
@@ -4113,20 +4129,19 @@ void GenericSignatureBuilder::processDelayedRequirements() {
       // Reprocess the delayed requirement.
       ConstraintResult reqResult;
       switch (req.kind) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
+      case DelayedRequirement::Type:
         reqResult = addTypeRequirement(
                        req.lhs, asUnresolvedType(req.rhs), req.source,
                        UnresolvedHandlingKind::ReturnUnresolved);
         break;
 
-      case RequirementKind::Layout:
+      case DelayedRequirement::Layout:
         reqResult = addLayoutRequirement(
                            req.lhs, req.rhs.get<LayoutConstraint>(), req.source,
                            UnresolvedHandlingKind::ReturnUnresolved);
         break;
 
-      case RequirementKind::SameType:
+      case DelayedRequirement::SameType:
         reqResult = addSameTypeRequirement(
                                req.lhs, asUnresolvedType(req.rhs), req.source,
                                UnresolvedHandlingKind::ReturnUnresolved);

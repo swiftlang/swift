@@ -1678,7 +1678,19 @@ public:
 /// Describes a requirement whose processing has been delayed for some reason.
 class GenericSignatureBuilder::DelayedRequirement {
 public:
-  RequirementKind kind;
+  enum Kind {
+    /// A type requirement, which may be a conformance or a superclass
+    /// requirement.
+    Type,
+
+    /// A layout requirement.
+    Layout,
+
+    /// A same-type requirement.
+    SameType,
+  };
+
+  Kind kind;
   UnresolvedType lhs;
   RequirementRHS rhs;
   FloatingRequirementSource source;
