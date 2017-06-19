@@ -67,6 +67,7 @@ extension String {
 
 extension String._StorageBase : _FactoryInitializable {
   @nonobjc
+  @inline(__always)
   public convenience init(uninitializedWithMinimumCapacity n: Int) {
     self.init(
       Builtin.allocWithTailElems_1(
@@ -76,6 +77,7 @@ extension String._StorageBase : _FactoryInitializable {
 
 //===--- UTF16 String Storage ---------------------------------------------===//
 extension String {
+  @_versioned
   internal final class _UTF16Storage
     : String._StorageBase<_SwiftUTF16StringHeader, UTF16.CodeUnit>,
       _NSStringCore {
@@ -194,6 +196,7 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
   }
   
   @nonobjc
+  @_versioned
   internal func _setMaxStored(_ maxCodeUnit: UInt16) {
     switch maxCodeUnit {
     case 0..<0x80: self.isKnownASCII = true; fallthrough
@@ -205,30 +208,21 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
   }
   
   @nonobjc
+  @inline(__always)
   public convenience init<Source : Collection>(
     _ source: Source,
-    isKnownASCII: Bool = false
+    maxElement: UInt16? = nil
   )
   where Source.Iterator.Element == UInt16 {
     self.init(count: numericCast(source.count))
-    
-    var maxCodeUnit: UInt16 = 0
     withUnsafeMutableBufferPointer {
-      if _fastPath(isKnownASCII || source.isEmpty) {
-        // Don't look for the maximal code unit value; we already know everything
-        // we can learn from it
-        source._copyCompleteContents(initializing: $0)
-      }
-      else {
-        // FIXME: hoping for loop fusion here; check to make sure we get it.
-        maxCodeUnit = source.max() ?? 0
-        source._copyCompleteContents(initializing: $0)
-      }
+      source._copyCompleteContents(initializing: $0)
     }
-    _setMaxStored(maxCodeUnit)
+    _setMaxStored(maxElement ?? source.max() ?? 0)
   }
 
   @nonobjc
+  @inline(__always)
   public convenience init(
     count: Int,
     minimumCapacity: Int = 0
@@ -242,6 +236,7 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
 
 //===--- Latin-1 String Storage -------------------------------------------===//
 extension String {
+  @_versioned
   internal final class _Latin1Storage
   : String._StorageBase<_SwiftLatin1StringHeader, UInt8>,
     _NSStringCore // Ensures that we implement essential NSString methods.  
@@ -299,6 +294,7 @@ extension String._Latin1Storage : _BoundedBufferReference {
   }
   
   @nonobjc
+  @inline(__always)
   public convenience init(
     count: Int,
     minimumCapacity: Int = 0
@@ -330,36 +326,27 @@ extension String._Latin1Storage {
   )
   where Source.Iterator.Element == UInt8 {
     self.init(count: numericCast(source.count))
-    
-    var maxCodeUnit: UInt8 = 0
     withUnsafeMutableBufferPointer {
-      if _fastPath(isKnownASCII || source.isEmpty) {
-        // Don't look for the maximal code unit value; we already know everything
-        // we can learn from it
-        source._copyCompleteContents(initializing: $0)
-        self.isKnownASCII = true
-      }
-      else {
-        // FIXME: hoping for loop fusion here; check to make sure we get it.
-        source._copyCompleteContents(initializing: $0)
-        self.isKnownASCII = (source.max() ?? 0) < 0x80
-      }
+      source._copyCompleteContents(initializing: $0)
     }
+    self.isKnownASCII = isKnownASCII || (source.max() ?? 0) < 0x80
   }
 }
 
 //===--- Multi-Format String Storage --------------------------------------===//
 
+@inline(__always)
 public func _mkLatin1<C: Collection>(_ x: C, isKnownASCII: Bool = false) -> AnyObject
 where C.Element == UInt8
 {
   return String._Latin1Storage(x, isKnownASCII: isKnownASCII)
 }
 
-public func _mkUTF16<C: Collection>(_ x: C, isKnownASCII: Bool = false) -> AnyObject
+@inline(__always)
+public func _mkUTF16<C: Collection>(_ x: C, maxElement: UInt16? = nil) -> AnyObject
 where C.Element == UInt16
 {
-  return String._UTF16Storage(x, isKnownASCII: isKnownASCII)
+  return String._UTF16Storage(x, maxElement: maxElement)
 }
 
 extension String {
