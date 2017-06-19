@@ -169,10 +169,6 @@ SWIFT_RUNTIME_EXPORT
 BoxPair::Return swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
-/// Returns the address of a heap object representing all empty box types.
-SWIFT_RUNTIME_EXPORT
-HeapObject* swift_allocEmptyBox();
-
 // Allocate plain old memory. This is the generalized entry point
 // Never returns nil. The returned memory is uninitialized. 
 //

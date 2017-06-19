@@ -31,7 +31,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <thread>
-#include "../SwiftShims/GlobalObjects.h"
 #include "../SwiftShims/RuntimeShims.h"
 #if SWIFT_OBJC_INTEROP
 # include <objc/NSObject.h>
@@ -226,12 +225,6 @@ OpaqueValue *swift::swift_projectBox(HeapObject *o) {
     return nullptr;
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
   return metadata->project(o);
-}
-
-HeapObject *swift::swift_allocEmptyBox() {
-  auto heapObject = reinterpret_cast<HeapObject*>(&_EmptyBoxStorage);
-  SWIFT_RT_ENTRY_CALL(swift_retain)(heapObject);
-  return heapObject;
 }
 
 // Forward-declare this, but define it after swift_release.
