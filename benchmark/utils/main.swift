@@ -111,6 +111,7 @@ import StringEdits
 import StringInterpolation
 import StringMatch
 import StringTests
+import StringUnicode
 import StringWalk
 import Substring
 import Suffix
@@ -387,6 +388,7 @@ addTo(&precommitTests, "StringHasSuffixUnicode", run_StringHasSuffixUnicode)
 addTo(&precommitTests, "StringInterpolation", run_StringInterpolation)
 addTo(&precommitTests, "StringMatch", run_StringMatch)
 addTo(&precommitTests, "StringUTF16Builder", run_StringUTF16Builder)
+addTo(&precommitTests, "StringUnicode", run_StringUnicode)
 addTo(&precommitTests, "StringWalk", run_StringWalk)
 addTo(&precommitTests, "StringWithCString", run_StringWithCString)
 addTo(&precommitTests, "SubstringComparable", run_SubstringComparable)

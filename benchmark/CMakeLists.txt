@@ -106,6 +106,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringInterpolation
     single-source/StringMatch
     single-source/StringTests
+    single-source/StringUnicode
     single-source/StringWalk
     single-source/Substring
     single-source/Suffix
