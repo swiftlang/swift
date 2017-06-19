@@ -3161,8 +3161,7 @@ static SmallVector<AnyFunctionType::Param, 4> decomposeInputType(Type type) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
     for (auto &elt : tupleTy->getElements()) {
-      AnyFunctionType::Param param(elt);
-      result.push_back(param);
+      result.push_back(AnyFunctionType::Param(elt));
     }
     return result;
   }

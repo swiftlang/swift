@@ -1235,9 +1235,11 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   auto *dc = candidate.getDecl()
       ? candidate.getDecl()->getInnermostDeclContext()
       : nullptr;
-  auto candArgs = decomposeParamType(candidate.getArgumentType(),
-                                     candidate.getDecl(),
-                                     candidate.level);
+  
+  auto candArgs = candidate.getUncurriedFunctionType()->getParams();
+  SmallVector<bool, 4> candDefaultMap;
+  computeDefaultMap(candidate.getArgumentType(), candidate.getDecl(),
+                    candidate.level, candDefaultMap);
 
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -1267,7 +1269,9 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // shape) to the specified candidates parameters.  This ignores the concrete
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
-  if (matchCallArguments(actualArgs, candArgs, hasTrailingClosure,
+  if (matchCallArguments(actualArgs, candArgs,
+                         candDefaultMap,
+                         hasTrailingClosure,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
     // On error, get our closeness from whatever problem the listener saw.
@@ -1300,25 +1304,37 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   CalleeCandidateInfo::FailedArgumentInfo failureInfo;
 
   // Local function which extracts type from the parameter container.
-  auto getType = [](const CallArgParam &param) -> Type {
+  auto getParamResultType = [](const AnyFunctionType::Param &param) -> Type {
+    // If parameter is marked as @autoclosure, we are
+    // only interested in it's resulting type.
+    if (param.isAutoClosure()) {
+      if (auto fnType = param.getType()->getAs<AnyFunctionType>())
+        return fnType->getResult();
+    }
+
+    return param.getType();
+  };
+  
+  // Local function which extracts type from the parameter container.
+  auto getCallResultType = [](const CallArgParam &param) -> Type {
     // If parameter is marked as @autoclosure, we are
     // only interested in it's resulting type.
     if (param.isAutoClosure()) {
       if (auto fnType = param.Ty->getAs<AnyFunctionType>())
         return fnType->getResult();
     }
-
+    
     return param.Ty;
   };
-
+  
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
     // Bindings specify the arguments that source the parameter.  The only case
     // this returns a non-singular value is when there are varargs in play.
     auto &bindings = paramBindings[i];
-    auto paramType = getType(candArgs[i]);
+    auto paramType = getParamResultType(candArgs[i]);
     
     for (auto argNo : bindings) {
-      auto argType = getType(actualArgs[argNo]);
+      auto argType = getCallResultType(actualArgs[argNo]);
       auto rArgType = argType->getRValueType();
       
       // If the argument has an unresolved type, then we're not actually
@@ -1438,7 +1454,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
   Type firstArg = actualArgs[0].Ty;
-  if (candArgs[0].Ty->is<InOutType>() && !(firstArg->hasLValueType() || firstArg->is<InOutType>()))
+  if (candArgs[0].getType()->is<InOutType>() && !(firstArg->hasLValueType() || firstArg->is<InOutType>()))
     return { CC_NonLValueInOut, {}};
   
   // If we have exactly one argument mismatching, classify it specially, so that
@@ -4483,11 +4499,20 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   if (argType && argType->is<TupleType>()) {
     // Decompose the parameter type, including information about default
     // arguments.
-    SmallVector<CallArgParam, 4> params =
-        decomposeParamType(
-          argType,
-            candidates.empty() ? nullptr : candidates[0].getDecl(),
-            candidates.empty() ? 0 : candidates[0].level);
+    
+    // HACK: Ask FunctionType to handle the decomposition for us.
+    auto *decomposeFunctionTy = FunctionType::get(argType, argType);
+    auto params = decomposeFunctionTy->getParams();
+    
+    // If we have a candidate function around, compute the position of its
+    // default arguments.
+    SmallVector<bool, 4> defaultMap;
+    if (candidates.empty()) {
+      defaultMap.assign(params.size(), false);
+    } else {
+      computeDefaultMap(argType, candidates[0].getDecl(),
+                        candidates[0].level, defaultMap);
+    }
 
     // Form a set of call arguments, using a dummy type (Void), because the
     // argument/parameter matching code doesn't need it.
@@ -4508,7 +4533,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     } listener;
 
     SmallVector<ParamBinding, 4> paramBindings;
-    if (!matchCallArguments(args, params, callArgHasTrailingClosure(argExpr),
+    if (!matchCallArguments(args, params, defaultMap,
+                            callArgHasTrailingClosure(argExpr),
                             /*allowFixes=*/true,
                             listener, paramBindings)) {
       SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
@@ -4520,7 +4546,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
         const auto &param = params[paramIdx];
 
         // Determine the parameter type.
-        auto currentParamType = param.Ty;
+        auto currentParamType = param.getType();
         if (currentParamType->is<InOutType>())
           options |= TCC_AllowLValue;
 
@@ -4813,7 +4839,9 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         (decl->isInstanceMember() && candidate.level == 1))
       continue;
 
-    auto params = decomposeParamType(argTy, decl, candidate.level);
+    auto params = candidate.getUncurriedFunctionType()->getParams();
+    SmallVector<bool, 4> defaultMap;
+    computeDefaultMap(argTy, decl, candidate.level, defaultMap);
     // If one of the candidates is an instance method with a single parameter
     // at the level 0, this might be viable situation for calling instance
     // method as curried member of type problem.
@@ -4992,7 +5020,9 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   auto argTy = candidate.getArgumentType();
   if (!argTy) return false;
 
-  auto params = decomposeParamType(argTy, candidate.getDecl(), candidate.level);
+  auto params = candidate.getUncurriedFunctionType()->getParams();
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(argTy, candidate.getDecl(), candidate.level, defaultMap);
   auto args = decomposeArgType(CCI.CS->getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -5047,8 +5077,9 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     TypeChecker &TC;
     Expr *FnExpr;
     Expr *ArgExpr;
-    llvm::SmallVectorImpl<CallArgParam> &Parameters;
-    llvm::SmallVectorImpl<CallArgParam> &Arguments;
+    ArrayRef<AnyFunctionType::Param> &Parameters;
+    SmallVectorImpl<bool> &DefaultMap;
+    SmallVectorImpl<CallArgParam> &Arguments;
 
     CalleeCandidateInfo CandidateInfo;
 
@@ -5063,11 +5094,12 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   public:
     ArgumentDiagnostic(Expr *fnExpr,
                        Expr *argExpr,
-                       llvm::SmallVectorImpl<CallArgParam> &params,
-                       llvm::SmallVectorImpl<CallArgParam> &args,
+                       ArrayRef<AnyFunctionType::Param> &params,
+                       SmallVectorImpl<bool> &defaultMap,
+                       SmallVectorImpl<CallArgParam> &args,
                        CalleeCandidateInfo &CCI, bool isSubscript)
         : TC(CCI.CS->TC), FnExpr(fnExpr), ArgExpr(argExpr),
-          Parameters(params), Arguments(args),
+          Parameters(params), DefaultMap(defaultMap), Arguments(args),
           CandidateInfo(CCI), IsSubscript(isSubscript) {}
 
     void extraArgument(unsigned extraArgIdx) override {
@@ -5111,7 +5143,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
     void missingArgument(unsigned missingParamIdx) override {
       auto &param = Parameters[missingParamIdx];
-      Identifier name = param.Label;
+      Identifier name = param.getLabel();
 
       // Search insertion index.
       unsigned argIdx = 0;
@@ -5133,14 +5165,14 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
         insertText << ", ";
       if (!name.empty())
         insertText << name.str() << ": ";
-      Type Ty = param.Ty;
+      Type Ty = param.getType();
       // Explode inout type.
-      if (auto IOT = param.Ty->getAs<InOutType>()) {
+      if (auto IOT = param.getType()->getAs<InOutType>()) {
         insertText << "&";
         Ty = IOT->getObjectType();
       }
       // @autoclosure; the type should be the result type.
-      if (auto FT = param.Ty->getAs<AnyFunctionType>())
+      if (auto FT = param.getType()->getAs<AnyFunctionType>())
         if (FT->isAutoClosure())
           Ty = FT->getResult();
       insertText << "<#" << Ty << "#>";
@@ -5240,7 +5272,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       auto tuple = cast<TupleExpr>(ArgExpr);
       TC.diagnose(tuple->getElement(paramIdx)->getStartLoc(),
                   diag::missing_argument_labels, false,
-                  Parameters[paramIdx].Label.str(), IsSubscript);
+                  Parameters[paramIdx].getLabel().str(), IsSubscript);
 
       Diagnosed = true;
     }
@@ -5309,7 +5341,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       // Use matchCallArguments to determine how close the argument list is (in
       // shape) to the specified candidates parameters.  This ignores the
       // concrete types of the arguments, looking only at the argument labels.
-      matchCallArguments(Arguments, Parameters,
+      matchCallArguments(Arguments, Parameters, DefaultMap,
                          CandidateInfo.hasTrailingClosure,
                          /*allowFixes:*/ true, *this, Bindings);
 
@@ -5317,7 +5349,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
     }
   };
 
-  return ArgumentDiagnostic(fnExpr, argExpr, params, args, CCI,
+  return ArgumentDiagnostic(fnExpr, argExpr, params, defaultMap, args, CCI,
                             isa<SubscriptExpr>(fnExpr))
       .diagnose();
 }
@@ -5380,14 +5412,16 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
     if (!decl)
       continue;
 
-    auto parameters =
-        decomposeParamType(candidate.getArgumentType(), decl, candidate.level);
+    auto parameters = candidate.getUncurriedFunctionType()->getParams();
+    SmallVector<bool, 4> defaultMap;
+    computeDefaultMap(candidate.getArgumentType(), decl,
+                      candidate.level, defaultMap);
 
     if (parameters.size() != arguments.size())
       continue;
 
     for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
-      auto paramType = parameters[i].Ty;
+      auto paramType = parameters[i].getType();
       auto argType = arguments[i].Ty;
 
       for (auto kind : rawRepresentableProtocols) {
@@ -5850,13 +5884,17 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto const &candidate = candidates.candidates[0];
-  auto params = decomposeParamType(candidate.getArgumentType(),
-                                   candidate.getDecl(), candidate.level);
+  auto params = candidate.getUncurriedFunctionType()->getParams();
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(candidate.getArgumentType(), candidate.getDecl(),
+                    candidate.level, defaultMap);
+  
   auto args = decomposeArgType(CS->getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
   MatchCallArgumentListener listener;
-  if (matchCallArguments(args, params, candidates.hasTrailingClosure,
+  if (matchCallArguments(args, params, defaultMap,
+                         candidates.hasTrailingClosure,
                          /*allowFixes=*/false, listener, bindings))
     return false;
 
@@ -5866,7 +5904,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   // requirements e.g. <A, B where A.Element == B.Element>.
   for (unsigned i = 0, e = bindings.size(); i != e; ++i) {
     auto param = params[i];
-    auto archetype = param.Ty->getAs<ArchetypeType>();
+    auto archetype = param.getType()->getAs<ArchetypeType>();
     if (!archetype)
       continue;
 
