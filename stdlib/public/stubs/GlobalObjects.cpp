@@ -35,6 +35,10 @@ ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
 // _direct type metadata for Swift._RawNativeSetStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
+
+// _direct type metadata for Swift._EmptyBoxStorage
+SWIFT_RUNTIME_STDLIB_INTERFACE
+ClassMetadata CLASS_METADATA_SYM(s16_EmptyBoxStorage);
 } // namespace swift
 
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
@@ -134,6 +138,7 @@ swift::_SwiftEmptyBoxStorage swift::_EmptyBoxStorage = {
  // HeapObject header;
   {
     &_emptyBoxStorageMetadata,
+    //&swift::CLASS_METADATA_SYM(s16_EmptyBoxStorage), // isa pointer
   }
 };
 
