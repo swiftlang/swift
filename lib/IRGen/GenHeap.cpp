@@ -1430,7 +1430,7 @@ public:
   allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
-                        IGF.emitAllocEmptyBoxCall());
+                        IGF.IGM.RefCountedNull);
   }
 
   void
@@ -1584,11 +1584,7 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // For fixed-sized types, we can emit concrete box metadata.
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
-  // Because we assume in enum's that payloads with a Builtin.NativeObject which
-  // is also the type for indirect enum cases have extra inhabitants of pointers
-  // we can't have a nil pointer as a representation for an empty box type --
-  // nil conflicts with the extra inhabitants. We return a static singleton
-  // empty box object instead.
+  // For empty types, we don't really need to allocate anything.
   if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);

@@ -73,11 +73,6 @@ FUNCTION(ProjectBox, swift_projectBox, DefaultCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-FUNCTION(AllocEmptyBox, swift_allocEmptyBox, DefaultCC,
-         RETURNS(RefCountedPtrTy),
-         ARGS(),
-         ATTRS(NoUnwind))
-
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocObject, swift_allocObject,
          _swift_allocObject, _swift_allocObject_, RegisterPreservingCC,

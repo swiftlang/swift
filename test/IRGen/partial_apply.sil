@@ -365,8 +365,7 @@ sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { v
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @empty_box()
 sil @empty_box : $@convention(thin) () -> () {
 entry:
-  // CHECK: [[BOX:%.*]] = call {{.*}}swift_allocEmptyBox
-  // CHECK: store %swift.refcounted* [[BOX]]
+  // CHECK: store %swift.refcounted* null
   // CHECK: store %swift.opaque* undef
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
