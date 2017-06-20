@@ -1425,17 +1425,31 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   
   if (filenameLength > INT_MAX)
     filenameLength = INT_MAX;
-  
-  reporter(
-    flags,
-    "*** %*s:%zu:%zu: implicit Objective-C entrypoint %c[%s %s] "
-    "is deprecated and will be removed in Swift 4; "
-    "add explicit '@objc' to the declaration to emit the Objective-C "
-    "entrypoint in Swift 4 and suppress this message\n",
-    (int)filenameLength, filename, line, column,
-    isInstanceMethod ? '-' : '+',
-    class_getName([self class]),
-    sel_getName(selector));
+
+  char *message, *nullTerminatedFilename;
+  asprintf(&message,
+           "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
+           "be removed in Swift 4",
+           isInstanceMethod ? '-' : '+',
+           class_getName([self class]),
+           sel_getName(selector));
+  asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
+
+  RuntimeErrorDetails details = {
+    .version = 1,
+    .errorType = "implicit-objc-entrypoint",
+    .framesToSkip = 1
+  };
+  bool isFatal = reporter == swift::fatalError;
+  reportToDebugger(isFatal, message, &details);
+
+  reporter(flags,
+           "*** %s:%zu:%zu: %s; add explicit '@objc' to the declaration to "
+           "emit the Objective-C entrypoint in Swift 4 and suppress this "
+           "message\n",
+           nullTerminatedFilename, line, column, message);
+  free(message);
+  free(nullTerminatedFilename);
 }
 
 #endif
