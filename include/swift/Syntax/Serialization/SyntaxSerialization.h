@@ -132,18 +132,39 @@ struct TokenDescription {
 };
 
 /// Serialization traits for TokenDescription.
-/// TokenDescriptions are always serialized this way:
+/// TokenDescriptions always serialized with a token kind, which is
+/// the stringified version of their name in the tok:: enum.
 /// ```
 /// {
 ///   "kind": <token name, e.g. "kw_struct">,
-///   "text": <token text, e.g. "struct">
 /// }
 /// ```
+///
+/// For tokens that have some kind of text attached, like literals or
+/// identifiers, the serialized form will also have a "text" key containing
+/// that text as the value.
 template<>
 struct ObjectTraits<TokenDescription> {
   static void mapping(Output &out, TokenDescription &value) {
     out.mapRequired("kind", value.Kind);
-    out.mapRequired("text", value.Text);
+    switch (value.Kind) {
+      case tok::integer_literal:
+      case tok::floating_literal:
+      case tok::string_literal:
+      case tok::unknown:
+      case tok::code_complete:
+      case tok::identifier:
+      case tok::oper_binary_unspaced:
+      case tok::oper_binary_spaced:
+      case tok::oper_postfix:
+      case tok::oper_prefix:
+      case tok::dollarident:
+      case tok::comment:
+        out.mapRequired("text", value.Text);
+        break;
+      default:
+        break;
+    }
   }
 };
 

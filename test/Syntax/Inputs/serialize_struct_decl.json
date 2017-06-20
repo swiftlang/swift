@@ -4,8 +4,7 @@
     "layout": [
       {
         "tokenKind": {
-          "kind": "kw_struct",
-          "text": "struct"
+          "kind": "kw_struct"
         },
         "leadingTrivia": [
           {
@@ -51,8 +50,7 @@
       },
       {
         "tokenKind": {
-          "kind": "l_brace",
-          "text": "{"
+          "kind": "l_brace"
         },
         "leadingTrivia": [
 
@@ -64,8 +62,7 @@
       },
       {
         "tokenKind": {
-          "kind": "kw_let",
-          "text": "let"
+          "kind": "kw_let"
         },
         "leadingTrivia": [
           {
@@ -103,8 +100,7 @@
       },
       {
         "tokenKind": {
-          "kind": "colon",
-          "text": ":"
+          "kind": "colon"
         },
         "leadingTrivia": [
 
@@ -132,8 +128,7 @@
       },
       {
         "tokenKind": {
-          "kind": "kw_let",
-          "text": "let"
+          "kind": "kw_let"
         },
         "leadingTrivia": [
           {
@@ -171,8 +166,7 @@
       },
       {
         "tokenKind": {
-          "kind": "colon",
-          "text": ":"
+          "kind": "colon"
         },
         "leadingTrivia": [
 
@@ -248,8 +242,7 @@
       },
       {
         "tokenKind": {
-          "kind": "r_brace",
-          "text": "}"
+          "kind": "r_brace"
         },
         "leadingTrivia": [
           {
