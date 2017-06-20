@@ -760,9 +760,8 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   return result;
 }
 
-SmallVector<CallArgParam, 4>
-swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
-                          unsigned level) {
+void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
+                              unsigned level, SmallVectorImpl<bool> &outDefaultMap) {
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (paramOwner) {
@@ -774,50 +773,33 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
         paramList = subscript->getIndices();
     }
   }
-
-  SmallVector<CallArgParam, 4> result;
+  
   switch (type->getKind()) {
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
-
+    
     // FIXME: In the weird case where we have a tuple type that should
     // be wrapped in a ParenType but isn't, just... forget it happened.
     if (paramList && tupleTy->getNumElements() != paramList->size() &&
         paramList->size() == 1)
       paramList = nullptr;
-
+    
     for (auto i : range(0, tupleTy->getNumElements())) {
-      const auto &elt = tupleTy->getElement(i);
-
-      CallArgParam argParam;
-      argParam.Ty = elt.isVararg() ? elt.getVarargBaseTy() : elt.getType();
-      argParam.Label = elt.getName();
-      argParam.HasDefaultArgument =
-          paramList && paramList->get(i)->isDefaultArgument();
-      argParam.parameterFlags = elt.getParameterFlags();
-      result.push_back(argParam);
+      outDefaultMap.push_back(paramList && paramList->get(i)->isDefaultArgument());
     }
     break;
   }
-
+      
   case TypeKind::Paren: {
-    CallArgParam argParam;
-    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
-    argParam.HasDefaultArgument =
-        paramList && paramList->get(0)->isDefaultArgument();
-    result.push_back(argParam);
+    outDefaultMap.push_back(paramList && paramList->get(0)->isDefaultArgument());
     break;
   }
-
+      
   default: {
-    CallArgParam argParam;
-    argParam.Ty = type;
-    result.push_back(argParam);
+    outDefaultMap.push_back(false);
     break;
   }
   }
-
-  return result;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
