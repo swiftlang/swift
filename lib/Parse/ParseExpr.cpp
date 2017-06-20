@@ -2146,7 +2146,9 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
   
   OS << "(";
   unsigned elementIndex = 0;
-  interleave(tupleRepr->getElements(),
+  llvm::SmallVector<TypeRepr *, 10> elementTypes;
+  tupleRepr->getElementTypes(elementTypes);
+  interleave(elementTypes,
              [&](const TypeRepr *element) {
                if (isa<TupleTypeRepr>(element)) {
                  printTupleNames(element, OS);

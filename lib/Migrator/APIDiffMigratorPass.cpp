@@ -168,9 +168,11 @@ public:
     // as their own index level
     if (T->getNumElements() == 1) {
       ParentIsOptional = false;
-      return visit(T->getElement(0));
+      return visit(T->getType(0));
     }
-    return handleParent(T, T->getElements());
+    llvm::SmallVector<TypeRepr *, 8> Children;
+    T->getElementTypes(Children);
+    return handleParent(T, ArrayRef<TypeRepr *>(Children));
   }
 
   FoundResult visitFunctionTypeRepr(FunctionTypeRepr *T) {

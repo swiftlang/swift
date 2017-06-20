@@ -622,6 +622,12 @@ public:
     return { getTrailingObjects<TupleTypeReprElement>(), NumElements };
   }
 
+  void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
+    for (auto &Element : getElements()) {
+      Types.push_back(Element.Type);
+    }
+  }
+
   TypeRepr *getType(unsigned i) const {
     return getElement(i).Type;
   }

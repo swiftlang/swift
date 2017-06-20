@@ -2333,7 +2333,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     if (const auto Tuple = dyn_cast<TupleTypeRepr>(args)) {
       if (Tuple->getNumElements() == 1) {
         if (const auto Void =
-            dyn_cast<SimpleIdentTypeRepr>(Tuple->getElement(0))) {
+            dyn_cast<SimpleIdentTypeRepr>(Tuple->getType(0))) {
           if (Void->getIdentifier().str() == "Void") {
             TC.diagnose(args->getStartLoc(), diag::paren_void_probably_void)
               .fixItReplace(args->getSourceRange(), "()");
