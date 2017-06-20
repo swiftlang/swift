@@ -6,11 +6,9 @@
 // (Some static/dynamic enforcement selection is done in SILGen, and some is
 // deferred. That may change over time but we want the outcome to be the same).
 //
-// Each FIXME line is a case that the current implementation misses.
-// The model is currently being refined, so this isn't set in stone.
-//
-// TODO: Ensure that each dynamic case is covered by
-// Interpreter/enforce_exclusive_access.swift.
+// These tests attempt to fully cover the possibilities of reads and
+// modifications to captures along with `inout` arguments on both the caller and
+// callee side.
 
 // Helper
 func doOne(_ f: () -> ()) {
@@ -24,10 +22,8 @@ func doTwo(_: ()->(), _: ()->()) {}
 func doOneInout(_: ()->(), _: inout Int) {}
 
 // Error: Cannot capture nonescaping closure.
-// Verification disabled because it suppresses all the other errors.
-// disabled-note@+1{{parameter 'fn' is implicitly non-escaping}}
+// This triggers an early diagnostics, so it's handled in inout_capture_disgnostics.swift.
 // func reentrantCapturedNoescape(fn: (() -> ()) -> ()) {
-//   disabled-error@+1{{closure use of non-escaping parameter 'fn' may allow it to escape}}
 //   let c = { fn {} }
 //   fn(c)
 // }
@@ -308,8 +304,8 @@ func inoutReadWriteInout(x: inout Int) {
 // CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape19inoutReadWriteInoutySiz1x_tFyycfU_'
 
-// Trap on boxed read + write inout.
-// FIXME: Passing a captured var as inout needs dynamic enforcement.
+// Traps on boxed read + write inout.
+// Covered by Interpreter/enforce_exclusive_access.swift.
 func readBoxWriteInout() {
   var x = 3
   let c = { _ = x }
@@ -333,12 +329,11 @@ func readBoxWriteInout() {
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape17readBoxWriteInoutyyFyycfU_'
 
 // Error: inout cannot be captured.
-// Verification disabled because is suppresses other errors.
-//func inoutReadBoxWriteInout(x: inout Int) {
-//  disabled-error@+1{{escaping closures can only capture inout parameters explicitly by value}}
-//  let c = { _ = x }
-//  doOneInout(c, &x)
-//}
+// This triggers an early diagnostics, so it's handled in inout_capture_disgnostics.swift.
+// func inoutReadBoxWriteInout(x: inout Int) {
+//   let c = { _ = x }
+//   doOneInout(c, &x)
+// }
 
 // Allow aliased noescape write + write.
 func writeWrite() {
@@ -395,9 +390,8 @@ func inoutWriteWrite(x: inout Int) {
 // CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape010inoutWriteE0ySiz1x_tFyycfU0_'
 
-// FIXME: Trap on aliased boxed write + noescape write.
-//
-// See the note above.
+// Traps on aliased boxed write + noescape write.
+// Covered by Interpreter/enforce_exclusive_access.swift.
 func writeWriteBox() {
   var x = 3
   let c = { x = 87 }
@@ -479,8 +473,8 @@ func inoutWriteWriteInout(x: inout Int) {
 // CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape010inoutWriteE5InoutySiz1x_tFyycfU_'
 
-// Trap on boxed write + write inout.
-// FIXME: Passing a captured var as inout needs dynamic enforcement.
+// Traps on boxed write + write inout.
+// Covered by Interpreter/enforce_exclusive_access.swift.
 func writeBoxWriteInout() {
   var x = 3
   let c = { x = 42 }
@@ -504,9 +498,8 @@ func writeBoxWriteInout() {
 // CHECK-LABEL: } // end sil function '_T027access_enforcement_noescape18writeBoxWriteInoutyyFyycfU_'
 
 // Error: Cannot capture inout
-// Verification disabled because it suppresses other errors.
+// This triggers an early diagnostics, so it's handled in inout_capture_disgnostics.swift.
 // func inoutWriteBoxWriteInout(x: inout Int) {
-//   disabled-error@+1{{escaping closures can only capture inout parameters explicitly by value}}
 //   let c = { x = 42 }
 //   doOneInout(c, &x)
 // }
