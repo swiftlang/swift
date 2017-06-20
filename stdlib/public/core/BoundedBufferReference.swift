@@ -61,6 +61,10 @@ extension _BoundedBufferReference {
   public init() {
     self.init(Self._emptyInstance())
   }
+  
+  public static func _emptyInstance() -> Self {
+    return make(_uninitializedCount: 0, minCapacity: 0)
+  }
 
   public static var extraCapacity: Int { return 0 }
   

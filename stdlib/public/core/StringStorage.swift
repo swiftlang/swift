@@ -9,15 +9,22 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-import SwiftShims
-extension _SwiftUTF16StringHeader : _BoundedBufferHeader {
+struct _SwiftUTF16StringHeader : _BoundedBufferHeader {
+  var count: UInt32
+  var capacity: UInt32
+  var flags: UInt16
+  
   public init(count: Int, capacity: Int) {
     self.count = numericCast(count)
     self.capacity = numericCast(capacity)
     self.flags = 0
   }
 }
-extension _SwiftLatin1StringHeader : _BoundedBufferHeader {
+struct _SwiftLatin1StringHeader : _BoundedBufferHeader {
+  var count: UInt32
+  var capacity: UInt32
+  var flags: UInt8
+  
   public init(count: Int, capacity: Int) {
     self.count = numericCast(count)
     self.capacity = numericCast(capacity)
@@ -124,14 +131,6 @@ extension String {
 
 
 extension String._UTF16Storage : _BoundedBufferReference {
-  /// Returns empty singleton that is used for every single empty String.
-  /// The contents of the storage should never be mutated.
-  @nonobjc
-  public static func _emptyInstance() -> String._UTF16Storage {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptyStringStorage))
-  }
-  
   @nonobjc
   public static var extraCapacity: Int { return 1 }
 }
@@ -284,11 +283,6 @@ extension String {
 extension String._Latin1Storage : _BoundedBufferReference {
   @nonobjc
   public static var extraCapacity: Int { return 1 }
-  
-  @nonobjc
-  public static func _emptyInstance() -> String._Latin1Storage {
-    return String._Latin1Storage.make(uninitializedWithMinimumCapacity: 0)
-  }
   
   @inline(__always)
   public static func make(
