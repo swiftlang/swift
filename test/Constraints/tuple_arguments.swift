@@ -1338,17 +1338,17 @@ do {
   s.takesClosureTuple({ _ = $0 })
   s.takesClosureTuple({ x in })
   s.takesClosureTuple({ (x: (Double, Double)) in })
-  s.takesClosureTuple({ _ = $0; _ = $1 }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring with implicit parameters}}
-  s.takesClosureTuple({ (x, y) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{25-31=(arg)}} {{34-34=let (x, y) = arg; }}
-  s.takesClosureTuple({ (x: Double, y:Double) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{25-46=(arg: (Double, Double))}} {{49-49=let (x, y) = arg; }}
+  s.takesClosureTuple({ _ = $0; _ = $1 })
+  s.takesClosureTuple({ (x, y) in })
+  s.takesClosureTuple({ (x: Double, y:Double) in })
 
   let sTwo = GenericConforms<(Double, Double)>()
   sTwo.takesClosure({ _ = $0 })
   sTwo.takesClosure({ x in })
   sTwo.takesClosure({ (x: (Double, Double)) in })
-  sTwo.takesClosure({ _ = $0; _ = $1 }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring with implicit parameters}}
-  sTwo.takesClosure({ (x, y) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{23-29=(arg)}} {{32-32=let (x, y) = arg; }}
-  sTwo.takesClosure({ (x: Double, y: Double) in }) // expected-error {{closure tuple parameter '(Double, Double)' does not support destructuring}} {{23-45=(arg: (Double, Double))}} {{48-48=let (x, y) = arg; }}
+  sTwo.takesClosure({ _ = $0; _ = $1 })
+  sTwo.takesClosure({ (x, y) in })
+  sTwo.takesClosure({ (x: Double, y: Double) in })
 }
 
 do {
@@ -1461,7 +1461,6 @@ let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = Muta
 // SR-4745
 let sr4745 = [1, 2]
 let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
-// expected-error@-1 {{closure tuple parameter '(offset: Int, element: Int)' does not support destructuring}} {{35-51=(arg) -> <#Result#>}} {{55-55=let (count, element) = arg; return }}
 
 // SR-4738
 
@@ -1472,7 +1471,6 @@ let sr4738 = (1, (2, 3))
 // rdar://problem/31892961
 let r31892961_1 = [1: 1, 2: 2]
 r31892961_1.forEach { (k, v) in print(k + v) }
-// expected-error@-1 {{closure tuple parameter '(key: Int, value: Int)' does not support destructuring}} {{23-29=(arg)}} {{33-33=let (k, v) = arg; }}
 
 let r31892961_2 = [1, 2, 3]
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
@@ -1482,15 +1480,12 @@ let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
 }
 
 let r31892961_3 = (x: 1, y: 42)
-[r31892961_3].map { (x: Int, y: Int) in x + y }
-// expected-error@-1 {{closure tuple parameter '(x: Int, y: Int)' does not support destructuring}} {{21-37=(arg: (x: Int, y: Int)) -> <#Result#>}} {{41-41=let (x, y) = arg; return }}
+_ = [r31892961_3].map { (x: Int, y: Int) in x + y }
 
-[r31892961_3].map { (x, y: Int) in x + y }
-// expected-error@-1 {{closure tuple parameter '(x: Int, y: Int)' does not support destructuring}} {{21-32=(arg: (x: Int, y: Int)) -> <#Result#>}} {{36-36=let (x, y) = arg; return }}
+_ = [r31892961_3].map { (x, y: Int) in x + y }
 
 let r31892961_4 = (1, 2)
-[r31892961_4].map { x, y in x + y }
-// expected-error@-1 {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{21-25=(arg) -> <#Result#>}} {{29-29=let (x, y) = arg; return }}
+_ = [r31892961_4].map { x, y in x + y }
 
 let r31892961_5 = (x: 1, (y: 2, (w: 3, z: 4)))
 [r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y }
@@ -1526,3 +1521,24 @@ rdar32301091_2 { _ in }
 // expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,_ }}
 rdar32301091_2 { x in }
 // expected-error@-1 {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}} {{19-19=,<#arg#> }}
+
+func rdar32875953() {
+  let myDictionary = ["hi":1]
+
+  myDictionary.forEach {
+    print("\($0) -> \($1)")
+  }
+
+  myDictionary.forEach { key, value in
+    print("\(key) -> \(value)")
+  }
+
+  myDictionary.forEach { (key, value) in
+    print("\(key) -> \(value)")
+  }
+
+  let array1 = [1]
+  let array2 = [2]
+
+  _ = zip(array1, array2).map(+)
+}

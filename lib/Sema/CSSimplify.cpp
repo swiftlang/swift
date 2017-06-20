@@ -1054,11 +1054,28 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   increaseScore(ScoreKind::SK_FunctionConversion);
 
+  // Add a very narrow exception to SE-0110 by allowing functions that
+  // take multiple arguments to be passed as an argument in places
+  // that expect a function that takes a single tuple (of the same
+  // arity).
+  auto func1Input = func1->getInput();
+  auto func2Input = func2->getInput();
+  if (!getASTContext().isSwiftVersion3()) {
+    if (auto elt = locator.last()) {
+      if (elt->getKind() == ConstraintLocator::ApplyArgToParam) {
+        if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
+          func2Input = paren2->getUnderlyingType();
+          if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer()))
+            func1Input = paren1->getUnderlyingType();
+        }
+      }
+    }
+  }
+
   // Input types can be contravariant (or equal).
-  SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
-                                   subKind, subflags,
-                                   locator.withPathElement(
-                                     ConstraintLocator::FunctionArgument));
+  SolutionKind result =
+      matchTypes(func2Input, func1Input, subKind, subflags,
+                 locator.withPathElement(ConstraintLocator::FunctionArgument));
   if (result == SolutionKind::Error)
     return SolutionKind::Error;
 
