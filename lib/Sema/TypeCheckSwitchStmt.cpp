@@ -76,11 +76,10 @@ namespace {
     private:
       SpaceKind Kind;
       llvm::PointerIntPair<Type, 1, bool> TypeAndVal;
-      Identifier Head;
 
-      // This is for type space only to help us print meaningful name, e.g.,
+      // In type space, we reuse HEAD to help us print meaningful name, e.g.,
       // tuple element name in fixits.
-      Identifier NameForPrinting;
+      Identifier Head;
       std::forward_list<Space> Spaces;
 
       // NB: This constant is arbitrary.  Anecdotally, the Space Engine is
@@ -139,8 +138,8 @@ namespace {
       
     public:
       explicit Space(Type T, Identifier NameForPrinting)
-        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(Identifier()),
-          NameForPrinting(NameForPrinting), Spaces({}){}
+        : Kind(SpaceKind::Type), TypeAndVal(T, false), Head(NameForPrinting),
+          Spaces({}){}
       explicit Space(Type T, Identifier H, bool downgrade,
                      SmallVectorImpl<Space> &SP)
         : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
@@ -190,6 +189,12 @@ namespace {
       Identifier getHead() const {
         assert(getKind() == SpaceKind::Constructor
                && "Wrong kind of space tried to access head");
+        return Head;
+      }
+
+      Identifier getPrintingName() const {
+        assert(getKind() == SpaceKind::Type
+               && "Wrong kind of space tried to access printing name");
         return Head;
       }
 
@@ -754,10 +759,11 @@ namespace {
           if (!forDisplay) {
             getType()->print(buffer);
           }
-          if (NameForPrinting.empty())
+          Identifier Name = getPrintingName();
+          if (Name.empty())
             buffer << "_";
           else
-            buffer << tok::kw_let << " " << NameForPrinting.str();
+            buffer << tok::kw_let << " " << Name.str();
           break;
         }
       }
