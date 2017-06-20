@@ -74,7 +74,7 @@ extension String {
 
 extension String._StorageBase {
   @inline(__always)
-  public static func make(uninitializedWithMinimumCapacity n: Int) -> Self {
+  public static func make(uninitializedWithMinCapacity n: Int) -> Self {
     return Builtin.allocWithTailElems_1(
         self, n._builtinWordValue, Element.self)
   }
@@ -221,9 +221,9 @@ extension String._UTF16Storage /*: UnicodeStorage*/ {
   @inline(__always)
   public static func make(
     count: Int,
-    minimumCapacity: Int = 0
+    minCapacity: Int = 0
   ) -> String._UTF16Storage {
-    return make(minimumCapacity: Swift.max(count, minimumCapacity)) {
+    return make(minCapacity: Swift.max(count, minCapacity)) {
       _SwiftUTF16StringHeader(
         count: UInt32(count), capacity: UInt32($0), flags: 0)
     }
@@ -287,9 +287,9 @@ extension String._Latin1Storage : _BoundedBufferReference {
   @inline(__always)
   public static func make(
     count: Int,
-    minimumCapacity: Int = 0
+    minCapacity: Int = 0
   ) -> String._Latin1Storage {
-    return make(minimumCapacity: Swift.max(count, minimumCapacity)) {
+    return make(minCapacity: Swift.max(count, minCapacity)) {
       _SwiftLatin1StringHeader(
         count: UInt32(count), capacity: UInt32($0), flags: 0)
     }
