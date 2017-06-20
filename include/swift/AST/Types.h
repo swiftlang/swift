@@ -1385,12 +1385,13 @@ public:
 /// escaping.
 class ParameterTypeFlags {
   enum ParameterFlags : uint8_t {
-    None = 0,
-    Variadic = 1 << 0,
+    None        = 0,
+    Variadic    = 1 << 0,
     AutoClosure = 1 << 1,
-    Escaping = 1 << 2,
-
-    NumBits = 3
+    Escaping    = 1 << 2,
+    InOut       = 1 << 3,
+    
+    NumBits = 4
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1400,10 +1401,11 @@ class ParameterTypeFlags {
 public:
   ParameterTypeFlags() = default;
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping)
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut)
       : value((variadic ? Variadic : 0) |
               (autoclosure ? AutoClosure : 0) |
-              (escaping ? Escaping : 0)) {}
+              (escaping ? Escaping : 0) |
+              (inOut ? InOut : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags fromParameterType(Type paramTy,
@@ -1413,7 +1415,8 @@ public:
   bool isVariadic() const { return value.contains(Variadic); }
   bool isAutoClosure() const { return value.contains(AutoClosure); }
   bool isEscaping() const { return value.contains(Escaping); }
-
+  bool isInOut() const { return value.contains(InOut); }
+  
   ParameterTypeFlags withEscaping(bool escaping) const {
     return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
                                        : value - ParameterTypeFlags::Escaping);
@@ -1467,24 +1470,16 @@ class TupleTypeElt {
   ParameterTypeFlags Flags;
 
   friend class TupleType;
-
+  
 public:
   TupleTypeElt() = default;
-  inline /*implicit*/ TupleTypeElt(Type ty, Identifier name,
-                                   bool isVariadic, bool isAutoClosure,
-                                   bool isEscaping);
-
   TupleTypeElt(Type ty, Identifier name = Identifier(),
-               ParameterTypeFlags PTFlags = {})
-      : Name(name), ElementType(ty), Flags(PTFlags) {}
-
-  /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : Name(Identifier()), ElementType(Ty), Flags() { }
-
+               ParameterTypeFlags fl = {});
+  
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
 
-  Type getType() const { return ElementType.getPointer(); }
+  Type getType() const { return ElementType; }
 
   ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -1496,16 +1491,14 @@ public:
 
   /// Determine whether this field is an escaping parameter closure.
   bool isEscaping() const { return Flags.isEscaping(); }
-
-  static inline Type getVarargBaseTy(Type VarArgT);
-
+  
+  /// Determine whether this field is marked 'inout'.
+  bool isInOut() const { return Flags.isInOut(); }
+  
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.
-  Type getVarargBaseTy() const {
-    assert(isVararg());
-    return getVarargBaseTy(getType());
-  }
-
+  Type getVarargBaseTy() const;
+  
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
     return TupleTypeElt(T, getName(), getParameterFlags());
@@ -2597,10 +2590,7 @@ struct CallArgParam {
 
   // The label associated with the argument or parameter, if any.
   Identifier Label;
-
-  /// Whether the parameter has a default argument.  Not valid for arguments.
-  bool HasDefaultArgument = false;
-
+  
   /// Parameter specific flags, not valid for arguments
   ParameterTypeFlags parameterFlags = {};
 
@@ -4661,24 +4651,9 @@ inline CanType CanType::getNominalParent() const {
     return cast<BoundGenericType>(*this).getParent();
   }
 }
-
-inline TupleTypeElt::TupleTypeElt(Type ty, Identifier name, bool isVariadic,
-                                  bool isAutoClosure, bool isEscaping)
-    : Name(name), ElementType(ty),
-      Flags(isVariadic, isAutoClosure, isEscaping) {
-  assert(!isVariadic ||
-         ty->hasError() ||
-         isa<ArraySliceType>(ty.getPointer()) ||
-         (isa<BoundGenericType>(ty.getPointer()) &&
-          ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
-  assert(!isAutoClosure || (ty->is<AnyFunctionType>() &&
-                            ty->castTo<AnyFunctionType>()->isAutoClosure()));
-  assert(!isEscaping || (ty->is<AnyFunctionType>() &&
-                         !ty->castTo<AnyFunctionType>()->isNoEscape()));
-}
-
-inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
-  TypeBase *T = VarArgT.getPointer();
+  
+inline Type TupleTypeElt::getVarargBaseTy() const {
+  TypeBase *T = getType().getPointer();
   if (auto *AT = dyn_cast<ArraySliceType>(T))
     return AT->getBaseType();
   if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
@@ -4696,7 +4671,8 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
-  return {isVariadic, autoclosure, escaping};
+  bool inOut = paramTy->is<InOutType>();
+  return {isVariadic, autoclosure, escaping, inOut};
 }
 
 #define TYPE(id, parent)

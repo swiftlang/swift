@@ -3248,7 +3248,7 @@ void Serializer::writeType(Type ty) {
     ParenTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
         paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping());
+        paramFlags.isEscaping(), paramFlags.isInOut());
     break;
   }
 
@@ -3264,7 +3264,8 @@ void Serializer::writeType(Type ty) {
       TupleTypeEltLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
           addTypeRef(elt.getType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping());
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(),
+          paramFlags.isInOut());
     }
 
     break;
