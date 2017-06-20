@@ -91,3 +91,10 @@ public func someProtocolFactory() -> SomeProtocol { return MyStruct() }
 // which are using it.
 public func blackHole<T>(_ x: T) {
 }
+
+// Return the passed argument without letting the optimizer know that.
+// It's important that this function is in another module than the tests
+// which are using it.
+@inline(never)
+public func getInt(_ x: Int) -> Int { return x }
+
