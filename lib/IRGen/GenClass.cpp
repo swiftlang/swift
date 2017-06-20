@@ -506,6 +506,13 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
   }
 }
 
+unsigned
+irgen::getClassFieldIndex(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
+  return classLayout.getFieldIndex(field);
+}
+
 FieldAccess
 irgen::getClassFieldAccess(IRGenModule &IGM, SILType baseType, VarDecl *field) {
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();

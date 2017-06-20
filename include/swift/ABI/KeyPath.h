@@ -173,14 +173,13 @@ public:
   
   enum ComputedPropertyIDKind {
     Pointer,
-    StoredPropertyOffset,
+    StoredPropertyIndex,
     VTableOffset,
   };
   
   constexpr static uint32_t
   getResolutionStrategy(ComputedPropertyIDKind idKind) {
     return idKind == Pointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
-         : idKind == StoredPropertyOffset ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFieldOffset
          : (assert("no resolution strategy implemented" && false), 0);
   }
   
@@ -196,7 +195,7 @@ public:
            ? _SwiftKeyPathComponentHeader_ComputedSettableFlag : 0)
       | (kind == SettableMutating
            ? _SwiftKeyPathComponentHeader_ComputedMutatingFlag : 0)
-      | (idKind == StoredPropertyOffset
+      | (idKind == StoredPropertyIndex
            ? _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag : 0)
       | (idKind == VTableOffset
            ? _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag : 0)
